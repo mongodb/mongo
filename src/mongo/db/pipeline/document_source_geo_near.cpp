@@ -138,8 +138,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceGeoNear::optimize() {
     return this;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceGeoNear::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceGeoNear::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
 
     // Currently this is the only rewrite.
     itr = splitForTimeseries(itr, container);
@@ -147,8 +147,8 @@ Pipeline::SourceContainer::iterator DocumentSourceGeoNear::doOptimizeAt(
     return itr;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     tassert(9911904, "", *itr == this);
 
     // Only do this rewrite if we are immediately following an $_internalUnpackBucket stage.
@@ -217,7 +217,7 @@ Pipeline::SourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
             "Unexpected GeoNearExpression field name after asNearQuery(): "_sd + nearExpr.field,
             nearExpr.field == ""_sd);
 
-    Pipeline::SourceContainer replacement;
+    DocumentSourceContainer replacement;
     // 1. $geoWithin maxDistance
     //    We always include a $geoWithin predicate, even if maxDistance covers the entire space,
     //    because it takes care of excluding documents that don't have the geo field we're querying.

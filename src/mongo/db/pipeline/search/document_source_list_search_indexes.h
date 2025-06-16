@@ -119,7 +119,7 @@ public:
         return boost::none;
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final;
+    StageConstraints constraints(PipelineSplitState pipeState) const final;
 
 private:
     GetNextResult doGetNext() final;

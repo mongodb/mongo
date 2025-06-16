@@ -128,8 +128,8 @@ void ReplaceRootTransformation::reportRenames(const MatchExpression* expr,
     }
 }
 
-bool ReplaceRootTransformation::pushDotRenamedMatchBefore(Pipeline::SourceContainer::iterator itr,
-                                                          Pipeline::SourceContainer* container) {
+bool ReplaceRootTransformation::pushDotRenamedMatchBefore(DocumentSourceContainer::iterator itr,
+                                                          DocumentSourceContainer* container) {
     // Attempt to push match stage before replaceRoot/replaceWith stage.
     const auto prospectiveMatch = dynamic_cast<DocumentSourceMatch*>(std::next(itr)->get());
     const auto unnestedPath = unnestsPath();
@@ -196,8 +196,8 @@ bool ReplaceRootTransformation::pushDotRenamedMatchBefore(Pipeline::SourceContai
     return false;
 }
 
-Pipeline::SourceContainer::iterator ReplaceRootTransformation::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator ReplaceRootTransformation::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     // Attempt to push match stage before replaceRoot/replaceWith stage.
     if (pushDotRenamedMatchBefore(itr, container)) {
         // Optimize the previous stage. If this is the first stage, optimize the current stage

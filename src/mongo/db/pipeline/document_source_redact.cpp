@@ -90,8 +90,8 @@ DocumentSource::GetNextResult DocumentSourceRedact::doGetNext() {
     return nextInput;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceRedact::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceRedact::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 
     if (std::next(itr) == container->end()) {
@@ -107,7 +107,7 @@ Pipeline::SourceContainer::iterator DocumentSourceRedact::doOptimizeAt(
             // Because R-M turns into M-R-M without modifying the original $match, we cannot step
             // backwards and optimize from before the $redact, otherwise this will just loop and
             // create an infinite number of $matches.
-            Pipeline::SourceContainer::iterator returnItr = std::next(itr);
+            DocumentSourceContainer::iterator returnItr = std::next(itr);
 
             container->insert(itr, DocumentSourceMatch::create(redactSafePortion, pExpCtx));
 

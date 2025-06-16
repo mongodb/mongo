@@ -98,7 +98,7 @@ public:
             expCtx, _taskExecutor, _originalSpec.copy(), _view);
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kFirst,
                                      HostTypeRequirement::kAnyShard,
@@ -117,8 +117,8 @@ public:
 protected:
     Value serialize(const SerializationOptions& opts) const override;
 
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) override;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) override;
 
 private:
     // Get the next record from mongot. This will establish the mongot cursor on the first call.
@@ -145,8 +145,8 @@ private:
      * optimization was successful. If optimization was successful, the container will be modified
      * appropriately.
      */
-    std::pair<Pipeline::SourceContainer::iterator, bool> _attemptSortAfterVectorSearchOptimization(
-        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
+    std::pair<DocumentSourceContainer::iterator, bool> _attemptSortAfterVectorSearchOptimization(
+        DocumentSourceContainer::iterator itr, DocumentSourceContainer* container);
 
     std::unique_ptr<MatchExpression> _filterExpr;
 

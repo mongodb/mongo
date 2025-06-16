@@ -487,8 +487,8 @@ boost::optional<StringMap<std::string>> renamedPaths(
 }
 
 boost::optional<StringMap<std::string>> renamedPaths(
-    const Pipeline::SourceContainer::const_iterator start,
-    const Pipeline::SourceContainer::const_iterator end,
+    const DocumentSourceContainer::const_iterator start,
+    const DocumentSourceContainer::const_iterator end,
     const OrderedPathSet& pathsOfInterest,
     boost::optional<std::function<bool(DocumentSource*)>> additionalStageValidatorCallback) {
     return renamedPathsFullPipeline(
@@ -496,15 +496,15 @@ boost::optional<StringMap<std::string>> renamedPaths(
 }
 
 boost::optional<StringMap<std::string>> renamedPaths(
-    const Pipeline::SourceContainer::const_reverse_iterator start,
-    const Pipeline::SourceContainer::const_reverse_iterator end,
+    const DocumentSourceContainer::const_reverse_iterator start,
+    const DocumentSourceContainer::const_reverse_iterator end,
     const OrderedPathSet& pathsOfInterest,
     boost::optional<std::function<bool(DocumentSource*)>> additionalStageValidatorCallback) {
     return renamedPathsFullPipeline(
         start, end, pathsOfInterest, Direction::kBackward, additionalStageValidatorCallback);
 }
 
-OrderedPathSet traceOriginatingPaths(const Pipeline::SourceContainer& pipeline,
+OrderedPathSet traceOriginatingPaths(const DocumentSourceContainer& pipeline,
                                      const OrderedPathSet& pathsOfInterest) {
     const auto optMap = renamedPathsFullPipeline(std::rbegin(pipeline),
                                                  std::rend(pipeline),
@@ -529,10 +529,10 @@ OrderedPathSet traceOriginatingPaths(const Pipeline::SourceContainer& pipeline,
     return res;
 }
 
-std::pair<Pipeline::SourceContainer::const_iterator, StringMap<std::string>>
+std::pair<DocumentSourceContainer::const_iterator, StringMap<std::string>>
 findLongestViablePrefixPreservingPaths(
-    const Pipeline::SourceContainer::const_iterator start,
-    const Pipeline::SourceContainer::const_iterator end,
+    const DocumentSourceContainer::const_iterator start,
+    const DocumentSourceContainer::const_iterator end,
     const OrderedPathSet& pathsOfInterest,
     boost::optional<std::function<bool(DocumentSource*)>> additionalStageValidatorCallback) {
     return multiStageRenamedPaths(

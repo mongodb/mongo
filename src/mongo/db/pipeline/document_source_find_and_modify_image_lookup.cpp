@@ -204,7 +204,7 @@ DocumentSourceFindAndModifyImageLookup::DocumentSourceFindAndModifyImageLookup(
       _includeCommitTransactionTimestamp(includeCommitTimestamp) {}
 
 StageConstraints DocumentSourceFindAndModifyImageLookup::constraints(
-    Pipeline::SplitState pipeState) const {
+    PipelineSplitState pipeState) const {
     return StageConstraints(StreamType::kStreaming,
                             PositionRequirement::kNone,
                             HostTypeRequirement::kAnyShard,

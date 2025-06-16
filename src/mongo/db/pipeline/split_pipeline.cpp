@@ -135,8 +135,8 @@ public:
         _limitFieldsSentFromShardsToMerger();
 
         _abandonCacheIfSentToShards();
-        _splitPipeline.shardsPipeline->setSplitState(Pipeline::SplitState::kSplitForShards);
-        _splitPipeline.mergePipeline->setSplitState(Pipeline::SplitState::kSplitForMerge);
+        _splitPipeline.shardsPipeline->setSplitState(PipelineSplitState::kSplitForShards);
+        _splitPipeline.mergePipeline->setSplitState(PipelineSplitState::kSplitForMerge);
 
         return *this;
     };

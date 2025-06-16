@@ -381,8 +381,8 @@ MONGO_COMPILER_NOINLINE void DocumentSourceUnionWith::logShardedViewFound(
                 "new_pipe"_attr = _pipeline->serializeToBson());
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceUnionWith::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceUnionWith::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     auto duplicateAcrossUnion = [&](auto&& nextStage) {
         _pipeline->addFinalSource(nextStage->clone(_pipeline->getContext()));
         // Apply the same rewrite to the cached pipeline if available.

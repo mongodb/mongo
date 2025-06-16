@@ -159,7 +159,7 @@ DocumentSourceChangeStreamHandleTopologyChange::DocumentSourceChangeStreamHandle
     : DocumentSourceInternalChangeStreamStage(kStageName, expCtx) {}
 
 StageConstraints DocumentSourceChangeStreamHandleTopologyChange::constraints(
-    Pipeline::SplitState) const {
+    PipelineSplitState) const {
     StageConstraints constraints{StreamType::kStreaming,
                                  PositionRequirement::kNone,
                                  HostTypeRequirement::kRouter,

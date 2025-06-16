@@ -406,7 +406,7 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,
@@ -451,8 +451,8 @@ public:
     GetNextResult doGetNext() final;
 
 protected:
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) final;
 
 private:
     enum class ValComparedToRange {
@@ -590,8 +590,8 @@ private:
     }
 
 
-    Pipeline::SourceContainer::iterator combineSorts(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container);
+    DocumentSourceContainer::iterator combineSorts(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container);
 
     boost::optional<DocGenerator> _docGenerator = boost::none;
 

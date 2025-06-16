@@ -70,7 +70,7 @@ public:
         return DocumentSourceChangeStreamCheckInvalidate::kStageName.data();
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,

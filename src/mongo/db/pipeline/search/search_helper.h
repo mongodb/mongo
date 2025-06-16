@@ -119,15 +119,15 @@ bool isMongotStage(DocumentSource* stage);
  * Asserts that $$SEARCH_META is accessed correctly; that is, it is set by a prior stage, and is
  * not accessed in a subpipline.
  */
-void assertSearchMetaAccessValid(const Pipeline::SourceContainer& pipeline,
+void assertSearchMetaAccessValid(const DocumentSourceContainer& pipeline,
                                  ExpressionContext* expCtx);
 
 /**
  * Overload used to check that $$SEARCH_META is being referenced correctly in a pipeline split
  * for execution on a sharded cluster.
  */
-void assertSearchMetaAccessValid(const Pipeline::SourceContainer& shardsPipeline,
-                                 const Pipeline::SourceContainer& mergePipeline,
+void assertSearchMetaAccessValid(const DocumentSourceContainer& shardsPipeline,
+                                 const DocumentSourceContainer& mergePipeline,
                                  ExpressionContext* expCtx);
 
 /**

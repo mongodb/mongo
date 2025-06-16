@@ -242,7 +242,7 @@ public:
     DocumentSourcePassthrough(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourceMock({}, expCtx) {}
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const override {
+    StageConstraints constraints(PipelineSplitState pipeState) const override {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,
@@ -272,9 +272,9 @@ TEST_F(DocumentSourceFacetTest, PassthroughFacetDoesntRequireDiskAndIsOKInaTxn) 
     facets.emplace_back("passthrough", std::move(passthroughPipe));
 
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).diskRequirement ==
            DocumentSource::DiskUseRequirement::kNoDiskUse);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).transactionRequirement ==
            DocumentSource::TransactionRequirement::kAllowed);
 }
 
@@ -285,7 +285,7 @@ class DocumentSourceWritesPersistentData final : public DocumentSourcePassthroug
 public:
     DocumentSourceWritesPersistentData(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourcePassthrough(expCtx) {}
-    StageConstraints constraints(Pipeline::SplitState) const final {
+    StageConstraints constraints(PipelineSplitState) const final {
         return {
             StreamType::kStreaming,
             PositionRequirement::kNone,
@@ -313,9 +313,9 @@ TEST_F(DocumentSourceFacetTest, FacetWithChildThatWritesDataAlsoReportsWritingDa
     facets.emplace_back("writes", std::move(pipeline));
 
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).diskRequirement ==
            DocumentSource::DiskUseRequirement::kWritesPersistentData);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).transactionRequirement ==
            DocumentSource::TransactionRequirement::kNotAllowed);
 }
 
@@ -793,7 +793,7 @@ public:
     static const ShardId kMergeShard;
     DocumentSourceNeedsSpecificShardMerger(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourcePassthrough(expCtx) {}
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kNone,
                                      HostTypeRequirement::kNone,
@@ -827,13 +827,13 @@ TEST_F(DocumentSourceFacetTest, ShouldRequirePrimaryShardIfAnyStageRequiresSpeci
     facets.emplace_back("needsSpecificShardMerger", std::move(secondPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).hostRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).hostRequirement ==
            StageConstraints::HostTypeRequirement::kNone);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).diskRequirement ==
            StageConstraints::DiskUseRequirement::kNoDiskUse);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).transactionRequirement ==
            StageConstraints::TransactionRequirement::kAllowed);
-    auto msi = facetStage->constraints(Pipeline::SplitState::kUnsplit).mergeShardId;
+    auto msi = facetStage->constraints(PipelineSplitState::kUnsplit).mergeShardId;
     ASSERT(msi.has_value());
     ASSERT(*msi == DocumentSourceNeedsSpecificShardMerger::kMergeShard);
 }
@@ -853,13 +853,13 @@ TEST_F(DocumentSourceFacetTest,
     facets.emplace_back("second", std::move(secondPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).hostRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).hostRequirement ==
            StageConstraints::HostTypeRequirement::kNone);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).diskRequirement ==
            StageConstraints::DiskUseRequirement::kNoDiskUse);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).transactionRequirement ==
            StageConstraints::TransactionRequirement::kAllowed);
-    ASSERT_FALSE(facetStage->constraints(Pipeline::SplitState::kUnsplit).mergeShardId.has_value());
+    ASSERT_FALSE(facetStage->constraints(PipelineSplitState::kUnsplit).mergeShardId.has_value());
 }
 
 /**
@@ -873,7 +873,7 @@ public:
     DocumentSourceNeedsSpecificShardMergerTmpDataNoTxn(
         const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourcePassthrough(expCtx) {}
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kNone,
                                      HostTypeRequirement::kNone,
@@ -902,7 +902,7 @@ class DocumentSourceBannedInLookup final : public DocumentSourcePassthrough {
 public:
     DocumentSourceBannedInLookup(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourcePassthrough(expCtx) {}
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
                 HostTypeRequirement::kAnyShard,
@@ -937,15 +937,14 @@ TEST_F(DocumentSourceFacetTest, ShouldSurfaceStrictestRequirementsOfEachConstrai
     facets.emplace_back("third", std::move(thirdPipeline));
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).hostRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).hostRequirement ==
            StageConstraints::HostTypeRequirement::kAnyShard);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).diskRequirement ==
            StageConstraints::DiskUseRequirement::kWritesTmpData);
-    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
+    ASSERT(facetStage->constraints(PipelineSplitState::kUnsplit).transactionRequirement ==
            StageConstraints::TransactionRequirement::kNotAllowed);
-    ASSERT_FALSE(
-        facetStage->constraints(Pipeline::SplitState::kUnsplit).isAllowedInLookupPipeline());
-    auto msi = facetStage->constraints(Pipeline::SplitState::kUnsplit).mergeShardId;
+    ASSERT_FALSE(facetStage->constraints(PipelineSplitState::kUnsplit).isAllowedInLookupPipeline());
+    auto msi = facetStage->constraints(PipelineSplitState::kUnsplit).mergeShardId;
     ASSERT(msi.has_value());
     ASSERT(*msi == DocumentSourceNeedsSpecificShardMergerTmpDataNoTxn::kMergeShard);
 }

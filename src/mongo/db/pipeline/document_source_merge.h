@@ -168,7 +168,7 @@ public:
         return _mergeProcessor.get_ptr();
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final;
+    StageConstraints constraints(PipelineSplitState pipeState) const final;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
 

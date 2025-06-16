@@ -294,8 +294,8 @@ boost::intrusive_ptr<DocumentSourceGroup> createBucketGroupForReorder(
 }
 
 // Optimize the section of the pipeline before the $_internalUnpackBucket stage.
-void optimizePrefix(Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
-    auto prefix = Pipeline::SourceContainer(container->begin(), itr);
+void optimizePrefix(DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
+    auto prefix = DocumentSourceContainer(container->begin(), itr);
     Pipeline::optimizeContainer(&prefix);
     Pipeline::optimizeEachStage(&prefix);
     container->erase(container->begin(), itr);
@@ -1076,9 +1076,9 @@ DocumentSource::GetNextResult DocumentSourceInternalUnpackBucket::doGetNext() {
     return nextResult;
 }
 
-boost::optional<Pipeline::SourceContainer::iterator>
+boost::optional<DocumentSourceContainer::iterator>
 DocumentSourceInternalUnpackBucket::pushDownComputedMetaProjection(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     if (_eventFilter || std::next(itr) == container->end()) {
         return boost::none;
     }
@@ -1190,7 +1190,7 @@ void DocumentSourceInternalUnpackBucket::internalizeProject(const BSONObj& proje
 }
 
 std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProjectToInternalize(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) const {
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) const {
     if (std::next(itr) == container->end() || _bucketUnpacker.hasIncludeExcludeFields()) {
         // There is no project to internalize or there are already fields being included/excluded,
         // which means we've already internalized a project.
@@ -1263,9 +1263,9 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractProjectForPu
     return {BSONObj{}, false};
 }
 
-std::pair<bool, Pipeline::SourceContainer::iterator>
-DocumentSourceInternalUnpackBucket::rewriteGroupStage(Pipeline::SourceContainer::iterator itr,
-                                                      Pipeline::SourceContainer* container) {
+std::pair<bool, DocumentSourceContainer::iterator>
+DocumentSourceInternalUnpackBucket::rewriteGroupStage(DocumentSourceContainer::iterator itr,
+                                                      DocumentSourceContainer* container) {
     // Rewriting a group might make it incompatible with SBE (e.g. if the rewrite is using
     // accumulator exprs that are not supported in SBE yet). Rather than tracking the specific
     // exprs, we temporarily reset the context to be fully SBE compatible and check later if any of
@@ -1362,7 +1362,7 @@ bool DocumentSourceInternalUnpackBucket::haveComputedMetaField() const {
 }
 
 bool DocumentSourceInternalUnpackBucket::enableStreamingGroupIfPossible(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     // skip unpack stage
     itr = std::next(itr);
 
@@ -1499,8 +1499,8 @@ bool extractFromAccIfTopBottomN(const AccumulatorN* multiAcc,
 // these stages to run at the bucket-level later.
 std::pair<boost::intrusive_ptr<DocumentSourceSort>, boost::intrusive_ptr<DocumentSourceGroup>>
 tryCreateBucketLevelSortGroup(boost::intrusive_ptr<ExpressionContext> expCtx,
-                              Pipeline::SourceContainer::iterator itr,
-                              Pipeline::SourceContainer* container,
+                              DocumentSourceContainer::iterator itr,
+                              DocumentSourceContainer* container,
                               DocumentSourceGroup* groupStage) {
     const auto accumulators = groupStage->getAccumulationStatements();
     if (accumulators.size() != 1) {
@@ -1541,8 +1541,8 @@ tryCreateBucketLevelSortGroup(boost::intrusive_ptr<ExpressionContext> expCtx,
 }
 }  // namespace
 
-bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceContainer::iterator itr,
-                                                           Pipeline::SourceContainer* container) {
+bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(DocumentSourceContainer::iterator itr,
+                                                           DocumentSourceContainer* container) {
     // A lastpoint-type aggregation must contain both a $sort and a $group stage, in that order, or
     // only a $group stage with a $top, $topN, $bottom, or $bottomN accumulator. This means we need
     // at least one stage after $_internalUnpackBucket.
@@ -1692,22 +1692,22 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
 }
 
 
-bool findSequentialDocumentCache(Pipeline::SourceContainer::iterator start,
-                                 Pipeline::SourceContainer::iterator end) {
+bool findSequentialDocumentCache(DocumentSourceContainer::iterator start,
+                                 DocumentSourceContainer::iterator end) {
     while (start != end && !dynamic_cast<DocumentSourceSequentialDocumentCache*>(start->get())) {
         start = std::next(start);
     }
     return start != end;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::optimizeAtRestOfPipeline(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::optimizeAtRestOfPipeline(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     if (itr == container->end()) {
         return itr;
     }
 
     invariant(*itr == this);
-    Pipeline::SourceContainer::iterator unpackBucket = itr;
+    DocumentSourceContainer::iterator unpackBucket = itr;
 
     itr = std::next(itr);
 
@@ -1729,12 +1729,12 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::optimize
 }
 
 DepsTracker DocumentSourceInternalUnpackBucket::getRestPipelineDependencies(
-    Pipeline::SourceContainer::iterator itr,
-    Pipeline::SourceContainer* container,
+    DocumentSourceContainer::iterator itr,
+    DocumentSourceContainer* container,
     bool includeEventFilter) const {
     auto deps = Pipeline::getDependenciesForContainer(
         pExpCtx,
-        Pipeline::SourceContainer{std::next(itr), container->end()},
+        DocumentSourceContainer{std::next(itr), container->end()},
         DepsTracker::NoMetadataValidation());
     if (_eventFilter && includeEventFilter) {
         match_expression::addDependencies(_eventFilter.get(), &deps);
@@ -1754,7 +1754,7 @@ void DocumentSourceInternalUnpackBucket::addVariableRefs(std::set<Variables::Id>
 namespace {
 // For now, we only support adjacent $sort + $group for the top-k sort optimization.
 std::pair<DocumentSourceSort*, DocumentSourceGroup*> getSortAndGroup(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     if (std::next(itr) == container->end() || std::next(std::next(itr)) == container->end()) {
         return {nullptr, nullptr};
     }
@@ -1776,7 +1776,7 @@ std::pair<DocumentSourceSort*, DocumentSourceGroup*> getSortAndGroup(
 }  // namespace
 
 bool DocumentSourceInternalUnpackBucket::tryToAbsorbTopKSortIntoGroup(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     auto [prospectiveSort, prospectiveGroup] = getSortAndGroup(itr, container);
     if (!prospectiveSort || !prospectiveGroup) {
         return false;
@@ -1786,8 +1786,8 @@ bool DocumentSourceInternalUnpackBucket::tryToAbsorbTopKSortIntoGroup(
         prospectiveSort, /*prospectiveSortItr=*/std::next(itr), container);
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
 
     invariant(*itr == this);
 

@@ -33,6 +33,7 @@
 #include "mongo/db/exec/exec_shard_filter_policy.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
 
 namespace mongo {
 
@@ -67,7 +68,7 @@ public:
         return id;
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const override {
+    StageConstraints constraints(PipelineSplitState pipeState) const override {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kNone,
                                      HostTypeRequirement::kAnyShard,
@@ -183,8 +184,8 @@ public:
     }
 
 protected:
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) override;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) override;
 
 private:
     DocumentSource::GetNextResult doGetNext() final;

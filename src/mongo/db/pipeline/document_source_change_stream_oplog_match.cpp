@@ -155,7 +155,7 @@ const char* DocumentSourceChangeStreamOplogMatch::getSourceName() const {
 }
 
 StageConstraints DocumentSourceChangeStreamOplogMatch::constraints(
-    Pipeline::SplitState pipeState) const {
+    PipelineSplitState pipeState) const {
     StageConstraints constraints(StreamType::kStreaming,
                                  PositionRequirement::kFirst,
                                  HostTypeRequirement::kAnyShard,
@@ -170,8 +170,8 @@ StageConstraints DocumentSourceChangeStreamOplogMatch::constraints(
     return constraints;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceChangeStreamOplogMatch::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceChangeStreamOplogMatch::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     tassert(5687203, "Iterator mismatch during optimization", *itr == this);
 
     auto nextChangeStreamStageItr = std::next(itr);

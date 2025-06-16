@@ -195,8 +195,8 @@ bool isChangeStreamRouterPipelineStage(StringData stageName) {
 }
 }  // namespace
 
-bool DocumentSource::pushMatchBefore(Pipeline::SourceContainer::iterator itr,
-                                     Pipeline::SourceContainer* container) {
+bool DocumentSource::pushMatchBefore(DocumentSourceContainer::iterator itr,
+                                     DocumentSourceContainer* container) {
     if (!constraints().canSwapWithMatch) {
         return false;
     }
@@ -259,8 +259,8 @@ bool DocumentSource::pushMatchBefore(Pipeline::SourceContainer::iterator itr,
     return true;
 }
 
-bool DocumentSource::pushSampleBefore(Pipeline::SourceContainer::iterator itr,
-                                      Pipeline::SourceContainer* container) {
+bool DocumentSource::pushSampleBefore(DocumentSourceContainer::iterator itr,
+                                      DocumentSourceContainer* container) {
     auto nextSample = dynamic_cast<DocumentSourceSample*>((*std::next(itr)).get());
     if (constraints().canSwapWithSkippingOrLimitingStage && nextSample) {
 
@@ -291,7 +291,7 @@ BSONObj DocumentSource::serializeToBSONForDebug() const {
 }
 
 bool DocumentSource::pushSingleDocumentTransformOrRedactBefore(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     if (constraints().canSwapWithSingleDocTransformOrRedact) {
         auto nextItr = std::next(itr);
         if (dynamic_cast<DocumentSourceSingleDocumentTransformation*>(nextItr->get()) ||
@@ -312,8 +312,8 @@ bool DocumentSource::pushSingleDocumentTransformOrRedactBefore(
     return false;
 }
 
-Pipeline::SourceContainer::iterator DocumentSource::optimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSource::optimizeAt(DocumentSourceContainer::iterator itr,
+                                                             DocumentSourceContainer* container) {
     invariant(*itr == this);
 
     // Attempt to swap 'itr' with a subsequent stage, if applicable.

@@ -484,7 +484,7 @@ TEST_F(DocumentSourceMatchTest, MultipleMatchStagesShouldCombineIntoOne) {
     auto match2 = DocumentSourceMatch::create(BSON("b" << 1), getExpCtx());
     auto match3 = DocumentSourceMatch::create(BSON("c" << 1), getExpCtx());
 
-    Pipeline::SourceContainer container;
+    DocumentSourceContainer container;
 
     // Check initial state
     ASSERT_BSONOBJ_EQ(match1->getQuery(), BSON("a" << 1));
@@ -505,7 +505,7 @@ TEST_F(DocumentSourceMatchTest, MultipleMatchStagesShouldCombineIntoOne) {
 }
 
 TEST_F(DocumentSourceMatchTest, DoesNotPushProjectBeforeSelf) {
-    Pipeline::SourceContainer container;
+    DocumentSourceContainer container;
     auto match = DocumentSourceMatch::create(BSON("_id" << 1), getExpCtx());
     auto project =
         DocumentSourceProject::create(BSON("fullDocument" << true), getExpCtx(), "$project"_sd);
@@ -573,7 +573,7 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyJoinWithSubsequentMatch) {
 
 TEST_F(DocumentSourceMatchTest, RepeatedJoinWithShouldNotNestAnds) {
     auto match1 = DocumentSourceMatch::create(fromjson("{}"), getExpCtx());
-    Pipeline::SourceContainer container{
+    DocumentSourceContainer container{
         match1,
         DocumentSourceMatch::create(fromjson("{}"), getExpCtx()),
         DocumentSourceMatch::create(fromjson("{a: 1}"), getExpCtx()),

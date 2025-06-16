@@ -186,7 +186,7 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
     using Doc = Document;
     using Arr = std::vector<Value>;
 
-    Pipeline::SourceContainer stages;
+    DocumentSourceContainer stages;
 
     // 1. Match config.collections entries with {_id: nss}. This stage will produce, at most, one
     // config.collections document.
@@ -364,7 +364,7 @@ AggregateCommandRequest makeUnsplittableCollectionsDataShardAggregation(
     using Doc = Document;
     using Arr = std::vector<Value>;
 
-    Pipeline::SourceContainer stages;
+    DocumentSourceContainer stages;
 
     // 1. Match config.collections entries with database name = dbName
     // {
@@ -1089,7 +1089,7 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getAllNssThatHaveZonesFo
         Document{{"$group", std::move(groupStageBson)}}.toBson().firstElement(), expCtx);
 
     // Create pipeline
-    Pipeline::SourceContainer stages;
+    DocumentSourceContainer stages;
     stages.emplace_back(std::move(matchStage));
     stages.emplace_back(std::move(groupStage));
 
@@ -1692,7 +1692,7 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
     auto projectStageFlatten = DocumentSourceProject::createFromBson(
         Document{{"$project", std::move(projectStageBson)}}.toBson().firstElement(), expCtx);
 
-    Pipeline::SourceContainer stages;
+    DocumentSourceContainer stages;
     stages.emplace_back(std::move(matchStage));
     stages.emplace_back(std::move(sortStage));
     stages.emplace_back(std::move(groupStage));
@@ -1706,7 +1706,7 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
         BSON("timestamp" << BSON("$lte" << atClusterTime) << "nss" << kMarkerNss), expCtx);
     auto sortFcvMarkerStage = DocumentSourceSort::create(expCtx, BSON("timestamp" << -1));
     auto limitFcvMarkerStage = DocumentSourceLimit::create(expCtx, 1);
-    Pipeline::SourceContainer stages2;
+    DocumentSourceContainer stages2;
     stages2.emplace_back(std::move(matchFcvMarkerStage));
     stages2.emplace_back(std::move(sortFcvMarkerStage));
     stages2.emplace_back(std::move(limitFcvMarkerStage));

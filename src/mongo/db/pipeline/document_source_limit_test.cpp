@@ -89,7 +89,7 @@ TEST_F(DocumentSourceLimitTest, ShouldRejectUserLimitOfZero) {
 }
 
 TEST_F(DocumentSourceLimitTest, TwoLimitStagesShouldCombineIntoOne) {
-    Pipeline::SourceContainer container;
+    DocumentSourceContainer container;
     auto firstLimit = DocumentSourceLimit::create(getExpCtx(), 10);
     auto secondLimit = DocumentSourceLimit::create(getExpCtx(), 5);
 
@@ -102,7 +102,7 @@ TEST_F(DocumentSourceLimitTest, TwoLimitStagesShouldCombineIntoOne) {
 }
 
 TEST_F(DocumentSourceLimitTest, DoesNotPushProjectBeforeSelf) {
-    Pipeline::SourceContainer container;
+    DocumentSourceContainer container;
     auto limit = DocumentSourceLimit::create(getExpCtx(), 10);
     auto project =
         DocumentSourceProject::create(BSON("fullDocument" << true), getExpCtx(), "$project"_sd);

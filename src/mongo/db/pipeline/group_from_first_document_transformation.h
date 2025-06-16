@@ -95,8 +95,8 @@ public:
 
     void optimize() final;
 
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) final;
 
     Document serializeTransformation(const SerializationOptions& options = {}) const final;
 

@@ -110,8 +110,7 @@ public:
 
     ~DocumentSourcePlanCacheStats() override = default;
 
-    StageConstraints constraints(
-        Pipeline::SplitState = Pipeline::SplitState::kUnsplit) const override {
+    StageConstraints constraints(PipelineSplitState = PipelineSplitState::kUnsplit) const override {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kFirst,
                                      _allHosts ? HostTypeRequirement::kAllShardHosts
@@ -144,8 +143,8 @@ public:
      * Absorbs a subsequent $match, in order to avoid copying the entire contents of the plan cache
      * prior to filtering.
      */
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) override;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) override;
 
     void serializeToArray(std::vector<Value>& array,
                           const SerializationOptions& opts = SerializationOptions{}) const final;

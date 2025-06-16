@@ -258,7 +258,7 @@ inline std::pair<boost::optional<Stage<T>>, std::function<T(const T&)>> makeTree
 
 template <typename T>
 inline void walk(Stage<T>* stage,
-                 Pipeline::SourceContainer::iterator* sourceIter,
+                 DocumentSourceContainer::iterator* sourceIter,
                  const std::function<void(Stage<T>*, DocumentSource*)>& zipper) {
     if (stage->principalChild)
         walk(stage->principalChild.get(), sourceIter, zipper);

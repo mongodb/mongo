@@ -200,12 +200,12 @@ public:
     // End of functions that are used for making parts of the sources for making a pipeline.
 
     std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
-        const Pipeline::SourceContainer& sources) {
+        const DocumentSourceContainer& sources) {
         return Pipeline::create(sources, _expCtx);
     }
 
     sharded_agg_helpers::SplitPipeline makeAndSplitPipeline(
-        const Pipeline::SourceContainer& sources) {
+        const DocumentSourceContainer& sources) {
         auto pipeline = makePipeline(sources);
         return sharded_agg_helpers::SplitPipeline::split(std::move(pipeline));
     }

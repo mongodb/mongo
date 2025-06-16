@@ -42,8 +42,10 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline_split_state.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/pipeline/variables.h"
@@ -58,7 +60,6 @@
 #include "mongo/util/fail_point.h"
 
 #include <functional>
-#include <list>
 #include <memory>
 #include <set>
 #include <vector>
@@ -71,8 +72,6 @@
 
 namespace mongo {
 class BSONObj;
-class DocumentSource;
-class ExpressionContext;
 class OperationContext;
 class Pipeline;
 class PipelineDeleter;
@@ -109,14 +108,6 @@ struct MakePipelineOptions {
  */
 class Pipeline {
 public:
-    using SourceContainer = std::list<boost::intrusive_ptr<DocumentSource>>;
-
-    /**
-     * A SplitState specifies whether the pipeline is currently unsplit, split for the shards, or
-     * split for merging.
-     */
-    enum class SplitState { kUnsplit, kSplitForShards, kSplitForMerge };
-
     /**
      * The list of default supported match expression features.
      */
@@ -171,13 +162,13 @@ public:
         PipelineValidatorCallback validator = nullptr);
 
     /**
-     * Creates a Pipeline from an existing SourceContainer.
+     * Creates a Pipeline from an existing DocumentSourceContainer.
      *
      * Returns a non-OK status if any stage is in an invalid position. For example, if an $out stage
      * is present but is not the last stage.
      */
     static std::unique_ptr<Pipeline, PipelineDeleter> create(
-        SourceContainer sources, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        DocumentSourceContainer sources, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Returns true if the provided aggregation command has an $out or $merge stage.
@@ -217,8 +208,8 @@ public:
      * Returns a valid iterator that points to the new "end of the pipeline": i.e., the stage that
      * comes after 'itr' in the newly optimized pipeline.
      */
-    static Pipeline::SourceContainer::iterator optimizeEndOfPipeline(
-        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
+    static DocumentSourceContainer::iterator optimizeEndOfPipeline(
+        DocumentSourceContainer::iterator itr, DocumentSourceContainer* container);
 
     static std::unique_ptr<Pipeline, PipelineDeleter> viewPipelineHelperForSearch(
         const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
@@ -274,7 +265,7 @@ public:
      * Communicates to the pipeline which part of a split pipeline it is when the pipeline has been
      * split in two.
      */
-    void setSplitState(SplitState state) {
+    void setSplitState(PipelineSplitState state) {
         _splitState = state;
     }
 
@@ -349,13 +340,13 @@ public:
     /**
      * Modifies the container, optimizes each stage individually.
      */
-    static void optimizeEachStage(SourceContainer* container);
+    static void optimizeEachStage(DocumentSourceContainer* container);
 
     /**
      * Modifies the container, optimizing it by combining, swapping, dropping and/or inserting
      * stages.
      */
-    static void optimizeContainer(SourceContainer* container);
+    static void optimizeContainer(DocumentSourceContainer* container);
 
     /**
      * Returns any other collections involved in the pipeline in addition to the collection the
@@ -373,13 +364,13 @@ public:
     std::vector<BSONObj> serializeToBson(
         boost::optional<const SerializationOptions&> opts = boost::none) const;
     static std::vector<Value> serializeContainer(
-        const SourceContainer& container,
+        const DocumentSourceContainer& container,
         boost::optional<const SerializationOptions&> opts = boost::none);
 
     std::vector<BSONObj> serializeForLogging(
         boost::optional<const SerializationOptions&> opts = boost::none) const;
     static std::vector<BSONObj> serializeContainerForLogging(
-        const SourceContainer& container,
+        const DocumentSourceContainer& container,
         boost::optional<const SerializationOptions&> opts = boost::none);
     static std::vector<BSONObj> serializePipelineForLogging(const std::vector<BSONObj>& pipeline);
 
@@ -410,14 +401,14 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const;
 
     /**
-     * Returns the dependencies needed by the SourceContainer. 'availableMetadata' should reflect
-     * what metadata is present on documents that are input to the front of the pipeline. If
+     * Returns the dependencies needed by the DocumentSourceContainer. 'availableMetadata' should
+     * reflect what metadata is present on documents that are input to the front of the pipeline. If
      * 'availableMetadata' is specified, this method will throw if any of the dependencies
      * reference unavailable metadata.
      */
     static DepsTracker getDependenciesForContainer(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const SourceContainer& container,
+        const DocumentSourceContainer& container,
         DepsTracker::MetadataDependencyValidation availableMetadata);
 
     /**
@@ -447,15 +438,15 @@ public:
      */
     bool generatesMetadataType(DocumentMetadataFields::MetaType type) const;
 
-    const SourceContainer& getSources() const {
+    const DocumentSourceContainer& getSources() const {
         return _sources;
     }
 
-    SourceContainer& getSources() {
+    DocumentSourceContainer& getSources() {
         return _sources;
     }
 
-    MONGO_COMPILER_ALWAYS_INLINE SourceContainer::size_type size() const {
+    MONGO_COMPILER_ALWAYS_INLINE DocumentSourceContainer::size_type size() const {
         return _sources.size();
     }
 
@@ -468,7 +459,7 @@ public:
      * This function must be called any time the order of stages within the container changes, e.g.
      * in optimizeContainer().
      */
-    static void stitch(SourceContainer* container);
+    static void stitch(DocumentSourceContainer* container);
 
     /**
      * Removes and returns the first stage of the pipeline. Returns nullptr if the pipeline is
@@ -548,7 +539,7 @@ private:
     friend class PipelineDeleter;
 
     Pipeline(const boost::intrusive_ptr<ExpressionContext>& pCtx);
-    Pipeline(SourceContainer stages, const boost::intrusive_ptr<ExpressionContext>& pCtx);
+    Pipeline(DocumentSourceContainer stages, const boost::intrusive_ptr<ExpressionContext>& pCtx);
 
     ~Pipeline();
 
@@ -570,10 +561,10 @@ private:
      */
     void stitch();
 
-    SourceContainer _sources;
+    DocumentSourceContainer _sources;
     std::unique_ptr<exec::agg::Pipeline> _execPipeline;
 
-    SplitState _splitState = SplitState::kUnsplit;
+    PipelineSplitState _splitState = PipelineSplitState::kUnsplit;
     boost::intrusive_ptr<ExpressionContext> pCtx;
     bool _disposed = false;
     bool _isParameterized = false;

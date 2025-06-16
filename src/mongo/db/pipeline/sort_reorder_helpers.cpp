@@ -74,8 +74,8 @@ bool checkModifiedPathsSortReorder(const SortPattern& sortPattern,
     return true;
 }
 
-Pipeline::SourceContainer::iterator tryReorderingWithSort(Pipeline::SourceContainer::iterator itr,
-                                                          Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator tryReorderingWithSort(DocumentSourceContainer::iterator itr,
+                                                        DocumentSourceContainer* container) {
     auto docSource = itr->get();
     invariant(dynamic_cast<DocumentSourceLookUp*>(docSource) ||
               dynamic_cast<DocumentSourceGraphLookUp*>(docSource));

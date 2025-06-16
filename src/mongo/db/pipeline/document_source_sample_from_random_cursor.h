@@ -66,7 +66,7 @@ public:
         return id;
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kFirst,
                 HostTypeRequirement::kAnyShard,

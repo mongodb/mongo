@@ -230,7 +230,7 @@ public:
                            size_t consumerId,
                            std::unique_ptr<ResourceYielder> yielder);
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,

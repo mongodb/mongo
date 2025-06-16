@@ -114,7 +114,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingTxnCloner::makePipeline(
                       .resolvedNamespace(std::move(resolvedNamespaces))
                       .build();
 
-    Pipeline::SourceContainer stages;
+    DocumentSourceContainer stages;
 
     if (startAfter) {
         stages.emplace_back(DocumentSourceMatch::create(

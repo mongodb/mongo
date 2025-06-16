@@ -442,8 +442,8 @@ void DocumentSourceInternalSetWindowFields::initialize() {
     _init = true;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceInternalSetWindowFields::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceInternalSetWindowFields::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 
     if (itr == container->begin()) {

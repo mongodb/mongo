@@ -99,7 +99,7 @@ DocumentSourceReshardingAddResumeId::DocumentSourceReshardingAddResumeId(
     : DocumentSource(kStageName, expCtx), exec::agg::Stage(kStageName, expCtx) {}
 
 StageConstraints DocumentSourceReshardingAddResumeId::constraints(
-    Pipeline::SplitState pipeState) const {
+    PipelineSplitState pipeState) const {
     return StageConstraints(StreamType::kStreaming,
                             PositionRequirement::kNone,
                             HostTypeRequirement::kAnyShard,

@@ -167,7 +167,7 @@ public:
      * Reports the StageConstraints of this $lookup instance. A $lookup constructed with pipeline
      * syntax will inherit certain constraints from the stages in its pipeline.
      */
-    StageConstraints constraints(Pipeline::SplitState) const final;
+    StageConstraints constraints(PipelineSplitState) const final;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
@@ -273,7 +273,7 @@ public:
         return _variablesParseState;
     }
 
-    const Pipeline::SourceContainer* getSubPipeline() const final {
+    const DocumentSourceContainer* getSubPipeline() const final {
         tassert(6080015,
                 "$lookup expected to have a resolved pipeline, but didn't",
                 _resolvedIntrospectionPipeline);
@@ -346,8 +346,8 @@ protected:
      * it may also absorb one or more $match stages that immediately followed the $unwind, setting
      * the resulting combined $match in the '_matchSrc' member.
      */
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) final;
 
 private:
     /**

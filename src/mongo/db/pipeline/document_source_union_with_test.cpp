@@ -483,7 +483,7 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithoutPipelineAreCorrect) {
                                         StageConstraints::LookupRequirement::kAllowed,
                                         StageConstraints::UnionRequirement::kAllowed);
     defaultConstraints.noFieldModifications = true;
-    ASSERT_TRUE(emptyUnion->constraints(Pipeline::SplitState::kUnsplit) == defaultConstraints);
+    ASSERT_TRUE(emptyUnion->constraints(PipelineSplitState::kUnsplit) == defaultConstraints);
 }
 
 TEST_F(DocumentSourceUnionWithTest, ConstraintsWithMixedSubPipelineAreCorrect) {
@@ -501,7 +501,7 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithMixedSubPipelineAreCorrect) {
     auto unionWithOne = DocumentSourceUnionWith(
         getExpCtx(),
         Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{mock}, getExpCtx()));
-    ASSERT_TRUE(unionWithOne.constraints(Pipeline::SplitState::kUnsplit) == stricterConstraint);
+    ASSERT_TRUE(unionWithOne.constraints(PipelineSplitState::kUnsplit) == stricterConstraint);
 }
 
 TEST_F(DocumentSourceUnionWithTest, ConstraintsWithStrictSubPipelineAreCorrect) {
@@ -553,7 +553,7 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithStrictSubPipelineAreCorrect) 
                             StageConstraints::TransactionRequirement::kNotAllowed,
                             StageConstraints::LookupRequirement::kNotAllowed,
                             StageConstraints::UnionRequirement::kAllowed);
-    ASSERT_TRUE(unionStage.constraints(Pipeline::SplitState::kUnsplit) == strict);
+    ASSERT_TRUE(unionStage.constraints(PipelineSplitState::kUnsplit) == strict);
 }
 
 TEST_F(DocumentSourceUnionWithTest, StricterConstraintsFromSubSubPipelineAreInherited) {
@@ -582,7 +582,7 @@ TEST_F(DocumentSourceUnionWithTest, StricterConstraintsFromSubSubPipelineAreInhe
                                          StageConstraints::TransactionRequirement::kNotAllowed,
                                          StageConstraints::LookupRequirement::kNotAllowed,
                                          StageConstraints::UnionRequirement::kAllowed);
-    ASSERT_TRUE(unionStage.constraints(Pipeline::SplitState::kUnsplit) == expectedConstraints);
+    ASSERT_TRUE(unionStage.constraints(PipelineSplitState::kUnsplit) == expectedConstraints);
 }
 
 TEST_F(DocumentSourceUnionWithTest, IncrementNestedAggregateOpCounterOnCreateButNotOnCopy) {

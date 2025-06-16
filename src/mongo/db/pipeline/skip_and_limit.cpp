@@ -82,8 +82,8 @@ SkipThenLimit LimitThenSkip::flip() const {
 
 namespace {
 
-Pipeline::SourceContainer::iterator eraseAndStich(Pipeline::SourceContainer::iterator itr,
-                                                  Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator eraseAndStich(DocumentSourceContainer::iterator itr,
+                                                DocumentSourceContainer* container) {
     itr = container->erase(itr);
     // If the removed stage wasn't the last in the pipeline, make sure that the stage followed the
     // erased stage has a valid pointer to the previous document source.
@@ -110,8 +110,8 @@ Pipeline::SourceContainer::iterator eraseAndStich(Pipeline::SourceContainer::ite
  * If shouldModifyPipeline is false, this method does not swap any stages but rather just returns
  * the single limit value described above.
  */
-boost::optional<long long> extractLimitForPushdownHelper(Pipeline::SourceContainer::iterator itr,
-                                                         Pipeline::SourceContainer* container,
+boost::optional<long long> extractLimitForPushdownHelper(DocumentSourceContainer::iterator itr,
+                                                         DocumentSourceContainer* container,
                                                          bool shouldModifyPipeline) {
     int64_t skipSum = 0;
     boost::optional<long long> minLimit;
@@ -148,18 +148,18 @@ boost::optional<long long> extractLimitForPushdownHelper(Pipeline::SourceContain
     return minLimit;
 }
 
-boost::optional<long long> extractLimitForPushdown(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container) {
+boost::optional<long long> extractLimitForPushdown(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) {
     return extractLimitForPushdownHelper(itr, container, true /* shouldModifyPipeline */);
 }
 
-boost::optional<long long> getUserLimit(Pipeline::SourceContainer::iterator itr,
-                                        Pipeline::SourceContainer* container) {
+boost::optional<long long> getUserLimit(DocumentSourceContainer::iterator itr,
+                                        DocumentSourceContainer* container) {
     return extractLimitForPushdownHelper(itr, container, false /* shouldModifyPipeline */);
 }
 
-boost::optional<long long> extractSkipForPushdown(Pipeline::SourceContainer::iterator itr,
-                                                  Pipeline::SourceContainer* container) {
+boost::optional<long long> extractSkipForPushdown(DocumentSourceContainer::iterator itr,
+                                                  DocumentSourceContainer* container) {
     boost::optional<long long> skipSum;
     while (itr != container->end()) {
         auto nextStage = itr->get();

@@ -60,7 +60,7 @@ protected:
         ShardingState::create(getServiceContext());
     }
 
-    DocsNeededBounds buildPipelineAndExtractBounds(Pipeline::SourceContainer sources) {
+    DocsNeededBounds buildPipelineAndExtractBounds(DocumentSourceContainer sources) {
         auto pipeline = Pipeline::create(sources, getExpCtx());
         return extractDocsNeededBounds(*pipeline);
     }
@@ -131,7 +131,7 @@ protected:
         return DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx);
     }
 
-    auto facet(std::vector<Pipeline::SourceContainer> subpipelines) {
+    auto facet(std::vector<DocumentSourceContainer> subpipelines) {
         auto expCtx = getExpCtx();
         ASSERT(!subpipelines.empty());
         std::vector<DocumentSourceFacet::FacetPipeline> facets;
@@ -528,32 +528,32 @@ TEST_F(DocsNeededBoundsTest, ProjectMatchSort) {
 }
 
 TEST_F(DocsNeededBoundsTest, FacetsWithLimits) {
-    Pipeline::SourceContainer pipeline1 = {limit(150), match(), limit(50)};
-    Pipeline::SourceContainer pipeline2 = {limit(100), project()};
+    DocumentSourceContainer pipeline1 = {limit(150), match(), limit(50)};
+    DocumentSourceContainer pipeline2 = {limit(100), project()};
     auto bounds = buildPipelineAndExtractBounds({facet({pipeline1, pipeline2})});
     assertDiscreteAndEq(bounds.getMinBounds(), 100);
     assertDiscreteAndEq(bounds.getMaxBounds(), 150);
 }
 
 TEST_F(DocsNeededBoundsTest, FacetsWithUnknownAndLimit) {
-    Pipeline::SourceContainer pipeline1 = {limit(75), match()};
-    Pipeline::SourceContainer pipeline2 = {project()};
+    DocumentSourceContainer pipeline1 = {limit(75), match()};
+    DocumentSourceContainer pipeline2 = {project()};
     auto bounds = buildPipelineAndExtractBounds({facet({pipeline1, pipeline2})});
     assertDiscreteAndEq(bounds.getMinBounds(), 75);
     assertUnknown(bounds.getMaxBounds());
 }
 
 TEST_F(DocsNeededBoundsTest, SearchFacet) {
-    Pipeline::SourceContainer pipeline1 = {project()};
-    Pipeline::SourceContainer pipeline2 = {match()};
+    DocumentSourceContainer pipeline1 = {project()};
+    DocumentSourceContainer pipeline2 = {match()};
     auto bounds = buildPipelineAndExtractBounds({search(), facet({pipeline1, pipeline2})});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
 }
 
 TEST_F(DocsNeededBoundsTest, SearchFacetLimit) {
-    Pipeline::SourceContainer pipeline1 = {project()};
-    Pipeline::SourceContainer pipeline2 = {match()};
+    DocumentSourceContainer pipeline1 = {project()};
+    DocumentSourceContainer pipeline2 = {match()};
     auto bounds =
         buildPipelineAndExtractBounds({search(), facet({pipeline1, pipeline2}), limit(50)});
     assertDiscreteAndEq(bounds.getMinBounds(), 50);
@@ -561,8 +561,8 @@ TEST_F(DocsNeededBoundsTest, SearchFacetLimit) {
 }
 
 TEST_F(DocsNeededBoundsTest, SearchFacetSort) {
-    Pipeline::SourceContainer pipeline1 = {match(), project()};
-    Pipeline::SourceContainer pipeline2 = {match(), project()};
+    DocumentSourceContainer pipeline1 = {match(), project()};
+    DocumentSourceContainer pipeline2 = {match(), project()};
     auto bounds = buildPipelineAndExtractBounds({search(), facet({pipeline1, pipeline2}), sort()});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
@@ -571,8 +571,8 @@ TEST_F(DocsNeededBoundsTest, SearchFacetSort) {
 TEST_F(DocsNeededBoundsTest, NeedAllFacetLimit) {
     // Having one $facet pipeline with a $sort will require the entire pipeline needing all
     // documents.
-    Pipeline::SourceContainer pipeline1 = {match(), sort()};
-    Pipeline::SourceContainer pipeline2 = {match(), project()};
+    DocumentSourceContainer pipeline1 = {match(), sort()};
+    DocumentSourceContainer pipeline2 = {match(), project()};
     auto bounds = buildPipelineAndExtractBounds({facet({pipeline1, pipeline2}), limit(30)});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());
@@ -581,8 +581,8 @@ TEST_F(DocsNeededBoundsTest, NeedAllFacetLimit) {
 TEST_F(DocsNeededBoundsTest, LimitProjectNeedAllFacet) {
     // The $limit value should hold when putting a $facet pipeline that yields NeedAll after a
     // $limit stage.
-    Pipeline::SourceContainer pipeline1 = {match(), sort()};
-    Pipeline::SourceContainer pipeline2 = {match(), project()};
+    DocumentSourceContainer pipeline1 = {match(), sort()};
+    DocumentSourceContainer pipeline2 = {match(), project()};
     auto bounds =
         buildPipelineAndExtractBounds({limit(70), project(), facet({pipeline1, pipeline2})});
     assertDiscreteAndEq(bounds.getMinBounds(), 70);
@@ -590,8 +590,8 @@ TEST_F(DocsNeededBoundsTest, LimitProjectNeedAllFacet) {
 }
 
 TEST_F(DocsNeededBoundsTest, MatchSortFacet) {
-    Pipeline::SourceContainer pipeline1 = {match(), limit(50)};
-    Pipeline::SourceContainer pipeline2 = {match(), project()};
+    DocumentSourceContainer pipeline1 = {match(), limit(50)};
+    DocumentSourceContainer pipeline2 = {match(), project()};
     auto bounds = buildPipelineAndExtractBounds({match(), sort(), facet({pipeline1, pipeline2})});
     assertNeedAll(bounds.getMinBounds());
     assertNeedAll(bounds.getMaxBounds());

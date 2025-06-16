@@ -61,8 +61,8 @@ ALLOCATE_DOCUMENT_SOURCE_ID(limit, DocumentSourceLimit::id)
 
 constexpr StringData DocumentSourceLimit::kStageName;
 
-Pipeline::SourceContainer::iterator DocumentSourceLimit::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceLimit::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 
     if (std::next(itr) == container->end()) {

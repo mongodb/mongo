@@ -192,7 +192,7 @@ constexpr MatchExpressionParser::AllowedFeatureSet Pipeline::kGeoNearMatcherFeat
 
 Pipeline::Pipeline(const intrusive_ptr<ExpressionContext>& pTheCtx) : pCtx(pTheCtx) {}
 
-Pipeline::Pipeline(SourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx)
+Pipeline::Pipeline(DocumentSourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx)
     : _sources(std::move(stages)), pCtx(expCtx) {}
 
 Pipeline::~Pipeline() {
@@ -202,7 +202,7 @@ Pipeline::~Pipeline() {
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::clone(
     const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
     auto expCtx = newExpCtx ? newExpCtx : getContext();
-    SourceContainer clonedStages;
+    DocumentSourceContainer clonedStages;
     for (auto&& stage : _sources) {
         clonedStages.push_back(stage->clone(expCtx));
     }
@@ -224,7 +224,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseCommon(
                           << internalPipelineLengthLimit << " stages.",
             static_cast<int>(rawPipeline.size()) <= internalPipelineLengthLimit);
 
-    SourceContainer stages;
+    DocumentSourceContainer stages;
     for (auto&& stageElem : rawPipeline) {
         auto parsedSources = DocumentSource::parse(expCtx, getElemFunc(stageElem));
         stages.insert(stages.end(), parsedSources.begin(), parsedSources.end());
@@ -282,7 +282,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseFacetPipeline(
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::create(
-    SourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx) {
+    DocumentSourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx) {
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
         new Pipeline(std::move(stages), expCtx), PipelineDeleter(expCtx->getOperationContext()));
 
@@ -363,8 +363,8 @@ void Pipeline::optimizePipeline() {
     optimizeEachStage(&_sources);
 }
 
-void Pipeline::optimizeContainer(SourceContainer* container) {
-    SourceContainer::iterator itr = container->begin();
+void Pipeline::optimizeContainer(DocumentSourceContainer* container) {
+    DocumentSourceContainer::iterator itr = container->begin();
     try {
         while (itr != container->end()) {
             invariant((*itr).get());
@@ -378,8 +378,8 @@ void Pipeline::optimizeContainer(SourceContainer* container) {
     stitch(container);
 }
 
-void Pipeline::optimizeEachStage(SourceContainer* container) {
-    SourceContainer optimizedSources;
+void Pipeline::optimizeEachStage(DocumentSourceContainer* container) {
+    DocumentSourceContainer optimizedSources;
     try {
         // We should have our final number of stages. Optimize each individually.
         for (auto&& source : *container) {
@@ -491,7 +491,8 @@ bool Pipeline::canParameterize() const {
 
 boost::optional<ShardId> Pipeline::needsSpecificShardMerger() const {
     for (const auto& stage : _sources) {
-        if (auto mergeShardId = stage->constraints(SplitState::kSplitForMerge).mergeShardId) {
+        if (auto mergeShardId =
+                stage->constraints(PipelineSplitState::kSplitForMerge).mergeShardId) {
             return mergeShardId;
         }
     }
@@ -500,8 +501,8 @@ boost::optional<ShardId> Pipeline::needsSpecificShardMerger() const {
 
 bool Pipeline::needsRouterMerger() const {
     return std::any_of(_sources.begin(), _sources.end(), [&](const auto& stage) {
-        return stage->constraints(SplitState::kSplitForMerge).resolvedHostTypeRequirement(pCtx) ==
-            HostTypeRequirement::kRouter;
+        return stage->constraints(PipelineSplitState::kSplitForMerge)
+                   .resolvedHostTypeRequirement(pCtx) == HostTypeRequirement::kRouter;
     });
 }
 
@@ -521,12 +522,12 @@ bool Pipeline::needsShard() const {
 }
 
 bool Pipeline::requiredToRunOnRouter() const {
-    invariant(_splitState != SplitState::kSplitForShards);
+    invariant(_splitState != PipelineSplitState::kSplitForShards);
 
     for (auto&& stage : _sources) {
         // If this pipeline is capable of splitting before the mongoS-only stage, then the pipeline
         // as a whole is not required to run on mongoS.
-        if (_splitState == SplitState::kUnsplit && stage->distributedPlanLogic()) {
+        if (_splitState == PipelineSplitState::kUnsplit && stage->distributedPlanLogic()) {
             return false;
         }
 
@@ -570,7 +571,7 @@ std::vector<BSONObj> Pipeline::serializeForLogging(
 }
 
 std::vector<BSONObj> Pipeline::serializeContainerForLogging(
-    const SourceContainer& container, boost::optional<const SerializationOptions&> opts) {
+    const DocumentSourceContainer& container, boost::optional<const SerializationOptions&> opts) {
     std::vector<Value> serialized = serializeContainer(container, opts);
     std::vector<BSONObj> redacted;
     for (auto&& stage : serialized) {
@@ -580,7 +581,7 @@ std::vector<BSONObj> Pipeline::serializeContainerForLogging(
     return redacted;
 }
 
-std::vector<Value> Pipeline::serializeContainer(const SourceContainer& container,
+std::vector<Value> Pipeline::serializeContainer(const DocumentSourceContainer& container,
                                                 boost::optional<const SerializationOptions&> opts) {
     std::vector<Value> serializedSources;
     for (auto&& source : container) {
@@ -609,7 +610,7 @@ void Pipeline::stitch() {
     stitch(&_sources);
 }
 
-void Pipeline::stitch(SourceContainer* container) {
+void Pipeline::stitch(DocumentSourceContainer* container) {
     if (container->empty()) {
         return;
     }
@@ -618,7 +619,7 @@ void Pipeline::stitch(SourceContainer* container) {
     // TODO SERVER-105683: Temporary cast to Stage until method is moved to agg::Pipeline.
     auto prevSource = dynamic_cast<exec::agg::Stage*>(container->front().get());
     prevSource->setSource(nullptr);
-    for (Pipeline::SourceContainer::iterator iter(++container->begin()), listEnd(container->end());
+    for (DocumentSourceContainer::iterator iter(++container->begin()), listEnd(container->end());
          iter != listEnd;
          ++iter) {
         intrusive_ptr<DocumentSource> pTemp(*iter);
@@ -677,7 +678,7 @@ DepsTracker Pipeline::getDependencies(
 
 DepsTracker Pipeline::getDependenciesForContainer(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const SourceContainer& container,
+    const DocumentSourceContainer& container,
     DepsTracker::MetadataDependencyValidation availableMetadata) {
     DepsTracker deps(availableMetadata);
 
@@ -972,11 +973,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
         opts.useCollectionDefaultCollator);
 }
 
-Pipeline::SourceContainer::iterator Pipeline::optimizeEndOfPipeline(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
-    // We must create a new SourceContainer representing the subsection of the pipeline we wish to
-    // optimize, since otherwise calls to optimizeAt() will overrun these limits.
-    auto endOfPipeline = Pipeline::SourceContainer(std::next(itr), container->end());
+DocumentSourceContainer::iterator Pipeline::optimizeEndOfPipeline(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
+    // We must create a new DocumentSourceContainer representing the subsection of the pipeline we
+    // wish to optimize, since otherwise calls to optimizeAt() will overrun these limits.
+    auto endOfPipeline = DocumentSourceContainer(std::next(itr), container->end());
     Pipeline::optimizeContainer(&endOfPipeline);
     Pipeline::optimizeEachStage(&endOfPipeline);
     container->erase(std::next(itr), container->end());

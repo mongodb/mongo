@@ -193,7 +193,7 @@ public:
         return _outputSortKeyMetadata || pExpCtx->getNeedsMerge();
     }
 
-    StageConstraints constraints(Pipeline::SplitState) const final {
+    StageConstraints constraints(PipelineSplitState) const final {
         StageConstraints constraints(StreamType::kBlocking,
                                      PositionRequirement::kNone,
                                      HostTypeRequirement::kNone,
@@ -278,8 +278,8 @@ protected:
     /**
      * Attempts to absorb a subsequent $limit stage so that it can perform a top-k sort.
      */
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) final;
 
     void doForceSpill() final;
 

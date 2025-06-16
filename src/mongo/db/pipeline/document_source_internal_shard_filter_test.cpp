@@ -94,7 +94,7 @@ public:
 };
 
 TEST_F(DocumentSourceInternalShardFilterTest, ShouldOptimizeAwayIfUnshardedCollection) {
-    Pipeline::SourceContainer container;
+    DocumentSourceContainer container;
     auto mock = DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}"}, getExpCtx());
 
     container.push_back(mock);
@@ -112,7 +112,7 @@ TEST_F(DocumentSourceInternalShardFilterTest, ShouldOptimizeAwayIfUnshardedColle
 
 TEST_F(DocumentSourceInternalShardFilterTest,
        ShouldOptimizeAwayIfUnshardedCollectionAndFirstInPipeline) {
-    Pipeline::SourceContainer container;
+    DocumentSourceContainer container;
 
     container.push_back(new DocumentSourceInternalShardFilter(
         getExpCtx(), std::make_unique<UnshardedShardFilterer>()));
@@ -149,7 +149,7 @@ private:
 };
 
 TEST_F(DocumentSourceInternalShardFilterTest, FiltersDocuments) {
-    Pipeline::SourceContainer container;
+    DocumentSourceContainer container;
     auto mock = DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}", "{a: 3}"}, getExpCtx());
 
     const auto nToFilter = 2;
@@ -189,7 +189,7 @@ private:
 };
 
 TEST_F(DocumentSourceInternalShardFilterTest, SkipDocumentsWithoutShardKey) {
-    Pipeline::SourceContainer container;
+    DocumentSourceContainer container;
     auto mock = DocumentSourceMock::createForTest({"{a: 1}", "{a: 2}", "{a: 3}"}, getExpCtx());
 
     DocumentSourceInternalShardFilter filter(getExpCtx(),

@@ -136,7 +136,7 @@ public:
         return id;
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         HostTypeRequirement hostTypeRequirement =
             _targetAllNodes ? HostTypeRequirement::kAllShardHosts : HostTypeRequirement::kAnyShard;
         StageConstraints constraints(StreamType::kStreaming,

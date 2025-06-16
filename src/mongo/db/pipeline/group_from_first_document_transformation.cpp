@@ -54,8 +54,8 @@ void GroupFromFirstDocumentTransformation::optimize() {
     }
 }
 
-Pipeline::SourceContainer::iterator GroupFromFirstDocumentTransformation::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator GroupFromFirstDocumentTransformation::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     return std::next(itr);
 }
 

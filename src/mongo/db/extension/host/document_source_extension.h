@@ -49,7 +49,7 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const override {}
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const override;
+    StageConstraints constraints(PipelineSplitState pipeState) const override;
 
     Value serialize(const SerializationOptions& opts) const override;
 

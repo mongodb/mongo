@@ -88,7 +88,7 @@ public:
         return id;
     }
 
-    StageConstraints constraints(Pipeline::SplitState) const final {
+    StageConstraints constraints(PipelineSplitState) const final {
         StageConstraints setVariableConstraints(StreamType::kStreaming,
                                                 PositionRequirement::kNone,
                                                 // Set variable can run anywhere as long as it is

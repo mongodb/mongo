@@ -68,7 +68,7 @@ const char* DocumentSourceSingleDocumentTransformation::getSourceName() const {
 }
 
 StageConstraints DocumentSourceSingleDocumentTransformation::constraints(
-    Pipeline::SplitState pipeState) const {
+    PipelineSplitState pipeState) const {
     StageConstraints constraints(StreamType::kStreaming,
                                  PositionRequirement::kNone,
                                  HostTypeRequirement::kNone,
@@ -144,9 +144,9 @@ projection_executor::ExclusionNode& DocumentSourceSingleDocumentTransformation::
     return *ret;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::maybeCoalesce(
-    Pipeline::SourceContainer::iterator itr,
-    Pipeline::SourceContainer* container,
+DocumentSourceContainer::iterator DocumentSourceSingleDocumentTransformation::maybeCoalesce(
+    DocumentSourceContainer::iterator itr,
+    DocumentSourceContainer* container,
     DocumentSourceSingleDocumentTransformation* nextSingleDocTransform) {
     // Adjacent exclusion projections can be coalesced by unioning their excluded fields.
     if (getTransformerType() == TransformerInterface::TransformerType::kExclusionProjection &&
@@ -179,8 +179,8 @@ Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::
     return std::next(itr);
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceSingleDocumentTransformation::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 
     if (std::next(itr) == container->end()) {

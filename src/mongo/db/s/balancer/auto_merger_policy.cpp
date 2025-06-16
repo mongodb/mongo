@@ -286,7 +286,7 @@ AutoMergerPolicy::_getNamespacesWithMergeableChunksPerShard(OperationContext* op
         resolvedNamespaces[CollectionType::ConfigNS] = {CollectionType::ConfigNS,
                                                         std::vector<BSONObj>()};
 
-        Pipeline::SourceContainer stages;
+        DocumentSourceContainer stages;
         auto expCtx = ExpressionContextBuilder{}
                           .opCtx(opCtx)
                           .ns(NamespaceString::kConfigsvrChunksNamespace)

@@ -153,7 +153,7 @@ protected:
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> buildAggExecAndIter(
         std::vector<BSONObj> stages) {
-        Pipeline::SourceContainer sources;
+        DocumentSourceContainer sources;
         for (const auto& s : stages) {
             sources.push_back(DocumentSource::parse(expCtx, s).front());
         }

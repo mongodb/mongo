@@ -75,7 +75,7 @@ DocumentSourceListMqlEntities::DocumentSourceListMqlEntities(
     std::sort(_results.begin(), _results.end(), std::greater<>());
 }
 
-StageConstraints DocumentSourceListMqlEntities::constraints(Pipeline::SplitState pipeState) const {
+StageConstraints DocumentSourceListMqlEntities::constraints(PipelineSplitState pipeState) const {
     auto constraints = StageConstraints{StreamType::kStreaming,
                                         PositionRequirement::kFirst,
                                         HostTypeRequirement::kLocalOnly,
@@ -93,8 +93,8 @@ const char* DocumentSourceListMqlEntities::getSourceName() const {
     return kStageName.data();
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceListMqlEntities::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceListMqlEntities::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     return std::next(itr);
 }
 

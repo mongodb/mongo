@@ -351,7 +351,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
                                        allowMergeOnNullishValues);
 }
 
-StageConstraints DocumentSourceMerge::constraints(Pipeline::SplitState pipeState) const {
+StageConstraints DocumentSourceMerge::constraints(PipelineSplitState pipeState) const {
     StageConstraints result{StreamType::kStreaming,
                             PositionRequirement::kLast,
                             HostTypeRequirement::kNone,
@@ -360,7 +360,7 @@ StageConstraints DocumentSourceMerge::constraints(Pipeline::SplitState pipeState
                             TransactionRequirement::kNotAllowed,
                             LookupRequirement::kNotAllowed,
                             UnionRequirement::kNotAllowed};
-    if (pipeState == Pipeline::SplitState::kSplitForMerge) {
+    if (pipeState == PipelineSplitState::kSplitForMerge) {
         result.mergeShardId = getMergeShardId();
     }
     return result;

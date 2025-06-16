@@ -94,8 +94,8 @@ boost::optional<StringMap<std::string>> renamedPaths(
  * 'end' should be an iterator referring to the past-the-end stage.
  */
 boost::optional<StringMap<std::string>> renamedPaths(
-    Pipeline::SourceContainer::const_iterator start,
-    Pipeline::SourceContainer::const_iterator end,
+    DocumentSourceContainer::const_iterator start,
+    DocumentSourceContainer::const_iterator end,
     const OrderedPathSet& pathsOfInterest,
     boost::optional<std::function<bool(DocumentSource*)>> additionalStageValidatorCallback =
         boost::none);
@@ -111,8 +111,8 @@ boost::optional<StringMap<std::string>> renamedPaths(
  * (the 'reverse end').
  */
 boost::optional<StringMap<std::string>> renamedPaths(
-    Pipeline::SourceContainer::const_reverse_iterator start,
-    Pipeline::SourceContainer::const_reverse_iterator end,
+    DocumentSourceContainer::const_reverse_iterator start,
+    DocumentSourceContainer::const_reverse_iterator end,
     const OrderedPathSet& pathsOfInterest,
     boost::optional<std::function<bool(DocumentSource*)>> additionalStageValidatorCallback =
         boost::none);
@@ -125,9 +125,9 @@ boost::optional<StringMap<std::string>> renamedPaths(
  * Returns an iterator to the first stage which modifies one of the paths in 'pathsOfInterest' or
  * fails 'additionalStageValidatorCallback', or returns 'end' if no such stage exists.
  */
-std::pair<Pipeline::SourceContainer::const_iterator, StringMap<std::string>>
-findLongestViablePrefixPreservingPaths(Pipeline::SourceContainer::const_iterator start,
-                                       Pipeline::SourceContainer::const_iterator end,
+std::pair<DocumentSourceContainer::const_iterator, StringMap<std::string>>
+findLongestViablePrefixPreservingPaths(DocumentSourceContainer::const_iterator start,
+                                       DocumentSourceContainer::const_iterator end,
                                        const OrderedPathSet& pathsOfInterest,
                                        boost::optional<std::function<bool(DocumentSource*)>>
                                            additionalStageValidatorCallback = boost::none);
@@ -154,7 +154,7 @@ bool pathSetContainsOverlappingPath(const OrderedPathSet& paths, const std::stri
  *
  * If any of the paths were added or overwritten by intermediate stages, the result will omit them.
  */
-OrderedPathSet traceOriginatingPaths(const Pipeline::SourceContainer& pipeline,
+OrderedPathSet traceOriginatingPaths(const DocumentSourceContainer& pipeline,
                                      const OrderedPathSet& pathsOfInterest);
 
 }  // namespace mongo::semantic_analysis

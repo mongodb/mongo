@@ -80,7 +80,7 @@ public:
                                   MqlEntityTypeEnum type,
                                   const StringMap<ParserRegistration>& docSourceParserMap);
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final;
+    StageConstraints constraints(PipelineSplitState pipeState) const final;
     const char* getSourceName() const final;
 
     static const Id& id;
@@ -88,8 +88,8 @@ public:
     Id getId() const override {
         return id;
     }
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) final;
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}

@@ -772,8 +772,8 @@ DensifyValue DensifyValue::decrement(const RangeStatement& range) const {
         _value);
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceInternalDensify::combineSorts(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceInternalDensify::combineSorts(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     if (std::next(itr) == container->end() || itr == container->begin()) {
         return container->end();
     }
@@ -827,8 +827,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalDensify::combineSorts(
     return std::prev(itr);
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceInternalDensify::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceInternalDensify::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     tassert(6059800, "Expected to optimize $densify stage", *itr == this);
 
     return combineSorts(itr, container);

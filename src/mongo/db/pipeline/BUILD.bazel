@@ -625,6 +625,7 @@ mongo_cc_library(
         "match_processor.h",
         "merge_processor.h",
         "pipeline.h",
+        "pipeline_split_state.h",
         "pipeline_test_util.h",
         "redact_processor.h",
         "//src/mongo/db/extension/host:document_source_extension.h",

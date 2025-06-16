@@ -52,7 +52,7 @@ public:
         return kUnallocatedId;
     }
 
-    StageConstraints constraints(Pipeline::SplitState) const override {
+    StageConstraints constraints(PipelineSplitState) const override {
         // Return the default constraints so that this can be used in test pipelines. Constructing a
         // pipeline needs to do some validation that depends on this.
         return StageConstraints{StreamType::kStreaming,

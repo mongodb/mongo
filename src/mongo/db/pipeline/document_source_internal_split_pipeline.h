@@ -88,7 +88,7 @@ public:
         return DistributedPlanLogic{nullptr, this, boost::none};
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kNone,
                                      _mergeType,

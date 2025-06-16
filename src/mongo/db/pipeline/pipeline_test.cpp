@@ -117,7 +117,7 @@ void setMockReplicationCoordinatorOnOpCtx(OperationContext* opCtx) {
         std::make_unique<repl::ReplicationCoordinatorMock>(opCtx->getServiceContext()));
 }
 
-DocumentSource* getStageAtPos(const Pipeline::SourceContainer& stages, int pos) {
+DocumentSource* getStageAtPos(const DocumentSourceContainer& stages, int pos) {
     if (pos >= 0) {
         auto it = stages.begin();
         std::advance(it, pos);
@@ -132,7 +132,7 @@ DocumentSource* getStageAtPos(const Pipeline::SourceContainer& stages, int pos) 
 }
 
 template <typename T>
-void assertStageAtPos(const Pipeline::SourceContainer& stages, int pos) {
+void assertStageAtPos(const DocumentSourceContainer& stages, int pos) {
     ASSERT(dynamic_cast<T*>(getStageAtPos(stages, pos)));
 }
 

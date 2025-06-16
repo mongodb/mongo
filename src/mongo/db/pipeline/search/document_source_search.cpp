@@ -196,15 +196,15 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
     return desugaredPipeline;
 }
 
-StageConstraints DocumentSourceSearch::constraints(Pipeline::SplitState pipeState) const {
+StageConstraints DocumentSourceSearch::constraints(PipelineSplitState pipeState) const {
     auto constraints = DocumentSourceInternalSearchMongotRemote::getSearchDefaultConstraints();
     if (!isStoredSource()) {
         constraints.noFieldModifications = true;
     }
     return constraints;
 }
-bool checkRequiresSearchSequenceToken(Pipeline::SourceContainer::iterator itr,
-                                      Pipeline::SourceContainer* container) {
+bool checkRequiresSearchSequenceToken(DocumentSourceContainer::iterator itr,
+                                      DocumentSourceContainer* container) {
     DepsTracker deps;
     while (itr != container->end()) {
         auto nextStage = itr->get();
@@ -214,8 +214,8 @@ bool checkRequiresSearchSequenceToken(Pipeline::SourceContainer::iterator itr,
     return deps.getNeedsMetadata(DocumentMetadataFields::kSearchSequenceToken);
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceSearch::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceSearch::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     // In the case where the query has an extractable limit, we send that limit to mongot as a guide
     // for the number of documents mongot should return (rather than the default batchsize).
     // Move past the current stage ($search).

@@ -679,7 +679,7 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
     // The merging pipeline is just a union of the results from each of the shards involved on the
     // consumer side of the exchange.
     auto mergePipeline = Pipeline::create({}, expCtx);
-    mergePipeline->setSplitState(Pipeline::SplitState::kSplitForMerge);
+    mergePipeline->setSplitState(PipelineSplitState::kSplitForMerge);
 
     auto splitPipeline = SplitPipeline::mergeOnly(std::move(mergePipeline));
 

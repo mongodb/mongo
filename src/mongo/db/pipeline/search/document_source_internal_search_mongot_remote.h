@@ -73,7 +73,7 @@ public:
         std::shared_ptr<executor::TaskExecutor> taskExecutor,
         boost::optional<SearchQueryViewSpec> view = boost::none);
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const override {
+    StageConstraints constraints(PipelineSplitState pipeState) const override {
         return getSearchDefaultConstraints();
     }
 

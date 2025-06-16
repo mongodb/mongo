@@ -197,9 +197,9 @@ TEST_F(DocumentSourceLookUpTest, LookupEmptyPipelineDoesntUseDiskAndIsOKInATrans
     auto lookup = static_cast<DocumentSourceLookUp*>(docSource.get());
 
     ASSERT_FALSE(lookup->hasLocalFieldForeignFieldJoin());
-    ASSERT(lookup->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
+    ASSERT(lookup->constraints(PipelineSplitState::kUnsplit).diskRequirement ==
            DocumentSource::DiskUseRequirement::kNoDiskUse);
-    ASSERT(lookup->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
+    ASSERT(lookup->constraints(PipelineSplitState::kUnsplit).transactionRequirement ==
            DocumentSource::TransactionRequirement::kAllowed);
 }
 

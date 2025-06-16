@@ -71,8 +71,8 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
 
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) final;
 
 private:
     const boost::intrusive_ptr<ExpressionContext> _expCtx;

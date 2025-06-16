@@ -90,7 +90,7 @@ public:
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
     GetModPathsReturn getModifiedPaths() const final;
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final;
+    StageConstraints constraints(PipelineSplitState pipeState) const final;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;
@@ -151,13 +151,13 @@ protected:
     GetNextResult doGetNext() final;
     void doDispose() final;
 
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) final;
 
 private:
-    Pipeline::SourceContainer::iterator maybeCoalesce(
-        Pipeline::SourceContainer::iterator itr,
-        Pipeline::SourceContainer* container,
+    DocumentSourceContainer::iterator maybeCoalesce(
+        DocumentSourceContainer::iterator itr,
+        DocumentSourceContainer* container,
         DocumentSourceSingleDocumentTransformation* nextSingleDocTransform);
 
     boost::optional<SingleDocumentTransformationProcessor> _transformationProcessor;

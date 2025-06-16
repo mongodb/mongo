@@ -44,7 +44,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_split_state.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -197,12 +197,17 @@ namespace mongo {
     }                                                                 \
     const DocumentSource::Id& constName = _dsid_##name;
 
+class DocumentSource;
+using DocumentSourceContainer = std::list<boost::intrusive_ptr<DocumentSource>>;
+
+class Pipeline;
+
 // TODO SPM-4106: Remove virtual keyword once the refactoring is done.
 class DocumentSource : public virtual RefCountable {
 public:
     // In general a parser returns a list of DocumentSources, to accommodate "multi-stage aliases"
     // like $bucket.
-    using Parser = std::function<std::list<boost::intrusive_ptr<DocumentSource>>(
+    using Parser = std::function<DocumentSourceContainer(
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&)>;
     // But in the common case a parser returns only one DocumentSource.
     using SimpleParser = std::function<boost::intrusive_ptr<DocumentSource>(
@@ -260,7 +265,7 @@ public:
 
         // A stage or stages which function to merge all the results together, or an empty list if
         // nothing is necessary after merging. For example, a $limit stage.
-        std::list<boost::intrusive_ptr<DocumentSource>> mergingStages = {};
+        DocumentSourceContainer mergingStages = {};
 
         // If set, each document is expected to have sort key metadata which will be serialized in
         // the '$sortKey' field. 'mergeSortPattern' will then be used to describe which fields are
@@ -328,19 +333,19 @@ public:
 
     /**
      * Returns a struct containing information about any special constraints imposed on using this
-     * stage. Input parameter Pipeline::SplitState is used by stages whose requirements change
+     * stage. Input parameter PipelineSplitState is used by stages whose requirements change
      * depending on whether they are in a split or unsplit pipeline.
      */
     virtual StageConstraints constraints(
-        Pipeline::SplitState = Pipeline::SplitState::kUnsplit) const = 0;
+        PipelineSplitState = PipelineSplitState::kUnsplit) const = 0;
 
     /**
      * If a stage's StageConstraints::PositionRequirement is kCustom, then it should also override
      * this method, which will be called by the validation process.
      */
     virtual void validatePipelinePosition(bool alreadyOptimized,
-                                          Pipeline::SourceContainer::const_iterator pos,
-                                          const Pipeline::SourceContainer& container) const {
+                                          DocumentSourceContainer::const_iterator pos,
+                                          const DocumentSourceContainer& container) const {
         MONGO_UNIMPLEMENTED_TASSERT(7183905);
     };
 
@@ -380,8 +385,8 @@ public:
     /**
      * Create a DocumentSource pipeline stage from 'stageObj'.
      */
-    static std::list<boost::intrusive_ptr<DocumentSource>> parse(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, BSONObj stageObj);
+    static DocumentSourceContainer parse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         BSONObj stageObj);
 
     /**
      * Function that will be used as an alternate parser for a document source that has been
@@ -445,16 +450,15 @@ private:
      * $match stage, attempt to push B before A. Returns whether this optimization was
      * performed.
      */
-    bool pushMatchBefore(Pipeline::SourceContainer::iterator itr,
-                         Pipeline::SourceContainer* container);
+    bool pushMatchBefore(DocumentSourceContainer::iterator itr, DocumentSourceContainer* container);
 
     /**
      * itr is pointing to some stage `A`. Fetch stage `B`, the stage after A in itr. If B is a
      * $sample stage, attempt to push B before A. Returns whether this optimization was
      * performed.
      */
-    bool pushSampleBefore(Pipeline::SourceContainer::iterator itr,
-                          Pipeline::SourceContainer* container);
+    bool pushSampleBefore(DocumentSourceContainer::iterator itr,
+                          DocumentSourceContainer* container);
 
     /**
      * Attempts to push any kind of 'DocumentSourceSingleDocumentTransformation' stage or a $redact
@@ -464,15 +468,15 @@ private:
      * Note that this optimization is oblivious to the transform function. The only stages that are
      * eligible to swap are those that can safely swap with any transform.
      */
-    bool pushSingleDocumentTransformOrRedactBefore(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container);
+    bool pushSingleDocumentTransformOrRedactBefore(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container);
 
     /**
      * Wraps various optimization methods and returns the call immediately if any one of them
      * returns true.
      */
-    bool attemptToPushStageBefore(Pipeline::SourceContainer::iterator itr,
-                                  Pipeline::SourceContainer* container) {
+    bool attemptToPushStageBefore(DocumentSourceContainer::iterator itr,
+                                  DocumentSourceContainer* container) {
         if (std::next(itr) == container->end()) {
             return false;
         }
@@ -490,8 +494,8 @@ public:
      * Subclasses should override doOptimizeAt() if they can apply some optimization(s) based on
      * subsequent stages in the pipeline.
      */
-    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                   Pipeline::SourceContainer* container);
+    DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
+                                                 DocumentSourceContainer* container);
 
     /**
      * Returns an optimized DocumentSource that is semantically equivalent to this one, or
@@ -697,7 +701,7 @@ public:
      * For stages that have sub-pipelines returns the source container holding the stages of that
      * pipeline. Otherwise returns a nullptr.
      */
-    virtual const Pipeline::SourceContainer* getSubPipeline() const {
+    virtual const DocumentSourceContainer* getSubPipeline() const {
         return nullptr;
     }
 
@@ -715,8 +719,8 @@ protected:
      * directly preceding 'itr', if such a position exists, since the stage at that position may be
      * able to perform further optimizations with its new neighbor.
      */
-    virtual Pipeline::SourceContainer::iterator doOptimizeAt(
-        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    virtual DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                           DocumentSourceContainer* container) {
         return std::next(itr);
     };
 

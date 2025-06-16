@@ -114,7 +114,7 @@ public:
      * report configurations which are present on 'mongod' instances, but not yet present on
      * 'mongos' ones and consequently won't be enforced.
      */
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         StageConstraints constraints{DocumentSource::StreamType::kStreaming,
                                      DocumentSource::PositionRequirement::kFirst,
                                      DocumentSource::HostTypeRequirement::kLocalOnly,

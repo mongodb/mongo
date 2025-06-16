@@ -143,7 +143,7 @@ DocumentSourceOut::~DocumentSourceOut() {
     }
 }
 
-StageConstraints DocumentSourceOut::constraints(Pipeline::SplitState pipeState) const {
+StageConstraints DocumentSourceOut::constraints(PipelineSplitState pipeState) const {
     StageConstraints result{StreamType::kStreaming,
                             PositionRequirement::kLast,
                             HostTypeRequirement::kNone,
@@ -152,7 +152,7 @@ StageConstraints DocumentSourceOut::constraints(Pipeline::SplitState pipeState) 
                             TransactionRequirement::kNotAllowed,
                             LookupRequirement::kNotAllowed,
                             UnionRequirement::kNotAllowed};
-    if (pipeState == Pipeline::SplitState::kSplitForMerge) {
+    if (pipeState == PipelineSplitState::kSplitForMerge) {
         // If output collection resides on a single shard, we should route $out to it to perform
         // local writes. Note that this decision is inherently racy and subject to become stale.
         // This is okay because either choice will work correctly, we are simply applying a

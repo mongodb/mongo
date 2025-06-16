@@ -125,7 +125,7 @@ public:
         return _bucketUnpacker.includeTimeField();
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kNone,
                                      HostTypeRequirement::kNone,
@@ -176,8 +176,8 @@ public:
      * function. The README.md should be maintained in sync with this function. Please update the
      * README accordingly.
      */
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) final;
 
     /*
      * Given a $project produced by 'extractOrBuildProjectToInternalize()', attempt to internalize
@@ -200,7 +200,7 @@ public:
      *    3. Otherwise, an empty BSONObj will be returned.
      */
     std::pair<BSONObj, bool> extractOrBuildProjectToInternalize(
-        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) const;
+        DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) const;
 
     /**
      * Convenience wrapper around BucketSpec::createPredicatesOnBucketLevelField().
@@ -251,8 +251,8 @@ public:
      * from it computed meta projections and push them pass the current stage. Returns the iterator
      * that needs to be optimized next.
      */
-    boost::optional<Pipeline::SourceContainer::iterator> pushDownComputedMetaProjection(
-        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
+    boost::optional<DocumentSourceContainer::iterator> pushDownComputedMetaProjection(
+        DocumentSourceContainer::iterator itr, DocumentSourceContainer* container);
 
     /**
      * If 'src' represents an exclusion $project, attempts to extract the parts of 'src' that are
@@ -267,15 +267,15 @@ public:
      * min/max/count aggregates. If the rewrite is possible, 'container' is modified, bool in the
      * return pair is set to 'true' and the iterator is set to point to the new group.
      */
-    std::pair<bool, Pipeline::SourceContainer::iterator> rewriteGroupStage(
-        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
+    std::pair<bool, DocumentSourceContainer::iterator> rewriteGroupStage(
+        DocumentSourceContainer::iterator itr, DocumentSourceContainer* container);
 
     /**
      * Helper method which checks if we can replace DocumentSourceGroup with
      * DocumentSourceStreamingGroup. Returns true if the optimization is performed.
      */
-    bool enableStreamingGroupIfPossible(Pipeline::SourceContainer::iterator itr,
-                                        Pipeline::SourceContainer* container);
+    bool enableStreamingGroupIfPossible(DocumentSourceContainer::iterator itr,
+                                        DocumentSourceContainer* container);
 
     /**
      * If the current aggregation is a lastpoint-type query (ie. with a $sort on meta and time
@@ -297,13 +297,13 @@ public:
      *
      * Note that the first $group includes all fields so we can avoid fetching the bucket twice.
      */
-    bool optimizeLastpoint(Pipeline::SourceContainer::iterator itr,
-                           Pipeline::SourceContainer* container);
+    bool optimizeLastpoint(DocumentSourceContainer::iterator itr,
+                           DocumentSourceContainer* container);
 
     GetModPathsReturn getModifiedPaths() const final;
 
-    DepsTracker getRestPipelineDependencies(Pipeline::SourceContainer::iterator itr,
-                                            Pipeline::SourceContainer* container,
+    DepsTracker getRestPipelineDependencies(DocumentSourceContainer::iterator itr,
+                                            DocumentSourceContainer* container,
                                             bool includeEventFilter) const;
 
     const MatchExpression* eventFilter() const {
@@ -335,8 +335,8 @@ private:
      * preceeding stages will be optimized. However, optimization of the bucket unpack stage will be
      * skipped.
      */
-    Pipeline::SourceContainer::iterator optimizeAtRestOfPipeline(
-        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
+    DocumentSourceContainer::iterator optimizeAtRestOfPipeline(
+        DocumentSourceContainer::iterator itr, DocumentSourceContainer* container);
 
     /**
      * The top-k sort optimization absorbs a $sort stage that is enough to produce a top-k sorted
@@ -361,8 +361,8 @@ private:
      *   }
      * ]
      */
-    bool tryToAbsorbTopKSortIntoGroup(Pipeline::SourceContainer::iterator itr,
-                                      Pipeline::SourceContainer* container);
+    bool tryToAbsorbTopKSortIntoGroup(DocumentSourceContainer::iterator itr,
+                                      DocumentSourceContainer* container);
 
     // If buckets contained a mixed type schema along some path, we have to push down special
     // predicates in order to ensure correctness.

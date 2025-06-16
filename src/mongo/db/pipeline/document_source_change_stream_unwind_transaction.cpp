@@ -166,7 +166,7 @@ void DocumentSourceChangeStreamUnwindTransaction::rebuild(BSONObj filter) {
 }
 
 StageConstraints DocumentSourceChangeStreamUnwindTransaction::constraints(
-    Pipeline::SplitState pipeState) const {
+    PipelineSplitState pipeState) const {
     return StageConstraints(StreamType::kStreaming,
                             PositionRequirement::kNone,
                             HostTypeRequirement::kNone,
@@ -588,8 +588,8 @@ boost::optional<Document> DocumentSourceChangeStreamUnwindTransaction::Transacti
         endOfTransaction};
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceChangeStreamUnwindTransaction::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceChangeStreamUnwindTransaction::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     tassert(5687205, "Iterator mismatch during optimization", *itr == this);
 
     auto nextChangeStreamStageItr = std::next(itr);

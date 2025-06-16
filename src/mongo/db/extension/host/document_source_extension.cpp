@@ -58,7 +58,7 @@ DocumentSourceExtension::distributedPlanLogic() {
     return boost::none;
 }
 
-StageConstraints DocumentSourceExtension::constraints(Pipeline::SplitState pipeState) const {
+StageConstraints DocumentSourceExtension::constraints(PipelineSplitState pipeState) const {
     auto constraints = StageConstraints(StageConstraints::StreamType::kStreaming,
                                         StageConstraints::PositionRequirement::kNone,
                                         StageConstraints::HostTypeRequirement::kNone,

@@ -74,7 +74,7 @@ TEST_F(DocumentSourceSkipTest, SkipsChainedTogetherShouldNotOverFlowWhenOptimizi
     // $skip should not optimize if combining the two values of skips would overflow a long long.
     auto skipShort = DocumentSourceSkip::create(getExpCtx(), 1);
     auto skipLong = DocumentSourceSkip::create(getExpCtx(), std::numeric_limits<long long>::max());
-    Pipeline::SourceContainer overflowContainer;
+    DocumentSourceContainer overflowContainer;
     overflowContainer.push_back(skipShort);
     overflowContainer.push_back(skipLong);
     skipShort->doOptimizeAt(overflowContainer.begin(), &overflowContainer);
@@ -87,7 +87,7 @@ TEST_F(DocumentSourceSkipTest, SkipsChainedTogetherShouldNotOverFlowWhenOptimizi
         DocumentSourceSkip::create(getExpCtx(), std::numeric_limits<long long>::max());
     auto secondMaxSkip =
         DocumentSourceSkip::create(getExpCtx(), std::numeric_limits<long long>::max());
-    Pipeline::SourceContainer doubleMaxContainer;
+    DocumentSourceContainer doubleMaxContainer;
     doubleMaxContainer.push_back(firstMaxSkip);
     doubleMaxContainer.push_back(secondMaxSkip);
     firstMaxSkip->doOptimizeAt(doubleMaxContainer.begin(), &doubleMaxContainer);
@@ -98,7 +98,7 @@ TEST_F(DocumentSourceSkipTest, SkipsChainedTogetherShouldNotOverFlowWhenOptimizi
     // $skip should optimize if the two skips will not overflow a long long when combined.
     auto skipFirst = DocumentSourceSkip::create(getExpCtx(), 1);
     auto skipSecond = DocumentSourceSkip::create(getExpCtx(), 1);
-    Pipeline::SourceContainer containerOptimized;
+    DocumentSourceContainer containerOptimized;
     containerOptimized.push_back(skipFirst);
     containerOptimized.push_back(skipSecond);
     skipFirst->doOptimizeAt(containerOptimized.begin(), &containerOptimized);

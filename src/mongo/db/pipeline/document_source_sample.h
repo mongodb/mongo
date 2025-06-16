@@ -65,7 +65,7 @@ public:
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         StageConstraints constraints{StreamType::kBlocking,
                                      PositionRequirement::kNone,
                                      HostTypeRequirement::kNone,

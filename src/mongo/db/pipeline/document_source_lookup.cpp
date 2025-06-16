@@ -551,7 +551,7 @@ void DocumentSourceLookUp::determineSbeCompatibility() {
     }
 }
 
-StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState pipeState) const {
+StageConstraints DocumentSourceLookUp::constraints(PipelineSplitState pipeState) const {
     HostTypeRequirement hostRequirement;
     bool nominateMergingShard = false;
     if (_fromNs.isConfigDotCacheDotChunks()) {
@@ -559,7 +559,7 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState pipeStat
         // shard, rather than just a merging shard, since each shard should have an identical copy
         // of the namespace.
         hostRequirement = HostTypeRequirement::kAnyShard;
-    } else if (pipeState == Pipeline::SplitState::kSplitForShards) {
+    } else if (pipeState == PipelineSplitState::kSplitForShards) {
         // This stage will only be on the shards pipeline if $lookup on sharded foreign collections
         // is allowed.
         hostRequirement = HostTypeRequirement::kAnyShard;
@@ -569,7 +569,7 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState pipeStat
     } else {
         // If the pipeline is unsplit, then this $lookup can run anywhere.
         hostRequirement = HostTypeRequirement::kNone;
-        nominateMergingShard = pipeState == Pipeline::SplitState::kSplitForMerge;
+        nominateMergingShard = pipeState == PipelineSplitState::kSplitForMerge;
     }
 
     // By default, $lookup is allowed in a transaction and does not use disk.
@@ -927,8 +927,8 @@ DocumentSource::GetModPathsReturn DocumentSourceLookUp::getModifiedPaths() const
     return {GetModPathsReturn::Type::kFiniteSet, std::move(modifiedPaths), {}};
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 
     if (std::next(itr) == container->end()) {

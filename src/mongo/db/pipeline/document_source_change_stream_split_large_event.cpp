@@ -109,7 +109,7 @@ Value DocumentSourceChangeStreamSplitLargeEvent::serialize(const SerializationOp
 }
 
 StageConstraints DocumentSourceChangeStreamSplitLargeEvent::constraints(
-    Pipeline::SplitState pipeState) const {
+    PipelineSplitState pipeState) const {
     StageConstraints constraints{StreamType::kStreaming,
                                  PositionRequirement::kCustom,
                                  HostTypeRequirement::kAnyShard,
@@ -212,8 +212,8 @@ size_t DocumentSourceChangeStreamSplitLargeEvent::_handleResumeAfterSplit(const 
     return fragmentNum;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceChangeStreamSplitLargeEvent::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceChangeStreamSplitLargeEvent::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     // Helper to determine whether the iterator has reached its final position in the pipeline.
     // Checks whether $changeStreamSplitLargeEvent should move ahead of the given stage.
     auto shouldMoveAheadOf = [](const auto& stagePtr) {
@@ -233,8 +233,8 @@ Pipeline::SourceContainer::iterator DocumentSourceChangeStreamSplitLargeEvent::d
 
 void DocumentSourceChangeStreamSplitLargeEvent::validatePipelinePosition(
     bool alreadyOptimized,
-    Pipeline::SourceContainer::const_iterator pos,
-    const Pipeline::SourceContainer& container) const {
+    DocumentSourceContainer::const_iterator pos,
+    const DocumentSourceContainer& container) const {
 
     // The $changeStreamSplitLargeEvent stage must be the final stage in the pipeline before
     // optimization.

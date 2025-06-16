@@ -102,8 +102,8 @@ public:
             {}};
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        invariant(pipeState != Pipeline::SplitState::kSplitForShards);
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
+        invariant(pipeState != PipelineSplitState::kSplitForShards);
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kNone,
                                      HostTypeRequirement::kAnyShard,

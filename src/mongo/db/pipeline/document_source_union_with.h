@@ -123,7 +123,7 @@ public:
         return {GetModPathsReturn::Type::kAllPaths, {}, {}};
     }
 
-    StageConstraints constraints(Pipeline::SplitState) const final {
+    StageConstraints constraints(PipelineSplitState) const final {
         StageConstraints unionConstraints(
             StreamType::kStreaming,
             PositionRequirement::kNone,
@@ -194,7 +194,7 @@ public:
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final;
 
-    const Pipeline::SourceContainer* getSubPipeline() const final {
+    const DocumentSourceContainer* getSubPipeline() const final {
         if (_pipeline) {
             return &_pipeline->getSources();
         }
@@ -204,8 +204,8 @@ public:
 protected:
     GetNextResult doGetNext() final;
 
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) final;
 
     boost::intrusive_ptr<DocumentSource> optimize() final {
         _pipeline->optimizePipeline();

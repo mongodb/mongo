@@ -258,7 +258,7 @@ StringData extractGeoNearFieldFromIndexes(OperationContext* opCtx,
  * 'nullptr'.
  */
 std::pair<DocumentSourceSample*, DocumentSourceInternalUnpackBucket*> extractSampleUnpackBucket(
-    const Pipeline::SourceContainer& sources) {
+    const DocumentSourceContainer& sources) {
     DocumentSourceSample* sampleStage = nullptr;
     DocumentSourceInternalUnpackBucket* unpackStage = nullptr;
 
@@ -342,7 +342,7 @@ struct SortAndUnpackInPipeline {
     int unpackIdx = -1;
     int sortIdx = -1;
 };
-SortAndUnpackInPipeline findUnpackAndSort(const Pipeline::SourceContainer& sources) {
+SortAndUnpackInPipeline findUnpackAndSort(const DocumentSourceContainer& sources) {
     SortAndUnpackInPipeline su;
 
     int idx = 0;
@@ -604,7 +604,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
         // unpacking will be done by the 'UnpackTimeseriesBucket' PlanStage if the backup plan
         // (Top-K sort plan) was chosen, and by the 'SampleFromTimeseriesBucket' PlanStage if the
         // ARHASH plan was chosen.
-        Pipeline::SourceContainer& sources = pipeline->_sources;
+        DocumentSourceContainer& sources = pipeline->_sources;
         sources.erase(sources.begin());
         // We can push down the $sample source into the PlanStage layer if the chosen strategy uses
         // ARHASH sampling on unsharded collections. For sharded collections, we cannot erase
@@ -681,7 +681,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutor(
     auto expCtx = pipeline->getContext();
 
     // We will be modifying the source vector as we go.
-    Pipeline::SourceContainer& sources = pipeline->_sources;
+    DocumentSourceContainer& sources = pipeline->_sources;
 
     // We skip the 'requiresInputDocSource' check in the case of pushing $search down into SBE,
     // as $search has 'requiresInputDocSource' as false.
@@ -767,7 +767,7 @@ namespace {
  * - second: the stage that would replace $group in the pipeline on top of DISTINCT_SCAN.
  */
 std::pair<boost::optional<SortPattern>, std::unique_ptr<GroupFromFirstDocumentTransformation>>
-tryDistinctGroupRewrite(const Pipeline::SourceContainer& sources) {
+tryDistinctGroupRewrite(const DocumentSourceContainer& sources) {
     auto sourcesIt = sources.begin();
     if (sourcesIt != sources.end()) {
         auto sortStage = dynamic_cast<DocumentSourceSort*>(sourcesIt->get());
@@ -1713,7 +1713,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
     // pushed down into the query executor.
     pipeline->optimizePipeline();
 
-    Pipeline::SourceContainer& sources = pipeline->_sources;
+    DocumentSourceContainer& sources = pipeline->_sources;
     auto expCtx = pipeline->getContext();
 
     // Look for an initial match. This works whether we got an initial query or not. If not, it
@@ -1868,7 +1868,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeoNear(
                           << nss.toStringForErrorMsg() << " does not exist",
             collection);
 
-    Pipeline::SourceContainer& sources = pipeline->_sources;
+    DocumentSourceContainer& sources = pipeline->_sources;
     auto expCtx = pipeline->getContext();
     const auto geoNearStage = dynamic_cast<DocumentSourceGeoNear*>(sources.front().get());
     tassert(9911900, "", geoNearStage);

@@ -105,8 +105,8 @@ void DocumentSourcePlanCacheStats::serializeToArray(std::vector<Value>& array,
     }
 }
 
-Pipeline::SourceContainer::iterator DocumentSourcePlanCacheStats::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourcePlanCacheStats::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     auto itrToNext = std::next(itr);
     if (itrToNext == container->end()) {
         return itrToNext;

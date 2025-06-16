@@ -263,7 +263,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
     const Value EXISTS = V{Doc{{"$exists", true}}};
     const Value DNE = V{Doc{{"$exists", false}}};
 
-    Pipeline::SourceContainer stages;
+    DocumentSourceContainer stages;
     // The node receiving the query verifies continuity of oplog entries (i.e: that the recipient
     // hasn't fallen off the oplog). This stage provides the input timestamp that the donor uses for
     // verification.

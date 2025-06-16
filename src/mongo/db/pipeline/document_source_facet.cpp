@@ -271,7 +271,7 @@ bool DocumentSourceFacet::validateOperationContext(const OperationContext* opCtx
            });
 }
 
-StageConstraints DocumentSourceFacet::constraints(Pipeline::SplitState state) const {
+StageConstraints DocumentSourceFacet::constraints(PipelineSplitState state) const {
     // Currently we don't split $facet to have a merger part and a shards part (see SERVER-24154).
     // This means that if any stage in any of the $facet pipelines needs to run on router, then the
     // entire $facet stage must run there.

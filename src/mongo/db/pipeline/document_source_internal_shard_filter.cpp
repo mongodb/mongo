@@ -108,8 +108,8 @@ DocumentSource::GetNextResult DocumentSourceInternalShardFilter::doGetNext() {
     return next;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceInternalShardFilter::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceInternalShardFilter::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 
     if (_shardFilterer->isCollectionSharded()) {

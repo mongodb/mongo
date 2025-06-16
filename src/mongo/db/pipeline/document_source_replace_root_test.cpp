@@ -299,7 +299,7 @@ TEST_F(ReplaceRootBasics, ReplaceRootWithRemoveSystemVariableThrows) {
 }
 
 TEST_F(ReplaceRootBasics, ReplaceRootSwapsWithMatchStage) {
-    Pipeline::SourceContainer container;
+    DocumentSourceContainer container;
 
     auto replaceRoot = createReplaceRoot(BSON("newRoot" << "$subDocument"));
     auto match = DocumentSourceMatch::create(BSON("x" << 2), getExpCtx());

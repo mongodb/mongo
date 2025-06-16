@@ -278,9 +278,9 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::desugar() {
     return desugaredPipeline;
 }
 
-std::pair<Pipeline::SourceContainer::iterator, bool>
+std::pair<DocumentSourceContainer::iterator, bool>
 DocumentSourceVectorSearch::_attemptSortAfterVectorSearchOptimization(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     auto isSortOnVectorSearchMeta = [](const SortPattern& sortPattern) -> bool {
         return isSortOnSingleMetaField(sortPattern,
                                        (1 << DocumentMetadataFields::MetaType::kVectorSearchScore));
@@ -305,8 +305,8 @@ DocumentSourceVectorSearch::_attemptSortAfterVectorSearchOptimization(
     return {itr, false};
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceVectorSearch::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceVectorSearch::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     // Attempt to remove a $sort on metadata after this $vectorSearch stage.
     {
         const auto&& [returnItr, optimizationSucceeded] =

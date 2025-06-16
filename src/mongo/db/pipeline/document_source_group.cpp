@@ -95,8 +95,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
     return createFromBsonWithMaxMemoryUsage(std::move(elem), expCtx, boost::none);
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceGroup::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceGroup::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 
     if (pushDotRenamedMatch(itr, container)) {
@@ -114,8 +114,8 @@ Pipeline::SourceContainer::iterator DocumentSourceGroup::doOptimizeAt(
     return std::next(itr);
 }
 
-bool DocumentSourceGroup::pushDotRenamedMatch(Pipeline::SourceContainer::iterator itr,
-                                              Pipeline::SourceContainer* container) {
+bool DocumentSourceGroup::pushDotRenamedMatch(DocumentSourceContainer::iterator itr,
+                                              DocumentSourceContainer* container) {
     if (std::next(itr) == container->end() || std::next(std::next(itr)) == container->end()) {
         return false;
     }
@@ -219,10 +219,9 @@ AccumulationStatement makeAccStmtForTopBottom(boost::intrusive_ptr<ExpressionCon
 }
 }  // namespace
 
-bool DocumentSourceGroup::tryToAbsorbTopKSort(
-    DocumentSourceSort* prospectiveSort,
-    Pipeline::SourceContainer::iterator prospectiveSortItr,
-    Pipeline::SourceContainer* container) {
+bool DocumentSourceGroup::tryToAbsorbTopKSort(DocumentSourceSort* prospectiveSort,
+                                              DocumentSourceContainer::iterator prospectiveSortItr,
+                                              DocumentSourceContainer* container) {
     invariant(prospectiveSort);
 
     // If the $sort has a limit, we cannot absorb it into the $group since we know the selected
@@ -512,8 +511,8 @@ AccConversionFunction createAccConversionFunction(boost::intrusive_ptr<Expressio
 }
 }  // namespace
 
-bool DocumentSourceGroup::tryToGenerateCommonSortKey(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) {
+bool DocumentSourceGroup::tryToGenerateCommonSortKey(DocumentSourceContainer::iterator itr,
+                                                     DocumentSourceContainer* container) {
     auto& accStmts = getMutableAccumulationStatements();
 
     TopBottomAccKeyToAccIndicesMap topBottomAccKeyToAccIndicesMap(
@@ -606,8 +605,8 @@ bool DocumentSourceGroup::tryToGenerateCommonSortKey(Pipeline::SourceContainer::
     return true;
 }
 
-bool DocumentSourceGroup::tryToOptimizeAccN(Pipeline::SourceContainer::iterator itr,
-                                            Pipeline::SourceContainer* container) {
+bool DocumentSourceGroup::tryToOptimizeAccN(DocumentSourceContainer::iterator itr,
+                                            DocumentSourceContainer* container) {
     auto& accumulators = getMutableAccumulationStatements();
     if (accumulators.empty()) {
         return false;

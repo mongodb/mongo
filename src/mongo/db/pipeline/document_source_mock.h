@@ -125,7 +125,7 @@ public:
         return this;
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const override {
+    StageConstraints constraints(PipelineSplitState pipeState) const override {
         return mockConstraints;
     }
 

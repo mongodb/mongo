@@ -50,7 +50,7 @@ ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamCheckTopologyChange,
                             DocumentSourceChangeStreamCheckTopologyChange::id)
 
 StageConstraints DocumentSourceChangeStreamCheckTopologyChange::constraints(
-    Pipeline::SplitState pipeState) const {
+    PipelineSplitState pipeState) const {
     return {StreamType::kStreaming,
             PositionRequirement::kNone,
             HostTypeRequirement::kAnyShard,

@@ -81,7 +81,7 @@ public:
         return id;
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kCustom,
                                      HostTypeRequirement::kAnyShard,
@@ -95,8 +95,8 @@ public:
     }
 
     void validatePipelinePosition(bool alreadyOptimized,
-                                  Pipeline::SourceContainer::const_iterator pos,
-                                  const Pipeline::SourceContainer& container) const final {
+                                  DocumentSourceContainer::const_iterator pos,
+                                  const DocumentSourceContainer& container) const final {
         // This stage must be in the first position in the pipeline after optimization.
         uassert(40603,
                 str::stream() << getSourceName()
@@ -193,8 +193,8 @@ public:
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
 
 protected:
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) final;
 
 private:
     explicit DocumentSourceGeoNear(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -205,8 +205,8 @@ private:
      *
      * Does nothing if not immediately following an $_internalUnpackBucket.
      */
-    Pipeline::SourceContainer::iterator splitForTimeseries(Pipeline::SourceContainer::iterator itr,
-                                                           Pipeline::SourceContainer* container);
+    DocumentSourceContainer::iterator splitForTimeseries(DocumentSourceContainer::iterator itr,
+                                                         DocumentSourceContainer* container);
 
 
     /**

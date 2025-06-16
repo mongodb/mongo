@@ -104,7 +104,7 @@ DocumentSourceReshardingOwnershipMatch::DocumentSourceReshardingOwnershipMatch(
       _temporaryReshardingNamespace{std::move(temporaryReshardingNamespace)} {}
 
 StageConstraints DocumentSourceReshardingOwnershipMatch::constraints(
-    Pipeline::SplitState pipeState) const {
+    PipelineSplitState pipeState) const {
     return StageConstraints(StreamType::kStreaming,
                             PositionRequirement::kNone,
                             HostTypeRequirement::kAnyShard,

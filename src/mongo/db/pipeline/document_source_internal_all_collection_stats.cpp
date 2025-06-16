@@ -109,8 +109,8 @@ DocumentSource::GetNextResult DocumentSourceInternalAllCollectionStats::doGetNex
     return GetNextResult::makeEOF();
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceInternalAllCollectionStats::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceInternalAllCollectionStats::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 
     if (std::next(itr) == container->end()) {

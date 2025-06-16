@@ -104,7 +104,7 @@ public:
      * Produce constraints consistent with a stage that takes no inputs and produces documents at
      * the beginning of a pipeline.
      */
-    StageConstraints constraints(Pipeline::SplitState pipeState) const override {
+    StageConstraints constraints(PipelineSplitState pipeState) const override {
         StageConstraints constraints = DocumentSourceMock::constraints(pipeState);
         constraints.requiredPosition = PositionRequirement::kFirst;
         constraints.isIndependentOfAnyCollection = true;

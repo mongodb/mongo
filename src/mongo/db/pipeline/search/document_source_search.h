@@ -78,7 +78,7 @@ public:
           _view(view) {}
 
     const char* getSourceName() const override;
-    StageConstraints constraints(Pipeline::SplitState pipeState) const override;
+    StageConstraints constraints(PipelineSplitState pipeState) const override;
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
     DepsTracker::State getDependencies(DepsTracker* deps) const override;
@@ -184,8 +184,8 @@ private:
         MONGO_UNREACHABLE_TASSERT(6253716);
     }
 
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) override;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) override;
 
     // Holds all the planning information for the command's eventual mongot request.
     InternalSearchMongotRemoteSpec _spec;

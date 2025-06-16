@@ -129,7 +129,7 @@ public:
 
     ~DocumentSourceOut() override;
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final;
+    StageConstraints constraints(PipelineSplitState pipeState) const final;
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 

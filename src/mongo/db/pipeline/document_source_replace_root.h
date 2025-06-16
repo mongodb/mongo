@@ -159,11 +159,11 @@ public:
      * Note: this optimization will not rename and push forward a match stage if there are
      * dependencies between different paths contained in the match expression.
      */
-    bool pushDotRenamedMatchBefore(Pipeline::SourceContainer::iterator itr,
-                                   Pipeline::SourceContainer* container);
+    bool pushDotRenamedMatchBefore(DocumentSourceContainer::iterator itr,
+                                   DocumentSourceContainer* container);
 
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) final;
 
     boost::intrusive_ptr<Expression>& getExpressionToModify() {
         return _newRoot;

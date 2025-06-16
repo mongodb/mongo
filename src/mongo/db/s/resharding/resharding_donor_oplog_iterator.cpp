@@ -110,7 +110,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingDonorOplogIterator::makePip
                       .resolvedNamespace(std::move(resolvedNamespaces))
                       .build();
 
-    Pipeline::SourceContainer stages;
+    DocumentSourceContainer stages;
 
     stages.emplace_back(
         DocumentSourceMatch::create(BSON("_id" << BSON("$gt" << _resumeToken.toBSON())), expCtx));

@@ -579,7 +579,7 @@ DocumentSource::GetModPathsReturn DocumentSourceGraphLookUp::getModifiedPaths() 
     return {GetModPathsReturn::Type::kFiniteSet, std::move(modifiedPaths), {}};
 }
 
-StageConstraints DocumentSourceGraphLookUp::constraints(Pipeline::SplitState pipeState) const {
+StageConstraints DocumentSourceGraphLookUp::constraints(PipelineSplitState pipeState) const {
     // $graphLookup can execute on a mongos or a shard, so its host type requirement is
     // 'kNone'. If it needs to execute on a specific merging shard, it can request this
     // later.
@@ -598,15 +598,15 @@ StageConstraints DocumentSourceGraphLookUp::constraints(Pipeline::SplitState pip
     // If this $graphLookup is on the merging half of the pipeline and the inner collection
     // isn't sharded (that is, it is either unsplittable or untracked), then we should merge
     // on the shard which owns the inner collection.
-    if (pipeState == Pipeline::SplitState::kSplitForMerge) {
+    if (pipeState == PipelineSplitState::kSplitForMerge) {
         constraints.mergeShardId = getMergeShardId();
     }
 
     return constraints;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceGraphLookUp::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceGraphLookUp::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 
     if (std::next(itr) == container->end()) {

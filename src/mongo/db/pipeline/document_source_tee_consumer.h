@@ -70,7 +70,7 @@ public:
         const boost::intrusive_ptr<TeeBuffer>& bufferSource,
         StringData stageName);
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+    StageConstraints constraints(PipelineSplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,

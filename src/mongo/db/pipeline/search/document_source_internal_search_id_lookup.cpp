@@ -187,8 +187,8 @@ const char* DocumentSourceInternalSearchIdLookUp::getSourceName() const {
     return kStageName.data();
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceInternalSearchIdLookUp::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceInternalSearchIdLookUp::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     for (auto optItr = std::next(itr); optItr != container->end(); ++optItr) {
         auto limitStage = dynamic_cast<DocumentSourceLimit*>(optItr->get());
         if (limitStage) {

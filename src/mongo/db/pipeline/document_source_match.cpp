@@ -160,8 +160,8 @@ DocumentSource::GetNextResult DocumentSourceMatch::doGetNext() {
     return nextInput;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceMatch::doOptimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+DocumentSourceContainer::iterator DocumentSourceMatch::doOptimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     invariant(*itr == this);
 
     if (std::next(itr) == container->end()) {

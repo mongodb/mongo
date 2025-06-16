@@ -118,7 +118,7 @@ DocumentSourceReshardingIterateTransaction::DocumentSourceReshardingIterateTrans
       _includeCommitTransactionTimestamp(includeCommitTransactionTimestamp) {}
 
 StageConstraints DocumentSourceReshardingIterateTransaction::constraints(
-    Pipeline::SplitState pipeState) const {
+    PipelineSplitState pipeState) const {
     return StageConstraints(StreamType::kStreaming,
                             PositionRequirement::kNone,
                             HostTypeRequirement::kAnyShard,

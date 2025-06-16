@@ -73,11 +73,11 @@ public:
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final;
+    StageConstraints constraints(PipelineSplitState pipeState) const final;
 
     void validatePipelinePosition(bool alreadyOptimized,
-                                  Pipeline::SourceContainer::const_iterator pos,
-                                  const Pipeline::SourceContainer& container) const final;
+                                  DocumentSourceContainer::const_iterator pos,
+                                  const DocumentSourceContainer& container) const final;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;
@@ -94,8 +94,8 @@ public:
     }
 
 protected:
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) final;
 
     DocumentSource::GetNextResult doGetNext() final;
 

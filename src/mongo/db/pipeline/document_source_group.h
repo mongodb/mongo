@@ -84,16 +84,16 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<int64_t> maxMemoryUsageBytes);
 
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) override;
+    DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
+                                                   DocumentSourceContainer* container) override;
 
     // The $sort/$group with $first/$last is rewritten to use $top/$bottom in $group so that $sort
     // is absorbed into $group. Currently this rewrite is only invoked from time-series.
     //
     // TODO SERVER-28980 will lift the restriction.
     bool tryToAbsorbTopKSort(DocumentSourceSort* prospectiveSort,
-                             Pipeline::SourceContainer::iterator prospectiveSortItr,
-                             Pipeline::SourceContainer* container);
+                             DocumentSourceContainer::iterator prospectiveSortItr,
+                             DocumentSourceContainer* container);
 
 protected:
     GetNextResult doGetNext() final;
@@ -122,8 +122,8 @@ protected:
      * dotted paths which include arrays change the evaluation of the filter statement and may lead
      * to erroneous results.
      */
-    bool pushDotRenamedMatch(Pipeline::SourceContainer::iterator itr,
-                             Pipeline::SourceContainer* container);
+    bool pushDotRenamedMatch(DocumentSourceContainer::iterator itr,
+                             DocumentSourceContainer* container);
 
     /**
      * This optimization combines multiple $top(N) or $bottom(N) accumulators that use the same sort
@@ -150,8 +150,8 @@ protected:
      * },
      * {$project: {tm: "$ts.tm", ti: "$ts.ti"}}
      */
-    bool tryToGenerateCommonSortKey(Pipeline::SourceContainer::iterator itr,
-                                    Pipeline::SourceContainer* container);
+    bool tryToGenerateCommonSortKey(DocumentSourceContainer::iterator itr,
+                                    DocumentSourceContainer* container);
 
     /**
      * This optimization desugars a $topN where N == 1 to a single $top followed by a $addFields to
@@ -176,8 +176,8 @@ protected:
      * },
      * {$addFields: {myField: ["$myField"]}
      */
-    bool tryToOptimizeAccN(Pipeline::SourceContainer::iterator itr,
-                           Pipeline::SourceContainer* container);
+    bool tryToOptimizeAccN(DocumentSourceContainer::iterator itr,
+                           DocumentSourceContainer* container);
 
 private:
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& expCtx,

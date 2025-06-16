@@ -85,8 +85,7 @@ Value DocumentSourceListSearchIndexes::serialize(const SerializationOptions& opt
 
 // We use 'kLocalOnly' because the aggregation request can be handled by a shard or mongos depending
 // on where the user sends the request.
-StageConstraints DocumentSourceListSearchIndexes::constraints(
-    Pipeline::SplitState pipeState) const {
+StageConstraints DocumentSourceListSearchIndexes::constraints(PipelineSplitState pipeState) const {
     StageConstraints constraints(StreamType::kStreaming,
                                  PositionRequirement::kFirst,
                                  HostTypeRequirement::kLocalOnly,

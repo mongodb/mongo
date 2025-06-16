@@ -385,7 +385,7 @@ private:
     }
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
-    Pipeline::SourceContainer _stages;
+    DocumentSourceContainer _stages;
 };
 
 AggregateCommandRequest createInitPlacementHistoryAggregationRequest(

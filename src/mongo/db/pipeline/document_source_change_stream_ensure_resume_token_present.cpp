@@ -69,7 +69,7 @@ const char* DocumentSourceChangeStreamEnsureResumeTokenPresent::getSourceName() 
 
 
 StageConstraints DocumentSourceChangeStreamEnsureResumeTokenPresent::constraints(
-    Pipeline::SplitState) const {
+    PipelineSplitState) const {
     StageConstraints constraints{StreamType::kStreaming,
                                  PositionRequirement::kNone,
                                  // If this is parsed on mongos it should stay on mongos. If we're

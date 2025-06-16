@@ -87,7 +87,7 @@ void desugarSearchPipeline(Pipeline* pipeline) {
 // 'DocumentSourceSetVariableFromSubPipeline' could do the actual setting of the variable, but it
 // can only be generated alongside a 'DocumentSourceInternalSearchMongotRemote'.
 void assertSearchMetaAccessValidHelper(
-    const std::vector<const Pipeline::SourceContainer*>& pipelines) {
+    const std::vector<const DocumentSourceContainer*>& pipelines) {
     // Whether or not there was a sub-pipeline stage previously in this pipeline.
     bool subPipeSeen = false;
     bool searchMetaSet = false;
@@ -325,7 +325,7 @@ bool isMongotStage(DocumentSource* stage) {
          dynamic_cast<mongo::DocumentSourceSearchMeta*>(stage));
 }
 
-void assertSearchMetaAccessValid(const Pipeline::SourceContainer& pipeline,
+void assertSearchMetaAccessValid(const DocumentSourceContainer& pipeline,
                                  ExpressionContext* expCtx) {
     if (pipeline.empty()) {
         return;
@@ -341,8 +341,8 @@ void assertSearchMetaAccessValid(const Pipeline::SourceContainer& pipeline,
     }
 }
 
-void assertSearchMetaAccessValid(const Pipeline::SourceContainer& shardsPipeline,
-                                 const Pipeline::SourceContainer& mergePipeline,
+void assertSearchMetaAccessValid(const DocumentSourceContainer& shardsPipeline,
+                                 const DocumentSourceContainer& mergePipeline,
                                  ExpressionContext* expCtx) {
     assertSearchMetaAccessValidHelper({&shardsPipeline, &mergePipeline});
 }

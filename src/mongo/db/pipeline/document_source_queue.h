@@ -105,7 +105,7 @@ public:
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override;
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const override {
+    StageConstraints constraints(PipelineSplitState pipeState) const override {
         if (_constraintsOverride.has_value()) {
             return *_constraintsOverride;
         }

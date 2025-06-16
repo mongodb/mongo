@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,26 +29,12 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_graph_lookup.h"
-#include "mongo/db/pipeline/document_source_lookup.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/sort_pattern.h"
-
 namespace mongo {
 
 /**
- * Checks if a sort stage's pattern is suitable to push the stage before $lookup or $graphLookup.
- * The sort stage must not share the same prefix with any field created or modified by the lookup
- * stage.
+ * A SplitState specifies whether the pipeline is currently unsplit, split for the shards, or
+ * split for merging.
  */
-bool checkModifiedPathsSortReorder(const SortPattern& sortPattern,
-                                   const DocumentSource::GetModPathsReturn& modPaths);
-
-/**
- * Tries to swap $lookup or $graphLookup with sort.
- */
-DocumentSourceContainer::iterator tryReorderingWithSort(DocumentSourceContainer::iterator itr,
-                                                        DocumentSourceContainer* container);
+enum class PipelineSplitState { kUnsplit, kSplitForShards, kSplitForMerge };
 
 }  // namespace mongo

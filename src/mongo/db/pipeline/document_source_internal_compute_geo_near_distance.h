@@ -88,7 +88,7 @@ public:
         return id;
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const override {
+    StageConstraints constraints(PipelineSplitState pipeState) const override {
         StageConstraints result = {
             StreamType::kStreaming,
             PositionRequirement::kNone,

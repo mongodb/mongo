@@ -145,7 +145,7 @@ TEST_F(DocumentSourceSortTest, SortWithLimit) {
     createSort(BSON("a" << 1));
 
     ASSERT(!sort()->getLimit());
-    Pipeline::SourceContainer container;
+    DocumentSourceContainer container;
     container.push_back(sort());
 
     {  // pre-limit checks
@@ -192,7 +192,7 @@ TEST_F(DocumentSourceSortTest, ParseableSerialization) {
     createSort(BSON("a" << 1));
 
     ASSERT(!sort()->getLimit());
-    Pipeline::SourceContainer container;
+    DocumentSourceContainer container;
     container.push_back(sort());
 
     container.push_back(DocumentSourceLimit::create(expCtx, 2));
@@ -230,7 +230,7 @@ TEST_F(DocumentSourceSortTest, QueryShapeSerializationOmitsInternalField) {
 }
 
 TEST_F(DocumentSourceSortTest, DoesNotPushProjectBeforeSelf) {
-    Pipeline::SourceContainer container;
+    DocumentSourceContainer container;
     createSort(BSON("_id" << 1));
     auto project =
         DocumentSourceProject::create(BSON("fullDocument" << true), getExpCtx(), "$project"_sd);

@@ -54,7 +54,7 @@ TEST_F(DocumentSourceRedactTest, ShouldCopyRedactSafePartOfMatchBeforeItself) {
     auto redact = DocumentSourceRedact::createFromBson(redactSpec.firstElement(), getExpCtx());
     auto match = DocumentSourceMatch::create(BSON("a" << 1), getExpCtx());
 
-    Pipeline::SourceContainer pipeline;
+    DocumentSourceContainer pipeline;
     pipeline.push_back(redact);
     pipeline.push_back(match);
 
