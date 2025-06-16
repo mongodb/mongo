@@ -832,6 +832,80 @@ TEST_F(BucketAutoTests, ShouldNotRoundZeroInFirstBucketWithGranularitySpecified)
                        Document(fromjson("{_id : {min : 0.63, max : 1.6}, count : 2}")));
 }
 
+TEST_F(BucketAutoTests, AllValuesZeroWithGranularitySpecified) {
+    auto bucketAutoSpec =
+        fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, granularity : 'R5'}}");
+
+    auto results = getResults(
+        bucketAutoSpec,
+        {Document{{"x", 0}}, Document{{"x", 0}}, Document{{"x", 0}}, Document{{"x", 0}}});
+
+    ASSERT_EQUALS(results.size(), 1UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 0, max : 0}, count : 4}")));
+}
+
+TEST_F(BucketAutoTests, MostValuesZeroWithGranularitySpecified) {
+    auto bucketAutoSpec =
+        fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, granularity : 'R5'}}");
+
+    auto results = getResults(
+        bucketAutoSpec,
+        {Document{{"x", 0}}, Document{{"x", 0}}, Document{{"x", 0}}, Document{{"x", 1}}});
+
+    ASSERT_EQUALS(results.size(), 2UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 0, max : 0.63}, count : 3}")));
+    ASSERT_DOCUMENT_EQ(results[1],
+                       Document(fromjson("{_id : {min : 0.63, max : 1.6}, count : 1}")));
+}
+
+TEST_F(BucketAutoTests, AllValuesInfinityWithGranularitySpecified) {
+    auto bucketAutoSpec =
+        fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, granularity : 'R5'}}");
+
+    auto results = getResults(bucketAutoSpec,
+                              {Document{{"x", std::numeric_limits<double>::infinity()}},
+                               Document{{"x", std::numeric_limits<double>::infinity()}},
+                               Document{{"x", std::numeric_limits<double>::infinity()}},
+                               Document{{"x", std::numeric_limits<double>::infinity()}}});
+
+    ASSERT_EQUALS(results.size(), 1UL);
+    ASSERT_DOCUMENT_EQ(results[0],
+                       Document(fromjson("{_id : {min : Infinity, max : Infinity}, count : 4}")));
+}
+
+TEST_F(BucketAutoTests, MostValuesInfinityWithGranularitySpecified) {
+    auto bucketAutoSpec =
+        fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, granularity : 'R5'}}");
+
+    auto results = getResults(bucketAutoSpec,
+                              {Document{{"x", 1}},
+                               Document{{"x", std::numeric_limits<double>::infinity()}},
+                               Document{{"x", std::numeric_limits<double>::infinity()}},
+                               Document{{"x", std::numeric_limits<double>::infinity()}}});
+
+    ASSERT_EQUALS(results.size(), 1UL);
+    ASSERT_DOCUMENT_EQ(results[0],
+                       Document(fromjson("{_id : {min : 0.63, max : Infinity}, count : 4}")));
+}
+
+TEST_F(BucketAutoTests, OneValueInfinityWithGranularitySpecified) {
+    auto bucketAutoSpec =
+        fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, granularity : 'R5'}}");
+
+    auto results = getResults(bucketAutoSpec,
+                              {Document{{"x", 1}},
+                               Document{{"x", 1}},
+                               Document{{"x", 1}},
+                               Document{{"x", std::numeric_limits<double>::infinity()}}});
+
+    ASSERT_EQUALS(results.size(), 2UL);
+    ASSERT_DOCUMENT_EQ(results[0],
+                       Document(fromjson("{_id : {min : 0.63, max : 1.6}, count : 3}")));
+    ASSERT_DOCUMENT_EQ(results[1],
+                       Document(fromjson("{_id : {min : 1.6, max : Infinity}, count : 1}")));
+}
+
+
 TEST_F(BucketAutoTests, ShouldFailOnNaNWhenGranularitySpecified) {
     auto bucketAutoSpec =
         fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, granularity : 'R5'}}");

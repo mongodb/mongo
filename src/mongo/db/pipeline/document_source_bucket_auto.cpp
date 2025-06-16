@@ -255,7 +255,8 @@ DocumentSourceBucketAuto::adjustBoundariesAndGetMinForNextBucket(Bucket* current
         // If there are any values that now fall into this bucket after we round the
         // boundary, absorb them into this bucket too.
         while (nextValue &&
-               pExpCtx->getValueComparator().evaluate(boundaryValue > nextValue->first)) {
+               (pExpCtx->getValueComparator().evaluate(boundaryValue > nextValue->first) ||
+                pExpCtx->getValueComparator().evaluate(currentBucket->_max == nextValue->first))) {
             addDocumentToBucket(*nextValue, *currentBucket);
             nextValue = getNextValIfPresent();
         }
