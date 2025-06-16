@@ -1825,6 +1825,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/resharding:resharding_coordinator_observer_test.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_service_external_state_test.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_service_test.cpp",
+        "//src/mongo/db/s/resharding:resharding_coordinator_service_util_test.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_test.cpp",
         "//src/mongo/db/s/resharding:resharding_service_test_helpers.h",
         "//src/mongo/db/s/resharding:resharding_util_test.cpp",

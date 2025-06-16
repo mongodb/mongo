@@ -408,110 +408,6 @@ void updateQueryAnalyzerMetadata(OperationContext* opCtx,
         opCtx, NamespaceString::kConfigQueryAnalyzersNamespace, request, txnNumber);
 }
 
-void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
-                                        const ReshardingCoordinatorDocument& coordinatorDoc,
-                                        boost::optional<ChunkVersion> chunkVersion,
-                                        boost::optional<const BSONObj&> collation,
-                                        boost::optional<bool> isUnsplittable,
-                                        TxnNumber txnNumber) {
-    BatchedCommandRequest request([&] {
-        auto nextState = coordinatorDoc.getState();
-        switch (nextState) {
-            case CoordinatorStateEnum::kPreparingToDonate: {
-                // Insert new entry for the temporary nss into config.collections
-                auto collType = resharding::createTempReshardingCollectionType(
-                    opCtx, coordinatorDoc, chunkVersion.value(), collation.value(), isUnsplittable);
-                return BatchedCommandRequest::buildInsertOp(
-                    CollectionType::ConfigNS, std::vector<BSONObj>{collType.toBSON()});
-            }
-            case CoordinatorStateEnum::kCloning: {
-                // Update the 'state', 'donorShards', 'approxCopySize', and 'cloneTimestamp' fields
-                // in the 'reshardingFields.recipient' section
-
-                BSONArrayBuilder donorShardsBuilder;
-                for (const auto& donor : coordinatorDoc.getDonorShards()) {
-                    DonorShardFetchTimestamp donorShardFetchTimestamp(donor.getId());
-                    donorShardFetchTimestamp.setMinFetchTimestamp(
-                        donor.getMutableState().getMinFetchTimestamp());
-                    donorShardsBuilder.append(donorShardFetchTimestamp.toBSON());
-                }
-
-                return BatchedCommandRequest::buildUpdateOp(
-                    CollectionType::ConfigNS,
-                    BSON(CollectionType::kNssFieldName
-                         << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss(),
-                                                           SerializationContext::stateDefault())),
-                    BSON("$set" << BSON(
-                             "reshardingFields.state"
-                             << CoordinatorState_serializer(nextState)
-                             << "reshardingFields.recipientFields.approxDocumentsToCopy"
-                             << coordinatorDoc.getApproxDocumentsToCopy().value()
-                             << "reshardingFields.recipientFields.approxBytesToCopy"
-                             << coordinatorDoc.getApproxBytesToCopy().value()
-                             << "reshardingFields.recipientFields.cloneTimestamp"
-                             << coordinatorDoc.getCloneTimestamp().value()
-                             << "reshardingFields.recipientFields.donorShards"
-                             << donorShardsBuilder.arr() << "lastmod"
-                             << opCtx->getServiceContext()->getPreciseClockSource()->now())),
-                    false,  // upsert
-                    false   // multi
-                );
-            }
-            case CoordinatorStateEnum::kCommitting:
-                // Remove the entry for the temporary nss
-                return BatchedCommandRequest::buildDeleteOp(
-                    CollectionType::ConfigNS,
-                    BSON(CollectionType::kNssFieldName
-                         << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss(),
-                                                           SerializationContext::stateDefault())),
-                    false  // multi
-                );
-            default: {
-                // Update the 'state' field, and 'abortReason' field if it exists, in the
-                // 'reshardingFields' section.
-                BSONObjBuilder updateBuilder;
-                {
-                    BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
-
-                    setBuilder.append("reshardingFields.state",
-                                      std::string{CoordinatorState_serializer(nextState)});
-                    setBuilder.append("lastmod",
-                                      opCtx->getServiceContext()->getPreciseClockSource()->now());
-
-                    if (auto abortReason = coordinatorDoc.getAbortReason()) {
-                        setBuilder.append("reshardingFields.abortReason", *abortReason);
-
-                        auto abortStatus = resharding::getStatusFromAbortReason(coordinatorDoc);
-                        setBuilder.append("reshardingFields.userCanceled",
-                                          abortStatus == ErrorCodes::ReshardCollectionAborted);
-                    }
-                }
-
-                return BatchedCommandRequest::buildUpdateOp(
-                    CollectionType::ConfigNS,
-                    BSON(CollectionType::kNssFieldName
-                         << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss(),
-                                                           SerializationContext::stateDefault())),
-                    updateBuilder.obj(),
-                    true,  // upsert
-                    false  // multi
-                );
-            }
-        }
-    }());
-
-    auto expectedNumMatched = (request.getBatchType() == BatchedCommandRequest::BatchType_Insert)
-        ? boost::none
-        : boost::make_optional(1);
-
-    auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
-        opCtx, CollectionType::ConfigNS, request, txnNumber);
-
-    if (expectedNumMatched) {
-        assertNumDocsMatchedEqualsExpected(request, res, *expectedNumMatched);
-    }
-}
-
 void writeToConfigPlacementHistoryForOriginalNss(
     OperationContext* opCtx,
     const ReshardingCoordinatorDocument& coordinatorDoc,
@@ -1049,16 +945,10 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
         }
     }());
 
-    auto expectedNumMatched = (request.getBatchType() == BatchedCommandRequest::BatchType_Insert)
-        ? boost::none
-        : boost::make_optional(1);
-
     auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx, NamespaceString::kConfigReshardingOperationsNamespace, request, txnNumber);
 
-    if (expectedNumMatched) {
-        assertNumDocsMatchedEqualsExpected(request, res, *expectedNumMatched);
-    }
+    assertResultIsValidForUpdatesAndDeletes(request, res);
 
     // We don't have metrics when moving from quiescing to done and when we are in the cloning state
     // or blocking state and are updating the donor shard entries.
@@ -1119,6 +1009,124 @@ ShardOwnership computeRecipientChunkOwnership(OperationContext* opCtx,
     invariant(recipientShardIds.size() == shardsOwningChunks.size() + shardsNotOwningChunks.size());
 
     return ShardOwnership{shardsOwningChunks, shardsNotOwningChunks};
+}
+
+void assertResultIsValidForUpdatesAndDeletes(const BatchedCommandRequest& request,
+                                             const BSONObj& result) {
+    if (request.getBatchType() == BatchedCommandRequest::BatchType_Delete) {
+        auto numDocsMatched = result.getIntField("n");
+        uassert(10541700,
+                str::stream() << "Expected to match 0 or 1 docs, but matched " << numDocsMatched
+                              << " for delete request " << request.toString(),
+                0 == numDocsMatched || 1 == numDocsMatched);
+    } else if (request.getBatchType() == BatchedCommandRequest::BatchType_Update) {
+        assertNumDocsMatchedEqualsExpected(request, result, 1);
+    }
+}
+
+void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
+                                        const ReshardingCoordinatorDocument& coordinatorDoc,
+                                        boost::optional<ChunkVersion> chunkVersion,
+                                        boost::optional<const BSONObj&> collation,
+                                        boost::optional<bool> isUnsplittable,
+                                        TxnNumber txnNumber) {
+    auto request = generateBatchedCommandRequestForConfigCollectionsForTempNss(
+        opCtx, coordinatorDoc, chunkVersion, collation, isUnsplittable);
+
+    auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
+        opCtx, CollectionType::ConfigNS, request, txnNumber);
+
+    assertResultIsValidForUpdatesAndDeletes(request, res);
+}
+
+BatchedCommandRequest generateBatchedCommandRequestForConfigCollectionsForTempNss(
+    OperationContext* opCtx,
+    const ReshardingCoordinatorDocument& coordinatorDoc,
+    boost::optional<ChunkVersion> chunkVersion,
+    boost::optional<const BSONObj&> collation,
+    boost::optional<bool> isUnsplittable) {
+    auto nextState = coordinatorDoc.getState();
+    switch (nextState) {
+        case CoordinatorStateEnum::kPreparingToDonate: {
+            // Insert new entry for the temporary nss into config.collections
+            auto collType = resharding::createTempReshardingCollectionType(
+                opCtx, coordinatorDoc, chunkVersion.value(), collation.value(), isUnsplittable);
+            return BatchedCommandRequest::buildInsertOp(CollectionType::ConfigNS,
+                                                        std::vector<BSONObj>{collType.toBSON()});
+        }
+        case CoordinatorStateEnum::kCloning: {
+            // Update the 'state', 'donorShards', 'approxCopySize', and 'cloneTimestamp' fields
+            // in the 'reshardingFields.recipient' section
+
+            BSONArrayBuilder donorShardsBuilder;
+            for (const auto& donor : coordinatorDoc.getDonorShards()) {
+                DonorShardFetchTimestamp donorShardFetchTimestamp(donor.getId());
+                donorShardFetchTimestamp.setMinFetchTimestamp(
+                    donor.getMutableState().getMinFetchTimestamp());
+                donorShardsBuilder.append(donorShardFetchTimestamp.toBSON());
+            }
+
+            return BatchedCommandRequest::buildUpdateOp(
+                CollectionType::ConfigNS,
+                BSON(CollectionType::kNssFieldName
+                     << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss(),
+                                                       SerializationContext::stateDefault())),
+                BSON("$set" << BSON("reshardingFields.state"
+                                    << CoordinatorState_serializer(nextState)
+                                    << "reshardingFields.recipientFields.approxDocumentsToCopy"
+                                    << coordinatorDoc.getApproxDocumentsToCopy().value()
+                                    << "reshardingFields.recipientFields.approxBytesToCopy"
+                                    << coordinatorDoc.getApproxBytesToCopy().value()
+                                    << "reshardingFields.recipientFields.cloneTimestamp"
+                                    << coordinatorDoc.getCloneTimestamp().value()
+                                    << "reshardingFields.recipientFields.donorShards"
+                                    << donorShardsBuilder.arr() << "lastmod"
+                                    << opCtx->getServiceContext()->getPreciseClockSource()->now())),
+                false,  // upsert
+                false   // multi
+            );
+        }
+        case CoordinatorStateEnum::kCommitting:
+            // Remove the entry for the temporary nss
+            return BatchedCommandRequest::buildDeleteOp(
+                CollectionType::ConfigNS,
+                BSON(CollectionType::kNssFieldName
+                     << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss(),
+                                                       SerializationContext::stateDefault())),
+                false  // multi
+            );
+        default: {
+            // Update the 'state' field, and 'abortReason' field if it exists, in the
+            // 'reshardingFields' section.
+            BSONObjBuilder updateBuilder;
+            {
+                BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
+
+                setBuilder.append("reshardingFields.state",
+                                  std::string{CoordinatorState_serializer(nextState)});
+                setBuilder.append("lastmod",
+                                  opCtx->getServiceContext()->getPreciseClockSource()->now());
+
+                if (auto abortReason = coordinatorDoc.getAbortReason()) {
+                    setBuilder.append("reshardingFields.abortReason", *abortReason);
+
+                    auto abortStatus = resharding::getStatusFromAbortReason(coordinatorDoc);
+                    setBuilder.append("reshardingFields.userCanceled",
+                                      abortStatus == ErrorCodes::ReshardCollectionAborted);
+                }
+            }
+
+            return BatchedCommandRequest::buildUpdateOp(
+                CollectionType::ConfigNS,
+                BSON(CollectionType::kNssFieldName
+                     << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss(),
+                                                       SerializationContext::stateDefault())),
+                updateBuilder.obj(),
+                true,  // upsert
+                false  // multi
+            );
+        }
+    }
 }
 
 }  // namespace resharding

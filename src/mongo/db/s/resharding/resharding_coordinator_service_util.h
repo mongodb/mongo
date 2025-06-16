@@ -118,6 +118,22 @@ struct ShardOwnership {
 ShardOwnership computeRecipientChunkOwnership(OperationContext* opCtx,
                                               const ReshardingCoordinatorDocument& coordinatorDoc);
 
+void assertResultIsValidForUpdatesAndDeletes(const BatchedCommandRequest& request,
+                                             const BSONObj& result);
+
+void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
+                                        const ReshardingCoordinatorDocument& coordinatorDoc,
+                                        boost::optional<ChunkVersion> chunkVersion,
+                                        boost::optional<const BSONObj&> collation,
+                                        boost::optional<bool> isUnsplittable,
+                                        TxnNumber txnNumber);
+
+BatchedCommandRequest generateBatchedCommandRequestForConfigCollectionsForTempNss(
+    OperationContext* opCtx,
+    const ReshardingCoordinatorDocument& coordinatorDoc,
+    boost::optional<ChunkVersion> chunkVersion,
+    boost::optional<const BSONObj&> collation,
+    boost::optional<bool> isUnsplittable);
 }  // namespace resharding
 
 }  // namespace mongo
