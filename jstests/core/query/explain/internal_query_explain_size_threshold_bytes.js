@@ -27,35 +27,15 @@ const statsTreeWarning = "stats tree exceeded BSON size limit for explain";
 const slotBasedPlanWarning = "slotBasedPlan exceeded BSON size limit for explain";
 const capWarning = "exceeded explain BSON size cap";
 
-function doesNotFitPlan(winningPlan) {
-    jsTestLog("doesNotFitPlan");
-    return winningPlan.queryPlan.hasOwnProperty("warning") &&
-        winningPlan.queryPlan.warning == statsTreeWarning;
-}
-
 function fitsPlanWarning(winningPlan) {
     jsTestLog("fitsPlanWarning");
     return winningPlan.hasOwnProperty("warning") && winningPlan.warning == slotBasedPlanWarning;
-}
-
-function fitsPlanSlotsWarning(winningPlan) {
-    jsTestLog("fitsPlanSlotsWarning");
-    return winningPlan.hasOwnProperty("slotBasedPlan") &&
-        winningPlan.slotBasedPlan.hasOwnProperty("warning") && winningPlan.warning == capWarning;
-}
-
-function fitsPlanSlots(winningPlan) {
-    jsTestLog("fitsPlanSlots");
-    return winningPlan.hasOwnProperty("slotBasedPlan") &&
-        winningPlan.slotBasedPlan.hasOwnProperty("slots") &&
-        !winningPlan.slotBasedPlan.hasOwnProperty("stages");
 }
 
 function fitsPlanSlotsStageWarning(winningPlan) {
     jsTestLog("fitsPlanSlotsStageWarning");
     return winningPlan.hasOwnProperty("slotBasedPlan") &&
         winningPlan.slotBasedPlan.hasOwnProperty("slots") &&
-        winningPlan.slotBasedPlan != capWarning &&
         !winningPlan.slotBasedPlan.hasOwnProperty("stages") &&
         winningPlan.slotBasedPlan.hasOwnProperty("warning") &&
         winningPlan.slotBasedPlan.warning == capWarning;
@@ -65,7 +45,6 @@ function fitsPlanSlotsStages(winningPlan) {
     jsTestLog("fitsPlanSlotsStages");
     return winningPlan.hasOwnProperty("slotBasedPlan") &&
         winningPlan.slotBasedPlan.hasOwnProperty("slots") &&
-        winningPlan.slotBasedPlan != capWarning &&
         winningPlan.slotBasedPlan.hasOwnProperty("stages") &&
         !winningPlan.slotBasedPlan.hasOwnProperty("warning");
 }
@@ -106,9 +85,8 @@ try {
             "Object.bsonsize(winningPlan)": Object.bsonsize(winningPlan),
             "winningPlan": winningPlan,
         });
-        assert(doesNotFitPlan(winningPlan) || fitsPlanWarning(winningPlan) ||
-               fitsPlanSlotsWarning(winningPlan) || fitsPlanSlots(winningPlan) ||
-               fitsPlanSlotsStageWarning(winningPlan) || fitsPlanSlotsStages(winningPlan));
+        assert(fitsPlanWarning(winningPlan) || fitsPlanSlotsStageWarning(winningPlan) ||
+               fitsPlanSlotsStages(winningPlan));
         // At very small thresholds, the error messages can cause the explain's BSON size to
         // exceed the threshold. Give ourselves 32 bytes of leeway for the comparison here.
         assert(Object.bsonsize(winningPlan) <= size + leeway);
