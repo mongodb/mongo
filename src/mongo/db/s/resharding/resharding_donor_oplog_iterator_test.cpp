@@ -41,6 +41,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/s/resharding/resharding_noop_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/service_context.h"
@@ -124,8 +125,10 @@ public:
     repl::MutableOplogEntry makeProgressMarkOplogEntry(Timestamp ts) {
         ReshardingDonorOplogId oplogId(ts, ts);
         const BSONObj oField(BSON("msg" << "Latest oplog ts from donor's cursor response"));
-        const BSONObj o2Field(BSON("type" << resharding::kReshardProgressMark));
-        return makeOplog(_crudNss, _uuid, repl::OpTypeEnum::kNoop, oField, o2Field, oplogId);
+        ReshardProgressMarkO2Field o2Field;
+        o2Field.setType(resharding::kReshardProgressMarkOpLogType);
+        return makeOplog(
+            _crudNss, _uuid, repl::OpTypeEnum::kNoop, oField, o2Field.toBSON(), oplogId);
     }
 
     const NamespaceString& oplogNss() const {

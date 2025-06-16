@@ -794,6 +794,7 @@ mongo_cc_library(
         "//src/mongo/db/s/resharding:resharding_coordinator_part_4.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_service_external_state.cpp",
         "//src/mongo/db/s/resharding:resharding_donor_service.cpp",
+        "//src/mongo/db/s/resharding:resharding_noop_o2_field_gen",
         "//src/mongo/db/s/resharding:resharding_oplog_applier_progress_gen",
         "//src/mongo/db/s/resharding:resharding_oplog_fetcher_progress_gen",
         "//src/mongo/db/s/resharding:resharding_recipient_service.cpp",

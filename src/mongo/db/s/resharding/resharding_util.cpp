@@ -53,6 +53,7 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/document_source_resharding_add_resume_id.h"
 #include "mongo/db/s/resharding/document_source_resharding_iterate_transaction.h"
+#include "mongo/db/s/resharding/resharding_noop_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
@@ -338,6 +339,25 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
         expCtx));
 
     return Pipeline::create(std::move(stages), expCtx);
+}
+
+bool isProgressMarkOplogAfterOplogApplicationStarted(const repl::OplogEntry& oplog) {
+    if (oplog.getOpType() != repl::OpTypeEnum::kNoop) {
+        return false;
+    }
+
+    auto o2Field = oplog.getObject2();
+    if (!o2Field) {
+        return false;
+    }
+
+    if (o2Field->getField(ReshardProgressMarkO2Field::kTypeFieldName).valueStringDataSafe() !=
+        kReshardProgressMarkOpLogType) {
+        return false;
+    }
+    return o2Field
+        ->getField(ReshardProgressMarkO2Field::kCreatedAfterOplogApplicationStartedFieldName)
+        .booleanSafe();
 }
 
 bool isFinalOplog(const repl::OplogEntry& oplog) {

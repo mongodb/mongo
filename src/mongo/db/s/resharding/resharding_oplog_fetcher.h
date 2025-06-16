@@ -165,10 +165,18 @@ private:
     void _ensureCollection(Client* client,
                            CancelableOperationContextFactory factory,
                            NamespaceString nss);
+
     AggregateCommandRequest _makeAggregateCommandRequest(Client* client,
                                                          CancelableOperationContextFactory factory);
+
     ExecutorFuture<void> _reschedule(std::shared_ptr<executor::TaskExecutor> executor,
                                      const CancellationToken& cancelToken);
+
+    /**
+     * Returns a progress mark noop oplog entry with the given oplog id.
+     */
+    repl::MutableOplogEntry _makeProgressMarkOplog(OperationContext* opCtx,
+                                                   const ReshardingDonorOplogId& oplogId);
 
     ServiceContext* _service() const {
         return _env->service();

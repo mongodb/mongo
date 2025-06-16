@@ -43,6 +43,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
+#include "mongo/db/s/resharding/resharding_noop_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -497,6 +498,131 @@ TEST_F(ReshardingUtilTest, EmptyDemoModeReshardCollectionRequest) {
     auto recipientFields = constructRecipientFields(coordinatorDoc);
     ASSERT_EQ(recipientFields.getMinimumOperationDurationMillis(),
               gReshardingMinimumOperationDurationMillis.load());
+}
+
+TEST_F(ReshardingUtilTest, IsProgressMarkOplogCreatedAfterOplogApplicationStarted) {
+    repl::MutableOplogEntry oplog;
+    oplog.setNss(nss());
+    oplog.setOpType(repl::OpTypeEnum::kNoop);
+    oplog.setUuid(UUID::gen());
+    oplog.set_id({});
+    oplog.setObject({});
+    oplog.setObject2(
+        BSON(ReshardProgressMarkO2Field::kTypeFieldName
+             << resharding::kReshardProgressMarkOpLogType
+             << ReshardProgressMarkO2Field::kCreatedAfterOplogApplicationStartedFieldName << true));
+    oplog.setOpTime(OplogSlot());
+    oplog.setWallClockTime(getServiceContext()->getFastClockSource()->now());
+    ASSERT(isProgressMarkOplogAfterOplogApplicationStarted({oplog.toBSON()}));
+}
+
+TEST_F(ReshardingUtilTest, IsNotProgressMarkOplogCreatedAfterOplogApplicationStarted_NotNoop) {
+    repl::MutableOplogEntry oplog;
+    oplog.setNss(nss());
+    oplog.setOpType(repl::OpTypeEnum::kInsert);
+    oplog.setUuid(UUID::gen());
+    oplog.set_id({});
+    oplog.setObject({});
+    oplog.setObject2(
+        BSON(ReshardProgressMarkO2Field::kTypeFieldName
+             << resharding::kReshardProgressMarkOpLogType
+             << ReshardProgressMarkO2Field::kCreatedAfterOplogApplicationStartedFieldName << true));
+    oplog.setOpTime(OplogSlot());
+    oplog.setWallClockTime(getServiceContext()->getFastClockSource()->now());
+    ASSERT_FALSE(isProgressMarkOplogAfterOplogApplicationStarted({oplog.toBSON()}));
+}
+
+TEST_F(ReshardingUtilTest, IsNotProgressMarkOplogCreatedAfterOplogApplicationStarted_NoObject2) {
+    repl::MutableOplogEntry oplog;
+    oplog.setNss(nss());
+    oplog.setOpType(repl::OpTypeEnum::kNoop);
+    oplog.setUuid(UUID::gen());
+    oplog.set_id({});
+    oplog.setObject({});
+    oplog.setOpTime(OplogSlot());
+    oplog.setWallClockTime(getServiceContext()->getFastClockSource()->now());
+    ASSERT_FALSE(isProgressMarkOplogAfterOplogApplicationStarted({oplog.toBSON()}));
+}
+
+TEST_F(ReshardingUtilTest,
+       IsNotProgressMarkOplogCreatedAfterOplogApplicationStarted_NotProgressMarkType) {
+    repl::MutableOplogEntry oplog;
+    oplog.setNss(nss());
+    oplog.setOpType(repl::OpTypeEnum::kNoop);
+    oplog.setUuid(UUID::gen());
+    oplog.set_id({});
+    oplog.setObject({});
+    oplog.setObject2(
+        BSON(ReshardProgressMarkO2Field::kTypeFieldName
+             << resharding::kReshardFinalOpLogType
+             << ReshardProgressMarkO2Field::kCreatedAfterOplogApplicationStartedFieldName << true));
+    oplog.setOpTime(OplogSlot());
+    oplog.setWallClockTime(getServiceContext()->getFastClockSource()->now());
+    ASSERT_FALSE(isProgressMarkOplogAfterOplogApplicationStarted({oplog.toBSON()}));
+}
+
+TEST_F(ReshardingUtilTest, IsNotProgressMarkOplogCreatedAfterOplogApplicationStarted_InvalidType) {
+    repl::MutableOplogEntry oplog;
+    oplog.setNss(nss());
+    oplog.setOpType(repl::OpTypeEnum::kNoop);
+    oplog.setUuid(UUID::gen());
+    oplog.set_id({});
+    oplog.setObject({});
+    oplog.setObject2(BSON(
+        ReshardProgressMarkO2Field::kTypeFieldName
+        << 2 << ReshardProgressMarkO2Field::kCreatedAfterOplogApplicationStartedFieldName << true));
+    oplog.setOpTime(OplogSlot());
+    oplog.setWallClockTime(getServiceContext()->getFastClockSource()->now());
+    ASSERT_FALSE(isProgressMarkOplogAfterOplogApplicationStarted({oplog.toBSON()}));
+}
+
+TEST_F(ReshardingUtilTest,
+       IsNotProgressMarkOplogCreatedAfterOplogApplicationStarted_CreatedAfterNull) {
+    repl::MutableOplogEntry oplog;
+    oplog.setNss(nss());
+    oplog.setOpType(repl::OpTypeEnum::kNoop);
+    oplog.setUuid(UUID::gen());
+    oplog.set_id({});
+    oplog.setObject({});
+    oplog.setObject2(BSON(ReshardProgressMarkO2Field::kTypeFieldName
+                          << resharding::kReshardProgressMarkOpLogType));
+    oplog.setOpTime(OplogSlot());
+    oplog.setWallClockTime(getServiceContext()->getFastClockSource()->now());
+    ASSERT_FALSE(isProgressMarkOplogAfterOplogApplicationStarted({oplog.toBSON()}));
+}
+
+TEST_F(ReshardingUtilTest,
+       IsNotProgressMarkOplogCreatedAfterOplogApplicationStarted_CreatedAfterFalse) {
+    repl::MutableOplogEntry oplog;
+    oplog.setNss(nss());
+    oplog.setOpType(repl::OpTypeEnum::kNoop);
+    oplog.setUuid(UUID::gen());
+    oplog.set_id({});
+    oplog.setObject({});
+    oplog.setObject2(BSON(
+        ReshardProgressMarkO2Field::kTypeFieldName
+        << resharding::kReshardProgressMarkOpLogType
+        << ReshardProgressMarkO2Field::kCreatedAfterOplogApplicationStartedFieldName << false));
+    oplog.setOpTime(OplogSlot());
+    oplog.setWallClockTime(getServiceContext()->getFastClockSource()->now());
+    ASSERT_FALSE(isProgressMarkOplogAfterOplogApplicationStarted({oplog.toBSON()}));
+}
+
+TEST_F(ReshardingUtilTest,
+       IsNotProgressMarkOplogCreatedAfterOplogApplicationStarted_CreatedAfterNotBoolean) {
+    repl::MutableOplogEntry oplog;
+    oplog.setNss(nss());
+    oplog.setOpType(repl::OpTypeEnum::kNoop);
+    oplog.setUuid(UUID::gen());
+    oplog.set_id({});
+    oplog.setObject({});
+    oplog.setObject2(
+        BSON(ReshardProgressMarkO2Field::kTypeFieldName
+             << resharding::kReshardProgressMarkOpLogType
+             << ReshardProgressMarkO2Field::kCreatedAfterOplogApplicationStartedFieldName << 2));
+    oplog.setOpTime(OplogSlot());
+    oplog.setWallClockTime(getServiceContext()->getFastClockSource()->now());
+    ASSERT_FALSE(isProgressMarkOplogAfterOplogApplicationStarted({oplog.toBSON()}));
 }
 
 TEST_F(ReshardingUtilTest, CalculateExponentialMovingAverageSmoothingFactorLessThanZero) {

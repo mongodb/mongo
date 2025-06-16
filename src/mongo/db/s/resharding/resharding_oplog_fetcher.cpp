@@ -66,6 +66,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_noop_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_oplog_fetcher_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
@@ -503,6 +504,25 @@ AggregateCommandRequest ReshardingOplogFetcher::_makeAggregateCommandRequest(
     return aggRequest;
 }
 
+repl::MutableOplogEntry ReshardingOplogFetcher::_makeProgressMarkOplog(
+    OperationContext* opCtx, const ReshardingDonorOplogId& oplogId) {
+    repl::MutableOplogEntry oplog;
+
+    oplog.setNss(_oplogBufferNss);
+    oplog.setOpType(repl::OpTypeEnum::kNoop);
+    oplog.setUuid(_collUUID);
+    oplog.set_id(Value(oplogId.toBSON()));
+    oplog.setObject(BSON("msg" << "Latest oplog ts from donor's cursor response"));
+
+    ReshardProgressMarkO2Field o2Field;
+    o2Field.setType(resharding::kReshardProgressMarkOpLogType);
+    oplog.setObject2(o2Field.toBSON());
+
+    oplog.setOpTime(OplogSlot());
+    oplog.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+    return oplog;
+}
+
 bool ReshardingOplogFetcher::consume(Client* client,
                                      CancelableOperationContextFactory factory,
                                      Shard* shard) {
@@ -617,17 +637,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
                     //      the minFetchTimestamp) in which case, the fetcher is going to resume
                     //      from there anyways.
                     if (currBatchLastOplogId != _startAt) {
-                        repl::MutableOplogEntry oplog;
-                        oplog.setNss(_oplogBufferNss);
-                        oplog.setOpType(repl::OpTypeEnum::kNoop);
-                        oplog.setUuid(_collUUID);
-                        oplog.set_id(Value(currBatchLastOplogId.toBSON()));
-                        oplog.setObject(
-                            BSON("msg" << "Latest oplog ts from donor's cursor response"));
-                        oplog.setObject2(BSON("type" << resharding::kReshardProgressMark));
-                        oplog.setOpTime(OplogSlot());
-                        oplog.setWallClockTime(
-                            opCtx->getServiceContext()->getFastClockSource()->now());
+                        auto oplog = _makeProgressMarkOplog(opCtx, currBatchLastOplogId);
 
                         insertOplogBatch(opCtx,
                                          oplogBufferColl.getCollectionPtr(),

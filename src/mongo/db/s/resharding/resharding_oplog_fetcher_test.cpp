@@ -72,6 +72,7 @@
 #include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_noop_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_oplog_fetcher.h"
 #include "mongo/db/s/resharding/resharding_oplog_fetcher_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
@@ -1092,8 +1093,10 @@ TEST_F(ReshardingOplogFetcherTest, TestProgressMarkOplogInsert) {
             << " Verify persisted metrics";
         assertUsedApplyOpsToBatchInsert(outputCollectionNss, 1 /* numApplyOpsOplogEntries */);
         auto lastOplogInOuptut = getLast(outputCollectionNss);
-        ASSERT_EQ(resharding::kReshardProgressMark,
-                  lastOplogInOuptut.getObjectField("o2").getField("type").String());
+        ASSERT_EQ(resharding::kReshardProgressMarkOpLogType,
+                  lastOplogInOuptut.getObjectField("o2")
+                      .getField(ReshardProgressMarkO2Field::kTypeFieldName)
+                      .String());
         ASSERT_EQ(postBatchResumeToken,
                   lastOplogInOuptut.getObjectField("_id").getField("ts").timestamp());
 

@@ -54,6 +54,14 @@ idl_generator(
 )
 
 idl_generator(
+    name = "resharding_noop_o2_field_gen",
+    src = "resharding_noop_o2_field.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
     name = "resharding_change_event_o2_field_gen",
     src = "resharding_change_event_o2_field.idl",
     deps = [
