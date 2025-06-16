@@ -1271,46 +1271,18 @@ uint64_t CollectionImpl::getIndexFreeStorageBytes(OperationContext* const opCtx)
     return totalSize;
 }
 
-/**
- * order will be:
- * 1) store index specs
- * 2) drop indexes
- * 3) truncate record store
- * 4) re-write indexes
- */
 Status CollectionImpl::truncate(OperationContext* opCtx) {
     dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(ns(), MODE_X));
     invariant(_indexCatalog->numIndexesInProgress() == 0);
 
-    // 1) store index specs
-    std::vector<BSONObj> indexSpecs;
-    {
-        auto ii = _indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
-        while (ii->more()) {
-            const IndexDescriptor* idx = ii->next()->descriptor();
-            indexSpecs.push_back(idx->infoObj().getOwned());
-        }
-    }
-
-    // 2) drop indexes
-    _indexCatalog->dropAllIndexes(opCtx, this, true, {});
-
-    // 3) truncate record store
-    auto status = _shared->_recordStore->truncate(opCtx);
-    if (!status.isOK())
+    if (auto status = _indexCatalog->truncateAllIndexes(opCtx, this); !status.isOK())
+        return status;
+    if (auto status = _shared->_recordStore->truncate(opCtx); !status.isOK())
         return status;
     if (ns().isOplog()) {
         if (auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers()) {
             truncateMarkers->clearMarkersOnCommit(opCtx);
         }
-    }
-
-    // 4) re-create indexes
-    for (size_t i = 0; i < indexSpecs.size(); i++) {
-        status =
-            _indexCatalog->createIndexOnEmptyCollection(opCtx, this, indexSpecs[i]).getStatus();
-        if (!status.isOK())
-            return status;
     }
 
     return Status::OK();

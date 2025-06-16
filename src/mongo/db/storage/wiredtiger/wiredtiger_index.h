@@ -194,6 +194,8 @@ public:
                                 RecoveryUnit& ru,
                                 const CompactOptions& options) override;
 
+    Status truncate(OperationContext* opCtx, RecoveryUnit& ru) override;
+
     const std::string& uri() const {
         return _uri;
     }

@@ -402,6 +402,10 @@ public:
     Status initAsEmpty() override {
         return Status::OK();
     }
+
+    Status truncate(OperationContext* opCtx, RecoveryUnit& ru) override {
+        return Status::OK();
+    }
 };
 
 DevNullKVEngine::DevNullKVEngine() : _engineDbPath(storageGlobalParams.dbpath) {

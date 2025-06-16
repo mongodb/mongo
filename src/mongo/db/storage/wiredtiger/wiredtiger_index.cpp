@@ -40,6 +40,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_index_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/validate/validate_options.h"
 #include "mongo/logv2/log.h"
@@ -459,6 +460,10 @@ StatusWith<int64_t> WiredTigerIndex::compact(OperationContext* opCtx,
                                              RecoveryUnit& ru,
                                              const CompactOptions& options) {
     return WiredTigerIndexUtil::compact(opCtx, WiredTigerRecoveryUnit::get(ru), _uri, options);
+}
+
+Status WiredTigerIndex::truncate(OperationContext* opCtx, RecoveryUnit& ru) {
+    return WiredTigerUtil::truncate(opCtx, WiredTigerRecoveryUnit::get(ru), _tableId, _uri);
 }
 
 boost::optional<RecordId> WiredTigerIndex::_keyExists(OperationContext* opCtx,

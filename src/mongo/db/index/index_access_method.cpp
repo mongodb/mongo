@@ -754,6 +754,10 @@ StatusWith<int64_t> SortedDataIndexAccessMethod::compact(OperationContext* opCtx
     return this->_newInterface->compact(opCtx, ru, options);
 }
 
+Status SortedDataIndexAccessMethod::truncate(OperationContext* opCtx, RecoveryUnit& ru) {
+    return this->_newInterface->truncate(opCtx, ru);
+}
+
 std::shared_ptr<Ident> SortedDataIndexAccessMethod::getSharedIdent() const {
     return this->_newInterface->getSharedIdent();
 }

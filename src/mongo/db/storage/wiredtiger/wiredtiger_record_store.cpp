@@ -427,23 +427,7 @@ Status WiredTigerRecordStore::wtUpdateRecord(OperationContext* opCtx,
 }
 
 Status WiredTigerRecordStore::wtTruncate(OperationContext* opCtx, WiredTigerRecoveryUnit& wtRu) {
-    auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
-    WiredTigerCursor startWrap(std::move(cursorParams), _uri, *wtRu.getSession());
-    WT_CURSOR* start = startWrap.get();
-    int ret = wiredTigerPrepareConflictRetry(
-        *opCtx, StorageExecutionContext::get(opCtx)->getPrepareConflictTracker(), wtRu, [&] {
-            return start->next(start);
-        });
-    // Empty collections don't have anything to truncate.
-    if (ret == WT_NOTFOUND) {
-        return Status::OK();
-    }
-    invariantWTOK(ret, start->session);
-
-    WiredTigerSession* session = wtRu.getSession();
-    invariantWTOK(WT_OP_CHECK(session->truncate(nullptr, start, nullptr, nullptr)), *session);
-
-    return Status::OK();
+    return WiredTigerUtil::truncate(opCtx, wtRu, _tableId, _uri);
 }
 
 Status WiredTigerRecordStore::wtRangeTruncate(OperationContext* opCtx,

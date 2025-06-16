@@ -1377,6 +1377,23 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
         onDropFn);
 }
 
+Status IndexCatalogImpl::truncateAllIndexes(OperationContext* opCtx, Collection* collection) {
+    uassert(ErrorCodes::BackgroundOperationInProgressForNamespace,
+            str::stream() << "cannot perform operation: an index build is currently running",
+            !haveAnyIndexesInProgress());
+    invariant(_buildingIndexes.size() == 0);
+
+    auto it = getIndexIterator(IndexCatalog::InclusionPolicy::kAll);
+    while (it->more()) {
+        const IndexDescriptor* desc = it->next()->descriptor();
+        auto status = desc->getEntry()->accessMethod()->truncate(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+        if (!status.isOK())
+            return status;
+    }
+    return Status::OK();
+}
+
 Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx,
                                                          Collection* collection,
                                                          IndexCatalogEntry* entry) {

@@ -31,6 +31,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/snapshot_window_options_gen.h"
@@ -38,6 +39,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/testing_proctor.h"
@@ -1458,6 +1460,26 @@ int WiredTigerUtil::handleWtEvictionEvent(WT_SESSION* session) {
 
 long long WiredTigerUtil::getCancelledCacheMetric_forTest() {
     return cancelledCacheMetric.get();
+}
+
+Status WiredTigerUtil::truncate(OperationContext* opCtx,
+                                WiredTigerRecoveryUnit& ru,
+                                uint64_t tableId,
+                                const std::string& uri) {
+    auto cursorParams = getWiredTigerCursorParams(ru, tableId);
+    WiredTigerCursor curwrap(std::move(cursorParams), uri, *ru.getSession());
+    WT_CURSOR* c = curwrap.get();
+    int ret = wiredTigerPrepareConflictRetry(
+        *opCtx, StorageExecutionContext::get(opCtx)->getPrepareConflictTracker(), ru, [&] {
+            return c->next(c);
+        });
+    if (ret == WT_NOTFOUND) {  // i.e. table is already empty
+        return Status::OK();
+    }
+    invariantWTOK(ret, c->session);
+
+    invariantWTOK(WT_OP_CHECK(ru.getSession()->truncate(nullptr, c, nullptr, nullptr)), c->session);
+    return Status::OK();
 }
 
 }  // namespace mongo

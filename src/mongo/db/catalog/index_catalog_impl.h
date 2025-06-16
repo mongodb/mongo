@@ -220,6 +220,8 @@ public:
                         bool includingIdIndex,
                         std::function<void(const IndexDescriptor*)> onDropFn) override;
 
+    Status truncateAllIndexes(OperationContext* opCtx, Collection* collection) override;
+
     Status resetUnfinishedIndexForRecovery(OperationContext* opCtx,
                                            Collection* collection,
                                            IndexCatalogEntry* entry) override;

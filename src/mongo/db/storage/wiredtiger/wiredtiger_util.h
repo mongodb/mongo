@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/validate/validate_results.h"
 
 #include <span>
@@ -358,6 +359,13 @@ public:
      */
     static Status canRunAutoCompact(bool isEphemeral);
 
+    /**
+     * Truncates the table identified by tableId and uri, removing all entries from it.
+     */
+    static Status truncate(OperationContext* opCtx,
+                           WiredTigerRecoveryUnit& ru,
+                           uint64_t tableId,
+                           const std::string& uri);
 
     static uint64_t genTableId();
 

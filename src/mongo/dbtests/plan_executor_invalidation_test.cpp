@@ -471,7 +471,7 @@ TEST_F(PlanExecutorInvalidationTest, IxscanDiesOnCollectionRenameWithinDatabase)
     ASSERT_THROWS_CODE(exec->restoreState(&collection()), DBException, ErrorCodes::QueryPlanKilled);
 }
 
-TEST_F(PlanExecutorInvalidationTest, IxscanDiesWhenTruncateCollectionDropsAllIndices) {
+TEST_F(PlanExecutorInvalidationTest, IxscanExecutorSurvivesCollectionTruncate) {
     BSONObj keyPattern = BSON("foo" << 1);
     ASSERT_OK(createIndex(&_opCtx, nss.ns_forTest(), keyPattern));
 
@@ -484,11 +484,14 @@ TEST_F(PlanExecutorInvalidationTest, IxscanDiesWhenTruncateCollectionDropsAllInd
         ASSERT_EQUALS(i, obj.firstElement().numberInt());
     }
 
-    // Call truncate() on the Collection during yield, and verify that yield recovery throws the
-    // expected error code.
+    // Call truncate() on the Collection during yield. The PlanExecutor should be restored
+    // successfully.
     exec->saveState();
     truncateCollection();
-    ASSERT_THROWS_CODE(exec->restoreState(&collection()), DBException, ErrorCodes::QueryPlanKilled);
+    exec->restoreState(&collection());
+
+    // Since all documents in the collection have been deleted, the PlanExecutor should issue EOF.
+    ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&obj, nullptr));
 }
 
 TEST_F(PlanExecutorInvalidationTest, CollScanExecutorSurvivesCollectionTruncate) {

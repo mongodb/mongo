@@ -229,6 +229,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    Status truncateAllIndexes(OperationContext*, Collection*) override {
+        MONGO_UNREACHABLE;
+    }
+
     Status resetUnfinishedIndexForRecovery(OperationContext*,
                                            Collection*,
                                            IndexCatalogEntry*) override {

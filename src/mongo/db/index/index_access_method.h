@@ -211,6 +211,11 @@ public:
                                         const CompactOptions& options) = 0;
 
     /**
+     * Removes all entries from the index.
+     */
+    virtual Status truncate(OperationContext* opCtx, RecoveryUnit& ru) = 0;
+
+    /**
      * Fetches the Ident for this index.
      */
     virtual std::shared_ptr<Ident> getSharedIdent() const = 0;
@@ -612,6 +617,8 @@ public:
     StatusWith<int64_t> compact(OperationContext* opCtx,
                                 RecoveryUnit& ru,
                                 const CompactOptions& options) final;
+
+    Status truncate(OperationContext* opCtx, RecoveryUnit& ru) final;
 
     std::shared_ptr<Ident> getSharedIdent() const final;
 

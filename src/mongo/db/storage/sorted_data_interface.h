@@ -191,6 +191,11 @@ public:
         return Status::OK();
     }
 
+    /**
+     * Removes all keys from the index.
+     */
+    virtual Status truncate(OperationContext* opCtx, RecoveryUnit& ru) = 0;
+
     //
     // Information about the tree
     //

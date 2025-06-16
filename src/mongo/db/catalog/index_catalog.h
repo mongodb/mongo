@@ -451,6 +451,11 @@ public:
                                 std::function<void(const IndexDescriptor*)> onDropFn) = 0;
 
     /**
+     * Truncates all indexes in the index catalog.
+     */
+    virtual Status truncateAllIndexes(OperationContext* opCtx, Collection* collection) = 0;
+
+    /**
      * Resets the index given its descriptor.
      *
      * This can only be called during startup recovery as it involves recreating the index table to
