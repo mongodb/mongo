@@ -218,6 +218,7 @@ void killOldestTransaction(OperationContext* opCtx,
 
         auto session =
             sessionCatalog->checkOutSessionForKill(opCtx, std::move(killToken), &timeout);
+        size_t sessionBytes = shard_role_details::getRecoveryUnit(opCtx)->getCacheDirtyBytes();
 
         // TODO (SERVER-33850): Rename KillAllSessionsByPattern and
         // ScopedKillAllSessionsByPatternImpersonator to not refer to session kill
@@ -233,14 +234,13 @@ void killOldestTransaction(OperationContext* opCtx,
                   "txnNumberAndRetryCounter"_attr =
                       txnParticipant.getActiveTxnNumberAndRetryCounter());
             if (txnParticipant.transactionIsInProgress()) {
-                (*bytesClearedEstimate) +=
-                    shard_role_details::getRecoveryUnit(opCtx)->getCacheDirtyBytes();
                 txnParticipant.abortTransaction(
                     opCtx,
                     Status(ErrorCodes::TemporarilyUnavailable,
                            "Transaction aborted due to cache pressure."));
-                (*numKills)++;
             }
+            (*numKills)++;
+            (*bytesClearedEstimate) += sessionBytes;
         }
     } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>&) {
         // Failed to check out the session for kill.
