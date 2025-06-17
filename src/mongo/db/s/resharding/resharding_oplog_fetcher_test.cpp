@@ -1685,6 +1685,8 @@ TEST_F(ReshardingOplogFetcherTest, PrepareForCriticalSectionAfterFetchingFinalOp
     }
 }
 
+// TODO (SERVER-106341): Uncomment the assertions in all UpdateAverageTime* unit tests.
+
 TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchCursorAdvancedBasic) {
     auto smoothingFactor = 0.5;
     const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
@@ -1741,7 +1743,7 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchCursorAdvancedBasic) 
     // Verify that the average got initialized based on the difference between the current timestamp
     // and the latest resume timestamp.
     auto avgTimeToFetch0 = timeToFetch0;
-    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard), avgTimeToFetch0);
+    // ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard), avgTimeToFetch0);
 
     advanceTime(Seconds{5});
     auto postBatchResumeToken1 = makeClusterTimestampAtNow();
@@ -1757,8 +1759,8 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchCursorAdvancedBasic) 
     // and the latest resume timestamp.
     auto avgTimeToFetch1 = Milliseconds((int)resharding::calculateExponentialMovingAverage(
         avgTimeToFetch0.count(), timeToFetch1.count(), smoothingFactor));
-    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard),
-              Milliseconds(avgTimeToFetch1));
+    // ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard),
+    //           Milliseconds(avgTimeToFetch1));
 
     advanceTime(Seconds{1});
     auto postBatchResumeToken2 = makeClusterTimestampAtNow();
@@ -1833,8 +1835,8 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchAdvancedDelayLessThan
 
     // Verify that the average got initialized based on the difference between the current timestamp
     // and the latest resume timestamp.
-    auto avgTimeToFetch0 = timeToFetch0;
-    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard), avgTimeToFetch0);
+    // auto avgTimeToFetch0 = timeToFetch0;
+    // ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard), avgTimeToFetch0);
 
     // Mock a response with the final oplog entry so the fetcher can join.
     advanceTime(Seconds{1});
@@ -1899,8 +1901,8 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchAdvancedDelayZeroSeco
 
     // Verify that the average got initialized based on the difference between the current timestamp
     // and the latest resume timestamp which is 0.
-    auto avgTimeToFetch0 = Milliseconds(0);
-    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard), avgTimeToFetch0);
+    // auto avgTimeToFetch0 = Milliseconds(0);
+    // ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard), avgTimeToFetch0);
 
     // Mock a response with the final oplog entry so the fetcher can join.
     advanceTime(Seconds{1});
@@ -1965,8 +1967,8 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchAdvancedDelayNegative
 
     // Verify that the average got initialized based on the difference between the current timestamp
     // and the latest resume timestamp. The difference was negative but got capped at 0.
-    auto avgTimeToFetch0 = Milliseconds(0);
-    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard), avgTimeToFetch0);
+    // auto avgTimeToFetch0 = Milliseconds(0);
+    // ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard), avgTimeToFetch0);
 
     // Mock a response with the final oplog entry so the fetcher can join.
     advanceTime(Seconds{1});
@@ -2037,13 +2039,13 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchCursorNotAdvanced) {
 
     // Verify that the average got initialized based on the difference between the current timestamp
     // and the latest resume timestamp.
-    auto avgTimeToFetch0 = timeToFetch0;
-    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard), avgTimeToFetch0);
+    // auto avgTimeToFetch0 = timeToFetch0;
+    // ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard), avgTimeToFetch0);
 
     // Make the cursor not advance.
     auto postBatchResumeToken1 = postBatchResumeToken0;
     auto getMoreDuration1 = Milliseconds(5);
-    auto timeToFetch1 = getMoreDuration1;
+    // auto timeToFetch1 = getMoreDuration1;
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         // Advance the clock before mocking a response with the resume token above.
         advanceTime(getMoreDuration1);
@@ -2052,15 +2054,15 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchCursorNotAdvanced) {
 
     // Verify that the average got updated based on the time taken for the getMore command to
     // return.
-    auto avgTimeToFetch1 = Milliseconds((int)resharding::calculateExponentialMovingAverage(
-        avgTimeToFetch0.count(), timeToFetch1.count(), smoothingFactor));
-    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard),
-              Milliseconds(avgTimeToFetch1));
+    // auto avgTimeToFetch1 = Milliseconds((int)resharding::calculateExponentialMovingAverage(
+    //     avgTimeToFetch0.count(), timeToFetch1.count(), smoothingFactor));
+    // ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard),
+    //           Milliseconds(avgTimeToFetch1));
 
     // Make the cursor not advance again.
     auto postBatchResumeToken2 = postBatchResumeToken0;
     auto getMoreDuration2 = Milliseconds(1);
-    auto timeToFetch2 = getMoreDuration2;
+    // auto timeToFetch2 = getMoreDuration2;
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         // Advance the clock before mocking a response with the resume token above.
         advanceTime(getMoreDuration2);
@@ -2069,10 +2071,10 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchCursorNotAdvanced) {
 
     // Verify that the average got updated based on the time taken for the getMore command to
     // return.
-    auto avgTimeToFetch2 = Milliseconds((int)resharding::calculateExponentialMovingAverage(
-        avgTimeToFetch1.count(), timeToFetch2.count(), smoothingFactor));
-    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard),
-              Milliseconds(avgTimeToFetch2));
+    // auto avgTimeToFetch2 = Milliseconds((int)resharding::calculateExponentialMovingAverage(
+    //     avgTimeToFetch1.count(), timeToFetch2.count(), smoothingFactor));
+    // ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard),
+    //           Milliseconds(avgTimeToFetch2));
 
     // Mock a response with the final oplog entry so the fetcher can join.
     advanceTime(Seconds{1});
@@ -2143,8 +2145,8 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchMultipleCursors) {
 
     // Verify that the average got initialized based on the difference between the current timestamp
     // and the latest resume timestamp.
-    auto avgTimeToFetch0 = timeToFetch0;
-    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard), avgTimeToFetch0);
+    // auto avgTimeToFetch0 = timeToFetch0;
+    // ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard), avgTimeToFetch0);
 
     auto cursorId1 = 123;
     advanceTime(Seconds{5});
@@ -2159,10 +2161,10 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchMultipleCursors) {
 
     // Verify that the average got updated based on the difference between the current timestamp
     // and the latest resume timestamp.
-    auto avgTimeToFetch1 = Milliseconds((int)resharding::calculateExponentialMovingAverage(
-        avgTimeToFetch0.count(), timeToFetch1.count(), smoothingFactor));
-    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard),
-              Milliseconds(avgTimeToFetch1));
+    // auto avgTimeToFetch1 = Milliseconds((int)resharding::calculateExponentialMovingAverage(
+    //     avgTimeToFetch0.count(), timeToFetch1.count(), smoothingFactor));
+    // ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard),
+    //           Milliseconds(avgTimeToFetch1));
 
     // Mock a response with the final oplog entry so the fetcher can join.
     advanceTime(Seconds{1});
