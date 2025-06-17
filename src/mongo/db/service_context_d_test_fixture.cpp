@@ -217,7 +217,7 @@ MongoDScopedGlobalServiceContextForTest::~MongoDScopedGlobalServiceContextForTes
         databaseHolder->closeAll(opCtx.get());
     }
 
-    shutdownGlobalStorageEngineCleanly(getServiceContext());
+    shutdownGlobalStorageEngineCleanly(getServiceContext(), true /* memLeakAllowed */);
 
     std::swap(storageGlobalParams.engine, _stashedStorageParams.engine);
     std::swap(storageGlobalParams.engineSetByUser, _stashedStorageParams.engineSetByUser);

@@ -80,6 +80,12 @@
 namespace mongo {
 namespace {
 
+#if __has_feature(address_sanitizer)
+constexpr bool kMemLeakAllowed = false;
+#else
+constexpr bool kMemLeakAllowed = true;
+#endif
+
 class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
     WiredTigerKVHarnessHelper(ServiceContext* svcCtx, bool forRepair = false)
@@ -96,11 +102,11 @@ public:
     }
 
     ~WiredTigerKVHarnessHelper() override {
-        getWiredTigerKVEngine()->cleanShutdown();
+        getWiredTigerKVEngine()->cleanShutdown(kMemLeakAllowed);
     }
 
     KVEngine* restartEngine() override {
-        getEngine()->cleanShutdown();
+        getEngine()->cleanShutdown(kMemLeakAllowed);
         _svcCtx->clearStorageEngine();
         _svcCtx->setStorageEngine(makeEngine());
         getEngine()->notifyStorageStartupRecoveryComplete();
@@ -757,7 +763,7 @@ MONGO_INITIALIZER(RegisterKVHarnessFactory)(InitializerContext*) {
 TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdown) {
     auto* engine = _helper.getWiredTigerKVEngine();
     ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
-    engine->cleanShutdown();
+    engine->cleanShutdown(kMemLeakAllowed);
     ASSERT(!engine->isWtConnReadyForStatsCollection_UNSAFE());
 }
 
@@ -772,7 +778,7 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerSingleActivityBeforeShutdownRAII) {
     }
     ASSERT_EQ(engine->getActiveStatsReaders(), 0);
     ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
-    engine->cleanShutdown();
+    engine->cleanShutdown(kMemLeakAllowed);
     ASSERT(!engine->isWtConnReadyForStatsCollection_UNSAFE());
 }
 
@@ -794,14 +800,14 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerMultipleActivitiesBeforeShutdownRAII) 
     }
     ASSERT_EQ(engine->getActiveStatsReaders(), 0);
     ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
-    engine->cleanShutdown();
+    engine->cleanShutdown(kMemLeakAllowed);
     ASSERT(!engine->isWtConnReadyForStatsCollection_UNSAFE());
 }
 
 TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivity) {
     auto* engine = _helper.getWiredTigerKVEngine();
     ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
-    engine->cleanShutdown();
+    engine->cleanShutdown(kMemLeakAllowed);
     ASSERT(!engine->tryGetStatsCollectionPermit());
     ASSERT_EQ(engine->getActiveStatsReaders(), 0);
     ASSERT(!engine->isWtConnReadyForStatsCollection_UNSAFE());
@@ -814,7 +820,7 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivityReleaseRAII
         auto permit = engine->tryGetStatsCollectionPermit();
         ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
         ASSERT_EQ(engine->getActiveStatsReaders(), 1);
-        stdx::thread shutdownThread([&]() { engine->cleanShutdown(); });
+        stdx::thread shutdownThread([&]() { engine->cleanShutdown(kMemLeakAllowed); });
         ASSERT_EQ(engine->getActiveStatsReaders(), 1);
         while (engine->isWtConnReadyForStatsCollection_UNSAFE()) {
             stdx::this_thread::yield();

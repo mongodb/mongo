@@ -141,7 +141,7 @@ public:
         return std::vector<std::string>();
     }
 
-    void cleanShutdown() override {}
+    void cleanShutdown(bool memLeakAllowed) override {}
 
     void setJournalListener(JournalListener* jl) override {}
 

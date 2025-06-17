@@ -110,7 +110,6 @@
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/time_support.h"
@@ -178,9 +177,6 @@ public:
         repl::ReplicationCoordinator::set(
             _svcCtx, std::unique_ptr<repl::ReplicationCoordinator>(_replCoord));
 
-        // Disable fast shutdown so that WT can free memory.
-        globalFailPointRegistry().find("WTDisableFastShutDown")->setMode(FailPoint::alwaysOn);
-
         auto startupOpCtx = _svcCtx->makeOperationContext(&cc());
         initializeStorageEngine(startupOpCtx.get(),
                                 StorageEngineInitFlags::kAllowNoLockFile |
@@ -246,8 +242,8 @@ public:
         auto databaseHolder = DatabaseHolder::get(opCtx);
         databaseHolder->closeAll(opCtx);
 
-        // Shut down storage engine.
-        shutdownGlobalStorageEngineCleanly(_svcCtx);
+        // Shut down storage engine and free memory.
+        shutdownGlobalStorageEngineCleanly(_svcCtx, false /* memLeakAllowed */);
     }
 
     // Shut down the storage engine, clear the dbpath, and restart the storage engine with empty
