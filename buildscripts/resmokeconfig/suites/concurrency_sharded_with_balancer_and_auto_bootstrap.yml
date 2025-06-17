@@ -46,6 +46,7 @@ selector:
     - requires_profiling
     - assumes_unsharded_collection
     - requires_getmore
+    - config_shard_incompatible
 
 executor:
   archive:
