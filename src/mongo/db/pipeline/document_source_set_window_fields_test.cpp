@@ -463,7 +463,7 @@ TEST_F(DocumentSourceSetWindowFieldsSpillingTest, CanForceSpill) {
         assertNextDocument(execPipeline->getNext());
     }
 
-    pipeline->forceSpill();
+    execPipeline->forceSpill();
 
     while (auto next = execPipeline->getNext()) {
         assertNextDocument(next);

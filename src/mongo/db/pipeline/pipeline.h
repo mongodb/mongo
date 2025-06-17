@@ -250,8 +250,6 @@ public:
      */
     void dispose(OperationContext* opCtx);
 
-    void forceSpill();
-
     bool isDisposed() const {
         return _disposed;
     }

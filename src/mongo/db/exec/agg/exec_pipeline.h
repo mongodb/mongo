@@ -90,6 +90,8 @@ public:
         return expCtx;
     }
 
+    void forceSpill();
+
 private:
     StageContainer _stages;
     boost::intrusive_ptr<ExpressionContext> expCtx;

@@ -434,13 +434,6 @@ void Pipeline::dispose(OperationContext* opCtx) {
     }
 }
 
-void Pipeline::forceSpill() {
-    if (!_sources.empty()) {
-        auto& stage = dynamic_cast<exec::agg::Stage&>(*_sources.back());
-        stage.forceSpill();
-    }
-}
-
 bool Pipeline::usedDisk() const {
     return std::any_of(_sources.begin(), _sources.end(), [](const auto& source) {
         auto& stage = dynamic_cast<exec::agg::Stage&>(*source);

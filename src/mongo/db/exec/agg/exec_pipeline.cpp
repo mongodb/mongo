@@ -110,4 +110,10 @@ void Pipeline::checkValidOperationContext() const {
             validateOperationContext(getContext()->getOperationContext()));
 }
 
+void Pipeline::forceSpill() {
+    if (!_stages.empty()) {
+        _stages.back()->forceSpill();
+    }
+}
+
 }  // namespace mongo::exec::agg

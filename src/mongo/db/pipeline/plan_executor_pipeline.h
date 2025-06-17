@@ -145,7 +145,7 @@ public:
         tassert(10450600,
                 "Pipelines acquire locks internally, so yieldPolicy must be nullptr",
                 yieldPolicy == nullptr);
-        _pipeline->forceSpill();
+        _execPipeline->forceSpill();
     }
 
     void stashResult(const BSONObj& obj) override {
