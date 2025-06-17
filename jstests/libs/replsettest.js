@@ -744,6 +744,7 @@ export class ReplSetTest {
      * If 'expectedPrimaryNode' is provided, ensure that every node is seeing this node as the
      * primary. Otherwise, ensure that all the nodes in the set agree with the first node on the
      * identity of the primary.
+     * This call does not guarantee that the agreed upon primary is writeable.
      */
     awaitNodesAgreeOnPrimary(timeout, nodes, expectedPrimaryNode, runHangAnalyzerOnTimeout = true) {
         timeout = timeout || this.timeoutMS;
@@ -827,6 +828,23 @@ export class ReplSetTest {
         }, "Finding primary", timeout, retryIntervalMS);
 
         return primary;
+    }
+
+    /**
+     * Blocks until all nodes agree on who the primary is and the primary is writeable.
+     * This includes waiting for the optional primary catchup process to complete, which
+     * getPrimary() ensures.
+     * Returns the primary.
+     */
+    awaitNodesAgreeOnWriteablePrimary(expectedPrimaryNode,
+                                      waitPrimaryWriteTimeout,
+                                      retryIntervalMS,
+                                      waitNodesAgreeTimeout,
+                                      nodes,
+                                      runHangAnalyzerOnTimeout = true) {
+        this.awaitNodesAgreeOnPrimary(
+            waitNodesAgreeTimeout, nodes, expectedPrimaryNode, runHangAnalyzerOnTimeout);
+        return this.getPrimary(waitPrimaryWriteTimeout, retryIntervalMS);
     }
 
     awaitNoPrimary(msg, timeout) {
