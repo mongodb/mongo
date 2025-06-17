@@ -34,8 +34,10 @@
 namespace mongo {
 
 ReshardingOplogApplierMetrics::ReshardingOplogApplierMetrics(
-    ReshardingMetrics* metrics, boost::optional<ReshardingOplogApplierProgress> progressDoc)
-    : _metrics(metrics) {
+    ShardId donorShardId,
+    ReshardingMetrics* metrics,
+    boost::optional<ReshardingOplogApplierProgress> progressDoc)
+    : _donorShardId(donorShardId), _metrics(metrics) {
     if (progressDoc) {
         _insertsApplied.store(progressDoc->getInsertsApplied());
         _updatesApplied.store(progressDoc->getUpdatesApplied());
@@ -70,6 +72,10 @@ void ReshardingOplogApplierMetrics::onOplogLocalBatchApplied(Milliseconds elapse
 void ReshardingOplogApplierMetrics::onOplogEntriesApplied(int64_t numEntries) {
     _oplogEntriesApplied.fetchAndAdd(numEntries);
     _metrics->onOplogEntriesApplied(numEntries);
+}
+
+void ReshardingOplogApplierMetrics::updateAverageTimeToApplyOplogEntries(Milliseconds timeToApply) {
+    _metrics->updateAverageTimeToApplyOplogEntries(_donorShardId, timeToApply);
 }
 
 void ReshardingOplogApplierMetrics::onWriteToStashCollections() {

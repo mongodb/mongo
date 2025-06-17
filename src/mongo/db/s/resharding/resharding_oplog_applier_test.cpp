@@ -215,8 +215,8 @@ public:
                                                    ReshardingMetrics::Role::kRecipient,
                                                    getServiceContext()->getFastClockSource()->now(),
                                                    getServiceContext());
-        _applierMetrics =
-            std::make_unique<ReshardingOplogApplierMetrics>(_metrics.get(), boost::none);
+        _applierMetrics = std::make_unique<ReshardingOplogApplierMetrics>(
+            _sourceId.getShardId(), _metrics.get(), boost::none);
 
         _executor = makeTaskExecutorForApplier();
         _executor->startup();

@@ -188,8 +188,8 @@ public:
                                                 ShardingDataTransformMetrics::Role::kRecipient,
                                                 serviceContext->getFastClockSource()->now(),
                                                 serviceContext);
-            _oplogApplierMetrics =
-                std::make_unique<ReshardingOplogApplierMetrics>(_metrics.get(), boost::none);
+            _oplogApplierMetrics = std::make_unique<ReshardingOplogApplierMetrics>(
+                _myDonorId, _metrics.get(), boost::none);
             _applier = std::make_unique<ReshardingOplogApplicationRules>(
                 _outputNss,
                 std::vector<NamespaceString>{_myStashNss, _otherStashNss},

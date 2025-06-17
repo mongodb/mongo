@@ -950,9 +950,9 @@ ReshardingRecipientService::RecipientStateMachine::_makeDataReplication(Operatio
     // The metrics map can already be pre-populated if it was recovered from disk.
     if (_applierMetricsMap.empty()) {
         for (const auto& donor : _donorShards) {
-            _applierMetricsMap.emplace(
-                donor.getShardId(),
-                std::make_unique<ReshardingOplogApplierMetrics>(_metrics.get(), boost::none));
+            _applierMetricsMap.emplace(donor.getShardId(),
+                                       std::make_unique<ReshardingOplogApplierMetrics>(
+                                           donor.getShardId(), _metrics.get(), boost::none));
         }
     } else {
         invariant(_applierMetricsMap.size() == _donorShards.size(),
@@ -1913,16 +1913,16 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
         const auto& progressDoc = shardIdDocPair.second;
 
         if (!progressDoc) {
-            _applierMetricsMap.emplace(
-                shardId,
-                std::make_unique<ReshardingOplogApplierMetrics>(_metrics.get(), boost::none));
+            _applierMetricsMap.emplace(shardId,
+                                       std::make_unique<ReshardingOplogApplierMetrics>(
+                                           shardId, _metrics.get(), boost::none));
             continue;
         }
 
         externalMetrics.accumulateFrom(*progressDoc);
 
         auto applierMetrics =
-            std::make_unique<ReshardingOplogApplierMetrics>(_metrics.get(), progressDoc);
+            std::make_unique<ReshardingOplogApplierMetrics>(shardId, _metrics.get(), progressDoc);
         _applierMetricsMap.emplace(shardId, std::move(applierMetrics));
     }
 

@@ -68,11 +68,14 @@
 #include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
+#include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_noop_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -94,6 +97,7 @@
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -102,9 +106,11 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/type_collection_common_types_gen.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -134,8 +140,13 @@ namespace {
 class ReshardingOplogBatchApplierTest : service_context_test::WithSetupTransportLayer,
                                         public ServiceContextMongoDTest {
 public:
+    ReshardingOplogBatchApplierTest()
+        : ServiceContextMongoDTest(
+              Options{}.useMockClock(true).useMockTickSource<Milliseconds>(true)) {}
+
     void setUp() override {
         ServiceContextMongoDTest::setUp();
+        advanceTime(Seconds(100));
 
         auto serviceContext = getServiceContext();
         {
@@ -185,8 +196,11 @@ public:
                                                 ShardingDataTransformMetrics::Role::kRecipient,
                                                 serviceContext->getFastClockSource()->now(),
                                                 serviceContext);
-            _applierMetrics =
-                std::make_unique<ReshardingOplogApplierMetrics>(_metrics.get(), boost::none);
+            _metrics->registerDonors({_myDonorId});
+
+            _applierMetrics = std::make_unique<ReshardingOplogApplierMetrics>(
+                _myDonorId, _metrics.get(), boost::none);
+
             _crudApplication = std::make_unique<ReshardingOplogApplicationRules>(
                 _outputNss,
                 std::vector<NamespaceString>{_myStashNss, _otherStashNss},
@@ -198,13 +212,38 @@ public:
             _sessionApplication =
                 std::make_unique<ReshardingOplogSessionApplication>(_myOplogBufferNss);
 
-            _batchApplier = std::make_unique<ReshardingOplogBatchApplier>(*_crudApplication,
-                                                                          *_sessionApplication);
+            _batchApplier = std::make_unique<ReshardingOplogBatchApplier>(
+                *_crudApplication, *_sessionApplication, _applierMetrics.get());
         }
+    }
+
+    ShardId getMyDonorShardId() {
+        return _myDonorId;
+    }
+
+    ReshardingMetrics* metrics() {
+        return _metrics.get();
     }
 
     ReshardingOplogBatchApplier* applier() {
         return _batchApplier.get();
+    }
+
+    ClockSourceMock* clockSource() {
+        return dynamic_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());
+    }
+
+    TickSourceMock<Milliseconds>* tickSource() {
+        return dynamic_cast<TickSourceMock<Milliseconds>*>(getServiceContext()->getTickSource());
+    }
+
+    Date_t now() {
+        return clockSource()->now();
+    }
+
+    void advanceTime(Milliseconds millis) {
+        clockSource()->advance(millis);
+        tickSource()->advance(millis);
     }
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutorForApplier() {
@@ -320,6 +359,84 @@ public:
         op.setNss({});
         op.setWallClockTime({});
 
+        return {op.toBSON()};
+    }
+
+    repl::OplogEntry makeProgressMarkNoopOplogEntry(Date_t wallClockTime,
+                                                    bool createdAfterOplogApplicationStarted) {
+        repl::MutableOplogEntry op;
+        op.setOpType(repl::OpTypeEnum::kNoop);
+        op.setObject({});
+
+        ReshardProgressMarkO2Field o2Field;
+        o2Field.setType(resharding::kReshardProgressMarkOpLogType);
+        if (createdAfterOplogApplicationStarted) {
+            o2Field.setCreatedAfterOplogApplicationStarted(true);
+        }
+        op.setObject2(o2Field.toBSON());
+        op.setNss({});
+        op.setOpTime({{}, {}});
+        op.setWallClockTime(wallClockTime);
+
+        return {op.toBSON()};
+    }
+
+    repl::OplogEntry makeFinalNoopOplogEntry() {
+        repl::MutableOplogEntry op;
+        op.setOpType(repl::OpTypeEnum::kNoop);
+        op.setObject({});
+
+        ReshardBlockingWritesChangeEventO2Field o2Field;
+        o2Field.setType(resharding::kReshardFinalOpLogType);
+        o2Field.setReshardBlockingWrites({});
+        o2Field.setReshardingUUID(UUID::gen());
+        op.setObject2(o2Field.toBSON());
+
+        op.setNss({});
+        op.setOpTime({{}, {}});
+        op.setWallClockTime({});
+
+        return {op.toBSON()};
+    }
+
+    repl::OplogEntry makeGenericNoopOplogEntry() {
+        repl::MutableOplogEntry op;
+        op.setOpType(repl::OpTypeEnum::kNoop);
+        op.setObject({});
+        op.setNss({});
+        op.setOpTime({{}, {}});
+        op.setWallClockTime({});
+        return {op.toBSON()};
+    }
+
+    repl::OplogEntry makeInsertOplogEntry() {
+        repl::MutableOplogEntry op;
+        op.setOpType(repl::OpTypeEnum::kInsert);
+        op.setNss(_outputNss);
+        op.setObject(BSON("_id" << 1));
+        op.setTimestamp({});
+        op.setWallClockTime({});
+        return {op.toBSON()};
+    }
+
+    repl::OplogEntry makeUpdateOplogEntry() {
+        repl::MutableOplogEntry op;
+        op.setOpType(repl::OpTypeEnum::kUpdate);
+        op.setNss(_outputNss);
+        op.setObject(BSON("_id" << 1 << "x" << 1));
+        op.setObject2(BSON("_id" << 1));
+        op.setTimestamp({});
+        op.setWallClockTime({});
+        return {op.toBSON()};
+    }
+
+    repl::OplogEntry makeDeleteOplogEntry() {
+        repl::MutableOplogEntry op;
+        op.setOpType(repl::OpTypeEnum::kDelete);
+        op.setNss(_outputNss);
+        op.setObject(BSON("_id" << 1));
+        op.setTimestamp({});
+        op.setWallClockTime({});
         return {op.toBSON()};
     }
 
@@ -522,6 +639,177 @@ TEST_F(ReshardingOplogBatchApplierTest, CancelableWhileWaitingOnPreparedTxn) {
 
     cancelSource.cancel();
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(ReshardingOplogBatchApplierTest, NotUpdateAvgTimeToApplyUponSeeingCrudOplog) {
+    auto executor = makeTaskExecutorForApplier();
+    auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
+
+    auto oplogEntry0 = makeInsertOplogEntry();
+    auto oplogEntry1 = makeUpdateOplogEntry();
+    auto oplogEntry2 = makeDeleteOplogEntry();
+
+    auto future = applier()->applyBatch<false>({&oplogEntry0, &oplogEntry1, &oplogEntry2},
+                                               executor,
+                                               CancellationToken::uncancelable(),
+                                               factory);
+    future.get();
+
+    ASSERT_FALSE(metrics()->getAverageTimeToApplyOplogEntries(getMyDonorShardId()));
+}
+
+TEST_F(ReshardingOplogBatchApplierTest,
+       UpdateAvgTimeToApplyUponSeeingProgressMarkOplogCreatedAfterOplogApplicationStartedBasic) {
+    auto smoothingFactor = 0.6;
+    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
+        "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
+
+    auto executor = makeTaskExecutorForApplier();
+    auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
+
+    // Verify that the average started out uninitialized.
+    ASSERT_FALSE(metrics()->getAverageTimeToApplyOplogEntries(getMyDonorShardId()));
+
+    // Test a batch with only one 'reshardProgressMark' oplog entry.
+    auto oplogWallTime0 = now();
+    auto oplogEntry0 = makeProgressMarkNoopOplogEntry(
+        oplogWallTime0, true /* createdAfterOplogApplicationStarted */);
+
+    // Advance the clock before applying the oplog entry above.
+    auto timeToApply0 = Milliseconds(1200);
+    advanceTime(timeToApply0);
+    auto future0 = applier()->applyBatch<false>(
+        {&oplogEntry0}, executor, CancellationToken::uncancelable(), factory);
+    future0.get();
+
+    // Verify that the average got initialized based on the difference between the current timestamp
+    // and oplogEntry0 wall time.
+    auto avgTimeToApply0 = timeToApply0;
+    ASSERT_EQ(metrics()->getAverageTimeToApplyOplogEntries(getMyDonorShardId()), avgTimeToApply0);
+
+    // Test a batch with multiple 'reshardProgressMark' oplog entries with different wall clock
+    // times.
+    advanceTime(Milliseconds(1000));
+    auto oplogWallTime1 = now();
+    auto oplogEntry1 = makeProgressMarkNoopOplogEntry(
+        oplogWallTime1, true /* createdAfterOplogApplicationStarted */);
+
+    advanceTime(Milliseconds(5));
+    auto oplogWallTime2 = now();
+    auto oplogEntry2 =
+        makeProgressMarkNoopOplogEntry(now(), true /* createdAfterOplogApplicationStarted */);
+
+    // Advance the clock before applying the oplog entries above.
+    advanceTime(Milliseconds(800));
+    auto future2 = applier()->applyBatch<false>(
+        {&oplogEntry1, &oplogEntry2}, executor, CancellationToken::uncancelable(), factory);
+    future2.get();
+
+    // Verify that the average got based on the difference between the current timestamp and
+    // oplogEntry1 wall time, and then again based on the difference between the current timestamp
+    // and oplogEntry2 wall time.
+    auto timeToApply1 = now() - oplogWallTime1;
+    auto avgTimeToApply1 = Milliseconds((int)resharding::calculateExponentialMovingAverage(
+        avgTimeToApply0.count(), timeToApply1.count(), smoothingFactor));
+
+    auto timeToApply2 = now() - oplogWallTime2;
+    auto avgTimeToApply2 = Milliseconds((int)resharding::calculateExponentialMovingAverage(
+        avgTimeToApply1.count(), timeToApply2.count(), smoothingFactor));
+
+    ASSERT_EQ(metrics()->getAverageTimeToApplyOplogEntries(getMyDonorShardId()), avgTimeToApply2);
+
+    // Test a batch with one 'reshardProgressMark' oplog entry and one crud oplog entry.
+    advanceTime(Milliseconds(600));
+    auto oplogWallTime3 = now();
+    auto oplogEntry3 = makeProgressMarkNoopOplogEntry(
+        oplogWallTime3, true /* createdAfterOplogApplicationStarted */);
+
+    auto oplogEntry4 = makeInsertOplogEntry();
+
+    // Advance the clock before applying the oplog entry above.
+    advanceTime(Milliseconds(400));
+    auto future4 = applier()->applyBatch<false>(
+        {&oplogEntry3, &oplogEntry4}, executor, CancellationToken::uncancelable(), factory);
+    future4.get();
+
+    // Verify that the average got based on the difference between the current timestamp and
+    // oplogEntry3 wall time.
+    auto timeToApply3 = now() - oplogWallTime3;
+    auto avgTimeToApply3 = Milliseconds((int)resharding::calculateExponentialMovingAverage(
+        avgTimeToApply2.count(), timeToApply3.count(), smoothingFactor));
+
+    ASSERT_EQ(metrics()->getAverageTimeToApplyOplogEntries(getMyDonorShardId()), avgTimeToApply3);
+
+    // Test a batch with no 'reshardProgressMark' oplog entries but one crud oplog entry.
+    auto oplogEntry5 = makeInsertOplogEntry();
+
+    // Advance the clock before applying the oplog entry above.
+    advanceTime(Milliseconds(200));
+    auto future3 = applier()->applyBatch<false>(
+        {&oplogEntry5}, executor, CancellationToken::uncancelable(), factory);
+    future3.get();
+
+    // Verify that the average does not get updated or cleared upon applying a crud oplog entry.
+    ASSERT_EQ(metrics()->getAverageTimeToApplyOplogEntries(getMyDonorShardId()), avgTimeToApply3);
+}
+
+TEST_F(
+    ReshardingOplogBatchApplierTest,
+    UpdateAvgTimeToApplyUponSeeingProgressMarkOplogCreatedAfterOplogApplicationStartedClockSkew) {
+    auto smoothingFactor = 0.5;
+    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
+        "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
+
+    auto executor = makeTaskExecutorForApplier();
+    auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
+
+    ASSERT_FALSE(metrics()->getAverageTimeToApplyOplogEntries(getMyDonorShardId()));
+
+    // Make the oplog wall time greater than the current time on the recipient.
+    auto oplogWallTime = now() + Milliseconds(100);
+    auto oplogEntry = makeProgressMarkNoopOplogEntry(
+        oplogWallTime, true /* createdAfterOplogApplicationStarted */);
+
+    auto future = applier()->applyBatch<false>(
+        {&oplogEntry}, executor, CancellationToken::uncancelable(), factory);
+    future.get();
+    ASSERT_EQ(metrics()->getAverageTimeToApplyOplogEntries(getMyDonorShardId()), Milliseconds(0));
+}
+
+DEATH_TEST_F(ReshardingOplogBatchApplierTest,
+             ThrowUponSeeingProgressMarkOplogCreatedBeforeOplogApplicationStarted,
+             "invariant") {
+    auto executor = makeTaskExecutorForApplier();
+    auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
+
+    auto oplogEntry =
+        makeProgressMarkNoopOplogEntry(now(), false /* createdAfterOplogApplicationStarted */);
+
+    auto future = applier()->applyBatch<false>(
+        {&oplogEntry}, executor, CancellationToken::uncancelable(), factory);
+    future.get();
+}
+
+DEATH_TEST_F(ReshardingOplogBatchApplierTest, ThrowUponSeeingFinalOplog, "invariant") {
+    auto executor = makeTaskExecutorForApplier();
+    auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
+
+    auto oplogEntry = makeFinalNoopOplogEntry();
+
+    auto future = applier()->applyBatch<false>(
+        {&oplogEntry}, executor, CancellationToken::uncancelable(), factory);
+    future.get();
+}
+
+DEATH_TEST_F(ReshardingOplogBatchApplierTest, ThrowUponSeeingGenericNoop, "invariant") {
+    auto executor = makeTaskExecutorForApplier();
+    auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
+
+    auto oplogEntry = makeGenericNoopOplogEntry();
+
+    auto future = applier()->applyBatch<false>(
+        {&oplogEntry}, executor, CancellationToken::uncancelable(), factory);
+    future.get();
 }
 
 }  // namespace

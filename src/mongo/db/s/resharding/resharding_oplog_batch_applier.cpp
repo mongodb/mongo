@@ -63,10 +63,28 @@
 
 namespace mongo {
 
+namespace {
+
+/*
+ * Returns the amount of time that has elapsed since the oplog entry was created.
+ */
+Milliseconds calculateTimeElapsedSinceOplogWallClockTime(OperationContext* opCtx,
+                                                         const repl::OplogEntry& oplogEntry) {
+    auto oplogWallTime = oplogEntry.getWallClockTime();
+    auto currentWallTime = opCtx->getServiceContext()->getFastClockSource()->now();
+    // If there are clock skews, then the difference below may be negative so cap it at zero.
+    return std::max(Milliseconds(0), currentWallTime - oplogWallTime);
+}
+
+}  // namespace
+
 ReshardingOplogBatchApplier::ReshardingOplogBatchApplier(
     const ReshardingOplogApplicationRules& crudApplication,
-    const ReshardingOplogSessionApplication& sessionApplication)
-    : _crudApplication(crudApplication), _sessionApplication(sessionApplication) {}
+    const ReshardingOplogSessionApplication& sessionApplication,
+    ReshardingOplogApplierMetrics* applierMetrics)
+    : _crudApplication(crudApplication),
+      _sessionApplication(sessionApplication),
+      _applierMetrics(applierMetrics) {}
 
 template <bool IsForSessionApplication>
 SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
@@ -101,8 +119,9 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                        } else {
                            if (resharding::isProgressMarkOplogAfterOplogApplicationStarted(
                                    oplogEntry)) {
-                               // TODO (SERVER-106057): Make the ReshardingOplogBatchApplier handle
-                               // progress mark oplog entry.
+                               auto timeToApply = calculateTimeElapsedSinceOplogWallClockTime(
+                                   opCtx.get(), oplogEntry);
+                               _applierMetrics->updateAverageTimeToApplyOplogEntries(timeToApply);
                                continue;
                            }
 

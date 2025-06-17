@@ -66,6 +66,9 @@ public:
                                                    getClockSource(),
                                                    _cumulativeMetrics.get());
     }
+
+protected:
+    ShardId donorShardId{"shard0"};
 };
 
 TEST_F(ReshardingOplogApplierMetricsTest,
@@ -75,7 +78,7 @@ TEST_F(ReshardingOplogApplierMetricsTest,
     auto report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("insertsApplied"), 0);
 
-    ReshardingOplogApplierMetrics applierMetrics(metrics.get(), boost::none);
+    ReshardingOplogApplierMetrics applierMetrics(donorShardId, metrics.get(), boost::none);
     applierMetrics.onInsertApplied();
 
     ASSERT_EQ(applierMetrics.getInsertsApplied(), 1);
@@ -90,7 +93,7 @@ TEST_F(ReshardingOplogApplierMetricsTest,
     auto report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("updatesApplied"), 0);
 
-    ReshardingOplogApplierMetrics applierMetrics(metrics.get(), boost::none);
+    ReshardingOplogApplierMetrics applierMetrics(donorShardId, metrics.get(), boost::none);
     applierMetrics.onUpdateApplied();
 
     ASSERT_EQ(applierMetrics.getUpdatesApplied(), 1);
@@ -105,7 +108,7 @@ TEST_F(ReshardingOplogApplierMetricsTest,
     auto report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("deletesApplied"), 0);
 
-    ReshardingOplogApplierMetrics applierMetrics(metrics.get(), boost::none);
+    ReshardingOplogApplierMetrics applierMetrics(donorShardId, metrics.get(), boost::none);
     applierMetrics.onDeleteApplied();
 
     ASSERT_EQ(applierMetrics.getDeletesApplied(), 1);
@@ -118,7 +121,7 @@ TEST_F(ReshardingOplogApplierMetricsTest, ApplierInsertProgressIncrementsIdepend
 
     ReshardingOplogApplierProgress progressDoc;
     progressDoc.setInsertsApplied(12);
-    ReshardingOplogApplierMetrics applierMetrics(metrics.get(), progressDoc);
+    ReshardingOplogApplierMetrics applierMetrics(donorShardId, metrics.get(), progressDoc);
 
     ASSERT_EQ(applierMetrics.getInsertsApplied(), 12);
     auto report = metrics->reportForCurrentOp();
@@ -136,7 +139,7 @@ TEST_F(ReshardingOplogApplierMetricsTest, ApplierUpdateProgressIncrementsIdepend
 
     ReshardingOplogApplierProgress progressDoc;
     progressDoc.setUpdatesApplied(34);
-    ReshardingOplogApplierMetrics applierMetrics(metrics.get(), progressDoc);
+    ReshardingOplogApplierMetrics applierMetrics(donorShardId, metrics.get(), progressDoc);
 
     ASSERT_EQ(applierMetrics.getUpdatesApplied(), 34);
     auto report = metrics->reportForCurrentOp();
@@ -154,7 +157,7 @@ TEST_F(ReshardingOplogApplierMetricsTest, ApplierDeleteProgressIncrementsIdepend
 
     ReshardingOplogApplierProgress progressDoc;
     progressDoc.setDeletesApplied(56);
-    ReshardingOplogApplierMetrics applierMetrics(metrics.get(), progressDoc);
+    ReshardingOplogApplierMetrics applierMetrics(donorShardId, metrics.get(), progressDoc);
 
     ASSERT_EQ(applierMetrics.getDeletesApplied(), 56);
     auto report = metrics->reportForCurrentOp();

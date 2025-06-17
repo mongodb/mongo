@@ -196,9 +196,10 @@ protected:
 
         ReshardingApplierMetricsMap applierMetricsMap;
         for (const auto& donor : donorFetchTimestamps) {
-            applierMetricsMap.emplace(donor.getShardId(),
-                                      std::make_unique<ReshardingOplogApplierMetrics>(
-                                          reshardingMetrics.get(), boost::none));
+            applierMetricsMap.emplace(
+                donor.getShardId(),
+                std::make_unique<ReshardingOplogApplierMetrics>(
+                    donor.getShardId(), reshardingMetrics.get(), boost::none));
         }
 
         auto opCtx = makeOperationContext();

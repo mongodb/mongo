@@ -102,7 +102,7 @@ ReshardingOplogApplier::ReshardingOplogApplier(
                        _env->applierMetrics(),
                        isCapped},
       _sessionApplication{std::move(oplogBufferNss)},
-      _batchApplier{_crudApplication, _sessionApplication},
+      _batchApplier{_crudApplication, _sessionApplication, _env->applierMetrics()},
       _oplogIter(std::move(oplogIterator)) {}
 
 SemiFuture<void> ReshardingOplogApplier::_applyBatch(

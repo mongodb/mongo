@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/cancellation.h"
@@ -53,7 +54,8 @@ public:
     using OplogBatch = ReshardingOplogBatchPreparer::OplogBatchToApply;
 
     ReshardingOplogBatchApplier(const ReshardingOplogApplicationRules& crudApplication,
-                                const ReshardingOplogSessionApplication& sessionApplication);
+                                const ReshardingOplogSessionApplication& sessionApplication,
+                                ReshardingOplogApplierMetrics* applierMetrics);
 
     template <bool IsForSessionApplication>
     SemiFuture<void> applyBatch(OplogBatch batch,
@@ -64,6 +66,7 @@ public:
 private:
     const ReshardingOplogApplicationRules& _crudApplication;
     const ReshardingOplogSessionApplication& _sessionApplication;
+    ReshardingOplogApplierMetrics* _applierMetrics;
 };
 
 }  // namespace mongo
