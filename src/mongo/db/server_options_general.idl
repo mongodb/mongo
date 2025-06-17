@@ -84,7 +84,6 @@ configs:
         description: 'Set socket listen backlog size'
         short_name: listenBacklog
         arg_vartype: Int
-        default: { expr: 'SOMAXCONN' }
     'net.maxIncomingConnections':
         description: 'Max number of simultaneous connections'
         short_name: maxConns

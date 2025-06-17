@@ -212,6 +212,10 @@ public:
         return appInfo().getProcessName();
     }
 
+    static int getDefaultListenBacklog() {
+        return sysInfo().defaultListenBacklog;
+    }
+
 private:
     /**
      * Host and operating system info.  Does not change over time.
@@ -240,6 +244,8 @@ private:
         //  18658199 Speed up msync() on ZFS by 90000x with this one weird trick
         bool preferMsyncOverFSync;
 
+        int defaultListenBacklog;
+
         SystemInfo()
             : addrSize(0),
               memSize(0),
@@ -250,7 +256,8 @@ private:
               pageSize(0),
               hasNuma(false),
               numNumaNodes(0),
-              preferMsyncOverFSync(true) {
+              preferMsyncOverFSync(true),
+              defaultListenBacklog(0) {
             // populate SystemInfo during construction
             collectSystemInfo();
         }
