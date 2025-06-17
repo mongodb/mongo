@@ -348,6 +348,58 @@ expectFailureWithArgs(
     },
     10487004);
 
+expectFailureWithArgs(
+    // Range based bounds cannot have a descending sortBy field.
+    {
+        sortBy: {y: -1},
+        output: {
+            "relativeXValue":
+                {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
+        }
+    },
+    8947401);
+
+expectFailureWithArgs(
+    // Range based bounds cannot have a descending sortBy field.
+    {
+        sortBy: {_id: -1},
+        output: {
+            "relativeXValue":
+                {$minMaxScaler: {input: "$x"}, window: {range: ["current", "unbounded"]}},
+        }
+    },
+    8947401);
+
+expectFailureWithArgs(
+    // Range based bounds cannot have a descending sortBy field.
+    {
+        sortBy: {_id: -1},
+        output: {
+            "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["current", 1]}},
+        }
+    },
+    8947401);
+
+expectFailureWithArgs(
+    // Range based bounds require a single sortBy field.
+    {
+        sortBy: {x: 1, _id: -1},
+        output: {
+            "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["current", 1]}},
+        }
+    },
+    5339902);
+
+expectFailureWithArgs(
+    // Range based bounds require a single sortBy field.
+    {
+        sortBy: {y: -1, _id: 1},
+        output: {
+            "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["current", 1]}},
+        }
+    },
+    5339902);
+
 // $setWindowFields args that should succeed.
 expectSuccessWithArgs({
     sortBy: {_id: 1},

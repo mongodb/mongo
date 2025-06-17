@@ -301,6 +301,12 @@ WindowBounds getMinMaxScalerWindowBoundsFromSpec(const MinMaxScalerSpec& spec,
     // and range based bounds, because range based bounds always require that the numerical
     // bounds tolerances are relative to the values that the documents are sorted by.
     //
+    // Note that descending sort bounds work for $minMaxScaler when the bounds are Document based
+    // (provided that the bounds continue to meet the criteria that the lower cannot be greater than
+    // 0 and the upper cannot be less than 0). This is because in reversed sort order, the window is
+    // still sorted so adding or removing documents to the window continues to guarantee that the
+    // current document is still bounded between the min and max of the window.
+    //
     // Get a bound value as a number. The first value of the return is the bound value,
     // the second value is whether or not the bound is numerically expressable.
     // Non-numerical bounds ("current" / "unbounded") do not need to be checked as they

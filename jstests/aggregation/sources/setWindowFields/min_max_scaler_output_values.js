@@ -89,6 +89,30 @@ function testDocumentBasedNonRemovableQueries() {
         },
         docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries
     });
+    // Tests reverse sorting in unbounded case. In an unbounded case, the results should not depend
+    // on sorting field (so results are same as above).
+    validateTestCase({
+        setWindowFieldsArgs: {
+            sortBy: {_id: -1},
+            output: {
+                "relativeXValue":
+                    {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "unbounded"]}},
+            }
+        },
+        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries
+    });
+    // Tests reverse sorting in unbounded case. In an unbounded case, the results should not depend
+    // on sorting field (so results are same as above).
+    validateTestCase({
+        setWindowFieldsArgs: {
+            sortBy: {y: -1},
+            output: {
+                "relativeXValue":
+                    {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "unbounded"]}},
+            }
+        },
+        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries
+    });
     // Left and right unbounded query should not depend on sorting field
     // (so results are same as above).
     validateTestCase({
@@ -136,6 +160,50 @@ function testDocumentBasedNonRemovableQueries() {
             5: 0,
             6: 6 / 16,
             7: 10 / 16,
+        }
+    });
+    validateTestCase({
+        setWindowFieldsArgs: {
+            sortBy: {_id: -1},
+            output: {
+                "relativeXValue":
+                    {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", 1]}},
+            }
+        },
+        docIdToOutputFieldValue: {
+            1: 3 / 16,  // includes all
+            2: 1,       // includes all
+            3: 9 / 16,  // includes [4, 0, -6, 2, 3, 10]
+            4: 8 / 10,  // includes [4, 0, -6, 2, 3]
+            5: 0,       // includes [4, 0, -6, 2]
+            6: 6 / 10,  // includes [4, 0, -6]
+            7: 1,       // includes [4, 0]
+        }
+    });
+    // List of documents with y sorted descending:
+    // {_id: 7, "x": 4, "y": 10, "partition": "A"},
+    // {_id: 1, "x": -3, "y": 8, "partition": "A"},
+    // {_id: 5, "x": -6, "y": 6, "partition": "A"},
+    // {_id: 2, "x": 10, "y": 4, "partition": "B"},
+    // {_id: 4, "x": 2, "y": 3, "partition": "B"},
+    // {_id: 3, "x": 3, "y": -2, "partition": "A"},
+    // {_id: 6, "x": 0, "y": -8, "partition": "B"},
+    validateTestCase({
+        setWindowFieldsArgs: {
+            sortBy: {y: -1},
+            output: {
+                "relativeXValue":
+                    {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", 1]}},
+            }
+        },
+        docIdToOutputFieldValue: {
+            1: 3 / 10,  // includes [4, -3, -6]
+            2: 1,       // includes [4, -3, -6, 10, 2]
+            3: 9 / 16,  // includes all
+            4: 1 / 2,   // includes [4, -3, -6, 10, 2, 3]
+            5: 0,       // includes [4, -3, -6, 10]
+            6: 3 / 8,   // includes all
+            7: 1,       // includes [4, -3]
         }
     });
     validateTestCase(
@@ -545,6 +613,48 @@ function testDocumentBasedRemovableQueries() {
                 7: 0,
             }
         });
+    validateTestCase(
+        // Windows that only ever include a single document should return 0 for every
+        // document.
+        {
+            setWindowFieldsArgs: {
+                sortBy: {_id: -1},
+                output: {
+                    "relativeXValue":
+                        {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "current"]}},
+                }
+            },
+            docIdToOutputFieldValue: {
+                1: 0,
+                2: 0,
+                3: 0,
+                4: 0,
+                5: 0,
+                6: 0,
+                7: 0,
+            }
+        });
+    validateTestCase(
+        // Windows that only ever include a single document should return 0 for every
+        // document.
+        {
+            setWindowFieldsArgs: {
+                sortBy: {y: -1},
+                output: {
+                    "relativeXValue":
+                        {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "current"]}},
+                }
+            },
+            docIdToOutputFieldValue: {
+                1: 0,
+                2: 0,
+                3: 0,
+                4: 0,
+                5: 0,
+                6: 0,
+                7: 0,
+            }
+        });
     validateTestCase({
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
@@ -561,6 +671,68 @@ function testDocumentBasedRemovableQueries() {
             5: 0,
             6: 0,
             7: 0,
+        }
+    });
+    validateTestCase({
+        setWindowFieldsArgs: {
+            sortBy: {_id: -1},
+            output: {
+                "relativeXValue":
+                    {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "unbounded"]}},
+            }
+        },
+        docIdToOutputFieldValue: {
+            1: 0,       // includes [-3]
+            2: 1,       // includes [10, -3]
+            3: 6 / 13,  // includes [3, 10, -3]
+            4: 5 / 13,  // includes [2, 3, 10, -3]
+            5: 0,       // includes [-6, 2, 3, 10, -3]
+            6: 3 / 8,   // includes [0, -6, 2, 3, 10, -3]
+            7: 5 / 8,   // includes [4, 0, -6, 2, 3, 10, -3]
+        }
+    });
+    validateTestCase({
+        setWindowFieldsArgs: {
+            sortBy: {_id: -1},
+            output: {
+                "relativeXValue":
+                    {$minMaxScaler: {input: "$x"}, window: {documents: [-1, "unbounded"]}},
+            }
+        },
+        docIdToOutputFieldValue: {
+            1: 0,       // includes [10, -3]
+            2: 1,       // includes [3, 10, -3]
+            3: 6 / 13,  // includes [2, 3, 10, -3]
+            4: 1 / 2,   // includes [-6, 2, 3, 10, -3]
+            5: 0,       // includes [0, -6, 2, 3, 10, -3]
+            6: 3 / 8,   // includes [4, 0, -6, 2, 3, 10, -3]
+            7: 5 / 8,   // includes [4, 0, -6, 2, 3, 10, -3]
+        }
+    });
+    // List of documents with y sorted descending:
+    // {_id: 7, "x": 4, "y": 10, "partition": "A"},
+    // {_id: 1, "x": -3, "y": 8, "partition": "A"},
+    // {_id: 5, "x": -6, "y": 6, "partition": "A"},
+    // {_id: 2, "x": 10, "y": 4, "partition": "B"},
+    // {_id: 4, "x": 2, "y": 3, "partition": "B"},
+    // {_id: 3, "x": 3, "y": -2, "partition": "A"},
+    // {_id: 6, "x": 0, "y": -8, "partition": "B"},
+    validateTestCase({
+        setWindowFieldsArgs: {
+            sortBy: {y: -1},
+            output: {
+                "relativeXValue":
+                    {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "unbounded"]}},
+            }
+        },
+        docIdToOutputFieldValue: {
+            1: 3 / 16,  // includes [-3, -6, 10, 2, 3, 0]
+            2: 1,       // includes [10, 2, 3, 0]
+            3: 1,       // includes [3, 0]
+            4: 2 / 3,   // includes [2, 3, 0]
+            5: 0,       // includes [-6, 10, 2, 3, 0]
+            6: 0,       // includes [0]
+            7: 5 / 8,   // includes all
         }
     });
     validateTestCase({
