@@ -13,7 +13,7 @@ This page provides an overview of the source code architecture for MongoDB's Que
    - [Views](../views/README.md)
 1. Query Planning
    - [Plan Enumeration](plan_enumerator/README.md)
-   - [Classic Runtime Planning](classic_runtime_planner/README.md)
+   - [Classic Runtime Planning](../exec/runtime_planners/classic_runtime_planner/README.md)
 1. [Explain](README_explain.md)
 1. [Plan Cache](plan_cache/README.md)
 1. [Cluster Planning](../../s/query/planner/README.md)

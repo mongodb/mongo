@@ -2,7 +2,7 @@
 
 ## Overview
 
-The goal of the classic engine's runtime planner is to take a vector of `QuerySolution`s (returned from [plan enumeration](../plan_enumerator/README.md)) as input and determine which query plan will most efficiently return the correct result set.
+The goal of the classic engine's runtime planner is to take a vector of `QuerySolution`s (returned from [plan enumeration](../../../query/plan_enumerator/README.md)) as input and determine which query plan will most efficiently return the correct result set.
 
 The classic engine makes this determination using a process called **multiplanning**. This involves _partially_ executing all query plans and evaluating, based on [limited execution](#end-conditions), which is most productive.
 
@@ -16,9 +16,9 @@ The Query Optimization team is currently developing a cost-based plan ranker as 
 
 ## [`CachedPlanner`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L164)
 
-If a query has been executed previously, its winning query plan might already be stored in the [plan cache](../plan_cache/README.md). If so, we can entirely bypass multiplanning by retrieving the winning query plan from the corresponding `PlanCacheEntry` via a `CachedPlanner`.
+If a query has been executed previously, its winning query plan might already be stored in the [plan cache](../../../query/plan_cache/README.md). If so, we can entirely bypass multiplanning by retrieving the winning query plan from the corresponding `PlanCacheEntry` via a `CachedPlanner`.
 
-Note that if execution of a cached plan fails because the cached plan is less efficient that expected, we [`replan()`](https://github.com/mongodb/mongo/blob/0088f90ce188b8bc32575e7e4b75149ceab5da0e/src/mongo/db/exec/cached_plan.cpp#L213) by falling back to standard multiplanning. For more information on replanning, see [here](../plan_cache/README.md#aside-replanning)
+Note that if execution of a cached plan fails because the cached plan is less efficient that expected, we [`replan()`](https://github.com/mongodb/mongo/blob/0088f90ce188b8bc32575e7e4b75149ceab5da0e/src/mongo/db/exec/cached_plan.cpp#L213) by falling back to standard multiplanning. For more information on replanning, see [here](../../../query/plan_cache/README.md#aside-replanning)
 
 ## [`MultiPlanner`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L182)
 
@@ -197,10 +197,10 @@ db.c.find({$or: [{a: 1, x: 1}, {b: 1, y: 2}]})
 
 In this query, the two branches: `{a: 1, x: 1}` and `{b: 1, y: 2}` would be multiplanned separately. Once a winning plan exists for each branch, the plan with the better score becomes the plan for the whole query.
 
-Note that subplanning's interaction with the [plan cache](../plan_cache/README.md#subplanning) is done on a _per-clause basis_. For details on this interaction, see [here](https://github.com/mongodb/mongo/blob/21e7b8cfb79f3a7baae651055d5e1b3549dbdfda/src/mongo/db/exec/subplan.h#L70-L80).
+Note that subplanning's interaction with the [plan cache](../../../query/plan_cache/README.md#subplanning) is done on a _per-clause basis_. For details on this interaction, see [here](https://github.com/mongodb/mongo/blob/21e7b8cfb79f3a7baae651055d5e1b3549dbdfda/src/mongo/db/exec/subplan.h#L70-L80).
 
 If, for any reason, subplanning fails on one of the children individually, [`choosePlanWholeQuery()`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/exec/subplan.cpp#L115) is called which falls back to multiplanning on the query as a whole.
 
 ---
 
-[Return to Cover Page](../README_QO.md)
+[Return to Cover Page](../../../query/README_QO.md)
