@@ -228,7 +228,9 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                                 opCtx,
                                 "insertSingleDocumentForInitialSyncOrRecovery-restoreCursor",
                                 ns,
-                                [&cursor] { cursor->restore(); });
+                                [opCtx, &cursor] {
+                                    cursor->restore(*shard_role_details::getRecoveryUnit(opCtx));
+                                });
                         });
                     if (!insertStatus.isOK()) {
                         return insertStatus;
@@ -249,8 +251,9 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
             // When this exits via success or WCE, we need to restore the cursor
             ON_BLOCK_EXIT([opCtx, ns, &cursor]() {
                 // restore CAN throw WCE per API
-                writeConflictRetry(
-                    opCtx, "retryRestoreCursor", ns, [&cursor] { cursor->restore(); });
+                writeConflictRetry(opCtx, "retryRestoreCursor", ns, [opCtx, &cursor] {
+                    cursor->restore(*shard_role_details::getRecoveryUnit(opCtx));
+                });
             });
             wunit.commit();
             return Status::OK();

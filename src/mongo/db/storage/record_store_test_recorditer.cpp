@@ -292,7 +292,7 @@ TEST(RecordStoreTest, RecordIteratorEOF) {
         ASSERT_OK(res.getStatus());
         txn.commit();
 
-        ASSERT(cursor->restore());
+        ASSERT(cursor->restore(ru));
 
         // Iterator should still be EOF.
         ASSERT(!cursor->next());
@@ -310,9 +310,9 @@ TEST(RecordStoreTest, RecordIteratorSaveRestore) {
     const int nToInsert = 10;
     RecordId locs[nToInsert];
     std::string datas[nToInsert];
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
     for (int i = 0; i < nToInsert; i++) {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
             StringBuilder sb;
             sb << "record " << i;
@@ -331,8 +331,6 @@ TEST(RecordStoreTest, RecordIteratorSaveRestore) {
     ASSERT_EQUALS(nToInsert, rs->numRecords());
 
     {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-
         // Get a forward iterator starting at the beginning of the record store.
         auto cursor = rs->getCursor(opCtx.get());
 
@@ -340,7 +338,7 @@ TEST(RecordStoreTest, RecordIteratorSaveRestore) {
         for (int i = 0; i < nToInsert; i++) {
             cursor->save();
             cursor->save();  // It is legal to save twice in a row.
-            cursor->restore();
+            cursor->restore(ru);
 
             const auto record = cursor->next();
             ASSERT(record);
@@ -350,7 +348,7 @@ TEST(RecordStoreTest, RecordIteratorSaveRestore) {
 
         cursor->save();
         cursor->save();  // It is legal to save twice in a row.
-        cursor->restore();
+        cursor->restore(ru);
 
         ASSERT(!cursor->next());
     }

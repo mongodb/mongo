@@ -70,8 +70,8 @@ public:
         _cursor->save();
     }
 
-    bool restore() {
-        return _cursor->restore();
+    bool restore(RecoveryUnit& ru) {
+        return _cursor->restore(ru);
     }
 
     void detachFromOperationContext() {
@@ -108,8 +108,8 @@ public:
         _cursor->save();
     }
 
-    void restore(OperationContext* opCtx) {
-        _cursor->restore(*shard_role_details::getRecoveryUnit(opCtx));
+    void restore(RecoveryUnit& ru) {
+        _cursor->restore(ru);
     }
 
     void detachFromOperationContext() {

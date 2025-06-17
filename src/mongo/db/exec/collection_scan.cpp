@@ -173,7 +173,7 @@ namespace {
  * Returns the first document (owned) in the collection using the cursor 'newCursor' assuming that
  * the cursor has not been used and is unpositioned.
  */
-BSONObj getFirstEntry(SeekableRecordCursor* newCursor) {
+BSONObj getFirstEntry(RecoveryUnit& ru, SeekableRecordCursor* newCursor) {
     auto firstRecord = newCursor->next();
     uassert(ErrorCodes::CollectionIsEmpty,
             "Found collection empty when checking that the first record has not rolled over",
@@ -182,7 +182,7 @@ BSONObj getFirstEntry(SeekableRecordCursor* newCursor) {
 
     // If we use the cursor, unposition it so that it is ready for use by future callers.
     newCursor->saveUnpositioned();
-    newCursor->restore();
+    newCursor->restore(ru);
     return entry;
 };
 
@@ -196,7 +196,8 @@ BSONObj getFirstEntry(SeekableRecordCursor* newCursor) {
 std::unique_ptr<SeekableRecordCursor> initCursorAndAssertTsHasNotFallenOff(
     OperationContext* opCtx, const CollectionPtr& coll, Timestamp tsToCheck) {
     auto cursor = coll->getCursor(opCtx);
-    const auto firstEntry = getFirstEntry(cursor.get());
+    const auto firstEntry =
+        getFirstEntry(*shard_role_details::getRecoveryUnit(opCtx), cursor.get());
     const repl::OplogEntryParserNonStrict oplogEntryParser{firstEntry};
 
     // Indicates that 'firstEntry' means initialization of a replica set.
@@ -564,7 +565,8 @@ void CollectionScan::doRestoreStateRequiresCollection() {
         // operation on a capped collection like a clustered TTL deletion, exempt this operation
         // from the guarantees above.
         const auto tolerateCappedCursorRepositioning = expCtx()->getIsCappedDelete();
-        const bool couldRestore = _cursor->restore(tolerateCappedCursorRepositioning);
+        const bool couldRestore = _cursor->restore(*shard_role_details::getRecoveryUnit(opCtx()),
+                                                   tolerateCappedCursorRepositioning);
         uassert(ErrorCodes::CappedPositionLost,
                 str::stream()
                     << "CollectionScan died due to position in capped collection being deleted. "

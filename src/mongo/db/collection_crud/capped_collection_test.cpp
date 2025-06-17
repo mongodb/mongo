@@ -270,7 +270,7 @@ TEST_F(CappedCollectionTest, OplogOrder) {
         {  // Other operations should not be able to see 2nd doc until w1 commits.
             restoreTransactionResourcesToOperationContext(earlyCtx.get(),
                                                           std::move(yieldedShardRoleResources));
-            earlyCursor->restore();
+            earlyCursor->restore(*shard_role_details::getRecoveryUnit(earlyCtx.get()));
             ASSERT(!earlyCursor->next());
         }
 
@@ -359,7 +359,7 @@ TEST_F(CappedCollectionTest, OplogOrder) {
         // Other operations should not be able to see 2nd doc until w1 commits.
         restoreTransactionResourcesToOperationContext(earlyCtx.get(),
                                                       std::move(yieldedShardRoleResources));
-        ASSERT(earlyCursor->restore());
+        ASSERT(earlyCursor->restore(*shard_role_details::getRecoveryUnit(earlyCtx.get())));
         ASSERT(!earlyCursor->next());
         {
             auto [c2, t2] = makeClientAndCtx("t2");

@@ -326,7 +326,7 @@ TEST(RecordStoreTest, OplogOrder) {
         }
 
         {  // Other operations should not be able to see 2nd doc until w1 commits.
-            earlyCursor->restore();
+            earlyCursor->restore(*storage_details::getRecoveryUnit(earlyReader.get()));
             ASSERT(!earlyCursor->next());
 
             auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
@@ -464,7 +464,7 @@ TEST(RecordStoreTest, OplogOrder) {
         }
 
         {  // Other operations should not be able to see 2nd doc until w1 commits.
-            ASSERT(earlyCursor->restore());
+            ASSERT(earlyCursor->restore(*storage_details::getRecoveryUnit(earlyReader.get())));
             ASSERT(!earlyCursor->next());
 
             auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");

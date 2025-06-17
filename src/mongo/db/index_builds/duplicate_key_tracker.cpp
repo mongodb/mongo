@@ -157,7 +157,7 @@ boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkCon
 
         constraintsCursor->save();
         wuow.commit();
-        constraintsCursor->restore();
+        constraintsCursor->restore(*shard_role_details::getRecoveryUnit(opCtx));
 
         {
             stdx::unique_lock<Client> lk(*opCtx->getClient());

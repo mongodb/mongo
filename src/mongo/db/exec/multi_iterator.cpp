@@ -107,7 +107,7 @@ void MultiIteratorStage::doSaveStateRequiresCollection() {
 
 void MultiIteratorStage::doRestoreStateRequiresCollection() {
     for (auto&& iterator : _iterators) {
-        const bool couldRestore = iterator->restore();
+        const bool couldRestore = iterator->restore(*shard_role_details::getRecoveryUnit(opCtx()));
         uassert(50991, "could not restore cursor for MULTI_ITERATOR stage", couldRestore);
     }
 }

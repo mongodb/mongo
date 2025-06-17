@@ -399,8 +399,8 @@ TEST(RecordStoreTest, CursorRestoreForward) {
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
 
+    auto& ru = *storage_details::getRecoveryUnit(opCtx.get());
     {
-        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         StorageWriteTransaction txn(ru);
         std::string s = "test";
         for (int i = 1; i <= 3; i++) {
@@ -417,16 +417,16 @@ TEST(RecordStoreTest, CursorRestoreForward) {
     ASSERT_EQ(RecordId(1), r1->id);
 
     cursor->save();
-    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
-    cursor->restore();
+    ru.abandonSnapshot();
+    cursor->restore(ru);
 
     auto r2 = cursor->next();
     ASSERT(r2);
     ASSERT_EQ(RecordId(2), r2->id);
 
     cursor->save();
-    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
-    cursor->restore();
+    ru.abandonSnapshot();
+    cursor->restore(ru);
 
     auto r3 = cursor->next();
     ASSERT(r3);
@@ -461,16 +461,16 @@ TEST(RecordStoreTest, CursorRestoreReverse) {
     ASSERT_EQ(RecordId(3), r1->id);
 
     cursor->save();
-    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
-    cursor->restore();
+    ru.abandonSnapshot();
+    cursor->restore(ru);
 
     auto r2 = cursor->next();
     ASSERT(r2);
     ASSERT_EQ(RecordId(2), r2->id);
 
     cursor->save();
-    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
-    cursor->restore();
+    ru.abandonSnapshot();
+    cursor->restore(ru);
 
     auto r3 = cursor->next();
     ASSERT(r3);
@@ -505,42 +505,42 @@ TEST(RecordStoreTest, CursorRestoreDeletedDoc) {
     ASSERT_EQ(RecordId(1), r1->id);
 
     cursor->save();
-    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
+    ru.abandonSnapshot();
 
     {
         StorageWriteTransaction txn(ru);
         rs->deleteRecord(opCtx.get(), RecordId(1));
         txn.commit();
     }
-    cursor->restore();
+    cursor->restore(ru);
 
     auto r2 = cursor->next();
     ASSERT(r2);
     ASSERT_EQ(RecordId(2), r2->id);
 
     cursor->save();
-    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
+    ru.abandonSnapshot();
 
     {
         StorageWriteTransaction txn(ru);
         rs->deleteRecord(opCtx.get(), RecordId(2));
         txn.commit();
     }
-    cursor->restore();
+    cursor->restore(ru);
 
     auto r3 = cursor->next();
     ASSERT(r3);
     ASSERT_EQ(RecordId(3), r3->id);
 
     cursor->save();
-    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
+    ru.abandonSnapshot();
 
     {
         StorageWriteTransaction txn(ru);
         rs->deleteRecord(opCtx.get(), RecordId(3));
         txn.commit();
     }
-    cursor->restore();
+    cursor->restore(ru);
 
     auto end = cursor->next();
     ASSERT_EQ(boost::none, end);
@@ -575,7 +575,7 @@ TEST(RecordStoreTest, CursorSaveRestoreSeek) {
     ASSERT_EQ(RecordId(2), r2->id);
 
     cursor->save();
-    cursor->restore();
+    cursor->restore(ru);
 
     r1 = cursor->seekExact(RecordId(1));
     ASSERT(r1);
@@ -611,7 +611,7 @@ TEST(RecordStoreTest, CursorSaveUnpositionedRestoreSeek) {
     ASSERT_EQ(RecordId(2), r2->id);
 
     cursor->saveUnpositioned();
-    cursor->restore();
+    cursor->restore(ru);
 
     r1 = cursor->seekExact(RecordId(1));
     ASSERT(r1);
@@ -817,11 +817,11 @@ DEATH_TEST_REGEX(RecordStoreTest, FailedRestoreDoesNotSetFlag, "Invariant failur
         ASSERT(cursor->next());
         // Clears _hasRestored
         cursor->save();
-        auto restoreFailed = [&cursor]() {
+        auto restoreFailed = [&ru, &cursor]() {
             try {
                 FailPointEnableBlock failPoint("WTWriteConflictExceptionForReads");
                 // Should not set _hasRestored
-                cursor->restore();
+                cursor->restore(ru);
                 return false;
             } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
                 return true;

@@ -165,7 +165,7 @@ void IDHackStage::doSaveStateRequiresIndex() {
 
 void IDHackStage::doRestoreStateRequiresIndex() {
     if (_recordCursor) {
-        auto couldRestore = _recordCursor->restore();
+        auto couldRestore = _recordCursor->restore(*shard_role_details::getRecoveryUnit(opCtx()));
         uassert(5083800, "IDHackStage could not restore cursor", couldRestore);
     }
 }

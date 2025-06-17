@@ -284,7 +284,8 @@ void ScanStage::doRestoreState() {
 
     if (auto cursor = getActiveCursor(); cursor != nullptr) {
         const auto tolerateCappedCursorRepositioning = false;
-        const bool couldRestore = cursor->restore(tolerateCappedCursorRepositioning);
+        const bool couldRestore = cursor->restore(*shard_role_details::getRecoveryUnit(_opCtx),
+                                                  tolerateCappedCursorRepositioning);
         uassert(ErrorCodes::CappedPositionLost,
                 str::stream()
                     << "CollectionScan died due to position in capped collection being deleted. ",
@@ -953,7 +954,7 @@ void ParallelScanStage::doRestoreState() {
     }
 
     if (_cursor) {
-        const bool couldRestore = _cursor->restore();
+        const bool couldRestore = _cursor->restore(*shard_role_details::getRecoveryUnit(_opCtx));
         uassert(ErrorCodes::CappedPositionLost,
                 str::stream()
                     << "CollectionScan died due to position in capped collection being deleted. ",

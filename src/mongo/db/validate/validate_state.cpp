@@ -143,16 +143,17 @@ void ValidateState::yieldCursors(OperationContext* opCtx) {
     _seekRecordStoreCursor->save();
 
     // Restore all the cursors.
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     for (const auto& indexCursor : _indexCursors) {
-        indexCursor.second->restore(opCtx);
+        indexCursor.second->restore(ru);
     }
 
     uassert(ErrorCodes::Interrupted,
             "Interrupted due to: failure to restore yielded traverse cursor",
-            _traverseRecordStoreCursor->restore());
+            _traverseRecordStoreCursor->restore(ru));
     uassert(ErrorCodes::Interrupted,
             "Interrupted due to: failure to restore yielded seek cursor",
-            _seekRecordStoreCursor->restore());
+            _seekRecordStoreCursor->restore(ru));
 }
 
 Status ValidateState::initializeCollection(OperationContext* opCtx) {

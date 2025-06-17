@@ -351,7 +351,7 @@ void DistinctScan::doRestoreStateRequiresIndex() {
     if (_fetchCursor) {
         uassert(9623400,
                 "Could not restore collection cursor for fetching DISTINCT_SCAN",
-                _fetchCursor->restore());
+                _fetchCursor->restore(ru));
     }
 }
 

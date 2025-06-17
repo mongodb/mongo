@@ -92,7 +92,7 @@ void TextOrStage::doSaveStateRequiresCollection() {
 
 void TextOrStage::doRestoreStateRequiresCollection() {
     if (_recordCursor) {
-        invariant(_recordCursor->restore());
+        invariant(_recordCursor->restore(*shard_role_details::getRecoveryUnit(opCtx())));
     }
 }
 

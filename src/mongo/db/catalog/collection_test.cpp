@@ -1076,7 +1076,7 @@ TEST_F(CollectionTest, CappedCursorRollover) {
     }
 
     // Cursor should now be dead.
-    ASSERT_FALSE(cursor->restore(false));
+    ASSERT_FALSE(cursor->restore(*shard_role_details::getRecoveryUnit(otherOpCtx.get()), false));
     ASSERT(!cursor->next());
 }
 
@@ -1169,12 +1169,13 @@ TEST_F(CatalogTestFixture, CappedCursorYieldFirst) {
     }
 
     auto cursor = rs->getCursor(operationContext());
+    auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
 
     // See that things work if you yield before you first call next().
     cursor->save();
-    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    ru.abandonSnapshot();
 
-    ASSERT_TRUE(cursor->restore());
+    ASSERT_TRUE(cursor->restore(ru));
 
     auto record = cursor->next();
     ASSERT(record);

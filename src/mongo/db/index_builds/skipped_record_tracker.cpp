@@ -263,7 +263,7 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
 
         cursor->save();
         wuow->commit();
-        cursor->restore();
+        cursor->restore(*shard_role_details::getRecoveryUnit(opCtx));
 
         onResolved();
     }

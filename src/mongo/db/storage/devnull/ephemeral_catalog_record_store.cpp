@@ -157,7 +157,7 @@ public:
         _savedId = RecordId();
     }
 
-    bool restore(bool tolerateCappedRepositioning) final {
+    bool restore(RecoveryUnit& ru, bool tolerateCappedRepositioning) final {
         if (_savedId.isNull()) {
             _it = _records.end();
             return true;
@@ -168,9 +168,6 @@ public:
 
         // Capped iterators die on invalidation rather than advancing.
         return !(_isCapped && _lastMoveWasRestore);
-    }
-    bool restore(RecoveryUnit& ru, bool tolerateCappedRepositioning) final {
-        return restore(tolerateCappedRepositioning);
     }
 
     uint64_t getCheckpointId() const final {
@@ -243,7 +240,7 @@ public:
         _savedId = RecordId();
     }
 
-    bool restore(bool tolerateCappedRepositioning) final {
+    bool restore(RecoveryUnit& ru, bool tolerateCappedRepositioning) final {
         if (_savedId.isNull()) {
             _it = _records.rend();
             return true;
@@ -257,9 +254,6 @@ public:
 
         // Capped iterators die on invalidation rather than advancing.
         return !(_isCapped && _lastMoveWasRestore);
-    }
-    bool restore(RecoveryUnit& ru, bool tolerateCappedRepositioning) final {
-        return restore(tolerateCappedRepositioning);
     }
 
     void detachFromOperationContext() final {}

@@ -87,13 +87,14 @@ void BM_RecordStoreSeek(benchmark::State& state,
                         Direction direction,
                         SeekableRecordCursor::BoundInclusion boundInclusion) {
     Fixture fix(direction, 100'000);
+    auto& ru = *shard_role_details::getRecoveryUnit(fix.opCtx.get());
     for (auto _ : state) {
         fix.cursor->seek(RecordId(50'000), boundInclusion);
 
         state.PauseTiming();
         fix.itemsProcessed += 1;
         fix.cursor->saveUnpositioned();
-        fix.cursor->restore();
+        fix.cursor->restore(ru);
         state.ResumeTiming();
     }
     state.SetItemsProcessed(fix.itemsProcessed);
@@ -152,10 +153,11 @@ void BM_RecordStoreAdvance(benchmark::State& state, Direction direction) {
 
 void BM_RecordStoreSaveRestore(benchmark::State& state) {
     Fixture fix(kForward, 100'000);
+    auto& ru = *shard_role_details::getRecoveryUnit(fix.opCtx.get());
     for (auto _ : state) {
         fix.cursor->seekExact(RecordId(1));
         fix.cursor->save();
-        fix.cursor->restore();
+        fix.cursor->restore(ru);
         fix.itemsProcessed += 1;
     }
     state.SetItemsProcessed(fix.itemsProcessed);

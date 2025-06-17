@@ -148,7 +148,7 @@ void FetchStage::doSaveStateRequiresCollection() {
 
 void FetchStage::doRestoreStateRequiresCollection() {
     if (_cursor) {
-        const bool couldRestore = _cursor->restore();
+        const bool couldRestore = _cursor->restore(*shard_role_details::getRecoveryUnit(opCtx()));
         uassert(50982, "could not restore cursor for FETCH stage", couldRestore);
     }
 }

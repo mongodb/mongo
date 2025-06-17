@@ -913,8 +913,9 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
                 cursor->save();
                 // When this exits via success or WCE, we need to restore the cursor.
                 ON_BLOCK_EXIT([opCtx, ns = tmpName, &cursor]() {
-                    writeConflictRetry(
-                        opCtx, "retryRestoreCursor", ns, [&cursor] { cursor->restore(); });
+                    writeConflictRetry(opCtx, "retryRestoreCursor", ns, [opCtx, &cursor] {
+                        cursor->restore(*shard_role_details::getRecoveryUnit(opCtx));
+                    });
                 });
                 return Status::OK();
             });

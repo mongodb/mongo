@@ -71,9 +71,6 @@ public:
         return {};
     }
     void save() final {}
-    bool restore(bool tolerateCappedRepositioning = true) final {
-        return true;
-    }
     bool restore(RecoveryUnit& ru, bool tolerateCappedRepositioning = true) final {
         return true;
     }

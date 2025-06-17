@@ -87,9 +87,6 @@ public:
     }
 
     void save() override {}
-    bool restore(bool tolerateCappedRepositioning) override {
-        return true;
-    }
     bool restore(RecoveryUnit& ru, bool tolerateCappedRepositioning) override {
         return true;
     }

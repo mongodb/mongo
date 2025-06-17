@@ -523,7 +523,7 @@ public:
           _opCtx(opCtx),
           _ru(&ru),
           _tableId(rs._tableId) {
-        restore();
+        restore(ru);
     }
 
     ~RandomCursor() override = default;
@@ -563,10 +563,7 @@ public:
         _ru = nullptr;
     }
 
-    bool restore(bool tolerateCappedRepositioning = true) final {
-        return restore(*storage_details::getRecoveryUnit(_opCtx), tolerateCappedRepositioning);
-    }
-    bool restore(RecoveryUnit& ru, bool tolerateCappedRepositioning) final {
+    bool restore(RecoveryUnit& ru, bool tolerateCappedRepositioning = true) final {
         _ru = &ru;
         auto& wtRu = WiredTigerRecoveryUnit::get(*_ru);
 
@@ -1876,9 +1873,6 @@ void WiredTigerRecordStoreCursorBase::saveUnpositioned() {
     _lastReturnedId = RecordId();
 }
 
-bool WiredTigerRecordStoreCursorBase::restore(bool tolerateCappedRepositioning) {
-    return restore(*storage_details::getRecoveryUnit(_opCtx), tolerateCappedRepositioning);
-}
 bool WiredTigerRecordStoreCursorBase::restore(RecoveryUnit& ru, bool tolerateCappedRepositioning) {
     _ru = &ru;
 
@@ -1989,9 +1983,6 @@ void WiredTigerCappedCursorBase::save() {
     resetVisibility();
 }
 
-bool WiredTigerCappedCursorBase::restore(bool tolerateCappedRepositioning) {
-    return restore(*storage_details::getRecoveryUnit(_opCtx), tolerateCappedRepositioning);
-}
 bool WiredTigerCappedCursorBase::restore(RecoveryUnit& ru, bool tolerateCappedRepositioning) {
     _ru = &ru;
 

@@ -62,9 +62,6 @@ public:
     // external data source is read-only.
     void save() override {}
     void saveUnpositioned() override {}
-    bool restore(bool tolerateCappedRepositioning) override {
-        return true;
-    }
     bool restore(RecoveryUnit& ru, bool tolerateCappedRepositioning) override {
         return true;
     }
