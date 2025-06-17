@@ -1558,21 +1558,12 @@ void commitRemoveShard(const Lock::ExclusiveLock&,
 void addShardInTransaction(OperationContext* opCtx,
                            const ShardType& newShard,
                            std::vector<DatabaseName>&& databasesInNewShard,
-                           std::vector<CollectionType>&& collectionsInNewShard,
                            std::shared_ptr<executor::TaskExecutor> executor) {
-
-    const auto collCreationTime = [&]() {
-        const auto currentTime = VectorClock::get(opCtx)->getTime();
-        return currentTime.clusterTime().asTimestamp();
-    }();
-    for (auto& coll : collectionsInNewShard) {
-        coll.setTimestamp(collCreationTime);
-    }
 
     // Set up and run the commit statements
     // TODO SERVER-81582: generate batches of transactions to insert the database/placementHistory
-    // and collection/placementHistory before adding the shard in config.shards.
-    auto transactionChain = [opCtx, &newShard, &databasesInNewShard, &collectionsInNewShard](
+    // before adding the shard in config.shards.
+    auto transactionChain = [opCtx, &newShard, &databasesInNewShard](
                                 const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
         write_ops::InsertCommandRequest insertShardEntry(NamespaceString::kConfigsvrShardsNamespace,
                                                          {newShard.toBSON()});
@@ -1606,60 +1597,6 @@ void addShardInTransaction(OperationContext* opCtx,
             .thenRunOn(txnExec)
             .then([&](const BatchedCommandResponse& insertDatabaseEntriesResponse) {
                 uassertStatusOK(insertDatabaseEntriesResponse.toStatus());
-                if (collectionsInNewShard.empty()) {
-                    BatchedCommandResponse noOpResponse;
-                    noOpResponse.setStatus(Status::OK());
-                    noOpResponse.setN(0);
-
-                    return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
-                }
-                std::vector<BSONObj> collEntries;
-
-                std::transform(collectionsInNewShard.begin(),
-                               collectionsInNewShard.end(),
-                               std::back_inserter(collEntries),
-                               [&](const CollectionType& coll) { return coll.toBSON(); });
-                write_ops::InsertCommandRequest insertCollectionEntries(
-                    NamespaceString::kConfigsvrCollectionsNamespace, std::move(collEntries));
-                return txnClient.runCRUDOp(insertCollectionEntries, {});
-            })
-            .thenRunOn(txnExec)
-            .then([&](const BatchedCommandResponse& insertCollectionEntriesResponse) {
-                uassertStatusOK(insertCollectionEntriesResponse.toStatus());
-                if (collectionsInNewShard.empty()) {
-                    BatchedCommandResponse noOpResponse;
-                    noOpResponse.setStatus(Status::OK());
-                    noOpResponse.setN(0);
-
-                    return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
-                }
-                std::vector<BSONObj> chunkEntries;
-                const auto unsplittableShardKey =
-                    ShardKeyPattern(sharding_ddl_util::unsplittableCollectionShardKey());
-                const auto shardId = ShardId(newShard.getName());
-                std::transform(
-                    collectionsInNewShard.begin(),
-                    collectionsInNewShard.end(),
-                    std::back_inserter(chunkEntries),
-                    [&](const CollectionType& coll) {
-                        // Create a single chunk for this
-                        ChunkType chunk(
-                            coll.getUuid(),
-                            {coll.getKeyPattern().globalMin(), coll.getKeyPattern().globalMax()},
-                            {{coll.getEpoch(), coll.getTimestamp()}, {1, 0}},
-                            shardId);
-                        chunk.setOnCurrentShardSince(coll.getTimestamp());
-                        chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), shardId)});
-                        return chunk.toConfigBSON();
-                    });
-
-                write_ops::InsertCommandRequest insertChunkEntries(
-                    NamespaceString::kConfigsvrChunksNamespace, std::move(chunkEntries));
-                return txnClient.runCRUDOp(insertChunkEntries, {});
-            })
-            .thenRunOn(txnExec)
-            .then([&](const BatchedCommandResponse& insertChunkEntriesResponse) {
-                uassertStatusOK(insertChunkEntriesResponse.toStatus());
                 if (databasesInNewShard.empty()) {
                     BatchedCommandResponse noOpResponse;
                     noOpResponse.setStatus(Status::OK());
@@ -1676,18 +1613,6 @@ void addShardInTransaction(OperationContext* opCtx,
                                                                  newShard.getTopologyTime(),
                                                                  {ShardId(newShard.getName())})
                                        .toBSON();
-                               });
-                std::transform(collectionsInNewShard.begin(),
-                               collectionsInNewShard.end(),
-                               std::back_inserter(placementEntries),
-                               [&](const CollectionType& coll) {
-                                   NamespacePlacementType placementInfo(
-                                       NamespaceString(coll.getNss()),
-                                       coll.getTimestamp(),
-                                       {ShardId(newShard.getName())});
-                                   placementInfo.setUuid(coll.getUuid());
-
-                                   return placementInfo.toBSON();
                                });
                 write_ops::InsertCommandRequest insertPlacementEntries(
                     NamespaceString::kConfigsvrPlacementHistoryNamespace,

@@ -274,11 +274,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     opCtx->setWriteConcern(defaultMajorityWriteConcernDoNotUse());
                     try {
                         topology_change_helpers::addShardInTransaction(
-                            opCtx,
-                            shard,
-                            std::move(dbList),
-                            std::vector<CollectionType>{},
-                            **executor);
+                            opCtx, shard, std::move(dbList), **executor);
                     } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
                         // If this happens, it means something happened in the previous try after
                         // doing the transaction, so it's okay to swallow the duplicate key

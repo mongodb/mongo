@@ -634,7 +634,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
         auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
         topology_change_helpers::addShardInTransaction(
-            opCtx, shardType, std::move(dbNamesStatus.getValue()), {}, executor);
+            opCtx, shardType, std::move(dbNamesStatus.getValue()), executor);
     }
     // Once the transaction has committed, we must immediately dismiss the guard to avoid
     // incorrectly removing the RSM after persisting the shard addition.
