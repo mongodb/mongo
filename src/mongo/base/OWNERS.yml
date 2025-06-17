@@ -5,7 +5,7 @@ filters:
       - 10gen/server-programmability
   - "error_codes.yml":
     approvers:
-      - NOOWNERS-DO-NOT-USE-DEPRECATED-2024-07-01
+      - NOOWNERS
   - "secure_allocator*":
     approvers:
       - 10gen/server-security

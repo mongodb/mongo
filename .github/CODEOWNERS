@@ -27,6 +27,10 @@ sbom.json @10gen/server-security @svc-auto-approve-bot
 MODULE.bazel* @10gen/devprod-build @svc-auto-approve-bot
 WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
+# The following patterns are parsed from ./.github/OWNERS.yml
+/.github/ @10gen/server-root-ownership @svc-auto-approve-bot
+/.github/ALLOWED_UNOWNED_FILES.yml @svc-auto-approve-bot alex.neben@mongodb.com
+
 # The following patterns are parsed from ./bazel/OWNERS.yml
 /bazel/**/* @10gen/devprod-build @svc-auto-approve-bot
 
@@ -3077,3 +3081,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./x509/OWNERS.yml
 /x509/**/* @10gen/server-security @svc-auto-approve-bot
+
+# The following lines are added from .github/ALLOWED_UNOWNED_FILES.yml
+/.github/CODEOWNERS

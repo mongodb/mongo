@@ -1,0 +1,8 @@
+version: 2.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-root-ownership
+  - "/ALLOWED_UNOWNED_FILES.yml":
+    approvers:
+      - alex.neben@mongodb.com

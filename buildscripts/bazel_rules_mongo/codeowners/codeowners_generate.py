@@ -149,10 +149,11 @@ def check_new_files(codeowners_binary_path: str, expansions_file: str, branch: s
     print(f"The following new files were detected: {new_files}")
 
     unowned_files = get_unowned_files(codeowners_binary_path)
+    allowed_unowned_files = get_allowed_unowned_files()
 
     unowned_new_files = []
     for file in new_files:
-        if file in unowned_files:
+        if file in unowned_files and f"/{file}" not in allowed_unowned_files:
             unowned_new_files.append(file)
 
     if unowned_new_files:
@@ -185,8 +186,13 @@ def check_orphaned_files(
     temp_codeowners_file.write(previous_codeowners_file_contents)
     temp_codeowners_file.close()
     old_unowned_files = get_unowned_files(codeowners_binary_path, temp_codeowners_file.name)
+    allowed_unowned_files = get_allowed_unowned_files()
 
     unowned_files_difference = current_unowned_files - old_unowned_files
+    for file in list(unowned_files_difference):
+        if f"/{file}" in allowed_unowned_files:
+            unowned_files_difference.remove(file)
+
     if not unowned_files_difference:
         print("No files have lost ownership with these changes.")
         return 0
@@ -217,6 +223,68 @@ def post_generation_checks(
         )
 
     return status
+
+
+def get_allowed_unowned_files_path() -> Optional[str]:
+    return os.environ.get("ALLOWED_UNOWNED_FILES_PATH", None)
+
+
+@cache
+def get_allowed_unowned_files() -> Set[str]:
+    allowed_unowned_file_path = get_allowed_unowned_files_path()
+    if not allowed_unowned_file_path:
+        return set()
+
+    unowned_files = set()
+
+    with open(allowed_unowned_file_path, "r") as file:
+        contents = yaml.safe_load(file)
+
+        try:
+            assert "version" in contents, f"version field not found in {allowed_unowned_file_path}"
+            assert contents["version"] == "1.0.0", f"unknown version in {allowed_unowned_file_path}"
+            del contents["version"]
+
+            working_directory = os.curdir
+            assert "filters" in contents, f"No filters were found in {allowed_unowned_file_path}"
+            for filter in contents["filters"]:
+                assert "justification" in filter, "all filters need a justification"
+                pattern = filter["filter"]
+                assert pattern.startswith("/"), "All unowned file filters must start with a /"
+                assert "*" not in pattern, "No wildcard patterns allowed in unowned file filters."
+                test_pattern = f"{working_directory}{pattern}"
+                assert os.path.exists(test_pattern), f"Filter was not found: {pattern}"
+                assert not os.path.isdir(
+                    test_pattern
+                ), "No directories are allowed in unowned file filters."
+                assert os.path.isfile(test_pattern), f"No files matched pattern: {pattern}"
+
+                unowned_files.add(pattern)
+        except Exception as ex:
+            print(f"Error occurred while parsing {allowed_unowned_file_path}")
+            print(
+                "For documentation around the file format please read https://github.com/10gen/mongo/blob/master/docs/owners/allowed_unowned_files_format.md"
+            )
+            raise ex
+
+    return unowned_files
+
+
+def add_allowed_unowned_files(output_lines: List[str]) -> None:
+    allowed_unowned_files = get_allowed_unowned_files()
+    if not allowed_unowned_files:
+        return
+
+    allowed_unowned_files_path = get_allowed_unowned_files_path()
+    assert (
+        allowed_unowned_files_path
+    ), "Somehow there were allowed unowned files but a path was not found."
+
+    output_lines.append(f"# The following lines are added from {allowed_unowned_files_path}")
+    for file in allowed_unowned_files:
+        output_lines.append(f"{file}")
+    # adds a newline
+    output_lines.append("")
 
 
 def main():
@@ -304,6 +372,7 @@ def main():
         files = evergreen_git.get_files_to_lint()
         root_node = build_tree(files)
         process_dir(output_lines, root_node)
+        add_allowed_unowned_files(output_lines)
     except Exception as ex:
         print("An exception was found while generating the CODEOWNERS file.", file=sys.stderr)
         print(

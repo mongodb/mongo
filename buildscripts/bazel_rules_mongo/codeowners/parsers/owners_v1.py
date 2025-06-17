@@ -51,7 +51,7 @@ class OwnersParserV1:
                         # approver is github username, need to prefix with @
                         owners.add(f"@{owner}")
 
-                NOOWNERS_NAME = "NOOWNERS-DO-NOT-USE-DEPRECATED-2024-07-01"
+                NOOWNERS_NAME = "NOOWNERS"
                 if NOOWNERS_NAME in approvers:
                     assert (
                         len(approvers) == 1

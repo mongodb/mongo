@@ -26,6 +26,11 @@ py_binary(
             "CODEOWNERS_CHECK_NEW_FILES": "false",
         },
         "//conditions:default": {},
+    }) | select({
+        ":have_allowed_unowned_files": {
+            "ALLOWED_UNOWNED_FILES_PATH": "$(codeowners_allowed_unowned_files_path)",
+        },
+        "//conditions:default": {},
     }),
     main = "codeowners_generate.py",
     visibility = ["//visibility:public"],
@@ -50,5 +55,12 @@ config_setting(
     name = "dont_check_new_files",
     define_values = {
         "codeowners_dont_check_new_files": "True",
+    },
+)
+
+config_setting(
+    name = "have_allowed_unowned_files",
+    define_values = {
+        "codeowners_have_allowed_unowned_files": "True",
     },
 )
