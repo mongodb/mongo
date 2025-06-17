@@ -89,6 +89,15 @@ void SHA1BlockTraits::computeHmac(const uint8_t* key,
     CCHmacFinal(&ctx, output);
 }
 
+void SHA1BlockTraits::computeHmacWithCtx(HmacContext*,
+                                         const uint8_t* key,
+                                         size_t keyLen,
+                                         std::initializer_list<ConstDataRange> input,
+                                         HashType* const output) {
+    return SHA1BlockTraits::computeHmac(key, keyLen, input, output);
+}
+
+
 void SHA256BlockTraits::computeHmac(const uint8_t* key,
                                     size_t keyLen,
                                     CDRinit input,
@@ -103,6 +112,15 @@ void SHA256BlockTraits::computeHmac(const uint8_t* key,
     CCHmacFinal(&ctx, output);
 }
 
+void SHA256BlockTraits::computeHmacWithCtx(HmacContext*,
+                                           const uint8_t* key,
+                                           size_t keyLen,
+                                           std::initializer_list<ConstDataRange> input,
+                                           HashType* const output) {
+    return SHA256BlockTraits::computeHmac(key, keyLen, input, output);
+}
+
+
 void SHA512BlockTraits::computeHmac(const uint8_t* key,
                                     size_t keyLen,
                                     CDRinit input,
@@ -115,6 +133,14 @@ void SHA512BlockTraits::computeHmac(const uint8_t* key,
         CCHmacUpdate(&ctx, range.data(), range.length());
     }
     CCHmacFinal(&ctx, output);
+}
+
+void SHA512BlockTraits::computeHmacWithCtx(HmacContext*,
+                                           const uint8_t* key,
+                                           size_t keyLen,
+                                           std::initializer_list<ConstDataRange> input,
+                                           HashType* const output) {
+    return SHA512BlockTraits::computeHmac(key, keyLen, input, output);
 }
 
 }  // namespace mongo
