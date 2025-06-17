@@ -113,9 +113,10 @@ function waitForFailPointOrCountDownLatch(fp, countDownLatch) {
     return enteredReshardFp;
 }
 
-function validateStateDocuments(topology, performVerification) {
+function validateStateDocuments(topology, collNS, performVerification) {
     const configRSPrimary = new Mongo(topology.configsvr.primary);
-    const coordinatorDoc = configRSPrimary.getCollection("config.reshardingOperations").findOne();
+    const coordinatorDoc =
+        configRSPrimary.getCollection("config.reshardingOperations").findOne({ns: collNS});
 
     if (performVerification === null && isVerificationEnabled) {
         // The command didn't specify 'performVerification'. If the feature flag was enabled when
@@ -143,14 +144,14 @@ function validateStateDocuments(topology, performVerification) {
     });
 }
 
-function testResharding(thread, countDownLatch, performVerification) {
+function testResharding(thread, countDownLatch, collNS, performVerification) {
     // Pause resharding before it commits so we can inspect the state documents.
     const commitFp = pauseReshardingBeforeDecisionPersisted(topology);
     thread.start();
     const enteredCommitFp = waitForFailPointOrCountDownLatch(commitFp, countDownLatch);
 
     if (enteredCommitFp) {
-        validateStateDocuments(topology, performVerification);
+        validateStateDocuments(topology, collNS, performVerification);
         commitFp.off();
         assert.commandWorked(thread.returnData());
     } else {
@@ -198,7 +199,7 @@ function testReshardCollection(performVerification) {
                                      {x: 1} /* key */,
                                      performVerification,
                                      reshardCountDownLatch);
-    testResharding(reshardThread, reshardCountDownLatch, performVerification);
+    testResharding(reshardThread, reshardCountDownLatch, ns, performVerification);
 }
 
 function testUnshardCollection(performVerification) {
@@ -218,7 +219,7 @@ function testUnshardCollection(performVerification) {
                                      getNonOwningShardName(dbName, collName),
                                      performVerification,
                                      unshardCountDownLatch);
-    testResharding(unshardThread, unshardCountDownLatch, performVerification);
+    testResharding(unshardThread, unshardCountDownLatch, ns, performVerification);
 }
 
 function testMoveCollection(performVerification) {
@@ -237,7 +238,7 @@ function testMoveCollection(performVerification) {
                                   getNonOwningShardName(dbName, collName),
                                   performVerification,
                                   moveCountDownLatch);
-    testResharding(moveThread, moveCountDownLatch, performVerification);
+    testResharding(moveThread, moveCountDownLatch, ns, performVerification);
 }
 
 function runTest(performVerification) {
