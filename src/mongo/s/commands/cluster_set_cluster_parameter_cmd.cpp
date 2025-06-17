@@ -55,6 +55,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/set_cluster_server_parameter_router_impl.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -101,11 +102,10 @@ public:
                 storage_validation::scanDocument(mutableUpdate, false, true, &ignore);
             }
 
-            static auto impl = getSetClusterParameterImpl(service);
-            impl(opCtx,
-                 request(),
-                 boost::none /* clusterParameterTime */,
-                 boost::none /* previousTime */);
+            setClusterParameterImplRouter(opCtx,
+                                          request(),
+                                          boost::none /* clusterParameterTime */,
+                                          boost::none /* previousTime */);
         }
 
     private:

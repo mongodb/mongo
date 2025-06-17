@@ -105,6 +105,7 @@ env.Library(
         'router_transactions_stats.idl',
         'router_role.cpp',
         'session_catalog_router.cpp',
+        'set_cluster_server_parameter_router_impl.cpp',
         'shard_key_pattern_query_util.cpp',
         'stale_shard_version_helpers.cpp',
         'transaction_router_resource_yielder.cpp',
