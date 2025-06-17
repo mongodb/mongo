@@ -36,6 +36,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/scopeguard.h"
 
 #include <memory>
 
@@ -56,9 +57,15 @@ boost::optional<Record> SpillTable::Cursor::next() {
 
 void SpillTable::Cursor::detachFromOperationContext() {
     _cursor->detachFromOperationContext();
+    if (_ru) {
+        _ru->setOperationContext(nullptr);
+    }
 }
 
 void SpillTable::Cursor::reattachToOperationContext(OperationContext* opCtx) {
+    if (_ru) {
+        _ru->setOperationContext(opCtx);
+    }
     _cursor->reattachToOperationContext(opCtx);
 }
 
@@ -127,6 +134,9 @@ Status SpillTable::insertRecords(OperationContext* opCtx, std::vector<Record>* r
             opCtx, *storage_details::getRecoveryUnit(opCtx), records, timestamps);
     }
 
+    _ru->setOperationContext(opCtx);
+    ON_BLOCK_EXIT([this] { _ru->setOperationContext(nullptr); });
+
     for (auto&& record : *records) {
         auto status = writeConflictRetry(
             opCtx, *_ru, "SpillTable::insertRecords", NamespaceString::kEmpty, [&] {
@@ -149,7 +159,14 @@ Status SpillTable::insertRecords(OperationContext* opCtx, std::vector<Record>* r
 }
 
 bool SpillTable::findRecord(OperationContext* opCtx, const RecordId& rid, RecordData* out) const {
-    return _rs->findRecord(opCtx, _ru ? *_ru : *storage_details::getRecoveryUnit(opCtx), rid, out);
+    if (!_ru) {
+        return _rs->findRecord(opCtx, *storage_details::getRecoveryUnit(opCtx), rid, out);
+    }
+
+    _ru->setOperationContext(opCtx);
+    ON_BLOCK_EXIT([this] { _ru->setOperationContext(nullptr); });
+
+    return _rs->findRecord(opCtx, *_ru, rid, out);
 }
 
 Status SpillTable::updateRecord(OperationContext* opCtx,
@@ -163,6 +180,9 @@ Status SpillTable::updateRecord(OperationContext* opCtx,
     if (!_ru) {
         return _rs->updateRecord(opCtx, *storage_details::getRecoveryUnit(opCtx), rid, data, len);
     }
+
+    _ru->setOperationContext(opCtx);
+    ON_BLOCK_EXIT([this] { _ru->setOperationContext(nullptr); });
 
     return writeConflictRetry(
         opCtx, *_ru, "SpillTable::updateRecord", NamespaceString::kEmpty, [&] {
@@ -184,6 +204,9 @@ void SpillTable::deleteRecord(OperationContext* opCtx, const RecordId& rid) {
         return;
     }
 
+    _ru->setOperationContext(opCtx);
+    ON_BLOCK_EXIT([this] { _ru->setOperationContext(nullptr); });
+
     writeConflictRetry(opCtx, *_ru, "SpillTable::deleteRecord", NamespaceString::kEmpty, [&] {
         StorageWriteTransaction txn{*_ru};
         _rs->deleteRecord(opCtx, *_ru, rid);
@@ -193,9 +216,13 @@ void SpillTable::deleteRecord(OperationContext* opCtx, const RecordId& rid) {
 
 std::unique_ptr<SpillTable::Cursor> SpillTable::getCursor(OperationContext* opCtx,
                                                           bool forward) const {
-    return std::make_unique<SpillTable::Cursor>(
-        _ru.get(),
-        _rs->getCursor(opCtx, _ru ? *_ru : *storage_details::getRecoveryUnit(opCtx), forward));
+    if (!_ru) {
+        return std::make_unique<SpillTable::Cursor>(
+            _ru.get(), _rs->getCursor(opCtx, *storage_details::getRecoveryUnit(opCtx), forward));
+    }
+
+    _ru->setOperationContext(opCtx);
+    return std::make_unique<SpillTable::Cursor>(_ru.get(), _rs->getCursor(opCtx, *_ru, forward));
 }
 
 Status SpillTable::truncate(OperationContext* opCtx) {
@@ -206,6 +233,9 @@ Status SpillTable::truncate(OperationContext* opCtx) {
     if (!_ru) {
         return _rs->truncate(opCtx, *storage_details::getRecoveryUnit(opCtx));
     }
+
+    _ru->setOperationContext(opCtx);
+    ON_BLOCK_EXIT([this] { _ru->setOperationContext(nullptr); });
 
     return writeConflictRetry(opCtx, *_ru, "SpillTable::truncate", NamespaceString::kEmpty, [&] {
         StorageWriteTransaction txn{*_ru};
@@ -235,6 +265,9 @@ Status SpillTable::rangeTruncate(OperationContext* opCtx,
                                   hintDataSizeIncrement,
                                   hintNumRecordsIncrement);
     }
+
+    _ru->setOperationContext(opCtx);
+    ON_BLOCK_EXIT([this] { _ru->setOperationContext(nullptr); });
 
     return writeConflictRetry(
         opCtx, *_ru, "SpillTable::rangeTruncate", NamespaceString::kEmpty, [&] {
