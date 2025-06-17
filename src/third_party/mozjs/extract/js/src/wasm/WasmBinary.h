@@ -659,9 +659,18 @@ class Decoder {
 inline ValType Decoder::uncheckedReadValType(const TypeContext& types) {
   uint8_t code = uncheckedReadFixedU8();
   switch (code) {
+    case uint8_t(TypeCode::AnyRef):
+    case uint8_t(TypeCode::EqRef):
+    case uint8_t(TypeCode::I31Ref):
+    case uint8_t(TypeCode::StructRef):
+    case uint8_t(TypeCode::ArrayRef):
+    case uint8_t(TypeCode::NullAnyRef):
     case uint8_t(TypeCode::FuncRef):
+    case uint8_t(TypeCode::NullFuncRef):
     case uint8_t(TypeCode::ExternRef):
+    case uint8_t(TypeCode::NullExternRef):
     case uint8_t(TypeCode::ExnRef):
+    case uint8_t(TypeCode::NullExnRef):
       return RefType::fromTypeCode(TypeCode(code), true);
     case uint8_t(TypeCode::Ref):
     case uint8_t(TypeCode::NullableRef): {
