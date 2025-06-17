@@ -41,12 +41,13 @@ Date.timeFunc = function(theFunc, numTimes = 1, ...args) {
  * The return value is not a valid JSON string. See 'tojson()' function comment for details.
  */
 Date.prototype.tojson = function() {
+    let time;
     try {
         // If this === Date.prototype or this is a Date instance created from
         // Object.create(Date.prototype), then the [[DateValue]] internal slot won't be set and will
-        // lead to a TypeError. We instead treat it as though the [[DateValue]] internal slot is NaN
-        // in order to be consistent with the ES5 behavior in MongoDB 3.2 and earlier.
-        this.getTime();
+        // lead to a TypeError. We instead treat it as though the [[DateValue]] internal slot is
+        // NaN.
+        time = this.getTime();
     } catch (e) {
         if (e instanceof TypeError &&
             e.message.includes("Date.prototype.getTime called on incompatible")) {
@@ -55,18 +56,15 @@ Date.prototype.tojson = function() {
         throw e;
     }
 
-    const YYYY = this.getUTCFullYear().zeroPad(4);
-    const MM = (this.getUTCMonth() + 1).zeroPad(2);
-    const DD = this.getUTCDate().zeroPad(2);
-    const HH = this.getUTCHours().zeroPad(2);
-    const mm = this.getUTCMinutes().zeroPad(2);
-    let ss = this.getUTCSeconds().zeroPad(2);
+    if (isNaN(time)) {
+        // backwards compatibility based on a custom parser that wasn't graceful here
+        return 'ISODate("0NaN-NaN-NaNTNaN:NaN:NaNZ")';
+    }
 
-    if (this.getUTCMilliseconds())
-        ss += '.' + this.getUTCMilliseconds().zeroPad(3);
+    let str = this.toISOString();
+    str = str.replace(".000", "");  // backwards compatibility
 
-    const ofs = 'Z';
-    return `ISODate("${YYYY}-${MM}-${DD}T${HH}:${mm}:${ss}${ofs}")`;
+    return `ISODate("${str}")`;
 };
 
 // eslint-disable-next-line
@@ -74,6 +72,8 @@ ISODate = function(isoDateStr) {
     if (!isoDateStr)
         return new Date();
 
+    // This format is more flexible than what Date.parse provides.
+    // Allows optional dashes, colons, and rounds ms
     const isoDateRegex =
         /^(\d{4})-?(\d{2})-?(\d{2})([T ](\d{2})(:?(\d{2})(:?(\d{2}(\.\d+)?))?)?(Z|([+-])(\d{2}):?(\d{2})?)?)?$/;
     let res = isoDateRegex.exec(isoDateStr);
