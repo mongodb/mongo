@@ -722,16 +722,6 @@ functions:
     - *generate_network_diagnostics
     - *upload_network_diagnostics
 
-  "send benchmark results": &send_benchmark_results
-    command: perf.send
-    display_name: "send benchmark results"
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      bucket: mciuploads
-      prefix: ${task_id}_${execution}
-      file: src/cedar_report.json
-
   "cleanup environment": &cleanup_environment
     command: subprocess.exec
     display_name: "cleanup environment"
@@ -1456,7 +1446,6 @@ functions:
     - *sign_macos_dev_binaries
     - *multiversion_exclude_tags_generate
     - *execute_resmoke_tests
-    - *send_benchmark_results
       # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
       # directly actionable. We use type=setup rather than type=system or type=test for this command
     # because we don't intend for any human to look at this failure.
