@@ -65,10 +65,6 @@ public:
         return std::make_unique<WiredTigerRecoveryUnit>(_connection.get());
     }
 
-    bool supportsDirectoryPerDB() const override {
-        return false;
-    }
-
     int64_t getIdentSize(RecoveryUnit&, StringData ident) override;
 
     bool hasIdent(RecoveryUnit&, StringData ident) const override;

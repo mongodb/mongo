@@ -69,9 +69,9 @@ struct InsertDeleteOptions;
  * Special kind of 'IndexCatalogEntryContainer' just for the "ready" indexes maintained by
  * 'IndexCatalogImpl'. The purpose of this class is to allow for fast access to the ready _id index.
  */
-class ReadyIndexCatalogEntryContainer : public IndexCatalogEntryContainer {
+class ReadyIndexCatalogEntryContainer : private IndexCatalogEntryContainer {
 public:
-    std::shared_ptr<const IndexCatalogEntry> release(const IndexDescriptor* desc) override {
+    std::shared_ptr<const IndexCatalogEntry> release(const IndexDescriptor* desc) {
         if (auto released = IndexCatalogEntryContainer::release(desc)) {
             // Some operations can drop the _id index, such as collection truncation or re-indexing.
             if (desc->isIdIndex()) {
@@ -82,7 +82,11 @@ public:
         return nullptr;
     }
 
-    void add(std::shared_ptr<const IndexCatalogEntry>&& entry) override {
+    bool remove(const IndexDescriptor* desc) {
+        return static_cast<bool>(release(desc));
+    }
+
+    void add(std::shared_ptr<const IndexCatalogEntry>&& entry) {
         if (entry->descriptor()->isIdIndex()) {
             _cachedIdIndex = entry->descriptor();
         }
@@ -92,6 +96,10 @@ public:
     const IndexDescriptor* getIdIndex() const {
         return _cachedIdIndex;
     }
+
+    using IndexCatalogEntryContainer::begin;
+    using IndexCatalogEntryContainer::end;
+    using IndexCatalogEntryContainer::size;
 
 private:
     // Pointer to the ready _id index, if it exists. Should be kept in sync with _entries.
@@ -411,9 +419,15 @@ private:
     IndexCatalogEntry* _getWritableEntry(const IndexDescriptor* descriptor);
 
     /**
-     * List of indexes that are "ready" in the sense that they are functional and in sync with the
-     * underlying collection's documents. Whenever this container is modified, it is required to
-     * rebuild the data in '_indexUpdateIdentifier'.
+     * Removes the entry from the container which holds it. Exactly one of the three containers must
+     * contain the entry.
+     */
+    void _removeEntry(IndexCatalogEntry* entry);
+
+    /**
+     * List of indexes that are "ready" in the sense that they are functional and in sync with
+     * the underlying collection's documents. Whenever this container is modified, it is
+     * required to rebuild the data in '_indexUpdateIdentifier'.
      */
     ReadyIndexCatalogEntryContainer _readyIndexes;
 

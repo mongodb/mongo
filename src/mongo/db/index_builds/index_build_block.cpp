@@ -163,17 +163,10 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection, bo
             return status;
     }
 
-    auto indexCatalog = collection->getIndexCatalog();
-    IndexCatalogEntry* indexCatalogEntry = nullptr;
-    if (forRecovery) {
-        indexCatalogEntry = indexCatalog->getWritableEntryByName(
-            opCtx, _indexName, IndexCatalog::InclusionPolicy::kUnfinished);
-    } else {
-        indexCatalogEntry = indexCatalog->createIndexEntry(
-            opCtx, collection, std::move(descriptor), CreateIndexEntryFlags::kNone);
-    }
-
     if (_method == IndexBuildMethod::kHybrid) {
+        auto indexCatalog = collection->getIndexCatalog();
+        auto indexCatalogEntry = indexCatalog->getWritableEntryByName(
+            opCtx, _indexName, IndexCatalog::InclusionPolicy::kUnfinished);
         _indexBuildInterceptor = std::make_unique<IndexBuildInterceptor>(opCtx, indexCatalogEntry);
         indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
     }

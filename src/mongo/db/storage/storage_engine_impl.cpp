@@ -119,9 +119,6 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
               _onMinOfCheckpointAndOldestTimestampChanged(opCtx, timestamp);
           }),
       _supportsCappedCollections(_engine->supportsCappedCollections()) {
-    uassert(28601,
-            "Storage engine does not support --directoryperdb",
-            !(_options.directoryPerDB && !_engine->supportsDirectoryPerDB()));
 
     // Replace the noop recovery unit for the startup operation context now that the storage engine
     // has been initialized. This is needed because at the time of startup, when the operation
@@ -205,10 +202,7 @@ void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
     LOGV2(9529901,
           "Initializing durable catalog",
           "numRecords"_attr = _catalogRecordStore->numRecords());
-    _catalog = std::make_unique<MDBCatalog>(_catalogRecordStore.get(),
-                                            _options.directoryPerDB,
-                                            _options.directoryForIndexes,
-                                            _engine.get());
+    _catalog = std::make_unique<MDBCatalog>(_catalogRecordStore.get(), _engine.get());
     _catalog->init(opCtx);
 
     LOGV2(9529902, "Retrieving all idents from storage engine");
@@ -467,6 +461,16 @@ std::string StorageEngineImpl::getFilesystemPathForDb(const DatabaseName& dbName
     } else {
         return storageGlobalParams.dbpath;
     }
+}
+
+std::string StorageEngineImpl::generateNewCollectionIdent(const DatabaseName& dbName) const {
+    return ident::generateNewCollectionIdent(
+        dbName, _options.directoryPerDB, _options.directoryForIndexes);
+}
+
+std::string StorageEngineImpl::generateNewIndexIdent(const DatabaseName& dbName) const {
+    return ident::generateNewIndexIdent(
+        dbName, _options.directoryPerDB, _options.directoryForIndexes);
 }
 
 void StorageEngineImpl::cleanShutdown(ServiceContext* svcCtx, bool memLeakAllowed) {

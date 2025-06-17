@@ -86,7 +86,7 @@ public:
         NamespaceString nss;
     };
 
-    MDBCatalog(RecordStore* rs, bool directoryPerDb, bool directoryForIndexes, KVEngine* engine);
+    MDBCatalog(RecordStore* rs, KVEngine* engine);
     MDBCatalog() = delete;
 
     static MDBCatalog* get(OperationContext* opCtx) {
@@ -164,24 +164,6 @@ public:
      */
     NamespaceString getNSSFromCatalog(OperationContext* opCtx, const RecordId& catalogId) const;
 
-    /**
-     *
-     * Flags to higher layers whether new idents should be generated with 'directoryPerDb' or
-     * 'directoryPerIndexes'.
-     *
-     * TODO SERVER-102875: Remove _directoryPerDb and _directoryForIndexes - idents are generated at
-     * higher layers and this is a layering violation. For now, they are necessary for ensuring
-     * index idents are generated with the correct settings in the 'durable_catalog', even when the
-     * MDBCatalog hasn't been plugged into the wider system and can't be located via
-     * MDBCatalog::get(opCtx).
-     */
-    bool isUsingDirectoryPerDb() {
-        return _directoryPerDb;
-    }
-    bool isUsingDirectoryForIndexes() {
-        return _directoryForIndexes;
-    }
-
     StatusWith<std::string> newOrphanedIdent(OperationContext* opCtx,
                                              const std::string& ident,
                                              bool isClustered);
@@ -213,8 +195,6 @@ private:
                                                       UUID uuid = UUID::gen());
 
     RecordStore* _rs;  // not owned
-    const bool _directoryPerDb;
-    const bool _directoryForIndexes;
 
     absl::flat_hash_map<RecordId, EntryIdentifier, RecordId::Hasher> _catalogIdToEntryMap;
     mutable stdx::mutex _catalogIdToEntryMapLock;

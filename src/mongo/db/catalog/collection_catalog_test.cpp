@@ -1202,10 +1202,7 @@ private:
 
         // Adds the collection to the durable catalog.
         auto storageEngine = getServiceContext()->getStorageEngine();
-        const auto ident =
-            ident::generateNewCollectionIdent(nss.dbName(),
-                                              storageEngine->isUsingDirectoryPerDb(),
-                                              storageEngine->isUsingDirectoryForIndexes());
+        const auto ident = storageEngine->generateNewCollectionIdent(nss.dbName());
         auto mdbCatalog = storageEngine->getMDBCatalog();
         std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
             uassertStatusOK(
@@ -3382,8 +3379,6 @@ TEST_F(CollectionCatalogTimestampTest, IndexCatalogEntryCopying) {
         CollectionWriter writer{opCtx.get(), autoColl};
         auto writableColl = writer.getWritableCollection(opCtx.get());
         ASSERT_OK(writableColl->prepareForIndexBuild(opCtx.get(), &desc, boost::none));
-        writableColl->getIndexCatalog()->createIndexEntry(
-            opCtx.get(), writableColl, std::move(desc), CreateIndexEntryFlags::kNone);
         wuow.commit();
     }
 

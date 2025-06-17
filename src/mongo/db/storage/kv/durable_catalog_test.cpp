@@ -116,9 +116,12 @@ public:
 
     std::string generateNewCollectionIdent(const NamespaceString& nss) {
         auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
-        const auto directoryPerDB = storageEngine->isUsingDirectoryPerDb();
-        const auto directoryForIndexes = storageEngine->isUsingDirectoryPerDb();
-        return ident::generateNewCollectionIdent(nss.dbName(), directoryPerDB, directoryForIndexes);
+        return storageEngine->generateNewCollectionIdent(nss.dbName());
+    }
+
+    std::string generateNewIndexIdent(const NamespaceString& nss) {
+        auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+        return storageEngine->generateNewIndexIdent(nss.dbName());
     }
 
     CollectionPtr getCollection() {
@@ -161,6 +164,7 @@ public:
             durable_catalog::getParsedCatalogEntry(operationContext(), catalogId, getMDBCatalog())
                 ->metadata,
             std::move(coll.second));
+        collection->init(operationContext());
 
         CollectionCatalog::write(operationContext(), [&](CollectionCatalog& catalog) {
             catalog.registerCollection(operationContext(),
@@ -200,10 +204,9 @@ public:
                           ->prepareForIndexBuild(operationContext(), &desc, buildUUID));
             entry = collWriter.getWritableCollection(operationContext())
                         ->getIndexCatalog()
-                        ->createIndexEntry(operationContext(),
-                                           collWriter.getWritableCollection(operationContext()),
-                                           std::move(desc),
-                                           CreateIndexEntryFlags::kNone);
+                        ->getWritableEntryByName(
+                            operationContext(), indexName, IndexCatalog::InclusionPolicy::kAll);
+            ASSERT(entry);
             wuow.commit();
         }
 
@@ -272,6 +275,7 @@ protected:
                                         << IndexConstants::kIdIndexName
                                         << IndexDescriptor::kIndexVersionFieldName << 2)};
 
+        idxIdent = generateNewIndexIdent(nss);
         durable_catalog::CatalogEntryMetaData::IndexMetaData imd;
         imd.spec = descriptor.infoObj();
         imd.ready = true;
@@ -279,15 +283,18 @@ protected:
         md = durable_catalog::getParsedCatalogEntry(operationContext(), catalogId, mdbCatalog)
                  ->metadata;
         md->insertIndex(std::move(imd));
-        durable_catalog::putMetaData(operationContext(), catalogId, *md, mdbCatalog);
+        durable_catalog::putMetaData(operationContext(),
+                                     catalogId,
+                                     *md,
+                                     mdbCatalog,
+                                     BSON(IndexConstants::kIdIndexName << idxIdent));
 
         ASSERT_OK(durable_catalog::createIndex(operationContext(),
                                                catalogId,
                                                nss,
                                                CollectionOptions{.uuid = UUID::gen()},
                                                descriptor.toIndexConfig(),
-                                               mdbCatalog));
-        idxIdent = mdbCatalog->getIndexIdent(operationContext(), catalogId, descriptor.indexName());
+                                               idxIdent));
 
         wuow.commit();
 

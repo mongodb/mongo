@@ -57,9 +57,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-namespace mongo {
-namespace durable_catalog {
-namespace internal {
+namespace mongo::durable_catalog {
+namespace {
 
 // Finds the durable catalog entry using the provided RecordStore cursor. The returned BSONObj is
 // unowned and is only valid while the cursor is positioned.
@@ -72,20 +71,22 @@ BSONObj findEntry(SeekableRecordCursor& cursor, const RecordId& catalogId) {
     return record->data.releaseToBson();
 }
 
-std::shared_ptr<durable_catalog::CatalogEntryMetaData> parseMetaData(const BSONElement& mdElement) {
-    std::shared_ptr<durable_catalog::CatalogEntryMetaData> md;
+std::shared_ptr<CatalogEntryMetaData> parseMetaData(const BSONElement& mdElement) {
+    std::shared_ptr<CatalogEntryMetaData> md;
     if (mdElement.isABSONObj()) {
         LOGV2_DEBUG(22210, 3, "returning metadata: {mdElement}", "mdElement"_attr = mdElement);
-        md = std::make_shared<durable_catalog::CatalogEntryMetaData>();
+        md = std::make_shared<CatalogEntryMetaData>();
         md->parse(mdElement.Obj());
     }
     return md;
 }
+}  // namespace
 
-durable_catalog::CatalogEntryMetaData createMetaDataForNewCollection(
-    const NamespaceString& nss, const CollectionOptions& collectionOptions) {
+namespace internal {
+CatalogEntryMetaData createMetaDataForNewCollection(const NamespaceString& nss,
+                                                    const CollectionOptions& collectionOptions) {
     const auto ns = NamespaceStringUtil::serializeForCatalog(nss);
-    durable_catalog::CatalogEntryMetaData md;
+    CatalogEntryMetaData md;
     md.nss = nss;
     md.options = collectionOptions;
     if (collectionOptions.timeseries) {
@@ -99,7 +100,7 @@ durable_catalog::CatalogEntryMetaData createMetaDataForNewCollection(
 
 BSONObj buildRawMDBCatalogEntry(const std::string& ident,
                                 const BSONObj& idxIdent,
-                                const durable_catalog::CatalogEntryMetaData& md,
+                                const CatalogEntryMetaData& md,
                                 const std::string& ns) {
     BSONObjBuilder b;
     b.append("ident", ident);
@@ -151,64 +152,54 @@ boost::optional<CatalogEntry> getParsedCatalogEntry(OperationContext* opCtx,
                                                     const RecordId& catalogId,
                                                     const MDBCatalog* mdbCatalog) {
     auto cursor = mdbCatalog->getCursor(opCtx);
-    BSONObj obj = internal::findEntry(*cursor, catalogId);
+    BSONObj obj = findEntry(*cursor, catalogId);
     return parseCatalogEntry(catalogId, obj);
 }
 
 void putMetaData(OperationContext* opCtx,
                  const RecordId& catalogId,
                  durable_catalog::CatalogEntryMetaData& md,
-                 MDBCatalog* mdbCatalog) {
-    BSONObj rawMDBCatalogEntry = [&] {
-        auto cursor = mdbCatalog->getCursor(opCtx);
-        auto entryObj = internal::findEntry(*cursor, catalogId);
+                 MDBCatalog* mdbCatalog,
+                 boost::optional<BSONObj> indexIdents) {
+    auto cursor = mdbCatalog->getCursor(opCtx);
+    auto entryObj = findEntry(*cursor, catalogId);
 
-        // rebuilt doc
-        BSONObjBuilder b;
-        b.append("md", md.toBSON());
+    // rebuilt doc
+    BSONObjBuilder b;
+    b.append("md", md.toBSON());
 
+    if (indexIdents) {
+        b.append("idxIdent", *indexIdents);
+    } else {
+        // Rebuild idxIdent, validating that idents are present for all indexes and discarding
+        // idents for any indexes that no longer exist
         BSONObjBuilder newIdentMap;
         BSONObj oldIdentMap;
-        if (entryObj["idxIdent"].isABSONObj())
-            oldIdentMap = entryObj["idxIdent"].Obj();
+        if (auto idxIdent = entryObj["idxIdent"]; !idxIdent.eoo()) {
+            oldIdentMap = idxIdent.Obj();
+        }
 
-        for (size_t i = 0; i < md.indexes.size(); i++) {
-            const auto& index = md.indexes[i];
+        for (auto&& index : md.indexes) {
             if (!index.isPresent()) {
                 continue;
             }
 
-            auto name = index.nameStringData();
-
             // All indexes with buildUUIDs must be ready:false.
             invariant(!(index.buildUUID && index.ready), str::stream() << md.toBSON(true));
 
-            // fix ident map
-            BSONElement e = oldIdentMap[name];
-            if (e.type() == BSONType::string) {
-                newIdentMap.append(e);
-                continue;
-            }
-
-            // The index in 'md.indexes' is missing a corresponding 'idxIdent' - which indicates
-            // there is a new index to track in the catalog, and the catlog must generate an ident
-            // to associate with it.
-            //
-            // TODO SERVER-102875: Compute the ident for a new index outside the durable_catalog.
-            newIdentMap.append(
-                name,
-                ident::generateNewIndexIdent(md.nss.dbName(),
-                                             mdbCatalog->isUsingDirectoryPerDb(),
-                                             mdbCatalog->isUsingDirectoryForIndexes()));
+            auto ident = oldIdentMap.getField(index.nameStringData());
+            invariant(ident.type() == BSONType::string, index.nameStringData());
+            newIdentMap.append(index.nameStringData(), ident.valueStringData());
         }
+
         b.append("idxIdent", newIdentMap.obj());
+    }
 
-        // Add whatever is left
-        b.appendElementsUnique(entryObj);
-        return b.obj();
-    }();
 
-    mdbCatalog->putUpdatedEntry(opCtx, catalogId, rawMDBCatalogEntry);
+    // Add whatever is left
+    b.appendElementsUnique(entryObj);
+
+    mdbCatalog->putUpdatedEntry(opCtx, catalogId, b.obj());
 }
 
 StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> createCollection(
@@ -237,8 +228,7 @@ Status createIndex(OperationContext* opCtx,
                    const NamespaceString& nss,
                    const CollectionOptions& collectionOptions,
                    const IndexConfig& indexConfig,
-                   MDBCatalog* mdbCatalog) {
-    std::string ident = mdbCatalog->getIndexIdent(opCtx, catalogId, indexConfig.indexName);
+                   const std::string& ident) {
     auto engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
     invariant(collectionOptions.uuid);
     Status status =
@@ -318,7 +308,7 @@ Status renameCollection(OperationContext* opCtx,
                         durable_catalog::CatalogEntryMetaData& md,
                         MDBCatalog* mdbCatalog) {
     auto cursor = mdbCatalog->getCursor(opCtx);
-    BSONObj old = internal::findEntry(*cursor, catalogId);
+    BSONObj old = findEntry(*cursor, catalogId);
     BSONObjBuilder b;
 
     b.append("ns", NamespaceStringUtil::serializeForCatalog(toNss));
@@ -402,11 +392,8 @@ boost::optional<CatalogEntry> parseCatalogEntry(const RecordId& catalogId, const
     }
 
     BSONElement idxIdent = obj["idxIdent"];
-    return CatalogEntry{catalogId,
-                        obj["ident"].String(),
-                        idxIdent.eoo() ? BSONObj() : idxIdent.Obj().getOwned(),
-                        internal::parseMetaData(obj["md"])};
+    BSONObj idxIdentObj = idxIdent.eoo() ? BSONObj() : idxIdent.Obj().getOwned();
+    return CatalogEntry{catalogId, obj["ident"].String(), idxIdentObj, parseMetaData(obj["md"])};
 }
 
-}  // namespace durable_catalog
-}  // namespace mongo
+}  // namespace mongo::durable_catalog

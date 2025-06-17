@@ -119,10 +119,6 @@ public:
 
     void dropIdentForImport(Interruptible&, RecoveryUnit&, StringData ident) override {}
 
-    bool supportsDirectoryPerDB() const override {
-        return false;
-    }
-
     bool isEphemeral() const override {
         return true;
     }

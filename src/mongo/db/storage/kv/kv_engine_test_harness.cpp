@@ -108,11 +108,8 @@ protected:
     }
 
     // Callers are responsible for managing the lifetime of 'catalogRS'.
-    std::unique_ptr<MDBCatalog> createMDBCatalog(RecordStore* catalogRS,
-                                                 bool directoryPerDB = false,
-                                                 bool directoryForIndexes = false) {
-        return std::make_unique<MDBCatalog>(
-            catalogRS, directoryPerDB, directoryForIndexes, helper->getEngine());
+    std::unique_ptr<MDBCatalog> createMDBCatalog(RecordStore* catalogRS) {
+        return std::make_unique<MDBCatalog>(catalogRS, helper->getEngine());
     }
 
     std::unique_ptr<RecordStore> createCatalogRS() {
@@ -138,13 +135,7 @@ protected:
                                 MDBCatalog* mdbCatalog) {
         Lock::DBLock dbLk(opCtx, nss.dbName(), MODE_IX);
 
-        // TODO SERVER-103136: Evaluate the better way to test idents generated with different
-        // <Directory<PerDb/ForIndexes>> options without relying on the MDBCatalog's tracking of
-        // the parameters.
-        const auto ident =
-            ident::generateNewCollectionIdent(nss.dbName(),
-                                              mdbCatalog->isUsingDirectoryPerDb(),
-                                              mdbCatalog->isUsingDirectoryForIndexes());
+        const auto ident = ident::generateNewCollectionIdent(nss.dbName(), false, false);
         auto md = durable_catalog::internal::createMetaDataForNewCollection(nss, collectionOptions);
         auto rawMDBCatalogEntry = durable_catalog::internal::buildRawMDBCatalogEntry(
             ident, BSONObj() /* idxIdent */, md, NamespaceStringUtil::serializeForCatalog(nss));
@@ -163,9 +154,10 @@ protected:
     void putMetaData(OperationContext* opCtx,
                      MDBCatalog* mdbCatalog,
                      RecordId catalogId,
-                     durable_catalog::CatalogEntryMetaData& md) {
+                     durable_catalog::CatalogEntryMetaData& md,
+                     boost::optional<BSONObj> indexIdents = boost::none) {
         Lock::GlobalLock globalLk(opCtx, MODE_IX);
-        durable_catalog::putMetaData(opCtx, catalogId, md, mdbCatalog);
+        durable_catalog::putMetaData(opCtx, catalogId, md, mdbCatalog, indexIdents);
     }
 
     std::string getIndexIdent(OperationContext* opCtx,
@@ -1046,6 +1038,7 @@ TEST_F(MDBCatalogTest, Idx1) {
         uow.commit();
     }
 
+    std::string idxIdent;
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
@@ -1058,22 +1051,16 @@ TEST_F(MDBCatalogTest, Idx1) {
         imd.spec = BSON("name" << "foo");
         imd.ready = false;
         imd.multikey = false;
+        idxIdent = ident::generateNewIndexIdent(md.nss.dbName(), false, false);
         md.indexes.push_back(imd);
-        putMetaData(opCtx, catalog.get(), catalogId, md);
+        putMetaData(opCtx, catalog.get(), catalogId, md, BSON("foo" << idxIdent));
         uow.commit();
     }
 
-    std::string idxIndent;
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
-        idxIndent = getIndexIdent(opCtx, catalog.get(), catalogId, "foo");
-    }
-
-    {
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        ASSERT_EQUALS(idxIndent, getIndexIdent(opCtx, catalog.get(), catalogId, "foo"));
+        ASSERT_EQUALS(idxIdent, getIndexIdent(opCtx, catalog.get(), catalogId, "foo"));
         ASSERT_TRUE(
             ident::isCollectionOrIndexIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
     }
@@ -1092,140 +1079,18 @@ TEST_F(MDBCatalogTest, Idx1) {
         imd.ready = false;
         imd.multikey = false;
         md.indexes.push_back(imd);
-        putMetaData(opCtx, catalog.get(), catalogId, md);
+        putMetaData(opCtx,
+                    catalog.get(),
+                    catalogId,
+                    md,
+                    BSON("foo" << ident::generateNewIndexIdent(md.nss.dbName(), false, false)));
         uow.commit();
     }
 
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
-        ASSERT_NOT_EQUALS(idxIndent, getIndexIdent(opCtx, catalog.get(), catalogId, "foo"));
-    }
-}
-
-TEST_F(MDBCatalogTest, DirectoryPerDb1) {
-    const bool directoryPerDB = true;
-    const bool directoryForIndexes = false;
-    std::unique_ptr<RecordStore> catalogRS = createCatalogRS();
-    std::unique_ptr<MDBCatalog> catalog =
-        createMDBCatalog(catalogRS.get(), directoryPerDB, directoryForIndexes);
-
-    RecordId catalogId;
-    {  // collection
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-        catalogId = addNewCatalogEntry(opCtx,
-                                       NamespaceString::createNamespaceString_forTest("a.b"),
-                                       CollectionOptions(),
-                                       catalog.get());
-        ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "a/");
-        ASSERT_TRUE(ident::isCollectionOrIndexIdent(catalog->getEntry(catalogId).ident));
-        uow.commit();
-    }
-
-    {  // index
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-
-        durable_catalog::CatalogEntryMetaData md;
-        md.nss = NamespaceString::createNamespaceString_forTest(boost::none, "a.b");
-
-        durable_catalog::CatalogEntryMetaData::IndexMetaData imd;
-        imd.spec = BSON("name" << "foo");
-        imd.ready = false;
-        imd.multikey = false;
-        md.indexes.push_back(imd);
-        putMetaData(opCtx, catalog.get(), catalogId, md);
-        ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "a/");
-        ASSERT_TRUE(
-            ident::isCollectionOrIndexIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
-        uow.commit();
-    }
-}
-
-TEST_F(MDBCatalogTest, Split1) {
-    const bool directoryPerDB = false;
-    const bool directoryForIndexes = true;
-    std::unique_ptr<RecordStore> catalogRS = createCatalogRS();
-    std::unique_ptr<MDBCatalog> catalog =
-        createMDBCatalog(catalogRS.get(), directoryPerDB, directoryForIndexes);
-
-    RecordId catalogId;
-    {
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-        catalogId = addNewCatalogEntry(opCtx,
-                                       NamespaceString::createNamespaceString_forTest("a.b"),
-                                       CollectionOptions(),
-                                       catalog.get());
-        ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "collection/");
-        ASSERT_TRUE(ident::isCollectionOrIndexIdent(catalog->getEntry(catalogId).ident));
-        uow.commit();
-    }
-
-    {  // index
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-
-        durable_catalog::CatalogEntryMetaData md;
-        md.nss = NamespaceString::createNamespaceString_forTest(boost::none, "a.b");
-
-        durable_catalog::CatalogEntryMetaData::IndexMetaData imd;
-        imd.spec = BSON("name" << "foo");
-        imd.ready = false;
-        imd.multikey = false;
-        md.indexes.push_back(imd);
-        putMetaData(opCtx, catalog.get(), catalogId, md);
-        ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "index/");
-        ASSERT_TRUE(
-            ident::isCollectionOrIndexIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
-        uow.commit();
-    }
-}
-
-TEST_F(MDBCatalogTest, DirectoryPerAndSplit1) {
-    const bool directoryPerDB = true;
-    const bool directoryPerIndexes = true;
-    std::unique_ptr<RecordStore> catalogRS = createCatalogRS();
-    std::unique_ptr<MDBCatalog> catalog =
-        createMDBCatalog(catalogRS.get(), directoryPerDB, directoryPerIndexes);
-
-    RecordId catalogId;
-    {
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-        catalogId = addNewCatalogEntry(opCtx,
-                                       NamespaceString::createNamespaceString_forTest("a.b"),
-                                       CollectionOptions(),
-                                       catalog.get());
-        ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "a/collection/");
-        ASSERT_TRUE(ident::isCollectionOrIndexIdent(catalog->getEntry(catalogId).ident));
-        uow.commit();
-    }
-
-    {  // index
-        auto clientAndCtx = makeClientAndCtx("opCtx");
-        auto opCtx = clientAndCtx.opCtx();
-        WriteUnitOfWork uow(opCtx);
-
-        durable_catalog::CatalogEntryMetaData md;
-        md.nss = NamespaceString::createNamespaceString_forTest(boost::none, "a.b");
-
-        durable_catalog::CatalogEntryMetaData::IndexMetaData imd;
-        imd.spec = BSON("name" << "foo");
-        imd.ready = false;
-        imd.multikey = false;
-        md.indexes.push_back(imd);
-        putMetaData(opCtx, catalog.get(), catalogId, md);
-        ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "a/index/");
-        ASSERT_TRUE(
-            ident::isCollectionOrIndexIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
-        uow.commit();
+        ASSERT_NOT_EQUALS(idxIdent, getIndexIdent(opCtx, catalog.get(), catalogId, "foo"));
     }
 }
 

@@ -33,6 +33,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/util/assert_util.h"
 
 #include <memory>
 #include <string>
@@ -205,18 +206,15 @@ public:
      * Removes an entry matching the descriptor from _entries, and returns the matching entry or
      * NULL if none matches.
      */
-    virtual std::shared_ptr<const IndexCatalogEntry> release(const IndexDescriptor* desc);
+    std::shared_ptr<const IndexCatalogEntry> release(const IndexDescriptor* desc);
 
     bool remove(const IndexDescriptor* desc) {
         return static_cast<bool>(release(desc));
     }
 
-    virtual void add(std::shared_ptr<const IndexCatalogEntry>&& entry) {
+    void add(std::shared_ptr<const IndexCatalogEntry>&& entry) {
+        dassert(!remove(entry->descriptor()));
         _entries.push_back(std::move(entry));
-    }
-
-    std::vector<std::shared_ptr<const IndexCatalogEntry>> getAllEntries() const {
-        return {_entries.begin(), _entries.end()};
     }
 
 private:

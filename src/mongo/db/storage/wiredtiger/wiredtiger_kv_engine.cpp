@@ -2041,10 +2041,6 @@ void WiredTigerKVEngine::dropIdentForImport(Interruptible& interruptible,
     invariant(dropStatus);
 }
 
-bool WiredTigerKVEngine::supportsDirectoryPerDB() const {
-    return true;
-}
-
 void WiredTigerKVEngine::_checkpoint(WiredTigerSession& session, bool useTimestamp) {
     _currentCheckpointIteration.fetchAndAdd(1);
     int wtRet;

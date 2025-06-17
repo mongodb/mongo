@@ -69,10 +69,6 @@ namespace ident {
  * As of 8.2, the <unique identifier> of an ident is a generated UUID. In previous versions, the
  * <unique identifier> is a combination of '<counter>-<random number>'.
  *
- * TODO SERVER-102875: Consolidate default generated idents (for collections and indexes)
- * where 'directoryPerDB' and 'directoryForIndexes' are automatically obtained to
- * ensure idents are stored in their intended locations.
- *
  * The 'generateNew<Collection|Index>Ident()' methods produce a new, unique ident for a
  * 'collection|index' table. Default method for generating user-data table idents.
  */

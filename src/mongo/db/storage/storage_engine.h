@@ -35,6 +35,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/index_builds/index_builds.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/spill_table.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/util/periodic_runner.h"
@@ -819,9 +820,14 @@ public:
      */
     virtual std::string getFilesystemPathForDb(const DatabaseName& dbName) const = 0;
 
-    virtual bool isUsingDirectoryPerDb() const = 0;
+    virtual std::string generateNewCollectionIdent(const DatabaseName& dbName) const = 0;
+    virtual std::string generateNewIndexIdent(const DatabaseName& dbName) const = 0;
 
-    virtual bool isUsingDirectoryForIndexes() const = 0;
+    /**
+     * Returns true if this storage engine stores all data files directly in the dbPath, and not in
+     * subdirectories of that path or in some other place.
+     */
+    virtual bool storesFilesInDbPath() const = 0;
 
     virtual int64_t getIdentSize(RecoveryUnit&, StringData ident) const = 0;
 

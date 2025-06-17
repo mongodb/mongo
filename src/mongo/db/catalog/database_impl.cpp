@@ -155,11 +155,7 @@ std::pair<RecordId, std::unique_ptr<RecordStore>> durablyTrackNewCollection(
     const NamespaceString& nss,
     const CollectionOptions& collectionOptions) {
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    const bool directoryPerDB = storageEngine->isUsingDirectoryPerDb();
-    const bool directoryPerIndexes = storageEngine->isUsingDirectoryForIndexes();
-
-    const auto ident =
-        ident::generateNewCollectionIdent(nss.dbName(), directoryPerDB, directoryPerIndexes);
+    const auto ident = storageEngine->generateNewCollectionIdent(nss.dbName());
     auto createResult = durable_catalog::createCollection(
         opCtx, nss, ident, collectionOptions, storageEngine->getMDBCatalog());
     if (createResult == ErrorCodes::ObjectAlreadyExists) {

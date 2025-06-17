@@ -427,6 +427,13 @@ private:
     void _writeMetadata(OperationContext* opCtx, Func func);
 
     /**
+     * Creates a mutable copy of the current metadata, including uncommitted multikey changes if
+     * applicable.
+     */
+    std::shared_ptr<durable_catalog::CatalogEntryMetaData> _copyMetadataForWrite(
+        OperationContext* opCtx);
+
+    /**
      * Helper for init() and initFromExisting() to initialize shared state.
      */
     void _initShared(OperationContext* opCtx, const CollectionOptions& options);

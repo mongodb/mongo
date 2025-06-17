@@ -27,15 +27,8 @@
  *    it in the license file.
  */
 
-#include <absl/container/node_hash_map.h>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
+#include "mongo/db/storage/storage_engine.h"
+
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -64,12 +57,12 @@
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
-#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/condition_variable.h"
@@ -89,6 +82,12 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -1135,12 +1134,118 @@ TEST_F(StorageEngineTest, IdentMissingForReadyIndex) {
     }
     ASSERT_OK(dropIndexTable(opCtx.get(), ns, indexName));
 
+    // Reinitialize the catalog as otherwise the already-initialized collection will continue to use
+    // the now dropped index table
+    CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& catalog) {
+        catalog.deregisterAllCollectionsAndViews(opCtx->getServiceContext());
+    });
+    catalog::initializeCollectionCatalog(opCtx.get(), getServiceContext()->getStorageEngine());
+
     // Startup recovery currently does not handle this invalid state, but throws an appropriate
     // exception rather than segfaulting or otherwise crashing uncleanly
     ASSERT_THROWS_CODE(startup_recovery::repairAndRecoverDatabases(
                            opCtx.get(), StorageEngine::LastShutdownState::kUnclean),
                        DBException,
                        ErrorCodes::NoSuchKey);
+}
+
+StorageEngine* reconfigureStorageEngine(OperationContext* opCtx, auto fn) {
+    StorageControl::stopStorageControls(
+        opCtx->getServiceContext(),
+        {ErrorCodes::InterruptedDueToStorageChange, "The storage engine is being reinitialized."},
+        /*forRestart=*/false);
+    CollectionCatalog::write(opCtx->getServiceContext(), [&](CollectionCatalog& catalog) {
+        catalog.deregisterAllCollectionsAndViews(opCtx->getServiceContext());
+    });
+    reinitializeStorageEngine(opCtx, StorageEngineInitFlags{}, false, false, false, [&] {
+        boost::filesystem::remove_all(storageGlobalParams.dbpath);
+        boost::filesystem::create_directory(storageGlobalParams.dbpath);
+        fn();
+    });
+    return opCtx->getServiceContext()->getStorageEngine();
+}
+
+std::pair<std::string, std::string> createCollectionAndIndex(OperationContext* opCtx,
+                                                             StorageEngineTest& fixture,
+                                                             StringData ns) {
+
+    Lock::GlobalLock lk(opCtx, MODE_X);
+    auto collNs = NamespaceString::createNamespaceString_forTest(ns);
+    auto coll = fixture.createCollection(opCtx, collNs);
+    WriteUnitOfWork wuow(opCtx);
+    ASSERT_OK(fixture.createIndex(opCtx, collNs, "x"));
+    wuow.commit();
+    auto indexIdent =
+        fixture._storageEngine->getMDBCatalog()->getIndexIdent(opCtx, coll.catalogId, "x");
+    return {coll.ident, indexIdent};
+}
+
+TEST_F(StorageEngineTest, DirectoryPerDb) {
+    auto opCtx = cc().makeOperationContext();
+
+    {
+        auto [ident, _] = createCollectionAndIndex(opCtx.get(), *this, "dbname.coll");
+        ASSERT_STRING_OMITS(ident, "dbname");
+    }
+
+    _storageEngine =
+        reconfigureStorageEngine(opCtx.get(), [] { storageGlobalParams.directoryperdb = true; });
+
+    {
+        auto [ident, _] = createCollectionAndIndex(opCtx.get(), *this, "dbname.coll");
+        ASSERT_STRING_CONTAINS(ident, "dbname/");
+    }
+
+    _storageEngine =
+        reconfigureStorageEngine(opCtx.get(), [] { storageGlobalParams.directoryperdb = false; });
+}
+
+TEST_F(StorageEngineTest, SplitIndexes) {
+    auto opCtx = cc().makeOperationContext();
+
+    {
+        auto [_, indexIdent] = createCollectionAndIndex(opCtx.get(), *this, "dbname.coll");
+        ASSERT_STRING_OMITS(indexIdent, "dbname");
+        ASSERT_STRING_CONTAINS(indexIdent, "index-");
+    }
+
+    _storageEngine = reconfigureStorageEngine(
+        opCtx.get(), [] { wiredTigerGlobalOptions.directoryForIndexes = true; });
+
+    {
+        auto [_, indexIdent] = createCollectionAndIndex(opCtx.get(), *this, "dbname.coll");
+        ASSERT_STRING_OMITS(indexIdent, "dbname");
+        ASSERT_STRING_CONTAINS(indexIdent, "index/");
+    }
+
+    _storageEngine = reconfigureStorageEngine(
+        opCtx.get(), [] { wiredTigerGlobalOptions.directoryForIndexes = false; });
+}
+
+TEST_F(StorageEngineTest, DirectoryPerDBAndSplitIndexes) {
+    auto opCtx = cc().makeOperationContext();
+
+    {
+        auto [collIdent, indexIdent] = createCollectionAndIndex(opCtx.get(), *this, "dbname.coll");
+        ASSERT_STRING_OMITS(collIdent, "dbname");
+        ASSERT_STRING_CONTAINS(indexIdent, "index-");
+    }
+
+    _storageEngine = reconfigureStorageEngine(opCtx.get(), [] {
+        storageGlobalParams.directoryperdb = true;
+        wiredTigerGlobalOptions.directoryForIndexes = true;
+    });
+
+    {
+        auto [collIdent, indexIdent] = createCollectionAndIndex(opCtx.get(), *this, "dbname.coll");
+        ASSERT_STRING_CONTAINS(collIdent, "dbname/collection/");
+        ASSERT_STRING_CONTAINS(indexIdent, "dbname/index/");
+    }
+
+    _storageEngine = reconfigureStorageEngine(opCtx.get(), [] {
+        storageGlobalParams.directoryperdb = false;
+        wiredTigerGlobalOptions.directoryForIndexes = false;
+    });
 }
 
 }  // namespace

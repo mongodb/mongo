@@ -342,13 +342,6 @@ public:
         return true;
     }
 
-    /**
-     * Returns true if storage engine supports --directoryperdb.
-     * See:
-     *     http://docs.mongodb.org/manual/reference/program/mongod/#cmdoption--directoryperdb
-     */
-    virtual bool supportsDirectoryPerDB() const = 0;
-
     virtual bool hasIdent(RecoveryUnit&, StringData ident) const = 0;
 
     virtual std::vector<std::string> getAllIdents(RecoveryUnit&) const = 0;

@@ -242,6 +242,8 @@ std::unique_ptr<IndexCatalog> IndexCatalogImpl::clone() const {
 void IndexCatalogImpl::init(OperationContext* opCtx,
                             Collection* collection,
                             bool isPointInTimeRead) {
+    invariant(!haveAnyIndexes());
+
     std::vector<std::string> indexNames;
     collection->getAllIndexes(&indexNames);
     const bool replSetMemberInStandaloneMode =
@@ -253,8 +255,7 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
         recoveryTs = storageEngine->getRecoveryTimestamp();
     }
 
-    for (size_t i = 0; i < indexNames.size(); i++) {
-        const std::string& indexName = indexNames[i];
+    for (auto& indexName : indexNames) {
         BSONObj spec = collection->getIndexSpec(indexName).getOwned();
         BSONObj keyPattern = spec.getObjectField("key");
 
@@ -630,6 +631,7 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
                                                       IndexDescriptor&& descriptor,
                                                       CreateIndexEntryFlags flags) {
     invariant(!descriptor.getEntry());
+    dassert(!findIndexByName(opCtx, descriptor.indexName(), InclusionPolicy::kAll));
 
     // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     Status status =
@@ -1394,6 +1396,25 @@ Status IndexCatalogImpl::truncateAllIndexes(OperationContext* opCtx, Collection*
     return Status::OK();
 }
 
+void IndexCatalogImpl::_removeEntry(IndexCatalogEntry* entry) {
+    auto desc = entry->descriptor();
+    if (kDebugBuild) {
+        auto check = [&](auto& container) {
+            return std::count_if(container.begin(), container.end(), [&](auto&& entry) {
+                return entry->descriptor() == desc ||
+                    entry->descriptor()->indexName() == desc->indexName();
+            });
+        };
+        auto count = check(_readyIndexes) + check(_buildingIndexes) + check(_frozenIndexes);
+        invariant(count == 1);
+    }
+
+    if (!_readyIndexes.remove(desc) && !_buildingIndexes.remove(desc) &&
+        !_frozenIndexes.remove(desc)) {
+        MONGO_UNREACHABLE_TASSERT(10083505);
+    }
+}
+
 Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx,
                                                          Collection* collection,
                                                          IndexCatalogEntry* entry) {
@@ -1401,51 +1422,38 @@ Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx
         shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_X));
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
+    auto ownedEntry = entry->shared_from_this();
     const std::string indexName = entry->descriptor()->indexName();
 
     // Only indexes that aren't ready can be reset.
     invariant(!collection->isIndexReady(indexName));
-
-    auto released = [&] {
-        if (auto released = _readyIndexes.release(entry->descriptor())) {
-            invariant(!released, "Cannot reset a ready index");
-        }
-        if (auto released = _buildingIndexes.release(entry->descriptor())) {
-            return released;
-        }
-        if (auto released = _frozenIndexes.release(entry->descriptor())) {
-            return released;
-        }
-        MONGO_UNREACHABLE_TASSERT(10083504);
-    }();
+    _removeEntry(entry);
 
     LOGV2(6987700,
           "Resetting unfinished index",
           logAttrs(collection->ns()),
           "index"_attr = indexName,
-          "ident"_attr = released->getIdent());
+          "ident"_attr = entry->getIdent());
 
-    invariant(released.get() == entry);
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
 
     // Drop the ident if it exists. The storage engine will return OK if the ident is not found.
     auto engine = opCtx->getServiceContext()->getStorageEngine();
-    const std::string ident = released->getIdent();
+    const std::string ident = entry->getIdent();
     Status status = engine->getEngine()->dropIdent(ru, ident, /*identHasSizeInfo=*/false);
     if (!status.isOK()) {
         return status;
     }
 
-    // Recreate the ident on-disk. durable_catalog::createIndex() will lookup the ident internally
-    // using the catalogId and index name.
-    const auto indexDescriptor = released->descriptor();
+    // Recreate the ident on-disk.
+    const auto indexDescriptor = entry->descriptor();
     status = durable_catalog::createIndex(opCtx,
                                           collection->getCatalogId(),
                                           collection->ns(),
                                           collection->getCollectionOptions(),
                                           indexDescriptor->toIndexConfig(),
-                                          MDBCatalog::get(opCtx));
+                                          ident);
     if (!status.isOK()) {
         return status;
     }
@@ -1457,7 +1465,7 @@ Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx
     }
 
     entry->setIsFrozen(false);
-    _buildingIndexes.add(std::move(released));
+    _buildingIndexes.add(std::move(ownedEntry));
 
     return Status::OK();
 }
@@ -1484,26 +1492,15 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx,
 
     audit::logDropIndex(opCtx->getClient(), indexName, collection->ns());
 
+    auto ownedEntry = entry->shared_from_this();
     _indexUpdateIdentifier.reset();
-    auto released = [&] {
-        if (auto released = _readyIndexes.release(entry->descriptor())) {
-            return released;
-        }
-        if (auto released = _buildingIndexes.release(entry->descriptor())) {
-            return released;
-        }
-        if (auto released = _frozenIndexes.release(entry->descriptor())) {
-            return released;
-        }
-        MONGO_UNREACHABLE_TASSERT(10083505);
-    }();
+    _removeEntry(entry);
 
     _rebuildIndexUpdateIdentifier();
-    invariant(released.get() == entry);
 
     CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
     CollectionIndexUsageTrackerDecoration::write(collection).unregisterIndex(indexName);
-    _deleteIndexFromDisk(opCtx, collection, indexName, entry->shared_from_this());
+    _deleteIndexFromDisk(opCtx, collection, indexName, std::move(ownedEntry));
 
     return Status::OK();
 }
@@ -1706,7 +1703,7 @@ std::shared_ptr<const IndexCatalogEntry> IndexCatalogImpl::getEntryShared(
 
 std::vector<std::shared_ptr<const IndexCatalogEntry>> IndexCatalogImpl::getAllReadyEntriesShared()
     const {
-    return _readyIndexes.getAllEntries();
+    return {_readyIndexes.begin(), _readyIndexes.end()};
 }
 
 const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,

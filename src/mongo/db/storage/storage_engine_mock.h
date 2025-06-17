@@ -183,10 +183,13 @@ public:
         return false;
     }
 
-    bool isUsingDirectoryPerDb() const final {
-        return false;
+    std::string generateNewCollectionIdent(const DatabaseName& dbName) const final {
+        return "";
     }
-    bool isUsingDirectoryForIndexes() const final {
+    std::string generateNewIndexIdent(const DatabaseName& dbName) const final {
+        return "";
+    }
+    bool storesFilesInDbPath() const final {
         return false;
     }
     int64_t getIdentSize(RecoveryUnit& ru, StringData ident) const final {

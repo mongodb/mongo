@@ -129,9 +129,6 @@ public:
     bool isEphemeral() const override {
         return false;
     }
-    bool supportsDirectoryPerDB() const override {
-        return false;
-    }
     bool hasIdent(RecoveryUnit&, StringData ident) const override {
         return false;
     }

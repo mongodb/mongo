@@ -250,12 +250,10 @@ public:
         return _dropPendingIdentReaper.getNumIdents();
     }
 
-    bool isUsingDirectoryPerDb() const override {
-        return _options.directoryPerDB;
-    }
-
-    bool isUsingDirectoryForIndexes() const override {
-        return _options.directoryForIndexes;
+    std::string generateNewCollectionIdent(const DatabaseName& dbName) const override;
+    std::string generateNewIndexIdent(const DatabaseName& dbName) const override;
+    bool storesFilesInDbPath() const override {
+        return !_options.directoryForIndexes && !_options.directoryPerDB;
     }
 
     int64_t getIdentSize(RecoveryUnit& ru, StringData ident) const final {

@@ -48,6 +48,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/api_parameters.h"
@@ -488,6 +489,7 @@ void CollectionImpl::_initShared(OperationContext* opCtx, const CollectionOption
 
 void CollectionImpl::_initCommon(OperationContext* opCtx) {
     invariant(!_initialized);
+    invariant(!_indexCatalog->haveAnyIndexes());
 
     const auto& collectionOptions = _metadata->options;
     auto validatorDoc = collectionOptions.validator.getOwned();
@@ -1642,6 +1644,9 @@ void CollectionImpl::removeIndex(OperationContext* opCtx, StringData indexName) 
 Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
                                             const IndexDescriptor* spec,
                                             boost::optional<UUID> buildUUID) {
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto ident = storageEngine->generateNewIndexIdent(ns().dbName());
+    invariant(!ident.empty());
 
     durable_catalog::CatalogEntryMetaData::IndexMetaData imd;
     imd.spec = spec->infoObj();
@@ -1670,17 +1675,35 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
               "spec"_attr = spec->infoObj());
     }
 
-    _writeMetadata(
-        opCtx, [indexMetaData = std::move(imd)](durable_catalog::CatalogEntryMetaData& md) mutable {
-            md.insertIndex(std::move(indexMetaData));
-        });
+    // Add this index to the metadata. This requires building a new idxIdent mapping which includes
+    // the new index ident. This must be done before createIndex() as that validates that the index
+    // is in the metadata.
+    {
 
-    return durable_catalog::createIndex(opCtx,
-                                        getCatalogId(),
-                                        ns(),
-                                        getCollectionOptions(),
-                                        spec->toIndexConfig(),
-                                        MDBCatalog::get(opCtx));
+        BSONObjBuilder indexIdents;
+        indexIdents.append(imd.nameStringData(), ident);
+
+        auto ii = _indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kAll);
+        while (ii->more()) {
+            auto entry = ii->next();
+            indexIdents.append(entry->descriptor()->indexName(), entry->getIdent());
+        }
+
+        auto metadata = _copyMetadataForWrite(opCtx);
+        metadata->insertIndex(std::move(imd));
+        durable_catalog::putMetaData(
+            opCtx, getCatalogId(), *metadata, MDBCatalog::get(opCtx), indexIdents.obj());
+        _metadata = std::move(metadata);
+    }
+
+    auto status = durable_catalog::createIndex(
+        opCtx, getCatalogId(), ns(), getCollectionOptions(), spec->toIndexConfig(), ident);
+    if (status.isOK()) {
+        _indexCatalog->createIndexEntry(
+            opCtx, this, IndexDescriptor{*spec}, CreateIndexEntryFlags::kNone);
+    }
+
+    return status;
 }
 
 boost::optional<UUID> CollectionImpl::getIndexBuildUUID(StringData indexName) const {
@@ -2051,8 +2074,8 @@ bool CollectionImpl::isMetadataEqual(const BSONObj& otherMetadata) const {
     return !_metadata->toBSON().woCompare(otherMetadata);
 }
 
-template <typename Func>
-void CollectionImpl::_writeMetadata(OperationContext* opCtx, Func func) {
+std::shared_ptr<durable_catalog::CatalogEntryMetaData> CollectionImpl::_copyMetadataForWrite(
+    OperationContext* opCtx) {
     // Even though we are holding an exclusive lock on the Collection there may be an ongoing
     // multikey change on this OperationContext. Make sure we include that update when we copy the
     // metadata for this operation.
@@ -2064,15 +2087,22 @@ void CollectionImpl::_writeMetadata(OperationContext* opCtx, Func func) {
         }
     }
 
-    // Copy metadata and apply provided function to make change.
     auto metadata = std::make_shared<durable_catalog::CatalogEntryMetaData>(*sourceMetadata);
-    func(*metadata);
 
     // Remove the cached multikey change, it is now included in the copied metadata. If we left it
     // here we could read stale data.
     if (uncommittedMultikeys) {
         uncommittedMultikeys->erase(this);
     }
+
+    return metadata;
+}
+
+template <typename Func>
+void CollectionImpl::_writeMetadata(OperationContext* opCtx, Func func) {
+    // Copy metadata and apply provided function to make change.
+    auto metadata = _copyMetadataForWrite(opCtx);
+    func(*metadata);
 
     // Store in durable catalog and replace pointer with our copied instance.
     durable_catalog::putMetaData(opCtx, getCatalogId(), *metadata, MDBCatalog::get(opCtx));

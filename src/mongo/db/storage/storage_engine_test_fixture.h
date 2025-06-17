@@ -36,7 +36,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/spill_table.h"
@@ -70,10 +69,7 @@ public:
         auto mdbCatalog = _storageEngine->getMDBCatalog();
         {
             WriteUnitOfWork wuow(opCtx);
-            const auto ident =
-                ident::generateNewCollectionIdent(ns.dbName(),
-                                                  _storageEngine->isUsingDirectoryPerDb(),
-                                                  _storageEngine->isUsingDirectoryForIndexes());
+            const auto ident = _storageEngine->generateNewCollectionIdent(ns.dbName());
             std::tie(catalogId, rs) = unittest::assertGet(
                 durable_catalog::createCollection(opCtx, ns, ident, options, mdbCatalog));
             wuow.commit();
@@ -84,6 +80,7 @@ public:
             catalogId,
             durable_catalog::getParsedCatalogEntry(opCtx, catalogId, mdbCatalog)->metadata,
             std::move(rs));
+        coll->init(opCtx);
 
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
             catalog.registerCollection(opCtx, std::move(coll), /*ts=*/boost::none);
@@ -186,7 +183,7 @@ public:
      */
     Status createIndex(OperationContext* opCtx, NamespaceString collNs, StringData key) {
         auto buildUUID = UUID::gen();
-        auto ret = startIndexBuild(opCtx, collNs, key, buildUUID, true);
+        auto ret = startIndexBuild(opCtx, collNs, key, buildUUID);
         if (!ret.isOK()) {
             return ret;
         }
@@ -198,20 +195,14 @@ public:
     Status startIndexBuild(OperationContext* opCtx,
                            NamespaceString collNs,
                            StringData key,
-                           boost::optional<UUID> buildUUID,
-                           bool createEntry = false) {
+                           boost::optional<UUID> buildUUID) {
         BSONObjBuilder builder;
         BSONObj spec = BSON("v" << 2 << "key" << BSON(key << 1) << "name" << key);
 
         CollectionWriter writer{opCtx, collNs};
         Collection* collection = writer.getWritableCollection(opCtx);
         IndexDescriptor descriptor(IndexNames::BTREE, spec);
-        auto ret = collection->prepareForIndexBuild(opCtx, &descriptor, buildUUID);
-        if (ret.isOK() && createEntry) {
-            collection->getIndexCatalog()->createIndexEntry(
-                opCtx, collection, std::move(descriptor), CreateIndexEntryFlags::kNone);
-        }
-        return ret;
+        return collection->prepareForIndexBuild(opCtx, &descriptor, buildUUID);
     }
 
     void indexBuildSuccess(OperationContext* opCtx, NamespaceString collNs, StringData key) {

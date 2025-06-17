@@ -49,7 +49,6 @@
 
 #include <boost/intrusive_ptr.hpp>
 #include <boost/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

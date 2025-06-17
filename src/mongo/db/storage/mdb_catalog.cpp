@@ -61,14 +61,7 @@ private:
     const RecordId _catalogId;
 };
 
-MDBCatalog::MDBCatalog(RecordStore* rs,
-                       bool directoryPerDb,
-                       bool directoryForIndexes,
-                       KVEngine* engine)
-    : _rs(rs),
-      _directoryPerDb(directoryPerDb),
-      _directoryForIndexes(directoryForIndexes),
-      _engine(engine) {}
+MDBCatalog::MDBCatalog(RecordStore* rs, KVEngine* engine) : _rs(rs), _engine(engine) {}
 
 void MDBCatalog::init(OperationContext* opCtx) {
     // No locking needed since called single threaded.

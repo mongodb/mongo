@@ -88,11 +88,16 @@ boost::optional<CatalogEntry> parseCatalogEntry(const RecordId& catalogId, const
  * Updates the catalog entry for the collection 'nss' with the fields specified in 'md'. If
  * 'md.indexes' contains a new index entry, then this method generates a new index ident and
  * adds it to the catalog entry.
+ *
+ * If `indexIdents` is supplied, the `idxIdents` entry in the catalog entry is replaced with the
+ * given object. If not, `idxIdents` must already contain idents for all indexes in the metadata.
+ * Any idents for indexes not present in the metadata will be discarded.
  */
 void putMetaData(OperationContext* opCtx,
                  const RecordId& catalogId,
                  durable_catalog::CatalogEntryMetaData& md,
-                 MDBCatalog* mdbCatalog);
+                 MDBCatalog* mdbCatalog,
+                 boost::optional<BSONObj> indexIdents = boost::none);
 
 /**
  * On success, returns the RecordId which identifies the new record store in the durable catalog in
@@ -110,7 +115,7 @@ Status createIndex(OperationContext* opCtx,
                    const NamespaceString& nss,
                    const CollectionOptions& collectionOptions,
                    const IndexConfig& indexConfig,
-                   MDBCatalog* mdbCatalog);
+                   const std::string& ident);
 
 /**
  * Import a collection by inserting the given metadata into the durable catalog and instructing

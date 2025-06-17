@@ -567,9 +567,7 @@ IndexBuildsCoordinator* IndexBuildsCoordinator::get(OperationContext* OperationC
 
 Status IndexBuildsCoordinator::checkDiskSpaceSufficientToStartIndexBuild(OperationContext* opCtx) {
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    const bool filesNotAllInSameDirectory =
-        storageEngine->isUsingDirectoryPerDb() || storageEngine->isUsingDirectoryForIndexes();
-    if (filesNotAllInSameDirectory) {
+    if (!storageEngine->storesFilesInDbPath()) {
         LOGV2(7333300,
               "Index build: skipping available disk space check before starting index build as "
               "storage engine stores data files in different directories");

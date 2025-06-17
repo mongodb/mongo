@@ -330,8 +330,6 @@ public:
 
     void setSortedDataInterfaceExtraOptions(const std::string& options);
 
-    bool supportsDirectoryPerDB() const override;
-
     /**
      * WiredTiger supports checkpoints when it isn't running in memory.
      */
