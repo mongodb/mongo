@@ -36,7 +36,8 @@ assert.commandWorked(coll.insert({"_id": 1, "title": "cakes"}));
 // Perform a $search query and assert that the connection fails due to invalid certificates.
 // We cannot assert on a specific error message because it will vary based on the transport
 // protocol used.
-assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.HostUnreachable, "");
+assertErrCodeAndErrMsgContains(
+    coll, pipeline, [ErrorCodes.SocketException, ErrorCodes.HostUnreachable], "");
 
 MongoRunner.stopMongod(conn);
 mongotmock.stop();

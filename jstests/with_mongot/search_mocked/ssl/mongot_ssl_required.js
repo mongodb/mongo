@@ -18,7 +18,7 @@ const conn = MongoRunner.runMongod({
     sslMode: "requireSSL",
     sslPEMKeyFile: "jstests/libs/password_protected.pem",
     sslPEMKeyPassword: "qwerty",
-    setParameter: {mongotHost: mongotConn.host},
+    setParameter: {mongotHost: mongotConn.host, searchTLSMode: "disabled"},
     sslCAFile: "jstests/libs/ca.pem"
 });
 
