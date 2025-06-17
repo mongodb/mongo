@@ -135,6 +135,10 @@ Microseconds WiredTigerStats::readingTime() const {
     return Microseconds(read_time);
 }
 
+int64_t WiredTigerStats::txnBytesDirty() const {
+    return txn_bytes_dirty;
+}
+
 std::unique_ptr<StorageStats> WiredTigerStats::clone() const {
     return std::make_unique<WiredTigerStats>(*this);
 }
