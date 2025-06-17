@@ -725,12 +725,6 @@ buildvariants:
       multiversion_edition: enterprise
       resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under UBSAN build.
       large_distro_name: rhel8.8-large
-    depends_on:
-      - name: version_gen
-        variant: generate-tasks-for-version
-        # This is added because of EVG-18211.
-        # Without this we are adding extra dependencies on evergreen and it is causing strain
-        omit_generated_tasks: true
     tasks:
       - name: compile_and_archive_dist_test_TG
       - name: .concurrency !.no_txns !.kill_terminate
