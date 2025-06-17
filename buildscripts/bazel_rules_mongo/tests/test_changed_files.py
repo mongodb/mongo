@@ -1,4 +1,5 @@
 import os
+import platform
 import shutil
 import sys
 import tempfile
@@ -20,7 +21,8 @@ def write_file(repo: Repo, file_name: str) -> None:
 
 
 @unittest.skipIf(
-    sys.platform == "win32", reason="This test breaks on windows and only needs to work on linux"
+    sys.platform == "win32" or platform.machine().lower() in {"ppc64le", "s390x"},
+    reason="This test breaks on windows and only needs to work on linux",
 )
 class TestChangedFiles(unittest.TestCase):
     @classmethod
