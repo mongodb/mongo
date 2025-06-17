@@ -46,6 +46,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
@@ -315,6 +316,7 @@ public:
                        const std::string& path,
                        ClockSource* cs,
                        WiredTigerConfig wtConfig,
+                       const WiredTigerExtensions& wtExtensions,
                        bool repair,
                        bool isReplSet,
                        bool shouldRecoverFromOplogAsStandalone,

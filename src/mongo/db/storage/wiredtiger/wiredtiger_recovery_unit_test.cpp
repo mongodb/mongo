@@ -79,6 +79,7 @@ public:
                                                  _dbpath.path(),
                                                  &_cs,
                                                  std::move(wtConfig),
+                                                 WiredTigerExtensions::get(serviceContext()),
                                                  false /* repair */,
                                                  true /* isReplSet */,
                                                  false /* shouldRecoverFromOplogAsStandalone */,

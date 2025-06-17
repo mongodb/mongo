@@ -51,7 +51,8 @@ namespace mongo {
 SpillWiredTigerKVEngine::SpillWiredTigerKVEngine(const std::string& canonicalName,
                                                  const std::string& path,
                                                  ClockSource* clockSource,
-                                                 WiredTigerConfig wtConfig)
+                                                 WiredTigerConfig wtConfig,
+                                                 const SpillWiredTigerExtensions& wtExtensions)
     : WiredTigerKVEngineBase(canonicalName, path, clockSource, std::move(wtConfig)) {
     tassert(10588600, "SpillWiredTigerKVEngine should not be in-memory", !_wtConfig.inMemory);
     if (!boost::filesystem::exists(path)) {
@@ -66,9 +67,8 @@ SpillWiredTigerKVEngine::SpillWiredTigerKVEngine(const std::string& canonicalNam
         }
     }
 
-    std::string config = generateWTOpenConfigString(
-        _wtConfig,
-        SpillWiredTigerExtensions::get(getGlobalServiceContext()).getOpenExtensionsConfig());
+    std::string config =
+        generateWTOpenConfigString(_wtConfig, wtExtensions.getOpenExtensionsConfig());
     LOGV2(10158000, "Opening spill WiredTiger", "config"_attr = config);
 
     auto startTime = Date_t::now();

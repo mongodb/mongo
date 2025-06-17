@@ -46,7 +46,8 @@ public:
     SpillWiredTigerKVEngine(const std::string& canonicalName,
                             const std::string& path,
                             ClockSource* clockSource,
-                            WiredTigerConfig wtConfig);
+                            WiredTigerConfig wtConfig,
+                            const SpillWiredTigerExtensions& wtExtensions);
 
     ~SpillWiredTigerKVEngine() override;
 

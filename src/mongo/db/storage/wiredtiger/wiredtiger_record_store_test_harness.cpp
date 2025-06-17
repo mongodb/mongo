@@ -70,6 +70,7 @@ WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData ext
                                                    _dbpath.path(),
                                                    &_cs,
                                                    std::move(wtConfig),
+                                                   WiredTigerExtensions::get(serviceContext()),
                                                    false,
                                                    _isReplSet,
                                                    shouldRecoverFromOplogAsStandalone,

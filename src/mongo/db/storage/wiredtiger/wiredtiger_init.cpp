@@ -27,21 +27,6 @@
  *    it in the license file.
  */
 
-
-#include <cstddef>
-#include <memory>
-#include <string>
-#include <utility>
-
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/optional/optional.hpp>
-
-#if defined(__linux__)
-#include <sys/statfs.h>  // IWYU pragma: keep
-#include <sys/vfs.h>     // IWYU pragma: keep
-#endif
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -59,6 +44,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/spill_wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/spill_wiredtiger_server_status.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
@@ -68,6 +54,20 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/processinfo.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/optional/optional.hpp>
+
+#if defined(__linux__)
+#include <sys/statfs.h>  // IWYU pragma: keep
+#include <sys/vfs.h>     // IWYU pragma: keep
+#endif
 
 #if __has_feature(address_sanitizer)
 #include <sanitizer/lsan_interface.h>
@@ -147,15 +147,16 @@ public:
         if (params.inMemory) {
             wtConfig.logEnabled = false;
         }
-        auto kv =
-            std::make_unique<WiredTigerKVEngine>(std::string{getCanonicalName()},
-                                                 params.dbpath,
-                                                 getGlobalServiceContext()->getFastClockSource(),
-                                                 std::move(wtConfig),
-                                                 params.repair,
-                                                 isReplSet,
-                                                 shouldRecoverFromOplogAsStandalone,
-                                                 inStandaloneMode);
+        auto kv = std::make_unique<WiredTigerKVEngine>(
+            std::string{getCanonicalName()},
+            params.dbpath,
+            opCtx->getServiceContext()->getFastClockSource(),
+            std::move(wtConfig),
+            WiredTigerExtensions::get(opCtx->getServiceContext()),
+            params.repair,
+            isReplSet,
+            shouldRecoverFromOplogAsStandalone,
+            inStandaloneMode);
         kv->setRecordStoreExtraOptions(wiredTigerGlobalOptions.collectionConfig);
         kv->setSortedDataInterfaceExtraOptions(wiredTigerGlobalOptions.indexConfig);
 
@@ -182,8 +183,9 @@ public:
             spillWiredTigerKVEngine = std::make_unique<SpillWiredTigerKVEngine>(
                 std::string{getCanonicalName()},
                 params.getSpillDbPath(),
-                getGlobalServiceContext()->getFastClockSource(),
-                std::move(wtConfig));
+                opCtx->getServiceContext()->getFastClockSource(),
+                std::move(wtConfig),
+                SpillWiredTigerExtensions::get(opCtx->getServiceContext()));
 
             std::call_once(spillWiredTigerServerStatusSectionFlag, [] {
                 *ServerStatusSectionBuilder<SpillWiredTigerServerStatusSection>(

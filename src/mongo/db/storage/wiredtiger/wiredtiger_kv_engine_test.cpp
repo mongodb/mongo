@@ -127,6 +127,7 @@ private:
                                                        _dbpath.path(),
                                                        _cs.get(),
                                                        std::move(wtConfig),
+                                                       WiredTigerExtensions::get(_svcCtx),
                                                        _forRepair,
                                                        isReplSet,
                                                        shouldRecoverFromOplogAsStandalone,
