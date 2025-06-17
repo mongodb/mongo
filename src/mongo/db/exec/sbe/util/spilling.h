@@ -125,13 +125,15 @@ public:
         switchToSpilling(opCtx);
         ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
 
-        return cursor->save();
+        cursor->save();
+        cursor->detachFromOperationContext();
     }
 
     auto restoreCursor(OperationContext* opCtx, std::unique_ptr<SpillTable::Cursor>& cursor) {
         switchToSpilling(opCtx);
         ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
 
+        cursor->reattachToOperationContext(opCtx);
         return cursor->restore(*shard_role_details::getRecoveryUnit(opCtx));
     }
 
