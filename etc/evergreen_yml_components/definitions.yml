@@ -1379,7 +1379,15 @@ functions:
     params:
       owner: 10gen
       repo: jepsen-io-mongodb
-      expansion_name: github_token
+      expansion_name: jepsen_io_github_token
+      permissions:
+        metadata: read
+        contents: read
+  - command: github.generate_token
+    params:
+      owner: 10gen
+      repo: jepsen
+      expansion_name: jepsen_github_token
       permissions:
         metadata: read
         contents: read
@@ -1390,7 +1398,8 @@ functions:
       args:
         - "./src/evergreen/jepsen_docker/setup.sh"
       include_expansions_in_env:
-        - github_token
+        - jepsen_io_github_token
+        - jepsen_github_token
   "run jepsen docker test":
   - *f_expansions_write
   - command: subprocess.exec
