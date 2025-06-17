@@ -36,7 +36,6 @@
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 
@@ -44,11 +43,6 @@
 
 
 namespace mongo {
-namespace {
-auto& collectionScansCounter = *MetricBuilder<Counter64>("queryExecutor.collectionScans.total");
-auto& collectionScansNonTailableCounter =
-    *MetricBuilder<Counter64>("queryExecutor.collectionScans.nonTailable");
-}  // namespace
 
 CollectionIndexUsageTracker::CollectionIndexUsageTracker(
     AggregatedIndexUsageTracker* aggregatedIndexUsageTracker, ClockSource* clockSource)
@@ -74,13 +68,11 @@ void CollectionIndexUsageTracker::recordIndexAccess(StringData indexName) const 
 
 void CollectionIndexUsageTracker::recordCollectionScans(unsigned long long collectionScans) const {
     _sharedStats->_collectionScans.fetchAndAdd(collectionScans);
-    collectionScansCounter.increment(collectionScans);
 }
 
 void CollectionIndexUsageTracker::recordCollectionScansNonTailable(
     unsigned long long collectionScansNonTailable) const {
     _sharedStats->_collectionScansNonTailable.fetchAndAdd(collectionScansNonTailable);
-    collectionScansNonTailableCounter.increment(collectionScansNonTailable);
 }
 
 void CollectionIndexUsageTracker::registerIndex(StringData indexName,

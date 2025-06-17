@@ -45,6 +45,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/collection_index_usage_tracker.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/exec/projection_executor.h"
@@ -75,6 +76,18 @@
 
 namespace mongo {
 namespace {
+
+auto& collectionScansCounter = *MetricBuilder<Counter64>("queryExecutor.collectionScans.total");
+auto& collectionScansNonTailableCounter =
+    *MetricBuilder<Counter64>("queryExecutor.collectionScans.nonTailable");
+
+auto& profilerScansCounter =
+    *MetricBuilder<Counter64>("queryExecutor.profiler.collectionScans.total");
+auto& profilerScansTailableCounter =
+    *MetricBuilder<Counter64>("queryExecutor.profiler.collectionScans.tailable");
+auto& profilerScansNonTailableCounter =
+    *MetricBuilder<Counter64>("queryExecutor.profiler.collectionScans.nonTailable");
+
 
 CoreIndexInfo indexInfoFromIndexCatalogEntry(const IndexCatalogEntry& ice) {
     auto desc = ice.descriptor();
@@ -110,6 +123,15 @@ void recordCollectionIndexUsage(const CollectionPtr& coll,
     for (auto it = indexesUsed.begin(); it != indexesUsed.end(); ++it) {
         collectionIndexUsageTracker.recordIndexAccess(*it);
     }
+
+    if (coll->ns().isSystemDotProfile()) {
+        profilerScansCounter.increment(collectionScans);
+        profilerScansTailableCounter.increment(collectionScans - collectionScansNonTailable);
+        profilerScansNonTailableCounter.increment(collectionScansNonTailable);
+    }
+
+    collectionScansCounter.increment(collectionScans);
+    collectionScansNonTailableCounter.increment(collectionScansNonTailable);
 }
 
 }  // namespace
@@ -255,6 +277,16 @@ void CollectionQueryInfo::notifyOfQuery(OperationContext* opCtx,
 void CollectionQueryInfo::notifyOfQuery(const CollectionPtr& coll, const OpDebug& debug) const {
     recordCollectionIndexUsage(
         coll, debug.collectionScans, debug.collectionScansNonTailable, debug.indexesUsed);
+}
+
+CollectionIndexUsageTracker::CollectionIndexUsageMap CollectionQueryInfo::getUsageStats(
+    const CollectionPtr& coll) {
+    return CollectionIndexUsageTrackerDecoration::get(coll.get()).getUsageStats();
+}
+
+CollectionIndexUsageTracker::CollectionScanStats CollectionQueryInfo::getCollectionScanStats(
+    const CollectionPtr& coll) {
+    return CollectionIndexUsageTrackerDecoration::get(coll.get()).getCollectionScanStats();
 }
 
 void CollectionQueryInfo::clearQueryCache(OperationContext* opCtx, const CollectionPtr& coll) {

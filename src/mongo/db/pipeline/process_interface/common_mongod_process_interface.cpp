@@ -227,9 +227,8 @@ std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationConte
         return indexStats;
     }
 
-    const auto& indexStatsMap =
-        CollectionIndexUsageTrackerDecoration::get(collection.getCollection().get())
-            .getUsageStats();
+    const auto& collPtr = collection.getCollection();
+    const auto& indexStatsMap = CollectionQueryInfo::getUsageStats(collPtr);
     for (auto&& indexStatsMapIter : indexStatsMap) {
         auto indexName = indexStatsMapIter.first;
         auto stats = indexStatsMapIter.second;
@@ -433,9 +432,8 @@ Status CommonMongodProcessInterface::appendQueryExecStats(OperationContext* opCt
     bool redactForQE =
         collection->getCollectionOptions().encryptedFieldConfig || nss.isFLE2StateCollection();
     if (!redactForQE) {
-        auto collectionScanStats =
-            CollectionIndexUsageTrackerDecoration::get(collection.getCollection().get())
-                .getCollectionScanStats();
+        const auto& collPtr = collection.getCollection();
+        auto collectionScanStats = CollectionQueryInfo::getCollectionScanStats(collPtr);
 
         dassert(collectionScanStats.collectionScans <=
                 static_cast<unsigned long long>(std::numeric_limits<long long>::max()));

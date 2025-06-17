@@ -73,6 +73,7 @@ public:
         int timeseriesExtendedRange = 0;
         int csfle = 0;
         int queryableEncryption = 0;
+        int systemProfile = 0;
 
         void toBson(BSONObjBuilder* builder) const {
             builder->append("collections", collections);
@@ -87,6 +88,7 @@ public:
             }
             builder->append("csfle", csfle);
             builder->append("queryableEncryption", queryableEncryption);
+            builder->append("systemProfile", systemProfile);
         }
     };
 
@@ -103,6 +105,7 @@ public:
         stats.timeseriesExtendedRange = requiresTimeseriesExtendedRangeSupport.loadRelaxed();
         stats.csfle = catalogStats.csfle;
         stats.queryableEncryption = catalogStats.queryableEncryption;
+        stats.systemProfile = catalogStats.systemProfile;
 
         const auto viewCatalogDbNames = catalog->getViewCatalogDbNames(opCtx);
         for (const auto& dbName : viewCatalogDbNames) {

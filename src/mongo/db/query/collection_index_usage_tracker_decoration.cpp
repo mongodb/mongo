@@ -28,11 +28,10 @@
  */
 
 
-#include <utility>
+#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 
 #include "mongo/db/aggregated_index_usage_tracker.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/decorable.h"
 
@@ -42,7 +41,6 @@
 namespace mongo {
 
 namespace {
-
 const auto getCollectionIndexUsageTrackerDecoration =
     Collection::declareDecoration<CollectionIndexUsageTrackerDecoration>();
 
@@ -50,16 +48,18 @@ const auto getCollectionIndexUsageTrackerDecoration =
 
 const CollectionIndexUsageTracker& CollectionIndexUsageTrackerDecoration::get(
     const Collection* collection) {
-    return *getCollectionIndexUsageTrackerDecoration(collection)._indexUsageTracker;
+    return *getCollectionIndexUsageTrackerDecoration(collection)._collectionIndexUsageTracker;
 }
+
 CollectionIndexUsageTracker& CollectionIndexUsageTrackerDecoration::write(Collection* collection) {
     auto& decoration = getCollectionIndexUsageTrackerDecoration(collection);
 
     // Make copy of existing CollectionIndexUsageTracker and store it in our writable Collection
     // instance.
-    decoration._indexUsageTracker = new CollectionIndexUsageTracker(*decoration._indexUsageTracker);
+    decoration._collectionIndexUsageTracker =
+        new CollectionIndexUsageTracker(*decoration._collectionIndexUsageTracker);
 
-    return *decoration._indexUsageTracker;
+    return *decoration._collectionIndexUsageTracker;
 }
 
 CollectionIndexUsageTrackerDecoration::CollectionIndexUsageTrackerDecoration() {
@@ -67,7 +67,7 @@ CollectionIndexUsageTrackerDecoration::CollectionIndexUsageTrackerDecoration() {
     if (!hasGlobalServiceContext())
         return;
 
-    _indexUsageTracker =
+    _collectionIndexUsageTracker =
         new CollectionIndexUsageTracker(AggregatedIndexUsageTracker::get(getGlobalServiceContext()),
                                         getGlobalServiceContext()->getPreciseClockSource());
 }

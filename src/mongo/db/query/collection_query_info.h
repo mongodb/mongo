@@ -138,6 +138,12 @@ public:
                        const PlanSummaryStats& summaryStats) const;
     void notifyOfQuery(const CollectionPtr& coll, const OpDebug& debug) const;
 
+    static CollectionIndexUsageTracker::CollectionIndexUsageMap getUsageStats(
+        const CollectionPtr& coll);
+
+    static CollectionIndexUsageTracker::CollectionScanStats getCollectionScanStats(
+        const CollectionPtr& coll);
+
 private:
     /**
      * Stores Clasic and SBE PlanCache-related state. Classic Plan Cache is stored per collection

@@ -642,6 +642,8 @@ public:
         int csfle = 0;
         // Queryable Encryption collections on non-internal databases
         int queryableEncryption = 0;
+        // <>.system.profile collections on non-internal databases. Counted as `internal`.
+        int systemProfile = 0;
     };
 
     /**
