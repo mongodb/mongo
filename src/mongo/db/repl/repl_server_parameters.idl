@@ -540,6 +540,18 @@ server_parameters:
             gte: 0
         redact: false
 
+    slowServiceOnStepDownThresholdMS:
+        description: >-
+            The maximum amount of time, in milliseconds, that a single replica set aware
+            service's onStepDown method can take without a warning being logged.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: slowServiceOnStepDownThresholdMS
+        default: 200
+        validator:
+            gte: 0
+        redact: false
+
     slowTotalOnStepUpBeginThresholdMS:
         description: >-
             The maximum amount of time, in milliseconds, that the total of all replica set
