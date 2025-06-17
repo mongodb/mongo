@@ -399,7 +399,7 @@ last-continuous:
     ticket: SERVER-92806
   - test_file: jstests/sharding/sharded_data_distribution.js
     ticket: SERVER-88400
-  - test_file: jstests/core/query/doc_validation/json_schema_validate_empty_path.js
+  - test_file: jstests/core/query/json_schema_validate_empty_path.js
     ticket: SERVER-97254
   suites: null
 last-lts:
@@ -848,6 +848,6 @@ last-lts:
     ticket: SERVER-92806
   - test_file: jstests/sharding/sharded_data_distribution.js
     ticket: SERVER-88400
-  - test_file: jstests/core/query/doc_validation/json_schema_validate_empty_path.js
+  - test_file: jstests/core/query/json_schema_validate_empty_path.js
     ticket: SERVER-97254
   suites: null
