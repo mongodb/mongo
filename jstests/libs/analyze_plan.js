@@ -16,6 +16,22 @@ function getWinningPlan(queryPlanner) {
 }
 
 /**
+ * Returns the winning plan from the corresponding sub-node of classic/SBE explain output. Takes
+ * into account that the plan may or may not have agg stages.
+ */
+function getWinningPlanFromExplain(explain) {
+    if (explain.hasOwnProperty("shards")) {
+        for (const shardName in explain.shards) {
+            let queryPlanner = getQueryPlanner(explain.shards[shardName]);
+            return getWinningPlan(queryPlanner);
+        }
+    }
+
+    let queryPlanner = getQueryPlanner(explain);
+    return getWinningPlan(queryPlanner);
+}
+
+/**
  * Returns an element of explain output which represents a rejected candidate plan.
  */
 function getRejectedPlan(rejectedPlan) {
@@ -349,6 +365,15 @@ function isIndexOnly(db, root) {
  */
 function isIxscan(db, root) {
     return planHasStage(db, root, "IXSCAN");
+}
+
+/**
+ * Returns true if the BSON representation of a plan rooted at 'winningPlan' is using
+ * a index scan over a multikey index, and false otherwise.
+ */
+function isIxscanMultikey(winningPlan) {
+    const ixscanStage = getPlanStage(winningPlan, "IXSCAN");
+    return ixscanStage && ixscanStage.isMultiKey;
 }
 
 /**
