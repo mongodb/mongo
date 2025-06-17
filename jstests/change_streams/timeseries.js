@@ -106,6 +106,11 @@ let expectedChanges = [
     },
     {
         "operationType": "create",
+        "ns": {"db": dbName, "coll": "system.views"},
+        "operationDescription": {"idIndex": {"v": 2, "key": {"_id": 1}, "name": "_id_"}}
+    },
+    {
+        "operationType": "create",
         "ns": {"db": dbName, "coll": collName},
         "operationDescription": {
             "viewOn": bucketsCollName,
