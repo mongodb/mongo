@@ -1589,6 +1589,7 @@ static const char *const __stats_connection_desc[] = {
   "cache: leaf pages split during eviction",
   "cache: locate a random in-mem ref by examining all entries on the root page",
   "cache: maximum bytes configured",
+  "cache: maximum gap between page and connection evict pass generation seen at eviction",
   "cache: maximum milliseconds spent at a single eviction",
   "cache: maximum page size seen at eviction",
   "cache: modified page evict attempts by application threads",
@@ -2414,6 +2415,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_eviction_split_leaf = 0;
     stats->cache_eviction_random_sample_inmem_root = 0;
     /* not clearing cache_bytes_max */
+    /* not clearing eviction_maximum_gen_gap */
     /* not clearing eviction_maximum_milliseconds */
     /* not clearing eviction_maximum_page_size */
     stats->eviction_app_dirty_attempt = 0;
@@ -3249,6 +3251,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_eviction_random_sample_inmem_root +=
       WT_STAT_CONN_READ(from, cache_eviction_random_sample_inmem_root);
     to->cache_bytes_max += WT_STAT_CONN_READ(from, cache_bytes_max);
+    to->eviction_maximum_gen_gap += WT_STAT_CONN_READ(from, eviction_maximum_gen_gap);
     to->eviction_maximum_milliseconds += WT_STAT_CONN_READ(from, eviction_maximum_milliseconds);
     to->eviction_maximum_page_size += WT_STAT_CONN_READ(from, eviction_maximum_page_size);
     to->eviction_app_dirty_attempt += WT_STAT_CONN_READ(from, eviction_app_dirty_attempt);

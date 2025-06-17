@@ -254,8 +254,6 @@ __wt_timing_stress_sleep_random(WT_SESSION_IMPL *session)
         max = 5;
     else
         max = 9;
-    if (pct > 100.0)
-        return;
 
     /*
      * We need a fast way to choose a sleep time. We want to sleep a short period most of the time,

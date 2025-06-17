@@ -586,6 +586,8 @@ struct __wt_connection_impl {
     bool prefetch_auto_on;
     bool prefetch_available;
 
+    bool preserve_prepared; /* Preserve prepared updates */
+
 #define WT_STATLOG_FILENAME "WiredTigerStat.%d.%H"
     WT_SESSION_IMPL *stat_session; /* Statistics log session */
     wt_thread_t stat_tid;          /* Statistics log thread */

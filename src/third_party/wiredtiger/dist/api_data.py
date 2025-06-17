@@ -1255,6 +1255,11 @@ wiredtiger_open_common =\
             whether pre-fetch is enabled for all sessions by default''',
             type='boolean'),
         ]),
+    Config('preserve_prepared', 'false', r'''
+        open connection in preserve prepare mode. All the prepared transactions that are
+        not yet committed or rolled back will be preserved in the database. This is useful for
+        applications that want to preserve prepared transactions across restarts.''',
+        type='boolean'),
     Config('readonly', 'false', r'''
         open connection in read-only mode. The database must exist. All methods that may
         modify a database are disabled. See @ref readonly for more information''',

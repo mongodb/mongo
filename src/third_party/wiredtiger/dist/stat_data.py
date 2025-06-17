@@ -330,6 +330,7 @@ conn_stats = [
     EvictStat('eviction_internal_pages_queued', 'internal pages queued for eviction'),
     EvictStat('eviction_internal_pages_seen', 'internal pages seen by eviction walk'),
     EvictStat('eviction_interupted_by_app', 'application requested eviction interrupt'),
+    EvictStat('eviction_maximum_gen_gap', 'maximum gap between page and connection evict pass generation seen at eviction', 'no_clear,no_scale,size'),
     EvictStat('eviction_maximum_milliseconds', 'maximum milliseconds spent at a single eviction', 'no_clear,no_scale,size'),
     EvictStat('eviction_maximum_page_size', 'maximum page size seen at eviction', 'no_clear,no_scale,size'),
     EvictStat('eviction_pages_already_queued', 'pages seen by eviction walk that are already queued'),
