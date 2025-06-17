@@ -115,6 +115,9 @@ def run_prettier(
         ]
         if files_to_format == "all":
             command += ["."]
+        elif len(files_to_format) == 0:
+            print("Skipping prettier due to having no files to format.")
+            return True
         else:
             command += files_to_format
         command += list(force_exclude_dirs)
