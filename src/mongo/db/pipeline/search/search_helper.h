@@ -195,11 +195,5 @@ std::unique_ptr<RemoteExplainVector> getSearchRemoteExplains(
 boost::optional<SearchQueryViewSpec> getViewFromBSONObj(
     boost::intrusive_ptr<ExpressionContext> expCtx, BSONObj spec);
 
-/**
- * Assert that the mongot stage is allowed to run on the view pipeline (i.e. the pipeline doesn't
- * involve other namespaces).
- */
-void validateViewPipeline(SearchQueryViewSpec view);
-
 }  // namespace search_helpers
 }  // namespace mongo

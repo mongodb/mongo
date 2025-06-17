@@ -629,33 +629,6 @@ std::unique_ptr<RemoteExplainVector> getSearchRemoteExplains(
     return nullptr;
 }
 
-
-void validateViewPipeline(SearchQueryViewSpec view) {
-    // mongot stages cannot run on a view involving other namespaces. This can occur when the
-    // view's pipeline contains $lookup, $unionWith, another mongot stage, etc. For safety, this
-    // error will throw even when these stages involve the same collection that the mongot stage
-    // is running on.
-    LiteParsedPipeline lpp(view.getNss(), view.getEffectivePipeline());
-
-    if (!lpp.getInvolvedNamespaces().empty()) {
-        if (lpp.hasSearchStage()) {
-            uassert(
-                9475801,
-                str::stream()
-                    << "mongot stages cannot be executed on a view if the view's pipeline includes "
-                       "other mongot stages ($search, $vectorSearch, $rankFusion, etc.)",
-                false);
-        } else {
-            uassert(
-                9475802,
-                str::stream()
-                    << "mongot stages cannot be executed on a view if the view's pipeline includes "
-                       "stages that involve other namespaces ($lookup, $unionWith, etc.)",
-                false);
-        }
-    }
-}
-
 boost::optional<SearchQueryViewSpec> getViewFromBSONObj(
     boost::intrusive_ptr<ExpressionContext> expCtx, BSONObj spec) {
     // First, check if the view is held on the spec object (sharded scenarios).

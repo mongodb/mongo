@@ -199,6 +199,7 @@ mongo_cc_library(
         "//src/mongo/db/query/search:search_index_common",
         "//src/mongo/db/query/search:search_index_options",
         "//src/mongo/db/query/search:search_index_process_interface",
+        "//src/mongo/db/query/search:search_index_view_validation",
         "//src/mongo/db/query/search:search_task_executors",
     ],
 )

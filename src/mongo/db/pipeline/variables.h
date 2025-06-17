@@ -116,6 +116,15 @@ public:
     static constexpr auto kSearchMetaId = Id(-7);
     static constexpr auto kUserRolesId = Id(-8);
 
+    static constexpr StringData kRootName = "ROOT"_sd;
+    static constexpr StringData kRemoveName = "REMOVE"_sd;
+    static constexpr StringData kNowName = "NOW"_sd;
+    static constexpr StringData kClusterTimeName = "CLUSTER_TIME"_sd;
+    static constexpr StringData kJsScopeName = "JS_SCOPE"_sd;
+    static constexpr StringData kIsMapReduceName = "IS_MR"_sd;
+    static constexpr StringData kSearchMetaName = "SEARCH_META"_sd;
+    static constexpr StringData kUserRolesName = "USER_ROLES"_sd;
+
     // Map from builtin var name to reserved id number.
     static const StringMap<Id> kBuiltinVarNameToId;
     static const std::map<StringData, std::function<void(const Value&)>> kSystemVarValidators;

@@ -270,3 +270,16 @@ mongo_cc_integration_test(
         "//src/mongo/util:version_impl",
     ],
 )
+
+mongo_cc_library(
+    name = "search_index_view_validation",
+    srcs = [
+        "search_index_view_validation.cpp",
+    ],
+    hdrs = [
+        "search_index_view_validation.h",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline",
+    ],
+)

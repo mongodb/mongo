@@ -33,6 +33,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/search/search_index_common.h"
 #include "mongo/db/query/search/search_index_process_interface.h"
+#include "mongo/db/query/search/search_index_view_validation.h"
 #include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -51,6 +52,11 @@ BSONObj retrieveSearchIndexManagerResponseHelper(OperationContext* opCtx, Comman
     const auto [collUUID, resolvedNss, view] =
         uassertStatusOKWithContext(retrieveCollectionUUIDAndResolveView(opCtx, currentOperationNss),
                                    "Error retrieving collection UUID and view info");
+
+    if (view) {
+        // Ensure that the view definition can be used with search indexes.
+        search_index_view_validation::validate(*view);
+    }
 
     // Run the search index command against the remote search index management server.
     auto searchIndexManagerResponse =

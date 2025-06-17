@@ -82,15 +82,6 @@ using namespace std::string_literals;
 constexpr Variables::Id Variables::kRootId;
 constexpr Variables::Id Variables::kRemoveId;
 
-constexpr StringData kRootName = "ROOT"_sd;
-constexpr StringData kRemoveName = "REMOVE"_sd;
-constexpr StringData kNowName = "NOW"_sd;
-constexpr StringData kClusterTimeName = "CLUSTER_TIME"_sd;
-constexpr StringData kJsScopeName = "JS_SCOPE"_sd;
-constexpr StringData kIsMapReduceName = "IS_MR"_sd;
-constexpr StringData kSearchMetaName = "SEARCH_META"_sd;
-constexpr StringData kUserRolesName = "USER_ROLES"_sd;
-
 const StringMap<Variables::Id> Variables::kBuiltinVarNameToId = {
     {kRootName.data(), kRootId},
     {kRemoveName.data(), kRemoveId},
