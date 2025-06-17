@@ -99,6 +99,11 @@ auto& classicWorksTotal = *MetricBuilder<Counter64>{"query.multiPlanner.classicW
 auto& classicCount = *MetricBuilder<Counter64>{"query.multiPlanner.classicCount"};
 
 /**
+ * Aggregation of the total number of candidate plans.
+ */
+auto& classicNumPlansTotal = *MetricBuilder<Counter64>{"query.multiPlanner.classicNumPlans"};
+
+/**
  * An element in this histogram is the number of microseconds spent in an invocation (of the
  * classic multiplanner).
  */
@@ -122,6 +127,29 @@ auto& classicNumPlansHistogram =
     *MetricBuilder<HistogramServerStatusMetric>{"query.multiPlanner.histograms.classicNumPlans"}
          .bind(HistogramServerStatusMetric::pow(5, 2, 2));
 
+/**
+ * Total number of times multiplanning stopped because a plan hit EOF.
+ */
+auto& multiPlannerHitEofTotal =
+    *MetricBuilder<Counter64>{"query.multiPlanner.stoppingCondition.hitEof"};
+
+/**
+ * Total number of times multiplanning stopped because a plan hit the numResults limit.
+ */
+auto& multiPlannerHitResultsLimitTotal =
+    *MetricBuilder<Counter64>{"query.multiPlanner.stoppingCondition.hitResultsLimit"};
+
+/**
+ * Total number of times multiplanning stopped because a plan hit the numWorks limit.
+ */
+auto& multiPlannerHitWorksLimitTotal =
+    *MetricBuilder<Counter64>{"query.multiPlanner.stoppingCondition.hitWorksLimit"};
+
+/**
+ * Total number of times multiplanning failed because all candidates hit the memory limit.
+ */
+auto& multiPlannerAllPlansHitMemoryLimitTotal =
+    *MetricBuilder<Counter64>{"query.multiPlanner.allPlansHitMemoryLimit"};
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(sleepWhileMultiplanning);
@@ -262,6 +290,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     auto startTicks = tickSource->getTicks();
 
     classicNumPlansHistogram.increment(_candidates.size());
+    classicNumPlansTotal.increment(_candidates.size());
     classicCount.increment();
 
     const double collFraction =
@@ -273,15 +302,16 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     try {
         // Work the plans, stopping when a plan hits EOF or returns some fixed number of results.
         size_t ix = 0;
-        for (; ix < numWorks; ++ix) {
-            bool moreToDo = workAllPlans(numResults, yieldPolicy);
-            if (!moreToDo) {
-                break;
-            }
+        bool moreToDo = true;
+        for (; ix < numWorks && moreToDo; ++ix) {
+            moreToDo = workAllPlans(numResults, yieldPolicy);
         }
         auto totalWorks = ix * _candidates.size();
         classicWorksHistogram.increment(totalWorks);
         classicWorksTotal.increment(totalWorks);
+        if (moreToDo) {
+            multiPlannerHitWorksLimitTotal.incrementRelaxed();
+        }
     } catch (DBException& e) {
         return e.toStatus().withContext("error while multiplanner was selecting best plan");
     }
@@ -368,6 +398,7 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
             // If all children have failed, then rethrow. Otherwise, swallow the error and move onto
             // the next candidate plan.
             if (_failureCount == _candidates.size()) {
+                multiPlannerAllPlansHitMemoryLimitTotal.incrementRelaxed();
                 throw;
             }
 
@@ -385,11 +416,13 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
             // Once a plan returns enough results, stop working.
             if (candidate.results.size() >= numResults) {
                 doneWorking = true;
+                multiPlannerHitResultsLimitTotal.incrementRelaxed();
             }
         } else if (PlanStage::IS_EOF == state) {
             // First plan to hit EOF wins automatically.  Stop evaluating other plans.
             // Assumes that the ranking will pick this plan.
             doneWorking = true;
+            multiPlannerHitEofTotal.incrementRelaxed();
         } else if (PlanStage::NEED_YIELD == state) {
             invariant(id == WorkingSet::INVALID_ID);
             // Run-time plan selection occurs before a WriteUnitOfWork is opened and it's not
