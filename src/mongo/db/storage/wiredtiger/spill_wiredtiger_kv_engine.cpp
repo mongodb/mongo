@@ -190,7 +190,7 @@ Status SpillWiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
 
     WiredTigerSession session(_connection.get());
 
-    int ret = session.drop(uri.c_str(), "checkpoint_wait=false");
+    int ret = session.drop(uri.c_str(), "checkpoint_wait=false,force=true");
     Status status = Status::OK();
     if (ret == 0 || ret == ENOENT) {
         // If ident doesn't exist, it is effectively dropped.

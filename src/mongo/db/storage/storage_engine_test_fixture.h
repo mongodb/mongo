@@ -158,6 +158,11 @@ public:
             *shard_role_details::getRecoveryUnit(opCtx));
     }
 
+    std::vector<std::string> getAllSpillKVEngineIdents(OperationContext* opCtx) {
+        return _storageEngine->getSpillEngine()->getAllIdents(
+            *_storageEngine->getSpillEngine()->newRecoveryUnit());
+    }
+
     bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
         std::vector<MDBCatalog::EntryIdentifier> allCollections =
             _storageEngine->getMDBCatalog()->getAllCatalogEntries(opCtx);
@@ -168,6 +173,11 @@ public:
 
     bool identExists(OperationContext* opCtx, StringData ident) {
         auto idents = getAllKVEngineIdents(opCtx);
+        return std::find(idents.begin(), idents.end(), ident) != idents.end();
+    }
+
+    bool spillIdentExists(OperationContext* opCtx, StringData ident) {
+        auto idents = getAllSpillKVEngineIdents(opCtx);
         return std::find(idents.begin(), idents.end(), ident) != idents.end();
     }
 
