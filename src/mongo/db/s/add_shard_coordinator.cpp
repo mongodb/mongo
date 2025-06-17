@@ -119,6 +119,25 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     throw;
                 }
 
+                std::string shardName =
+                    topology_change_helpers::createShardName(opCtx,
+                                                             _getTargeter(opCtx),
+                                                             _doc.getIsConfigShard(),
+                                                             _doc.getProposedName(),
+                                                             _executorWithoutGossip);
+
+                _doc.setChosenName(shardName);
+
+                // Check that a different shardIdentity is not present on the replicaset
+                if (!_doc.getIsConfigShard()) {
+                    uassert(
+                        ErrorCodes::IllegalOperation,
+                        fmt::format("Can't add shard {} because the replica set already contains a "
+                                    "shard identity which does not match the current operation.",
+                                    _doc.getConnectionString().toString()),
+                        _validateShardIdentityDocumentOnReplicaSet(opCtx));
+                }
+
                 _blockFCVChangesOnReplicaSet(opCtx, **executor);
 
                 // For the first shard we check if it's a promotion of a populated replicaset or
@@ -188,15 +207,6 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     _completeOnError = true;
                     throw;
                 }
-
-                std::string shardName =
-                    topology_change_helpers::createShardName(opCtx,
-                                                             _getTargeter(opCtx),
-                                                             _doc.getIsConfigShard(),
-                                                             _doc.getProposedName(),
-                                                             _executorWithoutGossip);
-
-                _doc.setChosenName(shardName);
             }))
         .then(_buildPhaseHandler(
             Phase::kPrepareNewShard,
@@ -470,6 +480,46 @@ RemoteCommandTargeter& AddShardCoordinator::_getTargeter(OperationContext* opCtx
     return *(_shardConnection->getTargeter());
 }
 
+bool AddShardCoordinator::_validateShardIdentityDocumentOnReplicaSet(OperationContext* opCtx) {
+    auto& targeter = _getTargeter(opCtx);
+    BSONObj existingShardIdentity;
+    auto fetcherStatus =
+        Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
+    auto fetcher = topology_change_helpers::createFindFetcher(
+        opCtx,
+        targeter,
+        NamespaceString::kServerConfigurationNamespace,
+        BSON("_id" << ShardIdentityType::IdName),
+        repl::ReadConcernLevel::kMajorityReadConcern,
+        [&](const std::vector<BSONObj>& docs) -> bool {
+            const auto numDocs = docs.size();
+            tassert(10556000,
+                    "Found more than one shardIdentity document on the replica set being added",
+                    numDocs <= 1);
+            if (numDocs == 1) {
+                existingShardIdentity = docs[0];
+            }
+            return false;
+        },
+        [&](const Status& status) { fetcherStatus = status; },
+        _executorWithoutGossip);
+    uassertStatusOK(fetcher->schedule());
+    uassertStatusOK(fetcher->join(opCtx));
+    uassertStatusOK(fetcherStatus);
+
+    if (existingShardIdentity.isEmpty()) {
+        return true;
+    }
+
+    BSONObj shardIdentity =
+        topology_change_helpers::createShardIdentity(opCtx, std::string{*_doc.getChosenName()})
+            .toShardIdentityDocument();
+    return shardIdentity.woCompare(existingShardIdentity,
+                                   {},
+                                   BSONObj::ComparisonRules::kConsiderFieldName |
+                                       BSONObj::ComparisonRules::kIgnoreFieldOrder) == 0;
+}
+
 void AddShardCoordinator::_runWithRetries(std::function<void()>&& function,
                                           std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                           const CancellationToken& token) {
@@ -646,6 +696,7 @@ AddShardCoordinator::_getUserWritesBlockFromReplicaSet(OperationContext* opCtx) 
         opCtx,
         targeter,
         NamespaceString::kUserWritesCriticalSectionsNamespace,
+        BSONObj() /* filter */,
         repl::ReadConcernLevel::kMajorityReadConcern,
         [&](const std::vector<BSONObj>& docs) -> bool {
             for (const BSONObj& doc : docs) {

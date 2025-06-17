@@ -85,6 +85,8 @@ private:
 
     RemoteCommandTargeter& _getTargeter(OperationContext* opCtx);
 
+    bool _validateShardIdentityDocumentOnReplicaSet(OperationContext* opCtx);
+
     void _runWithRetries(std::function<void()>&& function,
                          std::shared_ptr<executor::ScopedTaskExecutor> executor,
                          const CancellationToken& token);

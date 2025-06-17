@@ -358,6 +358,7 @@ using FetcherStatusCallbackFn = std::function<void(const Status& status)>;
 std::unique_ptr<Fetcher> createFindFetcher(OperationContext* opCtx,
                                            RemoteCommandTargeter& targeter,
                                            const NamespaceString& nss,
+                                           const BSONObj& filter,
                                            const repl::ReadConcernLevel& readConcernLevel,
                                            FetcherDocsCallbackFn processDocsCallback,
                                            FetcherStatusCallbackFn processStatusCallback,

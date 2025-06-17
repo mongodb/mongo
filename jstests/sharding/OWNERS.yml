@@ -39,6 +39,6 @@ filters:
   - "*zone*":
     approvers:
       - 10gen/server-cluster-scalability
-  - "addShard_block_setFCV.js":
+  - "addShard*":
     approvers:
       - 10gen/server-catalog-and-routing

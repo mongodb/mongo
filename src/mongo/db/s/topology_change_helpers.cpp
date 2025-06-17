@@ -522,6 +522,7 @@ void deleteAllDocumentsInCollection(
         opCtx,
         targeter,
         nss,
+        BSONObj() /* filter */,
         repl::ReadConcernLevel::kMajorityReadConcern,
         [&](const std::vector<BSONObj>& docs) -> bool {
             for (const BSONObj& doc : docs) {
@@ -624,6 +625,7 @@ ShardIdentityType createShardIdentity(OperationContext* opCtx, const ShardId& sh
 std::unique_ptr<Fetcher> createFindFetcher(OperationContext* opCtx,
                                            RemoteCommandTargeter& targeter,
                                            const NamespaceString& nss,
+                                           const BSONObj& filter,
                                            const repl::ReadConcernLevel& readConcernLevel,
                                            FetcherDocsCallbackFn processDocsCallback,
                                            FetcherStatusCallbackFn processStatusCallback,
@@ -634,6 +636,7 @@ std::unique_ptr<Fetcher> createFindFetcher(OperationContext* opCtx,
     const Milliseconds maxTimeMS =
         std::min(opCtx->getRemainingMaxTimeMillis(), Milliseconds(kRemoteCommandTimeout));
     findCommand.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
+    findCommand.setFilter(filter);
 
     return createFetcher(opCtx,
                          targeter,
@@ -1101,6 +1104,7 @@ void getClusterTimeKeysFromReplicaSet(OperationContext* opCtx,
         opCtx,
         targeter,
         NamespaceString::kKeysCollectionNamespace,
+        BSONObj() /* filter */,
         repl::ReadConcernLevel::kLocalReadConcern,
         [&](const std::vector<BSONObj>& docs) -> bool {
             for (const BSONObj& doc : docs) {
@@ -1302,6 +1306,7 @@ TenantIdMap<std::vector<BSONObj>> getClusterParametersFromReplicaSet(
             opCtx,
             targeter,
             NamespaceString::makeClusterParametersNSS(tenantId),
+            BSONObj() /* filter */,
             repl::ReadConcernLevel::kMajorityReadConcern,
             [&allParameters, tenantId](const std::vector<BSONObj>& docs) -> bool {
                 std::vector<BSONObj> parameters;

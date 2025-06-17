@@ -1327,7 +1327,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/**/*txn* @10gen/server-transactions @svc-auto-approve-bot
 /jstests/sharding/**/*_with_id_without_shard_key* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/*zone* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/jstests/sharding/**/addShard_block_setFCV.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/sharding/**/addShard* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/sharding/analyze_shard_key/OWNERS.yml
 /jstests/sharding/analyze_shard_key/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
