@@ -56,6 +56,7 @@
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/util/assert_util.h"
@@ -154,6 +155,8 @@ bool pushDownPipelineStageIfCompatible(
     const boost::intrusive_ptr<DocumentSource>& stage,
     SbeCompatibility minRequiredCompatibility,
     const CompatiblePipelineStages& allowedStages,
+    const CollatorInterface* collator,
+    const std::map<NamespaceString, CollectionInfo>& collectionsInfo,
     std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown) {
 
     auto stageId = stage->getId();
@@ -174,13 +177,29 @@ bool pushDownPipelineStageIfCompatible(
         stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (stageId == DocumentSourceLookUp::id) {
-        if (!allowedStages.lookup ||
-            static_cast<DocumentSourceLookUp*>(stage.get())->sbeCompatibility() <
-                minRequiredCompatibility) {
+        auto lookupStage = static_cast<DocumentSourceLookUp*>(stage.get());
+
+        if (!allowedStages.lookup || lookupStage->sbeCompatibility() < minRequiredCompatibility) {
             return false;
         }
-        stagesForPushdown.emplace_back(std::move(stage));
-        return true;
+
+        // Before making final decision about whether the stage can be pushed down check if it has
+        // collation compatible index.
+        auto foreignCollItr = collectionsInfo.find(lookupStage->getFromNs());
+        if (foreignCollItr == collectionsInfo.end() || !foreignCollItr->second.exists) {
+            // There is no foreign collection. There is no need to check the index.
+            stagesForPushdown.emplace_back(std::move(stage));
+            return true;
+        }
+
+        if (QueryPlannerAnalysis::canUseIndexForRightSideOfLookupInSBE(
+                lookupStage->getForeignField()->fullPath(),
+                foreignCollItr->second.indexes,
+                collator)) {
+            stagesForPushdown.emplace_back(std::move(stage));
+            return true;
+        }
+        return false;
     } else if (stageId == DocumentSourceUnwind::id) {
         if (!allowedStages.unwind ||
             static_cast<DocumentSourceUnwind*>(stage.get())->sbeCompatibility() <
@@ -481,6 +500,7 @@ bool findSbeCompatibleStagesForPushdown(
     const CanonicalQuery* cq,
     bool needsMerge,
     const Pipeline* pipeline,
+    const std::map<NamespaceString, CollectionInfo>& collectionsInfo,
     std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown) {
     const auto& queryKnob = cq->getExpCtx()->getQueryKnobConfiguration();
 
@@ -562,6 +582,8 @@ bool findSbeCompatibleStagesForPushdown(
                                                *itr,
                                                minRequiredCompatibility,
                                                allowedStages,
+                                               cq->getCollator(),
+                                               collectionsInfo,
                                                stagesForPushdown)) {
             // Stop pushing stages down once we hit an incompatible stage.
             allStagesPushedDown = false;
@@ -594,7 +616,8 @@ void finalizePipelineStages(Pipeline* pipeline, CanonicalQuery* canonicalQuery) 
 void attachPipelineStages(const MultipleCollectionAccessor& collections,
                           const Pipeline* pipeline,
                           bool needsMerge,
-                          CanonicalQuery* canonicalQuery) {
+                          CanonicalQuery* canonicalQuery,
+                          const std::map<NamespaceString, CollectionInfo>& collectionsInfo) {
     tassert(9298700,
             "attachPipelineStages() must not be called multiple times on a query",
             canonicalQuery->cqPipeline().empty());
@@ -604,9 +627,24 @@ void attachPipelineStages(const MultipleCollectionAccessor& collections,
 
     std::vector<boost::intrusive_ptr<DocumentSource>> stagesForPushdown;
     bool allStagesPushedDown = findSbeCompatibleStagesForPushdown(
-        collections, canonicalQuery, needsMerge, pipeline, stagesForPushdown);
+        collections, canonicalQuery, needsMerge, pipeline, collectionsInfo, stagesForPushdown);
     canonicalQuery->setCqPipeline(std::move(stagesForPushdown), allStagesPushedDown);
 };
+
+bool pipelineHasLookup(const Pipeline* pipeline) {
+    if (!pipeline) {
+        return false;
+    }
+
+    const auto& sources = pipeline->getSources();
+    for (auto itr = sources.begin(); itr != sources.end(); ++itr) {
+        if (DocumentSourceLookUp::id == (*itr)->getId()) {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 SbeCompatibility getMinRequiredSbeCompatibility(QueryFrameworkControlEnum currentQueryKnobFramework,
                                                 bool sbeFullEnabled) {
