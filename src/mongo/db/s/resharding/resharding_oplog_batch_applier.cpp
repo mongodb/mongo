@@ -37,6 +37,7 @@
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_version.h"
@@ -98,6 +99,13 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                                    std::move(*conflictingTxnCompletionFuture), cancelToken);
                            }
                        } else {
+                           if (resharding::isProgressMarkOplogAfterOplogApplicationStarted(
+                                   oplogEntry)) {
+                               // TODO (SERVER-106057): Make the ReshardingOplogBatchApplier handle
+                               // progress mark oplog entry.
+                               continue;
+                           }
+
                            resharding::data_copy::staleConfigShardLoop(opCtx.get(), [&] {
                                // ReshardingOpObserver depends on the collection metadata being
                                // known when processing writes to the temporary resharding

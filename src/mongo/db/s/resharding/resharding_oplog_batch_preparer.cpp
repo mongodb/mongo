@@ -38,6 +38,7 @@
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/idl/idl_parser.h"
@@ -172,6 +173,15 @@ WriterVectors ReshardingOplogBatchPreparer::makeCrudOpWriterVectors(
                 // `&derivedOp` is guaranteed to remain stable while we append more derived oplog
                 // entries because `derivedOps` is a std::list.
                 _appendCrudOpToWriterVector(&derivedOp, writerVectors);
+            }
+        } else if (resharding::isProgressMarkOplogAfterOplogApplicationStarted(op)) {
+            // This is a progress mark oplog entry created after resharding oplog application has
+            // started. The oplog entry does not need to be applied but is used for calculating the
+            // average time to apply oplog entries. So if
+            // 'reshardingRemainingTimeEstimateBasedOnMovingAverage' is enabled, add the oplog entry
+            // to a random writer.
+            if (resharding::gReshardingRemainingTimeEstimateBasedOnMovingAverage.load()) {
+                _appendOpToWriterVector(absl::HashOf(UUID::gen()), &op, writerVectors);
             }
         } else {
             invariant(repl::OpTypeEnum::kNoop == op.getOpType());

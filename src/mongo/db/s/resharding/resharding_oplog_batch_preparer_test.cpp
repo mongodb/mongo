@@ -39,6 +39,8 @@
 #include "mongo/db/query/write_ops/write_ops_retryability.h"
 #include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
+#include "mongo/db/s/resharding/resharding_noop_o2_field_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -172,6 +174,55 @@ protected:
         op.setTxnNumber(std::move(txnNumber));
 
         // These are unused by ReshardingOplogBatchPreparer but required by IDL parsing.
+        op.setNss({});
+        op.setOpTime({{}, {}});
+        op.setWallClockTime({});
+
+        return {op.toBSON()};
+    }
+
+    repl::OplogEntry makeGenericNoopOplogEntry(const boost::optional<LogicalSessionId>& lsid,
+                                               const boost::optional<TxnNumber>& txnNumber) {
+        repl::MutableOplogEntry op;
+        op.setSessionId(lsid);
+        op.setTxnNumber(txnNumber);
+        op.setOpType(repl::OpTypeEnum::kNoop);
+        op.setObject({});
+        op.setNss({});
+        op.setOpTime({{}, {}});
+        op.setWallClockTime({});
+        return {op.toBSON()};
+    }
+
+    repl::OplogEntry makeProgressMarkNoopOplogEntry(bool createdAfterOplogApplicationStarted) {
+        repl::MutableOplogEntry op;
+        op.setOpType(repl::OpTypeEnum::kNoop);
+        op.setObject({});
+
+        ReshardProgressMarkO2Field o2Field;
+        o2Field.setType(resharding::kReshardProgressMarkOpLogType);
+        if (createdAfterOplogApplicationStarted) {
+            o2Field.setCreatedAfterOplogApplicationStarted(true);
+        }
+        op.setObject2(o2Field.toBSON());
+        op.setNss({});
+        op.setOpTime({{}, {}});
+        op.setWallClockTime({});
+
+        return {op.toBSON()};
+    }
+
+    repl::OplogEntry makeFinalNoopOplogEntry() {
+        repl::MutableOplogEntry op;
+        op.setOpType(repl::OpTypeEnum::kNoop);
+        op.setObject({});
+
+        ReshardBlockingWritesChangeEventO2Field o2Field;
+        o2Field.setType(resharding::kReshardFinalOpLogType);
+        o2Field.setReshardBlockingWrites({});
+        o2Field.setReshardingUUID(UUID::gen());
+        op.setObject2(o2Field.toBSON());
+
         op.setNss({});
         op.setOpTime({{}, {}});
         op.setWallClockTime({});
@@ -406,22 +457,15 @@ TEST_F(ReshardingOplogBatchPreparerTest, ThrowsForUnsupportedCommandOps) {
     }
 }
 
-TEST_F(ReshardingOplogBatchPreparerTest, DiscardsNoops) {
+TEST_F(ReshardingOplogBatchPreparerTest, DiscardsGenericNoops) {
     auto runTest = [&](const boost::optional<LogicalSessionId>& lsid,
                        const boost::optional<TxnNumber>& txnNumber) {
         OplogBatch batch;
 
         int numOps = 5;
         for (int i = 0; i < numOps; ++i) {
-            repl::MutableOplogEntry op;
-            op.setSessionId(lsid);
-            op.setTxnNumber(txnNumber);
-            op.setOpType(repl::OpTypeEnum::kNoop);
-            op.setObject({});
-            op.setNss({});
-            op.setOpTime({{}, {}});
-            op.setWallClockTime({});
-            batch.emplace_back(op.toBSON());
+            auto op = makeGenericNoopOplogEntry(lsid, txnNumber);
+            batch.emplace_back(std::move(op));
         }
 
         std::list<repl::OplogEntry> derivedOpsForCrudWriters;
@@ -447,6 +491,73 @@ TEST_F(ReshardingOplogBatchPreparerTest, DiscardsNoops) {
     runTest(makeLogicalSessionIdForTest(), txnNumber);
     runTest(makeLogicalSessionIdWithTxnUUIDForTest(), txnNumber);
     runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest(), txnNumber);
+}
+
+TEST_F(ReshardingOplogBatchPreparerTest,
+       DiscardsProgressMarkOplogCreatedBeforeOplogApplicationStarted) {
+    OplogBatch batch;
+
+    auto op = makeProgressMarkNoopOplogEntry(false /* createdAfterOplogApplicationStarted */);
+    batch.emplace_back(std::move(op));
+
+    std::list<repl::OplogEntry> derivedOpsForCrudWriters;
+    auto writerVectors = _batchPreparer.makeCrudOpWriterVectors(batch, derivedOpsForCrudWriters);
+    ASSERT_EQ(writerVectors.size(), kNumWriterVectors);
+    ASSERT_EQ(derivedOpsForCrudWriters.size(), 0U);
+    ASSERT_EQ(writerVectors[0].size(), 0U);
+    ASSERT_EQ(writerVectors[1].size(), 0U);
+
+    std::list<repl::OplogEntry> derivedOpsForSessionWriters;
+    writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOpsForSessionWriters);
+    ASSERT_EQ(writerVectors.size(), kNumWriterVectors);
+    ASSERT_EQ(derivedOpsForSessionWriters.size(), 0U);
+    ASSERT_EQ(writerVectors[0].size(), 0U);
+    ASSERT_EQ(writerVectors[1].size(), 0U);
+}
+
+TEST_F(ReshardingOplogBatchPreparerTest,
+       CrudWriterDoesNotDiscardProgressMarkOplogCreatedAfterOplogApplicationStarted) {
+    OplogBatch batch;
+
+    auto op = makeProgressMarkNoopOplogEntry(true /* createdAfterOplogApplicationStarted */);
+    batch.emplace_back(std::move(op));
+
+    std::list<repl::OplogEntry> derivedOpsForCrudWriters;
+    auto writerVectors = _batchPreparer.makeCrudOpWriterVectors(batch, derivedOpsForCrudWriters);
+    ASSERT_EQ(writerVectors.size(), kNumWriterVectors);
+    ASSERT_EQ(derivedOpsForCrudWriters.size(), 0U);
+    auto writer = getNonEmptyWriterVector(writerVectors);
+    ASSERT_EQ(writer.size(), 1U);
+    ASSERT(resharding::isProgressMarkOplogAfterOplogApplicationStarted(*writer[0]));
+
+    // The 'reshardProgressMark' oplog entry should not get added to session writers.
+    std::list<repl::OplogEntry> derivedOpsForSessionWriters;
+    writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOpsForSessionWriters);
+    ASSERT_EQ(writerVectors.size(), kNumWriterVectors);
+    ASSERT_EQ(derivedOpsForSessionWriters.size(), 0U);
+    ASSERT_EQ(writerVectors[0].size(), 0U);
+    ASSERT_EQ(writerVectors[1].size(), 0U);
+}
+
+TEST_F(ReshardingOplogBatchPreparerTest, DiscardsFinalOplog) {
+    OplogBatch batch;
+
+    auto op = makeFinalNoopOplogEntry();
+    batch.emplace_back(std::move(op));
+
+    std::list<repl::OplogEntry> derivedOpsForCrudWriters;
+    auto writerVectors = _batchPreparer.makeCrudOpWriterVectors(batch, derivedOpsForCrudWriters);
+    ASSERT_EQ(writerVectors.size(), kNumWriterVectors);
+    ASSERT_EQ(derivedOpsForCrudWriters.size(), 0U);
+    ASSERT_EQ(writerVectors[0].size(), 0U);
+    ASSERT_EQ(writerVectors[1].size(), 0U);
+
+    std::list<repl::OplogEntry> derivedOpsForSessionWriters;
+    writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch, derivedOpsForSessionWriters);
+    ASSERT_EQ(writerVectors.size(), kNumWriterVectors);
+    ASSERT_EQ(derivedOpsForSessionWriters.size(), 0U);
+    ASSERT_EQ(writerVectors[0].size(), 0U);
+    ASSERT_EQ(writerVectors[1].size(), 0U);
 }
 
 TEST_F(ReshardingOplogBatchPreparerTest,
