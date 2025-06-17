@@ -492,28 +492,6 @@ size_t WiredTigerUtil::getMainCacheSizeMB(double requestedCacheSizeGB,
     return static_cast<size_t>(std::floor(cacheSizeMB));
 }
 
-int32_t WiredTigerUtil::getSpillCacheSizeMB(double requestedCacheSizeGB) {
-    double cacheSizeMB = 1024 * requestedCacheSizeGB;
-    const auto kMaxSizeCacheMB = 10 * 1000 * 1000;
-
-    if (requestedCacheSizeGB <= 0) {
-        LOGV2(10375300,
-              "Requested spill WiredTiger cache size is zero or negative, resetting to default.",
-              "requestedMB"_attr = requestedCacheSizeGB,
-              "default"_attr = kStorage_spillWiredTiger_engineConfig_cacheSizeGBDefault);
-        cacheSizeMB = kStorage_spillWiredTiger_engineConfig_cacheSizeGBDefault * 1024;
-    }
-    if (cacheSizeMB > kMaxSizeCacheMB) {
-        LOGV2(10375301,
-              "Requested spill WiredTiger cache size exceeds max, setting to maximum",
-              "requestedMB"_attr = cacheSizeMB,
-              "maximumMB"_attr = kMaxSizeCacheMB);
-        cacheSizeMB = kMaxSizeCacheMB;
-    }
-
-    return static_cast<int32_t>(std::floor(cacheSizeMB));
-}
-
 logv2::LogSeverity getWTLogSeverityLevel(const BSONObj& obj) {
     const std::string field = "verbose_level_id";
 

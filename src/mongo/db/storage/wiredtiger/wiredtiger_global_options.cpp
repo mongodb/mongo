@@ -211,7 +211,4 @@ void WiredTigerDirectoryForIndexesParameter::append(OperationContext* opCtx,
     builder->append(name, wiredTigerGlobalOptions.directoryForIndexes);
 }
 
-
-SpillWiredTigerGlobalOptions spillWiredTigerGlobalOptions;
-
 }  // namespace mongo

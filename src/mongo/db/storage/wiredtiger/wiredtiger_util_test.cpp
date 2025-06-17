@@ -1160,17 +1160,5 @@ DEATH_TEST_F(WiredTigerUtilTest, WTMainCacheSizeInvalidValues, "invariant") {
     WiredTigerUtil::getMainCacheSizeMB(10, 0.1);
 }
 
-TEST(WiredTigerUtilTest, WTSpillCacheSizeCalculation) {
-    const auto defaultCacheSizeMB = static_cast<int32_t>(
-        std::floor(kStorage_spillWiredTiger_engineConfig_cacheSizeGBDefault * 1024));
-    const auto tooLargeCacheMB = 100 * 1000 * 1000;
-    const auto maxCacheSizeMB = 10 * 1000 * 1000;
-
-    ASSERT_EQUALS(WiredTigerUtil::getSpillCacheSizeMB(-10), defaultCacheSizeMB);
-    ASSERT_EQUALS(WiredTigerUtil::getSpillCacheSizeMB(0), defaultCacheSizeMB);
-    ASSERT_EQUALS(WiredTigerUtil::getSpillCacheSizeMB(10), 10 * 1024);
-    ASSERT_EQUALS(WiredTigerUtil::getSpillCacheSizeMB(tooLargeCacheMB), maxCacheSizeMB);
-}
-
 }  // namespace
 }  // namespace mongo
