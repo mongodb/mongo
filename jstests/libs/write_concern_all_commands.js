@@ -5814,7 +5814,8 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
         // TODO SERVER-100936 create does not return WCE
         // TODO SERVER-100937 dropIndexes does not return WCE
 
-        // TODO SERVER-100939 setFeatureCompatibilityVersion does not return WCE
+        // TODO SERVER-100309 adapt/enable setFeatureCompatibilityVersion no-op case once the
+        // upgrade procedure will not proactively shard the sessions collection.
 
         // TODO SERVER-100940 enableSharding does not return WCE
         if (clusterType == "sharded" &&
