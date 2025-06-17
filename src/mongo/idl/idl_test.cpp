@@ -495,12 +495,7 @@ TEST(IDLOneTypeTests, TestBase64StringNegative) {
 }
 
 
-// BSONElement::exactNumberLong() provides different errors on windows
-#ifdef _WIN32
-constexpr auto kNANRepr = "-nan(ind)"_sd;
-#else
 constexpr auto kNANRepr = "nan"_sd;
-#endif
 
 TEST(IDLStructTests, DurationParse) {
     IDLParserContext ctxt("duration");
