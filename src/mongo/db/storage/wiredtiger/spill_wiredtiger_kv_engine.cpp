@@ -169,6 +169,11 @@ bool SpillWiredTigerKVEngine::hasIdent(RecoveryUnit& ru, StringData ident) const
                      WiredTigerUtil::buildTableUri(ident));
 }
 
+int64_t SpillWiredTigerKVEngine::getIdentSize(RecoveryUnit& ru, StringData ident) {
+    WiredTigerSession session{_connection.get()};
+    return WiredTigerUtil::getIdentSize(session, WiredTigerUtil::buildTableUri(ident));
+}
+
 std::vector<std::string> SpillWiredTigerKVEngine::getAllIdents(RecoveryUnit& ru) const {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     return _wtGetAllIdents(wtRu);

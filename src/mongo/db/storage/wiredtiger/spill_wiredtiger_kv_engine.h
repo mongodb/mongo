@@ -69,10 +69,7 @@ public:
         return false;
     }
 
-    int64_t getIdentSize(RecoveryUnit&, StringData ident) override {
-        // TODO(SERVER-103258): Implement getIdentSize().
-        MONGO_UNREACHABLE;
-    }
+    int64_t getIdentSize(RecoveryUnit&, StringData ident) override;
 
     bool hasIdent(RecoveryUnit&, StringData ident) const override;
 
