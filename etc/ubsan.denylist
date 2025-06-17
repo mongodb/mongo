@@ -15,6 +15,7 @@ src:src/third_party/immer/dist/immer/detail/hamts/node.hpp
 # s2 compatibility
 fun:_ZN8S2CellId14FromFaceIJWrapEiii
 
+src:src/mongo/bson/column/bsoncolumn_helpers.h
 src:src/third_party/abseil-cpp/dist/absl/numeric/int128_have_intrinsic.inc
 
 # SERVER-62972
