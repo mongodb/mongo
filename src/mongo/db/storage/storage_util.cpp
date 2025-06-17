@@ -47,40 +47,6 @@
 namespace mongo {
 namespace catalog {
 namespace {
-auto removeEmptyDirectory =
-    [](ServiceContext* svcCtx, StorageEngine* storageEngine, const NamespaceString& ns) {
-        // Nothing to do if not using directoryperdb or there are still collections in the database.
-        // If we don't support supportsPendingDrops then this is executing before the collection is
-        // removed from the catalog. In that case, just blindly attempt to delete the directory, it
-        // will only succeed if it is empty which is the behavior we want.
-        auto collectionCatalog = CollectionCatalog::get(svcCtx);
-        const TenantDatabaseName tenantDbName(boost::none, ns.db());
-        if (!storageEngine->isUsingDirectoryPerDb() ||
-            (storageEngine->supportsPendingDrops() &&
-             !collectionCatalog->range(tenantDbName).empty())) {
-            return;
-        }
-
-        boost::system::error_code ec;
-        boost::filesystem::remove(storageEngine->getFilesystemPathForDb(tenantDbName), ec);
-
-        if (!ec) {
-            LOGV2(4888200, "Removed empty database directory", "db"_attr = tenantDbName.dbName());
-        } else if (collectionCatalog->range(tenantDbName).empty()) {
-            // It is possible for a new collection to be created in the database between when we
-            // check whether the database is empty and actually attempting to remove the directory.
-            // In this case, don't log that the removal failed because it is expected. However,
-            // since we attempt to remove the directory for both the collection and index ident
-            // drops, once the database is empty it will be still logged until the final of these
-            // ident drops occurs.
-            LOGV2_DEBUG(4888201,
-                        1,
-                        "Failed to remove database directory",
-                        "db"_attr = tenantDbName.dbName(),
-                        "error"_attr = ec.message());
-        }
-    };
-
 BSONObj toBSON(const stdx::variant<Timestamp, StorageEngine::CheckpointIteration>& x) {
     return stdx::visit(visit_helper::Overloaded{[](const Timestamp& ts) { return ts.toBSON(); },
                                                 [](const StorageEngine::CheckpointIteration& iter) {
@@ -128,7 +94,8 @@ void removeIndex(OperationContext* opCtx,
                                      indexNameStr = indexName.toString(),
                                      ident](boost::optional<Timestamp> commitTimestamp) {
         StorageEngine::DropIdentCallback onDrop = [svcCtx, storageEngine, nss] {
-            removeEmptyDirectory(svcCtx, storageEngine, nss);
+            // This became a no-op due to SERVER-97726.
+            // To minimize the impact on future backports, we retain the empty lambda.
         };
 
         if (storageEngine->supportsPendingDrops()) {
@@ -186,7 +153,8 @@ Status dropCollection(OperationContext* opCtx,
         [svcCtx = opCtx->getServiceContext(), recoveryUnit, storageEngine, nss, ident](
             boost::optional<Timestamp> commitTimestamp) {
             StorageEngine::DropIdentCallback onDrop = [svcCtx, storageEngine, nss] {
-                removeEmptyDirectory(svcCtx, storageEngine, nss);
+                // This became a no-op due to SERVER-97726.
+                // To minimize the impact on future backports, we retain the empty lambda.
             };
 
             if (storageEngine->supportsPendingDrops()) {
