@@ -7,6 +7,8 @@
  *  does_not_support_stepdowns,
  *  # This test performs explicit calls to shardCollection
  *  assumes_unsharded_collection,
+ *  # Creates chunks on specific shards
+ *  assumes_stable_shard_list,
  * ]
  */
 

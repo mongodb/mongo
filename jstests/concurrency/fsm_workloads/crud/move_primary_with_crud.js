@@ -155,20 +155,24 @@ export const $config = (function() {
             const toShard = shards[Random.randInt(shards.length)];
             jsTestLog(`Running movePrimary: db=${db} to=${toShard}`);
 
+            let expectedErrorCodes = [
+                // Caused by a concurrent movePrimary operation on the same database but a
+                // different destination shard.
+                ErrorCodes.ConflictingOperationInProgress,
+                // Due to a stepdown of the donor during the cloning phase, the movePrimary
+                // operation failed. It is not automatically recovered, but any orphaned data on
+                // the recipient has been deleted.
+                7120202,
+                // In the FSM tests, there is a chance that there are still some User
+                // collections left to clone. This occurs when a MovePrimary joins an already
+                // existing MovePrimary command that has purposefully triggered a failpoint.
+                9046501,
+            ];
+            if (TestData.hasRandomShardsAddedRemoved) {
+                expectedErrorCodes.push(ErrorCodes.ShardNotFound);
+            }
             assert.commandWorkedOrFailedWithCode(
-                db.adminCommand({movePrimary: db.getName(), to: toShard}), [
-                    // Caused by a concurrent movePrimary operation on the same database but a
-                    // different destination shard.
-                    ErrorCodes.ConflictingOperationInProgress,
-                    // Due to a stepdown of the donor during the cloning phase, the movePrimary
-                    // operation failed. It is not automatically recovered, but any orphaned data on
-                    // the recipient has been deleted.
-                    7120202,
-                    // In the FSM tests, there is a chance that there are still some User
-                    // collections left to clone. This occurs when a MovePrimary joins an already
-                    // existing MovePrimary command that has purposefully triggered a failpoint.
-                    9046501,
-                ]);
+                db.adminCommand({movePrimary: db.getName(), to: toShard}), expectedErrorCodes);
         },
         checkDatabaseMetadataConsistency: function(db, collName, connCache) {
             jsTestLog('Executing checkMetadataConsistency state for database: ' + db.getName());

@@ -4,6 +4,8 @@
  *  requires_2_or_more_shards,
  *  # movePrimary fails if there is a stepdown during data cloning phase.
  *  does_not_support_stepdowns,
+ * # Expects databases to be located in specific places
+ *  assumes_stable_shard_list,
  * ]
  */
 

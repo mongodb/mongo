@@ -51,7 +51,11 @@ function initAndFillShardedCollection(db, collName, shardNames) {
             find: {x: lastInsertedShardKeyValue},
             to: shardNames[Random.randInt(shardNames.length)],
         });
-        assert.commandWorkedOrFailedWithCode(res, ErrorCodes.ConflictingOperationInProgress);
+        let allowedErrorCodes = [ErrorCodes.ConflictingOperationInProgress];
+        if (TestData.hasRandomShardsAddedRemoved) {
+            allowedErrorCodes.push(ErrorCodes.ShardNotFound);
+        }
+        assert.commandWorkedOrFailedWithCode(res, allowedErrorCodes);
     }
 
     // Allow balancing 'ns' again.
@@ -130,7 +134,7 @@ export const $config = (function() {
         for (var i = 0; i < dbNames.length; i++) {
             const dbName = dbNames[i];
             const newDb = db.getSiblingDB(dbName);
-            newDb.adminCommand({enablesharding: dbName, primaryShard: shardNames[i % numShards]});
+
             // Initialize one sharded collection per db
             initAndFillShardedCollection(
                 newDb, collNames[Random.randInt(collNames.length)], shardNames);

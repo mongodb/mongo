@@ -4,6 +4,8 @@
  * @tags: [
  *   requires_2_or_more_shards,
  *   does_not_support_stepdowns,
+ *   # Expects databases to be in specific places
+ *   assumes_stable_shard_list,
  * ]
  */
 

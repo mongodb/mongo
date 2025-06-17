@@ -90,6 +90,9 @@ export const $config = (function() {
                     ErrorCodes.BackgroundOperationInProgressForNamespace,
                     ErrorCodes.LockBusy,
                 ];
+                if (TestData.hasRandomShardsAddedRemoved) {
+                    acceptableCodes.push(ErrorCodes.ShardNotFound);
+                }
                 if (e.code && acceptableCodes.includes(e.code) ||
                     // Indexes may be transiently inconsistent across shards, which can lead a
                     // concurrent migration to abort if the recipient's collection is non-empty.
