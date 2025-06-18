@@ -478,7 +478,7 @@ protected:
 private:
     size_t _generation;
     Date_t _lastUsed;
-    size_t _timesUsed = 0;
+    AtomicWord<size_t> _timesUsed{0};
     Status _status = ConnectionPool::kConnectionStateUnknown;
 };
 
