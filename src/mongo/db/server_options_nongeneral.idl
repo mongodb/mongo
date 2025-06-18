@@ -73,6 +73,11 @@ configs:
         short_name: slowms
         arg_vartype: Int
         default: 100
+    "taskExecutorProfiling.slowTaskWaitTimeProfilingMs":
+        description: "Value of slow wait time for tasks"
+        short_name: slowTaskWaitTimeProfilingMs
+        arg_vartype: Int
+        default: 50
     "operationProfiling.slowOpSampleRate":
         description: "Fraction of slow ops to include in the profile and console log"
         short_name: slowOpSampleRate

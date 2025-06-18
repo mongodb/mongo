@@ -222,9 +222,11 @@ mongo_cc_library(
     ],
     hdrs = [
         "executor_stats.h",
+        "//src/mongo/logv2:log_severity_suppressor.h",
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db:server_options",
     ],
 )
 

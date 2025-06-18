@@ -114,6 +114,8 @@ struct ServerGlobalParams {
     AtomicWord<double> sampleRate{1.0};    // --samplerate rate at which to sample slow queries
     int defaultLocalThresholdMillis = 15;  // --localThreshold in ms to consider a node local
 
+    AtomicWord<int> slowTaskExecutorWaitTimeProfilingMs{
+        50};                    // --time in ms that is "slow" for a task to begin execution
     bool noUnixSocket = false;  // --nounixsocket
     bool doFork = false;        // --fork
     bool isMongoBridge = false;

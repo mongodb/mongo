@@ -453,6 +453,10 @@ Status storeBaseOptions(const moe::Environment& params) {
         serverGlobalParams.sampleRate.store(
             params["operationProfiling.slowOpSampleRate"].as<double>());
     }
+    if (params.count("taskExecutorProfiling.slowTaskWaitTimeProfilingMs")) {
+        serverGlobalParams.slowTaskExecutorWaitTimeProfilingMs.store(
+            params["taskExecutorProfiling.slowTaskWaitTimeProfilingMs"].as<int>());
+    }
 
     if (params.count("operationProfiling.filter")) {
         try {
