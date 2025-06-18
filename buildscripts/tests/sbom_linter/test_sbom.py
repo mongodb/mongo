@@ -1,13 +1,19 @@
 """Unit tests for the selected_tests script."""
 import os
 import shutil
+import sys
 import unittest
 
-from buildscripts import sbom_linter
+if sys.platform == "linux":
+    from buildscripts import sbom_linter
 
 TEST_DIR = os.path.join("buildscripts", "tests", "sbom_linter")
 
 
+@unittest.skipIf(
+    sys.platform != "linux",
+    reason="No need to run this unittest, since sbom_linter.py only runs on linux",
+)
 class TestSbom(unittest.TestCase):
     """Test errorcodes.py."""
 

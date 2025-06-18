@@ -3,8 +3,12 @@ import json
 import os
 import sys
 import jsonschema
+from referencing import Registry, Resource
 
-SCHEMA_LOCATION = os.path.join("buildscripts", "tests", "sbom_linter", "bom-1.5.schema.json")
+BOM_SCHEMA_LOCATION = os.path.join("buildscripts", "tests", "sbom_linter", "bom-1.5.schema.json")
+SPDX_SCHEMA_LOCATION = os.path.join("buildscripts", "tests", "sbom_linter", "spdx.schema.json")
+SPDX_SCHEMA_REF = "spdx.schema.json"
+
 # directory to scan for third party libraries
 THIRD_PARTY_DIR = os.path.join("src", "third_party")
 # platform independent prefix of third party libraries
@@ -22,8 +26,16 @@ MISSING_TEAM_ERROR = "component must include a 'internal:team_responsible' prope
 
 
 def get_schema():
-    with open(SCHEMA_LOCATION, "r") as schema_data:
+    with open(BOM_SCHEMA_LOCATION, "r") as schema_data:
         return json.load(schema_data)
+
+
+def local_schema_registry():
+    """Create a local registry which is used to resolve references to external schema."""
+
+    with open(SPDX_SCHEMA_LOCATION, "r") as spdx:
+        spdx_schema = Resource.from_contents(json.load(spdx))
+    return Registry().with_resources([(SPDX_SCHEMA_REF, spdx_schema)])
 
 
 def lint_sbom(input_file: str, output_file: str, third_party_libs: set,
@@ -40,7 +52,9 @@ def lint_sbom(input_file: str, output_file: str, third_party_libs: set,
         return errors
 
     try:
-        jsonschema.validate(sbom, get_schema())
+        schema = get_schema()
+        jsonschema.validators.validator_for(schema)(schema,
+                                                    registry=local_schema_registry()).validate(sbom)
     except jsonschema.ValidationError as error:
         errors.append(f"{input_file} file did not match the CycloneDX schema")
         errors.append(error.message)
