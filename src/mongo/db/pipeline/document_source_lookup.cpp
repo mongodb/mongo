@@ -97,9 +97,8 @@ void lookupPipeValidator(const Pipeline& pipeline) {
 // {from: {db: "local", coll: "tenantMigration.oplogView"}, ...} .
 NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
                                                    const DatabaseName& defaultDb) {
-    // The object syntax only works for 'cache.chunks.*', 'local.oplog.rs', and
-    // 'local.tenantMigration.oplogViewwhich' which are not user namespaces so object type is
-    // omitted from the error message below.
+    // The object syntax only works for 'cache.chunks.*', 'local.oplog.rs' which are not user
+    // namespaces so object type is omitted from the error message below.
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "$lookup 'from' field must be a string, but found "
                           << typeName(elem.type()),

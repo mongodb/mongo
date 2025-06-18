@@ -300,10 +300,10 @@ public:
                     std::vector<NamespaceString>&& resolvedNamespaces)
         : _expCtx{make_intrusive<ExpressionContext>(opCtx, nullptr /*collator*/, nss)} {
 
-        StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespacesMap;
+        ResolvedNamespaceMap resolvedNamespacesMap;
 
         for (const auto& collNs : resolvedNamespaces) {
-            resolvedNamespacesMap[collNs.coll()] = {collNs, std::vector<BSONObj>() /* pipeline */};
+            resolvedNamespacesMap[collNs] = {collNs, std::vector<BSONObj>() /* pipeline */};
         }
 
         _expCtx->setResolvedNamespaces(resolvedNamespacesMap);

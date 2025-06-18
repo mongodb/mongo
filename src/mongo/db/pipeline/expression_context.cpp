@@ -90,7 +90,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      const AggregateCommandRequest& request,
                                      std::unique_ptr<CollatorInterface> collator,
                                      std::shared_ptr<MongoProcessInterface> processInterface,
-                                     StringMap<ResolvedNamespace> resolvedNamespaces,
+                                     ResolvedNamespaceMap resolvedNamespaces,
                                      boost::optional<UUID> collUUID,
                                      bool mayDbProfile,
                                      bool allowDiskUseByDefault)
@@ -130,7 +130,7 @@ ExpressionContext::ExpressionContext(
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
     std::unique_ptr<CollatorInterface> collator,
     const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
+    ResolvedNamespaceMap resolvedNamespaces,
     boost::optional<UUID> collUUID,
     const boost::optional<BSONObj>& letParameters,
     bool mayDbProfile)

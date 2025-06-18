@@ -304,8 +304,8 @@ void runClusterAggregate(OperationContext* opCtx,
         analyzeShardKeyHangInClusterAggregate.pauseWhileSet();
     }
 
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[nss.coll()] = {nss, std::vector<BSONObj>{}};
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[nss] = {nss, std::vector<BSONObj>{}};
 
     auto pi = std::make_shared<ShardServerProcessInterface>(
         Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor());

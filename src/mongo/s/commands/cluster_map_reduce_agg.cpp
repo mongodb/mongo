@@ -75,14 +75,14 @@ auto makeExpressionContext(OperationContext* opCtx,
     }
 
     // Resolve involved namespaces.
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces.try_emplace(nss, nss, std::vector<BSONObj>{});
     if (parsedMr.getOutOptions().getOutputType() != OutputType::InMemory) {
         auto outNss = NamespaceString{parsedMr.getOutOptions().getDatabaseName()
                                           ? *parsedMr.getOutOptions().getDatabaseName()
                                           : parsedMr.getNamespace().db(),
                                       parsedMr.getOutOptions().getCollectionName()};
-        resolvedNamespaces.try_emplace(outNss.coll(), outNss, std::vector<BSONObj>{});
+        resolvedNamespaces.try_emplace(outNss, outNss, std::vector<BSONObj>{});
     }
     auto runtimeConstants = Variables::generateRuntimeConstants(opCtx);
     if (parsedMr.getScope()) {

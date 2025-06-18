@@ -56,9 +56,9 @@
 namespace mongo {
 namespace {
 boost::intrusive_ptr<ExpressionContext> _makeExpressionContext(OperationContext* opCtx) {
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[NamespaceString::kRsOplogNamespace.coll()] = {
-        NamespaceString::kRsOplogNamespace, std::vector<BSONObj>()};
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[NamespaceString::kRsOplogNamespace] = {NamespaceString::kRsOplogNamespace,
+                                                              std::vector<BSONObj>()};
     return make_intrusive<ExpressionContext>(opCtx,
                                              boost::none, /* explain */
                                              false,       /* fromMongos */

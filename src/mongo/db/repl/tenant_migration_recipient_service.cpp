@@ -112,18 +112,18 @@ bool isMigrationCompleted(TenantMigrationRecipientStateEnum state) {
 }
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* opCtx) {
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    ResolvedNamespaceMap resolvedNamespaces;
 
     // Add kTenantMigrationOplogView, kSessionTransactionsTableNamespace, and kRsOplogNamespace
     // to resolvedNamespaces since they are all used during different pipeline stages.
-    resolvedNamespaces[NamespaceString::kTenantMigrationOplogView.coll()] = {
+    resolvedNamespaces[NamespaceString::kTenantMigrationOplogView] = {
         NamespaceString::kTenantMigrationOplogView, std::vector<BSONObj>()};
 
-    resolvedNamespaces[NamespaceString::kSessionTransactionsTableNamespace.coll()] = {
+    resolvedNamespaces[NamespaceString::kSessionTransactionsTableNamespace] = {
         NamespaceString::kSessionTransactionsTableNamespace, std::vector<BSONObj>()};
 
-    resolvedNamespaces[NamespaceString::kRsOplogNamespace.coll()] = {
-        NamespaceString::kRsOplogNamespace, std::vector<BSONObj>()};
+    resolvedNamespaces[NamespaceString::kRsOplogNamespace] = {NamespaceString::kRsOplogNamespace,
+                                                              std::vector<BSONObj>()};
 
     return make_intrusive<ExpressionContext>(opCtx,
                                              boost::none, /* explain */

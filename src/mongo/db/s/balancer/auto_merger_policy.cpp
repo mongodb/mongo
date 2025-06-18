@@ -218,11 +218,10 @@ AutoMergerPolicy::_getNamespacesWithMergeableChunksPerShard(OperationContext* op
         Pipeline::SourceContainer stages;
 
         auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, ChunkType::ConfigNS);
-        StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-        resolvedNamespaces[ChunkType::ConfigNS.coll()] = {ChunkType::ConfigNS,
-                                                          std::vector<BSONObj>()};
-        resolvedNamespaces[CollectionType::ConfigNS.coll()] = {CollectionType::ConfigNS,
-                                                               std::vector<BSONObj>()};
+        ResolvedNamespaceMap resolvedNamespaces;
+        resolvedNamespaces[ChunkType::ConfigNS] = {ChunkType::ConfigNS, std::vector<BSONObj>()};
+        resolvedNamespaces[CollectionType::ConfigNS] = {CollectionType::ConfigNS,
+                                                        std::vector<BSONObj>()};
         expCtx->setResolvedNamespaces(resolvedNamespaces);
 
         // 1. Match all collections where `automerge` is enabled and `defragmentation` is disabled

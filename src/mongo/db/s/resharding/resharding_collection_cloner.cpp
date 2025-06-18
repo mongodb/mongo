@@ -103,14 +103,14 @@ ReshardingCollectionCloner::makeRawPipeline(
     Value resumeId) {
     // Assume that the input collection isn't a view. The collectionUUID parameter to
     // the aggregate would enforce this anyway.
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[_sourceNss.coll()] = {_sourceNss, std::vector<BSONObj>{}};
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[_sourceNss] = {_sourceNss, std::vector<BSONObj>{}};
 
     // Assume that the config.cache.chunks collection isn't a view either.
     auto tempNss = resharding::constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
     auto tempCacheChunksNss =
         NamespaceString::makeGlobalConfigCollection("cache.chunks." + tempNss.ns());
-    resolvedNamespaces[tempCacheChunksNss.coll()] = {tempCacheChunksNss, std::vector<BSONObj>{}};
+    resolvedNamespaces[tempCacheChunksNss] = {tempCacheChunksNss, std::vector<BSONObj>{}};
 
     // Pipeline::makePipeline() ignores the collation set on the AggregationRequest (or lack
     // thereof) and instead only considers the collator set on the ExpressionContext. Setting

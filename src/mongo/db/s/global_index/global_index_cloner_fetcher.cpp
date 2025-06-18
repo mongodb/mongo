@@ -55,9 +55,9 @@ namespace {
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* opCtx,
                                                               const NamespaceString& nss,
                                                               const UUID& collUUID) {
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[NamespaceString::kRsOplogNamespace.coll()] = {
-        NamespaceString::kRsOplogNamespace, std::vector<BSONObj>()};
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[NamespaceString::kRsOplogNamespace] = {NamespaceString::kRsOplogNamespace,
+                                                              std::vector<BSONObj>()};
     return make_intrusive<ExpressionContext>(opCtx,
                                              boost::none, /* explain */
                                              false,       /* fromMongos */
@@ -198,8 +198,8 @@ std::pair<std::vector<BSONObj>, boost::intrusive_ptr<ExpressionContext>>
 GlobalIndexClonerFetcher::makeRawPipeline(OperationContext* opCtx) {
     // Assume that the input collection isn't a view. The collectionUUID parameter to
     // the aggregate would enforce this anyway.
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[_nss.coll()] = {_nss, std::vector<BSONObj>{}};
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[_nss] = {_nss, std::vector<BSONObj>{}};
 
     auto expCtx = makeExpressionContext(opCtx, _nss, _collUUID);
     auto rawPipeline = buildRawPipelineForCloner(

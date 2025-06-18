@@ -86,8 +86,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingDonorOplogIterator::makePip
     using Arr = std::vector<Value>;
     using V = Value;
 
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[_oplogBufferNss.coll()] = {_oplogBufferNss, std::vector<BSONObj>{}};
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[_oplogBufferNss] = {_oplogBufferNss, std::vector<BSONObj>{}};
 
     auto expCtx = make_intrusive<ExpressionContext>(opCtx,
                                                     boost::none, /* explain */

@@ -49,7 +49,7 @@ class AggregationContextFixture : public ServiceContextTest {
 public:
     AggregationContextFixture()
         : AggregationContextFixture(NamespaceString::createNamespaceString_forTest(
-              boost::none, "unittests", "pipeline_test")) {}
+              boost::none, "test", "pipeline_test")) {}
 
     AggregationContextFixture(NamespaceString nss) {
         auto service = getServiceContext();
@@ -127,7 +127,7 @@ class ServerlessAggregationContextFixture : public AggregationContextFixture {
 public:
     ServerlessAggregationContextFixture()
         : AggregationContextFixture(NamespaceString::createNamespaceString_forTest(
-              TenantId(OID::gen()), "unittests", "pipeline_test")) {}
+              TenantId(OID::gen()), "test", "pipeline_test")) {}
 
     const std::string _targetDb = "test";
     const std::string _targetColl = "target_collection";

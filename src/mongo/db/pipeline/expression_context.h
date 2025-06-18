@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
 #include <boost/intrusive_ptr.hpp>
 #include <boost/optional.hpp>
 #include <memory>
@@ -85,6 +86,11 @@ public:
         std::vector<BSONObj> pipeline;
         boost::optional<UUID> uuid = boost::none;
     };
+
+    // "ResolvedNamespaceMap" is used for external references to this type, but it needs
+    // ResolvedNamespace to be defined so it is declared after this class definition.
+    using InternalResolvedNamespaceMapType =
+        absl::flat_hash_map<NamespaceString, ResolvedNamespace>;
 
     /**
      * An RAII type that will temporarily change the ExpressionContext's collator. Resets the
@@ -144,7 +150,7 @@ public:
                       const AggregateCommandRequest& request,
                       std::unique_ptr<CollatorInterface> collator,
                       std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
-                      StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
+                      InternalResolvedNamespaceMapType resolvedNamespaces,
                       boost::optional<UUID> collUUID,
                       bool mayDbProfile = true,
                       bool allowDiskUseByDefault = false);
@@ -165,7 +171,7 @@ public:
                       const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
                       std::unique_ptr<CollatorInterface> collator,
                       const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
-                      StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
+                      InternalResolvedNamespaceMapType resolvedNamespaces,
                       boost::optional<UUID> collUUID,
                       const boost::optional<BSONObj>& letParameters = boost::none,
                       bool mayDbProfile = true);
@@ -317,7 +323,7 @@ public:
      * namespace not involved in the pipeline.
      */
     const ResolvedNamespace& getResolvedNamespace(const NamespaceString& nss) const {
-        auto it = _resolvedNamespaces.find(nss.coll());
+        auto it = _resolvedNamespaces.find(nss);
         tassert(9453000,
                 str::stream() << "No resolved namespace provided for " << nss.toStringForErrorMsg(),
                 it != _resolvedNamespaces.end());
@@ -349,14 +355,14 @@ public:
         return !explain;
     }
 
-    void setResolvedNamespaces(StringMap<ResolvedNamespace> resolvedNamespaces) {
+    void setResolvedNamespaces(InternalResolvedNamespaceMapType resolvedNamespaces) {
         _resolvedNamespaces = std::move(resolvedNamespaces);
     }
 
     void addResolvedNamespaces(
         mongo::stdx::unordered_set<mongo::NamespaceString> resolvedNamespaces) {
         for (auto&& nss : resolvedNamespaces) {
-            _resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
+            _resolvedNamespaces.try_emplace(nss, nss, std::vector<BSONObj>{});
         }
     }
 
@@ -648,7 +654,7 @@ protected:
     ValueComparator _valueComparator;
 
     // A map from namespace to the resolved namespace, in case any views are involved.
-    StringMap<ResolvedNamespace> _resolvedNamespaces;
+    InternalResolvedNamespaceMapType _resolvedNamespaces;
 
     int _interruptCounter = kInterruptCheckPeriod;
 
@@ -672,5 +678,8 @@ private:
     // is being executed (if the variable was referenced, it is an element of this set).
     stdx::unordered_set<Variables::Id> _varsReferencedInQuery;
 };
+
+using ResolvedNamespaceMap =
+    absl::flat_hash_map<NamespaceString, ExpressionContext::ResolvedNamespace>;
 
 }  // namespace mongo

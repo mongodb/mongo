@@ -74,8 +74,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingTxnCloner::makePipeline(
     std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
     const boost::optional<LogicalSessionId>& startAfter) {
     const auto& sourceNss = NamespaceString::kSessionTransactionsTableNamespace;
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[sourceNss.coll()] = {sourceNss, std::vector<BSONObj>{}};
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[sourceNss] = {sourceNss, std::vector<BSONObj>{}};
 
     auto expCtx = make_intrusive<ExpressionContext>(opCtx,
                                                     boost::none, /* explain */

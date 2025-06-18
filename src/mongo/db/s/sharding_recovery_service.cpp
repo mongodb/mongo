@@ -75,10 +75,10 @@ const auto serviceDecorator = ServiceContext::declareDecoration<ShardingRecovery
 AggregateCommandRequest makeCollectionsAndIndexesAggregation(OperationContext* opCtx) {
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx, nullptr, NamespaceString::kShardCollectionCatalogNamespace);
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[NamespaceString::kShardCollectionCatalogNamespace.coll()] = {
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[NamespaceString::kShardCollectionCatalogNamespace] = {
         NamespaceString::kShardCollectionCatalogNamespace, std::vector<BSONObj>()};
-    resolvedNamespaces[NamespaceString::kShardIndexCatalogNamespace.coll()] = {
+    resolvedNamespaces[NamespaceString::kShardIndexCatalogNamespace] = {
         NamespaceString::kShardIndexCatalogNamespace, std::vector<BSONObj>()};
     expCtx->setResolvedNamespaces(resolvedNamespaces);
 

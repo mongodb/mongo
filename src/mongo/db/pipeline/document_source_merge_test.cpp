@@ -869,10 +869,10 @@ TEST_F(DocumentSourceMergeTest, SerializeLetArrayVariable) {
 }
 
 // This test verifies that when the 'let' argument is specified as 'null', the default 'new'
-// variable is still available. This is not a desirable behaviour but rather a limitation in the
-// IDL parser which cannot differentiate between an optional field specified explicitly as 'null',
-// or not specified at all. In both cases it will treat the field like it wasn't specified. So,
-// this test ensures that we're aware of this limitation. Once the limitation is addressed in
+// variable is still available. This is not a desirable behaviour but rather a limitation in the IDL
+// parser which cannot differentiate between an optional field specified explicitly as 'null', or
+// not specified at all. In both cases it will treat the field like it wasn't specified. So, this
+// test ensures that we're aware of this limitation. Once the limitation is addressed in
 // SERVER-41272, this test should be updated to accordingly.
 TEST_F(DocumentSourceMergeTest, SerializeNullLetVariablesAsDefault) {
     for (auto&& whenNotMatched : {"insert", "fail", "discard"}) {
@@ -927,7 +927,7 @@ TEST_F(DocumentSourceMergeTest, SerializeEmptyLetVariableMentionNew) {
         R"({
             "$merge": {
                 "into": {
-                    "db": "unittests",
+                    "db": "test",
                     "coll": "target_collection"
                 },
                 "on": "_id",
@@ -1196,7 +1196,7 @@ TEST_F(DocumentSourceMergeTest, QueryShape) {
     auto expectedBson = fromjson(R"({
             "$merge": {
                 "into": {
-                    "db": "HASH<unittests>",
+                    "db": "HASH<test>",
                     "coll": "HASH<target_collection>"
                 },
                 "on": "HASH<_id>",

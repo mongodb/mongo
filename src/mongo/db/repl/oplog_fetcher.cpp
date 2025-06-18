@@ -527,7 +527,7 @@ void OplogFetcher::_setMetadataWriterAndReader() {
 AggregateCommandRequest OplogFetcher::_makeAggregateCommandRequest(long long maxTimeMs,
                                                                    Timestamp startTs) const {
     auto opCtx = cc().makeOperationContext();
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    ResolvedNamespaceMap resolvedNamespaces;
     boost::intrusive_ptr<ExpressionContext> expCtx =
         make_intrusive<ExpressionContext>(opCtx.get(),
                                           boost::none, /* explain */
