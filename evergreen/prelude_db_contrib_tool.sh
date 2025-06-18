@@ -1,38 +1,8 @@
 function setup_db_contrib_tool {
-
-  mkdir -p ${workdir}/pipx
-  export PIPX_HOME="${workdir}/pipx"
-  export PIPX_BIN_DIR="${workdir}/pipx/bin"
-  export PATH="$PATH:$PIPX_BIN_DIR"
-  export PIP_CACHE_DIR=${workdir}/pip_cache
-
-  for i in {1..5}; do
-    python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" && RET=0 && break || RET=$? && sleep 1
-    echo "Failed to install pip and wheel, retrying..."
-  done
-
-  if [ $RET -ne 0 ]; then
-    echo "Failed to install pip and wheel"
-    exit $RET
+  # check if db-contrib-tool is already installed
+  if [[ $(type -P db-contrib-tool) ]]; then
+    return 0
   fi
 
-  for i in {1..5}; do
-    python -m pip --disable-pip-version-check install "pipx" && RET=0 && break || RET=$? && sleep 1
-    echo "Failed to install pipx, retrying..."
-  done
-
-  if [ $RET -ne 0 ]; then
-    echo "Failed to install pipx"
-    exit $RET
-  fi
-
-  for i in {1..5}; do
-    pipx install --force "db-contrib-tool==0.8.3" --pip-args="--no-cache-dir" && RET=0 && break || RET=$? && sleep 1
-    echo "Failed to install db-contrib-tool, retrying..."
-  done
-
-  if [ $RET -ne 0 ]; then
-    echo "Failed to install db-contrib-tool"
-    exit $RET
-  fi
+  $python evergreen/download_db_contrib_tool.py
 }

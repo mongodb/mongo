@@ -7,6 +7,11 @@ set -o errexit
 # path the directory that contains this script.
 evergreen_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 
+evergreen_workdir=$(realpath ${evergreen_dir}/../..)
+mkdir -p ${evergreen_workdir}/bin
+export PATH=$PATH:${evergreen_workdir}/bin
+unset evergreen_workdir
+
 . "$evergreen_dir/prelude_workdir.sh"
 . "$evergreen_dir/prelude_python.sh"
 . "$evergreen_dir/prelude_venv.sh"
