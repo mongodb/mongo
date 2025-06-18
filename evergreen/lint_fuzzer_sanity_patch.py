@@ -86,7 +86,7 @@ def _parse_jsfile(jsfile: Path) -> simple_report.Result:
     Returns what should be added to the report given to evergreen
     """
     # Find the relative path to the jsfile in the volume on the container
-    relative_js_file_path = f"{INPUT_DIR}/{jsfile.relative_to(LOCAL_INPUT_FULL_DIR)}"
+    relative_js_file_path = f"{OUTPUT_DIR}/{jsfile.relative_to(LOCAL_OUTPUT_FULL_DIR)}"
     start_time = time.time()
     proc = subprocess.run(
         [
@@ -130,7 +130,7 @@ report = simple_report.Report(failures=0, results=[])
 with futures.ThreadPoolExecutor() as executor:
     parse_jsfiles_futures = [
         executor.submit(_parse_jsfile, Path(jsfile))
-        for jsfile in glob.iglob(f"{LOCAL_INPUT_FULL_DIR}/**", recursive=True)
+        for jsfile in glob.iglob(f"{LOCAL_OUTPUT_FULL_DIR}/**", recursive=True)
         if os.path.isfile(jsfile)
     ]
 
