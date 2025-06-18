@@ -15,6 +15,10 @@
  * ]
  */
 
+import {
+    areViewlessTimeseriesEnabled
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+
 const kDb1 = "db1_agg_list_cluster_catalog";
 const kDb2 = "db2_agg_list_cluster_catalog";
 const kNotExistent = 'notExistent_agg_list_cluster_catalog';
@@ -98,10 +102,14 @@ function getStageResultForNss(stageResult, nss) {
 
 function isTempNss(collectionName) {
     if (collectionName.startsWith("system.resharding") ||
-        collectionName.startsWith("tmp.agg_out") ||
-        collectionName.startsWith("system.buckets.resharding") ||
-        collectionName.startsWith("system.buckets.tmp.agg_out")) {
+        collectionName.startsWith("tmp.agg_out")) {
         return true;
+    }
+    if (!areViewlessTimeseriesEnabled(db)) {
+        if (collectionName.startsWith("system.buckets.resharding") ||
+            collectionName.startsWith("system.buckets.tmp.agg_out")) {
+            return true;
+        }
     }
     return false;
 }

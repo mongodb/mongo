@@ -53,6 +53,12 @@ selector:
     - viewless_timeseries_incompatible
     - does_not_support_viewless_timeseries_yet
   roots:
+    - jstests/core/catalog/agg_internal_list_collections_stage.js
+    - jstests/core/catalog/agg_list_cluster_catalog.js
+    - jstests/core/catalog/agg_list_cluster_catalog_sharding_fields.js
+    - jstests/core/catalog/agg_list_cluster_catalog_with_match.js
+    - jstests/core/catalog/list_catalog.js
+    - jstests/core/catalog/list_catalog_stage_consistency.js
     - jstests/core/timeseries/ddl/bucket_granularity.js
     - jstests/core/timeseries/ddl/bucket_span_and_rounding_seconds.js
     - jstests/core/timeseries/ddl/bucket_timestamp_rounding.js

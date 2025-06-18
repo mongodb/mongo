@@ -13,6 +13,10 @@
  * ]
  */
 
+import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesCollForDDLOps
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const SHARDED_CLUSTER = 0;
@@ -59,15 +63,17 @@ expectedResults[REPLICA_SET][kCollUnsharded] = {
 
 // Standard unsharded timeseries
 dbTest.createCollection(kCollTimeseries, {timeseries: {timeField: 'time'}});
-expectedResults[SHARDED_CLUSTER][kCollTimeseries] = {
-    sharded: false,
-    shardKey: undefined,
-    shards: [primaryShard],
-    tracked: false,
-    balancingEnabled: undefined,
-    balancingEnabledReason: undefined
-};
-expectedResults[SHARDED_CLUSTER]["system.buckets." + kCollTimeseries] = {
+if (!areViewlessTimeseriesEnabled(dbTest)) {
+    expectedResults[SHARDED_CLUSTER][kCollTimeseries] = {
+        sharded: false,
+        shardKey: undefined,
+        shards: [primaryShard],
+        tracked: false,
+        balancingEnabled: undefined,
+        balancingEnabledReason: undefined
+    };
+}
+expectedResults[SHARDED_CLUSTER][getTimeseriesCollForDDLOps(dbTest, kCollTimeseries)] = {
     sharded: false,
     shardKey: undefined,
     shards: [primaryShard],
@@ -75,15 +81,17 @@ expectedResults[SHARDED_CLUSTER]["system.buckets." + kCollTimeseries] = {
     balancingEnabled: undefined,
     balancingEnabledReason: undefined
 };
-expectedResults[REPLICA_SET][kCollTimeseries] = {
-    sharded: false,
-    shardKey: undefined,
-    shards: [],
-    tracked: false,
-    balancingEnabled: undefined,
-    balancingEnabledReason: undefined
-};
-expectedResults[REPLICA_SET]["system.buckets." + kCollTimeseries] = {
+if (!areViewlessTimeseriesEnabled(dbTest)) {
+    expectedResults[REPLICA_SET][kCollTimeseries] = {
+        sharded: false,
+        shardKey: undefined,
+        shards: [],
+        tracked: false,
+        balancingEnabled: undefined,
+        balancingEnabledReason: undefined
+    };
+}
+expectedResults[REPLICA_SET][getTimeseriesCollForDDLOps(dbTest, kCollTimeseries)] = {
     sharded: false,
     shardKey: undefined,
     shards: [],
@@ -129,15 +137,17 @@ if (FixtureHelpers.isMongos(dbTest)) {
         timeseries: {timeField: 'time'},
         key: {time: 1}
     });
-    expectedResults[SHARDED_CLUSTER][kCollTimeseriesSharded] = {
-        sharded: false,
-        shardKey: undefined,
-        shards: [primaryShard],
-        tracked: false,
-        balancingEnabled: undefined,
-        balancingEnabledReason: undefined
-    };
-    expectedResults[SHARDED_CLUSTER]["system.buckets." + kCollTimeseriesSharded] = {
+    if (!areViewlessTimeseriesEnabled(dbTest)) {
+        expectedResults[SHARDED_CLUSTER][kCollTimeseriesSharded] = {
+            sharded: false,
+            shardKey: undefined,
+            shards: [primaryShard],
+            tracked: false,
+            balancingEnabled: undefined,
+            balancingEnabledReason: undefined
+        };
+    }
+    expectedResults[SHARDED_CLUSTER][getTimeseriesCollForDDLOps(dbTest, kCollTimeseriesSharded)] = {
         sharded: true,
         shardKey: {"control.min.time": 1},
         shards: [primaryShard],

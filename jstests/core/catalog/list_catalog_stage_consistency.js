@@ -12,6 +12,10 @@
  * ]
  */
 import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesBucketsColl
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {
     assertCatalogListOperationsConsistencyForCollection
 } from "jstests/libs/catalog_list_operations_consistency_validator.js";
 
@@ -92,10 +96,12 @@ assert.commandWorked(
     db.runCommand({collMod: "timeseries_complex", timeseriesBucketsMayHaveMixedSchemaData: true}));
 assertCatalogListOperationsConsistencyForCollection(db.timeseries_complex);
 
-// TODO(SERVER-68439): Remove once the view and buckets are atomically created by DDLs.
-createViewAndCheckConsistency(
-    db, "timeseries_no_buckets", "system.buckets.timeseries_no_buckets", []);
-db.timeseries_no_buckets.drop();
+if (!areViewlessTimeseriesEnabled(db)) {
+    // TODO(SERVER-68439): Remove once the view and buckets are atomically created by DDLs.
+    createViewAndCheckConsistency(
+        db, "timeseries_no_buckets", getTimeseriesBucketsColl("timeseries_no_buckets"), []);
+    db.timeseries_no_buckets.drop();
+}
 
 /**
  * Index test cases.

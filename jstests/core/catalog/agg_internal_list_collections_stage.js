@@ -14,6 +14,9 @@
  * ]
  */
 
+import {
+    areViewlessTimeseriesEnabled
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const dbTest1 = db.getSiblingDB(jsTestName() + "1");
@@ -52,9 +55,9 @@ function compareInternalListCollectionsStageAgainstListCollections(dbTest,
         // we don't check it.
         listCollectionsResponse = removeUuidField(listCollectionsResponse);
 
-        // There may exist temporal collection called '<db>.system.resharding.*' or
-        // '<db>.system.buckets.resharding.*' if there are moveCollection operations on the
-        // background. Remove them to pass the following checks.
+        // Temporary collections related to resharding may exist in the '<db>.system.*' namespace.
+        // These are created by background moveCollection operations and should be filtered out
+        // to pass the following checks.
         listCollectionsResponse = listCollectionsResponse.filter((collEntry) => {
             return !collEntry['ns'].includes("resharding");
         });
@@ -141,19 +144,17 @@ function runTestOnDb(dbTest) {
             key: {t: 1},
             timeseries: {timeField: "t"}
         }));
-        // We'll see two collections per every timeseries created collection: the main one
-        // and the buckets collection called `<db>.system.timeseries.<collName>`
-        numCollections += 2;
+        numCollections += 1 + !areViewlessTimeseriesEnabled(db);
         compareInternalListCollectionsStageAgainstListCollections(dbTest, numCollections);
     }
 
     // Timeseries collections
     assert.commandWorked(dbTest.createCollection("collTim1", {timeseries: {timeField: "t"}}));
-    numCollections += 2;
+    numCollections += 1 + !areViewlessTimeseriesEnabled(db);
     compareInternalListCollectionsStageAgainstListCollections(dbTest, numCollections);
 
     assert.commandWorked(dbTest.createCollection("collTim2", {timeseries: {timeField: "t"}}));
-    numCollections += 2;
+    numCollections += 1 + !areViewlessTimeseriesEnabled(db);
     compareInternalListCollectionsStageAgainstListCollections(dbTest, numCollections);
 }
 

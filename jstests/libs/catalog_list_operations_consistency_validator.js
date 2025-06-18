@@ -20,6 +20,10 @@
  * * We ensure that the computed output from `$listCatalog` matches the actual output from
  *   `listCollections` and `listIndexes` (modulo ordering differences).
  */
+import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesBucketsColl
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
@@ -314,8 +318,10 @@ function validateListCatalogToListCollectionsConsistency(
         return collectionList.sort((a, b) => a.name.localeCompare(b.name));
     }
 
-    // Create a map for looking up $listCatalog namespaces by name. We use this for time series
-    // collections, which inherit their options from their buckets collection in listCollections.
+    // TODO SERVER-101594 Remove the listCatalogMap indirection once 9.0 becomes lastLTS.
+    // We create a map for looking up $listCatalog namespaces by name. This map is used to handle
+    // legacy time series collections, which inherit their options from their buckets collection in
+    // listCollections. This becomes redundant once only viewless timeseries collections exist.
     const listCatalogMap = new Map(listCatalog.map(c => [c.name, c]));
 
     const listCollectionsFromListCatalog =
@@ -403,10 +409,11 @@ function filterListCatalogEntriesFromShardsWithoutChunks(db, listCatalog) {
  * (as otherwise, each operation may observe the collection at a different point in time).
  */
 export function assertCatalogListOperationsConsistencyForCollection(collection) {
-    // For time series collections, also check their associated buckets namespace.
-    const collectionNames = collection.exists().type === "timeseries"
-        ? [collection.getName(), "system.buckets." + collection.getName()]
-        : [collection.getName()];
+    // TODO SERVER-101594 Remove 'collectionNames' and pass the collection name directly
+    const collectionNames = [collection.getName()];
+    if (!areViewlessTimeseriesEnabled(db) && collection.getMetadata().type === "timeseries") {
+        collectionNames.push(getTimeseriesBucketsColl(collection).getName());
+    }
 
     // The database is read only when using standalone recovery options like --queryableBackupMode,
     // so we can assume that the database is not read-only when running a sharded cluster.
@@ -415,8 +422,9 @@ export function assertCatalogListOperationsConsistencyForCollection(collection) 
     const listCollections = db.getCollectionInfos({name: {$in: collectionNames}});
     const listIndexes =
         listCollections
-            // Note that while time series collections have indexes from the user's point of view,
-            // at the catalog level they only exist in the associated buckets collection.
+            // TODO SERVER-103776 Handle the viewless timeseries case by filtering by type !==
+            // 'view' and call getIndexes({rawData: true}) once listCatalog returns a consistent
+            // output for viewless timeseries.
             .filter(c => c.type === 'collection')
             .map(coll => ({name: coll.name, indexes: db.getCollection(coll.name).getIndexes()}));
 
@@ -566,6 +574,7 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
         // Skip checks for non-timeseries namespaces having an accompanying buckets namespace, as
         // several operations behave anomalously on those, including listIndexes.
         // TODO(SERVER-90862): Remove this workaround once this situation can not happen.
+        // TODO(SERVER-101594): Remove this workaround once only viewless timeseries exist.
         const namespaceSet = new Set(catalogInfo.map(c => c.name));
         const nsWithUnexpectedBucketsSet =
             new Set(catalogInfo

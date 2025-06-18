@@ -39,6 +39,7 @@ function arrayContainsValueOnField(listClusterArrayResponse, field, value) {
 }
 
 function isTempNss(collectionName) {
+    // TODO SERVER-101594 Remove system.buckets.resharding once 9.0 becomes last LTS
     if (collectionName.includes("system.resharding") || collectionName.includes("tmp.agg_out") ||
         collectionName.includes("system.buckets.resharding")) {
         return true;

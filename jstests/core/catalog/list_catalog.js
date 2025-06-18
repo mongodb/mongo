@@ -15,6 +15,10 @@
  *     simulate_atlas_proxy_incompatible,
  * ]
  */
+import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesBucketsColl
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDB = db.getSiblingDB(jsTestName());
@@ -65,7 +69,12 @@ const checkEntries = function(collName, entries, type, {numSecondaryIndexes, vie
         if (FixtureHelpers.isMongos(testDB)) {
             assert(entry.shard);
         }
-        if (type === 'view' || type === 'timeseries') {
+
+        if (!areViewlessTimeseriesEnabled(testDB) && type === 'timeseries') {
+            assert.eq(entry.viewOn, viewOn);
+        }
+
+        if (type === 'view') {
             assert.eq(entry.viewOn, viewOn);
         }
 
@@ -96,13 +105,20 @@ result = collClustered.aggregate([{$listCatalog: {}}]).toArray();
 jsTestLog(collClustered.getFullName() + ' $listCatalog: ' + tojson(result));
 checkEntries(collClustered.getName(), result, 'collection', {numSecondaryIndexes: 0});
 
-assert.commandFailedWithCode(
-    testDB.runCommand({aggregate: viewSimpleName, pipeline: [{$listCatalog: {}}], cursor: {}}),
-    40602);
+if (areViewlessTimeseriesEnabled(testDB)) {
+    result = collTimeseries.aggregate([{$listCatalog: {}}]).toArray();
+    jsTestLog(collTimeseries.getFullName() + ' $listCatalog: ' + tojson(result));
+    // TODO SERVER-103776: listCatalog should return type 'timeseries' instead of 'collection'
+    checkEntries(collTimeseries.getName(), result, 'collection', {numSecondaryIndexes: 0});
+} else {
+    assert.commandFailedWithCode(
+        testDB.runCommand(
+            {aggregate: collTimeseries.getName(), pipeline: [{$listCatalog: {}}], cursor: {}}),
+        40602);
+}
 
 assert.commandFailedWithCode(
-    testDB.runCommand(
-        {aggregate: collTimeseries.getName(), pipeline: [{$listCatalog: {}}], cursor: {}}),
+    testDB.runCommand({aggregate: viewSimpleName, pipeline: [{$listCatalog: {}}], cursor: {}}),
     40602);
 
 assert.commandFailedWithCode(
@@ -116,6 +132,11 @@ jsTestLog('Collectionless $listCatalog: ' + tojson(result));
 checkEntries(collSimple.getName(), result, 'collection', {numSecondaryIndexes: 1});
 checkEntries(collClustered.getName(), result, 'collection', {numSecondaryIndexes: 0});
 checkEntries(viewSimpleName, result, 'view', {viewOn: collSimple.getName()});
-checkEntries(collTimeseries.getName(), result, 'timeseries', {
-    viewOn: 'system.buckets.' + collTimeseries.getName()
-});
+
+if (areViewlessTimeseriesEnabled(testDB)) {
+    checkEntries(collTimeseries.getName(), result, 'timeseries', {numSecondaryIndexes: 0});
+} else {
+    checkEntries(collTimeseries.getName(), result, 'timeseries', {
+        viewOn: getTimeseriesBucketsColl(collTimeseries).getName()
+    });
+}
