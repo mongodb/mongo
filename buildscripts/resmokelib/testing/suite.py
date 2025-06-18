@@ -3,7 +3,7 @@
 import itertools
 import threading
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import selector as _selector
@@ -157,6 +157,8 @@ class Suite(object):
             print(f"to exclude the following tests: {evergreen_excluded_tests}")
             excluded.extend(evergreen_excluded_tests)
             tests = evergreen_filtered_tests
+
+        tests = self.filter_tests_for_shard(tests, _config.SHARD_COUNT, _config.SHARD_INDEX)
 
         # Always group tests at the end
         tests = _selector.group_tests(test_kind, selector_config, tests)
@@ -521,3 +523,13 @@ class Suite(object):
         if self.return_code is not None:
             attributes[Suite.METRIC_NAMES.RETURN_CODE] = self.return_code
         return attributes
+
+    @staticmethod
+    def filter_tests_for_shard(
+        tests: List[str], shard_count: Optional[int], shard_index: Optional[int]
+    ) -> List[str]:
+        """Filter tests to only include those that should be run by this shard."""
+        if shard_index is None or shard_count is None:
+            return tests
+
+        return [test_case for i, test_case in enumerate(tests) if i % shard_count == shard_index]

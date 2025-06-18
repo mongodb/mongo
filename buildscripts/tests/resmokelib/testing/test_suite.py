@@ -113,3 +113,15 @@ class TestGetTestsForKind(unittest.TestCase):
             str(context.exception.__cause__),
             "400 Client Error: Bad Request for url: https://evergreen.mongodb.com/rest/v2/select/tests",
         )
+
+    def test_sharding(self):
+        tests = ["1.js", "2.js", "3.js"]
+        shard_count = 2
+        shard1 = self.suite.filter_tests_for_shard(tests, shard_count, 0)
+        shard2 = self.suite.filter_tests_for_shard(tests, shard_count, 1)
+        self.assertEqual(shard1, ["1.js", "3.js"])
+        self.assertEqual(shard2, ["2.js"])
+
+        actual = shard1 + shard2
+        actual.sort()
+        self.assertEqual(actual, tests)

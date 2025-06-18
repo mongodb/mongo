@@ -113,6 +113,8 @@ DEFAULTS = {
     "disable_unreleased_ifr_flags": False,
     "seed": int(time.time() * 256),  # Taken from random.py code in Python 2.7.
     "service_executor": None,
+    "shard_count": None,
+    "shard_index": None,
     "shell_conn_string": None,
     "shell_port": None,
     "shuffle": None,
@@ -679,6 +681,12 @@ EXCLUDE_TAGS_FILE_PATH = None
 
 # Limit the number of tests to execute
 MAX_TEST_QUEUE_SIZE = None
+
+# The total shard count.
+SHARD_COUNT = None
+
+# The shard index of the shard to run.
+SHARD_INDEX = None
 
 ##
 # Internally used configuration options that aren't exposed to the user

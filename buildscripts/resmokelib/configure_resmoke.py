@@ -124,6 +124,11 @@ def _validate_options(parser, args):
     if error_msgs:
         parser.error(str(error_msgs))
 
+    if (args.shard_count is not None) ^ (args.shard_index is not None):
+        parser.error("Must specify both or neither of --shardCount and --shardIndex")
+    if (args.shard_count is not None) and (args.shard_index is not None) and args.jobs:
+        parser.error("Cannot specify --shardCount and --shardIndex in combination with --jobs.")
+
 
 def _validate_config(parser):
     from buildscripts.resmokelib.config_fuzzer_limits import config_fuzzer_params
@@ -492,6 +497,11 @@ flags in common: {common_set}
 
     _config.ENABLE_EVERGREEN_API_TEST_SELECTION = config.pop("enable_evergreen_api_test_selection")
     _config.EVERGREEN_TEST_SELECTION_STRATEGY = config.pop("test_selection_strategies_array")
+
+    shard_index = config.pop("shard_index")
+    shard_count = config.pop("shard_count")
+    _config.SHARD_INDEX = int(shard_index) if shard_index is not None else None
+    _config.SHARD_COUNT = int(shard_count) if shard_count is not None else None
 
     _config.INSTALL_DIR = config.pop("install_dir")
     if values.command == "run" and _config.INSTALL_DIR is None:

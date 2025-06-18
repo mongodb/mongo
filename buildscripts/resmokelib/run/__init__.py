@@ -1724,6 +1724,12 @@ class RunPlugin(PluginInterface):
             help="Skip validating that all paths in suite config selectors are valid.",
         )
 
+        parser.add_argument(
+            "--shardIndex", dest="shard_index", help="The shard index of the shard to run."
+        )
+
+        parser.add_argument("--shardCount", dest="shard_count", help="The total shard count.")
+
         configure_resmoke.add_otel_args(parser)
 
         mongodb_server_options = parser.add_argument_group(

@@ -77,7 +77,11 @@ class TestSuiteExecutor(object):
 
         :return: List of jobs.
         """
-        return [self._make_job(job_num) for job_num in range(num_jobs)]
+        return (
+            [self._make_job(_config.SHARD_INDEX)]
+            if _config.SHARD_INDEX
+            else [self._make_job(job_num) for job_num in range(num_jobs)]
+        )
 
     def run(self):
         """Execute the test suite.

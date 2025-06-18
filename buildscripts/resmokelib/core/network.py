@@ -66,12 +66,13 @@ class PortAllocator(object):
         ports than are reserved per job, or if the next port is not a
         valid port number.
         """
+        offset = cls.get_job_offset(job_num)
         with cls._NUM_USED_PORTS_LOCK:
-            start_port = config.BASE_PORT + (job_num * cls._PORTS_PER_JOB)
-            num_used_ports = cls._NUM_USED_PORTS[job_num]
+            start_port = config.BASE_PORT + (offset * cls._PORTS_PER_JOB)
+            num_used_ports = cls._NUM_USED_PORTS[offset]
             next_port = start_port + num_used_ports
 
-            cls._NUM_USED_PORTS[job_num] += 1
+            cls._NUM_USED_PORTS[offset] += 1
 
             if next_port >= start_port + cls._PORTS_PER_FIXTURE:
                 raise errors.PortAllocationError(
@@ -89,7 +90,11 @@ class PortAllocator(object):
         Raises a PortAllocationError if that port is higher than the
         maximum port.
         """
-        return config.BASE_PORT + (job_num * cls._PORTS_PER_JOB) + cls._PORTS_PER_FIXTURE
+        return (
+            config.BASE_PORT
+            + (cls.get_job_offset(job_num) * cls._PORTS_PER_JOB)
+            + cls._PORTS_PER_FIXTURE
+        )
 
     @classmethod
     @_check_port
@@ -99,7 +104,9 @@ class PortAllocator(object):
         Raises a PortAllocationError if that port is higher than the
         maximum port.
         """
-        next_range_start = config.BASE_PORT + ((job_num + 1) * cls._PORTS_PER_JOB)
+        next_range_start = config.BASE_PORT + (
+            (cls.get_job_offset(job_num) + 1) * cls._PORTS_PER_JOB
+        )
         return next_range_start - 1
 
     @classmethod
@@ -112,3 +119,10 @@ class PortAllocator(object):
 
         with cls._NUM_USED_PORTS_LOCK:
             cls._NUM_USED_PORTS = collections.defaultdict(int)
+
+    @classmethod
+    def get_job_offset(cls, job_num: int) -> int:
+        """Return the offset relative to the base port for the specified job number."""
+
+        # When sharding is enabled, the job number is the shard index, but only on job is actually running.
+        return job_num if config.SHARD_INDEX is None else 0
