@@ -106,7 +106,8 @@ Status CollectionBulkLoaderImpl::init(const BSONObj& idIndexSpec,
                 auto totalIndexBuildsIncludingIdIndex =
                     specs.size() + (idIndexSpec.isEmpty() ? 0 : 1);
                 auto maxInitialSyncIndexBuildMemoryUsageBytes =
-                    MultiIndexBlock::getTotalIndexBuildMaxMemoryUsageBytes();
+                    static_cast<std::size_t>(maxIndexBuildMemoryUsageMegabytes.load()) * 1024 *
+                    1024;
                 if (specs.size()) {
                     _secondaryIndexesBlock->ignoreUniqueConstraint();
                     auto maxSecondaryIndexMemoryUsageBytes =

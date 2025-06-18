@@ -93,15 +93,6 @@ public:
     ~MultiIndexBlock();
 
     /**
-     * Gets total allowed memory usage for all index builds from
-     * the server parameter 'maxIndexBuildMemoryUsageMegabytes'.
-     *
-     * This function does all bounds checking on the server
-     * parameter and computes a percentage-based value, if set.
-     */
-    static size_t getTotalIndexBuildMaxMemoryUsageBytes();
-
-    /**
      * When this is called:
      * For hybrid index builds, the index interceptor will not track duplicates.
      * For foreground index builds, the uniqueness constraint will be relaxed.

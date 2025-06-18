@@ -78,7 +78,6 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log_and_backoff.h"
-#include "mongo/util/processinfo.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -119,10 +118,10 @@ size_t getEachIndexBuildMaxMemoryUsageBytes(boost::optional<size_t> maxMemoryUsa
         return 0;
     }
 
-    size_t maxTotalIndexBuildMemoryBytes = maxMemoryUsageBytes.has_value()
+    auto maxBytes = maxMemoryUsageBytes.has_value()
         ? maxMemoryUsageBytes.get()
-        : MultiIndexBlock::getTotalIndexBuildMaxMemoryUsageBytes();
-    return (maxTotalIndexBuildMemoryBytes / numIndexSpecs);
+        : static_cast<std::size_t>(maxIndexBuildMemoryUsageMegabytes.load()) * 1024 * 1024;
+    return maxBytes / numIndexSpecs;
 }
 
 auto makeOnSuppressedErrorFn(const std::function<void()>& saveCursorBeforeWrite,
@@ -186,36 +185,6 @@ MultiIndexBlock::~MultiIndexBlock() {
 
 MultiIndexBlock::OnCleanUpFn MultiIndexBlock::kNoopOnCleanUpFn = []() {
 };
-
-size_t MultiIndexBlock::getTotalIndexBuildMaxMemoryUsageBytes() {
-    double memUsageLimit = maxIndexBuildMemoryUsageMegabytes.load();
-
-    size_t computedLimitBytes = 0;
-    if (memUsageLimit < 1) {
-        ProcessInfo pi;
-        double memSizeMB = pi.getMemSizeMB();
-        size_t computedLimitBytes = static_cast<size_t>(memUsageLimit * memSizeMB * 1024 * 1024);
-        if (computedLimitBytes < kMinIndexBuildMemSizeLimitBytes) {
-            LOGV2_WARNING(
-                10448902,
-                "maxIndexBuildMemoryUsageMegabytes computed value beneath minimum, setting to 50 "
-                "MB");
-            computedLimitBytes = kMinIndexBuildMemSizeLimitBytes;
-        }
-        LOGV2(10448901,
-              "maxIndexBuildMemoryUsageMegabytes parsed as percentage-based value",
-              "percentLimit"_attr = memUsageLimit,
-              "memorySizeMB"_attr = memSizeMB,
-              "limitBytes"_attr = computedLimitBytes);
-    } else {
-        computedLimitBytes = static_cast<size_t>(memUsageLimit * 1024 * 1024);
-        LOGV2(10448900,
-              "maxIndexBuildMemoryUsageMegabytes parsed as byte-based value",
-              "limitBytes"_attr = computedLimitBytes);
-    }
-
-    return computedLimitBytes;
-}
 
 void MultiIndexBlock::abortIndexBuild(OperationContext* opCtx,
                                       CollectionWriter& collection,
