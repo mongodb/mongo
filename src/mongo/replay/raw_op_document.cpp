@@ -50,7 +50,7 @@ RawOpDocument::RawOpDocument() {
     // Initialize other fields.
     BSONObjBuilder rootBuilder;
     rootBuilder.append("rawop", _rawOp);
-    rootBuilder.append("seen", BSON("sec" << 63884568370 << "nsec" << 87));
+    rootBuilder.append("seen", BSON("sec" << 63884568370ll << "nsec" << 87));
     rootBuilder.append("session", "{ remote: \"127.0.0.1:54420\", local: \"127.0.0.1:27017\" }");
     rootBuilder.append("order", 87);
     rootBuilder.append("seenconnectionnum", 16);
