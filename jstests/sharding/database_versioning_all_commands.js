@@ -712,6 +712,7 @@ let testCases = {
         }
     },
     repairShardedCollectionChunksHistory: {skip: "always targets the config server"},
+    replicateSearchIndexCommand: {skip: "internal command for testing only", conditional: true},
     replSetGetStatus: {skip: "not supported in mongos"},
     resetPlacementHistory: {skip: "always targets the config server"},
     reshardCollection: {skip: "does not forward command to primary shard"},
