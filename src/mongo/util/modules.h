@@ -46,8 +46,28 @@
  */
 // IWYU pragma: always_keep (see above)
 
-/** Marks a declaration and everything inside as public to other modules */
+/**
+ * Marks a declaration and everything inside as public to other modules.
+ * This allows using the declaration outside the module except as a base class. This means that by
+ * default all hierarchies are closed within their module unless explicitly marked as open.
+ * See MONGO_MOD_OPEN below.
+ */
 #define MONGO_MOD_PUB MONGO_MOD_ATTR_(public)
+
+/**
+ * Marks a class as open and everything inside as public to other modules.
+ * This is "more public than public" in that it also allows inheriting from the class.
+ * The naming as "open" and distinction from public are both inspired by Swift's access control
+ * levels.
+ *
+ * If we later decide we do not like this distinction, we can easily just sed this macro away
+ * and use MONGO_MOD_PUB everywhere. But it will be easier to start with the distinction than to add
+ * it later.
+ *
+ * NOTE: unlike other markers openness is *not* applied recursively, so each type that should
+ * support external subclasses must be separately marked as open.
+ */
+#define MONGO_MOD_OPEN MONGO_MOD_ATTR_(open)
 
 /**
  * Marks a declaration which the module owner would prefer to be

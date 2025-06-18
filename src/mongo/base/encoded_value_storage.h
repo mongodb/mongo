@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/data_view.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 
 #include <cstring>
 
@@ -42,7 +43,7 @@ struct ZeroInitTag_t {
 const ZeroInitTag_t kZeroInitTag;
 
 template <typename Layout, typename ConstView, typename View>
-class EncodedValueStorage {
+class MONGO_MOD_OPEN EncodedValueStorage {
 protected:
     EncodedValueStorage() {}
 

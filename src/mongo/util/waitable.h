@@ -31,6 +31,7 @@
 
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -49,7 +50,7 @@ namespace mongo {
  * Note that every Waitable should be level-triggered like its base class, Notifiable. See
  * mongo/stdx/condition_variable.h for more details.
  */
-class Waitable : public Notifiable {
+class MONGO_MOD_OPEN Waitable : public Notifiable {
 public:
     template <typename LockT>
     static void wait(Waitable* waitable,

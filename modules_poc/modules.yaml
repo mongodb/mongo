@@ -743,6 +743,7 @@ admission:
   files:
     - src/mongo/db/admission/
     - src/mongo/db/concurrency/flow_control_ticketholder*
+    - src/mongo/util/concurrency/admission_context*
 
 workload_simulation:
   meta:

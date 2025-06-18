@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 
 #include <memory>
 #include <utility>
@@ -97,7 +98,7 @@ private:
  *          .then([] { return doThing2(); })
  *          ...
  */
-class OutOfLineExecutor {
+class MONGO_MOD_OPEN OutOfLineExecutor {
 public:
     using Task = unique_function<void(Status)>;
 

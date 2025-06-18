@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 
 namespace mongo {
 
@@ -39,7 +40,7 @@ namespace mongo {
  * associative containers. These closely related operations are bundled into
  * this one interface.
  */
-class StringDataComparator {
+class MONGO_MOD_OPEN StringDataComparator {
 public:
     virtual ~StringDataComparator() = default;
 

@@ -44,6 +44,7 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/invalidating_lru_cache.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
@@ -150,7 +151,7 @@ template <typename Key,
           typename Value,
           typename Time = CacheNotCausallyConsistent,
           typename... LookupArgs>
-class ReadThroughCache : public ReadThroughCacheBase {
+class MONGO_MOD_OPEN ReadThroughCache : public ReadThroughCacheBase {
     /**
      * Data structure wrapping and expanding on the values stored in the cache.
      */

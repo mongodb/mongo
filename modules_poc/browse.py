@@ -163,6 +163,8 @@ class Decl:
     @property
     def fancy_visibility(self):
         match self.visibility:
+            case "open":
+                return Text("open", "green")
             case "public":
                 return Text("pub", "green")
             case "private":

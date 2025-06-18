@@ -45,13 +45,8 @@ using ::std::enable_if_t;
 namespace mongo {
 namespace stdx {
 
-template <typename T>
-struct type_identity {
-    using type = T;
-};
-
-template <typename T>
-using type_identity_t = typename type_identity<T>::type;
+using std::type_identity;
+using std::type_identity_t;
 
 template <class T>
 struct remove_cvref {

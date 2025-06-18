@@ -31,6 +31,7 @@
 
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util_core.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 
 #include <atomic>  // NOLINT
 #include <cstdlib>
@@ -40,7 +41,7 @@
 namespace mongo {
 
 /// This is an alternative base class to the above ones (will replace them eventually)
-class RefCountable {
+class MONGO_MOD_OPEN RefCountable {
     RefCountable(const RefCountable&) = delete;
     RefCountable& operator=(const RefCountable&) = delete;
 

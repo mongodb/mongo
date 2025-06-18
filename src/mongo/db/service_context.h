@@ -46,6 +46,7 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/tick_source.h"
@@ -196,7 +197,7 @@ using ServiceContextLock = service_context_detail::ObjectLock<ServiceContext, st
  * See registerKillOpListener() for more information,
  * including limitations on the lifetime of registered listeners.
  */
-class KillOpListenerInterface {
+class MONGO_MOD_OPEN KillOpListenerInterface {
 public:
     KillOpListenerInterface(const KillOpListenerInterface&) = delete;
     KillOpListenerInterface& operator=(const KillOpListenerInterface&) = delete;

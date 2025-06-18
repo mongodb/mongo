@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 
 #include <memory>
 #include <string>
@@ -53,7 +54,7 @@ namespace mongo {
  *  BackgroundJob object must exist for as long the background thread is running.
  */
 
-class BackgroundJob {
+class MONGO_MOD_OPEN BackgroundJob {
     BackgroundJob(const BackgroundJob&) = delete;
     BackgroundJob& operator=(const BackgroundJob&) = delete;
 
@@ -140,7 +141,7 @@ private:
  *   virtual void doWork() { log() << "hi" << std::endl; }
  * } myTask;
  */
-class PeriodicTask {
+class MONGO_MOD_OPEN PeriodicTask {
 public:
     PeriodicTask();
     virtual ~PeriodicTask();

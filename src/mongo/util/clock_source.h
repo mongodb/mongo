@@ -35,6 +35,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/lockable_adapter.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/time_support.h"
 
 #include <type_traits>
@@ -46,7 +47,7 @@ class Waitable;
 /**
  * An interface for getting the current wall clock time.
  */
-class ClockSource {
+class MONGO_MOD_OPEN ClockSource {
     // We need a type trait to differentiate waitable ptr args from predicates.
     //
     // This returns true for non-pointers and function pointers

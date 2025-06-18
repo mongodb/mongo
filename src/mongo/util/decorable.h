@@ -61,6 +61,7 @@
 #pragma once
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/static_immortal.h"
 
 #include <algorithm>
@@ -412,7 +413,7 @@ private:
 }  // namespace decorable_detail
 
 template <typename D>
-class Decorable {
+class MONGO_MOD_OPEN Decorable {
 public:
     using DerivedType = D;  // CRTP
 

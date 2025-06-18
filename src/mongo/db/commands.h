@@ -71,6 +71,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
@@ -434,7 +435,7 @@ private:
 /**
  * Serves as a base for server commands. See the constructor for more details.
  */
-class Command {
+class MONGO_MOD_OPEN Command {
 public:
     enum class AllowedOnSecondary { kAlways, kNever, kOptIn };
     enum class HandshakeRole { kNone, kHello, kAuth };
@@ -791,7 +792,7 @@ private:
 /**
  * Represents a single invocation of a given command.
  */
-class CommandInvocation {
+class MONGO_MOD_OPEN CommandInvocation {
 public:
     CommandInvocation(const Command* definition) : _definition(definition) {}
 
@@ -1032,7 +1033,7 @@ private:
  * sequences. Commands should implement this class if they require access to the
  * ReplyBuilderInterface (e.g. to set the next invocation for an exhaust command).
  */
-class BasicCommandWithReplyBuilderInterface : public Command {
+class MONGO_MOD_OPEN BasicCommandWithReplyBuilderInterface : public Command {
 private:
     class Invocation;
 
@@ -1182,7 +1183,7 @@ private:
 /**
  * Commands should implement this class if they do not require access to the ReplyBuilderInterface.
  */
-class BasicCommand : public BasicCommandWithReplyBuilderInterface {
+class MONGO_MOD_OPEN BasicCommand : public BasicCommandWithReplyBuilderInterface {
 public:
     using BasicCommandWithReplyBuilderInterface::BasicCommandWithReplyBuilderInterface;
 
@@ -1233,7 +1234,7 @@ public:
  *
  */
 template <typename Derived>
-class BasicCommandWithRequestParser : public BasicCommandWithReplyBuilderInterface {
+class MONGO_MOD_OPEN BasicCommandWithRequestParser : public BasicCommandWithReplyBuilderInterface {
 private:
     static constexpr StringData _commandAlias() {
         using T = typename Derived::Request;
@@ -1342,7 +1343,7 @@ private:
 /**
  * Deprecated. Do not add new subclasses.
  */
-class ErrmsgCommandDeprecated : public BasicCommand {
+class MONGO_MOD_OPEN ErrmsgCommandDeprecated : public BasicCommand {
     using BasicCommand::BasicCommand;
     bool run(OperationContext* opCtx,
              const DatabaseName& dbName,
@@ -1385,7 +1386,7 @@ class ErrmsgCommandDeprecated : public BasicCommand {
  *     base classes provided: InvocationBase or MinimalInvocationBase.
  */
 template <typename Derived>
-class TypedCommand : public Command {
+class MONGO_MOD_OPEN TypedCommand : public Command {
 public:
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& opMsgRequest) final;
@@ -1468,7 +1469,7 @@ private:
 };
 
 template <typename Derived>
-class TypedCommand<Derived>::MinimalInvocationBase : public InvocationBaseInternal {
+class MONGO_MOD_OPEN TypedCommand<Derived>::MinimalInvocationBase : public InvocationBaseInternal {
     // Implemented as just a strong typedef for InvocationBaseInternal.
     using InvocationBaseInternal::InvocationBaseInternal;
 };
@@ -1556,7 +1557,7 @@ public:
  *     }
  */
 template <typename Derived>
-class TypedCommand<Derived>::InvocationBase : public InvocationBaseInternal {
+class MONGO_MOD_OPEN TypedCommand<Derived>::InvocationBase : public InvocationBaseInternal {
 public:
     using InvocationBaseInternal::InvocationBaseInternal;
 

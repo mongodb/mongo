@@ -282,11 +282,15 @@ def get_visibility(
         else:
             alt = None
             assert attr in (
+                "open",
                 "public",
                 "private",
                 "file_private",
                 "needs_replacement",
             )
+            if attr == "open" and scanning_parent:
+                # "open" only applies to the current class and makes semantic children public.
+                attr = "public"
         return GetVisibilityResult(attr, alt, c, last_non_ns_parent)
 
     # details and internal namespaces
@@ -704,6 +708,27 @@ def find_usages(mod: str, c: Cursor, context: DecoratedCursor | None):
 
     usage = f"{pretty_location(c.location)} {context.string_for_context}"
     d.used_from.setdefault(mod, set()).add(usage)
+
+    # Check that cross-module inheritance only uses "open" bases that explicitly chose to allow it.
+    # For now we also allow "UNKNOWN" visibility, because that means that the base class hasn't been
+    # marked for visibility. When the owner of that class gets to it, they see errors if other modules
+    # inherit from it, and can then decide whether to mark it as open or not.
+    # NOTE: the way that this check is implemented, it allows trivially bypassing by using something like
+    # class Bad : public std::type_identity_t<ClosedBase> {}; but we are trying to catch accidental misuses,
+    # not malicious ones. If we find this is a problem, we can probably improve it by asking clang to
+    # resolve any typedefs. It won't help if the consumer is a template and the base is a dependent type,
+    # but that is a general problem with the scanner.
+    if c.kind == CursorKind.CXX_BASE_SPECIFIER and not (
+        d.visibility in ("open", "UNKNOWN") or d.mod == mod or mod.startswith(d.mod)
+    ):
+        perr_exit(
+            f"ERROR: {d.display_name} is used as a base class of {fully_qualified(context)}, "
+            f"but they are in different modules. This is only allowed for classes marked MONGO_MOD_OPEN."
+            f"\n    base: {d.loc} ({d.mod})"
+            f"\n    child: {pretty_location(c)} ({mod})"
+            f"\n    If you think that the base should be open, please contact the owner."
+            # TODO extract the slack channel from the module metadata and add it here
+        )
 
 
 seen = set[Cursor]()

@@ -32,6 +32,7 @@
 #include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 
 namespace mongo {
 
@@ -55,7 +56,8 @@ typedef std::multiset<BSONElement, BSONElementCmpWithoutField> BSONElementMultiS
  *
  * All methods are thread-safe.
  */
-class BSONElement::ComparatorInterface : public BSONComparatorInterfaceBase<BSONElement> {
+class MONGO_MOD_OPEN BSONElement::ComparatorInterface
+    : public BSONComparatorInterfaceBase<BSONElement> {
 public:
     /**
      * Constructs a BSONEltSet whose equivalence classes are given by this comparator. This

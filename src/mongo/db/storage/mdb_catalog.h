@@ -34,11 +34,18 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 
 #include <string>
 
 namespace mongo {
 class KVEngine;
+
+// This is only necessary because MDBCatalogTest is defined in a .cpp file in a different module
+// from MDBCatalog. Once that fixture is moved to the same module as MDBCatalog, this can be
+// removed and MDBCatalogTest can be made PRIVATE.
+// TODO(SERVER-105385): delete this line and comment.
+class MONGO_MOD_OPEN MDBCatalogTest;
 
 /**
  * A wrapper around the '_mdb_catalog' storage table. Each row in the table is indexed with a

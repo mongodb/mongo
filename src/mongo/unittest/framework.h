@@ -49,6 +49,7 @@
 #include "mongo/logv2/log_detail.h"
 #include "mongo/unittest/test_info.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/optional_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/synchronized_value.h"
@@ -196,7 +197,7 @@ private:
  *     };
  *     OldStyleSuiteInitializer<All> all;
  */
-class OldStyleSuiteSpecification {
+class MONGO_MOD_OPEN OldStyleSuiteSpecification {
 public:
     struct SuiteTest {
         std::string name;
@@ -313,7 +314,7 @@ private:
  * Base type for unit test fixtures.  Also, the default fixture type used
  * by the TEST() macro.
  */
-class Test {
+class MONGO_MOD_OPEN Test {
 public:
     Test();
     virtual ~Test();

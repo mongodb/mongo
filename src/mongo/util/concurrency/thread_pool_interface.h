@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/util/functional.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/out_of_line_executor.h"
 
 namespace mongo {
@@ -39,7 +40,7 @@ class Status;
 /**
  * Interface for a thread pool.
  */
-class ThreadPoolInterface : public OutOfLineExecutor {
+class MONGO_MOD_OPEN ThreadPoolInterface : public OutOfLineExecutor {
     ThreadPoolInterface(const ThreadPoolInterface&) = delete;
     ThreadPoolInterface& operator=(const ThreadPoolInterface&) = delete;
 

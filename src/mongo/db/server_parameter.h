@@ -51,6 +51,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version/releases.h"
 
@@ -116,7 +117,7 @@ class OperationContext;
 template <typename U>
 using TenantIdMap = std::map<boost::optional<TenantId>, U>;
 
-class ServerParameter {
+class MONGO_MOD_OPEN ServerParameter {
 private:
     enum class EnableState {
         enabled,

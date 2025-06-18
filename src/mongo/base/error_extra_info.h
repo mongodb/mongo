@@ -52,7 +52,7 @@ class BSONObjBuilder;
  * You must call the MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(type) macro in the cpp file that contains
  * the implementation for your subtype.
  */
-class ErrorExtraInfo {
+class MONGO_MOD_OPEN ErrorExtraInfo {
 public:
     using Parser = std::shared_ptr<const ErrorExtraInfo>(const BSONObj&);
 
