@@ -36,6 +36,7 @@
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/namespace_string_util.h"
@@ -46,6 +47,8 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 namespace mongo {
 
@@ -120,10 +123,11 @@ ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
       _writesDuringCriticalSection{0} {}
 
 boost::optional<Milliseconds>
-ShardingDataTransformInstanceMetrics::getHighEstimateRemainingTimeMillis() const {
+ShardingDataTransformInstanceMetrics::getHighEstimateRemainingTimeMillis(
+    CalculationLogOption logOption) const {
     switch (_role) {
         case Role::kRecipient:
-            return getRecipientHighEstimateRemainingTimeMillis();
+            return getRecipientHighEstimateRemainingTimeMillis(logOption);
         case Role::kCoordinator:
             return readCoordinatorEstimate(_coordinatorHighEstimateRemainingTimeMillis);
         case Role::kDonor:
@@ -482,19 +486,58 @@ int64_t ShardingDataTransformInstanceMetrics::getOplogEntriesApplied() const {
 }
 
 boost::optional<Milliseconds>
-ShardingDataTransformInstanceMetrics::getMaxAverageTimeToFetchAndApplyOplogEntries() const {
+ShardingDataTransformInstanceMetrics::getMaxAverageTimeToFetchAndApplyOplogEntries(
+    CalculationLogOption logOption) const {
     std::shared_lock lock(_oplogLatencyMetricsMutex);
 
+    auto shouldLog = logOption == CalculationLogOption::Show;
+    auto summaryBuilder = shouldLog ? boost::make_optional(BSONObjBuilder{}) : boost::none;
+    auto appendOptionalTime =
+        [](BSONObjBuilder* builder, StringData fieldName, boost::optional<Milliseconds> time) {
+            if (time.has_value()) {
+                builder->append(fieldName, time->count());
+            } else {
+                builder->appendNull(fieldName);
+            }
+        };
+
     boost::optional<Milliseconds> maxAvgTimeToFetchAndApply;
-    for (const auto& [_, metrics] : _oplogLatencyMetrics) {
-        auto avgTimeToFetchAndApply = metrics->getAverageTimeToFetchAndApply();
-        if (!avgTimeToFetchAndApply.has_value()) {
-            return boost::none;
+    bool incomplete = false;
+
+    for (const auto& [donorShardId, metrics] : _oplogLatencyMetrics) {
+        auto avgTimeToFetch = metrics->getAverageTimeToFetch();
+        auto avgTimeToApply = metrics->getAverageTimeToApply();
+
+        if (shouldLog) {
+            BSONObjBuilder shardBuilder;
+            appendOptionalTime(&shardBuilder, "timeToFetchMillis", avgTimeToFetch);
+            appendOptionalTime(&shardBuilder, "timeToApplyMillis", avgTimeToApply);
+            summaryBuilder->append(donorShardId, shardBuilder.obj());
         }
+
+        if (!avgTimeToFetch.has_value() || !avgTimeToApply.has_value()) {
+            maxAvgTimeToFetchAndApply = boost::none;
+            incomplete = true;
+            continue;
+        }
+        if (incomplete) {
+            // At least one donor has incomplete metrics, so skip calculating the maximum average.
+            continue;
+        }
+
+        auto avgTimeToFetchAndApply = *avgTimeToFetch + *avgTimeToApply;
         maxAvgTimeToFetchAndApply = maxAvgTimeToFetchAndApply
-            ? std::max(*maxAvgTimeToFetchAndApply, *avgTimeToFetchAndApply)
-            : *avgTimeToFetchAndApply;
+            ? std::max(*maxAvgTimeToFetchAndApply, avgTimeToFetchAndApply)
+            : avgTimeToFetchAndApply;
     }
+
+    if (shouldLog) {
+        LOGV2(10605801,
+              "Calculated the maximum average time to fetch and apply oplog entries",
+              "maxAvgTimeToFetchAndApply"_attr = maxAvgTimeToFetchAndApply,
+              "summary"_attr = summaryBuilder->obj());
+    }
+
     return maxAvgTimeToFetchAndApply;
 }
 
@@ -563,16 +606,6 @@ boost::optional<Milliseconds>
 ShardingDataTransformInstanceMetrics::OplogLatencyMetrics::getAverageTimeToApply() const {
     stdx::lock_guard<stdx::mutex> lk(_timeToApplyMutex);
     return _avgTimeToApply;
-}
-
-boost::optional<Milliseconds>
-ShardingDataTransformInstanceMetrics::OplogLatencyMetrics::getAverageTimeToFetchAndApply() const {
-    stdx::lock_guard<stdx::mutex> fetchLk(_timeToFetchMutex);
-    stdx::lock_guard<stdx::mutex> applyLk(_timeToApplyMutex);
-    if (_avgTimeToFetch.has_value() && _avgTimeToApply.has_value()) {
-        return *_avgTimeToFetch + *_avgTimeToApply;
-    }
-    return boost::none;
 }
 
 }  // namespace mongo

@@ -85,8 +85,6 @@ public:
         boost::optional<Milliseconds> getAverageTimeToFetch() const;
         boost::optional<Milliseconds> getAverageTimeToApply() const;
 
-        boost::optional<Milliseconds> getAverageTimeToFetchAndApply() const;
-
     private:
         const ShardId _donorShardId;
 
@@ -119,7 +117,10 @@ public:
 
     virtual BSONObj reportForCurrentOp() const;
 
-    boost::optional<Milliseconds> getHighEstimateRemainingTimeMillis() const;
+    enum class CalculationLogOption { Hide, Show };
+
+    boost::optional<Milliseconds> getHighEstimateRemainingTimeMillis(
+        CalculationLogOption logOption = CalculationLogOption::Hide) const;
     boost::optional<Milliseconds> getLowEstimateRemainingTimeMillis() const;
     Date_t getStartTimestamp() const;
     const UUID& getInstanceId() const;
@@ -217,9 +218,11 @@ public:
     /**
      * Returns the maximum exponential moving average of the time it takes to fetch and apply an
      * oplog entry across all donors. Returns none if the metrics for any of the donors are not
-     * available yet.
+     * available yet. If the calculation logging is enabled, logs the average time to fetch and
+     * apply oplog entries for each donor.
      */
-    boost::optional<Milliseconds> getMaxAverageTimeToFetchAndApplyOplogEntries() const;
+    boost::optional<Milliseconds> getMaxAverageTimeToFetchAndApplyOplogEntries(
+        CalculationLogOption logOption) const;
 
     void onBatchRetrievedDuringOplogFetching(Milliseconds elapsed);
     void onLocalInsertDuringOplogFetching(const Milliseconds& elapsed);
@@ -266,7 +269,8 @@ protected:
     void restoreWritesToStashCollections(int64_t writesToStashCollections);
     virtual std::string createOperationDescription() const;
     virtual StringData getStateString() const;
-    virtual boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis() const = 0;
+    virtual boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis(
+        CalculationLogOption logOption) const = 0;
 
     ShardingDataTransformCumulativeMetrics* getCumulativeMetrics();
     ReshardingCumulativeMetrics* getTypedCumulativeMetrics();

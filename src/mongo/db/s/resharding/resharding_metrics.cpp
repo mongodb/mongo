@@ -207,8 +207,8 @@ ReshardingCumulativeMetrics* ReshardingMetrics::getReshardingCumulativeMetrics()
     return dynamic_cast<ReshardingCumulativeMetrics*>(getCumulativeMetrics());
 }
 
-boost::optional<Milliseconds> ReshardingMetrics::getRecipientHighEstimateRemainingTimeMillis()
-    const {
+boost::optional<Milliseconds> ReshardingMetrics::getRecipientHighEstimateRemainingTimeMillis(
+    CalculationLogOption logOption) const {
     if (!_ableToEstimateRemainingRecipientTime.load()) {
         return boost::none;
     }
@@ -216,7 +216,7 @@ boost::optional<Milliseconds> ReshardingMetrics::getRecipientHighEstimateRemaini
     if (resharding::gReshardingRemainingTimeEstimateBasedOnMovingAverage.load()) {
         // If the estimate based on moving average is available, return it. Otherwise, fall back to
         // the estimate not based on moving average.
-        if (auto estimate = getMaxAverageTimeToFetchAndApplyOplogEntries()) {
+        if (auto estimate = getMaxAverageTimeToFetchAndApplyOplogEntries(logOption)) {
             return *estimate;
         }
     }

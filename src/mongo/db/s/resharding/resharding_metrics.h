@@ -191,7 +191,8 @@ public:
     void setIndexesBuilt(int64_t numIndexes);
 
 protected:
-    boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis() const override;
+    boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis(
+        CalculationLogOption logOption) const override;
     StringData getStateString() const override;
 
 private:

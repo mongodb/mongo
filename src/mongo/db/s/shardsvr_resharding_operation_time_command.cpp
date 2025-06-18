@@ -122,7 +122,8 @@ public:
                     duration_cast<Milliseconds>(metrics.getOperationRunningTimeSecs());
                 response.setRecipientElapsedMillis(elapsedTime);
 
-                const auto remainingTime = metrics.getHighEstimateRemainingTimeMillis();
+                const auto remainingTime = metrics.getHighEstimateRemainingTimeMillis(
+                    ReshardingMetrics::CalculationLogOption::Show);
                 response.setRecipientRemainingMillis(remainingTime);
 
                 const auto prepareThreshold = Milliseconds(

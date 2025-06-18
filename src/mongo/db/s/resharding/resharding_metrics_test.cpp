@@ -256,7 +256,9 @@ private:
         const RAIIServerParameterControllerForTest estimateBasedOnMovingAvgServerParameter{
             "reshardingRemainingTimeEstimateBasedOnMovingAverage", enableEstimateBasedOnMovingAvg};
 
-        ASSERT_EQ(metrics->getHighEstimateRemainingTimeMillis(), expectedEstimate);
+        ASSERT_EQ(metrics->getHighEstimateRemainingTimeMillis(
+                      ReshardingMetrics::CalculationLogOption::Show),
+                  expectedEstimate);
         auto report = metrics->reportForCurrentOp();
         if (expectedEstimate.has_value()) {
             ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"),
@@ -674,7 +676,8 @@ TEST_F(ReshardingMetricsTest, GetAndUpdateAverageTimeToApplyBasic) {
 TEST_F(ReshardingMetricsTest,
        GetMaxAverageTimeToFetchAndApplyOplogEntriesBeforeRegisteringDonorsReturnsNone) {
     auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
-    ASSERT_FALSE(metrics->getMaxAverageTimeToFetchAndApplyOplogEntries());
+    ASSERT_FALSE(metrics->getMaxAverageTimeToFetchAndApplyOplogEntries(
+        ReshardingMetrics::CalculationLogOption::Show));
 }
 
 TEST_F(ReshardingMetricsTest, GetMaxAverageTimeToFetchAndApplyOplogEntriesBasic) {
@@ -692,7 +695,12 @@ TEST_F(ReshardingMetricsTest, GetMaxAverageTimeToFetchAndApplyOplogEntriesBasic)
     metrics->updateAverageTimeToApplyOplogEntries(shardId1, shard1TimeToApply);
 
     auto maxTimeToFetchAndApply = shard1TimeToFetch + shard1TimeToApply;
-    ASSERT_EQ(metrics->getMaxAverageTimeToFetchAndApplyOplogEntries(), maxTimeToFetchAndApply);
+    ASSERT_EQ(metrics->getMaxAverageTimeToFetchAndApplyOplogEntries(
+                  ReshardingMetrics::CalculationLogOption::Show),
+              maxTimeToFetchAndApply);
+    ASSERT_EQ(metrics->getMaxAverageTimeToFetchAndApplyOplogEntries(
+                  ReshardingMetrics::CalculationLogOption::Hide),
+              maxTimeToFetchAndApply);
 }
 
 TEST_F(ReshardingMetricsTest, GetAverageTimeToFetchOplogEntriesConcurrentlyWithRegisterDonors) {
@@ -772,8 +780,10 @@ TEST_F(ReshardingMetricsTest,
     auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
 
     auto registerThread = stdx::thread([&, this] { metrics->registerDonors({shardId0}); });
-    auto getMaxThread =
-        stdx::thread([&, this] { metrics->getMaxAverageTimeToFetchAndApplyOplogEntries(); });
+    auto getMaxThread = stdx::thread([&, this] {
+        metrics->getMaxAverageTimeToFetchAndApplyOplogEntries(
+            ReshardingMetrics::CalculationLogOption::Show);
+    });
 
     registerThread.join();
     getMaxThread.join();
