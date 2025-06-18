@@ -27,16 +27,12 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <boost/optional.hpp>
 #include <functional>
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/future.h"
 #include "mongo/util/invalidating_lru_cache.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -467,6 +463,19 @@ TEST(InvalidatingLRUCacheTest, AdvanceTimeSameTime) {
     TestValueCacheCausallyConsistent cache(1);
     cache.insertOrAssignAndGet(100, TestValue("Value @ TS 30"), Timestamp(30));
     ASSERT(!cache.advanceTimeInStore(100, Timestamp(30)));
+}
+
+TEST(InvalidatingLRUCacheTest, TimeMonotonicityViolation) {
+    TestValueCacheCausallyConsistent cache(2);
+    cache.insertOrAssign(100, TestValue("Value @ TS 30"), Timestamp(30));
+    cache.insertOrAssign(200, TestValue("Value @ TS 30"), Timestamp(30));
+
+    ASSERT_THROWS_CODE(cache.insertOrAssign(100, TestValue("Value @ TS 20"), Timestamp(20)),
+                       DBException,
+                       ErrorCodes::ReadThroughCacheTimeMonotonicityViolation);
+    ASSERT_THROWS_CODE(cache.insertOrAssign(200, TestValue("Value @ TS 20"), Timestamp(20)),
+                       DBException,
+                       ErrorCodes::ReadThroughCacheTimeMonotonicityViolation);
 }
 
 template <class TCache, typename TestFunc>

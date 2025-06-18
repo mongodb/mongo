@@ -35,9 +35,7 @@
 
 #include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/lru_cache.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -321,7 +319,7 @@ public:
         Time currentTime, currentTimeInStore;
         _invalidate(&guard, key, _cache.find(key), &currentTime, &currentTimeInStore);
         if constexpr (!std::is_same_v<Time, CacheNotCausallyConsistent>) {
-            tassert(6493102,
+            uassert(ErrorCodes::ReadThroughCacheTimeMonotonicityViolation,
                     str::stream() << "Time monotonicity violation: new lookup time "
                                   << time.toString() << " which is less than the current time  "
                                   << currentTime.toString() << ".",
@@ -380,7 +378,7 @@ public:
         _invalidate(&guard, key, _cache.find(key), &currentTime, &currentTimeInStore);
 
         if constexpr (!std::is_same_v<Time, CacheNotCausallyConsistent>) {
-            tassert(6493101,
+            uassert(ErrorCodes::ReadThroughCacheTimeMonotonicityViolation,
                     str::stream() << "Time monotonicity violation: new lookup time "
                                   << time.toString() << " which is less than the current time  "
                                   << currentTime.toString() << ".",
