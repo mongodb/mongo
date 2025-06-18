@@ -305,6 +305,40 @@ function runTest(fixture) {
         fixture.disableWriteBlockMode();
     }
 
+    // Validate that temporary collections are allowed to be dropped during step up if user writes
+    // are blocked.
+    {
+        // Create a temporary collection.
+        const collTmpName = "collTmp";
+        fixture.applyOps(
+            [{op: "c", ns: jsTestName() + ".$cmd", o: {create: collTmpName, temp: true}}]);
+
+        // Validate that collection exists and it is marked as temporary.
+        fixture.asUser(({conn}) => {
+            const db = conn.getDB(jsTestName());
+            const collectionInfo = db.getCollectionInfos().find(info => info.name === collTmpName);
+
+            assert(collectionInfo);
+            assert(collectionInfo.options.temp,
+                   'The collection is not marked as a temporary one: ' + tojson(collectionInfo));
+        });
+
+        // Enable user write block mode and force a stepdown.
+        fixture.enableWriteBlockMode();
+
+        fixture.stepDown();
+
+        // Validate that temporary collections are dropped during startup recovery.
+        fixture.asUser(({conn}) => {
+            const db = conn.getDB(jsTestName());
+            const collectionExists =
+                db.getCollectionInfos().some(info => info.name === collTmpName);
+            assert(!collectionExists);
+        });
+
+        fixture.disableWriteBlockMode();
+    }
+
     if (fixture.takeGlobalLock) {
         // Test that serverStatus will produce WriteBlockState.UNKNOWN when the global lock is held.
         let globalLock = fixture.takeGlobalLock();
