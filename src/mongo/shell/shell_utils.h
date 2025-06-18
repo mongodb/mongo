@@ -113,6 +113,8 @@ struct GoldenTestContextShellFailure {
     void diff() const;
 };
 
+void closeMochaStyleTestContext(Scope& scope);
+
 enum class NormalizationOpts : uint32_t {
     kResults = 0,
     // Set this bit to sort an array of results. Used in QueryTester.

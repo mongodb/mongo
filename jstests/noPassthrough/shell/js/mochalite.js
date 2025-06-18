@@ -1,5 +1,5 @@
 
-import {describe, it, runTests} from "jstests/libs/mochalite.js";
+import {describe, it} from "jstests/libs/mochalite.js";
 
 // validate test execution and ordering
 
@@ -42,10 +42,7 @@ it("test8", function() {
 });
 it("test9", function() {
     log.push(9);
+
+    // final check on sequencing from prior testpoints
+    assert.eq(log, [...Array(10).keys()]);
 });
-
-assert.eq(log, []);
-
-runTests();
-
-assert.eq(log, [...Array(10).keys()]);

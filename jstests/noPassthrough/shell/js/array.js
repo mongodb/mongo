@@ -1,5 +1,5 @@
 
-import {describe, it, runTests} from "jstests/libs/mochalite.js";
+import {describe, it} from "jstests/libs/mochalite.js";
 
 describe("Array shims and polyfills", function() {
     it("contains", function() {
@@ -104,5 +104,3 @@ describe("Array shims and polyfills", function() {
         assert.eq(e.message, "The first argument to Array.stdDev must be an array");
     });
 });
-
-runTests();

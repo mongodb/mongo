@@ -1,5 +1,5 @@
 
-import {describe, it, runTests} from "jstests/libs/mochalite.js";
+import {describe, it} from "jstests/libs/mochalite.js";
 
 globalThis.TestData ??= {};
 
@@ -416,5 +416,3 @@ describe("tojson", function() {
         });
     });
 });
-
-runTests();

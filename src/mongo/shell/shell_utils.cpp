@@ -715,6 +715,12 @@ BSONObj _closeGoldenData(const BSONObj& input, void*) {
     return {};
 }
 
+void closeMochaStyleTestContext(Scope& scope) {
+    const StringData code =
+        "function() { if (typeof globalThis.__mochalite_closer === 'function') __mochalite_closer(); }"_sd;
+    scope.invokeSafe(code.data(), nullptr, nullptr);
+}
+
 /**
  * This function is a light-weight BSON builder to support building an arbitrary BSON in shell.
  * This function is particularly useful for testing invalid BSON object which is impossible to be

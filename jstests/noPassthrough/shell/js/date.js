@@ -1,5 +1,5 @@
 
-import {describe, it, runTests} from "jstests/libs/mochalite.js";
+import {describe, it} from "jstests/libs/mochalite.js";
 
 describe("Date shims and polyfills", function() {
     it("should be able to create a Date", function() {
@@ -252,5 +252,3 @@ describe("Date shims and polyfills", function() {
         });
     });
 });
-
-runTests();

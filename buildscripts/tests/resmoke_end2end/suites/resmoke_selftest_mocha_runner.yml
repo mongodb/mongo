@@ -1,0 +1,13 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - buildscripts/tests/resmoke_end2end/testfiles/mocha/**/*.js
+    - jstests/noPassthrough/shell/js/mochalite.js
+
+executor:
+  archive:
+    tests: true
+  config:
+    shell_options:
+      nodb: ""

@@ -1,5 +1,5 @@
 
-import {describe, it, runTests} from "jstests/libs/mochalite.js";
+import {describe, it} from "jstests/libs/mochalite.js";
 
 describe("Set shims and polyfills", function() {
     it("tojson", function() {
@@ -13,5 +13,3 @@ describe("Set shims and polyfills", function() {
         assert.eq(toJsonForLog(s), '{"$set":["value1","value2",2,"2"]}');
     });
 });
-
-runTests();

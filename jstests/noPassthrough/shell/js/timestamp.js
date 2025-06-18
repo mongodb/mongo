@@ -1,5 +1,5 @@
 
-import {describe, it, runTests} from "jstests/libs/mochalite.js";
+import {describe, it} from "jstests/libs/mochalite.js";
 
 describe("Timestamp shims and polyfills", function() {
     it("should be able to create a Timestamp", function() {
@@ -42,5 +42,3 @@ describe("Timestamp shims and polyfills", function() {
         assert.eq(ts.toStringIncomparable(), "Timestamp(1, 2)");
     });
 });
-
-runTests();

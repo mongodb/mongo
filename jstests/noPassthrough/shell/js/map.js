@@ -1,4 +1,4 @@
-import {describe, it, runTests} from "jstests/libs/mochalite.js";
+import {describe, it} from "jstests/libs/mochalite.js";
 
 describe("Map shims and polyfills", function() {
     describe("built-in Map", function() {
@@ -123,5 +123,3 @@ describe("Map shims and polyfills", function() {
         });
     });
 });
-
-runTests();

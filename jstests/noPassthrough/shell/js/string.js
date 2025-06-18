@@ -1,4 +1,4 @@
-import {describe, it, runTests} from "jstests/libs/mochalite.js";
+import {describe, it} from "jstests/libs/mochalite.js";
 
 describe("String shims and polyfills", function() {
     it("should implement trim", function() {
@@ -52,5 +52,3 @@ describe("String shims and polyfills", function() {
         assert.eq(str.pad(10, true, "X"), "helloXXXXX");
     });
 });
-
-runTests();

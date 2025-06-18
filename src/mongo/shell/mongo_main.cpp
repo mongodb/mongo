@@ -1011,6 +1011,14 @@ int mongo_main(int argc, char* argv[]) {
                 return kInputFileError;
             }
 
+            // If the test is using the mochalite framework, invoke the runner
+            try {
+                shell_utils::closeMochaStyleTestContext(*shellMainScope);
+            } catch (std::exception&) {
+                std::cout << "Failure detected from Mocha test runner" << std::endl;
+                return kInputFileError;
+            }
+
             // If the test began a GoldenTestContext, end it and compare actual/expected results.
             // NOTE: putting this in ~MongoProgramScope would call it at the end of each load(),
             // but we only want to call it once the original test file finishes.
