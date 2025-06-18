@@ -124,7 +124,8 @@ function runCommandWithRetryUponMigration(
     conn, dbName, commandName, commandObj, func, makeFuncArgs) {
     // These are the query commands that will be retried when failing due to a concurrent chunk or
     // collection migrations.
-    const kQueryCommands = new Set(['find', 'aggregate', 'listIndexes', 'count', 'distinct']);
+    const kQueryCommands =
+        new Set(['find', 'aggregate', 'listIndexes', 'count', 'distinct', 'explain']);
 
     // These are the DDL commands that can return BackgroundOperationInProgress error codes due to
     // concurrent chunk or collection migrations.
