@@ -532,7 +532,7 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
     session->setIdleExpireTime(_clockSource->now());
 
     {
-        stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+        stdx::lock_guard<Latch> lock(_cacheLock);
         _sessions.push_back(session);
     }
 
