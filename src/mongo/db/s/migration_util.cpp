@@ -132,54 +132,6 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 WriteConcernOptions::kNoTimeout);
 
-class MigrationUtilExecutor {
-public:
-    MigrationUtilExecutor()
-        : _executor(executor::ThreadPoolTaskExecutor::create(
-              _makePool(), executor::makeNetworkInterface("MigrationUtil-TaskExecutor"))) {}
-
-    void shutDownAndJoin() {
-        _executor->shutdown();
-        _executor->join();
-    }
-
-    std::shared_ptr<executor::ThreadPoolTaskExecutor> getExecutor() {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
-        if (!_started) {
-            _executor->startup();
-            _started = true;
-        }
-        return _executor;
-    }
-
-private:
-    std::unique_ptr<ThreadPool> _makePool() {
-        ThreadPool::Options options;
-        options.poolName = "MoveChunk";
-        options.minThreads = 0;
-        options.maxThreads = 16;
-        return std::make_unique<ThreadPool>(std::move(options));
-    }
-
-    std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
-
-    // TODO SERVER-57253: get rid of _mutex and _started fields
-    stdx::mutex _mutex;
-    bool _started = false;
-};
-
-const auto migrationUtilExecutorDecoration =
-    ServiceContext::declareDecoration<MigrationUtilExecutor>();
-const ServiceContext::ConstructorActionRegisterer migrationUtilExecutorRegisterer{
-    "MigrationUtilExecutor",
-    [](ServiceContext* service) {
-        // TODO SERVER-57253: start migration util executor at decoration construction time
-    },
-    [](ServiceContext* service) {
-        migrationUtilExecutorDecoration(service).shutDownAndJoin();
-    }};
-
-
 void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const NamespaceString& nss) {
     hangBeforeFilteringMetadataRefresh.pauseWhileSet();
 
@@ -215,11 +167,6 @@ BSONObj getQueryFilterForRangeDeletionTask(const UUID& collectionUuid, const Chu
 
 
 }  // namespace
-
-std::shared_ptr<executor::ThreadPoolTaskExecutor> getMigrationUtilExecutor(
-    ServiceContext* serviceContext) {
-    return migrationUtilExecutorDecoration(serviceContext).getExecutor();
-}
 
 BSONObjBuilder _makeMigrationStatusDocumentCommon(const NamespaceString& nss,
                                                   const ShardId& fromShard,

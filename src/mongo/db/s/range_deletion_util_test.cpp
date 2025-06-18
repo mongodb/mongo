@@ -115,11 +115,6 @@ public:
     void tearDown() override {
         DBDirectClient client(_opCtx);
         client.dropCollection(kNss);
-
-        while (migrationutil::getMigrationUtilExecutor(getServiceContext())->hasTasks()) {
-            continue;
-        }
-
         WaitForMajorityService::get(getServiceContext()).shutDown();
         ShardServerTestFixture::tearDown();
     }

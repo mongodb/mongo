@@ -116,14 +116,6 @@ ChunkRange extendOrTruncateBoundsForMetadata(const CollectionMetadata& metadata,
                                              const ChunkRange& range);
 
 /**
- * Returns an executor to be used to run commands related to submitting tasks to the range deleter.
- * The executor is initialized on the first call to this function. Uses a shared_ptr because a
- * shared_ptr is required to work with ExecutorFutures.
- */
-std::shared_ptr<executor::ThreadPoolTaskExecutor> getMigrationUtilExecutor(
-    ServiceContext* serviceContext);
-
-/**
  * Writes the migration coordinator document to config.migrationCoordinators and waits for majority
  * write concern.
  */
