@@ -328,7 +328,7 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
                                std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata,
                                std::unique_ptr<RecordStore> recordStore)
     : CollectionImpl(opCtx, nss, std::move(catalogId), metadata->options, std::move(recordStore)) {
-    _metadata = std::move(metadata);
+    _setMetadata(std::move(metadata));
 }
 
 CollectionImpl::~CollectionImpl() = default;
@@ -371,7 +371,7 @@ SharedCollectionDecorations* CollectionImpl::getSharedDecorations() const {
 }
 
 void CollectionImpl::init(OperationContext* opCtx) {
-    _metadata = DurableCatalog::get(opCtx)->getMetaData(opCtx, getCatalogId());
+    _setMetadata(DurableCatalog::get(opCtx)->getMetaData(opCtx, getCatalogId()));
     const auto& collectionOptions = _metadata->options;
 
     _initShared(opCtx, collectionOptions);
@@ -506,6 +506,23 @@ void CollectionImpl::_initCommon(OperationContext* opCtx) {
                               logAttrs(_ns),
                               "validatorStatus"_attr = _validator.getStatus());
     }
+}
+
+void CollectionImpl::_setMetadata(
+    std::shared_ptr<BSONCollectionCatalogEntry::MetaData>&& metadata) {
+    if (metadata->options.timeseries) {
+        // If present, reuse the storageEngine options to work around the issue described in
+        // SERVER-91194.
+        boost::optional<bool> optBackwardsCompatiblesMayHaveMixedSchemaDataFlag =
+            getFlagFromStorageEngineBson(
+                metadata->options.storageEngine,
+                backwards_compatible_collection_options::kTimeseriesBucketsMayHaveMixedSchemaData);
+        if (optBackwardsCompatiblesMayHaveMixedSchemaDataFlag.has_value()) {
+            metadata->timeseriesBucketsMayHaveMixedSchemaData =
+                *optBackwardsCompatiblesMayHaveMixedSchemaDataFlag;
+        }
+    }
+    _metadata = std::move(metadata);
 }
 
 bool CollectionImpl::isInitialized() const {
@@ -829,16 +846,6 @@ boost::optional<bool> CollectionImpl::getTimeseriesBucketsMayHaveMixedSchemaData
     if (!getTimeseriesOptions()) {
         return boost::none;
     }
-
-    // If present, reuse storageEngine options to work around the issue described in SERVER-91194
-    boost::optional<bool> optBackwardsCompatibleFlag = getFlagFromStorageEngineBson(
-        _metadata->options.storageEngine,
-        backwards_compatible_collection_options::kTimeseriesBucketsMayHaveMixedSchemaData);
-    if (optBackwardsCompatibleFlag) {
-        return *optBackwardsCompatibleFlag;
-    }
-
-    // Else, fallback to legacy parameter
     return _metadata->timeseriesBucketsMayHaveMixedSchemaData;
 }
 
@@ -1877,7 +1884,7 @@ bool CollectionImpl::isIndexReady(StringData indexName) const {
 void CollectionImpl::replaceMetadata(OperationContext* opCtx,
                                      std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md) {
     DurableCatalog::get(opCtx)->putMetaData(opCtx, getCatalogId(), *md);
-    _metadata = std::move(md);
+    _setMetadata(std::move(md));
 }
 
 bool CollectionImpl::isMetadataEqual(const BSONObj& otherMetadata) const {

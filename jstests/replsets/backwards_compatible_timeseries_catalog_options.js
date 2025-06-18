@@ -2,6 +2,8 @@
  * Test that timeseriesBucketsMayHaveMixedSchemaData and timeseriesBucketingParametersHaveChanged
  * collection options are correctly applied by secondaries and cloned on initial sync according to
  * the format introduced under SERVER-91195 (relying on storageEngine.wiredTiger.configString).
+ *
+ * @tags: [multiversion_incompatible]
  */
 load("jstests/libs/feature_flag_util.js");  // For "FeatureFlagUtil"
 
@@ -38,7 +40,7 @@ const configStringAfterCollMod =
 assert.eq(configStringAfterCollMod, expectedAppMetadata);
 
 // Add a new node and wait for it to complete initial sync
-rst.add({rsConfig: {priority: 0}});
+let isync_node = rst.add({rsConfig: {priority: 1}});
 
 rst.reInitiate();
 rst.awaitSecondaryNodes();
@@ -66,5 +68,57 @@ assertSameOutputFromDifferentNodes(node => {
         .runCommand({listCollections: 1, filter: {name: bucketCollName}})
         .cursor.firstBatch[0];
 });
+
+const bucketWithMixedSchema = {
+    _id: ObjectId("65a6eb806ffc9fa4280ecac4"),
+    control: {
+        version: NumberInt(1),
+        min: {
+            _id: ObjectId("65a6eba7e6d2e848e08c3750"),
+            t: ISODate("2024-01-16T20:48:00Z"),
+            a: 1,
+        },
+        max: {
+            _id: ObjectId("65a6eba7e6d2e848e08c3751"),
+            t: ISODate("2024-01-16T20:48:39.448Z"),
+            a: "a",
+        },
+    },
+    meta: 0,
+    data: {
+        _id: {
+            0: ObjectId("65a6eba7e6d2e848e08c3750"),
+            1: ObjectId("65a6eba7e6d2e848e08c3751"),
+        },
+        t: {
+            0: ISODate("2024-01-16T20:48:39.448Z"),
+            1: ISODate("2024-01-16T20:48:39.448Z"),
+        },
+        a: {
+            0: "a",
+            1: 1,
+        },
+    }
+};
+
+// Assert the current primary accepts the document.
+assert.commandWorked(
+    rst.getPrimary().getDB(dbName).getCollection(bucketCollName).insert(bucketWithMixedSchema));
+
+// Step-up to primary the initial-synced secondary.
+assert.soonNoExcept(function() {
+    assert.commandWorked(isync_node.adminCommand({replSetStepUp: 1}));
+    return true;
+});
+rst.awaitNodesAgreeOnPrimary(undefined /* timesout */, undefined /* nodes */, isync_node);
+
+// Assert the initial-synced node accepts the document.
+bucketWithMixedSchema._id = ObjectId("65a6eb806ffc9fa4280ecada");
+var bucketColl = rst.getPrimary().getDB(dbName).getCollection(bucketCollName);
+assert.commandWorked(bucketColl.insert(bucketWithMixedSchema));
+
+// Delete the collection to prevent post-test checks to fail. The current bucket collection is left
+// uncompressed.
+bucketColl.drop();
 
 rst.stopSet();
