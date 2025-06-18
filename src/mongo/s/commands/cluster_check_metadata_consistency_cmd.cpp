@@ -102,7 +102,8 @@ public:
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
             const auto nss = ns();
-            switch (getCommandLevel(nss)) {
+            const auto commandLevel = getCommandLevel(nss);
+            switch (commandLevel) {
                 case MetadataConsistencyCommandLevelEnum::kClusterLevel:
                     return _runClusterLevel(opCtx, nss);
                 case MetadataConsistencyCommandLevelEnum::kDatabaseLevel:
@@ -110,7 +111,14 @@ public:
                 case MetadataConsistencyCommandLevelEnum::kCollectionLevel:
                     return _runCollectionLevel(opCtx, nss);
                 default:
-                    MONGO_UNREACHABLE;
+                    tasserted(1011700,
+                              str::stream()
+                                  << "Unexpected parameter during the internal execution of "
+                                     "checkMetadataConsistency command. The router was expecting "
+                                     "to receive a cluster, database or collection level "
+                                     "parameter, but received "
+                                  << MetadataConsistencyCommandLevel_serializer(commandLevel)
+                                  << " with namespace " << nss.toStringForErrorMsg());
             }
         }
 
@@ -299,7 +307,8 @@ public:
             };
 
             const auto nss = ns();
-            switch (getCommandLevel(nss)) {
+            const auto commandLevel = getCommandLevel(nss);
+            switch (commandLevel) {
                 case MetadataConsistencyCommandLevelEnum::kClusterLevel:
                     uassert(ErrorCodes::Unauthorized,
                             "Not authorized to check cluster metadata consistency",
@@ -322,7 +331,14 @@ public:
                                 isAuthorizedOnResource(ResourcePattern::forExactNamespace(nss)));
                     break;
                 default:
-                    MONGO_UNREACHABLE;
+                    tasserted(1011701,
+                              str::stream()
+                                  << "Unexpected parameter during the internal execution of "
+                                     "checkMetadataConsistency command. The router was expecting "
+                                     "to receive a cluster, database or collection level "
+                                     "parameter, but received "
+                                  << MetadataConsistencyCommandLevel_serializer(commandLevel)
+                                  << " with namespace " << nss.toStringForErrorMsg());
             }
         }
     };

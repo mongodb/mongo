@@ -208,9 +208,13 @@ public:
             const auto& primaryShardId = request().getPrimaryShardId();
             const auto commandLevel = metadata_consistency_util::getCommandLevel(nss);
 
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << Request::kCommandName
-                                  << " can only be run over a specific collection or database",
+            tassert(1011703,
+                    str::stream()
+                        << "Unexpected parameter during the internal execution of "
+                           "checkMetadataConsistency command. The shard server was expecting to "
+                           "receive a database or collection level parameter, but received "
+                        << MetadataConsistencyCommandLevel_serializer(commandLevel)
+                        << " with namespace " << nss.toStringForErrorMsg(),
                     commandLevel == MetadataConsistencyCommandLevelEnum::kCollectionLevel ||
                         commandLevel == MetadataConsistencyCommandLevelEnum::kDatabaseLevel);
 
@@ -234,7 +238,14 @@ public:
                             return std::vector<CollectionType>{};
                         }
                     default:
-                        MONGO_UNREACHABLE;
+                        tasserted(1011704,
+                                  str::stream()
+                                      << "Unexpected parameter during the internal execution of "
+                                         "checkMetadataConsistency command. The shard server was "
+                                         "expecting to receive a database or collection level "
+                                         "parameter, but received "
+                                      << MetadataConsistencyCommandLevel_serializer(commandLevel)
+                                      << " with namespace " << nss.toStringForErrorMsg());
                 }
             }();
 
@@ -274,7 +285,14 @@ public:
                         break;
                     }
                     default:
-                        MONGO_UNREACHABLE;
+                        tasserted(1011705,
+                                  str::stream()
+                                      << "Unexpected parameter during the internal execution of "
+                                         "checkMetadataConsistency command. The shard server was "
+                                         "expecting to receive a database or collection level "
+                                         "parameter, but received "
+                                      << MetadataConsistencyCommandLevel_serializer(commandLevel)
+                                      << " with namespace " << nss.toStringForErrorMsg());
                 }
 
                 // Check consistency between local metadata and configsvr metadata

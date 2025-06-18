@@ -78,7 +78,8 @@ public:
             std::vector<MetadataInconsistencyItem> inconsistenciesMerged;
             const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
 
-            switch (metadata_consistency_util::getCommandLevel(nss)) {
+            const auto commandLevel = metadata_consistency_util::getCommandLevel(nss);
+            switch (commandLevel) {
                 case MetadataConsistencyCommandLevelEnum::kDatabaseLevel: {
                     const auto collections = catalogClient->getCollections(opCtx, nss.db());
 
@@ -97,10 +98,14 @@ public:
                     break;
                 }
                 default:
-                    uasserted(ErrorCodes::IllegalOperation,
+                    tasserted(1011702,
                               str::stream()
-                                  << Request::kCommandName
-                                  << " can only be run over a specific collection or database");
+                                  << "Unexpected parameter during the internal execution of "
+                                     "checkMetadataConsistency command. The config server was "
+                                     "expecting to receive a database or collection level "
+                                     "parameter, but received "
+                                  << MetadataConsistencyCommandLevel_serializer(commandLevel)
+                                  << " with namespace " << nss.toStringForErrorMsg());
             }
 
             auto exec = metadata_consistency_util::makeQueuedPlanExecutor(
