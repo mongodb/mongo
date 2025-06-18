@@ -69,10 +69,12 @@ selector:
     - jstests/core/timeseries/ddl/timeseries_index_spec_with_originalSpec.js
     - jstests/core/timeseries/ddl/timeseries_index_stats.js
     - jstests/core/timeseries/ddl/timeseries_index_ttl_partial.js
+    - jstests/core/timeseries/ddl/timeseries_index_use.js
     - jstests/core/timeseries/ddl/timeseries_list_catalog.js
     - jstests/core/timeseries/ddl/timeseries_list_collections.js
     - jstests/core/timeseries/ddl/timeseries_list_collections_filter_name.js
     - jstests/core/timeseries/ddl/timeseries_list_collections_rawdata.js
+    - jstests/core/timeseries/ddl/timeseries_metric_index_2dsphere.js
     - jstests/core/timeseries/ddl/timeseries_metric_index_ascending_descending.js
     - jstests/core/timeseries/ddl/timeseries_metric_index_compound.js
     - jstests/core/timeseries/ddl/timeseries_metric_index_hashed.js
@@ -101,6 +103,7 @@ selector:
     - jstests/core/timeseries/query/timeseries_explicit_unpack_bucket.js
     - jstests/core/timeseries/query/timeseries_groupby_reorder.js
     - jstests/core/timeseries/query/timeseries_groupby_reorder_expr.js
+    - jstests/core/timeseries/query/timeseries_hint.js
     - jstests/core/timeseries/query/timeseries_homogeneous_top_bottom.js
     - jstests/core/timeseries/query/timeseries_id_range.js
     - jstests/core/timeseries/query/timeseries_insert_normalize_metadata.js
@@ -114,6 +117,7 @@ selector:
     - jstests/core/timeseries/query/timeseries_match_pushdown.js
     - jstests/core/timeseries/query/timeseries_match_pushdown_with_project.js
     - jstests/core/timeseries/query/timeseries_merge.js
+    - jstests/core/timeseries/query/timeseries_partial_index_opt.js
     - jstests/core/timeseries/query/timeseries_project.js
     - jstests/core/timeseries/query/timeseries_project_pushdown.js
     - jstests/core/timeseries/query/timeseries_raw_data_getmore.js

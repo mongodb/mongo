@@ -9,8 +9,6 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   # TODO (SERVER-105506): Remove when explain() works for viewless timeseries on sharded clusters
- *   viewless_timeseries_bug,
  *   # During fcv upgrade/downgrade the index created might not be what we expect.
  * ]
  */

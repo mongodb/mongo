@@ -11,8 +11,6 @@
  *   requires_pipeline_optimization,
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   # TODO (SERVER-105506): Remove when explain() works for viewless timeseries on sharded clusters
- *   viewless_timeseries_bug,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";

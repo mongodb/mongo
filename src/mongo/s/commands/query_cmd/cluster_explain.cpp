@@ -37,6 +37,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/shard_id.h"
@@ -50,6 +51,8 @@
 #include "mongo/util/str.h"
 
 #include <memory>
+
+#include <fmt/format.h>
 
 namespace mongo {
 
@@ -177,6 +180,7 @@ void ClusterExplain::validateShardResponses(
 
     // Count up the number of shards that have execution stats and all plan execution level
     // information.
+    size_t numShardsQueryPlanner = 0;
     size_t numShardsExecStats = 0;
     size_t numShardsAllPlansStats = 0;
 
@@ -187,10 +191,20 @@ void ClusterExplain::validateShardResponses(
 
         auto responseData = response.swResponse.getValue().data;
 
-        uassert(ErrorCodes::OperationFailed,
-                str::stream() << "Explain command on shard " << response.shardId
-                              << " failed, caused by: " << responseData,
-                responseData["queryPlanner"].type() == BSONType::object);
+        if (const auto& shardQueryPlanner = responseData["queryPlanner"]) {
+            uassert(ErrorCodes::OperationFailed,
+                    str::stream() << "Explain command on shard " << response.shardId
+                                  << " failed, caused by: " << responseData,
+                    shardQueryPlanner.type() == BSONType::object);
+            numShardsQueryPlanner++;
+        } else {
+            uassert(ErrorCodes::OperationFailed,
+                    fmt::format("Explain command response from shard '{}' does not contain neither "
+                                "'queryPlanner' field nor 'stages' field. Response: {}",
+                                response.shardId.toString(),
+                                responseData.toString()),
+                    responseData.hasField("stages"));
+        }
 
         if (responseData.hasField("executionStats")) {
             numShardsExecStats++;
@@ -200,6 +214,11 @@ void ClusterExplain::validateShardResponses(
             }
         }
     }
+
+    uassert(ErrorCodes::InternalError,
+            str::stream() << "Only " << numShardsQueryPlanner << "/" << shardResponses.size()
+                          << " had top level queryPlanner explain information.",
+            numShardsQueryPlanner == 0 || numShardsQueryPlanner == shardResponses.size());
 
     // Either all shards should have execution stats info, or none should.
     uassert(ErrorCodes::InternalError,
@@ -230,6 +249,15 @@ void ClusterExplain::buildPlannerInfo(OperationContext* opCtx,
                                       const vector<AsyncRequestsSender::Response>& shardResponses,
                                       const char* mongosStageName,
                                       BSONObjBuilder* out) {
+    const auto& firstShardResponseData = shardResponses[0].swResponse.getValue().data;
+
+    if (firstShardResponseData.hasField("stages")) {
+        // Explain output is from an aggregation execution.
+        // Use the aggregation helper to merge shards output into the upstream response.
+        sharded_agg_helpers::mergeExplainOutputFromShards(shardResponses, out);
+        return;
+    }
+
     BSONObjBuilder queryPlannerBob(out->subobjStart("queryPlanner"));
 
     BSONObjBuilder winningPlanBob(queryPlannerBob.subobjStart("winningPlan"));

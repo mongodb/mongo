@@ -188,6 +188,9 @@ void partitionAndAddMergeCursorsSource(Pipeline* pipeline,
  */
 BSONObj targetShardsForExplain(Pipeline* ownedPipeline);
 
+
+void mergeExplainOutputFromShards(const std::vector<AsyncRequestsSender::Response>& shardResponses,
+                                  BSONObjBuilder* result);
 /**
  * Appends the explain output of `dispatchResults` to `result`.
  */

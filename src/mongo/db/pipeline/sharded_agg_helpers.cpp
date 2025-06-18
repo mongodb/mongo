@@ -1409,6 +1409,42 @@ void partitionAndAddMergeCursorsSource(Pipeline* mergePipeline,
     }
 }
 
+void mergeExplainOutputFromShards(const std::vector<AsyncRequestsSender::Response>& shardResponses,
+                                  BSONObjBuilder* result) {
+    BSONObjBuilder shardExplains(result->subobjStart("shards"));
+
+    for (const auto& shardResult : shardResponses) {
+        uassertStatusOK(shardResult.swResponse.getStatus());
+        uassertStatusOK(getStatusFromCommandResult(shardResult.swResponse.getValue().data));
+
+        invariant(shardResult.shardHostAndPort);
+
+        auto shardId = shardResult.shardId.toString();
+        const auto& data = shardResult.swResponse.getValue().data;
+        BSONObjBuilder explain;
+        explain << "host" << shardResult.shardHostAndPort->toString();
+
+        // Add the per shard explainVersion to the final explain output.
+        auto explainVersion = data["explainVersion"];
+        explain << "explainVersion" << explainVersion;
+
+        if (auto stagesElement = data["stages"]) {
+            explain << "stages" << stagesElement;
+        } else {
+            auto queryPlannerElement = data["queryPlanner"];
+            uassert(51157,
+                    str::stream() << "Malformed explain response received from shard " << shardId
+                                  << ": " << data.toString(),
+                    queryPlannerElement);
+            explain << "queryPlanner" << queryPlannerElement;
+            if (auto executionStatsElement = data["executionStats"]) {
+                explain << "executionStats" << executionStatsElement;
+            }
+        }
+        explain_common::appendIfRoom(explain.done(), shardId, &shardExplains);
+    }
+}
+
 Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
                             const boost::intrusive_ptr<ExpressionContext>& mergeCtx,
                             BSONObjBuilder* result) {
@@ -1483,38 +1519,7 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
         *result << "splitPipeline" << BSONNULL;
     }
 
-    BSONObjBuilder shardExplains(result->subobjStart("shards"));
-
-    for (const auto& shardResult : dispatchResults.remoteExplainOutput) {
-        uassertStatusOK(shardResult.swResponse.getStatus());
-        uassertStatusOK(getStatusFromCommandResult(shardResult.swResponse.getValue().data));
-
-        invariant(shardResult.shardHostAndPort);
-
-        auto shardId = shardResult.shardId.toString();
-        const auto& data = shardResult.swResponse.getValue().data;
-        BSONObjBuilder explain;
-        explain << "host" << shardResult.shardHostAndPort->toString();
-
-        // Add the per shard explainVersion to the final explain output.
-        auto explainVersion = data["explainVersion"];
-        explain << "explainVersion" << explainVersion;
-
-        if (auto stagesElement = data["stages"]) {
-            explain << "stages" << stagesElement;
-        } else {
-            auto queryPlannerElement = data["queryPlanner"];
-            uassert(51157,
-                    str::stream() << "Malformed explain response received from shard " << shardId
-                                  << ": " << data.toString(),
-                    queryPlannerElement);
-            explain << "queryPlanner" << queryPlannerElement;
-            if (auto executionStatsElement = data["executionStats"]) {
-                explain << "executionStats" << executionStatsElement;
-            }
-        }
-        explain_common::appendIfRoom(explain.done(), shardId, &shardExplains);
-    }
+    mergeExplainOutputFromShards(dispatchResults.remoteExplainOutput, result);
 
     return Status::OK();
 }

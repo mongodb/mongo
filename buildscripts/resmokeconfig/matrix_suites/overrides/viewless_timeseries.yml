@@ -1,4 +1,3 @@
-# featureFlagCreateViewlessTimeseriesCollections overrides
 - name: enable_viewless_timeseries_feature_flag_mongod
   value:
     executor:
@@ -31,7 +30,6 @@
             TestData:
               setParametersMongos:
                 featureFlagCreateViewlessTimeseriesCollections: true
-# concurrency test selectors
 - name: all_concurrency_timeseries_tests_selector
   value:
     selector:
@@ -39,7 +37,6 @@
       roots:
         - jstests/concurrency/fsm_workloads/**/*timeseries*/**/*.js
         - jstests/concurrency/fsm_workloads/**/*timeseries*.js
-# jsCore test selectors
 - name: all_jscore_timeseries_tests_selector
   value:
     selector:
@@ -71,10 +68,12 @@
         - jstests/core/timeseries/ddl/timeseries_index_spec_with_originalSpec.js
         - jstests/core/timeseries/ddl/timeseries_index_stats.js
         - jstests/core/timeseries/ddl/timeseries_index_ttl_partial.js
+        - jstests/core/timeseries/ddl/timeseries_index_use.js
         - jstests/core/timeseries/ddl/timeseries_list_catalog.js
         - jstests/core/timeseries/ddl/timeseries_list_collections.js
         - jstests/core/timeseries/ddl/timeseries_list_collections_filter_name.js
         - jstests/core/timeseries/ddl/timeseries_list_collections_rawdata.js
+        - jstests/core/timeseries/ddl/timeseries_metric_index_2dsphere.js
         - jstests/core/timeseries/ddl/timeseries_metric_index_ascending_descending.js
         - jstests/core/timeseries/ddl/timeseries_metric_index_compound.js
         - jstests/core/timeseries/ddl/timeseries_metric_index_hashed.js
@@ -103,6 +102,7 @@
         - jstests/core/timeseries/query/timeseries_explicit_unpack_bucket.js
         - jstests/core/timeseries/query/timeseries_groupby_reorder.js
         - jstests/core/timeseries/query/timeseries_groupby_reorder_expr.js
+        - jstests/core/timeseries/query/timeseries_hint.js
         - jstests/core/timeseries/query/timeseries_homogeneous_top_bottom.js
         - jstests/core/timeseries/query/timeseries_id_range.js
         - jstests/core/timeseries/query/timeseries_insert_normalize_metadata.js
@@ -116,6 +116,7 @@
         - jstests/core/timeseries/query/timeseries_match_pushdown.js
         - jstests/core/timeseries/query/timeseries_match_pushdown_with_project.js
         - jstests/core/timeseries/query/timeseries_merge.js
+        - jstests/core/timeseries/query/timeseries_partial_index_opt.js
         - jstests/core/timeseries/query/timeseries_project.js
         - jstests/core/timeseries/query/timeseries_project_pushdown.js
         - jstests/core/timeseries/query/timeseries_raw_data_getmore.js
@@ -137,7 +138,6 @@
         - jstests/core/timeseries/write/timeseries_out_of_order.js
         - jstests/core/timeseries/write/timeseries_simple.js
         - jstests/core/timeseries/write/timeseries_sparse.js
-# sharding test selectors
 - name: all_sharding_timeseries_tests_selector
   value:
     selector:
@@ -154,7 +154,6 @@
         - jstests/sharding/timeseries/timeseries_out_conflicting_namespace_on_shard.js
         - jstests/sharding/timeseries/timeseries_shard_collection_with_deprecation_message.js
         - jstests/sharding/timeseries/timeseries_user_system_buckets_sharding.js
-# noPassthrough test selectors
 - name: all_no_passthrough_timeseries_tests_selector
   value:
     selector:
@@ -220,7 +219,6 @@
         - jstests/noPassthrough/timeseries/write/timeseries_retryable_writes_restart.js
         - jstests/noPassthrough/timeseries/write/timeseries_time_backward.js
         - jstests/noPassthrough/timeseries/write/timeseries_write_concern.js
-# excludes
 - name: exclude_viewless_timeseries_incompabile_tag
   value:
     exclude_with_any_tags:
