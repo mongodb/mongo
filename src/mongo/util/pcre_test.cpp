@@ -399,5 +399,49 @@ TEST(PcreTest, SubstituteFlags) {
               "The $3 $2 $1 jumped over $3 $2 $1.");
 }
 
+TEST(PcreTest, MatchLimit) {
+    std::string s(8, 'a');
+    static const std::string pattern = "(a+)+\\d";
+    {
+        Regex customLimitRegex(pattern, CompileOptions{}, Limits{.matchLimit = 128});
+        auto match = customLimitRegex.match(s);
+        ASSERT_TRUE(match.error());
+        ASSERT_EQ(match.error().message(), "match limit exceeded");
+    }
+    {
+        Regex defaultLimitRegex(pattern, CompileOptions{});
+        auto match = defaultLimitRegex.match(s);
+        ASSERT_TRUE(match.error());
+        ASSERT_EQ(match.error().message(), "no match");
+    }
+}
+
+TEST(PcreTest, HeapLimit) {
+    static const size_t kBlockSize = 1024;
+    static const size_t kBlockCount = 512;
+
+    static const std::string pattern = "(b(a+)+[bc])+";
+
+    std::string s;
+    s.reserve(kBlockSize * kBlockCount);
+    for (size_t i = 0; i < kBlockCount; ++i) {
+        s.push_back('b');
+        s += std::string(kBlockSize - 2, 'a');
+        s.push_back('b' + i % 2);
+    }
+
+    {
+        Regex customLimitRegex(pattern, CompileOptions{}, Limits{.heapLimitKB = 128});
+        auto match = customLimitRegex.match(s);
+        ASSERT_TRUE(match.error());
+        ASSERT_EQ(match.error().message(), "heap limit exceeded");
+    }
+    {
+        Regex defaultLimitRegex(pattern, CompileOptions{});
+        auto match = defaultLimitRegex.match(s);
+        ASSERT_FALSE(match.error());
+    }
+}
+
 }  // namespace
 }  // namespace mongo::pcre

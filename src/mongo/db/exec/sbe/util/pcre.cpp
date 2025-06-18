@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/sbe/util/pcre.h"
 
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
 
@@ -37,8 +38,13 @@ using TypeTags = value::TypeTags;
 using Value = value::Value;
 
 std::pair<TypeTags, Value> makeNewPcreRegex(StringData pattern, StringData options) {
-    auto regex =
-        std::make_unique<pcre::Regex>(std::string{pattern}, pcre_util::flagsToOptions(options));
+    auto regex = std::make_unique<pcre::Regex>(
+        std::string{pattern},
+        pcre_util::flagsToOptions(options),
+        pcre::Limits{
+            .heapLimitKB = static_cast<uint32_t>(internalQueryRegexHeapLimitKB.loadRelaxed()),
+            .matchLimit = static_cast<uint32_t>(internalQueryRegexMatchLimit.loadRelaxed())});
+
     uassert(5073402, str::stream() << "Invalid Regex: " << errorMessage(regex->error()), *regex);
     return {TypeTags::pcreRegex, value::bitcastFrom<pcre::Regex*>(regex.release())};
 }

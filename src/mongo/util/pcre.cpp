@@ -39,7 +39,6 @@
 
 #include <algorithm>
 #include <array>
-#include <new>
 
 #include <pcre2.h>
 
@@ -138,9 +137,7 @@ public:
 
     std::error_code setMaxPatternLength(size_t sz) {
         invariant(_ptr);
-        if (int err = pcre2_set_max_pattern_length(_ptr.get(), sz))
-            return toErrc(err);
-        return {};
+        return toErrc(pcre2_set_max_pattern_length(_ptr.get(), sz));
     }
 
     pcre2_compile_context* get() const {
@@ -156,10 +153,65 @@ private:
     std::unique_ptr<pcre2_compile_context, D> _ptr{pcre2_compile_context_create(nullptr)};
 };
 
+/** Wrapper around a pcre2_match_context. */
+class MatchContext {
+public:
+    MatchContext() = default;
+
+    MatchContext(MatchContext&&) = default;
+    MatchContext& operator=(MatchContext&&) = default;
+
+    MatchContext(const MatchContext& other) : _ptr(other._copyContext()) {}
+    MatchContext& operator=(const MatchContext& other) {
+        if (this == &other) {
+            return *this;
+        }
+        _ptr = other._copyContext();
+        return *this;
+    }
+
+    std::error_code setHeapLimit(uint32_t heapLimitKB) {
+        if (!_ptr) {
+            _createContext();
+        }
+        return toErrc(pcre2_set_heap_limit(_ptr.get(), heapLimitKB));
+    }
+
+    std::error_code setMatchLimit(uint32_t matchLimit) {
+        if (!_ptr) {
+            _createContext();
+        }
+        return toErrc(pcre2_set_match_limit(_ptr.get(), matchLimit));
+    }
+
+    pcre2_match_context* get() const {
+        return _ptr.get();
+    }
+
+private:
+    struct D {
+        void operator()(pcre2_match_context* p) const {
+            pcre2_match_context_free(p);
+        }
+    };
+
+    void _createContext() {
+        _ptr.reset(pcre2_match_context_create(nullptr));
+        tassert(10638800, "Failed to create pcre2_match_context", _ptr);
+    }
+
+    std::unique_ptr<pcre2_match_context, D> _copyContext() const {
+        return _ptr ? std::unique_ptr<pcre2_match_context, D>{pcre2_match_context_copy(_ptr.get())}
+                    : nullptr;
+    }
+
+    std::unique_ptr<pcre2_match_context, D> _ptr;
+};
+
 /** Members implement Regex interface and are documented there. */
 class RegexImpl {
 public:
-    RegexImpl(std::string pattern, CompileOptions options)
+    RegexImpl(std::string pattern, CompileOptions options, Limits limits)
         : _pattern{std::move(pattern)}, _errorPos{0} {
         int err = 0;
         CompileContext compileContext;
@@ -173,9 +225,18 @@ public:
                               &err,
                               &_errorPos,
                               compileContext.get());
-        if (!_code)
+        if (!_code) {
             _error = toErrc(err);
+        }
+
+        if (!_error && limits.heapLimitKB != 0) {
+            _error = _matchContext.setHeapLimit(limits.heapLimitKB);
+        }
+        if (!_error && limits.matchLimit != 0) {
+            _error = _matchContext.setMatchLimit(limits.matchLimit);
+        }
     }
+
     ~RegexImpl() = default;
     RegexImpl(const RegexImpl&) = default;
     RegexImpl& operator=(const RegexImpl&) = default;
@@ -248,7 +309,7 @@ public:
                                     startPos,
                                     static_cast<uint32_t>(trialOptions),
                                     (pcre2_match_data*)nullptr,
-                                    (pcre2_match_context*)nullptr,
+                                    _matchContext.get(),
                                     (PCRE2_SPTR)replacement.data(),
                                     replacement.size(),
                                     (PCRE2_UCHAR*)buf.data(),
@@ -311,6 +372,8 @@ private:
     CodeHandle _code;
     std::error_code _error;
     size_t _errorPos;
+
+    MatchContext _matchContext;
 };
 
 /** Members implement MatchData interface and are documented there. */
@@ -393,7 +456,7 @@ public:
         return _data.get();
     }
 
-    void doMatch(MatchOptions options, size_t startPos) {
+    void doMatch(MatchOptions options, size_t startPos, const MatchContext& matchContext) {
         _startPos = startPos;
         _data.reset(pcre2_match_data_create_from_pattern(_regex->code(), nullptr));
         int matched = pcre2_match(_regex->code(),
@@ -402,7 +465,7 @@ public:
                                   startPos,
                                   static_cast<uint32_t>(options),
                                   _data.get(),
-                                  nullptr);
+                                  matchContext.get());
         // From pcre2_match.c:
         //   Returns:          > 0 => success; value is the number of ovector pairs filled
         //                     = 0 => success, but ovector is not big enough
@@ -450,14 +513,14 @@ MatchData RegexImpl::_doMatch(std::unique_ptr<MatchDataImpl> m,
                               MatchOptions options,
                               size_t startPos) const {
     if (*this)
-        m->doMatch(options, startPos);
+        m->doMatch(options, startPos, _matchContext);
     return MatchData{std::move(m)};
 }
 
 }  // namespace detail
 
-Regex::Regex(std::string pattern, CompileOptions options)
-    : _impl{std::make_unique<detail::RegexImpl>(std::move(pattern), options)} {}
+Regex::Regex(std::string pattern, CompileOptions options, Limits limits)
+    : _impl{std::make_unique<detail::RegexImpl>(std::move(pattern), options, limits)} {}
 
 Regex::~Regex() = default;
 

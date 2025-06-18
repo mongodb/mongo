@@ -140,7 +140,11 @@ void compile(const boost::optional<std::string>& pattern,
     }
 
     auto re = std::make_shared<pcre::Regex>(
-        *pattern, pcre_util::flagsToOptions(options.value_or(""), opName));
+        *pattern,
+        pcre_util::flagsToOptions(options.value_or(""), opName),
+        pcre::Limits{
+            .heapLimitKB = static_cast<uint32_t>(internalQueryRegexHeapLimitKB.loadRelaxed()),
+            .matchLimit = static_cast<uint32_t>(internalQueryRegexMatchLimit.loadRelaxed())});
     uassert(51111,
             str::stream() << "Invalid Regex in " << opName << ": " << errorMessage(re->error()),
             *re);

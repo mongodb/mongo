@@ -1017,6 +1017,32 @@ server_parameters:
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
+    internalQueryRegexHeapLimitKB:
+        description: >-
+            The limit in kilobytes on the amount of heap that pcre library can use during regex
+            processing. If set to zero, the pcre2 library default value will be used instead.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryRegexHeapLimitKB"
+        cpp_vartype: AtomicWord<int>
+        default:
+            expr: 100 * 1024
+        validator:
+            gte: 0
+        redact: false
+
+    internalQueryRegexMatchLimit:
+        description: >-
+            The limit on the amount of times that pcre library can call backtrack during regex
+            matching. It protects from unbounded CPU usage. If set to zero, the pcre2 library
+            default value will be used instead.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryRegexMatchLimit"
+        cpp_vartype: AtomicWord<int>
+        default: 0
+        validator:
+            gte: 0
+        redact: false
+
     enableSearchMeta:
         description: >-
             Exists for backwards compatibility in startup parameters, enabling this was

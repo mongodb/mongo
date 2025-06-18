@@ -435,14 +435,26 @@ class MatchDataImpl;
 }  // namespace detail
 
 /**
+ * Limits to control regex execution CPU and RAM consumption. The value of 0 will use default pcre2
+ * library limits.
+ */
+struct Limits {
+    uint32_t heapLimitKB = 0;
+    uint32_t matchLimit = 0;
+};
+
+/**
  * Wrapper class encapsulating the PCRE2 regular expression library.
  * See https://www.pcre.org/current/doc/html/
  */
 class Regex {
 public:
-    Regex(std::string pattern, CompileOptions options);
+    Regex(std::string pattern, CompileOptions options, Limits limits);
 
-    explicit Regex(std::string pattern) : Regex{std::move(pattern), CompileOptions{}} {}
+    Regex(std::string pattern, CompileOptions options)
+        : Regex{std::move(pattern), options, Limits{}} {}
+
+    explicit Regex(std::string pattern) : Regex{std::move(pattern), CompileOptions{}, Limits{}} {}
 
     ~Regex();
 

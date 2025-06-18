@@ -43,6 +43,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/path.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
@@ -166,7 +167,12 @@ const std::set<char> RegexMatchExpression::kValidRegexFlags = {'i', 'm', 's', 'x
 
 std::unique_ptr<pcre::Regex> RegexMatchExpression::makeRegex(const std::string& regex,
                                                              const std::string& flags) {
-    return std::make_unique<pcre::Regex>(regex, pcre_util::flagsToOptions(flags));
+    return std::make_unique<pcre::Regex>(
+        regex,
+        pcre_util::flagsToOptions(flags),
+        pcre::Limits{
+            .heapLimitKB = static_cast<uint32_t>(internalQueryRegexHeapLimitKB.loadRelaxed()),
+            .matchLimit = static_cast<uint32_t>(internalQueryRegexMatchLimit.loadRelaxed())});
 }
 
 RegexMatchExpression::RegexMatchExpression(boost::optional<StringData> path,
