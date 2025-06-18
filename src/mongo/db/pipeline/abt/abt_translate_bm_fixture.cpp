@@ -154,7 +154,7 @@ void ABTTranslateBenchmarkFixture::benchmarkMatchComplex(benchmark::State& state
         "{'g.h': {$eq: 3}}"
         "]}"
         "]}"
-        "]}}");
+        "]}");
     benchmarkABTTranslate(state, match, BSONObj());
 }
 
