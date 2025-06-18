@@ -146,7 +146,7 @@ sh_binary(
         "@shfmt",
     ],
     env = {
-        "SHFMT_PATH": "$(execpath @shfmt//:shfmt)",
+        "SHFMT_PATH": "$(rootpath @shfmt//:shfmt)",
     },
     visibility = ["//visibility:public"],
 )

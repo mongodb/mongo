@@ -92,7 +92,19 @@ def main():
     structlog.configure(logger_factory=structlog.stdlib.LoggerFactory())
 
     # Use the nodejs binary from the bazel's npm repository
-    subprocess.run(["bazel", "build", "//:eslint", "--config=local"], env=os.environ, check=True)
+    # had to add '--build_runfile_links', '--legacy_external_runfiles' due to hard coded path below
+    subprocess.run(
+        [
+            "bazel",
+            "build",
+            "//:eslint",
+            "--config=local",
+            "--build_runfile_links",
+            "--legacy_external_runfiles",
+        ],
+        env=os.environ,
+        check=True,
+    )
     os.environ["PATH"] = (
         "bazel-bin/eslint_/eslint.runfiles/nodejs_linux_arm64/bin/nodejs/bin/" + os.pathsep
     ) + os.environ["PATH"]

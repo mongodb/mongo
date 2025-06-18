@@ -38,6 +38,16 @@ common --experimental_cc_shared_library
 # Reuse sandboxes to save sandbox execution and deletion times.
 common --experimental_reuse_sandbox_directories
 
+# Disabling runfiles links drastically increases performance in slow disk IO situations
+# Do not build runfile trees by default. If an execution strategy relies on runfile
+# symlink tree, the tree is created on-demand. See: https://github.com/bazelbuild/bazel/issues/6627
+# and https://github.com/bazelbuild/bazel/commit/03246077f948f2790a83520e7dccc2625650e6df
+common --nobuild_runfile_links
+
+# This will become the default bazel 8.0+
+# https://bazel.build/reference/command-line-reference#flag--legacy_external_runfiles
+common --nolegacy_external_runfiles
+
 # Seeing as we link locally, you'll end up with 99% of the files locally anyways.
 # Using remote download all save some build time because it will immediately download an object
 # file when it is available, where toplevel will wait until the local linking job needs it

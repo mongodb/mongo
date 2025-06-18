@@ -14,8 +14,8 @@ py_binary(
         "@codeowners_validator//:codeowners-validator",
     ],
     env = {
-        "CODEOWNERS_VALIDATOR_PATH": "$(execpath @codeowners_validator//:codeowners-validator)",
-        "CODEOWNERS_BINARY_PATH": "$(execpath @codeowners_binary//:codeowners)",
+        "CODEOWNERS_VALIDATOR_PATH": "$(rootpath @codeowners_validator//:codeowners-validator)",
+        "CODEOWNERS_BINARY_PATH": "$(rootpath @codeowners_binary//:codeowners)",
     } | select({
         ":add_auto_approve_user": {
             "ADD_AUTO_APPROVE_USER": "true",

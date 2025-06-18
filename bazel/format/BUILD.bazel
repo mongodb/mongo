@@ -21,7 +21,7 @@ py_binary(
         "@shfmt",
     ],
     env = {
-        "SHFMT_PATH": "$(execpath @shfmt//:shfmt)",
+        "SHFMT_PATH": "$(rootpath @shfmt//:shfmt)",
     },
     main = "rules_lint_format_wrapper.py",
     visibility = ["//visibility:public"],
