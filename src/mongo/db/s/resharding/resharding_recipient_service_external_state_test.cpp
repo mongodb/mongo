@@ -64,6 +64,7 @@
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
@@ -543,6 +544,9 @@ TEST_F(RecipientServiceExternalStateTest,
 
 TEST_F(RecipientServiceExternalStateTest,
        CreateLocalReshardingCollectionCollectionAlreadyExistsWithSomeIndexes) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
+                                                               false);
+
     auto shards = setupNShards(2);
 
     // Shard kOrigNss by _id with chunks [minKey, 0), [0, maxKey] on shards "0" and "1"
@@ -577,13 +581,6 @@ TEST_F(RecipientServiceExternalStateTest,
                                                    << "indexOne"),
                                           BSON("v" << 2 << "key" << BSON("c.d" << 1) << "name"
                                                    << "nested")};
-    // When creating collection, only _id index should be created, the other index is cloned
-    // manually.
-    const std::vector<BSONObj> expectedIndexes = {
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                 << "_id_"),
-        BSON("v" << 2 << "key" << BSON("c.d" << 1) << "name"
-                 << "nested")};
 
     // Create the collection and indexes to simulate retrying after a failover. Only include the id
     // index, because it is needed to create the collection.
@@ -624,11 +621,14 @@ TEST_F(RecipientServiceExternalStateTest,
 
     future.default_timed_get();
 
-    verifyCollectionAndIndexes(kReshardingNss, kReshardingUUID, expectedIndexes);
+    verifyCollectionAndIndexes(kReshardingNss, kReshardingUUID, indexes);
 }
 
 TEST_F(RecipientServiceExternalStateTest,
        CreateLocalReshardingCollectionCollectionAlreadyExistsWithAllIndexes) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
+                                                               false);
+
     auto shards = setupNShards(2);
 
     // Shard kOrigNss by _id with chunks [minKey, 0), [0, maxKey] on shards "0" and "1"

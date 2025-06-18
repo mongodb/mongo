@@ -235,6 +235,8 @@ public:
 
     /**
      * Creates the collection on the shard and clones the indexes and options.
+     * If the collection already exists, it will be updated to match the target options and indexes,
+     * including dropping any indexes not specified in the target index specs.
      */
     static void cloneCollectionIndexesAndOptions(
         OperationContext* opCtx,
@@ -261,15 +263,6 @@ private:
     bool _applyMigrateOp(OperationContext* opCtx, const BSONObj& xfer);
 
     bool _flushPendingWrites(OperationContext* opCtx, const repl::OpTime& lastOpApplied);
-
-    /**
-     * If this shard doesn't own any chunks for the collection to be cloned and the collection
-     * exists locally, drops its indexes to guarantee that no stale indexes carry over.
-     */
-    void _dropLocalIndexesIfNecessary(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const CollectionOptionsAndIndexes& collectionOptionsAndIndexes);
 
     /**
      * Remembers a chunk range between 'min' and 'max' as a range which will have data migrated
