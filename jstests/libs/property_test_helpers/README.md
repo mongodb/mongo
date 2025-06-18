@@ -99,7 +99,15 @@ For now, this is also a valid model for a document in a time-series collection (
 
 ### Query Generation
 
-TODO SERVER-102567 expand readme
+These models cover a limited number of aggregation stages, located in `jstests/libs/property_test_helpers/models`. The supported stages are:
+
+- $project
+- $addFields
+- $match
+- $sort
+- $group
+- $limit
+- $skip
 
 #### Query Families
 
@@ -127,21 +135,50 @@ Then we extract several queries that have the same shape.
 This allows us to write properties that use the plan cache more often rather than relying on chance.
 Properties can use the `getQuery` interface to ask for queries with different shapes, or the same shape with different leaf values plugged in.
 
-## List of Core PBTs
+## Core PBTs
 
-[index_correctness_pbt.js](../../core/query/index_correctness_pbt.js)
-
-[cache_correctness_pbt.js](../../core/query/plan_cache/cache_correctness_pbt.js)
-
-[run_all_plans_pbt.js](../../core/query/run_all_plans_pbt.js)
-
-[cache_usage_pbt.js](../../core/query/plan_cache/cache_usage_pbt.js)
-
-[queries_create_one_cache_entry_pbt.js](../../core/query/plan_cache/queries_create_one_cache_entry_pbt.js)
-
-[agg_stages_basic_behavior_pbt.js](../../aggregation/sources/agg_stages_basic_behavior_pbt.js)
+`jstests/**/*_pbt.js`
 
 Details are provided at the top of each file.
+
+## Debugging a PBT Failure
+
+Currently, all PBTs have a fixed seed.
+This means that as long as the bug it found is deterministic on the server's side, the PBT will consistently run into the issue.
+If the bug is not deterministic, the PBT may or may not fail.
+
+### Shrinking (Minimizing)
+
+Once a counterexample (a failing case) to the property is found, fast-check tests will automatically attempt to shrink the issue.
+Shrinking often does not reach the global minimum counterexample, since fast-check cannot make certain jumps.
+For example it has no way of knowing that
+
+`{$and: [{a: {$eq: 1}}]}`
+
+can usually be turned into
+
+`{a: {$eq: 1}}`
+
+or even
+
+`{a: 1}`
+
+This could be solved if fast-check had domain-specific knowledge about MQL or if it fuzzed counterexamples during shrinking.
+However the counterexamples are usually small enough where there isn't much left to shrink.
+
+For non-deterministic issues, fast-check's shrinking is not as effective because it receives mixed signals from the property on whether the shrunk counterexamples fail or not.
+
+### Failure Output
+
+After a failure is minimized, the counterexample is printed out.
+This includes debug data such as the counterexample that fast-check found and the error it ran into.
+The counterexample will be a workload (see [Modeling Workloads](#modeling-workloads)), containing all information about the collection and queries run against it.
+
+To reproduce the issue, the workload can be copied and pasted into the failing property-based test, specifically by passing it in as the `examples` argument to `testProperty`.
+fast-check will take these hand-written examples and run them before trying randomized examples.
+See `partial_index_pbt.js` (which references `pbt_resolved_bugs.js`) for an example of this.
+`partial_index_pbt.js` uses the `examples` argument to ensure workloads that previously would fail are run.
+It can be used in the same way to repro existing bugs from BFs.
 
 # Appendix
 
