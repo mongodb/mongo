@@ -1,3 +1,7 @@
 version: 1.0.0
 options:
   no_parent_owners: true
+filters:
+  - "generated_suites/sharding_task_executor_pool_size*":
+    approvers:
+      - 10gen/server-networking-and-observability
