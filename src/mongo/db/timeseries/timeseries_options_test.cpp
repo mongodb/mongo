@@ -212,4 +212,65 @@ TEST(TimeseriesOptionsTest, ExtendedRangeRoundTimestamp) {
     }
 }
 
+TEST(TimeseriesOptionsTest, ExtendedRoundMilliTimestampBySeconds) {
+    std::vector<std::tuple<BucketGranularityEnum, Date_t, Date_t>> testCases{
+        {BucketGranularityEnum::Seconds,
+         Date_t::fromMillisSinceEpoch(-1),
+         Date_t::fromMillisSinceEpoch(-60000)},
+        {BucketGranularityEnum::Seconds,
+         Date_t::fromMillisSinceEpoch(-1000),
+         Date_t::fromMillisSinceEpoch(-60000)},
+        {BucketGranularityEnum::Seconds,
+         Date_t::fromMillisSinceEpoch(-1001),
+         Date_t::fromMillisSinceEpoch(-60000)},
+        {BucketGranularityEnum::Seconds,
+         Date_t::fromMillisSinceEpoch(-60000),
+         Date_t::fromMillisSinceEpoch(-60000)},
+        {BucketGranularityEnum::Seconds,
+         Date_t::fromMillisSinceEpoch(-60001),
+         Date_t::fromMillisSinceEpoch(-120000)},
+        {BucketGranularityEnum::Seconds, Date_t::min(), Date_t::min()},
+
+        {BucketGranularityEnum::Minutes,
+         Date_t::fromMillisSinceEpoch(-1),
+         Date_t::fromMillisSinceEpoch(-3600000)},
+        {BucketGranularityEnum::Minutes,
+         Date_t::fromMillisSinceEpoch(-1000),
+         Date_t::fromMillisSinceEpoch(-3600000)},
+        {BucketGranularityEnum::Minutes,
+         Date_t::fromMillisSinceEpoch(-1001),
+         Date_t::fromMillisSinceEpoch(-3600000)},
+        {BucketGranularityEnum::Minutes,
+         Date_t::fromMillisSinceEpoch(-3600000),
+         Date_t::fromMillisSinceEpoch(-3600000)},
+        {BucketGranularityEnum::Minutes,
+         Date_t::fromMillisSinceEpoch(-3600001),
+         Date_t::fromMillisSinceEpoch(-7200000)},
+        {BucketGranularityEnum::Minutes, Date_t::min(), Date_t::min()},
+
+        {BucketGranularityEnum::Hours,
+         Date_t::fromMillisSinceEpoch(-1),
+         Date_t::fromMillisSinceEpoch(-86400000)},
+        {BucketGranularityEnum::Hours,
+         Date_t::fromMillisSinceEpoch(-1000),
+         Date_t::fromMillisSinceEpoch(-86400000)},
+        {BucketGranularityEnum::Hours,
+         Date_t::fromMillisSinceEpoch(-1001),
+         Date_t::fromMillisSinceEpoch(-86400000)},
+        {BucketGranularityEnum::Hours,
+         Date_t::fromMillisSinceEpoch(-86400000),
+         Date_t::fromMillisSinceEpoch(-86400000)},
+        {BucketGranularityEnum::Hours,
+         Date_t::fromMillisSinceEpoch(-86400001),
+         Date_t::fromMillisSinceEpoch(-172800000)},
+        {BucketGranularityEnum::Hours, Date_t::min(), Date_t::min()},
+    };
+
+    for (const auto& [roundingGranularity, input, expectedOutput] : testCases) {
+        auto roundedDate = timeseries::roundTimestampToGranularity(
+            input, createTimeseriesOptionsWithGranularity(roundingGranularity));
+        ASSERT_EQ(roundedDate, expectedOutput);
+    }
+}
+
 }  // namespace mongo
