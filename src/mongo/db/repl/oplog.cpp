@@ -1457,6 +1457,16 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         iOp->getObject(), iOp->getTimestamp(), iOp->getTerm().value());
                 }
 
+                // This satisfies an assertion within insertDocuments that we are holding this lock
+                // when writing to a capped collection and have reserved oplog slots. However, in
+                // practice there shouldn't be any concurrency here, since all inserts to a
+                // non-clustered capped collection should belong to the same batch. TODO
+                // SERVER-106004: Revisit this acquisition.
+                if (collection->needsCappedLock()) {
+                    Lock::ResourceLock heldUntilEndOfWUOW{
+                        opCtx, ResourceId(RESOURCE_METADATA, collection->ns()), MODE_X};
+                }
+
                 // If an oplog entry has a recordId, this means that the collection is a
                 // recordIdReplicated collection, and therefore we should use the recordId
                 // present.
