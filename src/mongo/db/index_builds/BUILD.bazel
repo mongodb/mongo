@@ -290,6 +290,9 @@ idl_generator(
 idl_generator(
     name = "multi_index_block_gen",
     src = "multi_index_block.idl",
+    hdrs = [
+        "multi_index_block_validator.h",
+    ],
     deps = [
         "//src/mongo/db:basic_types_gen",
     ],

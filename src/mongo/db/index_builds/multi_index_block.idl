@@ -28,6 +28,8 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/index_builds/multi_index_block_validator.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -44,15 +46,21 @@ server_parameters:
         redact: false
 
     maxIndexBuildMemoryUsageMegabytes:
-        description: "Limits the amount of memory that simultaneous index builds on one collection may consume for the duration of the builds"
+        description:
+            "Limits the amount of memory that simultaneous index builds on one
+            collection may consume for the duration of the builds. A value between
+            0-1.0 (exclusive) will be interpreted as a percentage of RAM. A value
+            greater than or equal to 1.0 is interpreted as MB. A minimum limit of
+            50 MB is enforced on both MB and percentage computed values. For
+            percentage-based values, the maximum limit is 80%."
         set_at:
             - runtime
             - startup
         cpp_varname: maxIndexBuildMemoryUsageMegabytes
-        cpp_vartype: AtomicWord<int>
+        cpp_vartype: AtomicDouble
         default: 200
         validator:
-            gte: 50
+            callback: validateMaxIndexBuildMemoryUsageMegabytesSetting
         redact: false
 
     internalIndexBuildBulkLoadYieldIterations:
