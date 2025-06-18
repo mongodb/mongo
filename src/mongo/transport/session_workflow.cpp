@@ -290,6 +290,10 @@ boost::optional<Message> makeExhaustMessage(Message requestMsg, DbResponse& resp
         !response.shouldRunAgainForExhaust)
         return {};
 
+    int32_t responseOp = response.response.operation();
+    invariant(responseOp == dbMsg,
+              fmt::format("Exhaust response must use OP_MSG opcode, instead used {}", responseOp));
+
     const bool checksumPresent = OpMsg::isFlagSet(requestMsg, OpMsg::kChecksumPresent);
     Message exhaustMessage;
 
