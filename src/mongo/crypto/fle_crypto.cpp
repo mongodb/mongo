@@ -265,29 +265,6 @@ using UUIDBuf = std::array<uint8_t, UUID::kNumBytes>;
 
 static_assert(sizeof(PrfBlock) == SHA256Block::kHashLength);
 
-PrfBlock prf(ConstDataRange key, uint64_t value, int64_t value2) {
-    uassert(6378003, "Invalid key length", key.length() == crypto::sym256KeySize);
-
-    SHA256Block block;
-
-    std::array<char, sizeof(uint64_t)> bufValue;
-    DataView(bufValue.data()).write<LittleEndian<uint64_t>>(value);
-
-
-    std::array<char, sizeof(uint64_t)> bufValue2;
-    DataView(bufValue2.data()).write<LittleEndian<uint64_t>>(value2);
-
-    SHA256Block::computeHmac(key.data<uint8_t>(),
-                             key.length(),
-                             {
-                                 ConstDataRange{bufValue},
-                                 ConstDataRange{bufValue2},
-                             },
-                             &block);
-    return FLEUtil::blockToArray(block);
-}
-
-
 ConstDataRange binDataToCDR(const BSONBinData binData) {
     int len = binData.length;
     const char* data = static_cast<const char*>(binData.data);
@@ -501,6 +478,7 @@ boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader
                                           valueTokenT valueToken) {
 
     auto tracker = FLEStatusSection::get().makeEmuBinaryTracker();
+    HmacContext context;
 
     // Default search parameters
     uint64_t lambda = 0;
@@ -508,7 +486,7 @@ boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader
 
     // Step 2:
     // Search for null record
-    PrfBlock nullRecordId = collectionT::generateId(tagToken, boost::none);
+    PrfBlock nullRecordId = collectionT::generateId(&context, tagToken, boost::none);
 
     BSONObj nullDoc = reader.getById(nullRecordId);
 
@@ -543,7 +521,8 @@ boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader
     // condition
     while (flag) {
         // 7 a
-        bool docExists = reader.existsById(collectionT::generateId(tagToken, rho + lambda));
+        bool docExists =
+            reader.existsById(collectionT::generateId(&context, tagToken, rho + lambda));
 
 #ifdef DEBUG_ENUM_BINARY
         std::cout << fmt::format("search1: rho: {},  doc: {}", rho, doc.toString()) << std::endl;
@@ -574,7 +553,8 @@ boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader
 
 
         // 9b
-        bool docExists = reader.existsById(collectionT::generateId(tagToken, median + lambda));
+        bool docExists =
+            reader.existsById(collectionT::generateId(&context, tagToken, median + lambda));
 
 #ifdef DEBUG_ENUM_BINARY
         std::cout << fmt::format("search_stat: min: {}, median: {}, max: {}, i: {}, doc: {}",
@@ -605,7 +585,8 @@ boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader
             // explicitly
             if (j == maxIterations && min == 1) {
                 // 9 d ii A
-                bool docExists2 = reader.existsById(collectionT::generateId(tagToken, 1 + lambda));
+                bool docExists2 =
+                    reader.existsById(collectionT::generateId(&context, tagToken, 1 + lambda));
                 // 9 d ii B
                 if (docExists2) {
                     i = 1 + lambda;
@@ -1736,43 +1717,46 @@ BSONObj runStateMachineForDecryption(mongocrypt_ctx_t* ctx, FLEKeyVault* keyVaul
     return result;
 }
 
-FLEEdgeCountInfo getEdgeCountInfoForPadding(const FLEStateCollectionReader& reader,
+FLEEdgeCountInfo getEdgeCountInfoForPadding(HmacContext* hmacCtx,
+                                            const FLEStateCollectionReader& reader,
                                             ConstDataRange tag) {
     auto anchorPaddingRootToken = AnchorPaddingRootToken::parse(tag);
     auto tagToken = AnchorPaddingKeyToken::deriveFrom(anchorPaddingRootToken);
     auto valueToken = AnchorPaddingValueToken::deriveFrom(anchorPaddingRootToken);
     // There are no non-anchor padding edges, so we can skip the binaryHops search.
     auto tracker = FLEStatusSection::get().makeEmuBinaryTracker();
-    auto apos = ESCCollectionAnchorPadding::anchorBinaryHops(reader, tagToken, valueToken, tracker);
+    auto apos = ESCCollectionAnchorPadding::anchorBinaryHops(
+        hmacCtx, reader, tagToken, valueToken, tracker);
     EmuBinaryResult positions{
         apos.value_or(1) > 0 ? boost::none : boost::make_optional<uint64_t>(0), apos};
 
     return ESCCollectionAnchorPadding::getEdgeCountInfoForPaddingCleanupCommon(
-        reader, tagToken, valueToken, positions);
+        hmacCtx, reader, tagToken, valueToken, positions);
 }
 
-FLEEdgeCountInfo getEdgeCountInfoForCleanup(const FLEStateCollectionReader& reader,
+FLEEdgeCountInfo getEdgeCountInfoForCleanup(HmacContext* hmacCtx,
+                                            const FLEStateCollectionReader& reader,
                                             ConstDataRange tag) {
     auto escToken = EDCServerPayloadInfo::getESCToken(tag);
     auto tagToken = ESCTwiceDerivedTagToken::deriveFrom(escToken);
     auto valueToken = ESCTwiceDerivedValueToken::deriveFrom(escToken);
-    auto positions = ESCCollection::emuBinaryV2(reader, tagToken, valueToken);
+    auto positions = ESCCollection::emuBinaryV2(hmacCtx, reader, tagToken, valueToken);
     return ESCCollection::getEdgeCountInfoForPaddingCleanupCommon(
-        reader, tagToken, valueToken, positions);
+        hmacCtx, reader, tagToken, valueToken, positions);
 }
 
 /**
  * Performs all the ESC reads required by the QE compact algorithm.
  */
-FLEEdgeCountInfo getEdgeCountInfoForCompact(const FLEStateCollectionReader& reader,
+FLEEdgeCountInfo getEdgeCountInfoForCompact(HmacContext* hmacCtx,
+                                            const FLEStateCollectionReader& reader,
                                             ConstDataRange tag) {
-
     auto escToken = EDCServerPayloadInfo::getESCToken(tag);
 
     auto tagToken = ESCTwiceDerivedTagToken::deriveFrom(escToken);
     auto valueToken = ESCTwiceDerivedValueToken::deriveFrom(escToken);
 
-    auto positions = ESCCollection::emuBinaryV2(reader, tagToken, valueToken);
+    auto positions = ESCCollection::emuBinaryV2(hmacCtx, reader, tagToken, valueToken);
 
     // Handle case where cpos is none. This means that no new non-anchors have been inserted
     // since since the last compact/cleanup.
@@ -1796,7 +1780,7 @@ FLEEdgeCountInfo getEdgeCountInfoForCompact(const FLEStateCollectionReader& read
 
     if (positions.apos == boost::none) {
         auto nullAnchorPositions = ESCCollection::readAndDecodeAnchor(
-            reader, valueToken, ESCCollection::generateNullAnchorId(tagToken));
+            reader, valueToken, ESCCollection::generateNullAnchorId(hmacCtx, tagToken));
 
         uassert(7293601, "ESC null anchor document not found", nullAnchorPositions);
 
@@ -1813,7 +1797,8 @@ FLEEdgeCountInfo getEdgeCountInfoForCompact(const FLEStateCollectionReader& read
                             boost::none);
 }
 
-FLEEdgeCountInfo getEdgeCountInfo(const FLEStateCollectionReader& reader,
+FLEEdgeCountInfo getEdgeCountInfo(HmacContext* hmacCtx,
+                                  const FLEStateCollectionReader& reader,
                                   ConstDataRange tag,
                                   FLETagQueryInterface::TagQueryType type,
                                   const boost::optional<PrfBlock>& edc) {
@@ -1825,7 +1810,7 @@ FLEEdgeCountInfo getEdgeCountInfo(const FLEStateCollectionReader& reader,
     auto tagToken = ESCTwiceDerivedTagToken::deriveFrom(escToken);
     auto valueToken = ESCTwiceDerivedValueToken::deriveFrom(escToken);
 
-    auto positions = ESCCollection::emuBinaryV2(reader, tagToken, valueToken);
+    auto positions = ESCCollection::emuBinaryV2(hmacCtx, reader, tagToken, valueToken);
 
     if (positions.cpos.has_value()) {
         // Either no ESC documents exist yet (cpos == 0), OR new non-anchors
@@ -1840,9 +1825,9 @@ FLEEdgeCountInfo getEdgeCountInfo(const FLEStateCollectionReader& reader,
 
         PrfBlock anchorId;
         if (!positions.apos.has_value()) {
-            anchorId = ESCCollection::generateNullAnchorId(tagToken);
+            anchorId = ESCCollection::generateNullAnchorId(hmacCtx, tagToken);
         } else {
-            anchorId = ESCCollection::generateAnchorId(tagToken, positions.apos.value());
+            anchorId = ESCCollection::generateAnchorId(hmacCtx, tagToken, positions.apos.value());
         }
 
         auto anchorPositions = ESCCollection::readAndDecodeAnchor(reader, valueToken, anchorId);
@@ -2216,30 +2201,33 @@ void FLEClientCrypto::validateTagsArray(const BSONObj& doc) {
         6371507, str::stream() << kSafeContent << " must be an array", safeContent.type() == Array);
 }
 
-PrfBlock ESCCollection::generateId(const ESCTwiceDerivedTagToken& tagToken,
+PrfBlock ESCCollection::generateId(HmacContext* context,
+                                   const ESCTwiceDerivedTagToken& tagToken,
                                    boost::optional<uint64_t> index) {
     if (index.has_value()) {
-        return prf(tagToken.toCDR(), kESCNonNullId, index.value());
+        return FLEUtil::prf(context, tagToken.toCDR(), kESCNonNullId, index.value());
     } else {
-        return prf(tagToken.toCDR(), kESCNullId, 0);
+        return FLEUtil::prf(context, tagToken.toCDR(), kESCNullId, 0);
     }
 }
 
-PrfBlock ESCCollection::generateNonAnchorId(const ESCTwiceDerivedTagToken& tagToken,
+PrfBlock ESCCollection::generateNonAnchorId(HmacContext* context,
+                                            const ESCTwiceDerivedTagToken& tagToken,
                                             uint64_t cpos) {
-    HmacContext ctx;
-    return FLEUtil::prf(&ctx, tagToken.toCDR(), cpos);
+    return FLEUtil::prf(context, tagToken.toCDR(), cpos);
 }
 
 template <class TagToken, class ValueToken>
-PrfBlock ESCCollectionCommon<TagToken, ValueToken>::generateAnchorId(const TagToken& tagToken,
+PrfBlock ESCCollectionCommon<TagToken, ValueToken>::generateAnchorId(HmacContext* context,
+                                                                     const TagToken& tagToken,
                                                                      uint64_t apos) {
-    return prf(tagToken.toCDR(), kESCAnchorId, apos);
+    return FLEUtil::prf(context, tagToken.toCDR(), kESCAnchorId, apos);
 }
 
 template <class TagToken, class ValueToken>
-PrfBlock ESCCollectionCommon<TagToken, ValueToken>::generateNullAnchorId(const TagToken& tagToken) {
-    return generateAnchorId(tagToken, kESCNullAnchorPosition);
+PrfBlock ESCCollectionCommon<TagToken, ValueToken>::generateNullAnchorId(HmacContext* hmacCtx,
+                                                                         const TagToken& tagToken) {
+    return generateAnchorId(hmacCtx, tagToken, kESCNullAnchorPosition);
 }
 
 template <class TagToken, class ValueToken>
@@ -2261,6 +2249,7 @@ boost::optional<ESCCountsPair> ESCCollectionCommon<TagToken, ValueToken>::readAn
 
 template <class TagToken, class ValueToken>
 FLEEdgeCountInfo ESCCollectionCommon<TagToken, ValueToken>::getEdgeCountInfoForPaddingCleanupCommon(
+    HmacContext* hmacCtx,
     const FLEStateCollectionReader& reader,
     const TagToken& tagToken,
     const ValueToken& valueToken,
@@ -2268,7 +2257,7 @@ FLEEdgeCountInfo ESCCollectionCommon<TagToken, ValueToken>::getEdgeCountInfoForP
     // step (D)
     // nullAnchorPositions is r
     auto nullAnchorPositions =
-        readAndDecodeAnchor(reader, valueToken, generateNullAnchorId(tagToken));
+        readAndDecodeAnchor(reader, valueToken, generateNullAnchorId(hmacCtx, tagToken));
 
     // This holds what value of a_1 should be used when inserting/updating the null anchor.
     auto latestCpos = 0;
@@ -2309,7 +2298,7 @@ FLEEdgeCountInfo ESCCollectionCommon<TagToken, ValueToken>::getEdgeCountInfoForP
         // after.
         latestCpos = positions.cpos.value_or_eval([&]() {
             auto anchorPositions = readAndDecodeAnchor(
-                reader, valueToken, generateAnchorId(tagToken, positions.apos.value()));
+                reader, valueToken, generateAnchorId(hmacCtx, tagToken, positions.apos.value()));
             uassert(7295009, "ESC anchor is expected but not found", anchorPositions);
             return anchorPositions->cpos;
         });
@@ -2323,11 +2312,12 @@ FLEEdgeCountInfo ESCCollectionCommon<TagToken, ValueToken>::getEdgeCountInfoForP
                             boost::none);
 }
 
-BSONObj ESCCollection::generateNullDocument(const ESCTwiceDerivedTagToken& tagToken,
+BSONObj ESCCollection::generateNullDocument(HmacContext* hmacCtx,
+                                            const ESCTwiceDerivedTagToken& tagToken,
                                             const ESCTwiceDerivedValueToken& valueToken,
                                             uint64_t pos,
                                             uint64_t count) {
-    auto block = generateId(tagToken, boost::none);
+    auto block = generateId(hmacCtx, tagToken, boost::none);
 
     auto swCipherText = packAndEncrypt(std::tie(pos, count), valueToken);
     uassertStatusOK(swCipherText);
@@ -2344,14 +2334,18 @@ BSONObj ESCCollection::generateNullDocument(const ESCTwiceDerivedTagToken& tagTo
     return builder.obj();
 }
 
-PrfBlock ESCCollectionAnchorPadding::generateAnchorId(const AnchorPaddingKeyToken& keyToken,
+PrfBlock ESCCollectionAnchorPadding::generateAnchorId(HmacContext* context,
+                                                      const AnchorPaddingKeyToken& keyToken,
                                                       uint64_t apos) {
-    return prf(keyToken.toCDR(), kESCPaddingId, apos);
+    return FLEUtil::prf(context, keyToken.toCDR(), kESCPaddingId, apos);
 }
 
 BSONObj ESCCollectionAnchorPadding::generatePaddingDocument(
-    const AnchorPaddingKeyToken& keyToken, const AnchorPaddingValueToken& valueToken, uint64_t id) {
-    auto block = generateAnchorId(keyToken, id);
+    HmacContext* hmacCtx,
+    const AnchorPaddingKeyToken& keyToken,
+    const AnchorPaddingValueToken& valueToken,
+    uint64_t id) {
+    auto block = generateAnchorId(hmacCtx, keyToken, id);
 
     constexpr uint64_t dummy{0};
     auto cipherText = uassertStatusOK(packAndEncrypt(std::tie(dummy, dummy), valueToken));
@@ -2368,11 +2362,12 @@ BSONObj ESCCollectionAnchorPadding::generatePaddingDocument(
     return builder.obj();
 }
 
-BSONObj ESCCollection::generateInsertDocument(const ESCTwiceDerivedTagToken& tagToken,
+BSONObj ESCCollection::generateInsertDocument(HmacContext* hmacCtx,
+                                              const ESCTwiceDerivedTagToken& tagToken,
                                               const ESCTwiceDerivedValueToken& valueToken,
                                               uint64_t index,
                                               uint64_t count) {
-    auto block = generateId(tagToken, index);
+    auto block = generateId(hmacCtx, tagToken, index);
 
     auto swCipherText = packAndEncrypt(std::tie(KESCInsertRecordValue, count), valueToken);
     uassertStatusOK(swCipherText);
@@ -2389,11 +2384,12 @@ BSONObj ESCCollection::generateInsertDocument(const ESCTwiceDerivedTagToken& tag
 }
 
 BSONObj ESCCollection::generateCompactionPlaceholderDocument(
+    HmacContext* hmacCtx,
     const ESCTwiceDerivedTagToken& tagToken,
     const ESCTwiceDerivedValueToken& valueToken,
     uint64_t index,
     uint64_t count) {
-    auto block = generateId(tagToken, index);
+    auto block = generateId(hmacCtx, tagToken, index);
 
     auto swCipherText = packAndEncrypt(std::tie(kESCompactionRecordValue, count), valueToken);
     uassertStatusOK(swCipherText);
@@ -2405,19 +2401,21 @@ BSONObj ESCCollection::generateCompactionPlaceholderDocument(
     return builder.obj();
 }
 
-BSONObj ESCCollection::generateNonAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
+BSONObj ESCCollection::generateNonAnchorDocument(HmacContext* hmacCtx,
+                                                 const ESCTwiceDerivedTagToken& tagToken,
                                                  uint64_t cpos) {
-    auto block = generateNonAnchorId(tagToken, cpos);
+    auto block = generateNonAnchorId(hmacCtx, tagToken, cpos);
     BSONObjBuilder builder;
     toBinData(kId, block, &builder);
     return builder.obj();
 }
 
-BSONObj ESCCollection::generateAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
+BSONObj ESCCollection::generateAnchorDocument(HmacContext* hmacCtx,
+                                              const ESCTwiceDerivedTagToken& tagToken,
                                               const ESCTwiceDerivedValueToken& valueToken,
                                               uint64_t apos,
                                               uint64_t cpos) {
-    auto block = generateAnchorId(tagToken, apos);
+    auto block = generateAnchorId(hmacCtx, tagToken, apos);
 
     auto swCipherText = packAndEncrypt(std::tie(kESCNonNullAnchorValuePrefix, cpos), valueToken);
     uassertStatusOK(swCipherText);
@@ -2428,11 +2426,12 @@ BSONObj ESCCollection::generateAnchorDocument(const ESCTwiceDerivedTagToken& tag
     return builder.obj();
 }
 
-BSONObj ESCCollection::generateNullAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
+BSONObj ESCCollection::generateNullAnchorDocument(HmacContext* hmacCtx,
+                                                  const ESCTwiceDerivedTagToken& tagToken,
                                                   const ESCTwiceDerivedValueToken& valueToken,
                                                   uint64_t apos,
                                                   uint64_t cpos) {
-    auto block = generateNullAnchorId(tagToken);
+    auto block = generateNullAnchorId(hmacCtx, tagToken);
 
     auto swCipherText = packAndEncrypt(std::tie(apos, cpos), valueToken);
     uassertStatusOK(swCipherText);
@@ -2443,16 +2442,18 @@ BSONObj ESCCollection::generateNullAnchorDocument(const ESCTwiceDerivedTagToken&
     return builder.obj();
 }
 
-PrfBlock ESCCollectionAnchorPadding::generateNullAnchorId(const AnchorPaddingKeyToken& keyToken) {
-    return prf(keyToken.toCDR(), kESCPaddingId, 0);
+PrfBlock ESCCollectionAnchorPadding::generateNullAnchorId(HmacContext* hmacCtx,
+                                                          const AnchorPaddingKeyToken& keyToken) {
+    return FLEUtil::prf(hmacCtx, keyToken.toCDR(), kESCPaddingId, 0);
 }
 
 BSONObj ESCCollectionAnchorPadding::generateNullAnchorDocument(
+    HmacContext* hmacCtx,
     const AnchorPaddingKeyToken& keyToken,
     const AnchorPaddingValueToken& valueToken,
     uint64_t apos,
     uint64_t /* cpos */) {
-    auto block = generateNullAnchorId(keyToken);
+    auto block = generateNullAnchorId(hmacCtx, keyToken);
 
     constexpr uint64_t ignored{0};
     auto cipherText = uassertStatusOK(packAndEncrypt(std::tie(apos, ignored), valueToken));
@@ -2593,18 +2594,20 @@ boost::optional<uint64_t> binarySearchCommon(const FLEStateCollectionReader& rea
 }
 }  // namespace
 
-EmuBinaryResult ESCCollection::emuBinaryV2(const FLEStateCollectionReader& reader,
+EmuBinaryResult ESCCollection::emuBinaryV2(HmacContext* context,
+                                           const FLEStateCollectionReader& reader,
                                            const ESCTwiceDerivedTagToken& tagToken,
                                            const ESCTwiceDerivedValueToken& valueToken) {
     auto tracker = FLEStatusSection::get().makeEmuBinaryTracker();
 
-    auto x = anchorBinaryHops(reader, tagToken, valueToken, tracker);
-    auto i = binaryHops(reader, tagToken, valueToken, x, tracker);
+    auto x = anchorBinaryHops(context, reader, tagToken, valueToken, tracker);
+    auto i = binaryHops(context, reader, tagToken, valueToken, x, tracker);
     return EmuBinaryResult{i, x};
 }
 
 template <class TagToken, class ValueToken>
 boost::optional<uint64_t> ESCCollectionCommon<TagToken, ValueToken>::anchorBinaryHops(
+    HmacContext* context,
     const FLEStateCollectionReader& reader,
     const TagToken& tagToken,
     const ValueToken& valueToken,
@@ -2614,7 +2617,7 @@ boost::optional<uint64_t> ESCCollectionCommon<TagToken, ValueToken>::anchorBinar
     boost::optional<uint64_t> x;
 
     // 1. find null anchor
-    PrfBlock nullAnchorId = generateNullAnchorId(tagToken);
+    PrfBlock nullAnchorId = generateNullAnchorId(context, tagToken);
     BSONObj nullAnchorDoc = reader.getById(nullAnchorId);
 
     // 2. case: null anchor exists
@@ -2634,8 +2637,8 @@ boost::optional<uint64_t> ESCCollectionCommon<TagToken, ValueToken>::anchorBinar
     uint64_t rho = 2;
 
     // 5-8. perform binary searches
-    auto idGenerator = [&tagToken](uint64_t value) -> PrfBlock {
-        return generateAnchorId(tagToken, value);
+    auto idGenerator = [context, &tagToken](uint64_t value) -> PrfBlock {
+        return generateAnchorId(context, tagToken, value);
     };
 
 #ifdef DEBUG_ENUM_BINARY
@@ -2646,7 +2649,8 @@ boost::optional<uint64_t> ESCCollectionCommon<TagToken, ValueToken>::anchorBinar
     return binarySearchCommon(reader, rho, lambda, x, idGenerator, tracker);
 }
 
-boost::optional<uint64_t> ESCCollection::binaryHops(const FLEStateCollectionReader& reader,
+boost::optional<uint64_t> ESCCollection::binaryHops(HmacContext* context,
+                                                    const FLEStateCollectionReader& reader,
                                                     const ESCTwiceDerivedTagToken& tagToken,
                                                     const ESCTwiceDerivedValueToken& valueToken,
                                                     boost::optional<uint64_t> x,
@@ -2661,7 +2665,8 @@ boost::optional<uint64_t> ESCCollection::binaryHops(const FLEStateCollectionRead
         i = 0;
         lambda = 0;
     } else {
-        auto id = x.has_value() ? generateAnchorId(tagToken, *x) : generateNullAnchorId(tagToken);
+        auto id = x.has_value() ? generateAnchorId(context, tagToken, *x)
+                                : generateNullAnchorId(context, tagToken);
         auto doc = reader.getById(id);
         uassert(7291501, "ESC anchor document not found", !doc.isEmpty());
 
@@ -2677,8 +2682,8 @@ boost::optional<uint64_t> ESCCollection::binaryHops(const FLEStateCollectionRead
         rho = 2;
     }
 
-    auto idGenerator = [&tagToken](uint64_t value) -> PrfBlock {
-        return generateNonAnchorId(tagToken, value);
+    auto idGenerator = [context, &tagToken](uint64_t value) -> PrfBlock {
+        return generateNonAnchorId(context, tagToken, value);
     };
 
 #ifdef DEBUG_ENUM_BINARY
@@ -2693,6 +2698,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> ESCCollection::getTags(
     const std::vector<std::vector<FLEEdgePrfBlock>>& tokensSets,
     FLETagQueryInterface::TagQueryType type) {
 
+    HmacContext hmacCtx;
     std::vector<std::vector<FLEEdgeCountInfo>> countInfoSets;
     countInfoSets.reserve(tokensSets.size());
 
@@ -2703,17 +2709,18 @@ std::vector<std::vector<FLEEdgeCountInfo>> ESCCollection::getTags(
         for (const auto& token : tokens) {
             switch (type) {
                 case FLETagQueryInterface::TagQueryType::kCompact:
-                    countInfos.push_back(getEdgeCountInfoForCompact(reader, token.esc));
+                    countInfos.push_back(getEdgeCountInfoForCompact(&hmacCtx, reader, token.esc));
                     break;
                 case FLETagQueryInterface::TagQueryType::kCleanup:
-                    countInfos.push_back(getEdgeCountInfoForCleanup(reader, token.esc));
+                    countInfos.push_back(getEdgeCountInfoForCleanup(&hmacCtx, reader, token.esc));
                     break;
                 case FLETagQueryInterface::TagQueryType::kPadding:
-                    countInfos.push_back(getEdgeCountInfoForPadding(reader, token.esc));
+                    countInfos.push_back(getEdgeCountInfoForPadding(&hmacCtx, reader, token.esc));
                     break;
                 case FLETagQueryInterface::TagQueryType::kInsert:
                 case FLETagQueryInterface::TagQueryType::kQuery:
-                    countInfos.push_back(getEdgeCountInfo(reader, token.esc, type, token.edc));
+                    countInfos.push_back(
+                        getEdgeCountInfo(&hmacCtx, reader, token.esc, type, token.edc));
                     break;
                 default:
                     MONGO_UNREACHABLE;
@@ -3700,10 +3707,10 @@ std::vector<EDCServerPayloadInfo> EDCServerCollection::getEncryptedFieldInfo(BSO
     return fields;
 }
 
-PrfBlock EDCServerCollection::generateTag(HmacContext* obj,
+PrfBlock EDCServerCollection::generateTag(HmacContext* hmacCtx,
                                           EDCTwiceDerivedToken edcTwiceDerived,
                                           FLECounter count) {
-    return FLEUtil::prf(obj, edcTwiceDerived.toCDR(), count);
+    return FLEUtil::prf(hmacCtx, edcTwiceDerived.toCDR(), count);
 }
 
 PrfBlock EDCServerCollection::generateTag(const EDCServerPayloadInfo& payload) {
@@ -4656,6 +4663,29 @@ PrfBlock FLEUtil::blockToArray(const SHA256Block& block) {
     PrfBlock data;
     memcpy(data.data(), block.data(), sizeof(PrfBlock));
     return data;
+}
+
+PrfBlock FLEUtil::prf(HmacContext* context, ConstDataRange key, uint64_t value, int64_t value2) {
+    uassert(6378003, "Invalid key length", key.length() == crypto::sym256KeySize);
+
+    SHA256Block block;
+
+    std::array<char, sizeof(uint64_t)> bufValue;
+    DataView(bufValue.data()).write<LittleEndian<uint64_t>>(value);
+
+
+    std::array<char, sizeof(uint64_t)> bufValue2;
+    DataView(bufValue2.data()).write<LittleEndian<uint64_t>>(value2);
+
+    SHA256Block::computeHmacWithCtx(context,
+                                    key.data<uint8_t>(),
+                                    key.length(),
+                                    {
+                                        ConstDataRange{bufValue},
+                                        ConstDataRange{bufValue2},
+                                    },
+                                    &block);
+    return FLEUtil::blockToArray(block);
 }
 
 PrfBlock FLEUtil::prf(HmacContext* hmacCtx, ConstDataRange key, ConstDataRange cdr) {

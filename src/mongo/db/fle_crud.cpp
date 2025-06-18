@@ -880,6 +880,8 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
     std::vector<BSONObj> escDocuments;
     escDocuments.reserve(totalTokens);
 
+    HmacContext hmacCtx;
+
     for (size_t i = 0; i < countInfoSets.size(); i++) {
         auto& countInfos = countInfoSets[i];
 
@@ -896,7 +898,7 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
             serverPayload[i].counts.push_back(count);
 
             escDocuments.push_back(ESCCollection::generateNonAnchorDocument(
-                ESCTwiceDerivedTagToken(countInfo.tagTokenData), count));
+                &hmacCtx, ESCTwiceDerivedTagToken(countInfo.tagTokenData), count));
         }
     }
 
