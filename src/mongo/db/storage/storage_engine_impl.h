@@ -84,7 +84,7 @@ class StorageEngineImpl final : public StorageEngine {
 public:
     StorageEngineImpl(OperationContext* opCtx,
                       std::unique_ptr<KVEngine> engine,
-                      std::unique_ptr<KVEngine> spillEngine,
+                      std::unique_ptr<KVEngine> spillKVEngine,
                       StorageEngineOptions options = StorageEngineOptions());
 
     ~StorageEngineImpl() override;
@@ -129,8 +129,6 @@ public:
     std::unique_ptr<SpillTable> makeSpillTable(OperationContext* opCtx,
                                                KeyFormat keyFormat,
                                                int64_t thresholdBytes) override;
-
-    void dropSpillTable(RecoveryUnit& ru, StringData ident) override;
 
     std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
                                                                    KeyFormat keyFormat) override;
@@ -193,11 +191,11 @@ public:
     }
 
     KVEngine* getSpillEngine() override {
-        return _spillEngine.get();
+        return _spillKVEngine.get();
     }
 
     const KVEngine* getSpillEngine() const override {
-        return _spillEngine.get();
+        return _spillKVEngine.get();
     }
 
     void addDropPendingIdent(
@@ -336,7 +334,7 @@ private:
     std::unique_ptr<KVEngine> _engine;
 
     // KVEngine instance that is used for creating SpillTables.
-    std::unique_ptr<KVEngine> _spillEngine;
+    std::unique_ptr<KVEngine> _spillKVEngine;
 
     const StorageEngineOptions _options;
 
