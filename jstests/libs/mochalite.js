@@ -41,16 +41,16 @@ class Context {}
 
 // Test to be run with a given Context
 class Test {
-    #titleArray;
-    #fn;
-    static #titleSep = " > ";
+    _titleArray;
+    _fn;
+    static _titleSep = " > ";
 
     constructor(title, fn) {
-        this.#titleArray = title;
-        this.#fn = fn;
+        this._titleArray = title;
+        this._fn = fn;
     }
     fullTitle() {
-        return this.#titleArray.join(Test.#titleSep);
+        return this._titleArray.join(Test._titleSep);
     }
 
     /**
@@ -58,7 +58,7 @@ class Test {
      * @param {Context} ctx
      */
     run(ctx) {
-        this.#fn.call(ctx);
+        this._fn.call(ctx);
     }
 
     printPass() {
