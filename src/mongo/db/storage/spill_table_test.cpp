@@ -100,5 +100,32 @@ TEST_F(SpillTableTest, LaterBelowDiskSpaceThreshold) {
     ASSERT_EQ(spillTable->rangeTruncate(opCtx.get(), rid, rid), ErrorCodes::OutOfDiskSpace);
 }
 
+TEST_F(SpillTableTest, SpillTableDroppedOnDestruction) {
+    auto opCtx = makeOperationContext();
+
+    constexpr int64_t kThresholdBytes = 1024;
+    const StringData kRecordId = "1"_sd;
+    const StringData kPayload = "data"_sd;
+
+    auto spillTable = makeSpillTable(opCtx.get(), KeyFormat::String, kThresholdBytes);
+    auto ident = std::string(spillTable->ident());
+    ASSERT_TRUE(spillIdentExists(opCtx.get(), ident));
+
+    std::vector<Record> records(1);
+    records[0].id = RecordId(kRecordId);
+    records[0].data = RecordData(kPayload.data(), kPayload.size());
+
+    auto status = spillTable->insertRecords(opCtx.get(), &records);
+    ASSERT_OK(status);
+
+    records[0].data = RecordData();
+    ASSERT_TRUE(spillTable->findRecord(opCtx.get(), records[0].id, &records[0].data));
+    ASSERT_EQ(0, memcmp(kPayload.data(), records[0].data.data(), kPayload.size()));
+
+    spillTable.reset();
+
+    ASSERT_FALSE(spillIdentExists(opCtx.get(), ident));
+}
+
 }  // namespace
 }  // namespace mongo

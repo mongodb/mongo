@@ -34,6 +34,7 @@
 #include "mongo/db/storage/disk_space_monitor.h"
 #include "mongo/db/storage/disk_space_util.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/scopeguard.h"
@@ -101,15 +102,27 @@ bool SpillTable::DiskState::full() const {
 }
 
 SpillTable::SpillTable(std::unique_ptr<RecoveryUnit> ru, std::unique_ptr<RecordStore> rs)
-    : _ru(std::move(ru)), _rs(std::move(rs)) {}
+    : _ru(std::move(ru)), _rs(std::move(rs)), _storageEngine(nullptr) {}
 
 SpillTable::SpillTable(std::unique_ptr<RecoveryUnit> ru,
                        std::unique_ptr<RecordStore> rs,
+                       StorageEngine& storageEngine,
                        DiskSpaceMonitor& diskMonitor,
                        int64_t thresholdBytes)
     : _ru(std::move(ru)),
       _rs(std::move(rs)),
+      _storageEngine(&storageEngine),
       _diskState(boost::in_place_init, diskMonitor, thresholdBytes) {}
+
+SpillTable::~SpillTable() {
+    if (_storageEngine) {
+        _storageEngine->dropSpillTable(*_ru, ident());
+    }
+}
+
+StringData SpillTable::ident() const {
+    return _rs->getIdent();
+}
 
 long long SpillTable::dataSize() const {
     return _rs->dataSize();

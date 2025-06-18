@@ -517,6 +517,13 @@ public:
                                                        int64_t thresholdBytes) = 0;
 
     /**
+     * Removes knowledge of this ident from the SpillEngine. The ident and RecoveryUnit must
+     * belong to the same SpillTable. To call this method, the StorageEngine must be initialized
+     * with a spill engine.
+     */
+    virtual void dropSpillTable(RecoveryUnit& ru, StringData ident) = 0;
+
+    /**
      * Creates a temporary RecordStore on the storage engine. On startup after an unclean shutdown,
      * the storage engine will drop any un-dropped temporary record stores.
      */
