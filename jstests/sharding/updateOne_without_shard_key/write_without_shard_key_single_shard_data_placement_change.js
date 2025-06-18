@@ -34,7 +34,23 @@ WriteWithoutShardKeyTestUtil.setupShardedCollection(
 
 assert.commandWorked(coll.insert(docsToInsert));
 
+function is80OrAbove() {
+    const res = st.s.getDB("admin").system.version.findOne({_id: "featureCompatibilityVersion"});
+    return MongoRunner.compareBinVersions(res.version, "8.2") >= 0;
+}
+
+function getDB(session, testCase) {
+    if (testCase.cmdObj.bulkWrite) {
+        return session.getDatabase('admin');
+    } else {
+        return session.getDatabase(dbName);
+    }
+}
+
 function runTest(testCase) {
+    // Do not test the bulkWrite case in multiversion
+    if (!is80OrAbove() && testCase.cmdObj.bulkWrite)
+        return;
     const session = st.s.startSession();
     session.startTransaction({readConcern: {level: "snapshot"}});
     session.getDatabase(dbName).getCollection(collName2).insert({x: 1});
@@ -48,7 +64,7 @@ function runTest(testCase) {
 
     // This write cmd MUST fail, the data moved to another shard, we can't try on shard0 nor
     // shard1 with the original clusterTime of the transaction.
-    assert.commandFailedWithCode(session.getDatabase(dbName).runCommand(testCase.cmdObj),
+    assert.commandFailedWithCode(getDB(session, testCase).runCommand(testCase.cmdObj),
                                  ErrorCodes.MigrationConflict);
 
     hangDonorAtStartOfRangeDel.off();
@@ -79,6 +95,24 @@ let testCases = [
         cmdObj: {
             delete: collName,
             deletes: [{q: {y: 2}, limit: 1}],
+        },
+    },
+    {
+        logMessage: "Running bulkWrite test: updateOne",
+        cmdObj: {
+            bulkWrite: 1,
+            ops: [{update: 0, filter: {y: 2}, updateMods: {$inc: {z: 1}}}],
+            nsInfo: [{ns: dbName + "." + collName}]
+
+        },
+    },
+    {
+        logMessage: "Running bulkWrite test: deleteOne",
+        cmdObj: {
+            bulkWrite: 1,
+            ops: [{delete: 0, filter: {y: 2}}],
+            nsInfo: [{ns: dbName + "." + collName}]
+
         },
     }
 ];

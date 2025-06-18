@@ -48,7 +48,23 @@ assert.commandWorked(dbConn.adminCommand({
 
 assert.commandWorked(coll.insert(docsToInsert));
 
+function is80OrAbove() {
+    const res = st.s.getDB("admin").system.version.findOne({_id: "featureCompatibilityVersion"});
+    return MongoRunner.compareBinVersions(res.version, "8.0") >= 0;
+}
+
+function getDB(session, testCase) {
+    if (testCase.cmdObj.bulkWrite) {
+        return session.getDatabase('admin');
+    } else {
+        return session.getDatabase(dbName);
+    }
+}
+
 function runTest(testCase) {
+    // Do not test the bulkWrite case in multiversion
+    if (!is80OrAbove() && testCase.cmdObj.bulkWrite)
+        return;
     const session = st.s.startSession();
     session.startTransaction({readConcern: {level: "snapshot"}});
     session.getDatabase(dbName).getCollection(collName2).insert({x: 1});
@@ -59,7 +75,7 @@ function runTest(testCase) {
 
     // This command MUST fail, the data moved to another shard, we can't try on shard0 nor
     // shard1 with the original clusterTime of the transaction.
-    assert.commandFailedWithCode(session.getDatabase(dbName).runCommand(testCase.cmdObj),
+    assert.commandFailedWithCode(getDB(session, testCase).runCommand(testCase.cmdObj),
                                  ErrorCodes.MigrationConflict);
 
     // Reset the chunk distribution for the next test.
@@ -81,6 +97,26 @@ let testCases = [
         cmdObj: {
             delete: collName,
             deletes: [{q: {timestamp: ISODate("2024-01-03T00:00:00.00Z"), y: 2}, limit: 1}],
+        },
+    },
+    {
+        logMessage: "Running timeseries updateOne test in a bulkWrite",
+        cmdObj: {
+            bulkWrite: 1,
+            ops: [{
+                update: 0,
+                filter: {timestamp: ISODate("2024-01-03T00:00:00.00Z"), y: 2},
+                updateMods: {$inc: {z: 1}}
+            }],
+            nsInfo: [{ns: dbName + "." + collName}]
+        },
+    },
+    {
+        logMessage: "Running timeseries deleteOne test in a bulkWrite",
+        cmdObj: {
+            bulkWrite: 1,
+            ops: [{delete: 0, filter: {timestamp: ISODate("2024-01-03T00:00:00.00Z"), y: 2}}],
+            nsInfo: [{ns: dbName + "." + collName}]
         },
     }
 ];
