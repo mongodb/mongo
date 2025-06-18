@@ -400,6 +400,7 @@ const skips = new Set([
     "$externalFunction",
     "$hoppingWindow",
     "$https",
+    "$cachedLookup",
     "$indexStats",
     "$limit",
     "$listCachedAndActiveUsers",
