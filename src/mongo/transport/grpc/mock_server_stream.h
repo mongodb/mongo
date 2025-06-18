@@ -50,7 +50,7 @@ public:
     bool write(ConstSharedBuffer msg) override;
 
     explicit MockServerStream(HostAndPort hostAndPort,
-                              Milliseconds timeout,
+                              Date_t deadline,
                               Promise<MetadataContainer>&& initialMetadataPromise,
                               BidirectionalPipe::End&& serverPipeEnd,
                               MetadataView clientMetadata);

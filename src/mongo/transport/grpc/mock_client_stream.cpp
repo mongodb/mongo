@@ -35,10 +35,10 @@
 namespace mongo::transport::grpc {
 
 MockClientStream::MockClientStream(HostAndPort hostAndPort,
-                                   Milliseconds timeout,
+                                   Date_t deadline,
                                    Future<MetadataContainer>&& initialMetadataFuture,
                                    BidirectionalPipe::End&& pipe)
-    : _deadline{getGlobalServiceContext()->getFastClockSource()->now() + timeout},
+    : _deadline{deadline},
       _serverInitialMetadata{std::move(initialMetadataFuture)},
       _pipe{std::move(pipe)} {}
 

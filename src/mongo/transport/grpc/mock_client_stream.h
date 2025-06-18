@@ -51,7 +51,7 @@ public:
     bool write(ConstSharedBuffer msg);
 
     explicit MockClientStream(HostAndPort hostAndPort,
-                              Milliseconds timeout,
+                              Date_t deadline,
                               Future<MetadataContainer>&& serverInitialMetadata,
                               BidirectionalPipe::End&& pipe);
 

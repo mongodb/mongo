@@ -62,7 +62,9 @@ public:
     void setUp() override {
         SessionTest::setUp();
         _fixture = std::make_unique<MockStreamTestFixtures>(
-            HostAndPort{kRemote}, kStreamTimeout, _clientMetadata);
+            HostAndPort{kRemote},
+            getServiceContext()->getFastClockSource()->now() + kStreamTimeout,
+            _clientMetadata);
     }
 
     void tearDown() override {

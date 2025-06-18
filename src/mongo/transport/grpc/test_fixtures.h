@@ -57,21 +57,19 @@ inline Message makeUniqueMessage() {
 }
 
 struct MockStreamTestFixtures {
-    MockStreamTestFixtures(HostAndPort hostAndPort,
-                           Milliseconds timeout,
-                           MetadataView clientMetadata) {
+    MockStreamTestFixtures(HostAndPort hostAndPort, Date_t deadline, MetadataView clientMetadata) {
         BidirectionalPipe pipe;
         auto promiseAndFuture = makePromiseFuture<MetadataContainer>();
 
         serverStream = std::make_unique<MockServerStream>(hostAndPort,
-                                                          timeout,
+                                                          deadline,
                                                           std::move(promiseAndFuture.promise),
                                                           std::move(*pipe.left),
                                                           clientMetadata);
         serverCtx = std::make_unique<MockServerContext>(serverStream.get());
 
         clientStream = std::make_unique<MockClientStream>(
-            hostAndPort, timeout, std::move(promiseAndFuture.future), std::move(*pipe.right));
+            hostAndPort, deadline, std::move(promiseAndFuture.future), std::move(*pipe.right));
         clientCtx = std::make_unique<MockClientContext>(clientStream.get());
     }
 

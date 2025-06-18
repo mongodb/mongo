@@ -62,8 +62,9 @@ public:
 
     virtual void setUp() override {
         Base::setUp();
+        _deadline = getGlobalServiceContext()->getFastClockSource()->now() + kTimeout;
         _fixtures = std::make_unique<MockStreamTestFixtures>(
-            HostAndPort{kRemote}, kTimeout, _clientMetadata);
+            HostAndPort{kRemote}, _deadline, _clientMetadata);
     }
 
     MockStreamTestFixtures& getFixtures() {
@@ -120,8 +121,11 @@ public:
 
             getServerContext().tryCancel();
 
-            ASSERT_TRUE(opDone.waitFor(opCtx.get(), Milliseconds(25)))
-                << "operation thread should be finished after cancel";
+            // Operation thread should finish after cancel.
+            opDone.get(opCtx.get());
+
+            // Ensure that the operation finished via cancellation rather than the timeout.
+            ASSERT_LT(Base::getServiceContext()->getFastClockSource()->now(), _deadline);
 
             opThread.join();
         });
@@ -131,6 +135,7 @@ private:
     const MetadataView _clientMetadata = {{"foo", "bar"}, {"baz", "zoo"}};
     const Message _clientFirstMessage = makeUniqueMessage();
     std::unique_ptr<MockStreamTestFixtures> _fixtures;
+    Date_t _deadline;
 };
 
 class MockServerStreamTest : public MockServerStreamBase<LockerNoopServiceContextTest> {};
