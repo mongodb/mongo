@@ -44,6 +44,7 @@
 #include <boost/container/small_vector.hpp>
 
 namespace mongo {
+
 namespace bsoncolumn {
 
 /**
@@ -551,7 +552,7 @@ public:
                     bsoncolumn::scaleIndexForControlByte(control) ==
                         Simple8bTypeUtil::kMemoryAsInteger);
 
-            out += simple8b::sum<Encoding>(ptr + 1, size, lastNonRLEBlock);
+            out = simple8b::add(out, simple8b::sum<Encoding>(ptr + 1, size, lastNonRLEBlock));
 
             ptr += 1 + size;
         }
@@ -576,7 +577,8 @@ public:
                     bsoncolumn::scaleIndexForControlByte(control) ==
                         Simple8bTypeUtil::kMemoryAsInteger);
 
-            out += simple8b::prefixSum<Encoding>(ptr + 1, size, prefix, lastNonRLEBlock);
+            out = simple8b::add(
+                out, simple8b::prefixSum<Encoding>(ptr + 1, size, prefix, lastNonRLEBlock));
 
             ptr += 1 + size;
         }
@@ -603,7 +605,8 @@ public:
             auto encodedDouble = Simple8bTypeUtil::encodeDouble(last, scaleIndex);
             uassert(9095626, "Invalid double encoding in BSON Column", encodedDouble);
             lastValue = *encodedDouble;
-            lastValue += simple8b::sum<int64_t>(ptr + 1, size, lastNonRLEBlock);
+            lastValue =
+                simple8b::add(lastValue, simple8b::sum<int64_t>(ptr + 1, size, lastNonRLEBlock));
 
             last = Simple8bTypeUtil::decodeDouble(lastValue, scaleIndex);
 
@@ -636,7 +639,7 @@ public:
                         bsoncolumn::scaleIndexForControlByte(control) ==
                             Simple8bTypeUtil::kMemoryAsInteger);
 
-                out += simple8b::sum<int128_t>(ptr + 1, size, lastNonRLEBlock);
+                out = simple8b::add(out, simple8b::sum<int128_t>(ptr + 1, size, lastNonRLEBlock));
 
                 ptr += 1 + size;
             }

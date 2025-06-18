@@ -37,16 +37,6 @@ namespace {
 // Sentinel to represent missing, this value is not encodable in simple8b
 static constexpr int64_t kMissing = std::numeric_limits<int64_t>::max();
 
-// Performs addition as unsigned and cast back to signed to get overflow defined to wrapped around
-// instead of undefined behavior.
-static constexpr int64_t add(int64_t lhs, int64_t rhs) {
-    return static_cast<int64_t>(static_cast<uint64_t>(lhs) + static_cast<uint64_t>(rhs));
-}
-
-static constexpr int128_t add(int128_t lhs, int128_t rhs) {
-    return static_cast<int128_t>(static_cast<uint128_t>(lhs) + static_cast<uint128_t>(rhs));
-}
-
 // Simple Simple8b decoder for decoding any basic simple8b block where all bits are used for the
 // value, decodes signed integer at runtime. Suitable for selectors with many bits per slot. Encoded
 // should be be machine endian and first slot should start at least significant bit.
