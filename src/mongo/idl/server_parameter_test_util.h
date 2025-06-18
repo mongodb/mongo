@@ -56,7 +56,25 @@ public:
         uassertStatusOK(_serverParam->set(BSON(name << value).firstElement(), boost::none));
     }
 
+    ServerParameterControllerForTest(ServerParameterControllerForTest&& other)
+        : _serverParam(std::exchange(other._serverParam, nullptr)),
+          _oldValue(std::move(other._oldValue)) {}
+
+    ServerParameterControllerForTest& operator=(ServerParameterControllerForTest&& other) {
+        if (&other == this) {
+            return *this;
+        }
+
+        _serverParam = std::exchange(other._serverParam, nullptr);
+        _oldValue = std::move(other._oldValue);
+        return *this;
+    }
+
     void reset() {
+        if (!_serverParam) {
+            return;
+        }
+
         // Reset to the old value.
         auto elem = _oldValue.firstElement();
         uassertStatusOK(_serverParam->set(elem, boost::none));
@@ -79,6 +97,10 @@ public:
     template <typename T>
     RAIIServerParameterControllerForTest(StringData name, T value)
         : _serverParamController(ServerParameterControllerForTest(name, value)) {}
+
+    RAIIServerParameterControllerForTest(RAIIServerParameterControllerForTest&&) = default;
+    RAIIServerParameterControllerForTest& operator=(RAIIServerParameterControllerForTest&&) =
+        default;
 
     /**
      * Destructor resetting the server parameter to the original value.

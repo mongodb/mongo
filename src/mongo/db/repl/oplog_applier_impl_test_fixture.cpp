@@ -242,7 +242,7 @@ void OplogApplierImplTest::tearDown() {
     StorageInterface::set(serviceContext, {});
     ServiceContextMongoDTest::tearDown();
 
-    for (auto serverParamController : _serverParamControllers) {
+    for (auto&& serverParamController : _serverParamControllers) {
         serverParamController.reset();
     }
 }
