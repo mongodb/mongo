@@ -151,6 +151,14 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
             scopedRouterService.emplace(opCtx.get());
         }
 
+        auto ru = shard_role_details::getRecoveryUnit(opCtx.get());
+        if (ru) {
+            // Set the cache max wait timeout very low as we do not want any FTDC operation to get
+            // blocked on cache eviction. 1 is a magic number that opts this thread out of all
+            // optional eviction without any waiting.
+            ru->setCacheMaxWaitTimeout(Milliseconds(1));
+        }
+
         _collect(opCtx.get(), role.first, parent);
 
         if (multiServiceSchema) {

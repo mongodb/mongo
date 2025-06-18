@@ -989,6 +989,9 @@ bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngine* engine, BSO
     // Obtain a session that can be used during shut down,
     // potentially before the storage engine itself shuts down.
     WiredTigerSession session(&engine->getConnection(), handler, *permit);
+    // Configure the session to avoid being coopted into cache eviction. We never want to block stat
+    // fetching on workload issues.
+    session.modifyConfiguration("cache_max_wait_ms=1", "cache_max_wait_ms=0");
 
     // Filter out irrelevant statistic fields.
     std::vector<std::string> fieldsToIgnore = {"LSM"};
@@ -1022,6 +1025,9 @@ bool WiredTigerUtil::historyStoreStatistics(WiredTigerKVEngine* engine, BSONObjB
     // Obtain a session that can be used during shut down, potentially before the storage engine
     // itself shuts down.
     WiredTigerSession session(&engine->getConnection(), handler, *permit);
+    // Configure the session to avoid being coopted into cache eviction. We never want to block stat
+    // fetching on workload issues.
+    session.modifyConfiguration("cache_max_wait_ms=1", "cache_max_wait_ms=0");
 
     const auto historyStorageStatUri = "statistics:file:WiredTigerHS.wt";
 
