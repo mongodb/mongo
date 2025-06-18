@@ -209,7 +209,7 @@ public:
         int32_t evictionDirtyTargetMB{0};
         // This specifies the value for the eviction_dirty_trigger configuration parameter.
         int32_t evictionDirtyTriggerMB{0};
-        // This specifies the value for the eviction_update_trigger configuration parameter.
+        // This specifies the value for the eviction_updates_trigger configuration parameter.
         int32_t evictionUpdatesTriggerMB{0};
         // This specifies the value for the in_memory configuration parameter.
         bool inMemory{false};

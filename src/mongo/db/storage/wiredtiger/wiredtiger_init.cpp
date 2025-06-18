@@ -175,6 +175,8 @@ public:
             wtConfig.cacheSizeMB = gSpillWiredTigerCacheSizeMB;
             wtConfig.evictionThreadsMin = gSpillWiredTigerEvictionThreadsMin;
             wtConfig.evictionThreadsMax = gSpillWiredTigerEvictionThreadsMax;
+            wtConfig.evictionDirtyTriggerMB =
+                gSpillWiredTigerEvictionDirtyTriggerPercentage * wtConfig.cacheSizeMB / 100;
             wtConfig.inMemory = false;
             wtConfig.logEnabled = false;
             wtConfig.prefetchEnabled = false;

@@ -142,8 +142,7 @@ server_parameters:
 
     wiredTigerEvictionDirtyMaxGB:
         description: >-
-            Absolute threshold at which dirty cache eviction starts operating
-            aggressively;
+            Absolute threshold at which application threads starts dirty cache eviction;
             Defaults to 20% cache size
         set_at: startup
         cpp_varname: "wiredTigerGlobalOptions.evictionDirtyTriggerGB"
@@ -334,6 +333,18 @@ server_parameters:
         validator:
             gte: 1
             lte: 20
+        redact: false
+
+    spillWiredTigerEvictionDirtyTriggerPercentage:
+        description: >-
+            Percentage threshold at which application threads start dirty cache eviction on the spill engine.
+        set_at: startup
+        cpp_vartype: int32_t
+        cpp_varname: gSpillWiredTigerEvictionDirtyTriggerPercentage
+        default: 80
+        validator:
+            gte: 1
+            lte: 100
         redact: false
 
     enableTemporarilyUnavailableExceptions:
