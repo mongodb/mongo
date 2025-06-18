@@ -128,6 +128,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientDuringOplogApplication);
 MONGO_FAIL_POINT_DEFINE(reshardingOpCtxKilledWhileRestoringMetrics);
 MONGO_FAIL_POINT_DEFINE(reshardingRecipientFailsAfterTransitionToCloning);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeBuildingIndex);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeEnteringStrictConsistency);
 
 namespace {
 
@@ -1061,7 +1062,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                         _critSecReason,
                         ShardingCatalogClient::kLocalWriteConcern);
             }
-
+            reshardingPauseRecipientBeforeEnteringStrictConsistency.pauseWhileSet();
             _transitionState(RecipientStateEnum::kStrictConsistency, factory);
             _writeStrictConsistencyOplog(factory);
         });

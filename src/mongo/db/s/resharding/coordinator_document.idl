@@ -72,7 +72,7 @@ structs:
                     type: ReshardingMetricsTimeInterval
                     description: >-
                         The time interval of the entire resharding operation on the coordinator.
-                    optional: true            
+                    optional: true
             documentCopy:
                     type: ReshardingMetricsTimeInterval
                     description: >-
@@ -166,4 +166,8 @@ structs:
                 description: >-
                     "The number of subtasks to divide a single oplog batch into, so that it may be applied
                     concurrently by multiple threads on the recipient."
+                optional: true
+            criticalSectionExpiresAt:
+                type: date
+                description: "When to timeout after the critical session is initiated."
                 optional: true
