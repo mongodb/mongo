@@ -2119,4 +2119,22 @@ boost::optional<NamespaceString> shard_role_nocheck::lookupNssWithoutAcquisition
     return CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuid);
 }
 
+std::variant<CollectionOptions, std::shared_ptr<const ViewDefinition>, std::monostate>
+shard_role_nocheck::getCollectionOptionsOrViewDefinitionWithoutAcquisition(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    // Checks the databaseVersion, and sets up lock-free read state if needed.
+    AutoGetDbForReadMaybeLockFree autoGetDb(opCtx, nss.dbName());
+
+    const auto collectionCatalog = CollectionCatalog::get(opCtx);
+    const auto coll = collectionCatalog->lookupCollectionByNamespace(opCtx, nss);
+    if (coll) {
+        return coll->getCollectionOptions();
+    } else if (const auto& viewDefinition = collectionCatalog->lookupView(opCtx, nss)) {
+        return viewDefinition;
+    } else {
+        // Nss does not exist.
+        return std::monostate{};
+    }
+}
+
 }  // namespace mongo

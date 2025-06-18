@@ -32,11 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/transport/session.h"
@@ -55,30 +51,33 @@ namespace mongo {
 namespace analyze_shard_key {
 
 StatusWith<UUID> validateCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollectionForReadCommandMaybeLockFree collection(
-        opCtx,
-        nss,
-        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
+    const auto collOptionsOrViewDefinition =
+        shard_role_nocheck::getCollectionOptionsOrViewDefinitionWithoutAcquisition(opCtx, nss);
 
-    if (auto view = collection.getView()) {
-        if (view->timeseries()) {
-            return Status{ErrorCodes::IllegalOperation,
-                          "Operation not supported for a timeseries collection"};
-        }
-        return Status{ErrorCodes::CommandNotSupportedOnView, "Operation not supported for a view"};
-    }
-    if (!collection) {
-        return Status{ErrorCodes::NamespaceNotFound,
-                      str::stream() << "The namespace does not exist"};
-    }
-    if (collection->getCollectionOptions().encryptedFieldConfig.has_value()) {
-        return Status{
-            ErrorCodes::IllegalOperation,
-            str::stream()
-                << "Operation not supported for a collection with queryable encryption enabled"};
-    }
-
-    return collection->uuid();
+    return std::visit(
+        OverloadedVisitor{
+            [](const CollectionOptions& collOptions) -> StatusWith<UUID> {
+                if (collOptions.encryptedFieldConfig.has_value()) {
+                    return Status{ErrorCodes::IllegalOperation,
+                                  str::stream() << "Operation not supported for a collection with "
+                                                   "queryable encryption enabled"};
+                }
+                return *collOptions.uuid;
+            },
+            [](const std::shared_ptr<const ViewDefinition>& viewDef) -> StatusWith<UUID> {
+                if (viewDef->timeseries()) {
+                    return Status{ErrorCodes::IllegalOperation,
+                                  "Operation not supported for a timeseries collection"};
+                } else {
+                    return Status{ErrorCodes::CommandNotSupportedOnView,
+                                  "Operation not supported for a view"};
+                }
+            },
+            [](const std::monostate&) -> StatusWith<UUID> {
+                return Status{ErrorCodes::NamespaceNotFound,
+                              str::stream() << "The namespace does not exist"};
+            }},
+        collOptionsOrViewDefinition);
 }
 
 Status validateIndexKey(const BSONObj& indexKey) {

@@ -35,9 +35,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/cluster_role.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/keypattern.h"
@@ -52,6 +50,7 @@
 #include "mongo/db/s/analyze_shard_key_read_write_distribution.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/analyze_shard_key_cmd_gen.h"
@@ -92,13 +91,16 @@ namespace {
 
 std::unique_ptr<CollatorInterface> getDefaultCollator(OperationContext* opCtx,
                                                       const NamespaceString& nss) {
-    AutoGetCollectionForReadCommand collection(opCtx, nss);
+    const auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+        MODE_IS);
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "Can no longer find the collection being analyzed. This is likely "
                              "caused by concurrent dropCollection or data movement",
-            collection);
+            collection.exists());
 
-    if (auto defaultCollator = collection->getDefaultCollator()) {
+    if (auto defaultCollator = collection.getCollectionPtr()->getDefaultCollator()) {
         return defaultCollator->clone();
     }
     return nullptr;

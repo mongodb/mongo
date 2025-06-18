@@ -32,15 +32,15 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/s/balancer_stats_registry.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/request_types/get_stats_for_balancing_gen.h"
 #include "mongo/util/assert_util.h"
@@ -119,16 +119,30 @@ public:
             long long numRecords{0};
             long long dataSizeBytes{0};
 
-            if (AutoGetCollectionForReadCommandMaybeLockFree autoColl{opCtx, ns}) {
-                auto localCollUUID = autoColl->uuid();
-                if (auto wantedCollUUID = nsWithOptUUID.getUUID()) {
-                    if (wantedCollUUID != localCollUUID) {
-                        return 0LL;
+            {
+                AutoStatsTracker statsTracker(
+                    opCtx,
+                    ns,
+                    Top::LockType::ReadLocked,
+                    AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                    DatabaseProfileSettings::get(opCtx->getServiceContext())
+                        .getDatabaseProfileLevel(ns.dbName()));
+                const auto collection =
+                    acquireCollectionMaybeLockFree(opCtx,
+                                                   CollectionAcquisitionRequest::fromOpCtx(
+                                                       opCtx, ns, AcquisitionPrerequisites::kRead));
+                if (collection.exists()) {
+                    const auto& collectionPtr = collection.getCollectionPtr();
+                    auto localCollUUID = collection.uuid();
+                    if (auto wantedCollUUID = nsWithOptUUID.getUUID()) {
+                        if (wantedCollUUID != localCollUUID) {
+                            return 0LL;
+                        }
                     }
+                    collUUID.emplace(localCollUUID);
+                    numRecords = collectionPtr->numRecords(opCtx);
+                    dataSizeBytes = collectionPtr->dataSize(opCtx);
                 }
-                collUUID.emplace(localCollUUID);
-                numRecords = autoColl->numRecords(opCtx);
-                dataSizeBytes = autoColl->dataSize(opCtx);
             }
 
             // If the collection doesn't exists or is empty return 0
