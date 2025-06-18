@@ -85,9 +85,10 @@ public:
         result.appendNumber("maxMessageSizeBytes", static_cast<long long>(MaxMessageSizeBytes));
         result.appendDate("localTime", Date_t::now());
 
-        auto wireSpec = WireSpec::getWireSpec(opCtx->getServiceContext()).get();
-        result.append("maxWireVersion", wireSpec->incomingExternalClient.maxWireVersion);
-        result.append("minWireVersion", wireSpec->incomingExternalClient.minWireVersion);
+        auto incomingExternalClient =
+            WireSpec::getWireSpec(opCtx->getServiceContext()).getIncomingExternalClient();
+        result.append("maxWireVersion", incomingExternalClient.maxWireVersion);
+        result.append("minWireVersion", incomingExternalClient.minWireVersion);
 
         // The mongod paired with a mongotmock should be able to auth as the __system user with
         // the SCRAM-SHA-256 authentication mechanism.

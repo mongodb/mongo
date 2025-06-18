@@ -35,8 +35,8 @@ namespace mongo::transport::grpc {
 
 int WireVersionProvider::getClusterMaxWireVersion() const {
     return WireSpec::getWireSpec(getGlobalServiceContext())
-        .get()
-        ->incomingExternalClient.maxWireVersion;
+        .getIncomingExternalClient()
+        .maxWireVersion;
 }
 
 }  // namespace mongo::transport::grpc

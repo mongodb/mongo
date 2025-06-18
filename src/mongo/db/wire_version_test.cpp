@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 #include <limits>
@@ -272,6 +273,39 @@ TEST(WireVersionTest, ValidateWireVersionFailsForUpgradedServerNode) {
                       {WireVersion::LATEST_WIRE_VERSION - 1, WireVersion::LATEST_WIRE_VERSION - 1},
                       swReply.getValue()));
 }
+
+TEST(WireSpec, AllGetterReturnExpectedValues) {
+    auto serviceCtx = ServiceContext::make();
+
+    WireSpec::Specification testSpec;
+    testSpec.isInternalClient = true;
+    testSpec.incomingExternalClient = {WireVersion::RELEASE_2_4_AND_BEFORE,
+                                       WireVersion::LATEST_WIRE_VERSION};
+    testSpec.incomingInternalClient = {WireVersion::SUPPORTS_OP_MSG,
+                                       WireVersion::LATEST_WIRE_VERSION};
+    testSpec.outgoing = {WireVersion::LATEST_WIRE_VERSION, WireVersion::LATEST_WIRE_VERSION};
+
+    WireSpec::getWireSpec(serviceCtx.get()).initialize(std::move(testSpec));
+
+    auto specPtr = WireSpec::getWireSpec(serviceCtx.get()).get();
+    ASSERT(specPtr);
+
+    ASSERT_EQ(specPtr->isInternalClient,
+              WireSpec::getWireSpec(serviceCtx.get()).isInternalClient());
+
+    auto externalFromGetter = WireSpec::getWireSpec(serviceCtx.get()).getIncomingExternalClient();
+    ASSERT_EQ(specPtr->incomingExternalClient.minWireVersion, externalFromGetter.minWireVersion);
+    ASSERT_EQ(specPtr->incomingExternalClient.maxWireVersion, externalFromGetter.maxWireVersion);
+
+    auto internalFromGetter = WireSpec::getWireSpec(serviceCtx.get()).getIncomingInternalClient();
+    ASSERT_EQ(specPtr->incomingInternalClient.minWireVersion, internalFromGetter.minWireVersion);
+    ASSERT_EQ(specPtr->incomingInternalClient.maxWireVersion, internalFromGetter.maxWireVersion);
+
+    auto outgoingFromGetter = WireSpec::getWireSpec(serviceCtx.get()).getOutgoing();
+    ASSERT_EQ(specPtr->outgoing.minWireVersion, outgoingFromGetter.minWireVersion);
+    ASSERT_EQ(specPtr->outgoing.maxWireVersion, outgoingFromGetter.maxWireVersion);
+}
+
 
 }  // namespace
 }  // namespace mongo

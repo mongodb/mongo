@@ -214,10 +214,12 @@ public:
     // Calling `get()` on uninitialized instances of `WireSpec` is an invariant failure.
     std::shared_ptr<const Specification> get();
 
-    // Do not call this, it requires the caller to hold the lock on _spec.
-    bool isInitialized() const {
-        return _spec ? true : false;
-    }
+    // These getters allow direct access to fields in `WireSpec::Specification.`
+    // Calling these getters on uninitialized instances of `WireSpec` is an invariant failure.
+    WireVersionInfo getIncomingExternalClient() const;
+    WireVersionInfo getIncomingInternalClient() const;
+    WireVersionInfo getOutgoing() const;
+    bool isInternalClient() const;
 
 private:
     // Ensures concurrent accesses to `get()`, `appendInternalClientWireVersionIfNeeded()`, and
@@ -225,6 +227,10 @@ private:
     mutable stdx::mutex _mutex;
 
     std::shared_ptr<const Specification> _spec;
+
+    bool isInitialized() const {
+        return !!_spec;
+    }
 };
 
 namespace wire_version {

@@ -76,8 +76,7 @@ public:
 
     Message helloResponse() {
         OpMsg response;
-        WireVersionInfo wv =
-            WireSpec::getWireSpec(getServiceContext()).get()->incomingExternalClient;
+        WireVersionInfo wv = WireSpec::getWireSpec(getServiceContext()).getIncomingExternalClient();
         BSONObjBuilder bob;
         bob.append("ok", 1);
         WireVersionInfo::appendToBSON(wv, &bob);

@@ -448,8 +448,8 @@ public:
     static void addRequiredClientMetadata(::grpc::ClientContext& ctx) {
         ctx.AddMetadata(std::string{util::constants::kWireVersionKey},
                         std::to_string(WireSpec::getWireSpec(getGlobalServiceContext())
-                                           .get()
-                                           ->incomingExternalClient.maxWireVersion));
+                                           .getIncomingExternalClient()
+                                           .maxWireVersion));
         ctx.AddMetadata(std::string{util::constants::kAuthenticationTokenKey}, "my-token");
     }
 

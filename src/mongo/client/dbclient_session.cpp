@@ -299,8 +299,8 @@ void DBClientSession::connect(const HostAndPort& serverAddress,
         }
     }
 
-    auto wireSpec = WireSpec::getWireSpec(getGlobalServiceContext()).get();
-    auto validateStatus = wire_version::validateWireVersion(wireSpec->outgoing, replyWireVersion);
+    auto outgoing = WireSpec::getWireSpec(getGlobalServiceContext()).getOutgoing();
+    auto validateStatus = wire_version::validateWireVersion(outgoing, replyWireVersion);
     if (!validateStatus.isOK()) {
         LOGV2_WARNING(
             20126, "Remote host has incompatible wire version", "error"_attr = validateStatus);

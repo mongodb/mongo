@@ -153,13 +153,13 @@ void AsyncDBClient::_parseHelloResponse(BSONObj request,
     uassert(50786,
             "Expected OP_MSG response to 'hello'",
             response->getProtocol() == rpc::Protocol::kOpMsg);
-    auto wireSpec = WireSpec::getWireSpec(_svcCtx).get();
+    auto outgoing = WireSpec::getWireSpec(_svcCtx).getOutgoing();
     auto responseBody = response->getCommandReply();
     uassertStatusOK(getStatusFromCommandResult(responseBody));
 
     auto replyWireVersion =
         uassertStatusOK(wire_version::parseWireVersionFromHelloReply(responseBody));
-    auto validateStatus = wire_version::validateWireVersion(wireSpec->outgoing, replyWireVersion);
+    auto validateStatus = wire_version::validateWireVersion(outgoing, replyWireVersion);
     if (!validateStatus.isOK()) {
         LOGV2_WARNING(
             23741, "Remote host has incompatible wire version", "error"_attr = validateStatus);
@@ -171,7 +171,7 @@ void AsyncDBClient::_parseHelloResponse(BSONObj request,
     auto& egressConnectionCloserManager = executor::EgressConnectionCloserManager::get(_svcCtx);
     // Mark outgoing connection to keep open so it can be kept open on FCV upgrade if it is
     // not to a server with a lower binary version.
-    if (replyWireVersion.maxWireVersion >= wireSpec->outgoing.maxWireVersion) {
+    if (replyWireVersion.maxWireVersion >= outgoing.maxWireVersion) {
         pauseBeforeMarkKeepOpen.pauseWhileSet();
         egressConnectionCloserManager.setKeepOpen(_peer, true);
     } else {

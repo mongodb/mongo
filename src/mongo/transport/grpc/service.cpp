@@ -98,8 +98,8 @@ inline Status makeShutdownTerminationStatus() {
                         clientWireVersion,
                         clusterMaxWireVersion));
     } else if (auto serverMinWireVersion = WireSpec::getWireSpec(getGlobalServiceContext())
-                                               .get()
-                                               ->incomingExternalClient.minWireVersion;
+                                               .getIncomingExternalClient()
+                                               .minWireVersion;
                clientWireVersion < serverMinWireVersion) {
         return ::grpc::Status(::grpc::StatusCode::FAILED_PRECONDITION,
                               fmt::format("Provided wire version ({}) is less than this server's "

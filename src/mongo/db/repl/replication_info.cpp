@@ -483,8 +483,8 @@ public:
             // closed if the featureCompatibilityVersion is bumped to 3.6.
             if (internalClient->getMaxWireVersion() >=
                 WireSpec::getWireSpec(opCtx->getServiceContext())
-                    .get()
-                    ->incomingExternalClient.maxWireVersion) {
+                    .getIncomingExternalClient()
+                    .maxWireVersion) {
                 connectionTagsToSet |= Client::kLatestVersionInternalClientKeepOpen;
             } else {
                 connectionTagsToUnset |= Client::kLatestVersionInternalClientKeepOpen;
@@ -579,17 +579,15 @@ public:
                             opCtx->getClient()->getConnectionId());
 
 
-        if (auto wireSpec = WireSpec::getWireSpec(opCtx->getServiceContext()).get();
-            cmd.getInternalClient()) {
-            result.append(HelloCommandReply::kMinWireVersionFieldName,
-                          wireSpec->incomingInternalClient.minWireVersion);
-            result.append(HelloCommandReply::kMaxWireVersionFieldName,
-                          wireSpec->incomingInternalClient.maxWireVersion);
+        auto& wireSpec = WireSpec::getWireSpec(opCtx->getServiceContext());
+        if (cmd.getInternalClient()) {
+            auto internal = wireSpec.getIncomingInternalClient();
+            result.append(HelloCommandReply::kMinWireVersionFieldName, internal.minWireVersion);
+            result.append(HelloCommandReply::kMaxWireVersionFieldName, internal.maxWireVersion);
         } else {
-            result.append(HelloCommandReply::kMinWireVersionFieldName,
-                          wireSpec->incomingExternalClient.minWireVersion);
-            result.append(HelloCommandReply::kMaxWireVersionFieldName,
-                          wireSpec->incomingExternalClient.maxWireVersion);
+            auto external = wireSpec.getIncomingExternalClient();
+            result.append(HelloCommandReply::kMinWireVersionFieldName, external.minWireVersion);
+            result.append(HelloCommandReply::kMaxWireVersionFieldName, external.maxWireVersion);
         }
 
         result.append(HelloCommandReply::kReadOnlyFieldName, opCtx->readOnly());

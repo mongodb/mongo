@@ -1358,15 +1358,15 @@ TEST_F(NetworkInterfaceInternalClientTest,
     auto helloHandshake = waitForHello();
 
     // Verify that the "hello" reply has the expected internalClient data.
-    auto wireSpec = WireSpec::getWireSpec(getGlobalServiceContext()).get();
+    auto outgoing = WireSpec::getWireSpec(getGlobalServiceContext()).getOutgoing();
     auto internalClientElem = helloHandshake.request["internalClient"];
     ASSERT_EQ(internalClientElem.type(), BSONType::object);
     auto minWireVersionElem = internalClientElem.Obj()["minWireVersion"];
     auto maxWireVersionElem = internalClientElem.Obj()["maxWireVersion"];
     ASSERT_EQ(minWireVersionElem.type(), BSONType::numberInt);
     ASSERT_EQ(maxWireVersionElem.type(), BSONType::numberInt);
-    ASSERT_EQ(minWireVersionElem.numberInt(), wireSpec->outgoing.minWireVersion);
-    ASSERT_EQ(maxWireVersionElem.numberInt(), wireSpec->outgoing.maxWireVersion);
+    ASSERT_EQ(minWireVersionElem.numberInt(), outgoing.minWireVersion);
+    ASSERT_EQ(maxWireVersionElem.numberInt(), outgoing.maxWireVersion);
 
     // Verify that the ping op is counted as a success.
     auto res = deferred.get();

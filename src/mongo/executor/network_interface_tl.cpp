@@ -846,7 +846,7 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandStateBase::send
     clientHandle = std::move(retrievedClient);
 
     if (interface->_svcCtx && requestToSend.timeout != RemoteCommandRequest::kNoTimeout &&
-        WireSpec::getWireSpec(interface->_svcCtx).get()->isInternalClient) {
+        WireSpec::getWireSpec(interface->_svcCtx).isInternalClient()) {
         BSONObjBuilder updatedCmdBuilder;
         updatedCmdBuilder.appendElements(request.cmdObj);
         updatedCmdBuilder.append("maxTimeMSOpOnly", request.timeout.count());

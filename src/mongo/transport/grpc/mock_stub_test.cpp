@@ -85,8 +85,8 @@ public:
                     ctx.addMetadataEntry(
                         std::string{util::constants::kWireVersionKey},
                         std::to_string(WireSpec::getWireSpec(getGlobalServiceContext())
-                                           .get()
-                                           ->incomingExternalClient.maxWireVersion));
+                                           .getIncomingExternalClient()
+                                           .maxWireVersion));
                     ctx.addMetadataEntry(std::string{util::constants::kAuthenticationTokenKey},
                                          "my-token");
                     auto stream = makeStream(ctx);

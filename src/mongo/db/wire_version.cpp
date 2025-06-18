@@ -109,6 +109,30 @@ std::shared_ptr<const WireSpec::Specification> WireSpec::get() {
     return _spec;
 }
 
+bool WireSpec::isInternalClient() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    fassert(8082001, isInitialized());
+    return _spec->isInternalClient;
+}
+
+WireVersionInfo WireSpec::getIncomingExternalClient() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    fassert(8082002, isInitialized());
+    return _spec->incomingExternalClient;
+}
+
+WireVersionInfo WireSpec::getIncomingInternalClient() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    fassert(8082003, isInitialized());
+    return _spec->incomingInternalClient;
+}
+
+WireVersionInfo WireSpec::getOutgoing() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    fassert(8082004, isInitialized());
+    return _spec->outgoing;
+}
+
 namespace wire_version {
 
 StatusWith<WireVersionInfo> parseWireVersionFromHelloReply(const BSONObj& helloReply) {

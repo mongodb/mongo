@@ -1462,9 +1462,10 @@ BSONObj runStateMachineForEncryption(mongocrypt_ctx_t* ctx,
                         !opCmdName.empty());
                 if (str::equalCaseInsensitive(opCmdName, "isMaster")) {
                     BSONObjBuilder bob;
-                    auto wireSpec = WireSpec::getWireSpec(getGlobalServiceContext()).get();
-                    bob.append("maxWireVersion", wireSpec->incomingExternalClient.maxWireVersion);
-                    bob.append("minWireVersion", wireSpec->incomingExternalClient.minWireVersion);
+                    auto incomingExternalClient = WireSpec::getWireSpec(getGlobalServiceContext())
+                                                      .getIncomingExternalClient();
+                    bob.append("maxWireVersion", incomingExternalClient.maxWireVersion);
+                    bob.append("minWireVersion", incomingExternalClient.minWireVersion);
                     auto reply = bob.done();
                     auto feed = MongoCryptBinary::createFromBSONObj(reply);
                     feedOk = mongocrypt_ctx_mongo_feed(ctx, feed);
