@@ -462,6 +462,8 @@ void TTLMonitor::run() {
         try {
             const auto opCtxPtr = cc().makeOperationContext();
             writeConflictRetry(opCtxPtr.get(), "TTL pass", NamespaceString::kEmpty, [&] {
+                hangTTLMonitorBetweenPasses.pauseWhileSet(opCtxPtr.get());
+
                 _doTTLPass(opCtxPtr.get(), Date_t::now());
             });
         } catch (const DBException& ex) {
@@ -485,8 +487,6 @@ void TTLMonitor::shutdown() {
 }
 
 void TTLMonitor::_doTTLPass(OperationContext* opCtx, Date_t at) {
-    hangTTLMonitorBetweenPasses.pauseWhileSet(opCtx);
-
     // Increment the metric after the TTL work has been finished.
     ON_BLOCK_EXIT([&] { ttlPasses.increment(); });
 
