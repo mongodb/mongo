@@ -31,6 +31,12 @@ def _git_diff(args: list) -> str:
     return result.stdout.strip() + os.linesep
 
 
+def _git_unstaged_files() -> str:
+    command = ["git", "ls-files", "--others", "--exclude-standard"]
+    result = subprocess.run(command, capture_output=True, text=True, check=True)
+    return result.stdout.strip() + os.linesep
+
+
 def _get_files_changed_since_fork_point(origin_branch: str = "origin/master") -> List[str]:
     """Query git to get a list of files in the repo from a diff."""
     # There are 3 diffs we run:
@@ -43,6 +49,7 @@ def _get_files_changed_since_fork_point(origin_branch: str = "origin/master") ->
     diff_files = _git_diff(["--name-only", f"{fork_point}..HEAD"])
     diff_files += _git_diff(["--name-only", "--cached"])
     diff_files += _git_diff(["--name-only"])
+    diff_files += _git_unstaged_files()
 
     file_set = {
         os.path.normpath(os.path.join(os.curdir, line.rstrip()))
@@ -102,6 +109,7 @@ def run_prettier(
         "!./bazel-out",
         "!./bazel-mongo",
         "!./external",
+        "!./.compiledb",
     }
     for path in pathlib.Path(".").iterdir():
         if path.is_symlink():
