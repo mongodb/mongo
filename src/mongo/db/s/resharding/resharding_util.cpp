@@ -719,13 +719,14 @@ Milliseconds getMajorityReplicationLag(OperationContext* opCtx) {
     return lastAppliedWallTime - lastCommittedWallTime;
 }
 
-boost::optional<int> getIndexCount(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollection coll(opCtx, nss, MODE_IS);
-    if (!coll) {
+boost::optional<int> getIndexCount(OperationContext* opCtx,
+                                   const CollectionAcquisition& acquisition) {
+    if (!acquisition.exists()) {
         return boost::none;
     }
-    auto indexCount = coll->getIndexCatalog()->numIndexesTotal();
-    if (coll->isClustered()) {
+    auto& collPtr = acquisition.getCollectionPtr();
+    auto indexCount = collPtr->getIndexCatalog()->numIndexesTotal();
+    if (collPtr->isClustered()) {
         // There is an implicit 'clustered' index on a clustered collection.
         // Increment the total index count similar to storage stats:
         // https://github.com/10gen/mongo/blob/29d8030f8aa7f3bc119081007fb09777daffc591/src/mongo/db/stats/storage_stats.cpp#L249C1-L251C22

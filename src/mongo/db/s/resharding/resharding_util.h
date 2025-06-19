@@ -39,7 +39,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/cancelable_operation_context.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -517,7 +516,8 @@ Milliseconds getMajorityReplicationLag(OperationContext* opCtx);
 
 // Returns the number of indexes on the given namespace or boost::none if the collection does not
 // exist.
-boost::optional<int> getIndexCount(OperationContext* opCtx, const NamespaceString& nss);
+boost::optional<int> getIndexCount(OperationContext* opCtx,
+                                   const CollectionAcquisition& acquisition);
 
 
 /**

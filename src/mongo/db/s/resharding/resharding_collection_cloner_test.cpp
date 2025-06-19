@@ -324,9 +324,15 @@ protected:
 
         while (doOneBatch(
             opCtx, *_pipeline, *_execPipeline, txnNum, kMyShardName, _myHostAndPort, batchSize)) {
-            AutoGetCollection tempColl{opCtx, _tempNss, MODE_IX};
-            ASSERT_EQ(tempColl->numRecords(opCtx), _metrics->getDocumentsProcessedCount());
-            ASSERT_EQ(tempColl->dataSize(opCtx), _metrics->getBytesWrittenCount());
+            const auto tempColl =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      opCtx, _tempNss, AcquisitionPrerequisites::kRead),
+                                  MODE_IX);
+            ASSERT_EQ(tempColl.getCollectionPtr()->numRecords(opCtx),
+                      _metrics->getDocumentsProcessedCount());
+            ASSERT_EQ(tempColl.getCollectionPtr()->dataSize(opCtx),
+                      _metrics->getBytesWrittenCount());
 
             auto doc = getResumeDataDocument(opCtx);
             auto parsedDoc = ReshardingRecipientResumeData::parse(
@@ -336,20 +342,27 @@ protected:
             ASSERT_BSONOBJ_EQ(*parsedDoc.getResumeToken(), _getResumeToken());
 
             if (testOptions.storeProgress) {
-                ASSERT_EQ(tempColl->numRecords(opCtx), *parsedDoc.getDocumentsCopied());
-                ASSERT_GT(tempColl->dataSize(opCtx), 0);
-                ASSERT_EQ(tempColl->dataSize(opCtx), *parsedDoc.getBytesCopied());
+                ASSERT_EQ(tempColl.getCollectionPtr()->numRecords(opCtx),
+                          *parsedDoc.getDocumentsCopied());
+                ASSERT_GT(tempColl.getCollectionPtr()->dataSize(opCtx), 0);
+                ASSERT_EQ(tempColl.getCollectionPtr()->dataSize(opCtx),
+                          *parsedDoc.getBytesCopied());
             } else {
                 ASSERT(!parsedDoc.getDocumentsCopied());
             }
         }
 
-        AutoGetCollection tempColl{opCtx, _tempNss, MODE_IX};
-        ASSERT_EQ(tempColl->numRecords(operationContext()), expectedDocumentsCount);
+        const auto tempColl =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  opCtx, _tempNss, AcquisitionPrerequisites::kRead),
+                              MODE_IX);
+        ASSERT_EQ(tempColl.getCollectionPtr()->numRecords(operationContext()),
+                  expectedDocumentsCount);
         ASSERT_EQ(_metrics->getDocumentsProcessedCount(), expectedDocumentsCount);
-        ASSERT_GT(tempColl->dataSize(opCtx), 0);
-        ASSERT_EQ(tempColl->dataSize(opCtx), _metrics->getBytesWrittenCount());
-        verifyFunction(tempColl->getCursor(opCtx));
+        ASSERT_GT(tempColl.getCollectionPtr()->dataSize(opCtx), 0);
+        ASSERT_EQ(tempColl.getCollectionPtr()->dataSize(opCtx), _metrics->getBytesWrittenCount());
+        verifyFunction(tempColl.getCollectionPtr()->getCursor(opCtx));
     }
 
     ReshardingSourceId getSourceId() const {

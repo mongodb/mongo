@@ -99,13 +99,16 @@ void ensureCollectionExists(OperationContext* opCtx,
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     writeConflictRetry(opCtx, "resharding::data_copy::ensureCollectionExists", nss, [&] {
-        AutoGetCollection coll(opCtx, nss, MODE_IX);
-        if (coll) {
+        AutoGetDb db(opCtx, nss.dbName(), MODE_IX);
+        const auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        if (coll.exists()) {
             return;
         }
-
         WriteUnitOfWork wuow(opCtx);
-        coll.ensureDbExists(opCtx)->createCollection(opCtx, nss, options);
+        db.ensureDbExists(opCtx)->createCollection(opCtx, nss, options);
         wuow.commit();
     });
 }
@@ -117,15 +120,19 @@ void ensureCollectionDropped(OperationContext* opCtx,
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     writeConflictRetry(opCtx, "resharding::data_copy::ensureCollectionDropped", nss, [&] {
-        AutoGetCollection coll(opCtx, nss, MODE_X);
-        if (!coll || (uuid && coll->uuid() != uuid)) {
+        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
+        const auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        if (!coll.exists() || (uuid && coll.uuid() != uuid)) {
             // If the collection doesn't exist or exists with a different UUID, then the
             // requested collection has been dropped already.
             return;
         }
 
         WriteUnitOfWork wuow(opCtx);
-        uassertStatusOK(coll.getDb()->dropCollectionEvenIfSystem(
+        uassertStatusOK(autoDb.getDb()->dropCollectionEvenIfSystem(
             opCtx, nss, {} /* dropOpTime */, true /* markFromMigrate */));
         wuow.commit();
     });
@@ -184,21 +191,29 @@ void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
     // namespace at the same time.
 
     auto tempReshardingNssExists = [&] {
-        AutoGetCollection tempReshardingColl(opCtx, metadata.getTempReshardingNss(), MODE_IS);
+        const auto tempReshardingColl = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, metadata.getTempReshardingNss(), AcquisitionPrerequisites::kRead),
+            MODE_IS);
         uassert(ErrorCodes::InvalidUUID,
                 "Temporary resharding collection exists but doesn't have a UUID matching the"
                 " resharding operation",
-                !tempReshardingColl || tempReshardingColl->uuid() == metadata.getReshardingUUID());
-        return bool(tempReshardingColl);
+                !tempReshardingColl.exists() ||
+                    tempReshardingColl.uuid() == metadata.getReshardingUUID());
+        return tempReshardingColl.exists();
     }();
 
     if (!tempReshardingNssExists) {
-        AutoGetCollection sourceColl(opCtx, metadata.getSourceNss(), MODE_IS);
+        const auto sourceColl =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  opCtx, metadata.getSourceNss(), AcquisitionPrerequisites::kRead),
+                              MODE_IS);
         auto errmsg =
             "Temporary resharding collection doesn't exist and hasn't already been renamed"_sd;
-        uassert(ErrorCodes::NamespaceNotFound, errmsg, sourceColl);
-        uassert(
-            ErrorCodes::InvalidUUID, errmsg, sourceColl->uuid() == metadata.getReshardingUUID());
+        uassert(ErrorCodes::NamespaceNotFound, errmsg, sourceColl.exists());
+        uassert(ErrorCodes::InvalidUUID, errmsg, sourceColl.uuid() == metadata.getReshardingUUID());
         return;
     }
 
@@ -213,10 +228,14 @@ bool isCollectionCapped(OperationContext* opCtx, const NamespaceString& nss) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
-    AutoGetCollection coll(opCtx, nss, MODE_IS);
-    uassert(
-        ErrorCodes::NamespaceNotFound, "Temporary resharding collection doesn't exist."_sd, coll);
-    return coll.getCollection()->isCapped();
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    uassert(ErrorCodes::NamespaceNotFound,
+            "Temporary resharding collection doesn't exist."_sd,
+            coll.exists());
+    return coll.getCollectionPtr()->isCapped();
 }
 
 void deleteRecipientResumeData(OperationContext* opCtx, const UUID& reshardingUUID) {

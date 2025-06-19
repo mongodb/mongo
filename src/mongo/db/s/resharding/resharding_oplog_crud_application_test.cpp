@@ -36,10 +36,8 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -173,7 +171,13 @@ public:
             }
 
             {
-                AutoGetCollection autoColl(opCtx.get(), _outputNss, MODE_X);
+                auto coll = acquireCollection(
+                    opCtx.get(),
+                    CollectionAcquisitionRequest{_outputNss,
+                                                 PlacementConcern::kPretendUnsharded,
+                                                 repl::ReadConcernArgs::get(opCtx.get()),
+                                                 AcquisitionPrerequisites::kWrite},
+                    MODE_X);
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx.get(),
                                                                                      _outputNss)
                     ->setFilteringMetadata(
@@ -263,19 +267,23 @@ public:
     void checkCollectionContents(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const std::vector<BSONObj>& documents) {
-        AutoGetCollection coll(opCtx, nss, MODE_IS);
-        ASSERT_TRUE(bool(coll)) << "Collection '" << nss.toStringForErrorMsg()
-                                << "' does not exist";
+        auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        ASSERT_TRUE(coll.exists())
+            << "Collection '" << nss.toStringForErrorMsg() << "' does not exist";
 
-        auto exec = InternalPlanner::indexScan(opCtx,
-                                               &*coll,
-                                               coll->getIndexCatalog()->findIdIndex(opCtx),
-                                               BSONObj(),
-                                               BSONObj(),
-                                               BoundInclusion::kIncludeStartKeyOnly,
-                                               PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                               InternalPlanner::FORWARD,
-                                               InternalPlanner::IXSCAN_FETCH);
+        auto exec = InternalPlanner::indexScan(
+            opCtx,
+            &coll.getCollectionPtr(),
+            coll.getCollectionPtr()->getIndexCatalog()->findIdIndex(opCtx),
+            BSONObj(),
+            BSONObj(),
+            BoundInclusion::kIncludeStartKeyOnly,
+            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+            InternalPlanner::FORWARD,
+            InternalPlanner::IXSCAN_FETCH);
 
         size_t i = 0;
         BSONObj obj;
@@ -782,11 +790,15 @@ TEST_F(ReshardingOplogCrudApplicationTest, DeleteOpAtomicallyMovesFromOtherStash
             applier()->applyOperation(opCtx.get(), makeInsertOp(BSON("_id" << 0 << sk() << 2))));
 
         {
-            AutoGetCollection otherStashColl(opCtx.get(), otherStashNss(), MODE_IX);
+            auto otherStashColl = acquireCollection(
+                opCtx.get(),
+                CollectionAcquisitionRequest::fromOpCtx(
+                    opCtx.get(), otherStashNss(), AcquisitionPrerequisites::kWrite),
+                MODE_IX);
             WriteUnitOfWork wuow(opCtx.get());
             ASSERT_OK(
                 collection_internal::insertDocument(opCtx.get(),
-                                                    *otherStashColl,
+                                                    otherStashColl.getCollectionPtr(),
                                                     InsertStatement{BSON("_id" << 0 << sk() << -3)},
                                                     nullptr /* opDebug */));
             wuow.commit();

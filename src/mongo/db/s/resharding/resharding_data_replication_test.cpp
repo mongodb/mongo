@@ -40,7 +40,6 @@
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -218,15 +217,20 @@ protected:
                                             storeOplogFetcherProgress,
                                             false /* relaxed */);
 
-        AutoGetCollection oplopFetcherProgressColl(
-            opCtx.get(), NamespaceString::kReshardingFetcherProgressNamespace, MODE_IS);
+        const auto oplopFetcherProgressColl =
+            acquireCollection(opCtx.get(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  opCtx.get(),
+                                  NamespaceString::kReshardingFetcherProgressNamespace,
+                                  AcquisitionPrerequisites::kRead),
+                              MODE_IS);
         if (storeOplogFetcherProgress) {
             // The progress collection should have been created but it should not have any
             // documents.
-            ASSERT(oplopFetcherProgressColl);
-            ASSERT(oplopFetcherProgressColl->isEmpty(opCtx.get()));
+            ASSERT(oplopFetcherProgressColl.exists());
+            ASSERT(oplopFetcherProgressColl.getCollectionPtr()->isEmpty(opCtx.get()));
         } else {
-            ASSERT(!oplopFetcherProgressColl);
+            ASSERT(!oplopFetcherProgressColl.exists());
         }
     }
 
@@ -284,11 +288,16 @@ TEST_F(ReshardingDataReplicationTest, StashCollectionsHaveSameCollationAsReshard
 
     for (const auto& nss : stashCollections) {
         auto opCtx = makeOperationContext();
-        AutoGetCollection stashColl(opCtx.get(), nss, MODE_IS);
-        ASSERT_TRUE(bool(stashColl->getDefaultCollator()))
+        const auto stashColl =
+            acquireCollection(opCtx.get(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  opCtx.get(), nss, AcquisitionPrerequisites::kRead),
+                              MODE_IS);
+        ASSERT_TRUE(bool(stashColl.getCollectionPtr()->getDefaultCollator()))
             << "Stash collection was created with 'simple' collation";
-        ASSERT_BSONOBJ_BINARY_EQ(stashColl->getDefaultCollator()->getSpec().toBSON(),
-                                 collator.getSpec().toBSON());
+        ASSERT_BSONOBJ_BINARY_EQ(
+            stashColl.getCollectionPtr()->getDefaultCollator()->getSpec().toBSON(),
+            collator.getSpec().toBSON());
     }
 }
 
@@ -318,11 +327,16 @@ TEST_F(ReshardingDataReplicationTest,
 
                 for (const auto& nss : stashCollections) {
                     auto opCtx = Client::getCurrent()->makeOperationContext();
-                    AutoGetCollection stashColl(opCtx.get(), nss, MODE_IS);
-                    ASSERT_TRUE(bool(stashColl->getDefaultCollator()))
+                    const auto stashColl =
+                        acquireCollection(opCtx.get(),
+                                          CollectionAcquisitionRequest::fromOpCtx(
+                                              opCtx.get(), nss, AcquisitionPrerequisites::kRead),
+                                          MODE_IS);
+                    ASSERT_TRUE(bool(stashColl.getCollectionPtr()->getDefaultCollator()))
                         << "Stash collection was created with 'simple' collation";
-                    ASSERT_BSONOBJ_BINARY_EQ(stashColl->getDefaultCollator()->getSpec().toBSON(),
-                                             collator.getSpec().toBSON());
+                    ASSERT_BSONOBJ_BINARY_EQ(
+                        stashColl.getCollectionPtr()->getDefaultCollator()->getSpec().toBSON(),
+                        collator.getSpec().toBSON());
                 }
             }
         });
@@ -370,10 +384,18 @@ TEST_F(ReshardingDataReplicationTest, GetOplogFetcherResumeId) {
         oplogEntry.setWallClockTime({});
         oplogEntry.set_id(Value(oplogId.toBSON()));
 
-        AutoGetCollection oplogBufferColl(opCtx.get(), oplogBufferNss, MODE_IX);
+        const auto oplogBufferColl = acquireCollection(
+            opCtx.get(),
+            CollectionAcquisitionRequest{oplogBufferNss,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx.get()),
+                                         AcquisitionPrerequisites::kWrite},
+            MODE_IX);
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(collection_internal::insertDocument(
-            opCtx.get(), *oplogBufferColl, InsertStatement{oplogEntry.toBSON()}, nullptr));
+        ASSERT_OK(collection_internal::insertDocument(opCtx.get(),
+                                                      oplogBufferColl.getCollectionPtr(),
+                                                      InsertStatement{oplogEntry.toBSON()},
+                                                      nullptr));
         wuow.commit();
     };
 

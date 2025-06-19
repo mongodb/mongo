@@ -119,12 +119,15 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
     return ExecutorFuture<void>(**executor)
         .then(_buildPhaseHandler(Phase::kReshard, [this, anchor = shared_from_this()](auto* opCtx) {
             {
-                AutoGetCollection coll{opCtx,
-                                       nss(),
-                                       MODE_IS,
-                                       AutoGetCollection::Options{}
-                                           .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
-                                           .expectedUUID(_doc.getCollectionUUID())};
+                // Resharding on view is never allowed. However, historically, resharding doesn't
+                // fail with "CommandNotSupportedOnView" when running on a views but with
+                // "IllegalOperation". We therefore allow views here so that further checks can
+                // allow the back-compatible error.
+                auto coll = acquireCollectionOrView(
+                    opCtx,
+                    CollectionOrViewAcquisitionRequest::fromOpCtx(
+                        opCtx, nss(), _doc.getCollectionUUID(), AcquisitionPrerequisites::kRead),
+                    MODE_IS);
             }
 
             const auto cmOld = uassertStatusOK(

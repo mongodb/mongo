@@ -32,7 +32,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -294,18 +293,20 @@ public:
     }
 
     void insertNoopOplogEntry(NamespaceString nss, BSONObj msg, BSONObj o2Field) {
-        AutoGetCollection coll(opCtx, nss, LockMode::MODE_IX);
-        WriteUnitOfWork wuow(opCtx);
-        opCtx->getServiceContext()->getOpObserver()->onInternalOpMessage(
+        const auto coll = acquireCollection(
             opCtx,
-            coll.getCollection()->ns(),
-            coll.getCollection()->uuid(),
-            msg,
-            o2Field,
-            boost::none,
-            boost::none,
-            boost::none,
-            boost::none);
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+        opCtx->getServiceContext()->getOpObserver()->onInternalOpMessage(opCtx,
+                                                                         coll.nss(),
+                                                                         coll.uuid(),
+                                                                         msg,
+                                                                         o2Field,
+                                                                         boost::none,
+                                                                         boost::none,
+                                                                         boost::none,
+                                                                         boost::none);
         wuow.commit();
     }
 

@@ -30,7 +30,6 @@
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
@@ -108,7 +107,11 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
     MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         opCtx, metadata.getTempReshardingNss(), collOptionsAndIndexes);
 
-    AutoGetCollection autoColl(opCtx, metadata.getTempReshardingNss(), MODE_IX);
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, metadata.getTempReshardingNss(), AcquisitionPrerequisites::kWrite),
+        MODE_IX);
     CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
         opCtx, metadata.getTempReshardingNss())
         ->clearFilteringMetadata(opCtx);

@@ -37,7 +37,6 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/drop_database.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/persistent_task_store.h"
@@ -326,7 +325,13 @@ protected:
     }
 
     void addFilteringMetadata(OperationContext* opCtx, NamespaceString sourceNss, ShardId shardId) {
-        AutoGetCollection autoColl(opCtx, sourceNss, LockMode::MODE_IS);
+        const auto dataColl =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest{sourceNss,
+                                                           PlacementConcern::kPretendUnsharded,
+                                                           repl::ReadConcernArgs::get(opCtx),
+                                                           AcquisitionPrerequisites::kRead},
+                              MODE_IS);
         const auto metadata{makeShardedMetadataForOriginalCollection(opCtx, shardId)};
         ScopedSetShardRole scopedSetShardRole{
             opCtx,

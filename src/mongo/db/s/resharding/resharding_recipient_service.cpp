@@ -34,10 +34,8 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/cancelable_operation_context.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -1315,10 +1313,14 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
             for (const auto& donor : _donorShards) {
                 auto stashNss = resharding::getLocalConflictStashNamespace(
                     _metadata.getSourceUUID(), donor.getShardId());
-                AutoGetCollection stashColl(opCtx.get(), stashNss, MODE_IS);
+                const auto stashColl =
+                    acquireCollection(opCtx.get(),
+                                      CollectionAcquisitionRequest::fromOpCtx(
+                                          opCtx.get(), stashNss, AcquisitionPrerequisites::kRead),
+                                      MODE_IS);
                 uassert(5356800,
                         "Resharding completed with non-empty stash collections",
-                        !stashColl || stashColl->isEmpty(opCtx.get()));
+                        !stashColl.exists() || stashColl.getCollectionPtr()->isEmpty(opCtx.get()));
             }
         })
         .then([this, &factory] {
@@ -1815,9 +1817,12 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
     ReshardingMetrics::ExternallyTrackedRecipientFields externalMetrics;
     auto opCtx = factory.makeOperationContext(&cc());
     [&] {
-        AutoGetCollection tempReshardingColl(
-            opCtx.get(), _metadata.getTempReshardingNss(), MODE_IS);
-        if (!tempReshardingColl) {
+        const auto tempReshardingColl = acquireCollection(
+            opCtx.get(),
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx.get(), _metadata.getTempReshardingNss(), AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        if (!tempReshardingColl.exists()) {
             return;
         }
         if (_recipientCtx.getState() != RecipientStateEnum::kCloning &&
@@ -1828,13 +1833,14 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
             // documents do not affect the cloning metrics.
             return;
         }
+        auto& tempReshardingCollPtr = tempReshardingColl.getCollectionPtr();
         auto cloningMetrics = _tryFetchCloningMetrics(opCtx.get());
         externalMetrics.documentBytesCopied = cloningMetrics
             ? cloningMetrics->getBytesCopied()
-            : tempReshardingColl->dataSize(opCtx.get());
+            : tempReshardingCollPtr->dataSize(opCtx.get());
         externalMetrics.documentCountCopied = cloningMetrics
             ? cloningMetrics->getDocumentsCopied()
-            : tempReshardingColl->numRecords(opCtx.get());
+            : tempReshardingCollPtr->numRecords(opCtx.get());
     }();
 
     reshardingOpCtxKilledWhileRestoringMetrics.execute(
@@ -1851,13 +1857,19 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
             (ReshardingSourceId{_metadata.getReshardingUUID(), donor.getShardId()}).toBSON();
 
         if (_storeOplogFetcherProgress) {
-            AutoGetCollection fetcherProgressColl(
-                opCtx.get(), NamespaceString::kReshardingFetcherProgressNamespace, MODE_IS);
-            if (fetcherProgressColl) {
+            const auto fetcherProgressColl =
+                acquireCollection(opCtx.get(),
+                                  CollectionAcquisitionRequest(
+                                      NamespaceString::kReshardingFetcherProgressNamespace,
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx.get()),
+                                      AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
+            if (fetcherProgressColl.exists()) {
                 BSONObj result;
                 Helpers::findOne(
                     opCtx.get(),
-                    fetcherProgressColl.getCollection(),
+                    fetcherProgressColl.getCollectionPtr(),
                     BSON(ReshardingOplogFetcherProgress::kOplogSourceIdFieldName << sourceIdBson),
                     result);
 
@@ -1870,26 +1882,37 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
                 }
             }
         } else {
-            AutoGetCollection oplogBufferColl(opCtx.get(),
-                                              resharding::getLocalOplogBufferNamespace(
-                                                  _metadata.getSourceUUID(), donor.getShardId()),
-                                              MODE_IS);
-            if (oplogBufferColl) {
+            const auto oplogBufferColl =
+                acquireCollection(opCtx.get(),
+                                  CollectionAcquisitionRequest(
+                                      resharding::getLocalOplogBufferNamespace(
+                                          _metadata.getSourceUUID(), donor.getShardId()),
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx.get()),
+                                      AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
+            if (oplogBufferColl.exists()) {
                 setOrAdd(externalMetrics.oplogEntriesFetched,
-                         oplogBufferColl->numRecords(opCtx.get()));
+                         oplogBufferColl.getCollectionPtr()->numRecords(opCtx.get()));
             }
         }
 
         {
             boost::optional<ReshardingOplogApplierProgress> applierProgressDoc;
+            const auto applierProgressColl =
+                acquireCollection(opCtx.get(),
+                                  CollectionAcquisitionRequest(
+                                      NamespaceString::kReshardingApplierProgressNamespace,
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx.get()),
+                                      AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
 
-            AutoGetCollection applierProgressColl(
-                opCtx.get(), NamespaceString::kReshardingApplierProgressNamespace, MODE_IS);
-            if (applierProgressColl) {
+            if (applierProgressColl.exists()) {
                 BSONObj result;
                 Helpers::findOne(
                     opCtx.get(),
-                    applierProgressColl.getCollection(),
+                    applierProgressColl.getCollectionPtr(),
                     BSON(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << sourceIdBson),
                     result);
 
@@ -1931,8 +1954,13 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
 
 void ReshardingRecipientService::RecipientStateMachine::_updateContextMetrics(
     OperationContext* opCtx) {
-    AutoGetCollection coll(opCtx, _metadata.getTempReshardingNss(), MODE_IS);
-    if (coll) {
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, _metadata.getTempReshardingNss(), AcquisitionPrerequisites::kRead),
+        MODE_IS);
+
+    if (coll.exists()) {
         auto totalDocumentCount = [&]() -> long long {
             if (_metadata.getPerformVerification() && _changeStreamsMonitorCtx) {
                 uassert(9858303,
@@ -1942,14 +1970,14 @@ void ReshardingRecipientService::RecipientStateMachine::_updateContextMetrics(
                 return *_recipientCtx.getTotalNumDocuments() +
                     _changeStreamsMonitorCtx->getDocumentsDelta();
             } else {
-                return coll->numRecords(opCtx);
+                return coll.getCollectionPtr()->numRecords(opCtx);
             }
         }();
         _recipientCtx.setTotalNumDocuments(totalDocumentCount);
-        _recipientCtx.setTotalDocumentSize(coll->dataSize(opCtx));
+        _recipientCtx.setTotalDocumentSize(coll.getCollectionPtr()->dataSize(opCtx));
     }
 
-    auto optionalIndexCount = resharding::getIndexCount(opCtx, _metadata.getTempReshardingNss());
+    auto optionalIndexCount = resharding::getIndexCount(opCtx, coll);
     if (optionalIndexCount) {
         _recipientCtx.setNumOfIndexes(*optionalIndexCount);
     }
@@ -2002,7 +2030,7 @@ void ReshardingRecipientService::RecipientStateMachine::_tryFetchBuildIndexMetri
                 fmt::format("{} not found", _metadata.getTempReshardingNss().toStringForErrorMsg()),
                 tempReshardingColl.exists());
 
-        auto indexCatalog = tempReshardingColl.getCollectionPtr()->getIndexCatalog();
+        const auto& indexCatalog = tempReshardingColl.getCollectionPtr()->getIndexCatalog();
         invariant(indexCatalog,
                   str::stream() << "Collection is missing index catalog: "
                                 << _metadata.getTempReshardingNss().toStringForErrorMsg());

@@ -33,7 +33,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/keypattern.h"
@@ -47,6 +46,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -449,7 +449,11 @@ void clearFilteringMetadata(OperationContext* opCtx,
             catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
         }
 
-        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+        const auto acquisition = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
             ->clearFilteringMetadata(opCtx);
 

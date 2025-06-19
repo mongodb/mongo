@@ -113,6 +113,13 @@ struct CollectionOrViewAcquisitionRequest {
         AcquisitionPrerequisites::OperationType operationType,
         AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView);
 
+    static CollectionOrViewAcquisitionRequest fromOpCtx(
+        OperationContext* opCtx,
+        NamespaceString nss,
+        boost::optional<UUID> uuid,
+        AcquisitionPrerequisites::OperationType operationType,
+        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView);
+
     NamespaceStringOrUUID nssOrUUID;
 
     // When 'nssOrUUID' is in the NamespaceString form 'expectedUUID' may contain the expected

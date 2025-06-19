@@ -36,7 +36,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -548,10 +547,16 @@ ReshardingDonorOplogId ReshardingDataReplication::getOplogFetcherResumeId(
     Timestamp minFetchTimestamp) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
-    AutoGetCollection coll(opCtx, oplogBufferNss, MODE_IS);
-    if (coll) {
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest{oplogBufferNss,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead},
+        MODE_IS);
+    if (coll.exists()) {
         auto highestOplogBufferId =
-            resharding::data_copy::findDocWithHighestInsertedId(opCtx, *coll);
+            resharding::data_copy::findDocWithHighestInsertedId(opCtx, coll.getCollectionPtr());
 
         if (highestOplogBufferId) {
             auto oplogEntry = repl::OplogEntry{highestOplogBufferId->toBson()};

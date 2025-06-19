@@ -130,7 +130,7 @@ public:
             const auto collEntry = catalogClient->getCollection(opCtx, nss);
             if (!mongo::resharding::gFeatureFlagReshardingForTimeseries.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                uassert(ErrorCodes::NotImplemented,
+                uassert(ErrorCodes::IllegalOperation,
                         "reshardCollection command of a sharded time-series collection is not "
                         "supported",
                         !collEntry.getTimeseriesFields());

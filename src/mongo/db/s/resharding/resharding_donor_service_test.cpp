@@ -36,9 +36,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -327,10 +325,15 @@ public:
     }
 
     void checkStateDocumentRemoved(OperationContext* opCtx) {
-        AutoGetCollection donorColl(
-            opCtx, NamespaceString::kDonorReshardingOperationsNamespace, MODE_IS);
-        ASSERT_TRUE(bool(donorColl));
-        ASSERT_TRUE(bool(donorColl->isEmpty(opCtx)));
+        const auto donorColl = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest{NamespaceString::kDonorReshardingOperationsNamespace,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead},
+            MODE_IS);
+        ASSERT_TRUE(donorColl.exists());
+        ASSERT_TRUE(bool(donorColl.getCollectionPtr()->isEmpty(opCtx)));
     }
 
     boost::optional<ReshardingDonorDocument> getPersistedDonorDocumentOptional(
@@ -774,9 +777,15 @@ TEST_F(ReshardingDonorServiceTest, DropsSourceCollectionWhenDone) {
     notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
 
     {
-        AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
-        ASSERT_TRUE(bool(coll));
-        ASSERT_EQ(coll->uuid(), doc.getSourceUUID());
+        const auto coll = acquireCollection(
+            opCtx.get(),
+            CollectionAcquisitionRequest{doc.getSourceNss(),
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx.get()),
+                                         AcquisitionPrerequisites::kRead},
+            MODE_IS);
+        ASSERT_TRUE(coll.exists());
+        ASSERT_EQ(coll.uuid(), doc.getSourceUUID());
     }
 
     awaitChangeStreamsMonitorCompleted(opCtx.get(), *donor, doc);
@@ -785,8 +794,14 @@ TEST_F(ReshardingDonorServiceTest, DropsSourceCollectionWhenDone) {
     checkStateDocumentRemoved(opCtx.get());
 
     {
-        AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
-        ASSERT_FALSE(bool(coll));
+        const auto coll = acquireCollection(
+            opCtx.get(),
+            CollectionAcquisitionRequest{doc.getSourceNss(),
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx.get()),
+                                         AcquisitionPrerequisites::kRead},
+            MODE_IS);
+        ASSERT_FALSE(coll.exists());
     }
 }
 
@@ -805,9 +820,15 @@ TEST_F(ReshardingDonorServiceTest, RenamesTemporaryReshardingCollectionWhenDone)
     notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
 
     {
-        AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
-        ASSERT_TRUE(bool(coll));
-        ASSERT_EQ(coll->uuid(), doc.getSourceUUID());
+        const auto coll = acquireCollection(
+            opCtx.get(),
+            CollectionAcquisitionRequest{doc.getSourceNss(),
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx.get()),
+                                         AcquisitionPrerequisites::kRead},
+            MODE_IS);
+        ASSERT_TRUE(coll.exists());
+        ASSERT_EQ(coll.uuid(), doc.getSourceUUID());
     }
 
     awaitChangeStreamsMonitorCompleted(opCtx.get(), *donor, doc);
@@ -816,9 +837,15 @@ TEST_F(ReshardingDonorServiceTest, RenamesTemporaryReshardingCollectionWhenDone)
     checkStateDocumentRemoved(opCtx.get());
 
     {
-        AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
-        ASSERT_TRUE(bool(coll));
-        ASSERT_EQ(coll->uuid(), doc.getReshardingUUID());
+        const auto coll = acquireCollection(
+            opCtx.get(),
+            CollectionAcquisitionRequest{doc.getSourceNss(),
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx.get()),
+                                         AcquisitionPrerequisites::kRead},
+            MODE_IS);
+        ASSERT_TRUE(coll.exists());
+        ASSERT_EQ(coll.uuid(), doc.getReshardingUUID());
     }
 }
 
@@ -876,9 +903,16 @@ TEST_F(ReshardingDonorServiceTest, CompletesWithStepdownAfterAbort) {
         checkStateDocumentRemoved(opCtx.get());
 
         {
-            AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
-            ASSERT_TRUE(bool(coll));
-            ASSERT_EQ(coll->uuid(), doc.getSourceUUID());
+            const auto coll =
+                acquireCollection(opCtx.get(),
+                                  CollectionAcquisitionRequest{
+                                      doc.getSourceNss(),
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx.get()),
+                                      AcquisitionPrerequisites::kRead},
+                                  MODE_IS);
+            ASSERT_TRUE(coll.exists());
+            ASSERT_EQ(coll.uuid(), doc.getSourceUUID());
         }
     }
 }
@@ -906,9 +940,16 @@ TEST_F(ReshardingDonorServiceTest, RetainsSourceCollectionOnAbort) {
         notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
 
         {
-            AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
-            ASSERT_TRUE(bool(coll));
-            ASSERT_EQ(coll->uuid(), doc.getSourceUUID());
+            const auto coll =
+                acquireCollection(opCtx.get(),
+                                  CollectionAcquisitionRequest{
+                                      doc.getSourceNss(),
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx.get()),
+                                      AcquisitionPrerequisites::kRead},
+                                  MODE_IS);
+            ASSERT_TRUE(coll.exists());
+            ASSERT_EQ(coll.uuid(), doc.getSourceUUID());
         }
 
         donor->abort(false);
@@ -916,9 +957,16 @@ TEST_F(ReshardingDonorServiceTest, RetainsSourceCollectionOnAbort) {
         checkStateDocumentRemoved(opCtx.get());
 
         {
-            AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
-            ASSERT_TRUE(bool(coll));
-            ASSERT_EQ(coll->uuid(), doc.getSourceUUID());
+            const auto coll =
+                acquireCollection(opCtx.get(),
+                                  CollectionAcquisitionRequest{
+                                      doc.getSourceNss(),
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx.get()),
+                                      AcquisitionPrerequisites::kRead},
+                                  MODE_IS);
+            ASSERT_TRUE(coll.exists());
+            ASSERT_EQ(coll.uuid(), doc.getSourceUUID());
         }
     }
 }

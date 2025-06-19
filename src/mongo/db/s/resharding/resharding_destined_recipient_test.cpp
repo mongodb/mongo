@@ -39,9 +39,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -318,9 +316,13 @@ protected:
                   const NamespaceString& nss,
                   const BSONObj& doc,
                   const ReshardingEnv& env) {
-        AutoGetCollection coll(opCtx, nss, MODE_IX);
+        const auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(collection_internal::insertDocument(opCtx, *coll, InsertStatement(doc), nullptr));
+        ASSERT_OK(collection_internal::insertDocument(
+            opCtx, coll.getCollectionPtr(), InsertStatement(doc), nullptr));
         wuow.commit();
     }
 
@@ -340,14 +342,17 @@ protected:
                    const NamespaceString& nss,
                    const BSONObj& query,
                    const ReshardingEnv& env) {
-        AutoGetCollection coll(opCtx, nss, MODE_IX);
-
-        RecordId rid = Helpers::findOne(opCtx, coll.getCollection(), query);
+        const auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        RecordId rid = Helpers::findOne(opCtx, coll.getCollectionPtr(), query);
         ASSERT(!rid.isNull());
 
         WriteUnitOfWork wuow(opCtx);
         OpDebug opDebug;
-        collection_internal::deleteDocument(opCtx, *coll, kUninitializedStmtId, rid, &opDebug);
+        collection_internal::deleteDocument(
+            opCtx, coll.getCollectionPtr(), kUninitializedStmtId, rid, &opDebug);
         wuow.commit();
     }
 
@@ -364,7 +369,10 @@ TEST_F(DestinedRecipientTest, TestGetDestinedRecipient) {
     auto opCtx = operationContext();
     auto env = setupReshardingEnv(opCtx, true);
 
-    AutoGetCollection coll(opCtx, kNss, MODE_IX);
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, kNss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
     OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
     ShardingWriteRouter shardingWriteRouter(opCtx, kNss);
 
@@ -378,7 +386,10 @@ TEST_F(DestinedRecipientTest, TestGetDestinedRecipientThrowsOnBlockedRefresh) {
     auto opCtx = operationContext();
     auto env = setupReshardingEnv(opCtx, false);
 
-    AutoGetCollection coll(opCtx, kNss, MODE_IX);
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, kNss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
     OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
 
     FailPointEnableBlock failPoint("blockCollectionCacheLookup");

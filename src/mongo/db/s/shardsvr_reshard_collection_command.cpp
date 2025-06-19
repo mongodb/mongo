@@ -103,27 +103,6 @@ public:
             resharding::validatePerformVerification(VersionContext::getDecoration(opCtx),
                                                     request().getPerformVerification());
 
-            {
-                FixedFCVRegion fixedFcvRegion{opCtx};
-                bool isReshardingForTimeseriesEnabled =
-                    mongo::resharding::gFeatureFlagReshardingForTimeseries.isEnabled(
-                        fixedFcvRegion->acquireFCVSnapshot());
-
-                AutoGetCollection collOrView{opCtx,
-                                             ns(),
-                                             MODE_IS,
-                                             AutoGetCollection::Options{}.viewMode(
-                                                 auto_get_collection::ViewMode::kViewsPermitted)};
-
-                bool isTimeseries = collOrView.getView()
-                    ? collOrView.getView()->timeseries()
-                    : *collOrView && collOrView->getTimeseriesOptions().has_value();
-
-                uassert(ErrorCodes::IllegalOperation,
-                        "Can't reshard a timeseries collection",
-                        !isTimeseries || isReshardingForTimeseriesEnabled);
-            }
-
             if (resharding::isMoveCollection(request().getProvenance())) {
                 bool clusterHasTwoOrMoreShards = [&]() {
                     auto* clusterParameters = ServerParameterSet::getClusterParameterSet();

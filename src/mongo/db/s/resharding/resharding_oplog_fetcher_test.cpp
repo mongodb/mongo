@@ -446,7 +446,14 @@ public:
         _fetchTimestamp = repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);
 
         {
-            AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+            const auto dataColl =
+                acquireCollection(_opCtx,
+                                  CollectionAcquisitionRequest{
+                                      dataCollectionNss,
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(_opCtx),
+                                      AcquisitionPrerequisites::kWrite},
+                                  MODE_IX);
 
             // Set a failpoint to tack a `destinedRecipient` onto oplog entries.
             setGlobalFailPoint("addDestinedRecipient",
@@ -454,14 +461,15 @@ public:
                                     << "alwaysOn"
                                     << "data"
                                     << BSON("destinedRecipient" << destinedRecipient.toString())));
-
+            auto const& nss = dataColl.nss();
+            auto const& uuid = dataColl.uuid();
             // Generate insert oplog entries by inserting documents.
             {
                 for (std::int32_t num = 0; num < numInsertOplogEntriesBeforeFinalOplogEntry;
                      ++num) {
                     WriteUnitOfWork wuow(_opCtx);
                     insertDocument(
-                        dataColl.getCollection(),
+                        dataColl.getCollectionPtr(),
                         InsertStatement(
                             BSON("_id" << num << std::string(approxInsertOplogEntrySizeBytes, 'a')
                                        << num)));
@@ -474,11 +482,11 @@ public:
                 WriteUnitOfWork wuow(_opCtx);
                 _opCtx->getServiceContext()->getOpObserver()->onInternalOpMessage(
                     _opCtx,
-                    dataColl.getCollection()->ns(),
-                    dataColl.getCollection()->uuid(),
+                    nss,
+                    uuid,
                     BSON(
                         "msg" << fmt::format("Writes to {} are temporarily blocked for resharding.",
-                                             dataColl.getCollection()->ns().toString_forTest())),
+                                             nss.toString_forTest())),
                     BSON("type" << resharding::kReshardFinalOpLogType << "reshardingUUID"
                                 << _reshardingUUID),
                     boost::none,
@@ -494,8 +502,8 @@ public:
                     WriteUnitOfWork wuow(_opCtx);
                     _opCtx->getServiceContext()->getOpObserver()->onInternalOpMessage(
                         _opCtx,
-                        dataColl.getCollection()->ns(),
-                        dataColl.getCollection()->uuid(),
+                        nss,
+                        uuid,
                         BSON("msg" << "other noop"),
                         boost::none /* o2 */,
                         boost::none,
@@ -612,12 +620,18 @@ protected:
                           boost::optional<int> initialAggregateBatchSize,
                           int expectedNumFetchedOplogEntries,
                           int expectedNumApplyOpsOplogEntries) {
-        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+        const auto dataColl = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest{dataCollectionNss,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(_opCtx),
+                                         AcquisitionPrerequisites::kWrite},
+            MODE_IX);
         auto fetcherJob = launchAsync([&, this] {
             ThreadClient tc("RefetchRunner", _svcCtx->getService(), Client::noSession());
             ReshardingOplogFetcher fetcher(makeFetcherEnv(),
                                            _reshardingUUID,
-                                           dataColl->uuid(),
+                                           dataColl.uuid(),
                                            {_fetchTimestamp, _fetchTimestamp},
                                            _donorShard,
                                            _destinationShard,
@@ -877,7 +891,13 @@ TEST_F(ReshardingOplogFetcherTest, TestTrackLastSeen) {
 
     setupBasic(outputCollectionNss, dataCollectionNss, _destinationShard);
 
-    AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+    const auto dataColl = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest{dataCollectionNss,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(_opCtx),
+                                     AcquisitionPrerequisites::kWrite},
+        MODE_IX);
 
     const int maxBatches = 1;
     auto fetcherJob = launchAsync([&, this] {
@@ -885,7 +905,7 @@ TEST_F(ReshardingOplogFetcherTest, TestTrackLastSeen) {
 
         ReshardingOplogFetcher fetcher(makeFetcherEnv(),
                                        _reshardingUUID,
-                                       dataColl->uuid(),
+                                       dataColl.uuid(),
                                        {_fetchTimestamp, _fetchTimestamp},
                                        _donorShard,
                                        _destinationShard,
@@ -918,7 +938,13 @@ TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
 
     setupBasic(outputCollectionNss, dataCollectionNss, _destinationShard);
 
-    AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+    const auto dataColl = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest{dataCollectionNss,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(_opCtx),
+                                     AcquisitionPrerequisites::kWrite},
+        MODE_IX);
 
     auto fetcherJob = launchAsync([&, this] {
         ThreadClient tc("RefetcherRunner", _svcCtx->getService(), Client::noSession());
@@ -926,7 +952,7 @@ TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
         const Timestamp doesNotExist(1, 1);
         ReshardingOplogFetcher fetcher(makeFetcherEnv(),
                                        _reshardingUUID,
-                                       dataColl->uuid(),
+                                       dataColl.uuid(),
                                        {doesNotExist, doesNotExist},
                                        _donorShard,
                                        _destinationShard,
@@ -965,8 +991,14 @@ TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
     _fetchTimestamp = repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);
 
     const auto& collectionUUID = [&] {
-        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
-        return dataColl->uuid();
+        const auto dataColl = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest{dataCollectionNss,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(_opCtx),
+                                         AcquisitionPrerequisites::kWrite},
+            MODE_IX);
+        return dataColl.uuid();
     }();
 
     ReshardingDonorOplogId startAt{_fetchTimestamp, _fetchTimestamp};
@@ -1004,9 +1036,17 @@ TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
                                 BSON("destinedRecipient" << _destinationShard.toString()));
 
         {
-            AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+            const auto dataColl =
+                acquireCollection(_opCtx,
+                                  CollectionAcquisitionRequest{
+                                      dataCollectionNss,
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(_opCtx),
+                                      AcquisitionPrerequisites::kWrite},
+                                  MODE_IX);
             WriteUnitOfWork wuow(_opCtx);
-            insertDocument(dataColl.getCollection(), InsertStatement(BSON("_id" << 1 << "a" << 1)));
+            insertDocument(dataColl.getCollectionPtr(),
+                           InsertStatement(BSON("_id" << 1 << "a" << 1)));
             wuow.commit();
         }
 
@@ -1049,8 +1089,15 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
         _fetchTimestamp = repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);
 
         const auto& collectionUUID = [&] {
-            AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
-            return dataColl->uuid();
+            const auto dataColl =
+                acquireCollection(_opCtx,
+                                  CollectionAcquisitionRequest{
+                                      dataCollectionNss,
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(_opCtx),
+                                      AcquisitionPrerequisites::kWrite},
+                                  MODE_IX);
+            return dataColl.uuid();
         }();
 
         ReshardingDonorOplogId startAt{_fetchTimestamp, _fetchTimestamp};
@@ -1070,9 +1117,16 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
                                     BSON("destinedRecipient" << _destinationShard.toString()));
 
             {
-                AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+                const auto dataColl =
+                    acquireCollection(_opCtx,
+                                      CollectionAcquisitionRequest{
+                                          dataCollectionNss,
+                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                          repl::ReadConcernArgs::get(_opCtx),
+                                          AcquisitionPrerequisites::kWrite},
+                                      MODE_IX);
                 WriteUnitOfWork wuow(_opCtx);
-                insertDocument(dataColl.getCollection(),
+                insertDocument(dataColl.getCollectionPtr(),
                                InsertStatement(BSON("_id" << 1 << "a" << 1)));
                 wuow.commit();
             }
@@ -1101,9 +1155,16 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
         // Now, insert a document into a different collection that is not involved in resharding.
         auto writeToOtherCollectionTs = [&] {
             {
-                AutoGetCollection dataColl(_opCtx, otherCollection, LockMode::MODE_IX);
+                const auto dataColl =
+                    acquireCollection(_opCtx,
+                                      CollectionAcquisitionRequest{
+                                          otherCollection,
+                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                          repl::ReadConcernArgs::get(_opCtx),
+                                          AcquisitionPrerequisites::kWrite},
+                                      MODE_IX);
                 WriteUnitOfWork wuow(_opCtx);
-                insertDocument(dataColl.getCollection(),
+                insertDocument(dataColl.getCollectionPtr(),
                                InsertStatement(BSON("_id" << 1 << "a" << 1)));
                 wuow.commit();
             }
@@ -1157,8 +1218,14 @@ TEST_F(ReshardingOplogFetcherTest, RetriesOnRemoteInterruptionError) {
     _fetchTimestamp = repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);
 
     const auto& collectionUUID = [&] {
-        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
-        return dataColl->uuid();
+        const auto dataColl = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest{dataCollectionNss,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(_opCtx),
+                                         AcquisitionPrerequisites::kWrite},
+            MODE_IX);
+        return dataColl.uuid();
     }();
 
     auto fetcherJob = launchAsync([&, this] {
@@ -1200,8 +1267,14 @@ TEST_F(ReshardingOplogFetcherTest, RetriesOnNetworkTimeoutError) {
     _fetchTimestamp = repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);
 
     const auto& collectionUUID = [&] {
-        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
-        return dataColl->uuid();
+        const auto dataColl = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest{dataCollectionNss,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(_opCtx),
+                                         AcquisitionPrerequisites::kWrite},
+            MODE_IX);
+        return dataColl.uuid();
     }();
 
     auto fetcherJob = launchAsync([&, this] {
@@ -1241,8 +1314,14 @@ TEST_F(ReshardingOplogFetcherTest, ImmediatelyDoneWhenFinalOpHasAlreadyBeenFetch
     _fetchTimestamp = repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);
 
     const auto& collectionUUID = [&] {
-        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
-        return dataColl->uuid();
+        const auto dataColl = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest{dataCollectionNss,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(_opCtx),
+                                         AcquisitionPrerequisites::kWrite},
+            MODE_IX);
+        return dataColl.uuid();
     }();
 
     ReshardingOplogFetcher fetcher(makeFetcherEnv(),
@@ -1273,8 +1352,14 @@ DEATH_TEST_REGEX_F(ReshardingOplogFetcherTest,
     _fetchTimestamp = repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);
 
     const auto& collectionUUID = [&] {
-        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
-        return dataColl->uuid();
+        const auto dataColl = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest{dataCollectionNss,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(_opCtx),
+                                         AcquisitionPrerequisites::kWrite},
+            MODE_IX);
+        return dataColl.uuid();
     }();
 
     auto fetcherJob = launchAsync([&, this] {

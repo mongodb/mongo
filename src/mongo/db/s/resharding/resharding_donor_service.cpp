@@ -460,8 +460,13 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                        // We force a refresh to make sure that the placement information is updated
                        // in cache after abort decision before the donor state document is deleted.
                        {
-                           AutoGetCollection autoColl(
-                               opCtx.get(), _metadata.getTempReshardingNss(), MODE_IX);
+                           const auto coll =
+                               acquireCollection(opCtx.get(),
+                                                 CollectionAcquisitionRequest::fromOpCtx(
+                                                     opCtx.get(),
+                                                     _metadata.getTempReshardingNss(),
+                                                     AcquisitionPrerequisites::kWrite),
+                                                 MODE_IX);
                            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                                opCtx.get(), _metadata.getTempReshardingNss())
                                ->clearFilteringMetadata(opCtx.get());
@@ -682,17 +687,21 @@ void ReshardingDonorService::DonorStateMachine::
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
         auto rawOpCtx = opCtx.get();
 
-        if (auto optionalCount = resharding::getIndexCount(rawOpCtx, _metadata.getSourceNss())) {
+        const auto coll = acquireCollection(
+            rawOpCtx,
+            CollectionAcquisitionRequest::fromOpCtx(
+                rawOpCtx, _metadata.getSourceNss(), AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        if (auto optionalCount = resharding::getIndexCount(rawOpCtx, coll)) {
             indexCount = *optionalCount;
         }
 
-        AutoGetCollection coll(rawOpCtx, _metadata.getSourceNss(), MODE_IS);
-        if (coll) {
+        if (coll.exists()) {
             IndexBuildsCoordinator::get(rawOpCtx)->assertNoIndexBuildInProgForCollection(
-                coll->uuid());
+                coll.uuid());
 
-            bytesToClone = coll->dataSize(rawOpCtx);
-            documentsToClone = coll->numRecords(rawOpCtx);
+            bytesToClone = coll.getCollectionPtr()->dataSize(rawOpCtx);
+            documentsToClone = coll.getCollectionPtr()->numRecords(rawOpCtx);
         }
     }
 

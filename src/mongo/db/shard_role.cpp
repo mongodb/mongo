@@ -740,6 +740,23 @@ logv2::DynamicAttributes getCurOpLogAttrs(OperationContext* opCtx) {
 
 CollectionOrViewAcquisitionRequest CollectionOrViewAcquisitionRequest::fromOpCtx(
     OperationContext* opCtx,
+    NamespaceString nss,
+    boost::optional<UUID> uuid,
+    AcquisitionPrerequisites::OperationType operationType,
+    AcquisitionPrerequisites::ViewMode viewMode) {
+    auto& oss = OperationShardingState::get(opCtx);
+    auto& readConcern = repl::ReadConcernArgs::get(opCtx);
+
+    // Acquisitions by uuid cannot possibly have a corresponding ShardVersion attached.
+    PlacementConcern placementConcern =
+        PlacementConcern{oss.getDbVersion(nss.dbName()), oss.getShardVersion(nss)};
+
+    return CollectionOrViewAcquisitionRequest(
+        nss, uuid, placementConcern, readConcern, operationType, viewMode);
+}
+
+CollectionOrViewAcquisitionRequest CollectionOrViewAcquisitionRequest::fromOpCtx(
+    OperationContext* opCtx,
     NamespaceStringOrUUID nssOrUUID,
     AcquisitionPrerequisites::OperationType operationType,
     AcquisitionPrerequisites::ViewMode viewMode) {

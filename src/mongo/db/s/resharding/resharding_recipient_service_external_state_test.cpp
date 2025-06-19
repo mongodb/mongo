@@ -37,7 +37,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_constants.h"
@@ -336,8 +335,14 @@ TEST_F(RecipientServiceExternalStateTest, CreateLocalReshardingCollectionBasic) 
 
     {
         // The resharding collection shouldn't exist yet.
-        AutoGetCollection autoColl(operationContext(), kReshardingNss, MODE_IS);
-        ASSERT_FALSE(autoColl.getCollection());
+        const auto coll = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest{kReshardingNss,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(operationContext()),
+                                         AcquisitionPrerequisites::kRead},
+            MODE_IS);
+        ASSERT_FALSE(coll.exists());
     }
 
     // Simulate a refresh for the temporary resharding collection.
@@ -394,8 +399,14 @@ TEST_F(RecipientServiceExternalStateTest,
 
     {
         // The resharding collection shouldn't exist yet.
-        AutoGetCollection autoColl(operationContext(), kReshardingNss, MODE_IS);
-        ASSERT_FALSE(autoColl.getCollection());
+        const auto coll = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest{kReshardingNss,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(operationContext()),
+                                         AcquisitionPrerequisites::kRead},
+            MODE_IS);
+        ASSERT_FALSE(coll.exists());
     }
 
     // Simulate a refresh for the temporary resharding collection.
@@ -459,8 +470,14 @@ TEST_F(RecipientServiceExternalStateTest,
 
     {
         // The resharding collection shouldn't exist yet.
-        AutoGetCollection autoColl(operationContext(), kReshardingNss, MODE_IS);
-        ASSERT_FALSE(autoColl.getCollection());
+        const auto coll = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest{kReshardingNss,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(operationContext()),
+                                         AcquisitionPrerequisites::kRead},
+            MODE_IS);
+        ASSERT_FALSE(coll.exists());
     }
 
     // Simulate a refresh for the temporary resharding collection.

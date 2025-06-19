@@ -41,7 +41,6 @@
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
@@ -637,10 +636,15 @@ public:
     }
 
     void checkRecipientDocumentRemoved(OperationContext* opCtx) {
-        AutoGetCollection recipientColl(
-            opCtx, NamespaceString::kRecipientReshardingOperationsNamespace, MODE_IS);
-        ASSERT_TRUE(bool(recipientColl));
-        ASSERT_TRUE(bool(recipientColl->isEmpty(opCtx)));
+        auto recipientColl = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(NamespaceString::kRecipientReshardingOperationsNamespace,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        ASSERT_TRUE(recipientColl.exists());
+        ASSERT_TRUE(recipientColl.getCollectionPtr()->isEmpty(opCtx));
     }
 
     template <typename DocumentType>
@@ -1522,15 +1526,29 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
 
         if (testOptions.isAlsoDonor) {
             // Verify original collection still exists after aborting.
-            AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
-            ASSERT_TRUE(bool(coll));
-            ASSERT_EQ(coll->uuid(), doc.getSourceUUID());
+            auto coll =
+                acquireCollection(opCtx.get(),
+                                  CollectionAcquisitionRequest(
+                                      doc.getSourceNss(),
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx.get()),
+                                      AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
+            ASSERT_TRUE(coll.exists());
+            ASSERT_EQ(coll.uuid(), doc.getSourceUUID());
         }
 
         // Verify the temporary collection no longer exists.
         {
-            AutoGetCollection coll(opCtx.get(), doc.getTempReshardingNss(), MODE_IS);
-            ASSERT_FALSE(bool(coll));
+            auto coll =
+                acquireCollection(opCtx.get(),
+                                  CollectionAcquisitionRequest(
+                                      doc.getTempReshardingNss(),
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx.get()),
+                                      AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
+            ASSERT_FALSE(coll.exists());
         }
     }
 }
@@ -1559,9 +1577,16 @@ TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenD
         stateTransitionsGuard.wait(RecipientStateEnum::kApplying);
         {
             // Check the temporary collection exists but is not yet renamed.
-            AutoGetCollection coll(opCtx.get(), doc.getTempReshardingNss(), MODE_IS);
-            ASSERT_TRUE(bool(coll));
-            ASSERT_EQ(coll->uuid(), doc.getReshardingUUID());
+            auto coll =
+                acquireCollection(opCtx.get(),
+                                  CollectionAcquisitionRequest(
+                                      doc.getTempReshardingNss(),
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx.get()),
+                                      AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
+            ASSERT_TRUE(coll.exists());
+            ASSERT_EQ(coll.uuid(), doc.getReshardingUUID());
         }
         stateTransitionsGuard.unset(RecipientStateEnum::kApplying);
 
@@ -1577,9 +1602,16 @@ TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenD
 
         {
             // Ensure the temporary collection was renamed.
-            AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
-            ASSERT_TRUE(bool(coll));
-            ASSERT_EQ(coll->uuid(), doc.getReshardingUUID());
+            auto coll =
+                acquireCollection(opCtx.get(),
+                                  CollectionAcquisitionRequest(
+                                      doc.getSourceNss(),
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx.get()),
+                                      AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
+            ASSERT_TRUE(coll.exists());
+            ASSERT_EQ(coll.uuid(), doc.getReshardingUUID());
         }
     }
 }
