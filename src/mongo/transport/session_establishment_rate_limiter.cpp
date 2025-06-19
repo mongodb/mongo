@@ -29,6 +29,8 @@
 
 #include "mongo/transport/session_establishment_rate_limiter.h"
 
+#include "mongo/bson/json.h"
+#include "mongo/transport/cidr_range_list_parameter.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
@@ -36,6 +38,30 @@
 
 namespace mongo {
 namespace transport {
+namespace {
+
+VersionedValue<CIDRList> maxEstablishingConnsOverride;
+
+}  // namespace
+
+// TODO: SERVER-106468 Define CIDRRangeListParameter and remove this glue code
+void MaxEstablishingConnectionsOverrideServerParameter::append(OperationContext*,
+                                                               BSONObjBuilder* bob,
+                                                               StringData name,
+                                                               const boost::optional<TenantId>&) {
+    appendCIDRRangeListParameter(maxEstablishingConnsOverride, bob, name);
+}
+
+Status MaxEstablishingConnectionsOverrideServerParameter::set(const BSONElement& value,
+                                                              const boost::optional<TenantId>&) {
+    return setCIDRRangeListParameter(maxEstablishingConnsOverride, value.Obj());
+}
+
+Status MaxEstablishingConnectionsOverrideServerParameter::setFromString(
+    StringData str, const boost::optional<TenantId>&) {
+    return setCIDRRangeListParameter(maxEstablishingConnsOverride, fromjson(str));
+}
+
 
 SessionEstablishmentRateLimiter::SessionEstablishmentRateLimiter()
     : _rateLimiter(gIngressConnectionEstablishmentRatePerSec.load(),
@@ -60,7 +86,7 @@ SessionEstablishmentRateLimiter* SessionEstablishmentRateLimiter::get(ServiceCon
 
 Status SessionEstablishmentRateLimiter::throttleIfNeeded(Client* client) {
     // Check if the session is exempt from rate limiting based on its IP.
-    serverGlobalParams.maxEstablishingConnsOverride.refreshSnapshot(_maxEstablishingConnsOverride);
+    maxEstablishingConnsOverride.refreshSnapshot(_maxEstablishingConnsOverride);
     if (_maxEstablishingConnsOverride &&
         client->session()->isExemptedByCIDRList(*_maxEstablishingConnsOverride)) {
         _rateLimiter.recordExemption();

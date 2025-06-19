@@ -907,8 +907,7 @@ bool CommonAsioSession::checkForHTTPRequest(const Buffer& buffers) {
     return (bufferAsStr == "GET "_sd);
 }
 
-bool CommonAsioSession::isExemptedByCIDRList(
-    const std::vector<std::variant<CIDR, std::string>>& exemptions) const {
+bool CommonAsioSession::isExemptedByCIDRList(const CIDRList& exemptions) const {
     return transport::util::isExemptedByCIDRList(
         getProxiedSrcRemoteAddr(), localAddr(), exemptions);
 }

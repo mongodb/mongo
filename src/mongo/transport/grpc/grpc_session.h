@@ -193,8 +193,7 @@ public:
     }
 #endif
 
-    bool isExemptedByCIDRList(
-        const std::vector<std::variant<CIDR, std::string>>& exemptions) const override {
+    bool isExemptedByCIDRList(const CIDRList& exemptions) const override {
         return false;
     }
 

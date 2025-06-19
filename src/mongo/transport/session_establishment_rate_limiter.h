@@ -105,8 +105,7 @@ public:
 
 private:
     admission::RateLimiter _rateLimiter;
-    decltype(ServerGlobalParams::maxEstablishingConnsOverride)::Snapshot
-        _maxEstablishingConnsOverride;
+    VersionedValue<CIDRList>::Snapshot _maxEstablishingConnsOverride;
 
     // Stats
     Counter64 _exempted;

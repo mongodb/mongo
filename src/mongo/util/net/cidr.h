@@ -36,6 +36,8 @@
 
 #include <stdexcept>
 #include <string>
+#include <variant>
+#include <vector>
 
 #ifndef _WIN32
 #include <sys/socket.h>
@@ -132,5 +134,12 @@ StringBuilder& operator<<(StringBuilder& s, const CIDR& cidr);
  *     BSON("cidr" << cidr) -> { cidr: "..." }
  */
 BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& stream, const CIDR& value);
+
+/**
+ * A list of CIDR or strings. When the value is a string, it is assumed to be a unix path.
+ *
+ * The unix path string value is used to exempt anonymous unix socket.
+ */
+using CIDRList = std::vector<std::variant<CIDR, std::string>>;
 
 }  // namespace mongo

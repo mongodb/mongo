@@ -66,3 +66,12 @@ server_parameters:
             expr: std::numeric_limits<int32_t>::max()
         validator: {gte: 1}
         redact: false
+
+    ingressRequestRateLimiterExemptions:
+        description: "A document containing a list of CIDR ranges to be exempted from ingress request rate limiting."
+        set_at: [startup, runtime]
+        cpp_class:
+            name: "IngressRequestRateLimiterExemptions"
+            # Expects the payload to be an instance of `CIDRRangeListParameters`.
+            override_set: true
+        redact: false

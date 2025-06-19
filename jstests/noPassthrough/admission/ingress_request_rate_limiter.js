@@ -1,6 +1,6 @@
 
 /**
- * Test that the ingress admission rate limiter works correctly.
+ * Test that the ingress request rate limiter works correctly and exposes the right metrics.
  * @tags: [requires_fcv_80]
  */
 
@@ -9,11 +9,18 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-
-const maxInt32 = Math.pow(2, 31) - 1;
+import {
+    authenticateConnection,
+    getRateLimiterStats,
+    kConfigLogsAndFailPointsForRateLimiterTests,
+    kRateLimiterExemptAppName,
+    runTestReplSet,
+    runTestSharded,
+    runTestStandalone,
+} from "jstests/noPassthrough/admission/libs/ingress_request_rate_limiter_helper.js";
 
 /**
- * Runs the set parameter commands with some arbitrary value to ensure invalid values are rejected
+ * Runs the set parameter commands with some arbitrary value to ensure invalid values are rejected.
  */
 function testServerParameter(conn) {
     const db = conn.getDB("admin");
@@ -46,13 +53,6 @@ function testServerParameter(conn) {
         setParameter: 1,
         ingressRequestAdmissionRatePerSec: 1,
     }));
-
-    // Restore server parameters
-    assert.commandWorked(db.adminCommand({
-        setParameter: 1,
-        ingressRequestAdmissionRatePerSec: maxInt32,
-        ingressRequestAdmissionBurstSize: maxInt32
-    }));
 }
 
 // Arbitrary but low burst size in the amount of commands allowed to pass through.
@@ -64,7 +64,7 @@ const maxBurstSize = amountOfInserts;
 const extraRequests = 3;
 
 /**
- * This function compares the metrics before a test and after a test to ensure they are consistent
+ * This function compares the metrics before a test and after a test to ensure they are consistent.
  *
  * This function was factored out since some tests other than testRateLimiterMetrics are doing
  * the same checks.
@@ -93,9 +93,9 @@ function assertMetrics(
 }
 
 /**
- * Runs a fixed amount of operations and verifies the difference in the metrics
+ * Runs a fixed amount of operations and verifies the difference in the metrics.
  *
- * It also verifies that the errors has the right error label
+ * It also verifies that the errors has the right error label.
  */
 function testRateLimiterMetrics(conn, exemptConn) {
     const db = exemptConn.getDB(`${jsTest.name()}_db`);
@@ -113,7 +113,7 @@ function testRateLimiterMetrics(conn, exemptConn) {
     assert.gt(expectedAmountOfFailures, 0);
 
     // We run inserts command that will either pass or fail. When it fails, we validate the error
-    // code and label
+    // code and label.
     for (let i = 0; i < requestAmount; ++i) {
         const assertContainSystemOverloadedErrorLabel = (res) => {
             assert(res.hasOwnProperty("errorLabels"), res);
@@ -138,231 +138,135 @@ function testRateLimiterMetrics(conn, exemptConn) {
 /**
  * Runs some ping command with an unauthenticated client and validates that all requests were
  * exempt. This test only work on server with authentication enabled.
+ *
+ * As unauthenticated client are exempt from rate limiting, no token should be consumed.
  */
 function testRateLimiterUnauthenticated(noAuthClient, exemptConn) {
     // We run more pings than the available burst size. As all pings are exempts, they should
     // all succeed.
     const amountOfPing = maxBurstSize + extraRequests;
-    const db = exemptConn.getDB(`${jsTest.name()}_db`);
-    const initialStatus = db.serverStatus();
-    const initialExempt = initialStatus.network.ingressRequestRateLimiter.exemptedAdmissions;
-    const initialAvailableTokens =
-        initialStatus.network.ingressRequestRateLimiter.totalAvailableTokens;
+    const initialRateLimiterStats = getRateLimiterStats(exemptConn);
+    const initialExempt = initialRateLimiterStats.exemptedAdmissions;
+    const initialAvailableTokens = initialRateLimiterStats.totalAvailableTokens;
 
     // Run ping on unauthenticated client. As the client is unauthenticated, all command
-    // should work as there is no rate limiting applied
+    // should work as there is no rate limiting applied.
     const noAuthDB = noAuthClient.getDB("admin");
     for (let i = 0; i < maxBurstSize + extraRequests; ++i) {
         assert.commandWorked(noAuthDB.runCommand({ping: 1}));
     }
 
-    const finalStatus = db.serverStatus();
-    const finalExempt = finalStatus.network.ingressRequestRateLimiter.exemptedAdmissions;
-    const finalAvailableTokens = finalStatus.network.ingressRequestRateLimiter.totalAvailableTokens;
+    const finalRateLimiterStats = getRateLimiterStats(exemptConn);
+    const finalExempt = finalRateLimiterStats.exemptedAdmissions;
+    const finalAvailableTokens = finalRateLimiterStats.totalAvailableTokens;
 
     // Check that we added as much exempt requests as the amount of ping we ran. As no requests
-    // should be rate limited, running a command should only increment the exempt counter
+    // should be rate limited, running a command should only increment the exempt counter.
     assert.eq(finalExempt - initialExempt, amountOfPing);
 
-    // Check that we didn't affect the amount of available tokens while running pings
+    // Check that we didn't affect the amount of available tokens while running pings.
     assert.eq(finalAvailableTokens - initialAvailableTokens, 0);
 }
 
-function setupAuth(conn, exemptConn) {
-    // Since rate limiting only applies when authenticated, create a user and authenticate
-    const admin = conn.getDB('admin');
-    admin.createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
-    admin.auth('admin', 'pwd');
-    exemptConn.getDB('admin').auth('admin', 'pwd');
-}
-
-const kExemptAppName = "testRateLimiter";
-
-// Parameters for ingress admission rate limiting enabled
+// Parameters for ingress admission rate limiting enabled.
 const kParams = {
     ingressRequestAdmissionRatePerSec: 1,
     ingressRequestAdmissionBurstSize: maxBurstSize,
     ingressRequestRateLimiterEnabled: true,
 };
 
-// Parameters for ingress admission rate limiting disabled
-const kParamsRestore = {
-    ingressRequestAdmissionRatePerSec: maxInt32,
-    ingressRequestAdmissionBurstSize: maxInt32,
-    ingressRequestRateLimiterEnabled: false,
-};
-
-const kStartupConfig = {
-    logComponentVerbosity: tojson({command: 2}),
-    featureFlagIngressRateLimiting: 1,
-    "failpoint.ingressRateLimiterVerySlowRate": tojson({
-        mode: "alwaysOn",
-    }),
-    "failpoint.skipRateLimiterForTestClient":
-        tojson({mode: "alwaysOn", data: {exemptAppName: "testRateLimiter"}}),
-};
+/**
+ * Runs the server parameter test using a standalone instance.
+ *
+ * This test primarily checks if server parameters are validated correctly.
+ *
+ * See 'testServerParameter' for more detail.
+ */
+runTestStandalone({startupParams: {}, auth: true}, (conn, exemptConn) => {
+    testServerParameter(exemptConn);
+});
 
 /**
- * This function tests the ingress admission rate limiter when it is enabled at startup
+ * Runs a test using a standalone instance where we set parameters at startup
+ *
+ * It also tests that unauthenticated connections are exempt.
  */
-function runTestParamStartup() {
-    const mongod = MongoRunner.runMongod({
-        auth: '',
-        setParameter: {
-            ...kParams,
-            ...kStartupConfig,
-        },
-    });
+runTestStandalone({startupParams: kParams, auth: true}, (conn, exemptConn) => {
+    testRateLimiterUnauthenticated(conn, exemptConn);
 
-    const exemptConn = new Mongo(`mongodb://${mongod.host}/?appName=${kExemptAppName}`);
-    setupAuth(mongod, exemptConn);
-
-    testRateLimiterMetrics(mongod, exemptConn);
-    assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ...kParamsRestore}));
-
-    MongoRunner.stopMongod(mongod);
-}
+    authenticateConnection(conn);
+    testRateLimiterMetrics(conn, exemptConn);
+});
 
 /**
- * This function tests the ingress admission rate limiter when it is enabled at runtime
+ * Runs the test using a standalone instance where we set parameters at runtime.
+ *
+ * It also tests that unauthenticated connections are exempt.
  */
-function runTestParamRuntime() {
-    const mongod = MongoRunner.runMongod({auth: '', setParameter: kStartupConfig});
-    const exemptConn = new Mongo(`mongodb://${mongod.host}/?appName=${kExemptAppName}`);
-    const noAuthClient = new Mongo(mongod.host);
-
-    setupAuth(mongod, exemptConn);
+runTestStandalone({startupParams: {}, auth: true}, (conn, exemptConn) => {
+    // We test setting parameters at runtime.
     assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ...kParams}));
 
-    // This tests will run ping commands on the unauthenticated client. As auth is enabled on the
-    // server, no token should be consumed
-    testRateLimiterUnauthenticated(noAuthClient, exemptConn);
-
-    assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ...kParams}));
-    testRateLimiterMetrics(mongod, exemptConn);
-    assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ...kParamsRestore}));
-
-    MongoRunner.stopMongod(mongod);
-}
+    authenticateConnection(conn);
+    testRateLimiterMetrics(conn, exemptConn);
+});
 
 /**
- * This function tests the ingress admission rate limiter when authentication is disabled and
- * clients are unauthenticated
+ * Runs the test using a standalone instance where authentication is disabled on the server.
+ *
+ * The second parameter is set to false in order to disabled the authentication.
+ *
+ * We verify that unauthenticated clients are not exempt in this case. We do this by skipping
+ * the call to authenticateConnection we see in other tests.
  */
-function runTestAuthDisabled() {
-    const mongod = MongoRunner.runMongod({setParameter: kStartupConfig});
-    const exemptConn = new Mongo(`mongodb://${mongod.host}/?appName=${kExemptAppName}`);
-
-    // Here we skip authentication setup
-    // When auth is disabled, we expect rate limiting for both authenticated and unauthenticated
-    // clients
-
-    assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ...kParams}));
-    testRateLimiterMetrics(mongod, exemptConn);
-    assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ...kParamsRestore}));
-
-    MongoRunner.stopMongod(mongod);
-}
+runTestStandalone({startupParams: kParams, auth: false}, testRateLimiterMetrics);
 
 /**
- * Replica set test to check if rate limiting also applies to other topology
+ * Runs the test using a standalone instance where we set parameters at startup.
+ *
+ * It also tests that unauthenticated connections are exempt.
  */
-function runTestReplSet() {
-    const replSet = new ReplSetTest({
-        nodes: 1,
-        keyFile: "jstests/libs/key1",
-        nodeOptions: {
-            auth: '',
-            setParameter: {
-                ...kParams,
-                ...kStartupConfig,
-                ingressRequestRateLimiterEnabled: 0,  // kept disable during repl set setup
-            },
-        },
-    });
+runTestStandalone({startupParams: kParams, auth: true}, (conn, exemptConn) => {
+    testRateLimiterUnauthenticated(conn, exemptConn);
 
-    // We setup the replset safely with rate limiting disabled
-    replSet.startSet();
-    replSet.initiate();
+    authenticateConnection(conn);
+    testRateLimiterMetrics(conn, exemptConn);
+});
 
-    const primary = replSet.getPrimary();
-    const exemptConn = new Mongo(`mongodb://${primary.host}/?appName=${kExemptAppName}`);
+runTestReplSet({startupParams: kParams, auth: true}, (conn, exemptConn) => {
+    testRateLimiterUnauthenticated(conn, exemptConn);
 
-    setupAuth(primary, exemptConn);
-    const exemptAdmin = exemptConn.getDB("admin");
+    authenticateConnection(conn);
+    testRateLimiterMetrics(conn, exemptConn);
+});
 
-    // Enable rate limiting now that the replset is up
-    assert.commandWorked(
-        exemptAdmin.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled: 1}));
-    testRateLimiterMetrics(primary, exemptConn);
+runTestSharded({startupParams: kParams, auth: true}, (conn, exemptConn) => {
+    testRateLimiterUnauthenticated(conn, exemptConn);
 
-    assert.commandWorked(exemptAdmin.adminCommand({setParameter: 1, ...kParamsRestore}));
-    replSet.stopSet();
-}
+    authenticateConnection(conn);
+    testRateLimiterMetrics(conn, exemptConn);
+});
 
 /**
- * Sharding test to check if rate limiting also applies to sharded clusters
- */
-function runTestSharded() {
-    const st = new ShardingTest({
-        mongos: 1,
-        shards: 1,
-        other: {
-            auth: '',
-            keyFile: "jstests/libs/key1",
-            mongosOptions: {
-                setParameter: {
-                    ...kParams,
-                    ...kStartupConfig,
-                    ingressRequestRateLimiterEnabled: 0,  // kept disable during sharding setup
-                },
-            },
-            rsOptions: {
-                setParameter: {
-                    ...kParams,
-                    ...kStartupConfig,
-                    ingressRequestRateLimiterEnabled: 0,  // kept disable during sharding setup
-                },
-            },
-        }
-    });
-
-    // We create a connection with the exempted app name, used in the test to get server status
-    const exemptConn = new Mongo(`mongodb://${st.s.host}/?appName=${kExemptAppName}`);
-
-    setupAuth(st.s, exemptConn);
-    const exemptAdmin = exemptConn.getDB("admin");
-
-    // Enable rate limiting now that the replset is up
-    assert.commandWorked(
-        exemptAdmin.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled: 1}));
-    testRateLimiterMetrics(st.s, exemptConn);
-
-    assert.commandWorked(exemptAdmin.adminCommand({setParameter: 1, ...kParamsRestore}));
-    st.stop();
-}
-
-/**
- * This function tests the ingress admission rate limiter when with a compressed client
+ * This function tests the ingress admission rate limiter when with a compressed client.
  *
  * This test is different than the others because for compression to work a parallelShell is
  * needed.
  */
 function runTestCompressed() {
+    const kCompressor = "snappy";
     const mongod = MongoRunner.runMongod({
-        networkMessageCompressors: "snappy",
+        networkMessageCompressors: kCompressor,
         setParameter: {
             ...kParams,
-            ...kStartupConfig,
+            ...kConfigLogsAndFailPointsForRateLimiterTests,
             ingressRequestRateLimiterEnabled: false,
         },
     });
 
-    const kCompressor = "snappy";
-
     // We create an exempt connection in order to get the status without affecting the metrics
     const compressedConn = new Mongo(`mongodb://${mongod.host}/?compressors=${kCompressor}`);
-    const exemptConn = new Mongo(`mongodb://${mongod.host}/?appName=${kExemptAppName}`);
+    const exemptConn = new Mongo(`mongodb://${mongod.host}/?appName=${kRateLimiterExemptAppName}`);
     const admin = exemptConn.getDB("admin");
 
     // We calculate the amount of expected success and failures depending on the amount of token
@@ -408,7 +312,7 @@ function runTestCompressed() {
             },
             mongod.host,
             JSON.stringify(kParams),
-            kExemptAppName,
+            kRateLimiterExemptAppName,
             requestAmount),
         mongod.port,
         false,
@@ -426,9 +330,4 @@ function runTestCompressed() {
     MongoRunner.stopMongod(mongod);
 }
 
-runTestParamStartup();
-runTestParamRuntime();
-runTestAuthDisabled();
-runTestReplSet();
-runTestSharded();
 runTestCompressed();

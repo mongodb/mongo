@@ -105,8 +105,7 @@ protected:
 /**
  * Returns true if a session with remote/local addresses is part of the exemption list.
  */
-bool isExemptedByCIDRList(const std::shared_ptr<Session>& session,
-                          const std::vector<std::variant<CIDR, std::string>>& exemptions);
+bool isExemptedByCIDRList(const std::shared_ptr<Session>& session, const CIDRList& exemptions);
 
 }  // namespace transport
 }  // namespace mongo

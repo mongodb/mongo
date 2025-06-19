@@ -44,8 +44,6 @@
 namespace mongo {
 namespace {
 
-using ExemptionVector = std::vector<std::variant<CIDR, std::string>>;
-
 template <typename T>
 std::variant<CIDR, std::string> makeExemption(T exemption) {
     auto swCIDR = CIDR::parse(exemption);
@@ -73,7 +71,7 @@ std::shared_ptr<transport::Session> makeUNIXSession(StringData path) {
 #endif
 
 TEST(MaxConnsOverride, NormalCIDR) {
-    ExemptionVector cidrOnly{makeExemption("127.0.0.1"), makeExemption("10.0.0.0/24")};
+    CIDRList cidrOnly{makeExemption("127.0.0.1"), makeExemption("10.0.0.0/24")};
 
     ASSERT_TRUE(makeIPSession("127.0.0.1")->isExemptedByCIDRList(cidrOnly));
     ASSERT_TRUE(makeIPSession("10.0.0.35")->isExemptedByCIDRList(cidrOnly));
@@ -82,9 +80,9 @@ TEST(MaxConnsOverride, NormalCIDR) {
 
 #ifndef _WIN32
 TEST(MaxConnsOverride, UNIXPaths) {
-    ExemptionVector mixed{makeExemption("127.0.0.1"),
-                          makeExemption("10.0.0.0/24"),
-                          makeExemption("/tmp/mongod.sock")};
+    CIDRList mixed{makeExemption("127.0.0.1"),
+                   makeExemption("10.0.0.0/24"),
+                   makeExemption("/tmp/mongod.sock")};
 
     ASSERT_TRUE(makeIPSession("127.0.0.1")->isExemptedByCIDRList(mixed));
     ASSERT_TRUE(makeIPSession("10.0.0.35")->isExemptedByCIDRList(mixed));

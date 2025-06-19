@@ -28,6 +28,7 @@ mongo_cc_library(
         "transport_options.h",
     ],
     deps = [
+        ":cidr_range_list_parameter",
         "//src/mongo:base",
         "//src/mongo/db:connection_health_metrics_parameter",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",
@@ -79,6 +80,11 @@ mongo_cc_library(
 idl_generator(
     name = "transport_options_gen",
     src = "transport_options.idl",
+)
+
+idl_generator(
+    name = "cidr_range_list_parameter_gen",
+    src = "cidr_range_list_parameter.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
     ],
@@ -218,6 +224,22 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/idl:idl_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "cidr_range_list_parameter",
+    srcs = [
+        "cidr_range_list_parameter.cpp",
+        "cidr_range_list_parameter_gen",
+    ],
+    hdrs = [
+        "cidr_range_list_parameter.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo:core_headers_library",
+        "//src/mongo/util/net:network",
     ],
 )
 

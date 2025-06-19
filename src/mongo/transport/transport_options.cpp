@@ -31,102 +31,32 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/idl/idl_parser.h"
+#include "mongo/transport/cidr_range_list_parameter.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/transport/transport_options_gen.h"
-#include "mongo/util/net/cidr.h"
-#include "mongo/util/overloaded_visitor.h"
-
-#include <string>
-#include <variant>
-#include <vector>
 
 namespace mongo::transport {
-namespace {
-using ConnectionList = std::vector<std::variant<CIDR, std::string>>;
 
-auto parseConnectionListParameters(const BSONObj& obj) {
-    IDLParserContext ctx("maxConnectionsOverride");
-    const auto params = ConnectionListParameters::parse(ctx, obj);
-    ConnectionList output;
-    for (const auto& range : params.getRanges()) {
-        auto swr = CIDR::parse(range);
-        if (!swr.isOK()) {
-            output.push_back(std::string{range});
-        } else {
-            output.push_back(std::move(swr.getValue()));
-        }
-    }
-    return output;
-}
-
-void appendParameter(VersionedValue<ConnectionList>* value, BSONObjBuilder* bob, StringData name) {
-    BSONObjBuilder subBob(bob->subobjStart(name));
-    BSONArrayBuilder subArray(subBob.subarrayStart("ranges"_sd));
-
-    invariant(value);
-    auto snapshot = value->makeSnapshot();
-    if (!snapshot)
-        return;
-
-    for (const auto& range : *snapshot) {
-        subArray.append(std::visit(OverloadedVisitor{
-                                       [](const CIDR& arg) { return arg.toString(); },
-                                       [](const std::string& arg) { return arg; },
-                                   },
-                                   range));
-    }
-}
-
-Status setParameter(VersionedValue<ConnectionList>* value, BSONObj obj) try {
-    invariant(value);
-    auto list = parseConnectionListParameters(obj);
-    value->update(std::make_shared<ConnectionList>(std::move(list)));
-    return Status::OK();
-} catch (const AssertionException& e) {
-    return e.toStatus();
-}
-
-}  // namespace
-
+// TODO: SERVER-106468 Define CIDRRangeListParameter and remove this glue code
 void MaxIncomingConnectionsOverrideServerParameter::append(OperationContext*,
                                                            BSONObjBuilder* bob,
                                                            StringData name,
                                                            const boost::optional<TenantId>&) {
-    appendParameter(&serverGlobalParams.maxIncomingConnsOverride, bob, name);
+    appendCIDRRangeListParameter(serverGlobalParams.maxIncomingConnsOverride, bob, name);
 }
 
 Status MaxIncomingConnectionsOverrideServerParameter::set(const BSONElement& value,
                                                           const boost::optional<TenantId>&) {
-    return setParameter(&serverGlobalParams.maxIncomingConnsOverride, value.Obj());
+    return setCIDRRangeListParameter(serverGlobalParams.maxIncomingConnsOverride, value.Obj());
 }
 
 Status MaxIncomingConnectionsOverrideServerParameter::setFromString(
     StringData str, const boost::optional<TenantId>&) {
-    return setParameter(&serverGlobalParams.maxIncomingConnsOverride, fromjson(str));
-}
-
-void MaxEstablishingConnectionsOverrideServerParameter::append(OperationContext*,
-                                                               BSONObjBuilder* bob,
-                                                               StringData name,
-                                                               const boost::optional<TenantId>&) {
-    appendParameter(&serverGlobalParams.maxEstablishingConnsOverride, bob, name);
-}
-
-Status MaxEstablishingConnectionsOverrideServerParameter::set(const BSONElement& value,
-                                                              const boost::optional<TenantId>&) {
-    return setParameter(&serverGlobalParams.maxEstablishingConnsOverride, value.Obj());
-}
-
-Status MaxEstablishingConnectionsOverrideServerParameter::setFromString(
-    StringData str, const boost::optional<TenantId>&) {
-    return setParameter(&serverGlobalParams.maxEstablishingConnsOverride, fromjson(str));
+    return setCIDRRangeListParameter(serverGlobalParams.maxIncomingConnsOverride, fromjson(str));
 }
 
 template <typename Callback>

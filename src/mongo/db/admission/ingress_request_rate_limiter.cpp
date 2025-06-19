@@ -30,12 +30,12 @@
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
 
 #include "mongo/base/status.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/admission/ingress_request_rate_limiter_gen.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/service_context.h"
+#include "mongo/transport/cidr_range_list_parameter.h"
 #include "mongo/util/decorable.h"
-
-#include <limits>
 
 #include <boost/optional.hpp>
 
@@ -45,6 +45,8 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(ingressRateLimiterVerySlowRate);
+
+VersionedValue<CIDRList> ingressRequestRateLimiterExemptions;
 
 // This is very slow since it would allow one operation every 200,000 seconds, so roughly one
 // every 55 hours
@@ -58,6 +60,25 @@ const ConstructorActionRegistererType<ServiceContext> onServiceContextCreate{
         getIngressRequestRateLimiter(ctx).emplace();
     }};
 }  // namespace
+
+
+// TODO: SERVER-106468 Define CIDRRangeListParameter and remove this glue code
+void IngressRequestRateLimiterExemptions::append(OperationContext*,
+                                                 BSONObjBuilder* bob,
+                                                 StringData name,
+                                                 const boost::optional<TenantId>&) {
+    transport::appendCIDRRangeListParameter(ingressRequestRateLimiterExemptions, bob, name);
+}
+
+Status IngressRequestRateLimiterExemptions::set(const BSONElement& value,
+                                                const boost::optional<TenantId>&) {
+    return transport::setCIDRRangeListParameter(ingressRequestRateLimiterExemptions, value.Obj());
+}
+
+Status IngressRequestRateLimiterExemptions::setFromString(StringData str,
+                                                          const boost::optional<TenantId>&) {
+    return transport::setCIDRRangeListParameter(ingressRequestRateLimiterExemptions, fromjson(str));
+}
 
 IngressRequestRateLimiter::IngressRequestRateLimiter()
     : _rateLimiter{static_cast<double>(gIngressRequestRateLimiterRatePerSec.load()),
@@ -75,15 +96,21 @@ IngressRequestRateLimiter& IngressRequestRateLimiter::get(ServiceContext* servic
 }
 
 Status IngressRequestRateLimiter::admitRequest(Client* client) {
-    // TODO: SERVER-104934 Implement ip based exemption
-
     // The rate limiter applies only requests when the client is authenticated to prevent DoS
     // attacks caused by many unauthenticated requests. In the case auth is disabled, all
     // requests will be subject to rate limiting.
     const auto authorizationSession = AuthorizationSession::get(client);
 
-    if (!authorizationSession->shouldIgnoreAuthChecks() &&
-        !authorizationSession->isAuthenticated()) {
+    const auto isConnectionExempt = [&] {
+        ingressRequestRateLimiterExemptions.refreshSnapshot(_ingressRequestRateLimiterExemptions);
+
+        return _ingressRequestRateLimiterExemptions &&
+            client->session()->isExemptedByCIDRList(*_ingressRequestRateLimiterExemptions);
+    };
+
+    if ((!authorizationSession->shouldIgnoreAuthChecks() &&
+         !authorizationSession->isAuthenticated()) ||
+        isConnectionExempt()) {
         _rateLimiter.recordExemption();
         return Status::OK();
     }

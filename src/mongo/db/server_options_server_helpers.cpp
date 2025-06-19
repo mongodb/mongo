@@ -358,14 +358,15 @@ Status storeServerOptions(const moe::Environment& params) {
     }
 
     if (params.count("net.maxIncomingConnectionsOverride")) {
-        std::vector<std::variant<CIDR, std::string>> maxIncomingConnsOverride;
+        CIDRList maxIncomingConnsOverride;
         auto ranges = params["net.maxIncomingConnectionsOverride"].as<std::vector<std::string>>();
         for (const auto& range : ranges) {
             auto swr = CIDR::parse(range);
             if (!swr.isOK()) {
-                maxIncomingConnsOverride.push_back(range);
+                maxIncomingConnsOverride.emplace_back(std::in_place_type<std::string>, range);
             } else {
-                maxIncomingConnsOverride.push_back(std::move(swr.getValue()));
+                maxIncomingConnsOverride.emplace_back(std::in_place_type<CIDR>,
+                                                      std::move(swr.getValue()));
             }
         }
         serverGlobalParams.maxIncomingConnsOverride.update(

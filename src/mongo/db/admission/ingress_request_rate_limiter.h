@@ -82,6 +82,7 @@ public:
 
 private:
     admission::RateLimiter _rateLimiter;
+    VersionedValue<CIDRList>::Snapshot _ingressRequestRateLimiterExemptions;
 };
 
 }  // namespace mongo

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,34 +26,34 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
-#include "mongo/transport/session_util.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/server_options.h"
+#include "mongo/util/net/cidr.h"
+#include "mongo/util/versioned_value.h"
 
-namespace mongo::transport::util {
-bool isExemptedByCIDRList(const SockAddr& ra, const SockAddr& la, const CIDRList& exemptions) {
-    if (exemptions.empty())
-        return false;
+#include <string>
+#include <variant>
+#include <vector>
 
-    boost::optional<CIDR> remoteCIDR;
-    if (ra.isValid() && ra.isIP())
-        remoteCIDR = uassertStatusOK(CIDR::parse(ra.getAddr()));
+namespace mongo::transport {
 
-    return std::any_of(exemptions.begin(), exemptions.end(), [&](const auto& exemption) {
-        return visit(
-            [&](auto&& ex) {
-                using Alt = std::decay_t<decltype(ex)>;
-                if constexpr (std::is_same_v<Alt, CIDR>)
-                    return remoteCIDR && ex.contains(*remoteCIDR);
-#ifndef _WIN32
-                // Otherwise the exemption is a UNIX path and we should check the local path
-                // (the remoteAddr == "anonymous unix socket") against the exemption string.
-                // On Windows we don't check this at all and only CIDR ranges are supported.
-                if constexpr (std::is_same_v<Alt, std::string>)
-                    return la.isValid() && la.getAddr() == ex;
-#endif
-                return false;
-            },
-            exemption);
-    });
-}
-}  // namespace mongo::transport::util
+/**
+ * Appends a CIDR range list to a bson object. The array will be appended as a subobject using a key
+ * with the value of the 'name' parameter.
+ */
+void appendCIDRRangeListParameter(VersionedValue<CIDRList>& value,
+                                  BSONObjBuilder* bob,
+                                  StringData name);
+
+/**
+ * Parses the 'obj' bson object and sets 'value' if parsing the CIDR range was sucessful. If parsing
+ * was not sucessful, an error status from the thrown exception is returned.
+ */
+Status setCIDRRangeListParameter(VersionedValue<CIDRList>& value, BSONObj obj);
+
+// TODO: SERVER-106468 Define CIDRRangeListParameter here instead of generating the code.
+
+}  // namespace mongo::transport

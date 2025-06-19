@@ -48,7 +48,6 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
-#include <variant>
 
 #include <boost/optional/optional.hpp>
 #ifdef MONGO_CONFIG_SSL
@@ -242,8 +241,7 @@ public:
         return builder.obj();
     }
 
-    virtual bool isExemptedByCIDRList(
-        const std::vector<std::variant<CIDR, std::string>>& exemptions) const = 0;
+    virtual bool isExemptedByCIDRList(const CIDRList& exemptions) const = 0;
 
 #ifdef MONGO_CONFIG_SSL
     /**
