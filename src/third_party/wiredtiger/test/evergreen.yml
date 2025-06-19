@@ -824,13 +824,11 @@ functions:
           echo "Using num_jobs '-j ${num_jobs}' for 'unit test'"
           threads_command="-j ${num_jobs}"
         fi
-        for i in $(seq ${times|1}); do
-            if [ ${check_coverage|false} = true ]; then
-                ${python_binary|python3} ../test/suite/run.py ${ignore_stdout} ${unit_test_args|-v 2} ${unit_test_variant_args} $threads_command 2>&1 || echo "Ignoring failed test as we are checking test coverage"
-            else
-                ${python_binary|python3} ../test/suite/run.py ${ignore_stdout} ${unit_test_args|-v 2} ${unit_test_variant_args} $threads_command 2>&1
-            fi
-        done
+        if [ ${check_coverage|false} = true ]; then
+            ${python_binary|python3} ../test/suite/run.py ${ignore_stdout} ${unit_test_args|-v 2} ${unit_test_variant_args} $threads_command 2>&1 || echo "Ignoring failed test as we are checking test coverage"
+        else
+            ${python_binary|python3} ../test/suite/run.py ${ignore_stdout} ${unit_test_args|-v 2} ${unit_test_variant_args} $threads_command 2>&1
+        fi
 
   "code coverage analysis":
     command: shell.exec
@@ -2535,62 +2533,6 @@ tasks:
             set -o verbose
             ${PREPARE_TEST_ENV}
             ../test/live_restore/long_test.sh
-
-  # The following tests are temporary so we can heavily test live restore in the final weeks of the project.
-  # They should be deleted when on project completion.
-  # FIXME-WT-14312
-
-  - name: live-restore-short-heavy-testing
-    depends_on:
-    - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build/"
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-
-            # Runtime is approx 20 seconds under ASan. Run for 1 hour
-            for i in $(seq 180); do
-                ../test/live_restore/short_test.sh
-            done
-
-  # Runtime is already 1 hour under ASan. Create a second task to double the testing time.
-  - name: live-restore-long-heavy-testing
-    depends_on:
-    - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build/"
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-            ../test/live_restore/long_test.sh
-
-  - name: unit-test-live-restore-heavy-testing
-    depends_on:
-    - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "unit test"
-        vars:
-          unit_test_args: live_restore
-          times: 60 # Run time is approx 10 seconds. Loops it for 10 minutes
-
-  - name: format-live-restore-heavy-testing
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-      - func: "format test script"
-        vars:
-          # 2 hours using a custom config to maximally test live restore
-          format_test_script_args: "-c ../../../test/format/CONFIG.live_restore -t 120"
 
   # End of live restore tests
 
@@ -5476,10 +5418,6 @@ buildvariants:
     - name: csuite-long-running
       batchtime: 1440 # once a day
     - name: live-restore-long
-    - name: live-restore-short-heavy-testing
-    - name: live-restore-long-heavy-testing
-    - name: unit-test-live-restore-heavy-testing
-    - name: format-live-restore-heavy-testing
 
 - name: ubuntu2004-asan
   display_name: "! Ubuntu 20.04 ASAN"
@@ -5503,9 +5441,6 @@ buildvariants:
     - name: model-test-long-random-config
       batchtime: 1440 # once a day
     - name: live-restore-long
-    - name: live-restore-short-heavy-testing
-    - name: live-restore-long-heavy-testing
-    - name: format-live-restore-heavy-testing
 
 - name: ubuntu2004-tsan
   display_name: "! Ubuntu 20.04 TSAN"
@@ -5891,10 +5826,6 @@ buildvariants:
       distros: ubuntu2004-arm64-large
     - name: unit-test-zstd
     - name: wtperf-test
-    - name: live-restore-short-heavy-testing
-    - name: live-restore-long-heavy-testing
-    - name: unit-test-live-restore-heavy-testing
-    - name: format-live-restore-heavy-testing
 
 - name: amazon2-arm64
   display_name: "Amazon Linux 2 ARM64"
@@ -5968,10 +5899,6 @@ buildvariants:
     - name: configure-combinations
     - name: format-smoke-test
     - name: s3-tiered-storage-extensions-test
-    - name: live-restore-short-heavy-testing
-    - name: live-restore-long-heavy-testing
-    - name: unit-test-live-restore-heavy-testing
-    - name: format-live-restore-heavy-testing
 
 - name: ubuntu2004-release-arm64
   display_name: "~ Ubuntu 20.04 (ARM64, Release Build)"
@@ -6230,10 +6157,6 @@ buildvariants:
       distros: amazon2023-arm64-latest-large-m8g
     - name: format-smoke-test
     - name: s3-tiered-storage-extensions-test
-    - name: live-restore-short-heavy-testing
-    - name: live-restore-long-heavy-testing
-    - name: unit-test-live-restore-heavy-testing
-    - name: format-live-restore-heavy-testing
 
 - name: amazon2023-armv9
   display_name: "(ARMV9) Amazon Linux 2023 ARM64"
@@ -6242,8 +6165,7 @@ buildvariants:
   batchtime: 1440 # 24 hours
   expansions:
     ENABLE_TCMALLOC: 1
-    # FIXME-WT-14461: Use stable toolchain once workgen tests are fixed.
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_gcc.cmake
+    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v5_gcc.cmake
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
   tasks:
     - name: ".workgen-test"

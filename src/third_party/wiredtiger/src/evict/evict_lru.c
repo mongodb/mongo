@@ -2962,6 +2962,22 @@ __wti_evict_app_assist_worker(
             evict->app_waits++;
         } else if (ret != EBUSY)
             WT_ERR(ret);
+
+        /* Update elapsed cache metrics. */
+        if (time_start != 0) {
+            uint64_t time_stop = __wt_clock(session);
+            uint64_t elapsed = WT_CLOCKDIFF_US(time_stop, time_start);
+            WT_STAT_CONN_INCRV(session, application_cache_time, elapsed);
+            if (!interruptible) {
+                WT_STAT_CONN_INCRV(session, application_cache_uninterruptible_time, elapsed);
+                WT_STAT_SESSION_INCRV(session, cache_time_mandatory, elapsed);
+            } else {
+                WT_STAT_CONN_INCRV(session, application_cache_interruptible_time, elapsed);
+                WT_STAT_SESSION_INCRV(session, cache_time_interruptible, elapsed);
+            }
+            session->cache_wait_us += elapsed;
+            time_start = time_stop;
+        }
     }
 
 err:
