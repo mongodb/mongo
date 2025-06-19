@@ -601,7 +601,8 @@ struct ECOCCompactionDocumentV2 {
                                                     const ECOCToken& token);
 
     bool operator==(const ECOCCompactionDocumentV2& other) const {
-        return (fieldName == other.fieldName) && (esc == other.esc);
+        return (fieldName == other.fieldName) && (esc == other.esc) && (msize == other.msize) &&
+            (isLeaf == other.isLeaf);
     }
 
     template <typename H>
@@ -610,17 +611,22 @@ struct ECOCCompactionDocumentV2 {
     }
 
     bool isEquality() const {
-        return isLeaf == boost::none;
+        return isLeaf == boost::none && msize == boost::none;
     }
 
     bool isRange() const {
         return isLeaf != boost::none;
     }
 
+    bool isTextSearch() const {
+        return msize != boost::none;
+    }
+
     // Id is not included as it unimportant
     std::string fieldName;
     ESCDerivedFromDataTokenAndContentionFactorToken esc;
     boost::optional<bool> isLeaf;
+    boost::optional<uint32_t> msize;
     boost::optional<AnchorPaddingRootToken> anchorPaddingRootToken;
 };
 

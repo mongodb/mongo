@@ -1578,7 +1578,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Equality_Payloads_V2) {
     iupayload.setServerDerivedFromDataToken(serverDerivedFromDataToken);
 
     auto encryptedTokens =
-        StateCollectionTokensV2(escDataCounterkey, boost::none).encrypt(ecocToken);
+        StateCollectionTokensV2(escDataCounterkey, boost::none, boost::none).encrypt(ecocToken);
     ASSERT_EQ(encryptedTokens.toCDR().length(), crypto::aesCTRIVSize + sizeof(PrfBlock));
     iupayload.setEncryptedTokens(std::move(encryptedTokens));
     iupayload.setIndexKeyId(indexKeyId);
@@ -1626,7 +1626,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_InvalidArgs) {
     auto value = ConstDataRange(0, 0);
     PrfBlock bogusTag;
     FLE2InsertUpdatePayloadV2 iupayload;
-    auto bogusEncryptedTokens = StateCollectionTokensV2({{}}, false).encrypt({{}});
+    auto bogusEncryptedTokens = StateCollectionTokensV2({{}}, false, boost::none).encrypt({{}});
 
     iupayload.setValue(value);
     iupayload.setType(stdx::to_underlying(BSONType::numberLong));
@@ -1841,7 +1841,8 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Range_Payloads_V2) {
     iupayload.setServerDerivedFromDataToken(serverDerivedFromDataToken);
 
     auto encryptedTokens =
-        StateCollectionTokensV2(escDataCounterkey, false /* isLeaf */).encrypt(ecocToken);
+        StateCollectionTokensV2(escDataCounterkey, false /* isLeaf */, boost::none)
+            .encrypt(ecocToken);
     ASSERT_EQ(encryptedTokens.toCDR().length(), crypto::aesCTRIVSize + sizeof(PrfBlock) + 1);
     iupayload.setEncryptedTokens(encryptedTokens);
     iupayload.setIndexKeyId(indexKeyId);
@@ -1952,7 +1953,7 @@ static FLE2InsertUpdatePayloadV2 generateTestIUPV2ForTextSearch(BSONElement elem
     iupayload.setEscDerivedToken(ESCDerivedFromDataTokenAndContentionFactorToken(nullBlock));
     iupayload.setServerDerivedFromDataToken(ServerDerivedFromDataToken(nullBlock));
     iupayload.setEncryptedTokens(
-        StateCollectionTokensV2(iupayload.getEscDerivedToken(), boost::none).encrypt(ecocToken));
+        StateCollectionTokensV2(iupayload.getEscDerivedToken(), boost::none, 0).encrypt(ecocToken));
     // u, t, v, e, k
     iupayload.setIndexKeyId(indexKeyId);
     iupayload.setType(stdx::to_underlying(element.type()));
@@ -1979,7 +1980,8 @@ static FLE2InsertUpdatePayloadV2 generateTestIUPV2ForTextSearch(BSONElement elem
         exact.setEncryptedTokens(
             StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
                                         exact.getEscDerivedToken().asPrfBlock()),
-                                    boost::none)
+                                    boost::none,
+                                    1 /* msize */)
                 .encrypt(ecocToken));
     }
     return iupayload;
@@ -2025,7 +2027,8 @@ static void generateTextTokenSetsForIUPV2(FLE2InsertUpdatePayloadV2& iupayload,
             ts.setEncryptedTokens(
                 StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
                                             ts.getEscDerivedToken().asPrfBlock()),
-                                        boost::none)
+                                        boost::none,
+                                        0 /* msize */)
                     .encrypt(ecocToken));
         } else if (type == QueryTypeEnum::SuffixPreview) {
             tsts.getSuffixTokenSets().push_back({});
@@ -2046,7 +2049,8 @@ static void generateTextTokenSetsForIUPV2(FLE2InsertUpdatePayloadV2& iupayload,
             ts.setEncryptedTokens(
                 StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
                                             ts.getEscDerivedToken().asPrfBlock()),
-                                        boost::none)
+                                        boost::none,
+                                        0 /* msize */)
                     .encrypt(ecocToken));
         } else if (type == QueryTypeEnum::PrefixPreview) {
             tsts.getPrefixTokenSets().push_back({});
@@ -2067,7 +2071,8 @@ static void generateTextTokenSetsForIUPV2(FLE2InsertUpdatePayloadV2& iupayload,
             ts.setEncryptedTokens(
                 StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
                                             ts.getEscDerivedToken().asPrfBlock()),
-                                        boost::none)
+                                        boost::none,
+                                        0 /* msize */)
                     .encrypt(ecocToken));
         }
     }
@@ -2497,17 +2502,25 @@ TEST_F(ServiceContextTest, FLE_ECOC_EncryptedTokensRoundTrip) {
     auto escContentionToken =
         ESCDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDataToken, 1);
 
-    std::vector<boost::optional<bool>> isLeafValues({boost::none, true, false});
-    for (auto optIsLeaf : isLeafValues) {
-        StateCollectionTokensV2 encryptor{escContentionToken, optIsLeaf};
+    std::vector<std::tuple<boost::optional<bool>, boost::optional<std::uint32_t>>> etMetaValues(
+        {{boost::none, boost::none},
+         {true, boost::none},
+         {false, boost::none},
+         {boost::none, 0},
+         {boost::none, 1},
+         {boost::none, 0xfffefd}});
+    for (auto [optIsLeaf, optMsize] : etMetaValues) {
+        StateCollectionTokensV2 encryptor{escContentionToken, optIsLeaf, optMsize};
         auto encryptedTokens = encryptor.encrypt(ecocToken);
         ASSERT_EQ(encryptedTokens.toCDR().length(),
-                  crypto::aesCTRIVSize + sizeof(PrfBlock) + (optIsLeaf ? 1 : 0));
+                  crypto::aesCTRIVSize + sizeof(PrfBlock) + (optIsLeaf ? 1 : 0) +
+                      (optMsize ? 3 : 0));
 
         auto decoded = encryptedTokens.decrypt(ecocToken);
         ASSERT_EQ(encryptor.getESCDerivedFromDataTokenAndContentionFactorToken(),
                   decoded.getESCDerivedFromDataTokenAndContentionFactorToken());
         ASSERT_EQ(encryptor.getIsLeaf(), decoded.getIsLeaf());
+        ASSERT_EQ(encryptor.getMsize(), decoded.getMsize());
 
         auto rawEcocDoc = encryptedTokens.generateDocument("foo");
 
@@ -2515,6 +2528,7 @@ TEST_F(ServiceContextTest, FLE_ECOC_EncryptedTokensRoundTrip) {
         ASSERT_EQ(ecocDoc.fieldName, "foo");
         ASSERT_EQ(ecocDoc.esc, escContentionToken);
         ASSERT_EQ(ecocDoc.isLeaf, optIsLeaf);
+        ASSERT_EQ(ecocDoc.msize, optMsize);
     }
 }
 

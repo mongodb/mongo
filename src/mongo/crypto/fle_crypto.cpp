@@ -593,7 +593,7 @@ FLE2InsertUpdatePayloadV2 EDCClientPayload::serializeInsertUpdatePayloadV2(
     FLE2InsertUpdatePayloadV2 iupayload;
 
     iupayload.setEncryptedTokens(
-        StateCollectionTokensV2(escDataCounterToken, boost::none).encrypt(ecocToken));
+        StateCollectionTokensV2(escDataCounterToken, boost::none, boost::none).encrypt(ecocToken));
 
     iupayload.setEdcDerivedToken(std::move(edcDataCounterToken));
     iupayload.setEscDerivedToken(std::move(escDataCounterToken));
@@ -723,7 +723,7 @@ std::vector<EdgeTokenSetV2> getEdgeTokenSet(
 
         const bool isLeaf = edge == edges->getLeaf();
         ets.setEncryptedTokens(
-            StateCollectionTokensV2(escDataCounterkey, isLeaf).encrypt(ecocToken));
+            StateCollectionTokensV2(escDataCounterkey, isLeaf, boost::none).encrypt(ecocToken));
 
         ets.setEdcDerivedToken(std::move(edcDataCounterkey));
         ets.setEscDerivedToken(std::move(escDataCounterkey));
@@ -766,7 +766,8 @@ FLE2InsertUpdatePayloadV2 EDCClientPayload::serializeInsertUpdatePayloadV2ForRan
     FLE2InsertUpdatePayloadV2 iupayload;
 
     iupayload.setEncryptedTokens(
-        StateCollectionTokensV2(escDataCounterkey, false /* isLeaf */).encrypt(ecocToken));
+        StateCollectionTokensV2(escDataCounterkey, false /* isLeaf */, boost::none)
+            .encrypt(ecocToken));
 
     iupayload.setEdcDerivedToken(std::move(edcDataCounterkey));
     iupayload.setEscDerivedToken(std::move(escDataCounterkey));
@@ -1921,6 +1922,7 @@ StateCollectionTokensV2 StateCollectionTokensV2::Encrypted::decrypt(const ECOCTo
     try {
     assertLength(_encryptedTokens.size());
     const bool expectLeaf = _encryptedTokens.size() == kCipherLengthESCAndLeafFlag;
+    const bool expectMsize = _encryptedTokens.size() == kCipherLengthESCAndMsize;
 
     auto data = uassertStatusOK(FLEUtil::decryptData(token.toCDR(), toCDR()));
     ConstDataRangeCursor cdrc(data);
@@ -1928,6 +1930,7 @@ StateCollectionTokensV2 StateCollectionTokensV2::Encrypted::decrypt(const ECOCTo
     auto escToken = ESCDerivedFromDataTokenAndContentionFactorToken(std::move(rawESCToken));
 
     boost::optional<bool> isLeaf;
+    boost::optional<uint32_t> msize;
     if (expectLeaf) {
         auto leaf = cdrc.readAndAdvance<uint8_t>();
         uassert(ErrorCodes::BadValue,
@@ -1937,7 +1940,13 @@ StateCollectionTokensV2 StateCollectionTokensV2::Encrypted::decrypt(const ECOCTo
         isLeaf = !!leaf;
     }
 
-    return StateCollectionTokensV2(std::move(escToken), std::move(isLeaf));
+    if (expectMsize) {
+        // Read the 3 byte LE msize, and convert it to a uint32_t.
+        auto msize_arr = cdrc.readAndAdvance<std::array<std::uint8_t, 3>>();
+        msize = msize_arr[0] | (msize_arr[1] << 8) | (msize_arr[2] << 16);
+    }
+
+    return StateCollectionTokensV2(std::move(escToken), std::move(isLeaf), std::move(msize));
 
 } catch (const DBException& ex) {
     uassertStatusOK(ex.toStatus().withContext("Failed decrypting StateCollectionTokensV2"));
@@ -1951,6 +1960,15 @@ StateCollectionTokensV2::Encrypted StateCollectionTokensV2::encrypt(const ECOCTo
         DataBuilder builder(sizeof(PrfBlock) + 1);
         uassertStatusOK(builder.writeAndAdvance(_esc.toCDR()));
         uassertStatusOK(builder.writeAndAdvance(*_isLeaf));
+        encryptedTokens = uassertStatusOK(FLEUtil::encryptData(token.toCDR(), builder.getCursor()));
+    } else if (isTextSearch()) {
+        DataBuilder builder(sizeof(PrfBlock) + 3);
+        uassertStatusOK(builder.writeAndAdvance(_esc.toCDR()));
+        // Write msize as a little-endian 3-byte integer.
+        uassertStatusOK(builder.writeAndAdvance(
+            std::array<uint8_t, 3>{(std::uint8_t)(*_msize & 0xFF),
+                                   (std::uint8_t)((*_msize >> 8) & 0xFF),
+                                   (std::uint8_t)((*_msize >> 16) & 0xFF)}));
         encryptedTokens = uassertStatusOK(FLEUtil::encryptData(token.toCDR(), builder.getCursor()));
     } else {
         // Equality
@@ -2731,6 +2749,7 @@ ECOCCompactionDocumentV2 ECOCCompactionDocumentV2::parseAndDecrypt(const BSONObj
     ret.esc = ESCDerivedFromDataTokenAndContentionFactorToken(
         keys.getESCDerivedFromDataTokenAndContentionFactorToken());
     ret.isLeaf = keys.getIsLeaf();
+    ret.msize = keys.getMsize();
     return ret;
 }
 

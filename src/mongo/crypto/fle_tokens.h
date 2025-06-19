@@ -336,13 +336,15 @@ using ESCDerivedFromDataTokenAndContentionFactorToken = ESCDerivedFromDataTokenA
 using AnchorPaddingRootToken = AnchorPaddingTokenRoot;
 
 /**
- * Values of ECOC documents in Queryable Encryption protocol version 2
+ * Values of ECOC documents in Queryable Encryption from Text Search onwards
  *
  * Encrypt(ECOCToken, ESCDerivedFromDataTokenAndContentionFactorToken)
  *
  * struct {
  *    uint8_t[32] esc;
- *    uint8_t isLeaf; // Optional: 0 or 1 for range operations, absent for equality.
+ *    uint8_t isLeaf; // Optional: 0 or 1 for range operations, absent for equality and text search.
+ *    uint32_t msize; // Optional: 0 or total msize as 3-byte integer for text search inserts,
+ * absent for equality and range.
  * }
  */
 class StateCollectionTokensV2 {
@@ -350,12 +352,17 @@ public:
     StateCollectionTokensV2() = default;
 
     /**
-     * Initialize ESCTV2 with an unencrypted payload of ESCToken and isLeaf.
+     * Initialize ESCTV2 with an unencrypted payload of ESCToken, isLeaf, and msize.
      * Must call encrypt() before attempting to serialize.
      */
     StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken s,
-                            boost::optional<bool> leaf)
-        : _esc(std::move(s)), _isLeaf(std::move(leaf)) {}
+                            boost::optional<bool> leaf,
+                            boost::optional<std::uint32_t> msize)
+        : _esc(std::move(s)), _isLeaf(std::move(leaf)), _msize(std::move(msize)) {
+        tassert(10522900,
+                "StateCollectionTokensV2 must not have both isLeaf and msize set",
+                !_isLeaf || !_msize);
+    }
 
     /**
      * Return the ESCDerivedFromDataTokenAndContentionFactorToken value.
@@ -369,7 +376,7 @@ public:
      * Returns true if the encryptedToken is an equality token, false otherwise.
      */
     bool isEquality() const {
-        return getIsLeaf() == boost::none;
+        return getIsLeaf() == boost::none && getMsize() == boost::none;
     }
 
     /**
@@ -380,11 +387,26 @@ public:
     }
 
     /**
-     * Returns the trinary value isLeaf indicating equality(none), range-leaf(true), or
+     * Returns true if the encryptedToken is a text search token, false otherwise.
+     */
+    bool isTextSearch() const {
+        return getMsize() != boost::none;
+    }
+
+    /**
+     * Returns the trinary value isLeaf indicating equality/text-search(none), range-leaf(true), or
      * range-nonleaf(false).
      */
     boost::optional<bool> getIsLeaf() const {
         return _isLeaf;
+    }
+
+    /**
+     * Returns the msize, which is none if equality or range, the msize of the insert if a text
+     * search equality token, or 0 for other text search tokens.
+     */
+    boost::optional<std::uint32_t> getMsize() const {
+        return _msize;
     }
 
     /**
@@ -430,20 +452,23 @@ public:
         StateCollectionTokensV2 decrypt(const ECOCToken& token) const;
 
     private:
-        // Encrypted payloads should be 48 or 49 bytes in length.
+        // Encrypted payloads should be 48, 49, or 51 bytes in length.
         // IV(16) + PrfBlock(32) + optional-range-flag(1)
         static constexpr std::size_t kCTRIVSize = 16;
         static constexpr std::size_t kCipherLengthESCOnly = kCTRIVSize + sizeof(PrfBlock);
         static constexpr std::size_t kCipherLengthESCAndLeafFlag = kCipherLengthESCOnly + 1;
+        static constexpr std::size_t kCipherLengthESCAndMsize = kCipherLengthESCOnly + 3;
 
         static void assertLength(std::size_t sz) {
             uassert(ErrorCodes::BadValue,
-                    fmt::format("Invalid length for EncryptedStateCollectionTokensV2, expected {} "
-                                "or {}, got {}",
+                    fmt::format("Invalid length for EncryptedStateCollectionTokensV2, expected {}, "
+                                "{}, or {}, got {}",
                                 kCipherLengthESCOnly,
                                 kCipherLengthESCAndLeafFlag,
+                                kCipherLengthESCAndMsize,
                                 sz),
-                    (sz == kCipherLengthESCOnly) || (sz == kCipherLengthESCAndLeafFlag));
+                    (sz == kCipherLengthESCOnly) || (sz == kCipherLengthESCAndLeafFlag) ||
+                        (sz == kCipherLengthESCAndMsize));
         }
 
         std::vector<std::uint8_t> _encryptedTokens;
@@ -457,6 +482,7 @@ public:
 private:
     ESCDerivedFromDataTokenAndContentionFactorToken _esc;
     boost::optional<bool> _isLeaf;
+    boost::optional<uint32_t> _msize;
 };
 
 }  // namespace mongo

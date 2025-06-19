@@ -965,7 +965,7 @@ TEST_F(FleCrudTest, InsertV1PayloadAgainstV2Protocol) {
     BSONObj document = builder.obj();
     ASSERT_THROWS_CODE(EDCServerCollection::getEncryptedFieldInfo(document), DBException, 7291901);
 
-    auto bogusEncryptedTokens = StateCollectionTokensV2({{}}, false).encrypt({{}});
+    auto bogusEncryptedTokens = StateCollectionTokensV2({{}}, false, boost::none).encrypt({{}});
 
     FLE2InsertUpdatePayloadV2 payload;
     payload.setEdcDerivedToken({{}});
@@ -996,7 +996,7 @@ TEST_F(FleCrudTest, InsertUnindexedV1AgainstV2Protocol) {
 
     // Create a dummy InsertUpdatePayloadV2 to include in the document.
     // This is so that the assertion being tested will not be skipped during processInsert()
-    auto bogusEncryptedTokens = StateCollectionTokensV2({{}}, false).encrypt({{}});
+    auto bogusEncryptedTokens = StateCollectionTokensV2({{}}, false, boost::none).encrypt({{}});
     FLE2InsertUpdatePayloadV2 payload;
     payload.setEdcDerivedToken({{}});
     payload.setEscDerivedToken({{}});
@@ -1042,7 +1042,7 @@ TEST_F(FleCrudTest, InsertUnindexedV1AgainstV2Protocol) {
 // Test insert update payloads containing both the range edgeTokenSet array ('g') and the text
 // search token sets ('b') is rejected.
 TEST_F(FleCrudTest, InsertPayloadIsBothRangeAndTextSearch) {
-    auto bogusEncryptedTokens = StateCollectionTokensV2({{}}, false).encrypt({{}});
+    auto bogusEncryptedTokens = StateCollectionTokensV2({{}}, false, boost::none).encrypt({{}});
     FLE2InsertUpdatePayloadV2 payload({},
                                       {},
                                       bogusEncryptedTokens,
@@ -1458,7 +1458,7 @@ TEST_F(FleCrudTest, FindAndModify_SetSafeContent) {
 
 BSONObj makeInsertUpdatePayload(StringData path, const UUID& uuid) {
     // Actual values don't matter for these tests (apart from indexKeyId).
-    auto encryptedTokens = StateCollectionTokensV2({{}}, boost::none).encrypt({{}});
+    auto encryptedTokens = StateCollectionTokensV2({{}}, boost::none, boost::none).encrypt({{}});
     auto bson = FLE2InsertUpdatePayloadV2({},
                                           {},
                                           std::move(encryptedTokens),
