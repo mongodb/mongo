@@ -1751,19 +1751,21 @@ void ExecCommandDatabase::_initiateCommand() {
         }
 
         if (shardVersion || databaseVersion) {
-            // If a timeseries collection is sharded, only the buckets collection would be sharded.
-            // We expect all versioned commands to be sent over 'system.buckets' namespace. But it
-            // is possible that a stale mongos may send the request over a view namespace. In this
-            // case, we initialize the 'OperationShardingState' with buckets namespace.
+            OperationShardingState::setShardRole(
+                opCtx, invocationNss, shardVersion, databaseVersion);
+
+            // If a timeseries collection is sharded, only the buckets collection would be
+            // sharded. We expect all versioned commands to be sent over 'system.buckets'
+            // namespace. But it is possible that a stale mongos may send the request over a
+            // view namespace. In this case, we initialize the 'OperationShardingState' with
+            // both the invocation and buckets namespaces.
             auto bucketNss = invocationNss.makeTimeseriesBucketsNamespace();
-            // Hold reference to the catalog for collection lookup without locks to be safe.
             auto catalog = CollectionCatalog::get(opCtx);
             auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
-            auto namespaceForSharding =
-                (coll && coll->getTimeseriesOptions()) ? bucketNss : invocationNss;
 
-            OperationShardingState::setShardRole(
-                opCtx, namespaceForSharding, shardVersion, databaseVersion);
+            if (coll && coll->getTimeseriesOptions()) {
+                OperationShardingState::setShardRole(opCtx, bucketNss, shardVersion, {});
+            }
         }
     }
 
