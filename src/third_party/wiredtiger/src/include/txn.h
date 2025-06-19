@@ -289,6 +289,8 @@ struct __wt_txn_snapshot {
 struct __wt_txn {
     uint64_t id;
 
+    uint64_t prepared_id;
+
     WT_TXN_ISOLATION isolation;
 
     uint32_t forced_iso; /* Isolation is currently forced. */

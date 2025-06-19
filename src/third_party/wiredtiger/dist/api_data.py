@@ -1796,6 +1796,11 @@ methods = {
         set the prepare timestamp for the updates of the current transaction. The value must
         not be older than any active read timestamps, and must be newer than the current stable
         timestamp. See @ref timestamp_prepare'''),
+    Config('prepared_id', '0', r'''
+        set the optional prepared ID for the prepared updates of the current transaction. Multiple
+        transactions can share a prepared transaction ID, as long as they are all guaranteed to 
+        share a decision whether to commit or abort and share the same prepare, commit and durable 
+        timestamps. Default value 0 ignores this configuration option''', type='int', min=0)
 ]),
 
 'WT_SESSION.timestamp_transaction_uint' : Method([]),

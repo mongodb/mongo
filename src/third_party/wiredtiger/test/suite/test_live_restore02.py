@@ -50,6 +50,16 @@ class test_live_restore02(backup_base):
     scenarios = make_scenarios(format_values, read_sizes)
     nrows = 10000
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Ensure we have logged the live restore messages.
+        live_restore_patterns = [
+            r"Starting \d+ threads to restore \d+ files",
+            r"Live restore background migration finished restoring \d+ files in \d+ seconds",
+            r"Live restore has finished"
+        ]
+        self.ignoreStdoutPattern("|".join(live_restore_patterns))
+
     def get_stat(self, statistic):
         stat_cursor = self.session.open_cursor("statistics:")
         val = stat_cursor[statistic][2]
@@ -87,7 +97,7 @@ class test_live_restore02(backup_base):
                 os.remove(f)
 
         os.mkdir("DEST")
-        self.open_conn("DEST", config="statistics=(all),live_restore=(enabled=true,path=\"SOURCE\",threads_max=1,read_size=" + self.read_size + ")")
+        self.open_conn("DEST", config="statistics=(all),verbose=[live_restore_progress:1],live_restore=(enabled=true,path=\"SOURCE\",threads_max=1,read_size=" + self.read_size + ")")
 
         state = 0
         timeout = 120

@@ -177,7 +177,6 @@ __curfile_next(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_API_CALL(cursor, session, ret, next, CUR2BT(cbt));
-    API_RETRYABLE(session);
     CURSOR_REPOSITION_ENTER(cursor, session);
     WT_ERR(__cursor_copy_release(cursor));
 
@@ -193,7 +192,6 @@ __curfile_next(WT_CURSOR *cursor)
 
 err:
     CURSOR_REPOSITION_END(cursor, session);
-    API_RETRYABLE_END(session, ret);
     API_END_RET_STAT(session, ret, cursor_next);
 }
 
@@ -239,7 +237,6 @@ __curfile_prev(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     CURSOR_API_CALL(cursor, session, ret, prev, CUR2BT(cbt));
-    API_RETRYABLE(session);
     CURSOR_REPOSITION_ENTER(cursor, session);
     WT_ERR(__cursor_copy_release(cursor));
 
@@ -254,7 +251,6 @@ __curfile_prev(WT_CURSOR *cursor)
         F_MASK(cursor, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
 
 err:
-    API_RETRYABLE_END(session, ret);
     CURSOR_REPOSITION_END(cursor, session);
     API_END_RET_STAT(session, ret, cursor_prev);
 }

@@ -156,7 +156,7 @@ WT_CONF_API_DECLARE(WT_SESSION, create, 6, 67);
 WT_CONF_API_DECLARE(WT_SESSION, drop, 1, 5);
 WT_CONF_API_DECLARE(WT_SESSION, log_flush, 1, 1);
 WT_CONF_API_DECLARE(WT_SESSION, open_cursor, 3, 29);
-WT_CONF_API_DECLARE(WT_SESSION, prepare_transaction, 1, 1);
+WT_CONF_API_DECLARE(WT_SESSION, prepare_transaction, 1, 2);
 WT_CONF_API_DECLARE(WT_SESSION, query_timestamp, 1, 1);
 WT_CONF_API_DECLARE(WT_SESSION, reconfigure, 3, 9);
 WT_CONF_API_DECLARE(WT_SESSION, rollback_transaction, 1, 1);

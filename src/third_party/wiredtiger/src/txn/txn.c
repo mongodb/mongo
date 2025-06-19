@@ -2016,6 +2016,7 @@ err:
 int
 __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 {
+    WT_CONFIG_ITEM cval;
     WT_TXN *txn;
     WT_TXN_OP *op;
     WT_UPDATE *tmp, *upd;
@@ -2036,6 +2037,10 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 
     /* Set the prepare timestamp. */
     WT_RET(__wt_txn_set_timestamp(session, cfg, false));
+
+    /* Set the prepared id */
+    WT_RET(__wt_config_gets(session, cfg, "prepared_id", &cval));
+    session->txn->prepared_id = (uint64_t)cval.val;
 
     if (!F_ISSET(txn, WT_TXN_HAS_TS_PREPARE))
         WT_RET_MSG(session, EINVAL, "prepare timestamp is not set");
@@ -2799,7 +2804,7 @@ __wt_verbose_dump_txn_one(
         ", durable_timestamp: %s"
         ", first_commit_timestamp: %s"
         ", prepare_timestamp: %s"
-        ", pinned_durable_timestamp: %s"
+        ", prepared id: %" PRIu64 ", pinned_durable_timestamp: %s"
         ", read_timestamp: %s"
         ", checkpoint LSN: [%s]"
         ", full checkpoint: %s"
@@ -2812,7 +2817,7 @@ __wt_verbose_dump_txn_one(
         __wt_timestamp_to_string(txn->commit_timestamp, ts_string[0]),
         __wt_timestamp_to_string(txn->durable_timestamp, ts_string[1]),
         __wt_timestamp_to_string(txn->first_commit_timestamp, ts_string[2]),
-        __wt_timestamp_to_string(txn->prepare_timestamp, ts_string[3]),
+        __wt_timestamp_to_string(txn->prepare_timestamp, ts_string[3]), txn->prepared_id,
         __wt_timestamp_to_string(txn_shared->pinned_durable_timestamp, ts_string[4]),
         __wt_timestamp_to_string(txn_shared->read_timestamp, ts_string[5]), ckpt_lsn_str,
         txn->full_ckpt ? "true" : "false", txn->flags, iso_tag, txn_err_info->err,
