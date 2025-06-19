@@ -48,6 +48,6 @@ public:
     ~DeferredDropRecordStore() override;
 
 protected:
-    StorageEngine* _storageEngine{nullptr};
+    StorageEngine* _storageEngine;
 };
 }  // namespace mongo

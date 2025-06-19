@@ -188,7 +188,6 @@ mongo_cc_library(
         "//src/mongo/db/index:preallocated_container_pool",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/sorter:sorter_stats",
-        "//src/mongo/db/storage:spill_table",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/executor:task_executor_interface",
     ],

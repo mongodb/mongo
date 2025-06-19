@@ -40,7 +40,6 @@
 namespace mongo {
 
 class DiskSpaceMonitor;
-class StorageEngine;
 
 /**
  * SpillTable provides an interface for interacting with a RecordStore used for spilling
@@ -84,13 +83,10 @@ public:
      */
     SpillTable(std::unique_ptr<RecoveryUnit> ru,
                std::unique_ptr<RecordStore> rs,
-               StorageEngine& storageEngine,
                DiskSpaceMonitor& diskMonitor,
                int64_t thresholdBytes);
 
-    virtual ~SpillTable();
-
-    StringData ident() const;
+    virtual ~SpillTable() {}
 
     /**
      * The dataSize is an approximation of the sum of the sizes (in bytes) of the documents or
@@ -171,7 +167,6 @@ public:
 protected:
     std::unique_ptr<RecoveryUnit> _ru;
     std::unique_ptr<RecordStore> _rs;
-    StorageEngine* _storageEngine{nullptr};
 
 private:
     Status _checkDiskSpace() const;
