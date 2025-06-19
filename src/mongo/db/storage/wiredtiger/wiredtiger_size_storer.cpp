@@ -146,8 +146,12 @@ void WiredTigerSizeStorer::flush(bool syncToDisk) {
     // threads try to flush at the same time.
     stdx::lock_guard<stdx::mutex> flushLock(_flushMutex);
 
-    // When the session is destructed, it closes any cursors that remain open.
-    WiredTigerSession session(_conn);
+    // When the session is destructed, it closes any cursors that remain open. Set the config to a
+    // magic number that indicates to WT that this session should not take part in optional
+    // eviction. This is important for this path as it can be called by any thread which may be
+    // running a high priority operation.
+    WiredTigerSession session(_conn, nullptr, "isolation=snapshot,cache_max_wait_ms=1");
+
     WT_CURSOR* cursor = session.getNewCursor(_storageUri, "overwrite=true");
 
     {
