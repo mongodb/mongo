@@ -157,12 +157,15 @@ public:
                         auto size = db.size() + toWrite.size();
                         db.getCursor().write<LittleEndian<uint32_t>>(size);
 
+                        bool maxSizeExceeded = false;
+
                         {
                             stdx::lock_guard<stdx::mutex> lk(_mutex);
                             _written += size;
+                            maxSizeExceeded = _written >= _maxLogSize;
                         }
 
-                        if (_written >= _maxLogSize) {
+                        if (maxSizeExceeded) {
                             // The current recording file hits the maximum file size, open a new
                             // recording file.
                             boost::filesystem::path recordingFile(
