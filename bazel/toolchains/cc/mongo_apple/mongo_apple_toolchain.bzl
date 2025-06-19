@@ -33,7 +33,9 @@ or update the LLVM_VERSION in the //.bazelrc file or //.bazelrc.local.""".format
     ]
     result = repository_ctx.execute(command)
     if result.return_code != 0:
-        return False, "", "", "Failed to find the true LLVM path using command: {}".format(" ".join(command))
+        return False, "", "", """Failed to find the true LLVM path using command: {}. Please make
+sure that you have installed the LLVM toolchain using Homebrew:
+    `brew install llvm@{} lld@{}""".format(" ".join(command), llvm_version, llvm_version)
     llvm_path = result.stdout.strip()
 
     return True, llvm_path, llvm_version, ""
