@@ -45,11 +45,8 @@ export var FeatureFlagUtil = (function() {
         }
     }
 
-    function _getAuthenticatedConnectionToMongod(db, user) {
+    function _getAuthenticatedConnectionToMongod(db) {
         let mongodConn = _getConnectionToMongod(db);
-        if (user) {
-            mongodConn.auth(user.username, user.password);
-        }
         return mongodConn;
     }
 
@@ -127,7 +124,7 @@ export var FeatureFlagUtil = (function() {
      *     not found. A flag may be not found because it was recently deleted or because the test is
      *     running on an older mongod version for example.
      */
-    function getStatus(db, featureFlag, user, ignoreFCV) {
+    function getStatus(db, featureFlag, ignoreFCV) {
         // In order to get an accurate answer for whether a feature flag is enabled, we need to ask
         // a mongod.
         const conn = _getAuthenticatedConnectionToMongod(db);
@@ -151,8 +148,8 @@ export var FeatureFlagUtil = (function() {
      * The advantage of this throwing API is that such a test will start complaining in evergreen
      * when you delete the feature flag, rather than passing by not actually running any assertions.
      */
-    function isEnabled(db, featureFlag, user, ignoreFCV) {
-        let status = getStatus(db, featureFlag, user, ignoreFCV);
+    function isEnabled(db, featureFlag, ignoreFCV) {
+        let status = getStatus(db, featureFlag, ignoreFCV);
         assert(
             status != FlagStatus.kNotFound,
             `You asked about a feature flag ${featureFlag} which wasn't present. If this is a ` +
@@ -194,8 +191,8 @@ export var FeatureFlagUtil = (function() {
      * That code is dangerous because we may forget to delete it when "featureFlagMyFlag" is
      * removed, and the test would keep passing but stop testing.
      */
-    function isPresentAndEnabled(db, featureFlag, user, ignoreFCV) {
-        return getStatus(db, featureFlag, user, ignoreFCV) == FlagStatus.kEnabled;
+    function isPresentAndEnabled(db, featureFlag, ignoreFCV) {
+        return getStatus(db, featureFlag, ignoreFCV) == FlagStatus.kEnabled;
     }
 
     /**
@@ -213,8 +210,8 @@ export var FeatureFlagUtil = (function() {
      *
      *   assert(FeatureFlagUtil.isPresentAndDisabled(db, "MyFlag"))
      */
-    function isPresentAndDisabled(db, featureFlag, user, ignoreFCV) {
-        return getStatus(db, featureFlag, user, ignoreFCV) == FlagStatus.kDisabled;
+    function isPresentAndDisabled(db, featureFlag, ignoreFCV) {
+        return getStatus(db, featureFlag, ignoreFCV) == FlagStatus.kDisabled;
     }
 
     return {
