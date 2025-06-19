@@ -71,10 +71,8 @@ Value serializePartialSum(BSONType nonDecimalTotalType,
 
 void AccumulatorAvg::processInternal(const Value& input, bool merging) {
     if (merging) {
-        // We expect an object that contains both a subtotal and a count. Additionally there may
-        // be an error value, that allows for additional precision.
-        // 'input' is what getValue(true) produced below.
-        verify(input.getType() == Object);
+        // We expect an object that contains both a partial sum and a count.
+        assertMergingInputType(input, Object);
 
         // TODO SERVER-64227 Remove 'if' block when we branch for 6.1 because all nodes in a sharded
         // cluster would use the new data format.

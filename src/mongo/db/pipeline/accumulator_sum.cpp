@@ -129,7 +129,7 @@ void AccumulatorSum::processInternal(const Value& input, bool merging) {
                                 decimalTotal);
                 break;
             default:
-                MONGO_UNREACHABLE;
+                assertMergingInputType(input, BSONType::Array);
         }
         return;
     }
