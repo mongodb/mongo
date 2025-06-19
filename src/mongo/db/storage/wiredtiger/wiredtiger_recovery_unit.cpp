@@ -111,12 +111,6 @@ void WiredTigerRecoveryUnit::_ensureSession() {
         _managedSession = _connection->getUninterruptibleSession();
     }
     _session = _managedSession.get();
-
-    if (_cacheMaxWaitTimeout.count()) {
-        _session->modifyConfiguration(
-            fmt::format("cache_max_wait_ms={}", durationCount<Milliseconds>(_cacheMaxWaitTimeout)),
-            "cache_max_wait_ms=0");
-    }
 }
 
 WiredTigerSession* WiredTigerRecoveryUnit::getSessionNoTxn() {
@@ -937,11 +931,11 @@ void WiredTigerRecoveryUnit::setOperationContext(OperationContext* opCtx) {
 
 void WiredTigerRecoveryUnit::setCacheMaxWaitTimeout(Milliseconds timeout) {
     _cacheMaxWaitTimeout = timeout;
-    if (_session) {
-        _session->modifyConfiguration(
-            fmt::format("cache_max_wait_ms={}", durationCount<Milliseconds>(_cacheMaxWaitTimeout)),
-            "cache_max_wait_ms=0");
-    }
+    auto session = getSessionNoTxn();
+
+    session->modifyConfiguration(
+        fmt::format("cache_max_wait_ms={}", durationCount<Milliseconds>(_cacheMaxWaitTimeout)),
+        "cache_max_wait_ms=0");
 }
 
 size_t WiredTigerRecoveryUnit::getCacheDirtyBytes() {
