@@ -316,7 +316,8 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
         out = _cmdState->promise.getFuture().getNoThrow(opCtx);
     };
     if (_options.yieldPolicy) {
-        uassertStatusOK(_options.yieldPolicy->yieldOrInterrupt(opCtx, getDataFunc));
+        uassertStatusOK(_options.yieldPolicy->yieldOrInterrupt(
+            opCtx, getDataFunc, RestoreContext::RestoreType::kYield));
     } else {
         getDataFunc();
     }

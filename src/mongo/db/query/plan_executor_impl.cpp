@@ -212,7 +212,8 @@ void PlanExecutorImpl::restoreState(const RestoreContext& context) {
             throw;
 
         // Handles retries by calling restoreStateWithoutRetrying() in a loop.
-        uassertStatusOK(_yieldPolicy->yieldOrInterrupt(getOpCtx()));
+        uassertStatusOK(_yieldPolicy->yieldOrInterrupt(
+            getOpCtx(), nullptr /* whileYieldingFn */, context.type()));
     }
 }
 
@@ -352,7 +353,8 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
         };
 
         if (_yieldPolicy->shouldYieldOrInterrupt(_opCtx)) {
-            uassertStatusOK(_yieldPolicy->yieldOrInterrupt(_opCtx, whileYieldingFn));
+            uassertStatusOK(_yieldPolicy->yieldOrInterrupt(
+                _opCtx, whileYieldingFn, RestoreContext::RestoreType::kYield));
         }
 
         WorkingSetID id = WorkingSet::INVALID_ID;

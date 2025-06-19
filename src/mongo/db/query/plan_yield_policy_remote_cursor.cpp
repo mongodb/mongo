@@ -79,11 +79,12 @@ void PlanYieldPolicyRemoteCursor::saveState(OperationContext* opCtx) {
 }
 
 void PlanYieldPolicyRemoteCursor::restoreState(OperationContext* opCtx,
-                                               const Yieldable* yieldable) {
+                                               const Yieldable* yieldable,
+                                               RestoreContext::RestoreType restoreType) {
     if (_exec) {
         // collPtr is expected to be null, if yieldable is not CollectionPtr.
         auto collPtr = dynamic_cast<const CollectionPtr*>(yieldable);
-        _exec->restoreState({RestoreContext::RestoreType::kYield, collPtr});
+        _exec->restoreState({restoreType, collPtr});
     }
 }
 

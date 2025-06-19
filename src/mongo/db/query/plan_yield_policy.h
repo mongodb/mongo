@@ -39,7 +39,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/restore_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
@@ -240,7 +240,8 @@ public:
      * been relinquished.
      */
     virtual Status yieldOrInterrupt(OperationContext* opCtx,
-                                    std::function<void()> whileYieldingFn = nullptr);
+                                    std::function<void()> whileYieldingFn,
+                                    RestoreContext::RestoreType restoreType);
 
     /**
      * All calls to shouldYieldOrInterrupt() will return true until the next call to
@@ -318,7 +319,9 @@ private:
      * specific query execution engines.
      */
     virtual void saveState(OperationContext* opCtx) = 0;
-    virtual void restoreState(OperationContext* opCtx, const Yieldable* yieldable) = 0;
+    virtual void restoreState(OperationContext* opCtx,
+                              const Yieldable* yieldable,
+                              RestoreContext::RestoreType restoreType) = 0;
 
     /**
      * TODO SERVER-59620: Remove this.
