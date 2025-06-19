@@ -2975,14 +2975,12 @@ bool WiredTigerKVEngine::_windowTrackingStorageAppWaitTimeAndWriteLoad(WiredTige
 
     CachePressureStats cur{
         .cacheWaitUsecs = getStatisticValue(session, WT_STAT_CONN_APPLICATION_CACHE_TIME),
-        .evictWaitUsecs = getStatisticValue(session, WT_STAT_CONN_EVICTION_APP_TIME),
         .txnsCommittedCount = getStatisticValue(session, WT_STAT_CONN_TXN_COMMIT),
         .timestamp = globalSystemTickSource()->getTicks(),
     };
 
     // These metrics are cumulative so we will calculate based on their last seen value.
     int64_t cacheWaitTimeUsecs = cur.cacheWaitUsecs - _lastStats.cacheWaitUsecs;
-    int64_t evictWaitTimeUsecs = cur.evictWaitUsecs - _lastStats.evictWaitUsecs;
     int64_t wtTxnCommittedCount = cur.txnsCommittedCount - _lastStats.txnsCommittedCount;
     int64_t usBetweenStats = (cur.timestamp - _lastStats.timestamp) /
         (globalSystemTickSource()->getTicksPerSecond() / 1000000);
@@ -3002,15 +3000,14 @@ bool WiredTigerKVEngine::_windowTrackingStorageAppWaitTimeAndWriteLoad(WiredTige
     int64_t totalTickets =
         std::max(static_cast<int64_t>(std::round(_totalTicketsEDMA)), int64_t(1));
 
-    int64_t observedWaitTime = cacheWaitTimeUsecs + evictWaitTimeUsecs;
     int64_t expectedThreadTime = totalTickets * usBetweenStats;
     int64_t waitTimeThreshold =
         gCachePressureEvictionStallThresholdProportion.load() * expectedThreadTime;
-    bool perThreadWaitTimeExceedsThreshold = observedWaitTime > waitTimeThreshold;
+    bool perThreadWaitTimeExceedsThreshold = cacheWaitTimeUsecs > waitTimeThreshold;
 
     bool notEnoughTransactionsCommitted = (wtTxnCommittedCount == 0);
 
-    cachePressureObservedCacheWaitTime.set(observedWaitTime);
+    cachePressureObservedCacheWaitTime.set(cacheWaitTimeUsecs);
     cachePressureWaitTimeThreshold.set(waitTimeThreshold);
     cachePressureWaitTimeThresholdExceeded.set(perThreadWaitTimeExceedsThreshold);
 
@@ -3018,7 +3015,6 @@ bool WiredTigerKVEngine::_windowTrackingStorageAppWaitTimeAndWriteLoad(WiredTige
                 2,
                 "Cache pressure calculation statistics -- wait time",
                 "cache wait time average"_attr = cacheWaitTimeUsecs,
-                "eviction wait time average"_attr = evictWaitTimeUsecs,
                 "total wt transactions committed: "_attr = wtTxnCommittedCount,
                 "total write and read tickets: "_attr = totalTickets,
                 "wait time threshold: "_attr = waitTimeThreshold,

@@ -704,7 +704,6 @@ private:
     // against the previous value.
     struct CachePressureStats {
         int64_t cacheWaitUsecs = 0;
-        int64_t evictWaitUsecs = 0;
         int64_t txnsCommittedCount = 0;
         // Record when the current stats were generated.
         int64_t timestamp = 0;
