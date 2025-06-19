@@ -247,9 +247,11 @@ protected:
      * given database. Otherwise, it'll return just the requested collection.
      * This method can only run on a sharded cluster.
      */
-    std::vector<BSONObj> _runListCollectionsCommandOnAShardedCluster(OperationContext* opCtx,
-                                                                     const NamespaceString& nss,
-                                                                     bool addPrimaryShard = false);
+    std::vector<BSONObj> _runListCollectionsCommandOnAShardedCluster(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        bool addPrimaryShard = false,
+        bool runAgainstPrimary = false);
 };
 
 }  // namespace mongo

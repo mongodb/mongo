@@ -157,6 +157,21 @@ TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
         return res.toBSON();
     });
 
+    // Mock the response to $out's "listCollections" request to get the uuid of the temp collection.
+    auto uuid = UUID::gen();
+    const BSONObj collectionInfo = BSON("readOnly" << false << "uuid" << uuid);
+    const BSONObj listCollectionsGetUUIDResponse =
+        BSON("name" << tempNss.coll() << "type"
+                    << "collection"
+                    << "options" << collectionOptions << "info" << collectionInfo);
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ("listCollections", request.cmdObj.firstElement().fieldNameStringData());
+        ASSERT_EQ(kOutNss.dbName(), request.dbname);
+        ASSERT_EQ(tempNss.coll(), request.cmdObj["filter"]["name"].valueStringData());
+        return CursorResponse(kTestAggregateNss, CursorId{0}, {listCollectionsGetUUIDResponse})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
     // Mock the response to $out's "aggregate" request to config server, that is a part of
     // createIndexes.
     onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -179,6 +194,15 @@ TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
         ASSERT_EQ(1, indexArray.size());
         ASSERT_BSONOBJ_EQ(listIndexesResponse, indexArray.at(0).Obj());
         return BSON("ok" << 1);
+    });
+
+    // Mock the response to $out's "listCollections" request to get the uuid of the temp collection.
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ("listCollections", request.cmdObj.firstElement().fieldNameStringData());
+        ASSERT_EQ(kOutNss.dbName(), request.dbname);
+        ASSERT_EQ(tempNss.coll(), request.cmdObj["filter"]["name"].valueStringData());
+        return CursorResponse(kTestAggregateNss, CursorId{0}, {listCollectionsGetUUIDResponse})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
     });
 
     // Mock the response to $out's "internalRenameIfOptionsAndIndexesMatch" request.

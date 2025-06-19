@@ -337,6 +337,9 @@ public:
      */
     virtual BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
+    virtual UUID fetchCollectionUUIDFromPrimary(OperationContext* opCtx,
+                                                const NamespaceString& nss) = 0;
+
     /**
      * Returns the query shape collection type in the namespace given by 'nss'. This function holds
      * an acquisition that is freed right after execution, and can't guarantee if the collection or

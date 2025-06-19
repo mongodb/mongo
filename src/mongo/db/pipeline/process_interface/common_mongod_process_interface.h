@@ -120,6 +120,8 @@ public:
                                 const NamespaceString& nss,
                                 BSONObjBuilder* builder) const final;
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) override;
+    UUID fetchCollectionUUIDFromPrimary(OperationContext* opCtx,
+                                        const NamespaceString& nss) override;
     query_shape::CollectionType getCollectionType(OperationContext* opCtx,
                                                   const NamespaceString& nss) override;
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(

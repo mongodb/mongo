@@ -128,6 +128,9 @@ public:
                             const WriteConcernOptions& wc,
                             boost::optional<OID> targetEpoch) override;
 
+    UUID fetchCollectionUUIDFromPrimary(OperationContext* opCtx,
+                                        const NamespaceString& nss) override;
+
 private:
     /**
      * Attemps to execute the specified command on the primary. Returns the command response upon
@@ -136,12 +139,15 @@ private:
      */
     StatusWith<BSONObj> _executeCommandOnPrimary(OperationContext* opCtx,
                                                  const NamespaceString& ns,
-                                                 const BSONObj& cmdObj) const;
+                                                 const BSONObj& cmdObj,
+                                                 bool attachWriteConcern = true) const;
 
     /**
-     * Attaches command arguments such as writeConcern to 'cmd'.
+     * Attaches command arguments such as maxTimeMS to 'cmd'.
      */
-    void _attachGenericCommandArgs(OperationContext* opCtx, BSONObjBuilder* cmd) const;
+    void _attachGenericCommandArgs(OperationContext* opCtx,
+                                   BSONObjBuilder* cmd,
+                                   bool attachWriteConcern = true) const;
 
     /**
      * Returns whether we are the primary and can therefore perform writes locally. Result may be

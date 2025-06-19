@@ -28,6 +28,7 @@
  */
 
 #include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/smart_ptr.hpp>
 #include <string>
 
@@ -38,9 +39,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_time_tracker.h"
 #include "mongo/db/pipeline/process_interface/common_mongod_process_interface.h"
@@ -215,10 +218,30 @@ void ReplicaSetNodeProcessInterface::dropCollection(OperationContext* opCtx,
     uassertStatusOK(_executeCommandOnPrimary(opCtx, ns, cmd.obj()));
 }
 
+UUID ReplicaSetNodeProcessInterface::fetchCollectionUUIDFromPrimary(OperationContext* opCtx,
+                                                                    const NamespaceString& nss) {
+    // Create a listCollections command and run it against the primary to get the UUID.
+    ListCollections listCollectionsCmd;
+    listCollectionsCmd.setDbName(nss.dbName());
+    listCollectionsCmd.setFilter(BSON("name" << nss.coll()));
+
+    auto result = _executeCommandOnPrimary(
+        opCtx, nss, listCollectionsCmd.toBSON({}), /* attachWriteConcern */ false);
+    uassertStatusOK(result);
+
+    auto uuid = dotted_path_support::extractElementAtPath(result.getValue(),
+                                                          "cursor.firstBatch.0.info.uuid");
+    return uassertStatusOK(UUID::parse(uuid));
+}
+
 StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimary(
-    OperationContext* opCtx, const NamespaceString& ns, const BSONObj& cmdObj) const {
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    const BSONObj& cmdObj,
+    bool attachWriteConcern) const {
     BSONObjBuilder cmd(cmdObj);
-    _attachGenericCommandArgs(opCtx, &cmd);
+
+    _attachGenericCommandArgs(opCtx, &cmd, attachWriteConcern);
 
     // Verify that the ReplicationCoordinator believes that a primary exists before issuing a
     // command to it.
@@ -280,8 +303,11 @@ StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimary(
 }
 
 void ReplicaSetNodeProcessInterface::_attachGenericCommandArgs(OperationContext* opCtx,
-                                                               BSONObjBuilder* cmd) const {
-    cmd->append(WriteConcernOptions::kWriteConcernField, opCtx->getWriteConcern().toBSON());
+                                                               BSONObjBuilder* cmd,
+                                                               bool attachWriteConcern) const {
+    if (attachWriteConcern) {
+        cmd->append(WriteConcernOptions::kWriteConcernField, opCtx->getWriteConcern().toBSON());
+    }
 
     auto maxTimeMS = opCtx->getRemainingMaxTimeMillis();
     if (maxTimeMS != Milliseconds::max()) {

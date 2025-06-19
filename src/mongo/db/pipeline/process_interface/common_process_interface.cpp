@@ -327,7 +327,10 @@ std::vector<DatabaseName> CommonProcessInterface::_getAllDatabasesOnAShardedClus
 }
 
 std::vector<BSONObj> CommonProcessInterface::_runListCollectionsCommandOnAShardedCluster(
-    OperationContext* opCtx, const NamespaceString& nss, bool appendPrimaryShardToTheResponse) {
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    bool appendPrimaryShardToTheResponse,
+    bool runAgainstPrimary) {
     tassert(9525809, "This method can only run on a sharded cluster", Grid::get(opCtx));
 
     const bool isCollectionless = nss.coll().empty();
@@ -349,34 +352,42 @@ std::vector<BSONObj> CommonProcessInterface::_runListCollectionsCommandOnASharde
             return collectionsWithPrimaryShard;
         };
 
-    auto runListCollectionsFunc = [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+    const auto runListCollectionsFunc = [&](OperationContext* opCtx,
+                                            const CachedDatabaseInfo& cdb) {
         ListCollections listCollectionsCmd;
         listCollectionsCmd.setDbName(nss.dbName());
         if (!isCollectionless) {
             listCollectionsCmd.setFilter(BSON("name" << nss.coll()));
         }
 
-        // Append the readConcern to the command and check it's a 'local' level.
-        const auto& readConcernLevel = repl::ReadConcernArgs::get(opCtx).getLevel();
+        auto listCollectionsCmdObj = listCollectionsCmd.toBSON({});
+
+        const auto& readConcern = repl::ReadConcernArgs::get(opCtx);
         tassert(9746001,
                 str::stream() << "listCollections only allows 'local' read concern. Trying "
                                  "to call it with '"
-                              << repl::readConcernLevels::toString(readConcernLevel)
+                              << repl::readConcernLevels::toString(readConcern.getLevel())
                               << "' read concern level.",
-                readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern);
+                readConcern.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
 
-        BSONObj cmdToRun = applyReadWriteConcern(
-            opCtx, /*appendRC=*/true, /*appendWC=*/false, listCollectionsCmd.toBSON({}));
+        listCollectionsCmdObj = applyReadWriteConcern(
+            opCtx, /* appendRC */ true, /* appendWC */ false, listCollectionsCmdObj);
+        listCollectionsCmdObj = appendDbVersionIfPresent(listCollectionsCmdObj, cdb->getVersion());
 
         const auto shard =
             uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cdb->getPrimary()));
 
-        Shard::QueryResponse resultCollections;
-        resultCollections = uassertStatusOK(shard->runExhaustiveCursorCommand(
+        // Some collections (for example temp collections) only exist on the replica set primary so
+        // we may need to change the read preference to locate these.
+        const ReadPreferenceSetting readPreference = runAgainstPrimary
+            ? ReadPreferenceSetting(ReadPreference::PrimaryOnly)
+            : ReadPreferenceSetting::get(opCtx);
+
+        Shard::QueryResponse resultCollections = uassertStatusOK(shard->runExhaustiveCursorCommand(
             opCtx,
-            ReadPreferenceSetting::get(opCtx),
+            readPreference,
             nss.dbName(),
-            appendDbVersionIfPresent(cmdToRun, cdb->getVersion()),
+            listCollectionsCmdObj,
             opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis() : Milliseconds(-1)));
 
         // Make sure we return a single object if the request isn't collectionless.
