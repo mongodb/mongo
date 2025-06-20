@@ -701,7 +701,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipelineFr
 
     // Resolve the view definition.
     auto pipeline = Pipeline::makePipelineFromViewDefinition(
-        _fromExpCtx, resolvedNamespace, std::move(serializedPipeline), opts);
+        _fromExpCtx, resolvedNamespace, std::move(serializedPipeline), opts, _fromNs);
 
     // Store the pipeline with resolved namespaces so that we only trigger this exception on the
     // first input document.

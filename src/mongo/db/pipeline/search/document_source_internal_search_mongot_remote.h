@@ -188,6 +188,10 @@ public:
         return _searchIdLookupMetrics;
     }
 
+    boost::optional<SearchQueryViewSpec> getView() {
+        return _view;
+    }
+
 protected:
     /**
      * Helper serialize method that avoids making mongot call during explain from mongos.

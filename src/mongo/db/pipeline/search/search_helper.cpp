@@ -268,12 +268,7 @@ void checkAndSetViewOnExpCtx(boost::intrusive_ptr<ExpressionContext> expCtx,
     // storedSource is disabled, idLookup will retrieve full/unmodified documents during
     // (from the _id values returned by mongot), apply the view's data transforms, and pass
     // said transformed documents through the rest of the user pipeline.
-
-    // For returnStoredSource queries, the documents returned by mongot already include the
-    // fields transformed by the view pipeline. As such, mongod doesn't need to apply the
-    // view pipeline after idLookup.
-    if (expCtx->isFeatureFlagMongotIndexedViewsEnabled() && lpp.hasSearchStage() &&
-        !search_helper_bson_obj::isStoredSource(pipelineObj)) {
+    if (expCtx->isFeatureFlagMongotIndexedViewsEnabled() && lpp.hasSearchStage()) {
         expCtx->setView(boost::make_optional(std::make_pair(viewName, resolvedView.getPipeline())));
     }
 }
@@ -401,7 +396,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
                                                       origSearchStage->getTaskExecutor(),
                                                       userBatchSize,
                                                       nullptr,
-                                                      origSearchStage->getSearchIdLookupMetrics());
+                                                      origSearchStage->getSearchIdLookupMetrics(),
+                                                      origSearchStage->getView());
 
     // mongot can return zero cursors for an empty collection, one without metadata, or two for
     // results and metadata.

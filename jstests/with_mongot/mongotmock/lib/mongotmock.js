@@ -38,7 +38,7 @@ export function mongotCommandForQuery({
     protocolVersion = null,
     cursorOptions = null,
     explainVerbosity = null,
-    view = null,
+    viewName = null,
     optimizationFlags = null,
 }) {
     let cmd = {search: collName, $db: db, collectionUUID, query};
@@ -51,8 +51,8 @@ export function mongotCommandForQuery({
     if (explainVerbosity != null) {
         cmd.explain = explainVerbosity;
     }
-    if (view != null) {
-        cmd.view = view;
+    if (viewName != null) {
+        cmd.viewName = viewName;
     }
     if (optimizationFlags != null) {
         cmd.optimizationFlags = optimizationFlags;

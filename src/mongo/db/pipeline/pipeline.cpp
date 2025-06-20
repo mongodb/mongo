@@ -994,16 +994,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::viewPipelineHelperForSearch
     // storedSource is disabled, idLookup will retrieve full/unmodified documents during
     // (from the _id values returned by mongot), apply the view's data transforms, and pass
     // said transformed documents through the rest of the user pipeline.
+    const ResolvedView resolvedView{resolvedNs.ns, resolvedNs.pipeline, BSONObj()};
+    subPipelineExpCtx->setView(
+        boost::make_optional(std::make_pair(originalNs, resolvedView.getPipeline())));
 
-    // For returnStoredSource queries, the documents returned by mongot already include the
-    // fields transformed by the view pipeline. As such, mongod doesn't need to apply
-    // the view pipeline after idLookup. But for regular/non-stored source search queries, we
-    // need to set the resolved namespace so that idLookup knows to apply the view.
-    if (!search_helper_bson_obj::isStoredSource(currentPipeline)) {
-        const ResolvedView resolvedView{resolvedNs.ns, resolvedNs.pipeline, BSONObj()};
-        subPipelineExpCtx->setView(
-            boost::make_optional(std::make_pair(originalNs, resolvedView.getPipeline())));
-    }
     // return the user pipeline without appending the view stages.
     return Pipeline::makePipeline(currentPipeline, subPipelineExpCtx, opts);
 }

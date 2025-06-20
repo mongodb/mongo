@@ -89,13 +89,13 @@ std::unique_ptr<executor::TaskExecutorCursor> DocumentSourceSearchMeta::establis
     // TODO SERVER-94875 We should be able to remove any cursor establishment logic from
     // DocumentSourceSearchMeta if we establish the cursors during search_helper
     // pipeline preparation instead.
-    auto cursors = mongot_cursor::establishCursorsForSearchMetaStage(
-        pExpCtx,
-        getSearchQuery(),
-        getTaskExecutor(),
-        getIntermediateResultsProtocolVersion(),
-        nullptr,
-        _view ? boost::make_optional(_view->getNss()) : boost::none);
+    auto cursors =
+        mongot_cursor::establishCursorsForSearchMetaStage(pExpCtx,
+                                                          getSearchQuery(),
+                                                          getTaskExecutor(),
+                                                          getIntermediateResultsProtocolVersion(),
+                                                          nullptr,
+                                                          _view);
 
     // TODO SERVER-91594: Since mongot will no longer only return explain, remove this block.
     // Mongot can return only an explain object or an explain with a cursor. If mongot returned

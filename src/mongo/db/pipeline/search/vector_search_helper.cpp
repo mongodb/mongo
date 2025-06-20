@@ -33,7 +33,9 @@
 namespace mongo {
 namespace {
 executor::RemoteCommandRequest getRemoteCommandRequestForVectorSearchQuery(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& request) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const BSONObj& request,
+    boost::optional<SearchQueryViewSpec> view = boost::none) {
     BSONObjBuilder cmdBob;
     cmdBob.append(mongot_cursor::kVectorSearchCmd, expCtx->getNamespaceString().coll());
     uassert(7828001,
@@ -45,6 +47,10 @@ executor::RemoteCommandRequest getRemoteCommandRequestForVectorSearchQuery(
     if (expCtx->getExplain()) {
         cmdBob.append("explain",
                       BSON("verbosity" << ExplainOptions::verbosityString(*expCtx->getExplain())));
+    }
+
+    if (view) {
+        cmdBob.append(mongot_cursor::kViewNameField, view->getNss().coll());
     }
 
     auto commandObj = cmdBob.obj();
@@ -59,7 +65,8 @@ namespace search_helpers {
 std::unique_ptr<executor::TaskExecutorCursor> establishVectorSearchCursor(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const BSONObj& request,
-    std::shared_ptr<executor::TaskExecutor> taskExecutor) {
+    std::shared_ptr<executor::TaskExecutor> taskExecutor,
+    boost::optional<SearchQueryViewSpec> view) {
     // Note that we always pre-fetch the next batch here. This is because we generally expect
     // everything to fit into one batch, since we give mongot the exact upper bound initially - we
     // will only see multiple batches if this upper bound doesn't fit in 16MB. This should be a rare
@@ -69,7 +76,7 @@ std::unique_ptr<executor::TaskExecutorCursor> establishVectorSearchCursor(
         /*preFetchNextBatch*/ true);
     auto cursors = mongot_cursor::establishCursors(
         expCtx,
-        getRemoteCommandRequestForVectorSearchQuery(expCtx, request),
+        getRemoteCommandRequestForVectorSearchQuery(expCtx, request, view),
         taskExecutor,
         std::move(getMoreStrategy));
     // Should always have one results cursor.

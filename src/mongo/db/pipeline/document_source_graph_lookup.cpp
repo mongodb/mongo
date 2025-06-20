@@ -359,7 +359,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceGraphLookUp::makePipeli
             _fromExpCtx,
             ResolvedNamespace{e->getNamespace(), e->getPipeline()},
             _fromPipeline,
-            opts);
+            opts,
+            _from);
 
         // Update '_fromPipeline' with the resolved view definition to avoid triggering this
         // exception next time.

@@ -53,7 +53,7 @@ executor::RemoteCommandRequest getRemoteCommandRequestForSearchQuery(
     const boost::optional<ExplainOptions::Verbosity>& explain,
     const BSONObj& query,
     const OptimizationFlags& optimizationFlags,
-    const boost::optional<NamespaceString> viewName = boost::none,
+    const boost::optional<SearchQueryViewSpec> view = boost::none,
     const boost::optional<int> protocolVersion = boost::none,
     const boost::optional<long long> docsRequested = boost::none,
     const boost::optional<long long> batchSize = boost::none,
@@ -67,10 +67,8 @@ executor::RemoteCommandRequest getRemoteCommandRequestForSearchQuery(
         uuid);
     uuid.value().appendToBuilder(&cmdBob, kCollectionUuidField);
     cmdBob.append(kQueryField, query);
-    if (viewName) {
-        BSONObjBuilder subObj(cmdBob.subobjStart(kViewField));
-        subObj.append(kViewNameField, viewName->coll());
-        subObj.done();
+    if (view) {
+        cmdBob.append(kViewNameField, view->getNss().coll());
     }
     if (explain) {
         cmdBob.append(kExplainField,
@@ -285,7 +283,7 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     std::unique_ptr<PlanYieldPolicy> yieldPolicy,
     std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
         searchIdLookupMetrics,
-    boost::optional<NamespaceString> viewNss) {
+    boost::optional<SearchQueryViewSpec> view) {
     // UUID is required for mongot queries. If not present, no results for the query as the
     // collection has not been created yet.
     if (!expCtx->getUUID()) {
@@ -339,7 +337,7 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
                                               expCtx->getExplain(),
                                               query,
                                               getOptimizationFlagsForSearch(),
-                                              viewNss,
+                                              view,
                                               protocolVersion,
                                               docsRequested,
                                               batchSize,
@@ -355,7 +353,7 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     const boost::optional<int>& protocolVersion,
     std::unique_ptr<PlanYieldPolicy> yieldPolicy,
-    boost::optional<NamespaceString> viewNss) {
+    boost::optional<SearchQueryViewSpec> view) {
     // UUID is required for mongot queries. If not present, no results for the query as the
     // collection has not been created yet.
     if (!expCtx->getUUID()) {
@@ -373,7 +371,7 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
                                               expCtx->getExplain(),
                                               query,
                                               getOptimizationFlagsForSearchMeta(),
-                                              viewNss,
+                                              view,
                                               protocolVersion),
         taskExecutor,
         std::move(getMoreStrategy),
@@ -411,14 +409,14 @@ BSONObj getSearchExplainResponse(const ExpressionContext* expCtx,
                                  const BSONObj& query,
                                  executor::TaskExecutor* taskExecutor,
                                  const OptimizationFlags& optimizationFlags,
-                                 boost::optional<NamespaceString> viewNss) {
+                                 boost::optional<SearchQueryViewSpec> view) {
     const auto request = getRemoteCommandRequestForSearchQuery(expCtx->getOperationContext(),
                                                                expCtx->getNamespaceString(),
                                                                expCtx->getUUID(),
                                                                expCtx->getExplain(),
                                                                query,
                                                                optimizationFlags,
-                                                               viewNss);
+                                                               view);
     return getExplainResponse(expCtx, request, taskExecutor);
 }
 

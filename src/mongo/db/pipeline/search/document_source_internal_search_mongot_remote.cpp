@@ -179,12 +179,8 @@ Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
         : mongot_cursor::getOptimizationFlagsForSearch();
 
     BSONObj explainInfo = explainResponse.value_or_eval([&] {
-        return mongot_cursor::getSearchExplainResponse(pExpCtx.get(),
-                                                       _spec.getMongotQuery(),
-                                                       _taskExecutor.get(),
-                                                       optFlags,
-                                                       _view ? boost::make_optional(_view->getNss())
-                                                             : boost::none);
+        return mongot_cursor::getSearchExplainResponse(
+            pExpCtx.get(), _spec.getMongotQuery(), _taskExecutor.get(), optFlags, _view);
     });
 
     MutableDocument mDoc;
@@ -356,13 +352,7 @@ DocumentSourceInternalSearchMongotRemote::establishCursor() {
     // DocumentSourceInternalSearchMongotRemote if we establish the cursors during search_helper
     // pipeline preparation instead.
     auto cursors = mongot_cursor::establishCursorsForSearchStage(
-        pExpCtx,
-        _spec,
-        _taskExecutor,
-        boost::none,
-        nullptr,
-        getSearchIdLookupMetrics(),
-        _view ? boost::make_optional(_view->getNss()) : boost::none);
+        pExpCtx, _spec, _taskExecutor, boost::none, nullptr, getSearchIdLookupMetrics(), _view);
     // Should be called only in unsharded scenario, therefore only expect a results cursor and no
     // metadata cursor.
     tassert(5253301, "Expected exactly one cursor from mongot", cursors.size() == 1);

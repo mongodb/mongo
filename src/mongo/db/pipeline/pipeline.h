@@ -223,7 +223,7 @@ public:
         ResolvedNamespace resolvedNs,
         std::vector<BSONObj> currentPipeline,
         MakePipelineOptions opts,
-        NamespaceString originalNs = NamespaceString());
+        NamespaceString originalNs);
 
     /**
      * Callers can optionally specify 'newExpCtx' to construct the deep clone with it. This will be
