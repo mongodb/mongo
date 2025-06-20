@@ -606,15 +606,19 @@ public:
 
     /**
      * Statistics for the types of collections in the catalog.
-     * Total collections = 'internal' + 'userCollections'
+     * Total collections = 'internal' + 'userCollections' + 'userTimeseries'
      */
     struct Stats {
         // Non-system collections on non-internal databases
+        // Note timeseries collections are not accounted here.
         int userCollections = 0;
         // Non-system capped collections on non-internal databases
         int userCapped = 0;
         // Non-system clustered collection on non-internal databases.
+        // Note timeseries collections are not accounted here.
         int userClustered = 0;
+        // Non-system timeseries collections on non-internal databases.
+        int userTimeseries = 0;
         // System collections or collections on internal databases
         int internal = 0;
         // Client Side Field Level Encryption collections on non-internal databases

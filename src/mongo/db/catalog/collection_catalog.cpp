@@ -2260,7 +2260,11 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
 
 
     if (!nss.isOnInternalDb()) {
-        if (!nss.isSystem()) {
+        if (nss.isSystem()) {
+            _stats.internal += 1;
+        } else if (coll->isTimeseriesCollection() && coll->isNewTimeseriesWithoutView()) {
+            _stats.userTimeseries += 1;
+        } else {
             _stats.userCollections += 1;
             if (coll->isCapped()) {
                 _stats.userCapped += 1;
@@ -2274,8 +2278,6 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
             if (isCSFLE1Validator(coll->getValidatorDoc())) {
                 _stats.csfle += 1;
             }
-        } else {
-            _stats.internal += 1;
         }
 
         if (nss.isSystemDotProfile()) {
@@ -2285,7 +2287,8 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
         _stats.internal += 1;
     }
 
-    invariant(static_cast<size_t>(_stats.internal + _stats.userCollections) == _collections.size());
+    invariant(static_cast<size_t>(_stats.internal + _stats.userCollections +
+                                  _stats.userTimeseries) == _collections.size());
 
     auto& resourceCatalog = ResourceCatalog::get();
     resourceCatalog.add({RESOURCE_DATABASE, nss.dbName()}, nss.dbName());
@@ -2329,7 +2332,11 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
     _catalogIdTracker.drop(ns, uuid, commitTime);
 
     if (!ns.isOnInternalDb()) {
-        if (!ns.isSystem()) {
+        if (ns.isSystem()) {
+            _stats.internal -= 1;
+        } else if (coll->isTimeseriesCollection() && coll->isNewTimeseriesWithoutView()) {
+            _stats.userTimeseries -= 1;
+        } else {
             _stats.userCollections -= 1;
             if (coll->isCapped()) {
                 _stats.userCapped -= 1;
@@ -2343,8 +2350,6 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
             if (isCSFLE1Validator(coll->getValidatorDoc())) {
                 _stats.csfle -= 1;
             }
-        } else {
-            _stats.internal -= 1;
         }
 
         if (ns.isSystemDotProfile()) {
@@ -2354,7 +2359,8 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
         _stats.internal -= 1;
     }
 
-    invariant(static_cast<size_t>(_stats.internal + _stats.userCollections) == _collections.size());
+    invariant(static_cast<size_t>(_stats.internal + _stats.userCollections +
+                                  _stats.userTimeseries) == _collections.size());
 
     coll->onDeregisterFromCatalog(opCtx);
 

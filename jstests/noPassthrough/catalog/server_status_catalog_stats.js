@@ -5,6 +5,9 @@
  *   requires_replication,
  * ]
  */
+import {
+    areViewlessTimeseriesEnabled
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replSet = new ReplSetTest({nodes: 2});
@@ -39,8 +42,13 @@ assert.commandWorked(
 assert.commandWorked(db1.createCollection('view', {viewOn: 'coll', pipeline: []}));
 assert.commandWorked(db1.createCollection('ts', {timeseries: {timeField: 't'}}));
 
-// A system.views and system.buckets collection should have been created.
-let internalCollectionsCreated = 2;
+// A system.views collection should have been created.
+let internalCollectionsCreated = 1;
+
+if (!areViewlessTimeseriesEnabled(db1)) {
+    // A system.buckets collection should have been created.
+    internalCollectionsCreated += 1;
+}
 
 // Create the profile collection.
 assert.commandWorked(db1.setProfilingLevel(2, 0));
@@ -70,7 +78,6 @@ assertCatalogStats(db1, (stats) => {
     assert.eq(1, stats.systemProfile);
     assert.eq(1, stats.timeseries);
     assert.eq(1, stats.views);
-    // An system.views and system.buckets collection should have been created.
     assert.eq(internalCollectionsAtStart + internalCollectionsCreated, stats.internalCollections);
     assert.eq(internalViewsAtStart, stats.internalViews);
 });
@@ -82,8 +89,13 @@ assert.commandWorked(
 assert.commandWorked(db2.createCollection('view', {viewOn: 'coll', pipeline: []}));
 assert.commandWorked(db2.createCollection('ts', {timeseries: {timeField: 't'}}));
 
-// An system.views and system.buckets collection should have been created.
-internalCollectionsCreated += 2;
+// A system.views collection should have been created.
+internalCollectionsCreated += 1;
+
+if (!areViewlessTimeseriesEnabled(db2)) {
+    // A system.buckets collection should have been created.
+    internalCollectionsCreated += 1;
+}
 
 assertCatalogStats(db1, (stats) => {
     assert.eq(2, stats.capped);
@@ -117,11 +129,13 @@ assertCatalogStats(db1, (stats) => {
 assert(db1.coll.drop());
 assert(db1.capped.drop());
 assert(db1.clustered.drop());
-assert(db1.view.drop());
+assert(db1.view.drop());  // (Note this doesn't drop the internal system.views collection)
 assert(db1.ts.drop());
 
-// The system.buckets collection will be dropped, but not system.views.
-internalCollectionsCreated -= 1;
+if (!areViewlessTimeseriesEnabled(db1)) {
+    // The system.buckets collection will be dropped.
+    internalCollectionsCreated -= 1;
+}
 
 assertCatalogStats(db1, (stats) => {
     assert.eq(1, stats.capped);
@@ -152,8 +166,13 @@ assertCatalogStats(db1, (stats) => {
 
 db2.dropDatabase();
 
-// The system.views and system.buckets collections should be dropped.
-internalCollectionsCreated -= 2;
+// The system.views collection should be dropped.
+internalCollectionsCreated -= 1;
+
+if (!areViewlessTimeseriesEnabled(db1)) {
+    // The system.buckets collection should be dropped.
+    internalCollectionsCreated -= 1;
+}
 
 assertCatalogStats(db1, (stats) => {
     assert.eq(0, stats.capped);

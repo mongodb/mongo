@@ -101,6 +101,7 @@ public:
         stats.collections = catalogStats.userCollections;
         stats.capped = catalogStats.userCapped;
         stats.clustered = catalogStats.userClustered;
+        stats.timeseries = catalogStats.userTimeseries;
         stats.internalCollections = catalogStats.internal;
         stats.timeseriesExtendedRange = requiresTimeseriesExtendedRangeSupport.loadRelaxed();
         stats.csfle = catalogStats.csfle;

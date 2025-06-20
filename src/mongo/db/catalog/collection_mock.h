@@ -196,7 +196,7 @@ public:
     }
 
     bool isTimeseriesCollection() const override {
-        MONGO_UNREACHABLE;
+        return getTimeseriesOptions().has_value();
     }
 
     bool isNewTimeseriesWithoutView() const override {

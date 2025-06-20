@@ -64,6 +64,7 @@ public:
      */
     struct Stats {
         int userViews = 0;
+        // TODO(SERVER-106490): Remove once 9.0 becomes last LTS and timeseries views are phased out
         int userTimeseries = 0;
         int internal = 0;
     };

@@ -171,6 +171,7 @@
     selector:
       exclude_files: null
       roots:
+        - jstests/noPassthrough/catalog/server_status_catalog_stats.js
         - jstests/noPassthrough/**/timeseries/**/*.js
         - jstests/noPassthrough/**/*timeseries*.js
 - name: only_validated_no_passthrough_timeseries_tests_selector
@@ -178,6 +179,7 @@
     selector:
       exclude_files: null
       roots:
+        - jstests/noPassthrough/catalog/server_status_catalog_stats.js
         - jstests/noPassthrough/query/timeseries/bucket_unpacking_with_sort_granularity_change.js
         - jstests/noPassthrough/query/timeseries/timeseries_validate_mixed_schema_bucket.js
         - jstests/noPassthrough/timeseries/create/initial_sync_recreate_timeseries_collection.js

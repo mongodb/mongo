@@ -41,6 +41,7 @@ selector:
     - viewless_timeseries_incompatible
     - does_not_support_viewless_timeseries_yet
   roots:
+    - jstests/noPassthrough/catalog/server_status_catalog_stats.js
     - jstests/noPassthrough/query/timeseries/bucket_unpacking_with_sort_granularity_change.js
     - jstests/noPassthrough/query/timeseries/timeseries_validate_mixed_schema_bucket.js
     - jstests/noPassthrough/timeseries/create/initial_sync_recreate_timeseries_collection.js
