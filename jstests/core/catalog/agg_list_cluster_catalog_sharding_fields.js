@@ -2,8 +2,6 @@
  * Test the sharded fields returned by the $listClusterCatalog stage.
  *
  * @tags: [
- *    # TODO (SERVER-98652) Remove once $listClusterCatalog is introduced in v8.0
- *    requires_fcv_81,
  *    # There is no need to support multitenancy, as it has been canceled and was never in
  *    # production (see SERVER-97215 for more information)
  *    command_not_supported_in_serverless,
