@@ -253,10 +253,6 @@ bool OrderedIntervalList::isMaxToMin() const {
     return intervals.size() == 1 && intervals[0].isMaxToMin();
 }
 
-bool OrderedIntervalList::isFullyOpen() const {
-    return intervals.size() == 1 && intervals[0].isFullyOpen();
-}
-
 bool OrderedIntervalList::isPoint() const {
     return intervals.size() == 1 && intervals[0].isPoint();
 }

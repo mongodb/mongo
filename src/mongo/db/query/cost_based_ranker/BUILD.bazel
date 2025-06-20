@@ -109,7 +109,6 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":cbr_test_utils",
-        "//src/mongo/db/query/ce/sampling:sampling_test_utils",
     ],
 )
 
@@ -129,7 +128,6 @@ mongo_cc_library(
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/ce:ce_test_utils",
         "//src/mongo/db/query/ce/histogram:histogram_test_utils",
-        "//src/mongo/db/query/ce/sampling:sampling_estimator_interface",
         "//src/mongo/db/query/stats:collection_statistics_mock",
         "//src/mongo/db/query/stats:stats_histograms",
         "//src/mongo/db/query/stats:stats_test_utils",

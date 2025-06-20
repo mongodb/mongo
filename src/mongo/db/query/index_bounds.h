@@ -102,11 +102,6 @@ struct OrderedIntervalList {
     bool isMaxToMin() const;
 
     /**
-     * Returns true if this OIL has a single [MinKey, MaxKey] or [MaxKey, MinKey] interval.
-     */
-    bool isFullyOpen() const;
-
-    /**
      * Returns true if this OIL represents a point predicate: [N, N].
      *
      * These predicates are interesting because if you have an index on {a:1, b:1},

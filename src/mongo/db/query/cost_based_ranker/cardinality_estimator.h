@@ -69,8 +69,7 @@ public:
     CardinalityEstimator(const CollectionInfo& collInfo,
                          const ce::SamplingEstimator* samplingEstimator,
                          EstimateMap& qsnEstimates,
-                         QueryPlanRankerModeEnum rankerMode,
-                         bool useIndexBounds = false);
+                         QueryPlanRankerModeEnum rankerMode);
 
     // Delete the copy and move constructors and assignment operator
     CardinalityEstimator(const CardinalityEstimator&) = delete;
@@ -249,24 +248,6 @@ private:
     // ElemMatchValueMatchExpression may have a child which looks like GTMatchExpression with an
     // empty path.
     std::stack<StringData> _elemMatchPathStack;
-
-    // Temporary boolean flag to switch between two implementations of sampling cardinality
-    // estimation for index scan nodes. When '_useIndexBounds' is false (default) compute the
-    // estimation by transforming index bounds back to equivalent match expression and use the
-    // 'estimateCardinality' function. When the flag is true, use estimateRIDs() function, that
-    // matches index keys from the sample documents to the index bounds in the index scan node.
-    bool _useIndexBounds;
 };
 
-/**
- * Create a match expression equivalent to the index bounds intervals and possible filter
- * expression.
- * Params: 'bounds': index bounds from a IndexScanNode,
- *         'filterExpr': a filter expression of the IndexScanNode, in case of inexact match,
- *          or a filter expression in the parent FetchNode.
- * If the 'filterExpr' is not null, create a conjunction of the index-bounds expression
- * and the filter expression.
- */
-std::unique_ptr<MatchExpression> getMatchExpressionFromBounds(const IndexBounds& bounds,
-                                                              const MatchExpression* filterExpr);
 }  // namespace mongo::cost_based_ranker
