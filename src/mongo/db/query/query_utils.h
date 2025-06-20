@@ -123,6 +123,11 @@ inline ExpressEligibility isExpressEligible(OperationContext* opCtx,
         return ExpressEligibility::Ineligible;
     }
 
+    // If a query needs metadata, it is ineligible for express path.
+    if (cq.metadataDeps().any()) {
+        return ExpressEligibility::Ineligible;
+    }
+
     const auto& findCommandReq = cq.getFindCommandRequest();
 
     if (!coll || findCommandReq.getReturnKey() || findCommandReq.getBatchSize() ||
