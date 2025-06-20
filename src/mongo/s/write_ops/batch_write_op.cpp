@@ -469,16 +469,6 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             continue;
         }
 
-        for (auto&& write : result.writes) {
-            write->estimatedSizeBytes = getWriteSizeFn(writeOp, write->endpoint.shardName);
-        }
-
-        if (wouldMakeBatchesTooBig(result.writes, batchMap)) {
-            invariant(!batchMap.empty());
-            LOGV2_DEBUG(9986804, 5, "Making a new batch to avoid making batch size too large");
-            break;
-        }
-
         // If the WriteType of 'writeOp' is different than the current batch's WriteType, then
         // 'writeOp' cannot be added to the current batch. Also, if 'writeOp' doesn't support
         // grouping, then 'writeOp' cannot be added to the current batch because it must be in
@@ -490,6 +480,20 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             } else {
                 continue;
             }
+        }
+
+        // Call the getWriteSizeFn() callback to get the estimated size for each TargetedWrite.
+        // The getWriteSizeFn() callback may be stateful, so once it is called we are committed
+        // to either adding the WriteOp in the batch or stopping the batch here and breaking
+        // (i.e. "continue" is not allowed after this point).
+        for (auto&& write : result.writes) {
+            write->estimatedSizeBytes = getWriteSizeFn(writeOp, write->endpoint.shardName);
+        }
+
+        if (wouldMakeBatchesTooBig(result.writes, batchMap)) {
+            invariant(!batchMap.empty());
+            LOGV2_DEBUG(9986804, 5, "Making a new batch to avoid making batch size too large");
+            break;
         }
 
         // Targeting succeeded.
