@@ -30,6 +30,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 __all__ = ["Node", "build"]
 
@@ -39,32 +40,29 @@ class Node:
     """Represent Query Solution node."""
 
     node_type: str
-    plan_node_id: int
     children: list[Node]
 
     def print(self, level=0):
         """Pretty print of the QSN tree."""
-        print(f'{"| "*level}{self.node_type}, planNodeId: {self.plan_node_id}')
+        print(f'{"| "*level}{self.node_type}')
         for child in self.children:
             child.print(level + 1)
 
 
-def build(optimizer_plan: dict[str, any]) -> Node:
+def build(optimizer_plan: dict[str, Any]) -> Node:
     """Build QSN tree from query explain."""
 
     return parse_optimizer_node(optimizer_plan)
 
 
-def parse_optimizer_node(explain_node: dict[str, any]) -> Node:
+def parse_optimizer_node(explain_node: dict[str, Any]) -> Node:
     """Recursively parse QSN from query explain's node."""
 
     children = get_children(explain_node)
-    return Node(
-        node_type=explain_node["stage"], plan_node_id=explain_node["planNodeId"], children=children
-    )
+    return Node(node_type=explain_node["stage"], children=children)
 
 
-def get_children(explain_node: dict[str, any]) -> list[Node]:
+def get_children(explain_node: dict[str, Any]) -> list[Node]:
     """Get children nodes of the QSN."""
 
     if "inputStage" in explain_node:

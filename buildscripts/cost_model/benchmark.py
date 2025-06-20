@@ -35,7 +35,7 @@ from dataclasses import asdict, dataclass
 from typing import Sequence
 
 import bson.json_util as json
-import execution_tree
+import execution_tree_sbe
 import physical_tree
 from config import BenchmarkConfig
 from database_instance import DatabaseInstance, Pipeline, get_database_parameter
@@ -154,7 +154,7 @@ class ExperimentResult:
 
     explain: Sequence[dict[str, any]]
     physical_tree: Sequence[physical_tree.Node]
-    execution_tree: Sequence[execution_tree.Node]
+    execution_tree: Sequence[execution_tree_sbe.Node]
     mean: float
 
     def print(self, index: int = None):
@@ -200,7 +200,7 @@ async def benchmark(config: BenchmarkConfig, database: DatabaseInstance, task: B
 def make_variant(explain: Sequence[dict[str, any]]) -> ExperimentResult:
     """Make one variant of the A/B test."""
     pt = [physical_tree.build(e["queryPlanner"]["winningPlan"]["queryPlan"]) for e in explain]
-    et = [execution_tree.build_execution_tree(e["executionStats"]) for e in explain]
+    et = [execution_tree_sbe.build_execution_tree(e["executionStats"]) for e in explain]
     mean = sum(et.total_execution_time for et in et) / len(et)
     return ExperimentResult(explain=explain, physical_tree=pt, execution_tree=et, mean=mean)
 

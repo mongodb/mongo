@@ -98,7 +98,7 @@ from __future__ import annotations
 import dataclasses
 
 import bson.json_util as json
-import execution_tree as sbe
+import execution_tree_sbe as sbe
 import pandas as pd
 import physical_tree as abt
 import seaborn as sns
