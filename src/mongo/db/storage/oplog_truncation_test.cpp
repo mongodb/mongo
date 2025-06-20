@@ -341,8 +341,10 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
     // Truncate data using an inclusive RecordId that exists inside the truncate marker currently
     // being filled.
     {
+        WriteUnitOfWork wunit(opCtx);
         RecordStore::Capped::TruncateAfterResult result =
             rs->capped()->truncateAfter(opCtx, RecordId(1, 8), true /* inclusive */);
+        wunit.commit();
         oplogTruncateMarkers->updateMarkersAfterCappedTruncateAfter(
             result.recordsRemoved, result.bytesRemoved, result.firstRemovedId);
 
@@ -357,8 +359,10 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
     // marker.
     // The truncate marker should become the one currently being filled.
     {
+        WriteUnitOfWork wunit(opCtx);
         RecordStore::Capped::TruncateAfterResult result =
             rs->capped()->truncateAfter(opCtx, RecordId(1, 6), true /* inclusive */);
+        wunit.commit();
         oplogTruncateMarkers->updateMarkersAfterCappedTruncateAfter(
             result.recordsRemoved, result.bytesRemoved, result.firstRemovedId);
 

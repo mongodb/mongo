@@ -906,7 +906,7 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
         // of the oplog.  It is illegal for this maximum durable timestamp to be before the oldest
         // timestamp, so if the oldest timestamp is ahead of that point, we need to move it back.
         // Since the stable timestamp is never behind the oldest and also must not be ahead of the
-        // maximum durable timesatmp, it has to be moved back as well.  This usually happens when
+        // maximum durable timestamp, it has to be moved back as well.  This usually happens when
         // the truncateAfterTimestamp does not exist in the oplog because there was a hole open when
         // we crashed; in that case the oldest timestamp and the stable timestamp will be the
         // timestamp immediately prior to the hole.
@@ -929,9 +929,12 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
                                                        truncateAfterOplogEntryTs);
         }
     }
+
+    WriteUnitOfWork wunit(opCtx);
     RecordStore::Capped::TruncateAfterResult result =
         oplogCollection->getRecordStore()->capped()->truncateAfter(
             opCtx, truncateAfterRecordId, false /*inclusive*/);
+    wunit.commit();
     if (result.recordsRemoved > 0) {
         if (auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers()) {
             truncateMarkers->updateMarkersAfterCappedTruncateAfter(

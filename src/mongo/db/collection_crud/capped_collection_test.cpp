@@ -321,7 +321,9 @@ TEST_F(CappedCollectionTest, OplogOrder) {
         auto opCtx = newOperationContext();
         const auto ac = acquireCollForRead(opCtx.get(), nss);
         const CollectionPtr& coll = ac.getCollectionPtr();
+        WriteUnitOfWork wuow(opCtx.get());
         coll->getRecordStore()->capped()->truncateAfter(opCtx.get(), id1, /*inclusive*/ false);
+        wuow.commit();
     }
 
     {

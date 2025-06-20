@@ -1386,8 +1386,6 @@ RecordStore::Capped::TruncateAfterResult WiredTigerRecordStore::Capped::_truncat
         firstRemovedId = record->id;
     }
 
-    StorageWriteTransaction txn(ru);
-
     // Compute the number and associated sizes of the records to delete.
     do {
         recordsRemoved++;
@@ -1410,8 +1408,6 @@ RecordStore::Capped::TruncateAfterResult WiredTigerRecordStore::Capped::_truncat
     invariantWTOK(session->truncate(nullptr, start, nullptr, nullptr), *session);
 
     _changeNumRecordsAndDataSize(ru, -recordsRemoved, -bytesRemoved);
-
-    txn.commit();
 
     _handleTruncateAfter(WiredTigerRecoveryUnit::get(wtRu), lastKeptId);
 
