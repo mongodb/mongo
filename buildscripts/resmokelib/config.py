@@ -542,7 +542,7 @@ NUM_CLIENTS_PER_FIXTURE = None
 # If set, each client will be constructed with a generated tenant id.
 USE_TENANT_CLIENT = False
 
-# Indicates the name of the test suite prior to the suite being split up by uite generation
+# Indicates the name of the test suite prior to the suite being split up by suite generation
 ORIGIN_SUITE = None
 
 # Report file for Cedar.

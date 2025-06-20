@@ -93,6 +93,12 @@ class TestGetTestsForKind(unittest.TestCase):
         self.assertEqual(excluded, [])
 
     def test_with_test_selection_strategy(self):
+        # mock selector
+        mock_selector = MagicMock()
+        mock_selector.filter_tests.return_value = (["test1", "test2"], ["excluded_test"])
+        mock_selector.group_tests.return_value = ["test1", "test2"]
+
+        # Mock _config values
         under_test._config.ENABLE_EVERGREEN_API_TEST_SELECTION = True
         under_test._config.EVERGREEN_PROJECT_NAME = "project_name"
         under_test._config.EVERGREEN_VARIANT_NAME = "variant_name"
@@ -101,18 +107,36 @@ class TestGetTestsForKind(unittest.TestCase):
         under_test._config.EVERGREEN_TASK_NAME = "task_name"
         under_test._config.EVERGREEN_TEST_SELECTION_STRATEGY = "strategy"
 
-        # Currently raises an exception because the Evergreen endpoint is still under development
-        with self.assertRaises(RuntimeError) as context:
-            self.suite._get_tests_for_kind("js_test")
-        self.assertEqual(
-            str(context.exception),
-            "Failure using the select tests evergreen endpoint with the following request:\n"
-            + "{'project_id': 'project_name', 'build_variant': 'variant_name', 'requester': 'requester', 'task_id': 'task_id', 'task_name': 'task_name', 'tests': ['testroot'], 'strategies': 'strategy'}",
+        # Mock Evergreen API
+        mock_evg_api = MagicMock()
+        mock_evg_api.select_tests.return_value = {"tests": ["test1", "test2"]}
+        under_test.evergreen_conn = MagicMock()  # Mock evergreen_conn object
+        under_test.evergreen_conn.get_evergreen_api.return_value = mock_evg_api
+
+        # Replace _selector in under_test with the mock
+        under_test._selector = mock_selector
+
+        # Call `_get_tests_for_kind` and verify its behavior
+        tests, excluded = self.suite._get_tests_for_kind("js_test")
+
+        # Assert the expected results
+        self.assertEqual(tests, ["test1", "test2"])
+        self.assertEqual(excluded, ["excluded_test"])
+
+        mock_selector.filter_tests.assert_called_once_with(
+            "js_test", self.suite.get_selector_config()
         )
-        self.assertEqual(
-            str(context.exception.__cause__),
-            "400 Client Error: Bad Request for url: https://evergreen.mongodb.com/rest/v2/select/tests",
-        )
+
+        if under_test._config.ENABLE_EVERGREEN_API_TEST_SELECTION:
+            mock_evg_api.select_tests.assert_called_once_with(
+                project_id="project_name",
+                build_variant="variant_name",
+                requester="requester",
+                task_id="task_id",
+                task_name="task_name",
+                tests=["test1", "test2"],
+                strategies="strategy",
+            )
 
     def test_sharding(self):
         tests = ["1.js", "2.js", "3.js"]

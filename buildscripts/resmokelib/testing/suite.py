@@ -1,12 +1,15 @@
 """Holder for the (test kind, list of tests) pair with additional metadata their execution."""
 
 import itertools
+import logging
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from typing import Any, Dict, List, Optional
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import selector as _selector
+from buildscripts.resmokelib.logging import loggers
 from buildscripts.resmokelib.testing import report as _report
 from buildscripts.resmokelib.testing import summary as _summary
 from buildscripts.resmokelib.utils import evergreen_conn
@@ -37,6 +40,9 @@ EXIT_CODE_MAP = {
     -1073741571: "Stack Overflow",
     3221225725: "Stack Overflow",
 }
+
+# One out of TSS_ENDPOINT_FREQUENCY times, the TSS endpoint is used when selecting tests.
+TSS_ENDPOINT_FREQUENCY = 10
 
 
 def translate_exit_code(exit_code):
@@ -125,13 +131,29 @@ class Suite(object):
 
         tests, excluded = _selector.filter_tests(test_kind, selector_config)
 
+        if loggers.ROOT_EXECUTOR_LOGGER is None:
+            loggers.ROOT_EXECUTOR_LOGGER = logging.getLogger("executor")
+
+        # to reduce the amount of API requests to Evergreen
+        use_select_tests = _config.ENABLE_EVERGREEN_API_TEST_SELECTION
+        call_select_tests = (
+            _config.EVERGREEN_PATCH_BUILD
+            and _config.EVERGREEN_VERSION_ID
+            and (hash(_config.EVERGREEN_VERSION_ID) % TSS_ENDPOINT_FREQUENCY == 0)
+        )
+        call_api = use_select_tests or call_select_tests
+
         # Apply Evergreen API test selection if:
         # 1. We have tests to filter
         # 2. We're running in Evergreen
         # 3. Test selection is enabled
-        if tests and _config.EVERGREEN_TASK_ID and _config.ENABLE_EVERGREEN_API_TEST_SELECTION:
+        if tests and _config.EVERGREEN_TASK_ID and call_api:
             evg_api = evergreen_conn.get_evergreen_api()
-            test_selection_strategy = str(_config.EVERGREEN_TEST_SELECTION_STRATEGY)
+            test_selection_strategy = (
+                _config.EVERGREEN_TEST_SELECTION_STRATEGY
+                if _config.EVERGREEN_TEST_SELECTION_STRATEGY is not None
+                else ["NotFailing", "NotPassing", "NotFlaky"]
+            )
             request = {
                 "project_id": str(_config.EVERGREEN_PROJECT_NAME),
                 "build_variant": str(_config.EVERGREEN_VARIANT_NAME),
@@ -141,22 +163,54 @@ class Suite(object):
                 "tests": tests,
                 "strategies": test_selection_strategy,
             }
-            try:
-                result = evg_api.select_tests(**request)
-            except Exception as ex:
-                message = f"Failure using the select tests evergreen endpoint with the following request:\n{request}"
-                raise RuntimeError(message) from ex
 
-            evergreen_filtered_tests = result["tests"]
-            evergreen_excluded_tests = set(evergreen_filtered_tests).symmetric_difference(
-                set(tests)
-            )
-            print(
-                f"Evergreen applied the following test selection strategies: {test_selection_strategy}"
-            )
-            print(f"to exclude the following tests: {evergreen_excluded_tests}")
-            excluded.extend(evergreen_excluded_tests)
-            tests = evergreen_filtered_tests
+            # future thread is async
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                select_tests_succeeds_flag = True
+                execution = executor.submit(evg_api.select_tests, **request)
+                try:
+                    result = (
+                        execution.result(timeout=60)
+                        if _config.ENABLE_EVERGREEN_API_TEST_SELECTION
+                        else execution.result(timeout=20)
+                    )
+                    # if execution does not time out, checks for if result is in proper format to parse
+                    if not isinstance(result, dict):
+                        loggers.ROOT_EXECUTOR_LOGGER.info(f"Unexpected response type:{result}")
+                        select_tests_succeeds_flag = False
+                    if "tests" not in result:
+                        loggers.ROOT_EXECUTOR_LOGGER.info(
+                            "Tests key not in results, cannot properly parse what tests to use in Evergreen"
+                        )
+                        select_tests_succeeds_flag = False
+
+                # for if selecting tests via the test selection strategy takes too long
+                except TimeoutError:
+                    loggers.ROOT_EXECUTOR_LOGGER.info("TSS took too long or never finished")
+                    select_tests_succeeds_flag = False
+                except Exception:
+                    loggers.ROOT_EXECUTOR_LOGGER.info(
+                        f"Failure using the select tests evergreen endpoint with the following request:\n{request}"
+                    )
+                    select_tests_succeeds_flag = False
+
+                # ensures that select_tests results is only used if no exceptions or type errors are thrown from it
+                if select_tests_succeeds_flag and use_select_tests:
+                    evergreen_filtered_tests = result["tests"]
+                    evergreen_excluded_tests = set(evergreen_filtered_tests).symmetric_difference(
+                        set(tests)
+                    )
+                    loggers.ROOT_EXECUTOR_LOGGER.info(
+                        f"Evergreen applied the following test selection strategies: {test_selection_strategy}"
+                    )
+                    loggers.ROOT_EXECUTOR_LOGGER.info(
+                        f"to test after the test selection strategy was applied: {evergreen_filtered_tests}"
+                    )
+                    loggers.ROOT_EXECUTOR_LOGGER.info(
+                        f"to exclude the following tests: {evergreen_excluded_tests}"
+                    )
+                    excluded.extend(evergreen_excluded_tests)
+                    tests = evergreen_filtered_tests
 
         tests = self.filter_tests_for_shard(tests, _config.SHARD_COUNT, _config.SHARD_INDEX)
 
