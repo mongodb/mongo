@@ -210,7 +210,7 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
 
         if (intents) {
             for (auto intent : *intents) {
-                _killOperationsByIntent(intent);
+                _killOperationsByIntent(intent, interrupt == InterruptionType::Shutdown);
             }
             Timer timer;
             auto timeout = stdx::chrono::duration_cast<stdx::chrono::milliseconds>(timeOutSec);
@@ -297,14 +297,14 @@ bool IntentRegistry::_validIntent(IntentRegistry::Intent intent) const {
     }
 }
 
-void IntentRegistry::_killOperationsByIntent(IntentRegistry::Intent intent) {
+void IntentRegistry::_killOperationsByIntent(IntentRegistry::Intent intent, bool forShutdown) {
     auto& tokenMap = _tokenMaps[(size_t)intent];
     stdx::lock_guard<stdx::mutex> lock(tokenMap.lock);
     for (auto& [token, toKill] : tokenMap.map) {
         auto serviceCtx = toKill->getServiceContext();
         auto client = toKill->getClient();
         ClientLock lock(client);
-        if (_lastInterruption == InterruptionType::Shutdown) {
+        if (forShutdown) {
             serviceCtx->killOperation(lock, toKill, ErrorCodes::InterruptedAtShutdown);
         } else {
             serviceCtx->killOperation(lock, toKill, ErrorCodes::InterruptedDueToReplStateChange);

@@ -201,7 +201,7 @@ private:
         stdx::unordered_map<OperationContext*, Intent> map;
     };
     bool _validIntent(Intent intent) const;
-    void _killOperationsByIntent(Intent intent);
+    void _killOperationsByIntent(Intent intent, bool forShutdown);
     void _waitForDrain(Intent intent, stdx::chrono::milliseconds timeout);
 
     bool _enabled = true;
