@@ -157,6 +157,39 @@ void IntentRegistry::deregisterIntent(IntentRegistry::IntentToken token) {
     }
 }
 
+bool IntentRegistry::canDeclareIntent(Intent intent, OperationContext* opCtx) {
+    invariant(intent < Intent::_NumDistinctIntents_);
+    invariant(opCtx);
+
+    // Check these outside of the mutex to avoid a deadlock against the Replication Coordinator
+    // mutex.
+    bool isReplSet =
+        repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getSettings().isReplSet();
+    auto state = repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getMemberState();
+
+    stdx::unique_lock<stdx::mutex> lock(_stateMutex);
+
+    // Downgrade Write intent to LocalWrite during initial sync.
+    if (intent == Intent::Write && isReplSet &&
+        (state == repl::MemberState::RS_STARTUP2 || state == repl::MemberState::RS_REMOVED)) {
+        intent = Intent::LocalWrite;
+    }
+
+    if (opCtx != _interruptionCtx) {
+        if (!_validIntent(intent)) {
+            return false;
+        }
+
+        if (isReplSet && intent == Intent::Write) {
+            // canAcceptWritesFor asserts that we have the RSTL acquired.
+            return repl::ReplicationCoordinator::get(opCtx->getServiceContext())
+                ->canAcceptWritesFor_UNSAFE(opCtx, NamespaceString(DatabaseName::kAdmin));
+        }
+    }
+
+    return true;
+}
+
 stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOperations(
     IntentRegistry::InterruptionType interrupt,
     OperationContext* opCtx,

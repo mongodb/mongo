@@ -1648,6 +1648,8 @@ void ExecCommandDatabase::_initiateCommand() {
 
     _invocation->checkAuthorization(opCtx, _execContext.getRequest());
 
+    boost::optional<rss::consensus::IntentGuard> writeGuard;
+
     if (!opCtx->getClient()->isInDirectClient() &&
         !MONGO_unlikely(skipCheckingForNotPrimaryInCommandDispatch.shouldFail())) {
         const bool inMultiDocumentTransaction = (_sessionOptions.getAutocommit() == false);
@@ -1700,6 +1702,11 @@ void ExecCommandDatabase::_initiateCommand() {
         // 'setAlwaysInterruptAtStepDownOrUp_UNSAFE' flag we set above.
         if (inMultiDocumentTransaction) {
             hangAfterCheckingWritabilityForMultiDocumentTransactions.pauseWhileSet();
+            // Declaring Write intent ensures we are the primary node and this operation will be
+            // interrupted by StepDown.
+            if (gFeatureFlagIntentRegistration.isEnabled()) {
+                writeGuard.emplace(rss::consensus::IntentRegistry::Intent::Write, opCtx);
+            }
             repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
             uassert(ErrorCodes::NotWritablePrimary,
                     "Cannot start a transaction in a non-primary state",

@@ -58,6 +58,7 @@
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/shard_key_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
@@ -113,6 +114,13 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
             const NamespaceString& nss = ns();
+
+            // Declaring Write intent ensures we are the primary node and this operation will be
+            // interrupted by StepDown.
+            boost::optional<rss::consensus::IntentGuard> writeGuard;
+            if (gFeatureFlagIntentRegistration.isEnabled()) {
+                writeGuard.emplace(rss::consensus::IntentRegistry::Intent::Write, opCtx);
+            }
 
             {
                 repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);

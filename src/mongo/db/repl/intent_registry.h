@@ -142,6 +142,14 @@ public:
     void deregisterIntent(IntentToken token);
 
     /**
+     * Checks if the requested intent can be declared, returns true if it can and false if it
+     * cannot. Note that there is no guarantee that calling canDeclareIntent followed by
+     * registerIntent will be successful. This function should be used if you are declaring intent
+     * to temporarily check the state of the system to avoid exception handling.
+     */
+    bool canDeclareIntent(Intent intent, OperationContext* opCtx);
+
+    /**
      * Provides a way for transition threads to kill operations with intents
      * which conflict with the state transition, and wait for all of those
      * operations to deregister. While active, it will also prevent operations

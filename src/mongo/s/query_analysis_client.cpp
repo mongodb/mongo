@@ -37,7 +37,9 @@
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/db/repl/intent_guard.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/util/assert_util.h"
@@ -92,6 +94,10 @@ void QueryAnalysisClient::setTaskExecutor(ServiceContext* service,
 }
 
 bool QueryAnalysisClient::_canAcceptWrites(OperationContext* opCtx, const DatabaseName& dbName) {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+            .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx);
+    }
     repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
     return mongo::repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx,
                                                                                        dbName);

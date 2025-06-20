@@ -57,6 +57,7 @@
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/global_user_write_block_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/service_context.h"
@@ -671,6 +672,13 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
     }
 
     invariant(IndexBuildProtocol::kTwoPhase == replState->protocol);
+
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        if (!rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                 .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx)) {
+            return false;
+        }
+    }
 
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
