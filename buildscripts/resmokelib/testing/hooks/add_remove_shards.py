@@ -778,7 +778,15 @@ class _AddRemoveShardThread(threading.Thread):
                         "Completed " + msg + " in %0d ms", (time.time() - start_time) * 1000
                     )
                     return True
-                elif res["state"] == "started":
+
+                # Check whether the transition timeout has elapsed. Performing the check at this point
+                # ensures that the most updated transition state is logged if the timeout is reached.
+                if time.time() - start_time > self.TRANSITION_TIMEOUT_SECS:
+                    msg = "Could not " + msg + " with last response: " + str(res)
+                    self.logger.error(msg)
+                    raise errors.ServerFailure(msg)
+
+                if res["state"] == "started":
                     if self._client.config.chunks.count_documents({"shard": shard_id}) == 0:
                         self._should_wait_for_balancer_round = True
                 elif res["state"] == "ongoing":
@@ -788,10 +796,6 @@ class _AddRemoveShardThread(threading.Thread):
                 prev_round_interrupted = False
                 time.sleep(1)
 
-                if time.time() - start_time > self.TRANSITION_TIMEOUT_SECS:
-                    msg = "Could not " + msg + " with last response: " + str(res)
-                    self.logger.error(msg)
-                    raise errors.ServerFailure(msg)
             except pymongo.errors.AutoReconnect:
                 self.logger.info("AutoReconnect exception thrown, retrying...")
                 time.sleep(0.1)
@@ -866,6 +870,8 @@ class _AddRemoveShardThread(threading.Thread):
         else:
             self.logger.info("Starting to add shard " + shard_id)
 
+        start_time = time.time()
+
         msg = "transitioning from dedicated" if shard_id == "config" else "adding shard"
 
         while True:
@@ -880,6 +886,10 @@ class _AddRemoveShardThread(threading.Thread):
                     self.logger.info("Adding shard with new shardId: " + shard_name)
                     self._client.admin.command({"addShard": shard_host, "name": shard_name})
                     self._shard_name_suffix = self._shard_name_suffix + 1
+
+                self.logger.info(
+                    "Completed " + msg + " in %0d ms", (time.time() - start_time) * 1000
+                )
                 return
             except pymongo.errors.AutoReconnect:
                 self.logger.info("AutoReconnect exception thrown, retrying...")
