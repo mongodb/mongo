@@ -50,7 +50,7 @@ fi
 
 cd $BUILD_WORKING_DIRECTORY
 
-${RUNFILES_WORKING_DIRECTORY}/external/gdb/%s/bin/gdb "${@:1}"
+${RUNFILES_WORKING_DIRECTORY}/../gdb/%s/bin/gdb "${@:1}"
 """ % ctx.attr.version,
         )
 
