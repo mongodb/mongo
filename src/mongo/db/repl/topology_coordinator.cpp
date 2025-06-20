@@ -2182,7 +2182,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
              // Ignore the VersionContext for simplicity.
              // TODO SERVER-102586: Revisit this decision in case the feature-flag
              // gets re-enabled.
-             kVersionContextIgnored,
+             kVersionContextIgnored_UNSAFE,
              serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
          serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer))) {
         response->append("configsvr", true);

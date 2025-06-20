@@ -56,7 +56,7 @@ TEST_F(VersionContextTest, NoVersionContextHasNoOperationFCV) {
 }
 
 TEST_F(VersionContextTest, VersionContextIgnoredHasNoOperationFCV) {
-    ASSERT_FALSE(getOFCV(kVersionContextIgnored).has_value());
+    ASSERT_FALSE(getOFCV(kVersionContextIgnored_UNSAFE).has_value());
 }
 
 TEST_F(VersionContextTest, FCVConstructorInitializesOFCVToLatest) {

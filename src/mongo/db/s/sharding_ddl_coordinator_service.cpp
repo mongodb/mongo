@@ -406,7 +406,8 @@ ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx,
     // Moreover, DDL operations cannot be nested. Therefore, the VersionContext
     // shouldn't have been initialized yet.
     invariant(!VersionContext::getDecoration(opCtx).isInitialized());
-    if (feature_flags::gSnapshotFCVInDDLCoordinators.isEnabled(kVersionContextIgnored, fcv)) {
+    if (feature_flags::gSnapshotFCVInDDLCoordinators.isEnabled(kVersionContextIgnored_UNSAFE,
+                                                               fcv)) {
         forwardableOpMetadata.setVersionContext(VersionContext{fcv});
     }
     coorMetadata.setForwardableOpMetadata(forwardableOpMetadata);

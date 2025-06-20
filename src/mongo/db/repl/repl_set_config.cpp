@@ -451,7 +451,7 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
         if (!gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
                 // This code will be removed since master is 8.1 already (see SERVER-82024).
                 // Ignore the versionContext for simplicity.
-                kVersionContextIgnored,
+                kVersionContextIgnored_UNSAFE,
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             return Status(ErrorCodes::BadValue,
                           "Nodes started with the --configsvr flag must have configsvr:true in "

@@ -180,8 +180,10 @@ void FCVGatedFeatureFlag::appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder
 
     auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     if (fcvSnapshot.isVersionInitialized()) {
-        // TODO (SERVER-102076): Use VersionContext from opCtx instead of kVersionContextIgnored.
-        flagBuilder.append("currentlyEnabled", isEnabled(kVersionContextIgnored, fcvSnapshot));
+        // TODO (SERVER-102076): Use VersionContext from opCtx instead of
+        // kVersionContextIgnored_UNSAFE.
+        flagBuilder.append("currentlyEnabled",
+                           isEnabled(kVersionContextIgnored_UNSAFE, fcvSnapshot));
     }
 }
 
@@ -190,17 +192,17 @@ void FCVGatedFeatureFlag::setForServerParameter(bool enabled) {
 }
 
 bool LegacyContextUnawareFCVGatedFeatureFlag::isEnabled(ServerGlobalParams::FCVSnapshot fcv) const {
-    return isEnabled(kVersionContextIgnored, fcv);
+    return isEnabled(kVersionContextIgnored_UNSAFE, fcv);
 }
 
 bool LegacyContextUnawareFCVGatedFeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized(
     ServerGlobalParams::FCVSnapshot fcv) const {
-    return isEnabledUseLastLTSFCVWhenUninitialized(kVersionContextIgnored, fcv);
+    return isEnabledUseLastLTSFCVWhenUninitialized(kVersionContextIgnored_UNSAFE, fcv);
 }
 
 bool LegacyContextUnawareFCVGatedFeatureFlag::isEnabledUseLatestFCVWhenUninitialized(
     ServerGlobalParams::FCVSnapshot fcv) const {
-    return isEnabledUseLatestFCVWhenUninitialized(kVersionContextIgnored, fcv);
+    return isEnabledUseLatestFCVWhenUninitialized(kVersionContextIgnored_UNSAFE, fcv);
 }
 
 namespace {

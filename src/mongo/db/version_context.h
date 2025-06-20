@@ -147,6 +147,6 @@ inline const VersionContext kNoVersionContext{VersionContext::OutsideOperationTa
  * the node's local FCV only. This should be used with a lot of care, only if you can ensure none
  * of your current or future callers acts incorrectly due to ignoring their Operation FCV.
  */
-inline const VersionContext kVersionContextIgnored{VersionContext::IgnoreOFCVTag{}};
+inline const VersionContext kVersionContextIgnored_UNSAFE{VersionContext::IgnoreOFCVTag{}};
 
 }  // namespace mongo

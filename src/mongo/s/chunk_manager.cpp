@@ -67,7 +67,7 @@ ErrorCodes::Error metadataInconsistencyErrorCode() {
                 // The ChunkMetadataInconsistency error was introduced to make it more clear when
                 // inconsistent metadata is fetched. To keep things simple, we ignore the
                 // VersionContext and focus on the node's FCV.
-                kVersionContextIgnored,
+                kVersionContextIgnored_UNSAFE,
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return ErrorCodes::ChunkMetadataInconsistency;
     }
