@@ -367,13 +367,13 @@ buildvariants:
           - amazon2023.3-arm64-large
 
   - &enterprise-amazon2023-arm64-template
-    name: enterprise-amazon2023-arm64
+    name: &enterprise-amazon2023-arm64 enterprise-amazon2023-arm64
     display_name: "Enterprise Amazon Linux 2023.3 arm64"
     tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - amazon2023.3-arm64-small
-    expansions:
+    expansions: &enterprise-amazon2023-arm64-dynamic-expansions
       additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
       push_path: linux
       push_bucket: downloads.10gen.com
@@ -392,7 +392,7 @@ buildvariants:
       packager_arch: aarch64
       packager_distro: amazon2023
       repo_edition: enterprise
-      compile_variant: enterprise-amazon2023-arm64
+      compile_variant: *enterprise-amazon2023-arm64
     tasks:
       - name: compile_test_and_package_serial_TG
         distros:
@@ -601,7 +601,8 @@ buildvariants:
       - name: streams_lambda
       - name: streams_s3
 
-  - <<: *enterprise-amazon2023-arm64-template
+  - &enterprise-amazon2023-arm64-fuzzers-template
+    <<: *enterprise-amazon2023-arm64-template
     name: enterprise-amazon2023-arm64-fuzzers
     display_name: "Enterprise Amazon Linux 2023.3 arm64 Fuzzers"
     tags: []
@@ -612,9 +613,19 @@ buildvariants:
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
       - name: archive_dist_test
-        variant: enterprise-amazon2023-arm64
+        variant: *enterprise-amazon2023-arm64
     tasks:
       - name: .aggfuzzer !.multiversion
       - name: .change_stream_fuzzer
       - name: .query_fuzzer
       - name: .updatefuzzer !.multiversion
+
+  - <<: *enterprise-amazon2023-arm64-fuzzers-template
+    name: enterprise-amazon2023-arm64-fuzzers-roll-back-incremental-feature-flags
+    display_name: "Enterprise Amazon Linux 2023.3 arm64 Fuzzers (roll back incremental feature flags)"
+    cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day
+    expansions:
+      <<: *enterprise-amazon2023-arm64-dynamic-expansions
+      test_flags: >-
+        --disableUnreleasedIFRFlags
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source
