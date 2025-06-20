@@ -285,12 +285,13 @@ tasks:
           exec_timeout_secs: 18000 # 5 hour timeout.
           resmoke_jobs_max: 1
 
-  - <<: *task_template
-    name: streams
+  - <<: *gen_task_template
+    name: streams_gen
     tags: ["assigned_to_jira_team_streams", "default"]
     commands:
-      - func: "do setup"
-      - func: "run tests"
+      - func: "generate resmoke tasks"
+        vars:
+          fallback_num_sub_suites: 2
 
   - <<: *task_template
     name: streams_kafka

@@ -496,7 +496,7 @@ buildvariants:
       - name: .release_critical .requires_large_host !crypt_push
         distros:
           - amazon2023-latest-large
-      - name: streams
+      - name: streams_gen
       - name: streams_kafka
       - name: streams_kafka_gwproxy
       - name: streams_kafka_benchmark
@@ -544,7 +544,7 @@ buildvariants:
       - name: .release_critical .requires_large_host !crypt_push
         distros:
           - amazon2-latest-large
-      - name: streams
+      - name: streams_gen
       - name: streams_kafka
       - name: streams_kafka_gwproxy
       - name: streams_kafka_benchmark
@@ -592,7 +592,7 @@ buildvariants:
       - name: .release_critical .requires_large_host !crypt_push
         distros:
           - amazon2-arm64-latest-large
-      - name: streams
+      - name: streams_gen
       - name: streams_kafka
       # TODO(SERVER-103985) - Enabling this is blocked on SRE support arm64 in the sre/gwproxy image (SRE-1481)
       # - name: streams_kafka_gwproxy
