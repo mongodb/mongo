@@ -35,6 +35,8 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/db/transaction_resources.h"
 
 #include <chrono>
 #include <string>
@@ -94,6 +96,10 @@ void BM_OplogEntryHash(benchmark::State& state) {
     auto serviceContext = setupServiceContext();
     ThreadClient threadClient(serviceContext->getService());
     auto opCtx = threadClient->makeOperationContext();
+
+    shard_role_details::setRecoveryUnit(opCtx.get(),
+                                        std::make_unique<RecoveryUnitNoop>(),
+                                        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
     const auto kNumOps = 1000;
     const auto kDbName = "test";
