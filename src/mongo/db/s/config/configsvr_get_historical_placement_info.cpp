@@ -96,8 +96,8 @@ public:
                 // The content of config.placementHistory is pending to be reset and may not be
                 // reliable. Use the current content of config.shards to compose an approximate
                 // response.
-                auto shardsWithOpTime = uassertStatusOK(catalogClient->getAllShards(
-                    opCtx, repl::ReadConcernLevel::kMajorityReadConcern));
+                auto shardsWithOpTime = catalogClient->getAllShards(
+                    opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
                 std::vector<ShardId> shardIds;
                 std::transform(shardsWithOpTime.value.begin(),
                                shardsWithOpTime.value.end(),

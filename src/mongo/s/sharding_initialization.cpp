@@ -335,12 +335,14 @@ Status preWarmConnectionPool(OperationContext* opCtx) {
 
     std::vector<HostAndPort> allHosts;
     auto const grid = Grid::get(opCtx);
-    auto allShardsStatus =
-        grid->catalogClient()->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
-    if (!allShardsStatus.isOK()) {
-        return allShardsStatus.getStatus();
+    std::vector<ShardType> allShards;
+    try {
+        allShards = grid->catalogClient()
+                        ->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern)
+                        .value;
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
-    auto allShards = allShardsStatus.getValue().value;
 
     for (auto& shard : allShards) {
         auto connStrStatus = ConnectionString::parse(shard.getHost());

@@ -91,10 +91,15 @@ using ChunkDistributionMap = stdx::unordered_map<ShardId, size_t>;
 using ZoneShardMap = StringMap<std::vector<ShardId>>;
 
 std::vector<ShardId> getAllNonDrainingShardIds(OperationContext* opCtx) {
-    const auto shardsAndOpTime = uassertStatusOKWithContext(
-        Grid::get(opCtx)->catalogClient()->getAllShards(
-            opCtx, repl::ReadConcernLevel::kMajorityReadConcern, true /* excludeDraining */),
-        "Cannot retrieve updated shard list from config server");
+    const auto shardsAndOpTime = [&] {
+        try {
+            return Grid::get(opCtx)->catalogClient()->getAllShards(
+                opCtx, repl::ReadConcernLevel::kMajorityReadConcern, true /* excludeDraining */);
+        } catch (DBException& ex) {
+            ex.addContext("Cannot retrieve updated shard list from config server");
+            throw;
+        }
+    }();
     const auto shards = std::move(shardsAndOpTime.value);
     const auto lastVisibleOpTime = std::move(shardsAndOpTime.opTime);
 

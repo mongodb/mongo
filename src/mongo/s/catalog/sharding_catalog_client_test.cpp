@@ -314,8 +314,8 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsValid) {
     const vector<ShardType> expectedShardsList = {s1, s2, s3};
 
     auto future = launchAsync([this] {
-        auto shards = assertGet(catalogClient()->getAllShards(
-            operationContext(), repl::ReadConcernLevel::kMajorityReadConcern));
+        auto shards = catalogClient()->getAllShards(operationContext(),
+                                                    repl::ReadConcernLevel::kMajorityReadConcern);
         return shards.value;
     });
 
@@ -347,10 +347,10 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsWithInvalidShard) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
-        auto status = catalogClient()->getAllShards(operationContext(),
-                                                    repl::ReadConcernLevel::kMajorityReadConcern);
-
-        ASSERT_EQ(ErrorCodes::NoSuchKey, status.getStatus());
+        ASSERT_THROWS_CODE(catalogClient()->getAllShards(
+                               operationContext(), repl::ReadConcernLevel::kMajorityReadConcern),
+                           DBException,
+                           ErrorCodes::NoSuchKey);
     });
 
     onFindCommand([](const RemoteCommandRequest& request) {
@@ -373,9 +373,9 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsWithDrainingShard) {
 
     auto future = launchAsync([this]() {
         const auto shards =
-            assertGet(catalogClient()->getAllShards(operationContext(),
-                                                    repl::ReadConcernLevel::kMajorityReadConcern,
-                                                    true /* excludeDraining */));
+            catalogClient()->getAllShards(operationContext(),
+                                          repl::ReadConcernLevel::kMajorityReadConcern,
+                                          true /* excludeDraining */);
         return shards.value;
     });
 

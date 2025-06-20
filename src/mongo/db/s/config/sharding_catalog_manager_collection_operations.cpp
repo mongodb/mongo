@@ -118,9 +118,8 @@ void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
                                         ShardingCatalogClient* catalogClient,
                                         const CollectionType& coll) {
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-    const auto allShards = uassertStatusOK(catalogClient->getAllShards(
-                                               opCtx, repl::ReadConcernLevel::kLocalReadConcern))
-                               .value;
+    const auto allShards =
+        catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern).value;
     for (const auto& shardEntry : allShards) {
         const auto query = BSON(ChunkType::collectionUUID
                                 << coll.getUuid() << ChunkType::shard(shardEntry.getName()));

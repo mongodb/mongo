@@ -297,9 +297,8 @@ public:
      * Retrieves the list of shards in this sharded cluster. If `excludeDraining` is set to `false`
      * (default), it retrieves all shards. Otherwise, it retrieves only shards that are not
      * draining.
-     * Returns a !OK status if an error occurs.
      */
-    virtual StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
+    virtual repl::OpTimeWith<std::vector<ShardType>> getAllShards(
         OperationContext* opCtx,
         repl::ReadConcernLevel readConcern,
         bool excludeDraining = false) = 0;

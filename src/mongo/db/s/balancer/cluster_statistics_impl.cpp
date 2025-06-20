@@ -79,13 +79,13 @@ StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::getStats(Operati
     //
     // TODO: skip unresponsive shards and mark information as stale.
     const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-    auto shardsStatus =
-        catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
-    if (!shardsStatus.isOK()) {
-        return shardsStatus.getStatus();
+    std::vector<ShardType> shards;
+    try {
+        shards =
+            catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern).value;
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
-
-    auto& shards = shardsStatus.getValue().value;
 
     auto client = opCtx->getClient();
     std::shuffle(shards.begin(), shards.end(), client->getPrng().urbg());

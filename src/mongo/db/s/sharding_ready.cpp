@@ -62,14 +62,13 @@ ShardingReady* ShardingReady::get(OperationContext* opCtx) {
 
 void ShardingReady::scheduleTransitionToConfigShard(OperationContext* opCtx) {
     auto catalogManager = ShardingCatalogManager::get(opCtx);
-    auto getShards = catalogManager->localCatalogClient()->getAllShards(
+    auto shards = catalogManager->localCatalogClient()->getAllShards(
         opCtx, repl::ReadConcernLevel::kLocalReadConcern);
-    uassertStatusOK(getShards);
 
     // Only transition to config shard if we have no existing data shards. Otherwise, we could end
     // up transitioning back to config shard after the user called transition to dedicated config
     // server.
-    if (getShards.getValue().value.empty()) {
+    if (shards.value.empty()) {
         auto executor =
             Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
 

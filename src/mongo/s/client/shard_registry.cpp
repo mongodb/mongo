@@ -787,9 +787,14 @@ std::pair<ShardRegistryData, Timestamp> ShardRegistryData::createFromCatalogClie
     OperationContext* opCtx, ShardFactory* shardFactory) {
     auto const catalogClient = Grid::get(opCtx)->catalogClient();
 
-    auto shardsAndOpTime = uassertStatusOKWithContext(
-        catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kSnapshotReadConcern),
-        "could not get updated shard list from config server");
+    const auto shardsAndOpTime = [&] {
+        try {
+            return catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kSnapshotReadConcern);
+        } catch (DBException& ex) {
+            ex.addContext("could not get updated shard list from config server");
+            throw;
+        }
+    }();
 
     auto shards = std::move(shardsAndOpTime.value);
     auto reloadOpTime = std::move(shardsAndOpTime.opTime);

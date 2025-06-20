@@ -88,9 +88,8 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const auto opTimeWithShards =
-            uassertStatusOK(Grid::get(opCtx)->catalogClient()->getAllShards(
-                opCtx, repl::ReadConcernLevel::kMajorityReadConcern));
+        const auto opTimeWithShards = Grid::get(opCtx)->catalogClient()->getAllShards(
+            opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
 
         BSONArrayBuilder shardsArr(result.subarrayStart("shards"));
         for (const auto& shard : opTimeWithShards.value) {

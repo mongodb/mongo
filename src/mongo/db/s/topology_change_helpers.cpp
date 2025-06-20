@@ -671,9 +671,15 @@ boost::optional<ShardType> getExistingShard(OperationContext* opCtx,
                                             const boost::optional<StringData>& proposedShardName,
                                             ShardingCatalogClient& localCatalogClient) {
     // Check whether any host in the connection is already part of the cluster.
-    const auto existingShards = uassertStatusOKWithContext(
-        localCatalogClient.getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern),
-        "Failed to load existing shards during addShard");
+    const auto existingShards = [&] {
+        try {
+            return localCatalogClient.getAllShards(opCtx,
+                                                   repl::ReadConcernLevel::kLocalReadConcern);
+        } catch (DBException& ex) {
+            ex.addContext("Failed to load existing shards during addShard");
+            throw;
+        }
+    }();
 
     // Now check if this shard already exists - if it already exists *with the same options* then
     // the addShard request can return success early without doing anything more.

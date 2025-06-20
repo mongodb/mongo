@@ -327,10 +327,15 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
 }
 
 ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx) {
-    const auto shardsAndOpTime = uassertStatusOKWithContext(
-        Grid::get(opCtx)->catalogClient()->getAllShards(
-            opCtx, repl::ReadConcernLevel::kSnapshotReadConcern, true /* excludeDraining */),
-        "Cannot retrieve updated shard list from config server");
+    const auto shardsAndOpTime = [&] {
+        try {
+            return Grid::get(opCtx)->catalogClient()->getAllShards(
+                opCtx, repl::ReadConcernLevel::kSnapshotReadConcern, true /* excludeDraining */);
+        } catch (DBException& ex) {
+            ex.addContext("Cannot retrieve updated shard list from config server");
+            throw;
+        }
+    }();
 
     const auto& nonDrainingShards = shardsAndOpTime.value;
     uassert(ErrorCodes::ShardNotFound, "No non-draining shard found", !nonDrainingShards.empty());

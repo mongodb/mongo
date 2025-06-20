@@ -164,9 +164,9 @@ std::vector<NamespaceString> ShardingCatalogClientMock::getAllNssThatHaveZonesFo
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 
-StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientMock::getAllShards(
+repl::OpTimeWith<std::vector<ShardType>> ShardingCatalogClientMock::getAllShards(
     OperationContext* opCtx, repl::ReadConcernLevel readConcern, bool excludeDraining) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
+    uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 
 bool ShardingCatalogClientMock::runUserManagementReadCommand(OperationContext* opCtx,

@@ -1114,7 +1114,7 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getAllNssThatHaveZonesFo
     return nssList;
 }
 
-StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientImpl::getAllShards(
+repl::OpTimeWith<std::vector<ShardType>> ShardingCatalogClientImpl::getAllShards(
     OperationContext* opCtx, repl::ReadConcernLevel readConcern, bool excludeDraining) {
     const auto& findRes = uassertStatusOK(
         _exhaustiveFindOnConfig(opCtx,
@@ -1129,17 +1129,12 @@ StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientImpl::
     shards.reserve(findRes.value.size());
     for (const BSONObj& doc : findRes.value) {
         auto shardRes = ShardType::fromBSON(doc);
-        if (!shardRes.isOK()) {
-            return shardRes.getStatus().withContext(str::stream()
-                                                    << "Failed to parse shard document " << doc);
-        }
+        uassertStatusOKWithContext(shardRes,
+                                   str::stream() << "Failed to parse shard document " << doc);
 
         ShardType& shard = shardRes.getValue();
-        if (const Status validateStatus = shard.validate(); !validateStatus.isOK()) {
-            return validateStatus.withContext(str::stream()
-                                              << "Failed to validate shard document " << doc);
-        }
-
+        uassertStatusOKWithContext(shard.validate(),
+                                   str::stream() << "Failed to validate shard document " << doc);
         shards.push_back(std::move(shard));
     }
 

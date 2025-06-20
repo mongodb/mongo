@@ -1870,8 +1870,8 @@ void ReshardingCoordinator::_updateChunkImbalanceMetrics(const NamespaceString& 
                           tag.getTag())));
         }
 
-        const auto allShardsWithOpTime = uassertStatusOK(
-            catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern));
+        const auto allShardsWithOpTime =
+            catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
 
         auto imbalanceCount =
             getMaxChunkImbalanceCount(routingInfo, allShardsWithOpTime.value, zoneInfo);

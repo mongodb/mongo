@@ -882,8 +882,8 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
     // We do a direct read of the shards collection with local readConcern so no shards are missed,
     // but don't go through the ShardRegistry to prevent it from caching data that may be rolled
     // back.
-    const auto opTimeWithShards = uassertStatusOK(
-        _localCatalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern));
+    const auto opTimeWithShards =
+        _localCatalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
 
     for (const auto& shardType : opTimeWithShards.value) {
         const auto shardStatus =
@@ -926,8 +926,8 @@ Status ShardingCatalogManager::runCloneAuthoritativeMetadataOnShards(OperationCo
     // We do a direct read of the shards collection with local readConcern so no shards are missed,
     // but don't go through the ShardRegistry to prevent it from caching data that may be rolled
     // back.
-    const auto opTimeWithShards = uassertStatusOK(
-        _localCatalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern));
+    const auto opTimeWithShards =
+        _localCatalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
 
     for (const auto& shardType : opTimeWithShards.value) {
         const auto shardStatus =

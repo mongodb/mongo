@@ -169,10 +169,9 @@ public:
     public:
         StaticCatalogClient(std::vector<ShardType> shards) : _shards(std::move(shards)) {}
 
-        StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
-            OperationContext* opCtx,
-            repl::ReadConcernLevel readConcern,
-            bool excludeDraining) override {
+        repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
+                                                              repl::ReadConcernLevel readConcern,
+                                                              bool excludeDraining) override {
             return repl::OpTimeWith<std::vector<ShardType>>(_shards);
         }
         std::vector<CollectionType> getShardedCollections(OperationContext* opCtx,
