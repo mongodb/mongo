@@ -160,6 +160,7 @@ mongo_cc_library(
     hdrs = [
         "change_stream_constants.h",
         "change_stream_helpers.h",
+        "change_stream_read_mode.h",
         "document_source_change_stream.h",
         "document_source_hybrid_scoring_input_util.h",
         "document_source_merge.h",

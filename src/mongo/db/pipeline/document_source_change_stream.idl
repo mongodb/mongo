@@ -222,6 +222,19 @@ structs:
                 optional: true
                 query_shape: parameter
 
+            ignoreRemovedShards:
+                type: optionalBool
+                description:
+                    Selects the change stream read mode w.r.t removed shards.
+                    If set to true, the change stream reader ignores shards that had
+                    relevant change events allocated to them but have been removed from
+                    the system. This makes the change stream to be read in
+                    Ignore-Removed-Shards mode.
+                    If set to false, the change stream reader fails if it cannot return
+                    a change event because a shard that holds the event has been removed
+                    from the system. This makes the change stream to be read in Strict mode.
+                query_shape: literal
+
             supportedEvents:
                 type: array<string>
                 description:

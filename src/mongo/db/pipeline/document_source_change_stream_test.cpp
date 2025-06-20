@@ -58,6 +58,7 @@
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/change_stream_read_mode.h"
 #include "mongo/db/pipeline/change_stream_test_helpers.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
@@ -867,6 +868,62 @@ TEST_F(ChangeStreamStageTest, CreatingChangestreamFailsWithInvalidVersions) {
         ASSERT_THROWS_CODE(DSChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
                            AssertionException,
                            ErrorCodes::BadValue);
+    }
+}
+
+// Test different values for 'ignoreRemovedShards' when creating a change stream.
+TEST_F(ChangeStreamStageTest, SetIgnoreRemovedShards) {
+    std::array<boost::optional<bool>, 3> values = {boost::none, true, false};
+
+    for (auto ignoreRemovedShards : values) {
+        BSONObj spec;
+        if (ignoreRemovedShards.has_value()) {
+            spec = BSON("$changeStream" << BSON("ignoreRemovedShards" << *ignoreRemovedShards));
+        } else {
+            spec = BSON("$changeStream" << BSONObj());
+        }
+
+        auto pipeline = DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+        ASSERT_FALSE(pipeline.empty());
+
+        bool found = false;
+        for (auto& stage : pipeline) {
+            if (stage->getSourceName() == DocumentSourceChangeStreamTransform::kStageName) {
+                // Serialize the stage to BSON and read back the "version" field.
+                std::vector<Value> serialization;
+                stage->serializeToArray(serialization);
+
+                ASSERT_EQ(serialization.size(), 1UL);
+                ASSERT_EQ(serialization[0].getType(), BSONType::object);
+
+                if (ignoreRemovedShards.has_value()) {
+                    ASSERT_EQ(*ignoreRemovedShards,
+                              serialization[0]
+                                  .getDocument()
+                                  .getField(DocumentSourceChangeStreamTransform::kStageName)
+                                  .getDocument()
+                                  .getField("ignoreRemovedShards"_sd)
+                                  .getBool());
+                } else {
+                    ASSERT_TRUE(serialization[0]
+                                    .getDocument()
+                                    .getField(DocumentSourceChangeStreamTransform::kStageName)
+                                    .getDocument()
+                                    .getField("ignoreRemovedShards"_sd)
+                                    .missing());
+                }
+                found = true;
+
+                // Also test conversion from optional<bool> to 'ChangeStreamReadMode' enum value.
+                ChangeStreamReadMode readMode =
+                    fromIgnoreRemovedShardsParameter(ignoreRemovedShards);
+                ASSERT_EQ(ignoreRemovedShards.value_or(false)
+                              ? ChangeStreamReadMode::kIgnoreRemovedShards
+                              : ChangeStreamReadMode::kStrict,
+                          readMode);
+            }
+        }
+        ASSERT_TRUE(found);
     }
 }
 
@@ -5453,7 +5510,6 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamTransformMo
                 "fullDocument": "required",
                 "fullDocumentBeforeChange": "whenAvailable",
                 "showExpandedEvents": true
-
             }
         })",
         docSource->serialize().getDocument().toBson());

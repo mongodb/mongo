@@ -193,6 +193,10 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamInjectControlEvents::doG
 
 Value DocumentSourceChangeStreamInjectControlEvents::doSerialize(
     const SerializationOptions& opts) const {
+    if (opts.isReplacingLiteralsWithRepresentativeValues()) {
+        // 'actions' is an internal parameter. Don't serialize it for representative query shapes.
+        return Value();
+    }
     BSONObjBuilder builder;
     if (opts.isSerializingForExplain()) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
