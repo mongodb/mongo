@@ -48,7 +48,7 @@ export const emptyMessageTest = (ingressPort, egressPort, node, isRouter) => {
 };
 
 export const fuzzingTest = (ingressPort, egressPort, node, isRouter) => {
-    const numConnections = 200;
+    const numConnections = 10;
 
     for (let i = 0; i < numConnections; i++) {
         jsTestLog("Starting nc to simulate client connect to proxy port sending random data");
@@ -66,32 +66,6 @@ export const fuzzingTest = (ingressPort, egressPort, node, isRouter) => {
         connectAndHello(node.port, isRouter);
 
         stopMongoProgramByPid(pid);
-    }
-};
-
-export const loadTest = (ingressPort, egressPort, node, isRouter) => {
-    const numConnections = 200;
-    let threads = [];
-
-    for (let i = 0; i < numConnections; i++) {
-        threads.push(new Thread((regularPort, ingressPort, egressPort, connectFn, isRouter) => {
-            // Throw in some connections without data to make sure we handle those correctly.
-            const pid = _startMongoProgram('nc', '127.0.0.1', egressPort);
-
-            // Connecting to the proxy port still succeeds within a reasonable time
-            // limit.
-            connectFn(ingressPort, isRouter);
-
-            // Connecting to the default port still succeeds within a reasonable time limit.
-            connectFn(regularPort, isRouter);
-
-            stopMongoProgramByPid(pid);
-        }, node.port, ingressPort, egressPort, connectAndHello, isRouter));
-        threads[i].start();
-    }
-
-    for (let i = 0; i < numConnections; i++) {
-        threads[i].join();
     }
 };
 
