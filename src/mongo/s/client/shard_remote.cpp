@@ -435,7 +435,17 @@ Status ShardRemote::runAggregation(
         }
 
         try {
-            if (!callback(data.documents, data.otherFields.postBatchResumeToken)) {
+            // The "postBatchResumeToken" is the highest _id seen in the collection scan. The
+            // document with that _id  may or may not be part of the batch itself.
+            // (a) It could be that the document got filtered out from the batch due
+            //     to $match.
+            // (b) It could be that the document just hasn't been yet in the batch due to response
+            //     size limit.
+            // Due to (b), it is only correct to consult the postBatchResumeToken when the batch is
+            // empty.
+            boost::optional<BSONObj> postBatchResumeToken =
+                data.documents.empty() ? data.otherFields.postBatchResumeToken : boost::none;
+            if (!callback(data.documents, postBatchResumeToken)) {
                 *nextAction = Fetcher::NextAction::kNoAction;
             }
         } catch (...) {
