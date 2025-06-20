@@ -79,6 +79,51 @@ variables:
           resmoke_jobs_max: 1
           suite: benchmark_suite
 
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &jstestfuzz_config_vars
+    is_jstestfuzz: true
+    num_files: 15
+    num_tasks: 5 # Upperbound by `max_sub_suites` specified through the variant with each task still running `num_files` files.
+    # It is error prone to require each fuzzer-related Evergreen task to need to override the
+    # resmoke_args variable. However, the resmoke_args variable must be defined as a string in the
+    # task generation configuration to satisfy mongodb/mongo-task-generator. We therefore specify an
+    # empty string for the variable to reflect there are no additional arguments provided to resmoke
+    # by default for the fuzzer-related tasks.
+    resmoke_args: ""
+    resmoke_jobs_max: 1
+    should_shuffle: false
+    continue_on_failure: false
+    # Terminate the function when there has been no output to stdout for 30 minutes. E.g. when something is stuck in an infinite loop.
+    # resmoke.py writes the test output to logkeeper and only writes to stdout when starting the next test.
+    # resmoke.py not producing output on stdout means that the test is still running and presumably not going to finish.
+    # Note that timeout_secs is different from exec_timeout_secs, which applies to a task and times out regardless of whether output has been written to stdout.
+    timeout_secs: 1800
+
+  # Used for tests that invoke 'resmoke.py --suites=jstestfuzz*'.
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+  # - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &jstestfuzz_template
+    name: jstestfuzz_template
+    exec_timeout_secs: 14400 # Time out the task if it runs for more than 4 hours.
+    depends_on:
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+      - archive_dist_test
+    commands:
+      - func: "generate resmoke tasks"
+
 ################################################
 #                    Tasks                     #
 ################################################
@@ -291,3 +336,67 @@ tasks:
     commands:
       - func: "do setup"
       - func: "run tests"
+
+  # Experimental task running the jscore suite bazel target. To be removed with SERVER-103537.
+  - name: bazel_jscore
+    tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "do setup"
+      - func: "run resmoke tests via bazel"
+        vars:
+          suite: //buildscripts/resmokeconfig:core
+          compiling_for_test: true
+          bazel_args: >-
+            --config=no-remote-exec
+            --test_output=all
+            --workspace_status_command="bazel/resmoke/volatile_status.sh"
+            --//bazel/resmoke:in_evergreen
+
+  # Experimental task running the jstestfuzz suite bazel target. To be removed with SERVER-103537.
+  - <<: *jstestfuzz_template
+    name: bazel_jstestfuzz_gen
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "jstestfuzz",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 2
+          num_tasks: 2
+          jstestfuzz_vars: --jsTestsDir jstests
+          suite: //buildscripts/resmokeconfig:jstestfuzz
+          npm_command: jstestfuzz
+          bazel_args: >-
+            --config=no-remote-exec
+            --test_output=all
+            --workspace_status_command="bazel/resmoke/volatile_status.sh"
+            --//bazel/resmoke:in_evergreen
+
+  # Experimental task running the multiversion sanity check bazel targets. To be removed with SERVER-103537.
+  - <<: *gen_task_template
+    name: bazel_multiversion_sanity_check_gen
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "multiversion",
+        "multiversion_sanity_check",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          bazel_args: >-
+            --config=no-remote-exec
+            --test_output=all
+            --workspace_status_command="bazel/resmoke/volatile_status.sh"
+            --//bazel/resmoke:in_evergreen
+      - func: "initialize multiversion tasks"
+        vars:
+          //buildscripts/resmokeconfig:bazel_multiversion_sanity_check_last_continuous_new_new_old: last_continuous
+          //buildscripts/resmokeconfig:bazel_multiversion_sanity_check_last_lts_new_new_old: last_lts

@@ -15,5 +15,9 @@ if [[ "${require_multiversion_setup}" = "true" && -n "${multiversion_exclude_tag
     exclude_tags_file_path_arg="--excludeTagsFilePath=multiversion_exclude_tags.yml"
   fi
 
-  eval $python buildscripts/resmoke.py generate-multiversion-exclude-tags --oldBinVersion="${multiversion_exclude_tags_version}" "$exclude_tags_file_path_arg"
+  if [ -n "${multiversion_link_dir}" ]; then
+    multiversion_dir_arg="--multiversionDir=${multiversion_link_dir}"
+  fi
+
+  eval $python buildscripts/resmoke.py generate-multiversion-exclude-tags --oldBinVersion="${multiversion_exclude_tags_version}" "$exclude_tags_file_path_arg" "$multiversion_dir_arg"
 fi

@@ -8,7 +8,7 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
-# This is an experimental test target for running running the jstests core
+# This is an experimental test target for running the jstests core
 # suite as a bazel test. It runs in an experimental Evergreen task on an
 # infrequent build variant. You should not worry about this target being
 # perfectly up-to-date with the sutie config, nor create similar bazel targets
@@ -24,7 +24,6 @@ resmoke_suite_test(
         "//src/third_party/schemastore.org:schemas",
     ],
     resmoke_args = [
-        "--jobs=2",
         "--storageEngineCacheSizeGB=1",
     ],
     tags = [
@@ -32,7 +31,7 @@ resmoke_suite_test(
     ],
 )
 
-# This is an experimental test target for running running the jstestfuzz
+# This is an experimental test target for running the jstestfuzz
 # suite as a bazel test. It runs in an experimental Evergreen task on an
 # infrequent build variant. You should not worry about this target being
 # perfectly up-to-date with the suite config, nor create similar bazel targets
@@ -47,7 +46,6 @@ resmoke_suite_test(
         "//jstests/hooks:all_javascript_files",
     ],
     resmoke_args = [
-        "--jobs=2",
         "--storageEngineCacheSizeGB=1",
     ],
     tags = [
@@ -55,17 +53,40 @@ resmoke_suite_test(
     ],
 )
 
-# This is an experimental test target for running running the multiversion_sanity_check
+# This is an experimental test target for running the multiversion_sanity_check
 # suite as a bazel test. It runs in an experimental Evergreen task on an
 # infrequent build variant. You should not worry about this target being
 # perfectly up-to-date with the suite config, nor create similar bazel targets
 # for other suites. Cleanup with SERVER-103537.
 resmoke_suite_test(
-    name = "multiversion_sanity_check_last_continuous_new_new_old",
+    name = "bazel_multiversion_sanity_check_last_continuous_new_new_old",
     srcs = [
-        "//jstests/core/testing:all_javascript_files",
+        "//jstests/core/testing:mixed_version_replica_set.js",
     ],
     config = ":matrix_suites/generated_suites/multiversion_sanity_check_last_continuous_new_new_old.yml",
+    data = [
+        "//:multiversion_binaries",
+        "//jstests/hooks:all_javascript_files",
+    ],
+    resmoke_args = [
+        "--storageEngineCacheSizeGB=1",
+    ],
+    tags = [
+        "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
+    ],
+)
+
+# This is an experimental test target for running the multiversion_sanity_check
+# suite as a bazel test. It runs in an experimental Evergreen task on an
+# infrequent build variant. You should not worry about this target being
+# perfectly up-to-date with the suite config, nor create similar bazel targets
+# for other suites. Cleanup with SERVER-103537.
+resmoke_suite_test(
+    name = "bazel_multiversion_sanity_check_last_lts_new_new_old",
+    srcs = [
+        "//jstests/core/testing:mixed_version_replica_set.js",
+    ],
+    config = ":matrix_suites/generated_suites/multiversion_sanity_check_last_lts_new_new_old.yml",
     data = [
         "//:multiversion_binaries",
         "//jstests/hooks:all_javascript_files",

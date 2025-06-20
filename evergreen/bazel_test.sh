@@ -90,13 +90,6 @@ for i in {1..3}; do
   $BAZEL_BINARY shutdown
 done
 
-# For a target //path:test, the undeclared test outputs are in
-# bazel-testlogs/path/test/test.outputs/outputs.zip
-outputs=bazel-testlogs/$(sed "s|//||;s|:|/|" <<< ${targets})/test.outputs/outputs.zip
-if [ -f $outputs ]; then
-  unzip $outputs -d ../
-fi
-
 set -o errexit
 
 if [[ $RET != 0 ]]; then

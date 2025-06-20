@@ -110,6 +110,7 @@ def resmoke_suite_test(
             "//bazel/resmoke:volatile_status",
             "//buildscripts/resmokeconfig:all_files",  # This needs to be reduced, SERVER-103610
             "//src/mongo/util/version:releases.yml",
+            "//:generated_resmoke_config",
         ] + select({
             "//bazel/resmoke:in_evergreen_enabled": ["//:installed-dist-test"],
             "//conditions:default": ["//:install-dist-test"],

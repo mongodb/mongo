@@ -15,4 +15,5 @@ RUST_BACKTRACE=full PATH=$PATH:$HOME:/ ./mongo-task-generator \
   --generate-sub-tasks-config etc/generate_subtasks_config.yml \
   --s3-test-stats-bucket mongo-test-stats \
   --include-fully-disabled-feature-tests \
+  --bazel-suite-configs resmoke_suite_configs.yml \
   $@

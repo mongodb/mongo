@@ -1096,6 +1096,27 @@ functions:
         OTEL_PARENT_ID: ${otel_parent_id}
         OTEL_COLLECTOR_DIR: "../build/OTelTraces/"
 
+  "execute resmoke tests via bazel": &execute_resmoke_tests_via_bazel
+    command: subprocess.exec
+    display_name: "execute resmoke tests via bazel"
+    type: test
+    params:
+      binary: bash
+      env:
+        build_id: ${build_id}
+        distro_id: ${distro_id}
+        execution: ${execution}
+        project: ${project}
+        revision: ${revision}
+        revision_order_id: ${revision_order_id}
+        task_id: ${task_id}
+        task_name: ${task_name}
+        build_variant: ${build_variant}
+        version_id: ${version_id}
+        requester: ${requester}
+      args:
+        - "./src/evergreen/resmoke_tests_execute_bazel.sh"
+
   "retrieve generated test configuration":
     &retrieve_generated_test_configuration
     command: s3.get
@@ -1495,17 +1516,6 @@ functions:
       env:
         evergreen_remote_exec: ${evergreen_remote_exec|off}
         author_email: ${author_email}
-        build_id: ${build_id}
-        distro_id: ${distro_id}
-        execution: ${execution}
-        project: ${project}
-        revision: ${revision}
-        revision_order_id: ${revision_order_id}
-        task_id: ${task_id}
-        task_name: ${task_name}
-        build_variant: ${build_variant}
-        version_id: ${version_id}
-        requester: ${requester}
       args:
         - "src/evergreen/bazel_test.sh"
 
@@ -1606,6 +1616,113 @@ functions:
     - *set_bazel_test_silent_fail # TODO SERVER-99431 Remove once bazel coverage timeouts are under control.
     - *f_expansions_write
     - *bazel_coverage_sh
+
+  "build all resmoke configs":
+    - *f_expansions_write
+    - *bazel_compile_sh
+    - command: subprocess.exec
+      type: system
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/get_all_resmoke_suite_configs.sh"
+
+  "run resmoke tests via bazel":
+    - *get_version_expansions
+    - *apply_version_expansions
+    - *f_expansions_write
+    - *get_engflow_key
+    - *get_engflow_cert
+    - *f_expansions_write
+    - *generate_evergreen_bazelrc
+    - command: expansions.update
+      params:
+        updates:
+          - key: targets
+            value: ${suite}_config
+    - *f_expansions_write
+    - *bazel_compile_sh
+    - *f_expansions_write
+    - command: subprocess.exec
+      type: system
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/get_resmoke_suite_config.sh"
+    - command: expansions.update
+      params:
+        file: src/suite_config_expansion.yml
+    - *f_expansions_write
+    - command: expansions.update
+      params:
+        updates:
+          - key: targets
+            value: ${suite}
+    - *f_expansions_write
+    - command: expansions.update
+      params:
+        updates:
+          - key: aws_key_remote
+            value: ${mongodatafiles_aws_key}
+          - key: aws_profile_remote
+            value: mongodata_aws
+          - key: aws_secret_remote
+            value: ${mongodatafiles_aws_secret}
+    - *f_expansions_write
+    - *set_code_coverage_expansion
+    - *f_expansions_write
+    - *set_up_remote_credentials
+    - *f_expansions_write
+    - *determine_resmoke_jobs
+    - *update_resmoke_jobs_expansions
+    - *f_expansions_write
+    - *configure_evergreen_api_credentials
+    - *determine_task_timeout
+    - *update_task_timeout_expansions
+    - *f_expansions_write
+    - *update_task_timeout
+    - *f_expansions_write
+    - *sign_macos_dev_binaries
+    - *execute_resmoke_tests_via_bazel
+
+  "run generated tests via bazel":
+    - *f_expansions_write
+    - *retrieve_generated_test_configuration
+    - *extract_generated_test_configuration
+    - *f_expansions_write
+    - command: expansions.update
+      params:
+        updates:
+          - key: aws_key_remote
+            value: ${mongodatafiles_aws_key}
+          - key: aws_profile_remote
+            value: mongodata_aws
+          - key: aws_secret_remote
+            value: ${mongodatafiles_aws_secret}
+    - *f_expansions_write
+    - *set_code_coverage_expansion
+    - *f_expansions_write
+    - *set_up_remote_credentials
+    - *f_expansions_write
+    - *determine_resmoke_jobs
+    - *update_resmoke_jobs_expansions
+    - *f_expansions_write
+    - *configure_evergreen_api_credentials
+    - *determine_task_timeout
+    - *update_task_timeout_expansions
+    - *f_expansions_write
+    - *update_task_timeout
+    - *f_expansions_write
+    - *sign_macos_dev_binaries
+    - *multiversion_exclude_tags_generate
+    - *get_engflow_key
+    - *get_engflow_cert
+    - *f_expansions_write
+    - *generate_evergreen_bazelrc
+    - *get_version_expansions
+    - *apply_version_expansions
+    - *f_expansions_write
+    - *execute_resmoke_tests_via_bazel
 
   "generate version expansions": &generate_version_expansions
     command: subprocess.exec

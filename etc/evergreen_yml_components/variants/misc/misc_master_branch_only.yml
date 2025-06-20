@@ -43,6 +43,8 @@ buildvariants:
         variant: amazon-linux2023-arm64-static-compile
       - name: archive_jstestshell
         variant: amazon-linux2023-arm64-static-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
     expansions:
       compile_variant: amazon-linux2023-arm64-static-compile
       multiversion_platform: amazon2023
@@ -50,9 +52,6 @@ buildvariants:
       multiversion_architecture: aarch64
       multiversion_link_dir: multiversion_binaries
     tasks:
-      - name: select_multiversion_binaries
-      - name: bazel_test_jscore
-      - name: bazel_test_multiversion_sanity_check_last_continuous_new_new_old
-        depends_on:
-          - name: select_multiversion_binaries
-      - name: bazel_test_jstestfuzz
+      - name: bazel_jscore
+      - name: bazel_multiversion_sanity_check_gen
+      - name: bazel_jstestfuzz_gen

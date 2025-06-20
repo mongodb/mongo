@@ -6,9 +6,11 @@ cd src
 set -o verbose
 set -o errexit
 
-# Set the suite name to be the task name by default; unless overridden with the `suite` expansion.
+# Set the suite name to be the task name by default; unless overridden with the `suite`/`suite_config` expansion.
 suite_name=${task_name}
-if [[ -n ${suite} ]]; then
+if [[ -n ${suite_config} ]]; then
+  suite_name=${suite_config}
+elif [[ -n ${suite} ]]; then
   suite_name=${suite}
 fi
 

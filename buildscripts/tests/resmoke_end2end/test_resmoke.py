@@ -745,13 +745,16 @@ class TestEvergreenYML(unittest.TestCase):
 
     def validate_jstestfuzz_selector(self, suite_names):
         for suite_name in suite_names:
-            suite_config = suitesconfig.get_suite(suite_name).get_config()
-            expected_selector = ["jstestfuzz/out/*.js"]
-            self.assertEqual(
-                suite_config["selector"]["roots"],
-                expected_selector,
-                msg=f"The jstestfuzz selector for {suite_name} did not match 'jstestfuzz/out/*.js'",
-            )
+            if not suite_name.startswith(
+                "//"
+            ):  # Ignore suites that are run via bazel. TODO: SERVER-104460
+                suite_config = suitesconfig.get_suite(suite_name).get_config()
+                expected_selector = ["jstestfuzz/out/*.js"]
+                self.assertEqual(
+                    suite_config["selector"]["roots"],
+                    expected_selector,
+                    msg=f"The jstestfuzz selector for {suite_name} did not match 'jstestfuzz/out/*.js'",
+                )
 
     # This test asserts that the jstestfuzz tasks uploads the the URL we expect it to
     # If the remote url changes, also change it in the _log_local_resmoke_invocation method

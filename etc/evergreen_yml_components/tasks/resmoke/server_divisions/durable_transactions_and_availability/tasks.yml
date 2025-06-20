@@ -61,6 +61,7 @@ variables:
           suite: benchmark_suite
 
   # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
   # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
   # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
   # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
@@ -86,6 +87,7 @@ variables:
 
   # Used for tests that invoke 'resmoke.py --suites=jstestfuzz*'.
   # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
   # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
   # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
   # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml

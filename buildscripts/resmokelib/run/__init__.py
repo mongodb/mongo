@@ -2316,6 +2316,13 @@ class RunPlugin(PluginInterface):
             dest="exclude_tags_file_path",
             help="Where to output the generated tags.",
         )
+        parser.add_argument(
+            "--multiversionDir",
+            dest="multiversion_dirs",
+            action="append",
+            metavar="MULTIVERSION_DIR",
+            help="Directory to search for multiversion binaries. Can be specified multiple times.",
+        )
 
 
 def to_local_args(input_args: Optional[List[str]] = None):
