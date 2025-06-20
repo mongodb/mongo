@@ -215,6 +215,7 @@
 #include "mongo/idl/cluster_server_parameter_initializer.h"
 #include "mongo/idl/cluster_server_parameter_op_observer.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metrics_initialization.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/process_id.h"
@@ -1988,6 +1989,15 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     LOGV2_OPTIONS(4784931, {LogComponent::kDefault}, "Dropping the scope cache for shutdown");
     ScriptEngine::dropScopeCache();
 
+
+    // Shutdown OpenTelemetry metrics
+    {
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::shutDownOtelMetrics,
+                                       &shutdownTimeElapsedBuilder);
+        otel::metrics::shutdown();
+    }
+
     // Shutdown Full-Time Data Capture
     {
         SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
@@ -2047,6 +2057,8 @@ int mongod_main(int argc, char* argv[]) {
     // Per SERVER-7434, startSignalProcessingThread must run after any forks (i.e.
     // initialize_server_global_state::forkServerOrDie) and before the creation of any other threads
     startSignalProcessingThread();
+
+    uassertStatusOK(otel::metrics::initialize("mongod"));
 
     auto* service = [] {
         try {
@@ -2130,6 +2142,7 @@ int mongod_main(int argc, char* argv[]) {
 #endif
 
     ExitCode exitCode = initAndListen(service);
+
     exitCleanly(exitCode);
     return 0;
 }

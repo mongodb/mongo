@@ -1,0 +1,162 @@
+diff --git a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/BUILD b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/BUILD
+index b3ddd1924b8..e728cd8c414 100644
+--- a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/BUILD
++++ b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/BUILD
+@@ -10,12 +10,14 @@ mongo_cc_library(
+     name = "otlp_recordable",
+     srcs = [
+         "src/otlp_environment.cc",
++        "src/otlp_metric_utils.cc",
+         "src/otlp_populate_attribute_utils.cc",
+         "src/otlp_recordable.cc",
+         "src/otlp_recordable_utils.cc",
+     ],
+     hdrs = [
+         "include/opentelemetry/exporters/otlp/otlp_environment.h",
++        "include/opentelemetry/exporters/otlp/otlp_metric_utils.h",
+         "include/opentelemetry/exporters/otlp/otlp_populate_attribute_utils.h",
+         "include/opentelemetry/exporters/otlp/otlp_preferred_temporality.h",
+         "include/opentelemetry/exporters/otlp/otlp_recordable.h",
+@@ -31,6 +33,7 @@ mongo_cc_library(
+         "//src/third_party/opentelemetry-cpp/sdk/src/resource",
+         "//src/third_party/opentelemetry-cpp/sdk/src/trace",
+         "//src/third_party/opentelemetry-proto:common_proto_cc",
++        "//src/third_party/opentelemetry-proto:metrics_service_proto_cc",
+         "//src/third_party/opentelemetry-proto:resource_proto_cc",
+         "//src/third_party/opentelemetry-proto:trace_proto_cc",
+         "//src/third_party/opentelemetry-proto:trace_service_proto_cc",
+@@ -73,22 +76,31 @@ mongo_cc_library(
+         "//src/third_party/opentelemetry-cpp/ext/src/http/client/curl:http_client_curl",
+         "//src/third_party/opentelemetry-cpp/sdk:headers",
+         "//src/third_party/opentelemetry-cpp/sdk/src/common:base64",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common:global_log_handler",
+         "//src/third_party/opentelemetry-proto:common_proto_cc",
+     ],
+ )
+
++# "metric" exporters could be in their own library, but I added them to the existing
++# library for the sake of simplicity.
+ mongo_cc_library(
+     name = "otlp_http_exporter",
+     srcs = [
+         "src/otlp_http_exporter.cc",
+         "src/otlp_http_exporter_factory.cc",
+         "src/otlp_http_exporter_options.cc",
++        "src/otlp_http_metric_exporter.cc",
++        "src/otlp_http_metric_exporter_factory.cc",
++        "src/otlp_http_metric_exporter_options.cc",
+     ],
+     hdrs = [
+         "include/opentelemetry/exporters/otlp/otlp_environment.h",
+         "include/opentelemetry/exporters/otlp/otlp_http_exporter.h",
+         "include/opentelemetry/exporters/otlp/otlp_http_exporter_factory.h",
+         "include/opentelemetry/exporters/otlp/otlp_http_exporter_options.h",
++        "include/opentelemetry/exporters/otlp/otlp_http_metric_exporter.h",
++        "include/opentelemetry/exporters/otlp/otlp_http_metric_exporter_factory.h",
++        "include/opentelemetry/exporters/otlp/otlp_http_metric_exporter_options.h",
+         "include/opentelemetry/exporters/otlp/protobuf_include_prefix.h",
+         "include/opentelemetry/exporters/otlp/protobuf_include_suffix.h",
+     ],
+@@ -102,6 +114,7 @@ mongo_cc_library(
+     deps = [
+         ":otlp_http_client",
+         ":otlp_recordable",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common:global_log_handler",
+         "//src/third_party/opentelemetry-cpp/sdk/src/trace",
+         "//src/third_party/opentelemetry-proto:common_proto_cc",
+         "//src/third_party/opentelemetry-proto:resource_proto_cc",
+@@ -135,22 +148,31 @@ mongo_cc_library(
+         "//src/third_party/opentelemetry-cpp/api",
+         "//src/third_party/opentelemetry-cpp/sdk:headers",
+         "//src/third_party/opentelemetry-cpp/sdk/src/common:base64",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common:global_log_handler",
+         "//src/third_party/opentelemetry-proto:common_proto_cc",
+     ],
+ )
+
++# "metric" exporters could be in their own library, but I added them to the existing
++# library for the sake of simplicity.
+ mongo_cc_library(
+     name = "otlp_file_exporter",
+     srcs = [
+         "src/otlp_file_exporter.cc",
+         "src/otlp_file_exporter_factory.cc",
+         "src/otlp_file_exporter_options.cc",
++        "src/otlp_file_metric_exporter.cc",
++        "src/otlp_file_metric_exporter_factory.cc",
++        "src/otlp_file_metric_exporter_options.cc",
+     ],
+     hdrs = [
+         "include/opentelemetry/exporters/otlp/otlp_environment.h",
+         "include/opentelemetry/exporters/otlp/otlp_file_exporter.h",
+         "include/opentelemetry/exporters/otlp/otlp_file_exporter_factory.h",
+         "include/opentelemetry/exporters/otlp/otlp_file_exporter_options.h",
++        "include/opentelemetry/exporters/otlp/otlp_file_metric_exporter.h",
++        "include/opentelemetry/exporters/otlp/otlp_file_metric_exporter_factory.h",
++        "include/opentelemetry/exporters/otlp/otlp_file_metric_exporter_options.h",
+         "include/opentelemetry/exporters/otlp/protobuf_include_prefix.h",
+         "include/opentelemetry/exporters/otlp/protobuf_include_suffix.h",
+     ],
+@@ -164,6 +186,7 @@ mongo_cc_library(
+     deps = [
+         ":otlp_file_client",
+         ":otlp_recordable",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common:global_log_handler",
+         "//src/third_party/opentelemetry-cpp/sdk/src/trace",
+         "//src/third_party/opentelemetry-proto:common_proto_cc",
+         "//src/third_party/opentelemetry-proto:resource_proto_cc",
+diff --git a/src/third_party/opentelemetry-cpp/dist/ext/src/http/client/curl/BUILD b/src/third_party/opentelemetry-cpp/dist/ext/src/http/client/curl/BUILD
+index cf8d6827c11..7ac634f34f3 100644
+--- a/src/third_party/opentelemetry-cpp/dist/ext/src/http/client/curl/BUILD
++++ b/src/third_party/opentelemetry-cpp/dist/ext/src/http/client/curl/BUILD
+@@ -24,15 +24,17 @@ mongo_cc_library(
+             "-DEFAULTLIB:Normaliz.lib",
+             "-DEFAULTLIB:Ws2_32.lib",
+         ],
+-        "//conditions:default": [],
++        "//conditions:default": [
++            "-lcurl",
++        ],
+     }),
+     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+     deps = [
+         "//src/third_party/opentelemetry-cpp/api",
+         "//src/third_party/opentelemetry-cpp/ext:headers",
+         "//src/third_party/opentelemetry-cpp/sdk:headers",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common:global_log_handler",
+         "//src/third_party/opentelemetry-cpp/sdk/src/common:random",
+-        # "//src/third_party/opentelemetry-cpp:curl",
+         "//src/third_party/zlib",
+     ],
+ )
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/src/metrics/BUILD b/src/third_party/opentelemetry-cpp/dist/sdk/src/metrics/BUILD
+index ff8d244da19..eab0853dec9 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/src/metrics/BUILD
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/src/metrics/BUILD
+@@ -1,18 +1,20 @@
+ # Copyright The OpenTelemetry Authors
+ # SPDX-License-Identifier: Apache-2.0
+
++load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
++
+ package(default_visibility = ["//visibility:public"])
+
+-cc_library(
++mongo_cc_library(
+     name = "metrics",
+     srcs = glob(["**/*.cc"]),
+     hdrs = glob(["**/*.h"]),
+     include_prefix = "src/metrics",
+     deps = [
+-        "//api",
+-        "//sdk:headers",
+-        "//sdk/src/common:global_log_handler",
+-        "//sdk/src/common:random",
+-        "//sdk/src/resource",
++        "//src/third_party/opentelemetry-cpp/api",
++        "//src/third_party/opentelemetry-cpp/sdk:headers",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common:global_log_handler",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common:random",
++        "//src/third_party/opentelemetry-cpp/sdk/src/resource",
+     ],
+ )

@@ -42,6 +42,11 @@ mongo_cc_library(
         ":abi_version_no_1": ["OPENTELEMETRY_ABI_VERSION_NO=1"],
         ":abi_version_no_2": ["OPENTELEMETRY_ABI_VERSION_NO=2"],
     }),
+    includes = [
+        # Any target depending on "//src/third_party/opentelemetry-cpp/api" also gets
+        # "src/third_party/opentelemetry-cpp/api/include" added to the include path.
+        "include",
+    ],
     strip_include_prefix = "include",
     tags = ["api"],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,

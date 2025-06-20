@@ -925,8 +925,15 @@ observability.tracing:
     slack: server-networking-observability
     jira: Networking & Observability
   files:
-    - src/mongo/tracing/
+    - src/mongo/otel/traces/
     - src/mongo/util/tracing_support*
+
+observability.metrics:
+  meta:
+    slack: server-networking-observability
+    jira: Networking & Observability
+  files:
+    - src/mongo/otel/metrics/
 
 observability.ftdc:
   meta:

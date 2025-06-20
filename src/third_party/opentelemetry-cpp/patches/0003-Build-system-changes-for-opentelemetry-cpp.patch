@@ -1,0 +1,84 @@
+diff --git a/src/third_party/opentelemetry-cpp/dist/api/BUILD b/src/third_party/opentelemetry-cpp/dist/api/BUILD
+index dbc3b1d452e..2b8f088ac12 100644
+--- a/src/third_party/opentelemetry-cpp/dist/api/BUILD
++++ b/src/third_party/opentelemetry-cpp/dist/api/BUILD
+@@ -42,6 +42,11 @@ mongo_cc_library(
+         ":abi_version_no_1": ["OPENTELEMETRY_ABI_VERSION_NO=1"],
+         ":abi_version_no_2": ["OPENTELEMETRY_ABI_VERSION_NO=2"],
+     }),
++    includes = [
++        # Any target depending on "//src/third_party/opentelemetry-cpp/api" also gets
++        # "src/third_party/opentelemetry-cpp/api/include" added to the include path.
++        "include",
++    ],
+     strip_include_prefix = "include",
+     tags = ["api"],
+     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+diff --git a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/BUILD b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/BUILD
+index d77bf584bde..0ef1a177878 100644
+--- a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/BUILD
++++ b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/BUILD
+@@ -26,6 +26,11 @@ mongo_cc_library(
+         "include/opentelemetry/exporters/otlp/protobuf_include_suffix.h",
+     ],
+     copts = OTEL_COPTS,
++    includes = [
++        # Any target depending on "//src/third_party/opentelemetry-cpp/exporters/otlp" also gets
++        # "src/third_party/opentelemetry-cpp/exporters/otlp/include" added to the include path.
++        "include",
++    ],
+     strip_include_prefix = "include",
+     tags = ["otlp"],
+     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+@@ -33,6 +38,7 @@ mongo_cc_library(
+         "//src/third_party/opentelemetry-cpp/sdk/src/resource",
+         "//src/third_party/opentelemetry-cpp/sdk/src/trace",
+         "//src/third_party/opentelemetry-proto:common_proto_cc",
++        "//src/third_party/opentelemetry-proto:metrics_proto_cc",
+         "//src/third_party/opentelemetry-proto:metrics_service_proto_cc",
+         "//src/third_party/opentelemetry-proto:resource_proto_cc",
+         "//src/third_party/opentelemetry-proto:trace_proto_cc",
+@@ -81,7 +87,7 @@ mongo_cc_library(
+     ],
+ )
+
+-# "metric" exporters could be in their own library, but I added them to the existing
++# "metric" exporters should probably be in their own library, but I added them to the existing
+ # library for the sake of simplicity.
+ mongo_cc_library(
+     name = "otlp_http_exporter",
+@@ -153,7 +159,7 @@ mongo_cc_library(
+     ],
+ )
+
+-# "metric" exporters could be in their own library, but I added them to the existing
++# "metric" exporters should probably be in their own library, but I added them to the existing
+ # library for the sake of simplicity.
+ mongo_cc_library(
+     name = "otlp_file_exporter",
+diff --git a/src/third_party/opentelemetry-cpp/dist/otel_rules.bzl b/src/third_party/opentelemetry-cpp/dist/otel_rules.bzl
+index 7eed9aed421..be79a8406ed 100644
+--- a/src/third_party/opentelemetry-cpp/dist/otel_rules.bzl
++++ b/src/third_party/opentelemetry-cpp/dist/otel_rules.bzl
+@@ -41,4 +41,4 @@ def mongo_cc_proto_lib(name, deps):
+     mongo_cc_proto_library(name = proto_cc_name, deps = deps)
+
+     cc_dep = ":" + proto_cc_name
+-    mongo_cc_library(name = name, cc_deps = [cc_dep], copts = OTEL_COPTS, target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH)
++    mongo_cc_library(name = name, cc_deps = [cc_dep], copts = OTEL_COPTS, target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH, no_undefined_ref_DO_NOT_USE = False)
+diff --git a/src/third_party/opentelemetry-cpp/dist/sdk/BUILD b/src/third_party/opentelemetry-cpp/dist/sdk/BUILD
+index bdeaaba3b7c..6aff9b658c8 100644
+--- a/src/third_party/opentelemetry-cpp/dist/sdk/BUILD
++++ b/src/third_party/opentelemetry-cpp/dist/sdk/BUILD
+@@ -9,6 +9,11 @@ package(default_visibility = ["//visibility:public"])
+ mongo_cc_library(
+     name = "headers",
+     hdrs = glob(["include/**/*.h"]),
++    includes = [
++        # Any target depending on "//src/third_party/opentelemetry-cpp/sdk" also gets
++        # "src/third_party/opentelemetry-cpp/sdk/include" added to the include path.
++        "include",
++    ],
+     strip_include_prefix = "include",
+     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+ )

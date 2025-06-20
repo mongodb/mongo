@@ -64,3 +64,34 @@ mongo_cc_proto_lib(
     name = "trace_service_proto_cc",
     deps = [":trace_service_proto"],
 )
+
+mongo_proto_library(
+    name = "metrics_proto",
+    srcs = [
+        "opentelemetry/proto/metrics/v1/metrics.proto",
+    ],
+    deps = [
+        ":common_proto",
+        ":resource_proto",
+    ],
+)
+
+mongo_cc_proto_lib(
+    name = "metrics_proto_cc",
+    deps = [":metrics_proto"],
+)
+
+mongo_proto_library(
+    name = "metrics_service_proto",
+    srcs = [
+        "opentelemetry/proto/collector/metrics/v1/metrics_service.proto",
+    ],
+    deps = [
+        ":metrics_proto",
+    ],
+)
+
+mongo_cc_proto_lib(
+    name = "metrics_service_proto_cc",
+    deps = [":metrics_service_proto"],
+)

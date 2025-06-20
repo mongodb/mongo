@@ -2684,6 +2684,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/logv2/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/logv2/**/*redaction* @10gen/server-security @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/otel/OWNERS.yml
+/src/mongo/otel/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/platform/OWNERS.yml
 /src/mongo/platform/**/* @10gen/server-programmability @svc-auto-approve-bot
 
@@ -2951,9 +2954,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/tools/workload_simulation/OWNERS.yml
 /src/mongo/tools/workload_simulation/**/* @10gen/server-workload-scheduling @svc-auto-approve-bot
-
-# The following patterns are parsed from ./src/mongo/tracing/OWNERS.yml
-/src/mongo/tracing/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/transport/OWNERS.yml
 /src/mongo/transport/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
