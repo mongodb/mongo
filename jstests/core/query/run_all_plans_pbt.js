@@ -23,6 +23,9 @@
  * does_not_support_causal_consistency,
  * # Runs queries that may return many results, requiring getmores
  * requires_getmore,
+ * # Exercises hashed index bug in SERVER-102302. Once that fix is backported, this fcv
+ * # requirement can be removed.
+ * requires_fcv_81,
  * ]
  */
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
@@ -76,6 +79,7 @@ function hintedQueryHasSameResultsAsControlCollScan(getQuery, testHelpers) {
                     index,
                     explain: experimentColl.explain().aggregate(query, {hint: index.name}),
                     controlResults,
+                    docsInCollection: controlColl.find().toArray(),
                     experimentalResults: res.docs
                 };
             }
