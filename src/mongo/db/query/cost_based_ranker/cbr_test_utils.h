@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/cost_based_ranker/cardinality_estimator.h"
 #include "mongo/db/query/cost_based_ranker/estimates.h"
 #include "mongo/db/query/index_bounds.h"
@@ -83,6 +84,11 @@ CardinalityEstimate getPlanHeuristicCE(const QuerySolution& plan, double collCar
 CardinalityEstimate getPlanHeuristicCE(const QuerySolution& plan, const CollectionInfo& collInfo);
 
 CardinalityEstimate getPlanHistogramCE(const QuerySolution& plan, const CollectionInfo& collInfo);
+
+CardinalityEstimate getPlanSamplingCE(const QuerySolution& plan,
+                                      double collCard,
+                                      ce::SamplingEstimator* samplingEstimator,
+                                      bool useIndexBounds);
 
 std::unique_ptr<stats::CollectionStatistics> makeCollStats(double collCard);
 std::unique_ptr<stats::CollectionStatistics> makeCollStatsWithHistograms(

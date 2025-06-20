@@ -28,6 +28,8 @@
  */
 
 #include "mongo/bson/json.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/ce/sampling/sampling_test_utils.h"
 #include "mongo/db/query/cost_based_ranker/cbr_test_utils.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/unittest/unittest.h"
@@ -498,6 +500,172 @@ TEST(CardinalityEstimator, NAryXOR) {
 
     const auto ceRes3 = getPlanCE(*xorPlan3, collInfo, QueryPlanRankerModeEnum::kHistogramCE);
     ASSERT(!ceRes3.isOK() && ceRes3.getStatus().code() == ErrorCodes::CEFailure);
+}
+
+// Index bounds to MatchExpressions section.
+TEST(CardinalityEstimator, PointIntervalToEqMatchExpression) {
+    auto pointOIL = makePointInterval(5.0, "a");
+    IndexBounds bounds;
+    bounds.fields.push_back(pointOIL);
+    auto expr = getMatchExpressionFromBounds(bounds, nullptr);
+
+    BSONObj query = fromjson("{a: 5}");
+    auto parsedExpr = parse(query);
+    ASSERT(expr->equivalent(parsedExpr.get()));
+}
+
+TEST(CardinalityEstimator, EmptyIntervalToAlwaysFalseMatchExpression) {
+    auto testIndex = buildSimpleIndexEntry({"a"});
+    BSONObj query1 = fromjson("{a: 3}");
+    auto expr1 = parse(query1);
+
+    BSONElement elt = query1.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    interval_evaluation_tree::Builder ietBuilder{};
+    IndexBoundsBuilder::translate(expr1.get(), elt, testIndex, &oil, &tightness, &ietBuilder);
+
+    BSONObj query2 = fromjson("{a: 8}");
+    auto expr2 = parse(query2);
+    IndexBoundsBuilder::translateAndIntersect(
+        expr2.get(), elt, testIndex, &oil, &tightness, &ietBuilder);
+
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 0U);
+
+    IndexBounds bounds;
+    bounds.fields.push_back(oil);
+    auto expr = getMatchExpressionFromBounds(bounds, nullptr);
+
+    BSONObj query = fromjson("{ $alwaysFalse: 1 }");
+    auto parsedExpr = parse(query);
+    ASSERT(expr->equivalent(parsedExpr.get()));
+}
+
+TEST(CardinalityEstimator, FullyOpenIntervalToNullptrMatchExpression) {
+    // For fully open intervals we don't create match expressions.
+    BSONObj keyPattern = fromjson("{a: 1}");
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::allValuesForField(keyPattern.firstElement(), &oil);
+    ASSERT(oil.isFullyOpen());
+
+    IndexBounds bounds;
+    bounds.fields.push_back(oil);
+    auto expr = getMatchExpressionFromBounds(bounds, nullptr);
+    ASSERT(expr == nullptr);
+}
+
+TEST(CardinalityEstimator, RangeIntervalToAndMatchExpression) {
+    OrderedIntervalList rangeOIL("a");
+    auto range = BSON("" << 5.0 << "" << 10.0);
+    rangeOIL.intervals.push_back(
+        IndexBoundsBuilder::makeRangeInterval(range, BoundInclusion::kIncludeBothStartAndEndKeys));
+    IndexBounds bounds;
+    bounds.fields.push_back(rangeOIL);
+    auto expr = getMatchExpressionFromBounds(bounds, nullptr);
+
+    BSONObj query = fromjson("{a: {$gte: 5, $lte: 10}}");
+    auto parsedExpr = parse(query);
+
+    ASSERT(expr->equivalent(parsedExpr.get()));
+}
+
+
+TEST(CardinalityEstimator, OpenRangeIntervalToGTEMatchExpression) {
+    std::vector<std::string> indexFields = {"a"};
+    // Bounds for [3, inf)
+    IndexBounds bounds =
+        makeRangeIntervalBounds(BSON("" << 3.0 << "" << std::numeric_limits<double>::infinity()),
+                                BoundInclusion::kIncludeStartKeyOnly,
+                                indexFields[0]);
+    auto expr = getMatchExpressionFromBounds(bounds, nullptr);
+
+    BSONObj query = fromjson("{a: {$gte: 3}}");
+    auto parsedExpr = parse(query);
+    ASSERT(expr->equivalent(parsedExpr.get()));
+}
+
+TEST(CardinalityEstimator, OpenRangeIntervalToLTMatchExpression) {
+    std::vector<std::string> indexFields = {"a"};
+    // Bounds for ["", "sun")
+    IndexBounds bounds = makeRangeIntervalBounds(
+        BSON("" << "" << "" << "sun"), BoundInclusion::kIncludeStartKeyOnly, indexFields[0]);
+    auto expr = getMatchExpressionFromBounds(bounds, nullptr);
+
+    BSONObj query = fromjson("{a: {$lt: 'sun'}}");
+    auto parsedExpr = parse(query);
+    ASSERT(expr->equivalent(parsedExpr.get()));
+}
+
+TEST(CardinalityEstimator, TwoIntervalsAndExpressionToAndMatchExpression) {
+    auto pointOIL = makePointInterval(100, "a");
+    OrderedIntervalList rangeOIL("b");
+    auto range = BSON("" << 5 << "" << 10);
+    rangeOIL.intervals.push_back(
+        IndexBoundsBuilder::makeRangeInterval(range, BoundInclusion::kIncludeBothStartAndEndKeys));
+    IndexBounds bounds;
+    bounds.fields.push_back(pointOIL);
+    bounds.fields.push_back(rangeOIL);
+
+    auto pred = fromjson("{c : 'xyz'}");
+    auto parsedPred = parse(pred);
+
+    auto expr = getMatchExpressionFromBounds(bounds, parsedPred.get());
+    auto optExpr = MatchExpression::optimize(std::move(expr));
+
+    BSONObj query = fromjson("{a: 100,  c : 'xyz', b: {$gte: 5, $lte: 10}}");
+    auto parsedExpr = parse(query);
+
+    ASSERT(optExpr->equivalent(parsedExpr.get()));
+}
+
+// Cardinality estimator with sampling.
+TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScans) {
+    size_t collCard = 1000;
+    ce::SamplingEstimatorTest samplingEstimatorTest;
+    samplingEstimatorTest.setUp();
+    auto samplingEstimator = samplingEstimatorTest.createSamplingEstimatorForTesting(collCard, 200);
+
+    // Create indexed plan without filter.
+    std::vector<std::string> indexFields = {"a", "b"};
+    IndexBounds bounds;
+    bounds.fields.push_back(makePointInterval(50, indexFields[0]));
+    OrderedIntervalList oilRange(indexFields[1]);
+    oilRange.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 4 << "" << 6), BoundInclusion::kIncludeBothStartAndEndKeys));
+    bounds.fields.push_back(oilRange);
+
+    auto plan = makeIndexScanFetchPlan(std::move(bounds), std::move(indexFields));
+
+    // Use cardinalityEstimator that uses index bounds.
+    auto estIB = getPlanSamplingCE(*plan, collCard, &samplingEstimator, true /*_useIndexBounds*/);
+
+    // Use cardinalityEstimator that uses match expression conversion.
+    auto estME = getPlanSamplingCE(*plan, collCard, &samplingEstimator, false /*_useIndexBounds*/);
+
+    ASSERT_EQUALS(estIB, estME);
+}
+
+TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanAndFetch) {
+    size_t collCard = 1000;
+    ce::SamplingEstimatorTest samplingEstimatorTest;
+    samplingEstimatorTest.setUp();
+    auto samplingEstimator = samplingEstimatorTest.createSamplingEstimatorForTesting(collCard, 200);
+
+    // Create indexed plan with a fetch filter.
+    std::vector<std::string> indexFields = {"a"};
+    BSONObj fetchCond = fromjson("{$or: [{b: 5}, {c: 'xyz'}]}");
+    auto fetchExpr = parse(fetchCond);
+    auto plan = makeIndexScanFetchPlan(
+        makePointIntervalBounds(50.0, indexFields[0]), indexFields, nullptr, std::move(fetchExpr));
+
+    // Use cardinalityEstimator that uses index bounds.
+    auto estIB = getPlanSamplingCE(*plan, collCard, &samplingEstimator, true /*_useIndexBounds*/);
+
+    // Use cardinalityEstimator that uses match expression conversion.
+    auto estME = getPlanSamplingCE(*plan, collCard, &samplingEstimator, false /*_useIndexBounds*/);
+
+    ASSERT_EQUALS(estIB, estME);
 }
 
 }  // unnamed namespace

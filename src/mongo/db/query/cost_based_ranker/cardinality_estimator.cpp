@@ -29,7 +29,9 @@
 
 #include "mongo/db/query/cost_based_ranker/cardinality_estimator.h"
 
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/query/ce/histogram/histogram_estimator.h"
 #include "mongo/db/query/cost_based_ranker/heuristic_estimator.h"
 #include "mongo/db/query/index_bounds_builder.h"
@@ -44,14 +46,16 @@ namespace mongo::cost_based_ranker {
 CardinalityEstimator::CardinalityEstimator(const CollectionInfo& collInfo,
                                            const ce::SamplingEstimator* samplingEstimator,
                                            EstimateMap& qsnEstimates,
-                                           QueryPlanRankerModeEnum rankerMode)
+                                           QueryPlanRankerModeEnum rankerMode,
+                                           bool useIndexBounds)
     : _collCard{CardinalityEstimate{CardinalityType{collInfo.collStats->getCardinality()},
                                     EstimationSource::Metadata}},
       _inputCard{_collCard},
       _collInfo(collInfo),
       _samplingEstimator(samplingEstimator),
       _qsnEstimates{qsnEstimates},
-      _rankerMode(rankerMode) {
+      _rankerMode(rankerMode),
+      _useIndexBounds(useIndexBounds) {
     if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE ||
         _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
         tassert(9746501,
@@ -451,7 +455,21 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     // dedupication and applying the filter. This approach does not combine selectivity computed
     // from the index scan.
     if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
-        auto ridsEst = _samplingEstimator->estimateRIDs(node->bounds, node->filter.get());
+        auto ridsEst = [&]() -> CardinalityEstimate {
+            if (_useIndexBounds) {
+                return _samplingEstimator->estimateRIDs(node->bounds, node->filter.get());
+            } else {
+                auto matchExpr = getMatchExpressionFromBounds(node->bounds, node->filter.get());
+                if (matchExpr) {
+                    return _samplingEstimator->estimateCardinality(matchExpr.get());
+                }
+                // In the case of fully open interval ([MinKey, MaxKey]), we do not construct match
+                // expression equivalent to the index bounds. This can happen for instance if an
+                // index scan used to satisfy a sort. In this case return input cardinality.
+                return _inputCard;
+            }
+        }();
+
         _conjSels.emplace_back(ridsEst / _inputCard);
         est.outCE = ridsEst;
         CardinalityEstimate outCE{est.outCE};
@@ -503,8 +521,23 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
         static_cast<const IndexScanNode*>(node->children[0].get())->filter ==
             nullptr &&  // TODO SERVER-98577: Remove this restriction
         _rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
-        auto ce = _samplingEstimator->estimateRIDs(
-            static_cast<const IndexScanNode*>(node->children[0].get())->bounds, node->filter.get());
+
+        auto& bounds = static_cast<const IndexScanNode*>(node->children[0].get())->bounds;
+        auto ce = [&]() -> CardinalityEstimate {
+            if (_useIndexBounds) {
+                return _samplingEstimator->estimateRIDs(bounds, node->filter.get());
+            } else {
+                auto matchExpr = getMatchExpressionFromBounds(bounds, node->filter.get());
+                if (matchExpr) {
+                    return _samplingEstimator->estimateCardinality(matchExpr.get());
+                }
+                // In the case of fully open interval ([MinKey, MaxKey]), we do not construct match
+                // expression equivalent to the index bounds. This can happen for instance if an
+                // index scan used to satisfy a sort. In this case return the input cardinality.
+                return ceRes1.getValue();
+            }
+        }();
+
         popSelectivities();
         _conjSels.emplace_back(ce / _inputCard);
         est.outCE = ce;
@@ -1201,6 +1234,156 @@ CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node, bool fo
 
     resultCard = std::min(resultCard, _inputCard);
     return resultCard;
+}
+
+namespace {
+BSONObj minForType(BSONType type) {
+    BSONObjBuilder bMin;
+    bMin.appendMinForType("", stdx::to_underlying(type));
+    return bMin.obj();
+}
+
+BSONObj maxForType(BSONType type) {
+    BSONObjBuilder bMax;
+    bMax.appendMaxForType("", stdx::to_underlying(type));
+    return bMax.obj();
+}
+
+static const BSONObj kMinBsonInt = minForType(BSONType::numberInt);
+static const BSONObj kMaxBsonInt = maxForType(BSONType::numberInt);
+static const BSONObj kMinBsonString = minForType(BSONType::string);
+static const BSONObj kMaxBsonString = maxForType(BSONType::string);
+
+BSONObj maxBsonForType(BSONType type) {
+    switch (type) {
+        case BSONType::numberInt:
+        case BSONType::numberDouble:
+        case BSONType::numberLong:
+        case BSONType::numberDecimal:
+            return kMaxBsonInt;
+        case BSONType::string:
+            return kMaxBsonString;
+        default:
+            return maxForType(type);
+    }
+}
+
+BSONObj minBsonForType(BSONType type) {
+    switch (type) {
+        case BSONType::numberInt:
+        case BSONType::numberDouble:
+        case BSONType::numberLong:
+        case BSONType::numberDecimal:
+            return kMinBsonInt;
+        case BSONType::string:
+            return kMinBsonString;
+        default:
+            return minForType(type);
+    }
+}
+
+std::unique_ptr<MatchExpression> getMatchExpressionFromInterval(StringData path,
+                                                                const Interval& interval) {
+    if (interval.isFullyOpen()) {
+        return std::make_unique<AlwaysTrueMatchExpression>();
+    }
+
+    if (interval.isNull()) {
+        return std::make_unique<AlwaysFalseMatchExpression>();
+    }
+
+    if (interval.isPoint()) {
+        return std::make_unique<EqualityMatchExpression>(path, interval.start);
+    }
+
+    // Create other comparison expressions.
+    auto direction = interval.getDirection();
+    tassert(10450101,
+            "Expected interval with ascending or descending direction",
+            direction != Interval::Direction::kDirectionNone);
+
+    std::vector<std::unique_ptr<MatchExpression>> expressions;
+    bool isAscending = (direction == Interval::Direction::kDirectionAscending);
+
+    bool gtIncl = (isAscending) ? interval.startInclusive : interval.endInclusive;
+    auto& gtVal = (isAscending) ? interval.start : interval.end;
+    bool ltIncl = (isAscending) ? interval.endInclusive : interval.startInclusive;
+    auto& ltVal = (isAscending) ? interval.end : interval.start;
+
+    BSONElement minElem = minBsonForType(ltVal.type()).firstElement();
+    if (gtVal.woCompare(minElem, false) != 0) {
+        // Create an expression for the lower bound only if it is not minimal for the type.
+        if (gtIncl) {
+            expressions.push_back(std::make_unique<GTEMatchExpression>(path, gtVal));
+        } else {
+            expressions.push_back(std::make_unique<GTMatchExpression>(path, gtVal));
+        };
+    }
+
+    BSONElement maxElem = maxBsonForType(gtVal.type()).firstElement();
+    if (ltVal.woCompare(maxElem, false) != 0) {
+        // Create an expression for the upper bound only if it is not maximal for the type.
+        if (ltIncl) {
+            expressions.push_back(std::make_unique<LTEMatchExpression>(path, ltVal));
+        } else {
+            expressions.push_back(std::make_unique<LTMatchExpression>(path, ltVal));
+        };
+    }
+
+    tassert(10450102,
+            "The interval should have at least one bound different from default min and max values",
+            expressions.size() >= 1);
+    if (expressions.size() == 1) {
+        return std::move(expressions[0]);
+    }
+    return std::make_unique<AndMatchExpression>(std::move(expressions));
+}
+
+std::unique_ptr<MatchExpression> getMatchExpressionFromOIL(const OrderedIntervalList* oil) {
+    if (oil->isFullyOpen()) {
+        // Do not create expression for intervals containing all values of a field.
+        return nullptr;
+    }
+
+    if (oil->intervals.size() == 0) {
+        // Edge case when interval intersection is empty. For instance: {$and: [{"a": 1}, {"a" :
+        // 5}]}. Create an ALWAYS_FALSE expression.
+        return std::make_unique<AlwaysFalseMatchExpression>();
+    }
+
+    const auto path = StringData(oil->name);
+    std::vector<std::unique_ptr<MatchExpression>> expressions;
+    for (const auto& interval : oil->intervals) {
+        auto expr = getMatchExpressionFromInterval(path, interval);
+        expressions.push_back(std::move(expr));
+    }
+    if (expressions.size() == 1) {
+        return std::move(expressions[0]);
+    }
+    // Make an OR match expression for the disjunction of intervals.
+    return std::make_unique<OrMatchExpression>(std::move(expressions));
+}
+}  // namespace
+
+std::unique_ptr<MatchExpression> getMatchExpressionFromBounds(const IndexBounds& bounds,
+                                                              const MatchExpression* filterExpr) {
+    std::vector<std::unique_ptr<MatchExpression>> expressions;
+
+    for (auto& oil : bounds.fields) {
+        auto conj = getMatchExpressionFromOIL(&oil);
+        if (conj) {
+            expressions.push_back(std::move(conj));
+        }
+    }
+    if (filterExpr) {
+        expressions.push_back(filterExpr->clone());
+    }
+    if (expressions.size() > 1) {
+        return std::make_unique<AndMatchExpression>(std::move(expressions));
+    } else if (expressions.size() == 1) {
+        return std::move(expressions[0]);
+    }
+    return nullptr;
 }
 
 }  // namespace mongo::cost_based_ranker

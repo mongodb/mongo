@@ -361,4 +361,26 @@ void SamplingAccuracyTest::runSamplingEstimatorTestConfiguration(
     }
 }
 
+SamplingEstimatorForTesting SamplingEstimatorTest::createSamplingEstimatorForTesting(
+    size_t collCard, size_t sampleSize) {
+    insertDocuments(_kTestNss, createDocuments(collCard));
+
+    AutoGetCollection collPtr(operationContext(), _kTestNss, LockMode::MODE_IX);
+    auto colls = MultipleCollectionAccessor(operationContext(),
+                                            &collPtr.getCollection(),
+                                            _kTestNss,
+                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
+                                            {});
+
+    SamplingEstimatorForTesting samplingEstimator(
+        operationContext(),
+        colls,
+        sampleSize,
+        SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        boost::none,
+        makeCardinalityEstimate(collCard));
+
+    return samplingEstimator;
+}
+
 }  // namespace mongo::ce
