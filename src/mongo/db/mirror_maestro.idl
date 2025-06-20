@@ -86,3 +86,12 @@ server_parameters:
             data: "synchronized_value<MirroredReadsParameters>"
             override_set: true
         redact: false
+    mirrorReadsMaxConnPoolSize:
+        description: "The maximum number of connections that the MirrorMaestro connection pool can keep open"
+        set_at: [startup, runtime]
+        cpp_varname: "gMirrorMaestroConnPoolMaxSize"
+        cpp_vartype: AtomicWord<int>
+        validator:
+            gte: 1
+        default: 4
+        redact: false
