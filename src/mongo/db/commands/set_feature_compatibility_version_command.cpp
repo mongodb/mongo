@@ -819,6 +819,18 @@ private:
         const auto isUpgrading = originalVersion < requestedVersion;
 
         if (isDowngrading) {
+            // Drain ongoing chunk migrations to ensure that no backwards-incompatible metadata
+            // will be persisted in their recovery docs.
+            // TODO SERVER-103838 Remove this code block once 9.0 becomes LTS.
+            if (feature_flags::gPersistRecipientPlacementInfoInMigrationRecoveryDoc
+                    .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
+                                                                  originalVersion)) {
+                static constexpr char kRegistryLockReason[] = "Performing FCV Downgrade";
+                auto& activeMigrationRegistry = ActiveMigrationsRegistry::get(opCtx);
+                activeMigrationRegistry.lock(opCtx, kRegistryLockReason);
+                activeMigrationRegistry.unlock(kRegistryLockReason);
+            }
+
             // TODO SERVER-99655: update once gSnapshotFCVInDDLCoordinators is enabled
             // on the lastLTS
             if (feature_flags::gSnapshotFCVInDDLCoordinators.isEnabledOnVersion(originalVersion)) {
@@ -871,18 +883,6 @@ private:
                     ShardingDDLCoordinatorService::getService(opCtx)
                         ->waitForCoordinatorsOfGivenTypeToComplete(
                             opCtx, DDLCoordinatorTypeEnum::kRemoveShardCommit);
-                }
-
-                // Drain ongoing chunk migrations to ensure that no backwards-incompatible metadata
-                // will be persisted in their recovery docs.
-                // TODO SERVER-103838 Remove this code block once 9.0 becomes LTS.
-                if (feature_flags::gPersistRecipientPlacementInfoInMigrationRecoveryDoc
-                        .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
-                                                                      originalVersion)) {
-                    static constexpr char kRegistryLockReason[] = "Performing FCV Downgrade";
-                    auto& activeMigrationRegistry = ActiveMigrationsRegistry::get(opCtx);
-                    activeMigrationRegistry.lock(opCtx, kRegistryLockReason);
-                    activeMigrationRegistry.unlock(kRegistryLockReason);
                 }
             }
         }
