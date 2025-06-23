@@ -53,10 +53,13 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/log_and_backoff.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -107,10 +110,10 @@ std::string generateNewResumableIndexBuildIdent() {
 
 StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
                                      std::unique_ptr<KVEngine> engine,
-                                     std::unique_ptr<KVEngine> spillKVEngine,
+                                     std::unique_ptr<KVEngine> spillEngine,
                                      StorageEngineOptions options)
     : _engine(std::move(engine)),
-      _spillKVEngine(std::move(spillKVEngine)),
+      _spillEngine(std::move(spillEngine)),
       _options(std::move(options)),
       _dropPendingIdentReaper(_engine.get()),
       _minOfCheckpointAndOldestTimestampListener(
@@ -486,8 +489,8 @@ void StorageEngineImpl::cleanShutdown(ServiceContext* svcCtx, bool memLeakAllowe
         memLeakAllowed = false;
     }
 
-    if (_spillKVEngine) {
-        _spillKVEngine->cleanShutdown(memLeakAllowed);
+    if (_spillEngine) {
+        _spillEngine->cleanShutdown(memLeakAllowed);
     }
 
     _engine->cleanShutdown(memLeakAllowed);
@@ -628,15 +631,40 @@ Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx,
 std::unique_ptr<SpillTable> StorageEngineImpl::makeSpillTable(OperationContext* opCtx,
                                                               KeyFormat keyFormat,
                                                               int64_t thresholdBytes) {
-    invariant(_spillKVEngine);
-    auto ru = _spillKVEngine->newRecoveryUnit();
+    invariant(_spillEngine);
+    auto ru = _spillEngine->newRecoveryUnit();
     std::unique_ptr<RecordStore> rs =
-        _spillKVEngine->makeTemporaryRecordStore(*ru, ident::generateNewInternalIdent(), keyFormat);
+        _spillEngine->makeTemporaryRecordStore(*ru, ident::generateNewInternalIdent(), keyFormat);
     LOGV2_DEBUG(10380301, 1, "Created spill table", "ident"_attr = rs->getIdent());
+
     return std::make_unique<SpillTable>(std::move(ru),
                                         std::move(rs),
+                                        *this,
                                         *DiskSpaceMonitor::get(opCtx->getServiceContext()),
                                         thresholdBytes);
+}
+
+void StorageEngineImpl::dropSpillTable(RecoveryUnit& ru, StringData ident) {
+    // TODO (SERVER-100890): Remove this retry loop.
+    for (size_t retries = 0;; ++retries) {
+        auto status = _spillEngine->dropIdent(ru,
+                                              ident,
+                                              false, /* identHasSizeInfo */
+                                              nullptr /* onDrop */);
+        if (status.isOK()) {
+            return;
+        }
+        if (status != ErrorCodes::ObjectIsBusy) {
+            uassertStatusOK(status);
+        }
+
+        logAndBackoff(10327300,
+                      logv2::LogComponent::kStorage,
+                      logv2::LogSeverity::Log(),
+                      retries,
+                      "Failed to drop spill table, retrying",
+                      "error"_attr = status);
+    }
 }
 
 std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStore(
