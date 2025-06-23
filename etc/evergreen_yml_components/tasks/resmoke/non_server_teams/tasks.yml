@@ -358,12 +358,7 @@ tasks:
   # Experimental task running the jstestfuzz suite bazel target. To be removed with SERVER-103537.
   - <<: *jstestfuzz_template
     name: bazel_jstestfuzz_gen
-    tags:
-      [
-        "assigned_to_jira_team_devprod_correctness",
-        "experimental",
-        "jstestfuzz",
-      ]
+    tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -387,7 +382,7 @@ tasks:
         "assigned_to_jira_team_devprod_correctness",
         "experimental",
         "multiversion",
-        "multiversion_sanity_check",
+        "future_git_tag_incompatible",
       ]
     commands:
       - func: "generate resmoke tasks"
