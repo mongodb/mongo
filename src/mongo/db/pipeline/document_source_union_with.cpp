@@ -137,8 +137,8 @@ void validateUnionWithCollectionlessPipeline(
     LOGV2_DEBUG(5909700,
                 4,
                 "$unionWith validating collectionless pipeline",
-                "pipeline"_attr = pipeline,
-                "first"_attr = firstStageBson);
+                "pipeline"_attr = Pipeline::serializePipelineForLogging(*pipeline),
+                "first"_attr = redact(firstStageBson));
     uassert(ErrorCodes::FailedToParse,
             errMsg,
             // TODO SERVER-59628 replace with constraints check

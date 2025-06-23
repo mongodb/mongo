@@ -151,7 +151,10 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearchMeta::createFromBso
     // provide).
     if (specObj.hasField(InternalSearchMongotRemoteSpec::kMongotQueryFieldName)) {
         auto params = InternalSearchMongotRemoteSpec::parse(IDLParserContext(kStageName), specObj);
-        LOGV2_DEBUG(8569405, 4, "Parsing as $internalSearchMongotRemote", "params"_attr = params);
+        LOGV2_DEBUG(8569405,
+                    4,
+                    "Parsing as $internalSearchMongotRemote",
+                    "params"_attr = redact(params.toBSON()));
         auto executor = executor::getMongotTaskExecutor(expCtx->opCtx->getServiceContext());
         return {make_intrusive<DocumentSourceSearchMeta>(std::move(params), expCtx, executor)};
     }

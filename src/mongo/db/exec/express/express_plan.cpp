@@ -105,7 +105,7 @@ void logRecordNotFound(OperationContext* opCtx,
         "collection.",
         logAttrs(ns),
         "recordId"_attr = rid,
-        "indexKeyData"_attr = indexKeyData);
+        "indexKeyData"_attr = redact(indexKeyData));
 }
 
 }  // namespace express

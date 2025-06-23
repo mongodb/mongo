@@ -217,7 +217,7 @@ private:
                 auto status = exceptionToStatus();
                 LOGV2_WARNING(4988200,
                               "JS Thread exiting after catching unhandled exception",
-                              "error"_attr = status);
+                              "error"_attr = redact(status));
                 thisv->_sharedData->setErrorStatus(status);
                 thisv->_sharedData->_returnData = BSON("ret" << BSONUndefined);
             }

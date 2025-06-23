@@ -928,7 +928,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> tryAttachCursorSourceForLocalRead(
                     3,
                     "Performing local read",
                     logAttrs(expCtx.ns),
-                    "pipeline"_attr = pipelineWithCursor->serializeToBson(),
+                    "pipeline"_attr = pipelineWithCursor->serializeForLogging(),
                     "comment"_attr = expCtx.opCtx->getComment());
 
         return pipelineWithCursor;
@@ -1975,7 +1975,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     LOGV2_DEBUG(9497004,
                 5,
                 "Preparing pipeline for execution",
-                "pipeline"_attr = pipeline->serializeToBson());
+                "pipeline"_attr = pipeline->serializeForLogging());
 
     if (firstStageCanExecuteWithoutCursor(*pipeline)) {
         // There's no need to attach a cursor here - the first stage provides its own data and

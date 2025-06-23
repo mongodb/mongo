@@ -195,7 +195,7 @@ InternalSearchMongotRemoteSpec planShardedSearch(
                 5,
                 "planShardedSearch",
                 "ns"_attr = expCtx->ns.coll(),
-                "searchRequest"_attr = searchRequest);
+                "searchRequest"_attr = redact(searchRequest));
     // Mongos issues the 'planShardedSearch' command rather than 'search' in order to:
     // * Create the merging pipeline.
     // * Get a sortSpec.
@@ -219,7 +219,8 @@ InternalSearchMongotRemoteSpec planShardedSearch(
     InternalSearchMongotRemoteSpec remoteSpec(searchRequest.getOwned(),
                                               response.data["protocolVersion"_sd].Int());
     auto rawPipeline = response.data["metaPipeline"];
-    LOGV2_DEBUG(9497009, 5, "planShardedSearch response", "mergePipeline"_attr = rawPipeline);
+    LOGV2_DEBUG(
+        9497009, 5, "planShardedSearch response", "mergePipeline"_attr = redact(rawPipeline));
     auto parsedPipeline = mongo::Pipeline::parseFromArray(rawPipeline, expCtx);
     remoteSpec.setMergingPipeline(parsedPipeline->serializeToBson());
     if (response.data.hasElement("sortSpec")) {

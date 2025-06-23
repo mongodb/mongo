@@ -352,8 +352,8 @@ Pipeline::SourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
     LOGV2_DEBUG(5860209,
                 5,
                 "$geoNear splitForTimeseries",
-                "pipeline"_attr = Pipeline::serializeContainer(*container),
-                "replacement"_attr = Pipeline::serializeContainer(replacement));
+                "pipeline"_attr = Pipeline::serializeContainerForLogging(*container),
+                "replacement"_attr = Pipeline::serializeContainerForLogging(replacement));
 
     auto prev = std::prev(itr);
     std::move(replacement.begin(), replacement.end(), std::inserter(*container, itr));

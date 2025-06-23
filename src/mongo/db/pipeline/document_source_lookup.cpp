@@ -594,7 +594,8 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
     try {
         pipeline = buildPipeline(_fromExpCtx, inputDoc);
-        LOGV2_DEBUG(9497000, 5, "Built pipeline", "pipeline"_attr = pipeline->serializeToBson());
+        LOGV2_DEBUG(
+            9497000, 5, "Built pipeline", "pipeline"_attr = pipeline->serializeForLogging());
     } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
         // If lookup on a sharded collection is disallowed and the foreign collection is sharded,
         // throw a custom exception.
@@ -732,8 +733,8 @@ PipelinePtr DocumentSourceLookUp::buildPipeline(
                         "$lookup found view definition. ns: {namespace}, pipeline: {pipeline}. New "
                         "$lookup sub-pipeline: {new_pipe}",
                         logAttrs(e->getNamespace()),
-                        "pipeline"_attr = Value(e->getPipeline()),
-                        "new_pipe"_attr = _resolvedPipeline);
+                        "pipeline"_attr = Pipeline::serializePipelineForLogging(e->getPipeline()),
+                        "new_pipe"_attr = Pipeline::serializePipelineForLogging(_resolvedPipeline));
 
             // We can now safely optimize and reattempt attaching the cursor source.
             pipeline = Pipeline::makePipeline(_resolvedPipeline, fromExpCtx, pipelineOpts);
@@ -783,8 +784,8 @@ PipelinePtr DocumentSourceLookUp::buildPipeline(
                         "$lookup found view definition. ns: {namespace}, pipeline: {pipeline}. New "
                         "$lookup sub-pipeline: {new_pipe}",
                         logAttrs(e->getNamespace()),
-                        "pipeline"_attr = Value(e->getPipeline()),
-                        "new_pipe"_attr = _resolvedPipeline);
+                        "pipeline"_attr = Pipeline::serializePipelineForLogging(e->getPipeline()),
+                        "new_pipe"_attr = Pipeline::serializePipelineForLogging(_resolvedPipeline));
 
             // Try to attach the cursor source again.
             pipeline = pExpCtx->mongoProcessInterface->preparePipelineForExecution(

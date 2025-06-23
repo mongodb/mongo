@@ -54,8 +54,10 @@ using CmpOp = ExpressionCompare::CmpOp;
 
 RewriteExpr::RewriteResult RewriteExpr::rewrite(const boost::intrusive_ptr<Expression>& expression,
                                                 const CollatorInterface* collator) {
-    LOGV2_DEBUG(
-        20725, 5, "Expression prior to rewrite", "expression"_attr = expression->serialize());
+    LOGV2_DEBUG(20725,
+                5,
+                "Expression prior to rewrite",
+                "expression"_attr = redact(expression->serialize().toString()));
 
     RewriteExpr rewriteExpr(collator);
     std::unique_ptr<MatchExpression> matchExpression;
@@ -65,7 +67,7 @@ RewriteExpr::RewriteResult RewriteExpr::rewrite(const boost::intrusive_ptr<Expre
         LOGV2_DEBUG(20726,
                     5,
                     "Post-rewrite MatchExpression",
-                    "expression"_attr = matchExpression->debugString());
+                    "expression"_attr = redact(matchExpression->debugString()));
         // The Boolean simplifier is disabled since we don't want to simplify sub-expressions, but
         // simplify the whole expression instead.
         matchExpression =
@@ -73,7 +75,7 @@ RewriteExpr::RewriteResult RewriteExpr::rewrite(const boost::intrusive_ptr<Expre
         LOGV2_DEBUG(20727,
                     5,
                     "Post-rewrite/post-optimized MatchExpression",
-                    "expression"_attr = matchExpression->debugString());
+                    "expression"_attr = redact(matchExpression->debugString()));
     }
 
     return {std::move(matchExpression),

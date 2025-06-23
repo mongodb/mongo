@@ -418,7 +418,7 @@ public:
             LOGV2_DEBUG(7298307,
                         2,
                         "Constructed targeted write command for a write without shard key",
-                        "cmdObj"_attr = cmdObj);
+                        "cmdObj"_attr = redact(cmdObj));
 
             AsyncRequestsSender::Request arsRequest(shardId, cmdObj);
             std::vector<AsyncRequestsSender::Request> arsRequestVector({arsRequest});
@@ -452,7 +452,7 @@ public:
             LOGV2_DEBUG(7298308,
                         2,
                         "Finished targeted write command for a write without shard key",
-                        "response"_attr = response.data);
+                        "response"_attr = redact(response.data));
 
             return Response(response.data, shardId.toString());
         }
