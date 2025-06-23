@@ -30,6 +30,7 @@ executor:
       nodb: ''
       global_vars:
         TestData:
+          implicitClusterCollections: true
           setParameters:
             enableTestCommands: 1
             failpoint.clusterAllCollectionsByDefault: "{mode: 'alwaysOn'}"

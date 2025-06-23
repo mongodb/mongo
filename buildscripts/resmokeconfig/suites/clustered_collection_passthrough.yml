@@ -81,6 +81,9 @@ executor:
     n: 20
   config:
     shell_options:
+      global_vars:
+        TestData:
+          implicitClusterCollections: true
       eval: >-
         globalThis.testingReplication = true;
   fixture:
