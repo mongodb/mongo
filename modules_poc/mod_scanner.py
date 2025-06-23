@@ -255,12 +255,6 @@ def get_visibility(
     for child in c.get_children():
         if child.kind != CursorKind.ANNOTATE_ATTR:
             continue
-        if is_internal_namespace:
-            perr(
-                pretty_location(c.location)
-                + ": namespaces ending in 'detail(s)' or 'internal(s)' are implicitly private, ignoring module tag"
-            )
-            break
         terms = child.spelling.split("::")
         if not (len(terms) >= 3 and terms.pop(0) == "mongo" and terms.pop(0) == "mod"):
             continue
@@ -270,6 +264,13 @@ def get_visibility(
             if scanning_parent:
                 continue  # shallow doesn't apply to children
         attr = terms.pop(0)
+        if is_internal_namespace and not attr.endswith("private"):
+            perr(
+                pretty_location(c.location)
+                + ": namespaces ending in 'detail(s)' or 'internal(s)' are implicitly private."
+                + " Attributes other than MONGO_MOD_FILE_PRIVATE are ignored."
+            )
+            break
         if terms:
             alt = "::".join(terms)
             assert attr in ("use_replacement",)
@@ -293,37 +294,18 @@ def get_visibility(
                 attr = "public"
         return GetVisibilityResult(attr, alt, c, last_non_ns_parent)
 
-    # details and internal namespaces
-    if is_internal_namespace and in_complete_header:
-        return GetVisibilityResult("private", None, c, last_non_ns_parent)
-
-    # Apply high-priority defaults that override parent's visibility
-    if not scanning_parent:
-        # TODO consider making PROTECTED also default to module private
-        if c.access_specifier == AccessSpecifier.PRIVATE:
+    # Apply high-priority defaults that override parent's visibility.
+    if in_complete_header:
+        # details and internal namespaces
+        if is_internal_namespace:
             return GetVisibilityResult("private", None, c, last_non_ns_parent)
 
-        # TODO: Unfortunately these rules are violated on 64 declarations,
-        # so it can't be enabled yet.
-        #
-        # - Some of the forTest methods appear to be intended as helpers for
-        #   consumers writing tests. We may want to use a different suffix like
-        #   "forTests" for that.
-        # - The usages of details namespace violations are more tricky, and there
-        #   appear to be a few kinds:
-        #   - True violations: we should fix these.
-        #   - Files not mapped to modules correctly: we should fix the mapping.
-        #   - APIs intended to be used from macro implementations: We might be
-        #     able to fix these by using clang_getFileLocation rather than
-        #     clang_getInstantiationLocation, but I don't think we want to do
-        #     that everywhere and it isn't currently exposed from python.
-        #     For now we may just want to mark those as public.
-        #   - Types not intended to be named directly by consumers, but used as
-        #     part of public APIs (eg return types or base classes) such that
-        #     consumers are expected to use their APIs. Maybe they should be
-        #     declared public anyway?
-        if 0:  # :(
-            if c.spelling.endswith("forTest"):
+        if c.spelling.endswith("_forTest"):
+            return GetVisibilityResult("file_private", None, c, last_non_ns_parent)
+
+        if not scanning_parent:
+            # TODO consider making PROTECTED also default to module private
+            if c.access_specifier == AccessSpecifier.PRIVATE:
                 return GetVisibilityResult("private", None, c, last_non_ns_parent)
 
     if c.normalized_parent:

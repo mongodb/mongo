@@ -236,7 +236,7 @@ def main(
                 assert file_base.startswith("src/mongo/")
 
                 file_family_regex = re.compile(
-                    rf"[\w/]*{file_base}(?:_(?:internals?|details?|test|bm|mock)(_.*)?)?\."
+                    rf"(?:.*/)?{file_base}(?:_(?:internals?|details?|test|bm|mock)(_.*)?)?\."
                 )
                 assert file_family_regex.match(decl["loc"])  # sanity check
 
