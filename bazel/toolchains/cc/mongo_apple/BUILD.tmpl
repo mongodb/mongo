@@ -14,6 +14,13 @@ filegroup(
     srcs = glob(["**/*"]),
 )
 
+DEBUG_LEVEL = select({
+    "@//bazel/config:gcc_or_clang_dbg_level_0": 0,
+    "@//bazel/config:gcc_or_clang_dbg_level_1": 1,
+    "@//bazel/config:gcc_or_clang_dbg_level_2": 2,
+    "@//bazel/config:gcc_or_clang_dbg_level_3": 3,
+})
+
 [
     cc_toolchain(
         name = "cc-compiler-" + arch,
@@ -64,6 +71,7 @@ feature_attrs = get_common_features_attrs()
         },
         builtin_sysroot = "@//bazel/config:sdkroot",
         optimization_level = feature_attrs[FEATURES_ATTR_NAMES.OPT_LEVEL],
+        debug_level = DEBUG_LEVEL,
     )
     for arch, cpu in get_supported_apple_archs().items()
 ]

@@ -188,4 +188,72 @@ def get_apple_features(ctx):
                 ),
             ],
         ),
+        # TODO(SERVER-105741): feature g0, g1, g2, g3 were copied from ../mongo_linux/mongo_linux_cc_toolchain_config.bzl file.
+        # Since we are combining the Linux and Apple toolchains config together, the merging of the
+        # debug_level feature will be done at the same time. Need to pay attention to the disable_debug_symbols
+        # attribute and other implied features in mongo_linux_cc_toolchain_config.bzl file during the merge.
+        feature(
+            name = "g0",
+            enabled = ctx.attr.debug_level == 0,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                "-g0",
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        feature(
+            name = "g1",
+            enabled = ctx.attr.debug_level == 1,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                "-g1",
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        feature(
+            name = "g2",
+            enabled = ctx.attr.debug_level == 2,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                "-g2",
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        feature(
+            name = "g3",
+            enabled = ctx.attr.debug_level == 3,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                "-g3",
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
     ]

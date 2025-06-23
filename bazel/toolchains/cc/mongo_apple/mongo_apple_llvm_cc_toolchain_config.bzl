@@ -1719,6 +1719,7 @@ mongo_apple_llvm_cc_toolchain_config = rule(
         "unfiltered_compile_flags": attr.string_list(),
         "builtin_sysroot": attr.label(mandatory = True),
         "optimization_level": attr.string(mandatory = False),
+        "debug_level": attr.int(mandatory = False),
     },
     fragments = ["apple", "cpp"],
     provides = [CcToolchainConfigInfo],
