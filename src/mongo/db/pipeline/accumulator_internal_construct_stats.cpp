@@ -93,7 +93,7 @@ void AccumulatorInternalConstructStats::processInternal(const Value& input, bool
     //      {val: {_id: ..., val: "some value from the collection"}, sampleRate: 0.5}
     auto val = doc["val"][InternalConstructStatsAccumulatorParams::kValFieldName];
 
-    LOGV2_DEBUG(6735800, 4, "Extracted document", "val"_attr = val);
+    LOGV2_DEBUG(6735800, 4, "Extracted document", "val"_attr = redact(val.toString()));
     _values.emplace_back(stats::SBEValue(sbe::value::makeValue(val)));
 
     _count++;

@@ -159,7 +159,7 @@ void SessionInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
                 LOGV2_INFO(22791,
                            "Failed to end logical session",
                            "lsid"_attr = lsid,
-                           "error"_attr = status);
+                           "error"_attr = redact(status));
             } catch (...) {
                 // This is here in case logging fails.
             }

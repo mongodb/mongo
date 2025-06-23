@@ -1668,7 +1668,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     LOGV2_DEBUG(9497004,
                 5,
                 "Preparing pipeline for execution",
-                "pipeline"_attr = pipeline->serializeToBson());
+                "pipeline"_attr = pipeline->serializeForLogging());
 
     tassert(9597602,
             "Pipeline should not start with $mergeCursors",
@@ -1769,7 +1769,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
                                 3,
                                 "Performing local read",
                                 logAttrs(expCtx->ns),
-                                "pipeline"_attr = pipelineWithCursor->serializeToBson(),
+                                "pipeline"_attr = pipelineWithCursor->serializeForLogging(),
                                 "comment"_attr = expCtx->opCtx->getComment());
 
                     return pipelineWithCursor;

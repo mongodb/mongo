@@ -320,7 +320,8 @@ public:
     stdx::unordered_set<NamespaceString> getInvolvedCollections() const;
 
     /**
-     * Helpers to serialize a pipeline.
+     * Helpers to serialize a pipeline. If serializing for logging, use one of the "*forLogging"
+     * helpers, which handle redaction.
      */
     std::vector<Value> serialize(
         boost::optional<const SerializationOptions&> opts = boost::none) const;
@@ -329,6 +330,13 @@ public:
     static std::vector<Value> serializeContainer(
         const SourceContainer& container,
         boost::optional<const SerializationOptions&> opts = boost::none);
+
+    std::vector<BSONObj> serializeForLogging(
+        boost::optional<const SerializationOptions&> opts = boost::none) const;
+    static std::vector<BSONObj> serializeContainerForLogging(
+        const SourceContainer& container,
+        boost::optional<const SerializationOptions&> opts = boost::none);
+    static std::vector<BSONObj> serializePipelineForLogging(const std::vector<BSONObj>& pipeline);
 
     // The initial source is special since it varies between mongos and mongod.
     void addInitialSource(boost::intrusive_ptr<DocumentSource> source);

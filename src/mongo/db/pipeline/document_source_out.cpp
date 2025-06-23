@@ -85,7 +85,7 @@ DocumentSourceOut::~DocumentSourceOut() {
                 LOGV2_WARNING(7466203,
                               "Unexpected error dropping temporary collection; drop will complete "
                               "on next server restart",
-                              "error"_attr = e.toString(),
+                              "error"_attr = redact(e.toString()),
                               "coll"_attr = dropNs);
             };
         };

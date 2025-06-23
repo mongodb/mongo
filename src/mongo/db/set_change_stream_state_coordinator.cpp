@@ -223,7 +223,7 @@ SetChangeStreamStateCoordinatorService::getOrCreateInstance(OperationContext* op
             LOGV2_ERROR(6663106,
                         "Failed to create coordinator instance",
                         "service"_attr = kSetChangeStreamStateCoordinatorServiceName,
-                        "reason"_attr = ex);
+                        "reason"_attr = redact(ex));
             throw;
         }
     }();

@@ -126,7 +126,8 @@ DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::getNextNonDu
                 LOGV2_DEBUG(20903,
                             1,
                             "$sample encountered duplicate document: {nextInput_getDocument}",
-                            "nextInput_getDocument"_attr = nextInput.getDocument().toString());
+                            "nextInput_getDocument"_attr =
+                                redact(nextInput.getDocument().toString()));
                 break;  // Try again with the next document.
             }
             case GetNextResult::ReturnStatus::kPauseExecution: {
