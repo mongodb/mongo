@@ -134,13 +134,14 @@ public:
                    bool defaultFromMigrate,
                    OpStateAccumulator* opAccumulator = nullptr) override;
 
-    void onCreateCollection(OperationContext* opCtx,
-                            const CollectionPtr& coll,
-                            const NamespaceString& collectionName,
-                            const CollectionOptions& options,
-                            const BSONObj& idIndex,
-                            const OplogSlot& createOpTime,
-                            bool fromMigrate) override;
+    void onCreateCollection(
+        OperationContext* opCtx,
+        const NamespaceString& collectionName,
+        const CollectionOptions& options,
+        const BSONObj& idIndex,
+        const OplogSlot& createOpTime,
+        const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
+        bool fromMigrate) override;
 
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
@@ -256,16 +257,22 @@ void OpObserverMock::onInserts(OperationContext* opCtx,
         opCtx, coll, begin, end, recordIds, std::move(fromMigrate), defaultFromMigrate);
 }
 
-void OpObserverMock::onCreateCollection(OperationContext* opCtx,
-                                        const CollectionPtr& coll,
-                                        const NamespaceString& collectionName,
-                                        const CollectionOptions& options,
-                                        const BSONObj& idIndex,
-                                        const OplogSlot& createOpTime,
-                                        bool fromMigrate) {
+void OpObserverMock::onCreateCollection(
+    OperationContext* opCtx,
+    const NamespaceString& collectionName,
+    const CollectionOptions& options,
+    const BSONObj& idIndex,
+    const OplogSlot& createOpTime,
+    const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
+    bool fromMigrate) {
     _logOp(opCtx, collectionName, "create");
-    OpObserverNoop::onCreateCollection(
-        opCtx, coll, collectionName, options, idIndex, createOpTime, fromMigrate);
+    OpObserverNoop::onCreateCollection(opCtx,
+                                       collectionName,
+                                       options,
+                                       idIndex,
+                                       createOpTime,
+                                       createCollCatalogIdentifier,
+                                       fromMigrate);
 }
 
 repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,

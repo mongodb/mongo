@@ -600,7 +600,6 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommand) {
                         << UUID::gen());
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
-                                            const CollectionPtr&,
                                             const NamespaceString& collNss,
                                             const CollectionOptions&,
                                             const BSONObj&) {
@@ -625,7 +624,6 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenant) {
     auto op = BSON("create" << nss.coll());
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
-                                            const CollectionPtr&,
                                             const NamespaceString& collNss,
                                             const CollectionOptions&,
                                             const BSONObj&) {
@@ -658,7 +656,6 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenantRequireTenantIDFa
 
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
-                                            const CollectionPtr&,
                                             const NamespaceString& collNss,
                                             const CollectionOptions&,
                                             const BSONObj&) {
@@ -700,7 +697,6 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenantAlreadyExists) {
 
     // Target this callback to only work with nssTenant2
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
-                                            const CollectionPtr&,
                                             const NamespaceString& collNss,
                                             const CollectionOptions&,
                                             const BSONObj&) {
@@ -2582,7 +2578,6 @@ protected:
         _lsid = makeLogicalSessionId(_opCtx.get());
 
         _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
-                                                const CollectionPtr&,
                                                 const NamespaceString& collNss,
                                                 const CollectionOptions&,
                                                 const BSONObj&) {
@@ -3674,7 +3669,6 @@ TEST_F(OplogApplierImplTest,
 
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
-                                            const CollectionPtr&,
                                             const NamespaceString& collNss,
                                             const CollectionOptions&,
                                             const BSONObj&) {

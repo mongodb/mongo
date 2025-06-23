@@ -107,13 +107,14 @@ public:
                              const boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
                              const boost::optional<OplogSlot> slot) override {}
 
-    void onCreateCollection(OperationContext* opCtx,
-                            const CollectionPtr& coll,
-                            const NamespaceString& collectionName,
-                            const CollectionOptions& options,
-                            const BSONObj& idIndex,
-                            const OplogSlot& createOpTime,
-                            bool fromMigrate) override {}
+    void onCreateCollection(
+        OperationContext* opCtx,
+        const NamespaceString& collectionName,
+        const CollectionOptions& options,
+        const BSONObj& idIndex,
+        const OplogSlot& createOpTime,
+        const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
+        bool fromMigrate) override {}
 
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,

@@ -182,7 +182,7 @@ protected:
                 opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, false);
                 opObserver.onStartIndexBuildSinglePhase(opCtx, nss);
                 opObserver.onCreateCollection(
-                    opCtx, CollectionPtr(), nss, {}, BSONObj(), OplogSlot(), false);
+                    opCtx, nss, {}, BSONObj(), OplogSlot(), boost::none, false);
                 opObserver.onCollMod(opCtx, nss, uuid, BSONObj(), {}, boost::none);
                 opObserver.onDropDatabase(opCtx, nss.dbName(), false /*fromMigrate*/);
                 opObserver.onDropCollection(opCtx,
@@ -236,7 +236,7 @@ protected:
                           AssertionException);
             ASSERT_THROWS(opObserver.onStartIndexBuildSinglePhase(opCtx, nss), AssertionException);
             ASSERT_THROWS(opObserver.onCreateCollection(
-                              opCtx, CollectionPtr(), nss, {}, BSONObj(), OplogSlot(), false),
+                              opCtx, nss, {}, BSONObj(), OplogSlot(), boost::none, false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onCollMod(opCtx, nss, uuid, BSONObj(), {}, boost::none),
                           AssertionException);

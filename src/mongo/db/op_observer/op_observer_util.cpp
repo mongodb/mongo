@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -50,6 +51,13 @@ const OpStateAccumulator::Decoration<std::unique_ptr<ShardingWriteRouter>>
 
 MONGO_FAIL_POINT_DEFINE(addDestinedRecipient);
 MONGO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);
+
+bool shouldReplicateLocalCatalogIdentifers(OperationContext* opCtx) {
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    return fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabled(
+            VersionContext::getDecoration(opCtx), fcvSnapshot);
+}
 
 /**
  * Given a raw collMod command object and associated collection metadata, create and return the

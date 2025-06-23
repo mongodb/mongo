@@ -284,17 +284,23 @@ public:
                                    slot);
     }
 
-    void onCreateCollection(OperationContext* const opCtx,
-                            const CollectionPtr& coll,
-                            const NamespaceString& collectionName,
-                            const CollectionOptions& options,
-                            const BSONObj& idIndex,
-                            const OplogSlot& createOpTime,
-                            bool fromMigrate) override {
+    void onCreateCollection(
+        OperationContext* const opCtx,
+        const NamespaceString& collectionName,
+        const CollectionOptions& options,
+        const BSONObj& idIndex,
+        const OplogSlot& createOpTime,
+        const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
+        bool fromMigrate) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onCreateCollection(
-                opCtx, coll, collectionName, options, idIndex, createOpTime, fromMigrate);
+            o->onCreateCollection(opCtx,
+                                  collectionName,
+                                  options,
+                                  idIndex,
+                                  createOpTime,
+                                  createCollCatalogIdentifier,
+                                  fromMigrate);
     }
 
     void onCollMod(OperationContext* const opCtx,

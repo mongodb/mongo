@@ -308,13 +308,14 @@ public:
     /**
      * Tracks the temporary collections mapReduces creates.
      */
-    void onCreateCollection(OperationContext* opCtx,
-                            const CollectionPtr& coll,
-                            const NamespaceString& collectionName,
-                            const CollectionOptions& options,
-                            const BSONObj& idIndex,
-                            const OplogSlot& createOpTime,
-                            bool fromMigrate) override;
+    void onCreateCollection(
+        OperationContext* opCtx,
+        const NamespaceString& collectionName,
+        const CollectionOptions& options,
+        const BSONObj& idIndex,
+        const OplogSlot& createOpTime,
+        const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
+        bool fromMigrate) override;
 
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
@@ -366,13 +367,14 @@ void MapReduceOpObserver::onInserts(OperationContext* opCtx,
     onInsertsFn();
 }
 
-void MapReduceOpObserver::onCreateCollection(OperationContext*,
-                                             const CollectionPtr&,
-                                             const NamespaceString& collectionName,
-                                             const CollectionOptions& options,
-                                             const BSONObj&,
-                                             const OplogSlot&,
-                                             bool fromMigrate) {
+void MapReduceOpObserver::onCreateCollection(
+    OperationContext*,
+    const NamespaceString& collectionName,
+    const CollectionOptions& options,
+    const BSONObj&,
+    const OplogSlot&,
+    const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
+    bool fromMigrate) {
     if (!options.temp) {
         return;
     }

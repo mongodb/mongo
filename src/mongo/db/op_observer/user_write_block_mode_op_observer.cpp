@@ -182,13 +182,14 @@ void UserWriteBlockModeOpObserver::onStartIndexBuildSinglePhase(OperationContext
     _checkWriteAllowed(opCtx, nss);
 }
 
-void UserWriteBlockModeOpObserver::onCreateCollection(OperationContext* opCtx,
-                                                      const CollectionPtr& coll,
-                                                      const NamespaceString& collectionName,
-                                                      const CollectionOptions& options,
-                                                      const BSONObj& idIndex,
-                                                      const OplogSlot& createOpTime,
-                                                      bool fromMigrate) {
+void UserWriteBlockModeOpObserver::onCreateCollection(
+    OperationContext* opCtx,
+    const NamespaceString& collectionName,
+    const CollectionOptions& options,
+    const BSONObj& idIndex,
+    const OplogSlot& createOpTime,
+    const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
+    bool fromMigrate) {
     _checkWriteAllowed(opCtx, collectionName);
 }
 

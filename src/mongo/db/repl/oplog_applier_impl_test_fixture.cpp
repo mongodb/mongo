@@ -123,17 +123,19 @@ void OplogApplierImplOpObserver::onUpdate(OperationContext* opCtx,
     onUpdateFn(opCtx, args);
 }
 
-void OplogApplierImplOpObserver::onCreateCollection(OperationContext* opCtx,
-                                                    const CollectionPtr& coll,
-                                                    const NamespaceString& collectionName,
-                                                    const CollectionOptions& options,
-                                                    const BSONObj& idIndex,
-                                                    const OplogSlot& createOpTime,
-                                                    bool fromMigrate) {
+void OplogApplierImplOpObserver::onCreateCollection(
+    OperationContext* opCtx,
+    const NamespaceString& collectionName,
+    const CollectionOptions& options,
+    const BSONObj& idIndex,
+    const OplogSlot& createOpTime,
+    const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
+    bool fromMigrate) {
     if (!onCreateCollectionFn) {
         return;
     }
-    onCreateCollectionFn(opCtx, coll, collectionName, options, idIndex);
+    // TODO SERVER-105262: Modify tests to check 'createCollCatalogIdentifier'.
+    onCreateCollectionFn(opCtx, collectionName, options, idIndex);
 }
 
 void OplogApplierImplOpObserver::onRenameCollection(OperationContext* opCtx,

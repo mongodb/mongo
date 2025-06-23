@@ -137,13 +137,14 @@ public:
     /**
      * Called when OplogApplierImpl creates a collection.
      */
-    void onCreateCollection(OperationContext* opCtx,
-                            const CollectionPtr& coll,
-                            const NamespaceString& collectionName,
-                            const CollectionOptions& options,
-                            const BSONObj& idIndex,
-                            const OplogSlot& createOpTime,
-                            bool fromMigrate) override;
+    void onCreateCollection(
+        OperationContext* opCtx,
+        const NamespaceString& collectionName,
+        const CollectionOptions& options,
+        const BSONObj& idIndex,
+        const OplogSlot& createOpTime,
+        const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
+        bool fromMigrate) override;
 
     /**
      * Called when OplogApplierImpl renames a collection.
@@ -199,11 +200,8 @@ public:
 
     std::function<void(OperationContext*, const OplogUpdateEntryArgs&)> onUpdateFn;
 
-    std::function<void(OperationContext*,
-                       const CollectionPtr&,
-                       const NamespaceString&,
-                       const CollectionOptions&,
-                       const BSONObj&)>
+    std::function<void(
+        OperationContext*, const NamespaceString&, const CollectionOptions&, const BSONObj&)>
         onCreateCollectionFn;
 
     std::function<void(OperationContext*,

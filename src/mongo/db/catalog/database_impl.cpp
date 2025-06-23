@@ -51,6 +51,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/basic_types_gen.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -87,6 +88,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/system_index.h"
 #include "mongo/db/transaction_resources.h"
@@ -147,6 +149,40 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString cons
         uasserted(ErrorCodes::MovePrimaryInProgress,
                   "movePrimary is in progress for namespace " + nss.toStringForErrorMsg());
     }
+}
+
+/**
+ * Returns the underlying 'ident' for 'sharedIdent'. Returns an empty string if 'sharedIdent' is
+ * unexpectedly null.
+ * TODO SERVER-106410: Use explicitly defined idents.
+ */
+std::string getIdentSafe(std::shared_ptr<Ident> sharedIdent) {
+    if (sharedIdent == nullptr) {
+        return "";
+    }
+    return sharedIdent->getIdent();
+}
+
+CreateCollCatalogIdentifier getCreateCollCatalogIdentifier(OperationContext* opCtx,
+                                                           Collection* coll,
+                                                           bool createdWithIdIndex) {
+    invariant(coll);
+    CreateCollCatalogIdentifier createCollCatalogIdentifier;
+    createCollCatalogIdentifier.catalogId = coll->getCatalogId();
+    createCollCatalogIdentifier.ident = getIdentSafe(coll->getSharedIdent());
+
+    if (createdWithIdIndex) {
+        auto ic = coll->getIndexCatalog();
+        invariant(ic);
+
+        if (auto idIndexDescriptor = coll->getIndexCatalog()->findIdIndex(opCtx)) {
+            auto idIndexEntry = idIndexDescriptor->getEntry();
+            invariant(idIndexEntry);
+            // TODO SERVER-106410: Use explicitly generated ident over lazily retrieved ident.
+            createCollCatalogIdentifier.idIndexIdent = getIdentSafe(idIndexEntry->getSharedIdent());
+        }
+    }
+    return createCollCatalogIdentifier;
 }
 
 // Utilizes the durable_catalog to allocate and track storage resources for the new collection.
@@ -752,30 +788,27 @@ Collection* DatabaseImpl::_createCollection(
                 "uuid"_attr = optionsWithUUID.uuid.value(),
                 "options"_attr = options);
 
+    bool isVirtualCollection = vopts.has_value();
+
     // Create Collection object
     auto ownedCollection = [&]() -> std::shared_ptr<Collection> {
-        if (!vopts) {
-            if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
-                throwWriteConflictException(str::stream()
-                                            << "Namespace '" << nss.toStringForErrorMsg()
-                                            << "' is already in use.");
-            }
-
-            std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
-                durablyTrackNewCollection(opCtx, nss, optionsWithUUID);
-            auto& catalogId = catalogIdRecordStorePair.first;
-
-            auto catalogEntry =
-                durable_catalog::getParsedCatalogEntry(opCtx, catalogId, MDBCatalog::get(opCtx));
-            auto metadata = catalogEntry->metadata;
-
-            return Collection::Factory::get(opCtx)->make(
-                opCtx, nss, catalogId, metadata, std::move(catalogIdRecordStorePair.second));
-        } else {
+        if (isVirtualCollection) {
             // Virtual collection stays only in memory and its metadata need not persist on disk and
             // therefore we bypass durable_catalog.
             return VirtualCollectionImpl::make(opCtx, nss, optionsWithUUID, *vopts);
         }
+
+        if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
+            throwWriteConflictException(str::stream() << "Namespace '" << nss.toStringForErrorMsg()
+                                                      << "' is already in use.");
+        }
+
+        auto [catalogId, recordStore] = durablyTrackNewCollection(opCtx, nss, optionsWithUUID);
+        auto catalogEntry =
+            durable_catalog::getParsedCatalogEntry(opCtx, catalogId, MDBCatalog::get(opCtx));
+        auto metadata = catalogEntry->metadata;
+        return Collection::Factory::get(opCtx)->make(
+            opCtx, nss, catalogId, metadata, std::move(recordStore));
     }();
     auto collection = ownedCollection.get();
     ownedCollection->init(opCtx);
@@ -811,17 +844,22 @@ Collection* DatabaseImpl::_createCollection(
         }
     }
 
+    boost::optional<CreateCollCatalogIdentifier> createCollCatalogIdentifier;
+    if (!isVirtualCollection) {
+        // Non-virtual collections are persisted in the local catalog.
+        createCollCatalogIdentifier =
+            getCreateCollCatalogIdentifier(opCtx, collection, !fullIdIndexSpec.isEmpty());
+    }
+
     hangBeforeLoggingCreateCollection.pauseWhileSet();
 
-    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-    opCtx->getServiceContext()->getOpObserver()->onCreateCollection(
-        opCtx,
-        CollectionPtr::CollectionPtr_UNSAFE(collection),
-        nss,
-        optionsWithUUID,
-        fullIdIndexSpec,
-        createOplogSlot,
-        fromMigrate);
+    opCtx->getServiceContext()->getOpObserver()->onCreateCollection(opCtx,
+                                                                    nss,
+                                                                    optionsWithUUID,
+                                                                    fullIdIndexSpec,
+                                                                    createOplogSlot,
+                                                                    createCollCatalogIdentifier,
+                                                                    fromMigrate);
 
     // It is necessary to create the system index *after* running the onCreateCollection so that
     // the storage timestamp for the index creation is after the storage timestamp for the

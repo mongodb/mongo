@@ -135,6 +135,28 @@ struct CollectionUpdateArgs {
 };
 
 /**
+ * Local catalog ('_mdb_catalog') information identifying where collection contents are/should be
+ * stored at the time of collection creation.
+ */
+struct CreateCollCatalogIdentifier {
+    /**
+     * Where collection information is stored in the local catalog.
+     */
+    RecordId catalogId;
+
+    /**
+     * The main 'ident' associated with a collection.
+     */
+    std::string ident;
+
+    /**
+     * Present when the '_id_' index is automatically generated during collection creation.
+     * Otherwise, boost::none.
+     */
+    boost::optional<std::string> idIndexIdent;
+};
+
+/**
  * A decorable object that is shared across all Collection instances for the same collection. There
  * may be several Collection instances simultaneously in existence representing different versions
  * of a collection's persisted state. A single instance of SharedCollectionDecorations will be

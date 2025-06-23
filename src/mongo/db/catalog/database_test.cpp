@@ -39,11 +39,13 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/catalog/database_impl.h"
+#include "mongo/db/catalog/durable_catalog.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/unique_collection_name.h"
 #include "mongo/db/catalog_raii.h"
@@ -57,6 +59,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
+#include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/operation_logger_mock.h"
 #include "mongo/db/operation_context.h"
@@ -104,6 +107,7 @@ protected:
 
     ServiceContext::UniqueOperationContext _opCtx;
     NamespaceString _nss;
+    OpObserverRegistry* _opObserverRegistry;
 };
 
 void DatabaseTest::setUp() {
@@ -126,9 +130,8 @@ void DatabaseTest::setUp() {
 
     // Set up OpObserver so that Database will append actual oplog entries to the oplog using
     // repl::logOp(). repl::logOp() will also store the oplog entry's optime in ReplClientInfo.
-    OpObserverRegistry* opObserverRegistry =
-        dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
-    opObserverRegistry->addObserver(
+    _opObserverRegistry = dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
+    _opObserverRegistry->addObserver(
         std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerMock>()));
 
     _nss = NamespaceString::createNamespaceString_forTest("test.foo");
@@ -142,6 +145,138 @@ void DatabaseTest::tearDown() {
     repl::StorageInterface::set(service, {});
 
     ServiceContextMongoDTest::tearDown();
+}
+
+boost::optional<durable_catalog::CatalogEntry> getLocalCatalogEntry(OperationContext* opCtx,
+                                                                    const NamespaceString& nss) {
+    const auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    const auto mdbCatalog = storageEngine->getMDBCatalog();
+    return durable_catalog::scanForCatalogEntryByNss(opCtx, nss, mdbCatalog);
+}
+
+// OpObserver to validate the presence or absence of 'CreateCollCatalogIdentifier' after a create
+// collection operation.
+class CreateCollCatalogIdentifierObserver : public OpObserverNoop {
+public:
+    // - 'expectIdentifiers': If true, enforces calls to 'onCreateCollection()' report a
+    //          'CreateCollCatalogIdentifier'. Otherwise, enforce 'CreateCollCatalogIdentifier' is
+    //          always 'boost::none'. Provides an extra guarantee that each test targets the
+    //          expected behavior.
+    explicit CreateCollCatalogIdentifierObserver(bool expectIdentifiers)
+        : _expectIdentifiers(expectIdentifiers) {}
+
+    void onCreateCollection(
+        OperationContext* opCtx,
+        const NamespaceString& collectionName,
+        const CollectionOptions& options,
+        const BSONObj& idIndex,
+        const OplogSlot& createOpTime,
+        const boost::optional<CreateCollCatalogIdentifier>& collCatalogIdentifier,
+        bool fromMigrate) override {
+        const auto catalogEntry = getLocalCatalogEntry(opCtx, collectionName);
+
+        // First, validate the test correctly configured whether collections are persisted in
+        // the local catalog. If not equal, there's an error with the test.
+        ASSERT_EQ(catalogEntry.has_value(), _expectIdentifiers);
+
+        ASSERT_EQ(_expectIdentifiers, collCatalogIdentifier.has_value());
+
+        if (_expectIdentifiers) {
+            // Assert 'collCatalogIdentifier' aligns with information persisted in the local
+            // catalog entry.
+            ASSERT_EQ(catalogEntry->catalogId, collCatalogIdentifier->catalogId);
+            ASSERT_EQ(catalogEntry->ident, collCatalogIdentifier->ident);
+
+            if (!idIndex.isEmpty()) {
+                // Collection creation included the creation of the '_id_' index.
+                ASSERT_TRUE(collCatalogIdentifier->idIndexIdent.has_value());
+                const auto expectedIdIndexIdent = catalogEntry->indexIdents.getStringField("_id_");
+                ASSERT_EQ(expectedIdIndexIdent, *collCatalogIdentifier->idIndexIdent);
+            }
+        }
+    }
+
+private:
+    bool _expectIdentifiers{false};
+};
+
+void runCreateCollection(OperationContext* opCtx,
+                         const NamespaceString& nss,
+                         const CollectionOptions& collectionOptions,
+                         bool createDefaultIndexes = true,
+                         const BSONObj& idIndex = BSONObj(),
+                         bool fromMigrate = false) {
+    writeConflictRetry(opCtx, "testCatalogIdentifiers", nss, [&] {
+        WriteUnitOfWork wuow(opCtx);
+        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
+        auto db = autoDb.ensureDbExists(opCtx);
+        ASSERT_TRUE(db);
+
+        // Signals 'onCreateCollection()' to all OpObservers once complete.
+        ASSERT_TRUE(db->createCollection(
+            opCtx, nss, collectionOptions, createDefaultIndexes, idIndex, fromMigrate));
+        wuow.commit();
+    });
+};
+
+// Tests 'Database::createCollection()' reports the local catalog identifier for collections
+// persisted in the local catalog.
+TEST_F(DatabaseTest, CreateCollectionReportsCatalogIdentifier) {
+    // OpObserver which validates each collection created in this test is persisted in the local
+    // catalog and generates a 'CreateCollCatalogIdentifier'.
+    auto createOpObserver =
+        std::make_unique<CreateCollCatalogIdentifierObserver>(true /* expectIdentifiers */);
+    _opObserverRegistry->addObserver(std::move(createOpObserver));
+
+    auto opCtx = _opCtx.get();
+
+    // Standard replicated collection.
+    ASSERT_TRUE(_nss.isReplicated());
+    runCreateCollection(opCtx, _nss, CollectionOptions{});
+
+    // Local collection. While local collections aren't replicated, they are still present in
+    // the local catalog.
+    NamespaceString unreplicatedNSS =
+        NamespaceString::createNamespaceString_forTest("local.isUnreplicated");
+    ASSERT_FALSE(unreplicatedNSS.isReplicated());
+    runCreateCollection(opCtx, unreplicatedNSS, CollectionOptions{});
+
+    // Timeseries buckets collection.
+    const NamespaceString bucketsNSS =
+        NamespaceString::createNamespaceString_forTest("system.buckets.ts");
+    CollectionOptions bucketsOptions{
+        .clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat(),
+        .timeseries = TimeseriesOptions{"t"}};
+    runCreateCollection(opCtx, bucketsNSS, CollectionOptions{}, false /* createDefaultIndexes*/);
+}
+
+TEST_F(DatabaseTest, CreateCollectionDoesNotReportCatalogIdentifierForVirtualCollection) {
+    // Register an OpObserver to validate the collection isn't persisted in the local catalog and
+    // thus does not generate a 'CreateCollCatalogIdentifier'.
+    auto createOpObserver =
+        std::make_unique<CreateCollCatalogIdentifierObserver>(false /* expectIdentifiers */);
+    _opObserverRegistry->addObserver(std::move(createOpObserver));
+
+    // Virtual collections are not persisted to the local catalog.
+    VirtualCollectionOptions virtualCollectionOptions;
+    const auto url = ExternalDataSourceMetadata::kUrlProtocolFile + "named_pipe1";
+    virtualCollectionOptions.dataSources.emplace_back(
+        url, StorageTypeEnum::pipe, FileTypeEnum::bson);
+    CollectionOptions collectionOptions;
+    collectionOptions.setNoIdIndex();
+
+    auto opCtx = _opCtx.get();
+    writeConflictRetry(opCtx, "testNoCatalogIdentifierForVirtualColl", _nss, [&] {
+        WriteUnitOfWork wuow(opCtx);
+        AutoGetDb autoDb(opCtx, _nss.dbName(), MODE_X);
+        auto db = autoDb.ensureDbExists(opCtx);
+        ASSERT_TRUE(db);
+
+        // Signals 'onCreateCollection()' to the OpObserver once complete.
+        ASSERT_TRUE(
+            db->createVirtualCollection(opCtx, _nss, collectionOptions, virtualCollectionOptions));
+        wuow.commit();
+    });
 }
 
 TEST_F(DatabaseTest, CreateCollectionThrowsExceptionWhenDatabaseIsInADropPendingState) {

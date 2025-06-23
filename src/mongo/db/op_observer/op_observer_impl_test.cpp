@@ -40,6 +40,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_options_gen.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/import_collection_oplog_entry_gen.h"
@@ -73,6 +74,7 @@
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/oplog_interface_local.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -85,6 +87,7 @@
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -111,6 +114,7 @@
 
 #include <boost/cstdint.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -450,6 +454,215 @@ private:
         return settings;
     }
 };
+
+// Test suite targeting 'onCreateCollection()' behavior.
+class OpObserverOnCreateCollectionTest : public OpObserverTest {
+protected:
+    // Validates that local catalog identifier information is replicated in the 'o2' field of an
+    // 'create' oplog entry iff the server supports replicating local catalog identifiers.
+    void validateReplicatedCatalogIdentifier(const OplogEntry& oplogEntry,
+                                             const CreateCollCatalogIdentifier& catalogIdentifier,
+                                             bool catalogReplicationEnabled) {
+        ASSERT_EQ(repl::CommandTypeEnum::kCreate, oplogEntry.getCommandType());
+        const auto o2 = oplogEntry.getObject2();
+
+        // The o2 field exclusively holds replicated catalog information.
+        ASSERT_EQ(catalogReplicationEnabled, o2.has_value());
+        if (!o2.has_value()) {
+            return;
+        }
+
+        ASSERT_EQ(catalogIdentifier.catalogId,
+                  RecordId::deserializeToken(o2->getField("catalogId")));
+        ASSERT_EQ(catalogIdentifier.ident, o2->getStringField("ident"));
+
+        bool expectIdIndexIdent = catalogIdentifier.idIndexIdent.has_value();
+        ASSERT_EQ(expectIdIndexIdent, o2->hasField("idIndexIdent"));
+        if (expectIdIndexIdent) {
+            ASSERT_EQ(*catalogIdentifier.idIndexIdent, o2->getStringField("idIndexIdent"));
+        }
+    }
+
+    CreateCollCatalogIdentifier newCatalogIdentifier(const DatabaseName& dbName,
+                                                     bool includeIdIndexIdent) {
+        CreateCollCatalogIdentifier catalogIdentifier;
+        catalogIdentifier.catalogId = RecordId(100);
+        catalogIdentifier.ident = ident::generateNewCollectionIdent(dbName, true, true);
+        if (includeIdIndexIdent) {
+            catalogIdentifier.idIndexIdent = ident::generateNewIndexIdent(dbName, true, true);
+        }
+        return catalogIdentifier;
+    }
+
+    // Tests the oplog entry generated from 'onCreateCollection'. Simulates the creation of a
+    // non-clustered collection.
+    void testOnCreateCollBasic(bool catalogReplicationEnabled) {
+        RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
+            "featureFlagReplicateLocalCatalogIdentifiers", catalogReplicationEnabled);
+
+        // Simulate catalog information for a normal collection with a standard '_id_' index.
+        ASSERT_TRUE(nss.isReplicated());
+        auto catalogIdentifier = newCatalogIdentifier(nss.dbName(), true /* includeIdIndexIdent */);
+        CollectionOptions options{.uuid = uuid};
+
+        auto opCtxWrapper = cc().makeOperationContext();
+        auto opCtx = opCtxWrapper.get();
+        OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+        {
+            // Generate the create oplog entry.
+            AutoGetCollection autoColl(opCtx, nss, MODE_X);
+            WriteUnitOfWork wuow(opCtx);
+            opObserver.onCreateCollection(
+                opCtx,
+                nss,
+                options,
+                BSON("v" << 2 << "key" << BSON("_id_" << 1) << "name" << "_id_") /* idIndex */,
+                repl::getNextOpTime(opCtx),
+                catalogIdentifier,
+                false /* fromMigrate*/);
+            wuow.commit();
+        }
+
+        const auto oplogEntryBSON = getSingleOplogEntry(opCtx);
+        const auto oplogEntry = assertGet(OplogEntry::parse(oplogEntryBSON));
+        validateReplicatedCatalogIdentifier(
+            oplogEntry, catalogIdentifier, catalogReplicationEnabled);
+    }
+
+    void testOnCreateCollClustered(bool catalogReplicationEnabled) {
+        RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
+            "featureFlagReplicateLocalCatalogIdentifiers", catalogReplicationEnabled);
+
+        CollectionOptions clusteredCollectionOptions{
+            .uuid = uuid, .clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()};
+
+        // Simulate catalog information for clustered collection - clustered collections don't have
+        // an explicit '_id_' index table.
+        ASSERT_TRUE(nss.isReplicated());
+        auto catalogIdentifier =
+            newCatalogIdentifier(nss.dbName(), false /* includeIdIndexIdent */);
+        ASSERT_FALSE(catalogIdentifier.idIndexIdent.has_value());
+
+        auto opCtxWrapper = cc().makeOperationContext();
+        auto opCtx = opCtxWrapper.get();
+        OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+        {
+            // Generate the create oplog entry.
+            AutoGetCollection autoColl(opCtx, nss, MODE_X);
+            WriteUnitOfWork wuow(opCtx);
+            opObserver.onCreateCollection(opCtx,
+                                          nss,
+                                          clusteredCollectionOptions,
+                                          BSONObj() /* idIndex */,
+                                          repl::getNextOpTime(opCtx),
+                                          catalogIdentifier,
+                                          false /* fromMigrate*/);
+            wuow.commit();
+        }
+
+        const auto oplogEntryBSON = getSingleOplogEntry(opCtx);
+        const auto oplogEntry = assertGet(OplogEntry::parse(oplogEntryBSON));
+        validateReplicatedCatalogIdentifier(
+            oplogEntry, catalogIdentifier, catalogReplicationEnabled);
+    }
+
+    // Tests that the presences or absence of a 'CreateCollCatalogIdentifier' passed into
+    // 'OpObserverImpl::onCreateCollection()' is valid for an unreplicated collection.
+    //
+    // While many unreplicated collections are persisted in the catalog, it is also valid to issue
+    // 'onCreateCollection()' for a collection not persisted in the local catalog, provided it is
+    // unreplicated. One real-world example is a virtual collection - but for simplicity the test
+    // generates a local collection as they are unreplicated by default.
+    // - 'catalogReplicationEnabled': Whether to enable the
+    // 'featureFlagReplicateLocalCatalogIdentifiers'.
+    // - 'isPersistedInLocalCatalog': Whether or not to simulate the unreplicated collection as a
+    // collection persisted in the local catalog.
+    void testOnCreateUnreplicatedCollection(bool catalogReplicationEnabled,
+                                            bool isPersistedInLocalCatalog) {
+        RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
+            "featureFlagReplicateLocalCatalogIdentifiers", catalogReplicationEnabled);
+        OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+        auto opCtx = cc().makeOperationContext();
+
+        const NamespaceString localNSS = NamespaceString::makeLocalCollection(
+            "unreplicated_local_collection"_sd + UUID::gen().toString());
+        ASSERT_FALSE(localNSS.isReplicated());
+        ASSERT_TRUE(repl::ReplicationCoordinator::get(opCtx.get())
+                        ->isOplogDisabledFor(opCtx.get(), localNSS));
+
+        boost::optional<CreateCollCatalogIdentifier> catalogIdentifier;
+        if (isPersistedInLocalCatalog) {
+            catalogIdentifier =
+                newCatalogIdentifier(localNSS.dbName(), false /* includeIdIndexIdent */);
+        }
+
+        {
+            AutoGetCollection autoColl(opCtx.get(), localNSS, MODE_X);
+            WriteUnitOfWork wuow(opCtx.get());
+            opObserver.onCreateCollection(opCtx.get(),
+                                          localNSS,
+                                          CollectionOptions{},
+                                          BSONObj() /* idIndex */,
+                                          repl::OpTime() /* createOpTime */,
+                                          catalogIdentifier /* createCollCatalogIdentifier */,
+                                          false /* fromMigrate*/);
+            wuow.commit();
+        }
+
+        // No oplog entry generated.
+        getNOplogEntries(opCtx.get(), 0);
+    }
+};
+
+TEST_F(OpObserverOnCreateCollectionTest, BasicReplicatedCatalogIdentifiersEnabled) {
+    testOnCreateCollBasic(true /* catalogReplicationEnabled */);
+}
+TEST_F(OpObserverOnCreateCollectionTest, BasicReplicatedCatalogIdentifiersDisabled) {
+    testOnCreateCollBasic(false /* catalogReplicationEnabled */);
+}
+
+TEST_F(OpObserverOnCreateCollectionTest, ClusteredReplicatedCatalogIdentifiersEnabled) {
+    testOnCreateCollClustered(true /* catalogReplicationEnabled */);
+}
+TEST_F(OpObserverOnCreateCollectionTest, ClusteredReplicatedCatalogIdentifiersDisabled) {
+    testOnCreateCollClustered(false /* catalogReplicationEnabled */);
+}
+
+TEST_F(OpObserverOnCreateCollectionTest, CatalogIdentifierForUnreplicatedCollection) {
+    testOnCreateUnreplicatedCollection(true /* catalogReplicationEnabled */,
+                                       true /* isPersistedInLocalCatalog */);
+    testOnCreateUnreplicatedCollection(false /* catalogReplicationEnabled */,
+                                       true /* isPersistedInLocalCatalog */);
+}
+
+TEST_F(OpObserverOnCreateCollectionTest, UnreplicatedCollectionNotInLocalCatalog) {
+    testOnCreateUnreplicatedCollection(true /* catalogReplicationEnabled */,
+                                       false /* isPersistedInLocalCatalog */);
+    testOnCreateUnreplicatedCollection(false /* catalogReplicationEnabled */,
+                                       false /* isPersistedInLocalCatalog */);
+}
+
+DEATH_TEST_F(OpObserverOnCreateCollectionTest, CrashIfNoReplicatedCatalogIdentifier, "invariant") {
+    // Invariant only enforced when replicated local catalog identifiers are required for
+    // replication correctness.
+    RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
+        "featureFlagReplicateLocalCatalogIdentifiers", true);
+    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+    auto opCtx = cc().makeOperationContext();
+
+    ASSERT_TRUE(nss.isReplicated());
+    AutoGetCollection autoColl(opCtx.get(), nss, MODE_X);
+    WriteUnitOfWork wuow(opCtx.get());
+    opObserver.onCreateCollection(
+        opCtx.get(),
+        nss,
+        CollectionOptions{.uuid = UUID::gen()},
+        BSON("v" << 2 << "key" << BSON("_id_" << 1) << "name" << "_id_") /* idIndex */,
+        repl::getNextOpTime(opCtx.get()),
+        boost::none /* createCollCatalogIdentifier */,
+        false /* fromMigrate*/);
+    wuow.commit();
+}
 
 TEST_F(OpObserverTest, StartIndexBuildExpectedOplogEntry) {
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());

@@ -643,13 +643,14 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
     }
 }
 
-void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
-                                               const CollectionPtr& coll,
-                                               const NamespaceString& collectionName,
-                                               const CollectionOptions& options,
-                                               const BSONObj& idIndex,
-                                               const OplogSlot& createOpTime,
-                                               bool fromMigrate) {
+void ShardServerOpObserver::onCreateCollection(
+    OperationContext* opCtx,
+    const NamespaceString& collectionName,
+    const CollectionOptions& options,
+    const BSONObj& idIndex,
+    const OplogSlot& createOpTime,
+    const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
+    bool fromMigrate) {
     // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
     if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;

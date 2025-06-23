@@ -111,7 +111,13 @@ DEATH_TEST_REGEX_F(BatchedWriteContextTest,
 
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest(boost::none, "other", "coll");
-    auto op = repl::MutableOplogEntry::makeCreateCommand(nss, CollectionOptions(), BSON("v" << 2));
+    repl::ReplOperation op;
+    op.setOpType(repl::OpTypeEnum::kCommand);
+
+    op.setTid(nss.tenantId());
+    op.setNss(nss.getCommandNS());
+    op.setObject(
+        repl::MutableOplogEntry::makeCreateCollObject(nss, CollectionOptions(), BSON("v" << 2)));
     bwc.addBatchedOperation(opCtx, op);
 }
 

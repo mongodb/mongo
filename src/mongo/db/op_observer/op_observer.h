@@ -306,13 +306,29 @@ public:
                             boost::none);
     }
 
-    virtual void onCreateCollection(OperationContext* opCtx,
-                                    const CollectionPtr& coll,
-                                    const NamespaceString& collectionName,
-                                    const CollectionOptions& options,
-                                    const BSONObj& idIndex,
-                                    const OplogSlot& createOpTime,
-                                    bool fromMigrate) = 0;
+    /**
+     * Signals to observers that a new collection has been created.
+     * - 'collectionName': The namespace of the new collection.
+     * - 'options': The main options for collection creation.
+     * - 'idIndex': The spec for the '_id_' index automatically generated as a part of collection
+     * creation. Empty if no '_id_' index was generated.
+     * - 'createOpTime': The reserved timestamp for collection creation outside a multi-document
+     * transaction. Unset for creation inside a multi-document transaction as multi-document
+     * transactions reserve the appropriate oplog slots at commit time.
+     * - 'createCollCatalogIdentifier': Information about how the collection was registered in the
+     * local catalog and storage engine. 'boost::none' if the collection was not persisted to the
+     * local catalog.
+     * - 'fromMigrate': Whether collection creation was driven by a migration.
+     */
+    virtual void onCreateCollection(
+        OperationContext* opCtx,
+        const NamespaceString& collectionName,
+        const CollectionOptions& options,
+        const BSONObj& idIndex,
+        const OplogSlot& createOpTime,
+        const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
+        bool fromMigrate) = 0;
+
     /**
      * This function logs an oplog entry when a 'collMod' command on a collection is executed.
      * Since 'collMod' commands can take a variety of different formats, the 'o' field of the

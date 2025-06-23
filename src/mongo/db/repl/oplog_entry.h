@@ -271,13 +271,19 @@ public:
                                              UUID uuid,
                                              const BSONObj& docToDelete);
 
-    static ReplOperation makeCreateCommand(NamespaceString nss,
-                                           const mongo::CollectionOptions& options,
-                                           const BSONObj& idIndex);
-
-    static BSONObj makeCreateCollCmdObj(const NamespaceString& collectionName,
+    /**
+     * Generates the 'o' field of a 'create' OplogEntry.
+     */
+    static BSONObj makeCreateCollObject(const NamespaceString& collectionName,
                                         const mongo::CollectionOptions& options,
                                         const BSONObj& idIndex);
+
+    /**
+     * Attaches local catalog identifiers into the 'o2' field of a 'create' OplogEntry.
+     */
+    static BSONObj makeCreateCollObject2(const RecordId& catalogId,
+                                         StringData ident,
+                                         const boost::optional<std::string>& idIndexIdent);
 
     static StatusWith<MutableOplogEntry> parse(const BSONObj& object);
 
@@ -483,7 +489,6 @@ public:
 
     // Make helper functions accessible.
     using MutableOplogEntry::getOpTime;
-    using MutableOplogEntry::makeCreateCommand;
     using MutableOplogEntry::makeDeleteOperation;
     using MutableOplogEntry::makeInsertOperation;
     using MutableOplogEntry::makeUpdateOperation;

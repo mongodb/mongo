@@ -107,21 +107,30 @@ void AuthOpObserver::onDelete(OperationContext* opCtx,
         ->notifyDDLOperation(opCtx, "d", coll->ns(), documentId, nullptr);
 }
 
-void AuthOpObserver::onCreateCollection(OperationContext* opCtx,
-                                        const CollectionPtr& coll,
-                                        const NamespaceString& collectionName,
-                                        const CollectionOptions& options,
-                                        const BSONObj& idIndex,
-                                        const OplogSlot& createOpTime,
-                                        bool fromMigrate) {
+void AuthOpObserver::onCreateCollection(
+    OperationContext* opCtx,
+    const NamespaceString& collectionName,
+    const CollectionOptions& options,
+    const BSONObj& idIndex,
+    const OplogSlot& createOpTime,
+    const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
+    bool fromMigrate) {
     const auto cmdNss = collectionName.getCommandNS();
 
     const auto cmdObj =
-        repl::MutableOplogEntry::makeCreateCollCmdObj(collectionName, options, idIndex);
+        repl::MutableOplogEntry::makeCreateCollObject(collectionName, options, idIndex);
+
+    BSONObj o2;
+    if (createCollCatalogIdentifier.has_value() && shouldReplicateLocalCatalogIdentifers(opCtx)) {
+        o2 = repl::MutableOplogEntry::makeCreateCollObject2(
+            createCollCatalogIdentifier->catalogId,
+            createCollCatalogIdentifier->ident,
+            createCollCatalogIdentifier->idIndexIdent);
+    }
 
     dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
     AuthorizationManager::get(opCtx->getService())
-        ->notifyDDLOperation(opCtx, "c", cmdNss, cmdObj, nullptr);
+        ->notifyDDLOperation(opCtx, "c", cmdNss, cmdObj, &o2);
 }
 
 void AuthOpObserver::onCollMod(OperationContext* opCtx,

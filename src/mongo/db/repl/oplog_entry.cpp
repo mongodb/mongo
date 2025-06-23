@@ -206,7 +206,35 @@ ReplOperation MutableOplogEntry::makeInsertOperation(const NamespaceString& nss,
     return op;
 }
 
-BSONObj MutableOplogEntry::makeCreateCollCmdObj(const NamespaceString& collectionName,
+ReplOperation MutableOplogEntry::makeUpdateOperation(const NamespaceString nss,
+                                                     UUID uuid,
+                                                     const BSONObj& update,
+                                                     const BSONObj& criteria) {
+    ReplOperation op;
+    op.setOpType(OpTypeEnum::kUpdate);
+
+    op.setTid(nss.tenantId());
+    op.setNss(nss);
+    op.setUuid(uuid);
+    op.setObject(update.getOwned());
+    op.setObject2(criteria.getOwned());
+    return op;
+}
+
+ReplOperation MutableOplogEntry::makeDeleteOperation(const NamespaceString& nss,
+                                                     UUID uuid,
+                                                     const BSONObj& docToDelete) {
+    ReplOperation op;
+    op.setOpType(OpTypeEnum::kDelete);
+
+    op.setTid(nss.tenantId());
+    op.setNss(nss);
+    op.setUuid(uuid);
+    op.setObject(docToDelete.getOwned());
+    return op;
+}
+
+BSONObj MutableOplogEntry::makeCreateCollObject(const NamespaceString& collectionName,
                                                 const CollectionOptions& options,
                                                 const BSONObj& idIndex) {
     BSONObjBuilder b;
@@ -231,46 +259,16 @@ BSONObj MutableOplogEntry::makeCreateCollCmdObj(const NamespaceString& collectio
     return b.obj();
 }
 
-ReplOperation MutableOplogEntry::makeUpdateOperation(const NamespaceString nss,
-                                                     UUID uuid,
-                                                     const BSONObj& update,
-                                                     const BSONObj& criteria) {
-    ReplOperation op;
-    op.setOpType(OpTypeEnum::kUpdate);
-
-    op.setTid(nss.tenantId());
-    op.setNss(nss);
-    op.setUuid(uuid);
-    op.setObject(update.getOwned());
-    op.setObject2(criteria.getOwned());
-    return op;
-}
-
-ReplOperation MutableOplogEntry::makeCreateCommand(const NamespaceString nss,
-                                                   const CollectionOptions& options,
-                                                   const BSONObj& idIndex) {
-
-    ReplOperation op;
-    op.setOpType(OpTypeEnum::kCommand);
-
-    op.setTid(nss.tenantId());
-    op.setNss(nss.getCommandNS());
-    op.setUuid(options.uuid);
-    op.setObject(makeCreateCollCmdObj(nss, options, idIndex));
-    return op;
-}
-
-ReplOperation MutableOplogEntry::makeDeleteOperation(const NamespaceString& nss,
-                                                     UUID uuid,
-                                                     const BSONObj& docToDelete) {
-    ReplOperation op;
-    op.setOpType(OpTypeEnum::kDelete);
-
-    op.setTid(nss.tenantId());
-    op.setNss(nss);
-    op.setUuid(uuid);
-    op.setObject(docToDelete.getOwned());
-    return op;
+BSONObj MutableOplogEntry::makeCreateCollObject2(const RecordId& catalogId,
+                                                 StringData ident,
+                                                 const boost::optional<std::string>& idIndexIdent) {
+    BSONObjBuilder b;
+    catalogId.serializeToken("catalogId", &b);
+    b.append("ident", ident);
+    if (idIndexIdent) {
+        b.append("idIndexIdent", *idIndexIdent);
+    }
+    return b.obj();
 }
 
 StatusWith<MutableOplogEntry> MutableOplogEntry::parse(const BSONObj& object) {

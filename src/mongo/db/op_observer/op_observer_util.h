@@ -51,6 +51,11 @@ namespace mongo {
 extern FailPoint addDestinedRecipient;
 extern FailPoint sleepBetweenInsertOpTimeGenerationAndLogOp;
 
+/**
+ * Returns true when local catalog identifiers should be replicated through the oplog.
+ */
+bool shouldReplicateLocalCatalogIdentifers(OperationContext* opCtx);
+
 BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
                           const CollectionOptions& oldCollOptions,
                           boost::optional<IndexCollModInfo> indexInfo);

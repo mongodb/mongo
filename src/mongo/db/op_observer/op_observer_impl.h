@@ -133,13 +133,18 @@ public:
                              boost::optional<repl::OpTime> postImageOpTime,
                              boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
                              boost::optional<OplogSlot> slot) final;
-    void onCreateCollection(OperationContext* opCtx,
-                            const CollectionPtr& coll,
-                            const NamespaceString& collectionName,
-                            const CollectionOptions& options,
-                            const BSONObj& idIndex,
-                            const OplogSlot& createOpTime,
-                            bool fromMigrate) final;
+    /**
+     * Enforces that 'createCollCatalogIdentifier' must be present to log the creation of a
+     * replicated collection when 'featureFlagReplicateLocalCatalogIdentifier' is enabled.
+     */
+    void onCreateCollection(
+        OperationContext* opCtx,
+        const NamespaceString& collectionName,
+        const CollectionOptions& options,
+        const BSONObj& idIndex,
+        const OplogSlot& createOpTime,
+        const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
+        bool fromMigrate) final;
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,
                    const UUID& uuid,

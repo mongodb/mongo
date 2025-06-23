@@ -1070,13 +1070,14 @@ void OpObserverImpl::onInternalOpMessage(
     logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
 }
 
-void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
-                                        const CollectionPtr& coll,
-                                        const NamespaceString& collectionName,
-                                        const CollectionOptions& options,
-                                        const BSONObj& idIndex,
-                                        const OplogSlot& createOpTime,
-                                        bool fromMigrate) {
+void OpObserverImpl::onCreateCollection(
+    OperationContext* opCtx,
+    const NamespaceString& collectionName,
+    const CollectionOptions& options,
+    const BSONObj& idIndex,
+    const OplogSlot& createOpTime,
+    const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
+    bool fromMigrate) {
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collectionName)) {
         return;
     }
@@ -1086,7 +1087,17 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
     oplogEntry.setTid(collectionName.tenantId());
     oplogEntry.setNss(collectionName.getCommandNS());
     oplogEntry.setUuid(options.uuid);
-    oplogEntry.setObject(MutableOplogEntry::makeCreateCollCmdObj(collectionName, options, idIndex));
+    oplogEntry.setObject(MutableOplogEntry::makeCreateCollObject(collectionName, options, idIndex));
+    if (shouldReplicateLocalCatalogIdentifers(opCtx)) {
+        invariant(createCollCatalogIdentifier.has_value(),
+                  "Missing catalog identifier required to log replicated "
+                  "collection");
+        const auto o2 = repl::MutableOplogEntry::makeCreateCollObject2(
+            createCollCatalogIdentifier->catalogId,
+            createCollCatalogIdentifier->ident,
+            createCollCatalogIdentifier->idIndexIdent);
+        oplogEntry.setObject2(o2);
+    }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
 
     if (!createOpTime.isNull()) {
