@@ -283,10 +283,6 @@ public:
         return _unwindSrc;
     }
 
-    const boost::optional<BSONObj>& getAdditionalFilter() const {
-        return _additionalFilter;
-    }
-
     /*
      * Indicates whether this $lookup stage has absorbed an immediately following $unwind stage that
      * unwinds the lookup result array.

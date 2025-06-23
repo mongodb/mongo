@@ -498,12 +498,12 @@ TEST_F(DocumentSourceMatchTest, MultipleMatchStagesShouldCombineIntoOne) {
     match1->optimizeAt(container.begin(), &container);
 
     ASSERT_EQUALS(container.size(), 1U);
-    ASSERT_BSONOBJ_EQ(match1->getQuery(), fromjson("{'$and': [{a:1}, {b:1}]}"));
+    ASSERT_BSONOBJ_EQ(match1->getQuery(), fromjson("{'$and': [{a: 1}, {b: 1}]}"));
 
     container.push_back(match3);
     match1->optimizeAt(container.begin(), &container);
     ASSERT_EQUALS(container.size(), 1U);
-    ASSERT_BSONOBJ_EQ(match1->getQuery(), fromjson("{'$and': [{a:1}, {b:1}, {c:1}]}"));
+    ASSERT_BSONOBJ_EQ(match1->getQuery(), fromjson("{'$and': [{a: 1}, {b: 1}, {c: 1}]}"));
 }
 
 TEST_F(DocumentSourceMatchTest, DoesNotPushProjectBeforeSelf) {
@@ -552,7 +552,7 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyJoinWithSubsequentMatch) {
     const auto match = DocumentSourceMatch::create(BSON("a" << 1), getExpCtx());
     const auto secondMatch = DocumentSourceMatch::create(BSON("b" << 1), getExpCtx());
 
-    match->joinMatchWith(secondMatch, "$and"_sd);
+    match->joinMatchWith(secondMatch, MatchExpression::MatchType::AND);
 
     const auto mock = DocumentSourceMock::createForTest({Document{{"a", 1}, {"b", 1}},
                                                          Document{{"a", 2}, {"b", 1}},

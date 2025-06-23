@@ -1603,7 +1603,10 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
     auto expCtx = pipeline->getContext();
 
     // Look for an initial match. This works whether we got an initial query or not. If not, it
-    // results in a "{}" query, which will be what we want in that case.
+    // results in a "{}" query, which will be what we want in that case. Note that if there is a
+    // leading $match, 'queryObj' will hold a reference to that $match's MatchExpression backing
+    // BSON. This gets passed into the FindCommandRequest we construct later through
+    // 'prepareExecutor', and this is how we keep the MatchExpression's backing BSON alive.
     const BSONObj queryObj = pipeline->getInitialQuery();
     boost::intrusive_ptr<DocumentSourceMatch> leadingMatch;
     bool isTextQuery = false;
