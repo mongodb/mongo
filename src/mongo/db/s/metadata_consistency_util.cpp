@@ -58,6 +58,7 @@
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/scoped_read_concern.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/logv2/log.h"
@@ -1067,6 +1068,9 @@ std::vector<MetadataInconsistencyItem> checkChunksConsistency(OperationContext* 
             ShardingState::get(opCtx)->shardId() == ShardId::kConfigServerId);
 
     DBDirectClient client{opCtx};
+    // We need to read at snapshot readConcern, set it in the opCtx for DBDirectClient.
+    ScopedReadConcern scopedReadConcern(
+        opCtx, repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern));
     const auto chunksCursor = _getCollectionChunksCursor(&client, collection);
 
     const auto& uuid = collection.getUuid();

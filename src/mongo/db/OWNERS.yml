@@ -203,7 +203,7 @@ filters:
   - "field_ref*":
     approvers:
       - 10gen/query-optimization
-  - "read_concern*":
+  - "*read_concern*":
     approvers:
       - 10gen/server-rw-concerns
   - "read_write_concern*":

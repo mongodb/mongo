@@ -1335,6 +1335,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/**/*_with_id_without_shard_key* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/*zone* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/addShard* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/sharding/**/check_metadata* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/sharding/analyze_shard_key/OWNERS.yml
 /jstests/sharding/analyze_shard_key/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
@@ -1557,7 +1558,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/drop*idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/**/startup_recovery* @10gen/server-storage-engine-api @svc-auto-approve-bot
 /src/mongo/db/**/field_ref* @10gen/query-optimization @svc-auto-approve-bot
-/src/mongo/db/**/read_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
+/src/mongo/db/**/*read_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
 /src/mongo/db/**/read_write_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
 /src/mongo/db/**/write_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
 /src/mongo/db/**/feature_compatibility* @10gen/server-fcv @svc-auto-approve-bot

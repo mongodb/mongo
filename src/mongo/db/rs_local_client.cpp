@@ -38,6 +38,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/scoped_read_concern.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -227,24 +228,6 @@ Status RSLocalClient::runAggregation(
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
-    // saving original read source and read concern
-    auto originalRCA = repl::ReadConcernArgs::get(opCtx);
-    auto originalReadSource = shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource();
-    boost::optional<Timestamp> originalReadTimestamp;
-    if (originalReadSource == RecoveryUnit::ReadSource::kProvided)
-        originalReadTimestamp =
-            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
-
-    ON_BLOCK_EXIT([&]() {
-        repl::ReadConcernArgs::get(opCtx) = originalRCA;
-        if (originalReadSource == RecoveryUnit::ReadSource::kProvided) {
-            shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
-                originalReadSource, originalReadTimestamp);
-        } else {
-            shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(originalReadSource);
-        }
-    });
-
     repl::ReadConcernArgs requestReadConcernArgs = [&] {
         if (!aggRequest.getReadConcern()) {
             // Default concern is local at the lastOp applied timestamp.
@@ -254,6 +237,7 @@ Status RSLocalClient::runAggregation(
             return *aggRequest.getReadConcern();
         }
     }();
+    ScopedReadConcern scopedReadConcern(opCtx, requestReadConcernArgs);
 
     // Waits for any writes performed by this ShardLocal instance to be committed and
     // visible. This will set the correct ReadSource as well.
@@ -270,7 +254,6 @@ Status RSLocalClient::runAggregation(
                 return status;
         }
     }
-    repl::ReadConcernArgs::get(opCtx) = requestReadConcernArgs;
     Status rcStatus = mongo::waitForReadConcern(
         opCtx, requestReadConcernArgs, aggRequest.getNamespace().dbName(), true);
     if (!rcStatus.isOK())

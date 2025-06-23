@@ -1284,7 +1284,7 @@ replication.server_rw_concerns:
     jira: Server Replication
   files:
     - src/mongo/db/commands/read_write_concern_defaults_server_status.cpp
-    - src/mongo/db/read_concern*
+    - src/mongo/db/*read_concern*
     - src/mongo/db/read_write_concern*
     - src/mongo/db/repl/*read_concern*
     - src/mongo/db/repl/*write_concern*

@@ -851,9 +851,11 @@ mongo_cc_library(
     name = "dbdirectclient",
     srcs = [
         "dbdirectclient.cpp",
+        "scoped_read_concern.cpp",
     ],
     hdrs = [
         "dbdirectclient.h",
+        "scoped_read_concern.h",
     ],
     deps = [
         ":not_primary_error_tracker",  # TODO(SERVER-93876): Remove.

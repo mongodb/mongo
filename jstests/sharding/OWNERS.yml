@@ -42,3 +42,6 @@ filters:
   - "addShard*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "check_metadata*":
+    approvers:
+      - 10gen/server-catalog-and-routing
