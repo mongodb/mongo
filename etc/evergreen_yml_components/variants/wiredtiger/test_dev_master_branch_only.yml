@@ -168,7 +168,10 @@ buildvariants:
       - name: external_auth_windows
         distros:
           - windows-2016-dc
-      - name: .jscore .common !.sharding
+      - name: .jscore .common !.sharding !.requires_large_host
+      - name: .jscore .common !.sharding .requires_large_host
+        distros:
+          - windows-2022-large
       # SERVER-105328: Enable this task once container support is added to Windows variants.
       # - name: .jstestfuzz .common !.feature_flag_guarded
       - name: replica_sets_auth_gen

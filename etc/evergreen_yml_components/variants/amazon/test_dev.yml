@@ -250,7 +250,11 @@ buildvariants:
         --excludeWithAnyTags=resource_intensive
     tasks:
       - name: aggregation_mongos_passthrough
+        distros:
+          - amazon2023-arm64-latest-large
       - name: aggregation_sharded_collections_passthrough
+        distros:
+          - amazon2023-arm64-latest-large
       - name: aggregation_one_shard_sharded_collections
       - name: aggregation
       - name: aggregation_disabled_optimization

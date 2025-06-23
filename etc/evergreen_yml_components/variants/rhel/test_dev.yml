@@ -164,9 +164,15 @@ buildvariants:
         --excludeWithAnyTags=config_shard_incompatible
     tasks:
       - name: aggregation_mongos_passthrough
+        distros:
+          - rhel8.8-large
       - name: aggregation_one_shard_sharded_collections
       - name: aggregation_sharded_collections_causally_consistent_passthrough
+        distros:
+          - rhel8.8-large
       - name: aggregation_sharded_collections_passthrough
+        distros:
+          - rhel8.8-large
       - name: auth_gen
       - name: causally_consistent_jscore_passthrough_auth_gen
       - name: causally_consistent_jscore_passthrough_gen
@@ -229,7 +235,10 @@ buildvariants:
         omit_generated_tasks: true
     tasks:
       - name: .aggfuzzer !.sbe_only
-      - name: .aggregation !.sbe_only
+      - name: .aggregation !.sbe_only !.requires_large_host
+      - name: .aggregation !.sbe_only .requires_large_host
+        distros:
+          - rhel8.8-medium
       - name: .auth
       - name: .causally_consistent !.sharding
       - name: .change_stream_fuzzer !.serverless
@@ -241,14 +250,20 @@ buildvariants:
       - name: .encrypt
       - name: .jscore .common !jsCore !.sbe_only
       - name: .jstestfuzz !.feature_flag_guarded
-      - name: .misc_js
+      - name: .misc_js !.requires_large_host
+      - name: .misc_js .requires_large_host
+        distros:
+          - rhel8.8-medium
       - name: .multi_shard
       - name: .query_fuzzer
       - name: query_golden_classic
       - name: query_golden_sharding
       - name: .random_multiversion_ds
       - name: .read_only
-      - name: .read_write_concern !.large
+      - name: .read_write_concern !.large !.requires_large_host
+      - name: .read_write_concern !.large .requires_large_host
+        distros:
+          - rhel8.8-medium
       - name: .read_write_concern .large
         distros:
           - rhel8.8-medium
@@ -309,9 +324,17 @@ buildvariants:
       - name: retryable_writes_jscore_stepdown_passthrough_gen
       - name: sasl
       - name: search
+        distros:
+          - rhel8.8-large
       - name: search_community
+        distros:
+          - rhel8.8-large
       - name: search_community_ssl
+        distros:
+          - rhel8.8-large
       - name: search_auth
+        distros:
+          - rhel8.8-large
       - name: search_no_pinned_connections_auth
       - name: search_ssl
       - name: secondary_reads_passthrough_gen

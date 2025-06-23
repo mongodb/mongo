@@ -32,12 +32,23 @@ buildvariants:
           - amazon2023.3-large
       # downstream_expansions.set() is noop for evergreen versions, so fine to define in cron-only variants for sake of shared yaml anchor.
       - name: set_downstream_expansions_for_mongot
-      - name: .mongot_e2e_tests
+      - name: .mongot_e2e_tests !.requires_large_host
+      - name: .mongot_e2e_tests .requires_large_host
+        distros:
+          - amazon2023.3-large
       # TODO SERVER-89721 remove search suites that use mongot mock.
       - name: search
+        distros:
+          - amazon2023.3-large
       - name: search_auth
+        distros:
+          - amazon2023.3-large
       - name: search_community
+        distros:
+          - amazon2023.3-large
       - name: search_community_ssl
+        distros:
+          - amazon2023.3-large
       - name: search_no_pinned_connections_auth
       - name: search_ssl
       - name: vector_search
@@ -51,7 +62,7 @@ buildvariants:
     tags: ["mongot_e2e"]
     patch_only: true
     run_on:
-      - amazon2023.3-small
+      - amazon2023.3-large
     expansions:
       <<: *amazon-linux-2023-x86-mongot-integration-expansions
       compile_variant: amazon-linux-2023-x86-mongot-integration-patchable
@@ -92,12 +103,23 @@ buildvariants:
           - amazon2023.3-arm64-large
       # downstream_expansions.set() is noop for evergreen versions, so fine to define in cron-only variants for sake of shared yaml anchor.
       - name: set_downstream_expansions_for_mongot
-      - name: .mongot_e2e_tests
+      - name: .mongot_e2e_tests !.requires_large_host
+      - name: .mongot_e2e_tests .requires_large_host
+        distros:
+          - amazon2023.3-arm64-large
       # TODO SERVER-89721 remove search suites that use mongot mock.
       - name: search
+        distros:
+          - amazon2023.3-arm64-large
       - name: search_community
+        distros:
+          - amazon2023.3-arm64-large
       - name: search_community_ssl
+        distros:
+          - amazon2023.3-arm64-large
       - name: search_auth
+        distros:
+          - amazon2023.3-arm64-large
       - name: search_no_pinned_connections_auth
       - name: search_ssl
       - name: vector_search
@@ -144,12 +166,23 @@ buildvariants:
           - amazon2-arm64-latest-large
       # downstream_expansions.set() is noop for evergreen versions, so fine to define in cron-only variants for sake of shared yaml anchor.
       - name: set_downstream_expansions_for_mongot
-      - name: .mongot_e2e_tests
+      - name: .mongot_e2e_tests !.requires_large_host
+      - name: .mongot_e2e_tests .requires_large_host
+        distros:
+          - amazon2-arm64-latest-large
       # TODO SERVER-89721 remove search suites that use mongot mock.
       - name: search
+        distros:
+          - amazon2-arm64-latest-large
       - name: search_auth
+        distros:
+          - amazon2-arm64-latest-large
       - name: search_community
+        distros:
+          - amazon2-arm64-latest-large
       - name: search_community_ssl
+        distros:
+          - amazon2-arm64-latest-large
       - name: search_no_pinned_connections_auth
       - name: search_ssl
       - name: vector_search

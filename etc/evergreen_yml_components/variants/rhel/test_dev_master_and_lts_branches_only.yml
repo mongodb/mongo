@@ -77,23 +77,35 @@ buildvariants:
         distros:
           - rhel8.8-large
       - name: .aggfuzzer .common !.feature_flag_guarded
-      - name: .aggregation !.unwind !.encrypt !.feature_flag_guarded
+      - name: .aggregation !.unwind !.encrypt !.feature_flag_guarded !.requires_large_host
+      - name: .aggregation !.unwind !.encrypt !.feature_flag_guarded .requires_large_host
+        distros:
+          - rhel8.8-large
       - name: audit
       - name: .auth !.multiversion
       - name: .causally_consistent !.wo_snapshot !.durable_history
       - name: .change_streams
       - name: .change_stream_fuzzer !.serverless
-      - name: .misc_js
+      - name: .misc_js !.requires_large_host
+      - name: .misc_js .requires_large_host
+        distros:
+          - rhel8.8-large
       - name: .concurrency !.no_txns !.kill_terminate !.incompatible_inmemory !.feature_flag_guarded
         distros:
           - rhel8.8-medium # Some workloads require a lot of memory, use a bigger machine for this suite.
       - name: initial_sync_fuzzer_gen
-      - name: .jscore .common !.decimal
+      - name: .jscore .common !.decimal !.requires_large_host
+      - name: .jscore .common !.decimal .requires_large_host
+        distros:
+          - rhel8.8-large
       - name: jsCore_txns_large_txns_format
       - name: .jstestfuzz !.initsync !.feature_flag_guarded !.incompatible_inmemory
       - name: .multi_shard .common
       - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-      - name: .read_write_concern !.durable_history
+      - name: .read_write_concern !.durable_history !.requires_large_host
+      - name: .read_write_concern !.durable_history .requires_large_host
+        distros:
+          - rhel8.8-large
       - name: replica_sets_gen
       - name: .replica_sets .common
       - name: .replica_sets .multi_oplog !.encrypt
@@ -153,6 +165,8 @@ buildvariants:
       - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
       - name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
       - name: jsCore
+        distros:
+          - rhel8.8-medium
       - name: jsCore_txns
       - name: .multi_shard
       - name: multi_stmt_txn_jscore_passthrough_with_migration_gen

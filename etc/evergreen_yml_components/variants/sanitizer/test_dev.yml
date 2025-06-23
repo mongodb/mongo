@@ -686,9 +686,13 @@ buildvariants:
           - rhel8.8-xlarge
       - name: aggregation
       - name: aggregation_mongos_passthrough
+        distros:
+          - rhel8.8-large
       - name: auth_gen
       - name: concurrency_simultaneous_gen
       - name: jsCore
+        distros:
+          - rhel8.8-large
       - name: noPassthrough_gen
       - name: sharding_gen
 

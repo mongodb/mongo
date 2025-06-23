@@ -42,7 +42,10 @@ buildvariants:
           - windows-2022-large
       - name: concurrency_replication_causal_consistency_gen
       - name: initial_sync_fuzzer_gen
-      - name: .jscore .common !.decimal !.sharding
+      - name: .jscore .common !.decimal !.sharding !.requires_large_host
+      - name: .jscore .common !.decimal !.sharding .requires_large_host
+        distros:
+          - windows-2022-large
       # SERVER-105328: Enable this task once container support is added to Windows variants.
       # - name: .jstestfuzz .common !.feature_flag_guarded
       - name: .read_write_concern .linearize !.durable_history
