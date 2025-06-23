@@ -724,7 +724,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                     }
 
                     if (!write_ops_exec::shouldRetryDuplicateKeyException(
-                            parsedUpdate, *ex.extraInfo<DuplicateKeyErrorInfo>())) {
+                            parsedUpdate, *ex.extraInfo<DuplicateKeyErrorInfo>(), retryAttempts)) {
                         throw;
                     }
 
