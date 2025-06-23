@@ -55,7 +55,8 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const final {
-            return {};
+            return {
+                Privilege(ResourcePattern::forClusterResource(), ActionSet{ActionType::internal})};
         }
 
         bool allowedToPassthroughFromMongos() const final {
