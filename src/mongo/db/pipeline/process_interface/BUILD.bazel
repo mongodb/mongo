@@ -302,6 +302,7 @@ mongo_cc_library(
         "//src/mongo/db/query/client_cursor",
         "//src/mongo/db/query/write_ops",
         "//src/mongo/db/query/write_ops:write_ops_exec",
+        "//src/mongo/db/repl:intent_registry",
         "//src/mongo/db/repl:primary_only_service",
         "//src/mongo/db/s:query_analysis_writer",
         "//src/mongo/db/s:transaction_coordinator",

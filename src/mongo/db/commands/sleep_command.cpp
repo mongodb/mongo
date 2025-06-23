@@ -198,6 +198,7 @@ public:
                 lockTarget = cmdObj["lockTarget"].checkAndGetStringData();
             }
 
+            // TODO: remove in SERVER-103635
             if (lockTarget == "RSTL") {
                 _sleepInRSTL(opCtx, msRemaining.count());
                 continue;

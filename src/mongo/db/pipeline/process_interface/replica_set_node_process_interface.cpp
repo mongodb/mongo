@@ -42,7 +42,9 @@
 #include "mongo/db/operation_time_tracker.h"
 #include "mongo/db/pipeline/process_interface/common_mongod_process_interface.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/repl/intent_guard.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -322,6 +324,14 @@ void ReplicaSetNodeProcessInterface::_attachGenericCommandArgs(OperationContext*
 bool ReplicaSetNodeProcessInterface::_canWriteLocally(OperationContext* opCtx,
                                                       const NamespaceString& ns) const {
     Lock::ResourceLock rstl(opCtx, resourceIdReplicationStateTransitionLock, MODE_IX);
+    boost::optional<rss::consensus::IntentGuard> write_guard;
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        try {
+            write_guard.emplace(rss::consensus::IntentRegistry::Intent::Write, opCtx);
+        } catch (const ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
+            return false;
+        }
+    }
     return repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns);
 }
 
