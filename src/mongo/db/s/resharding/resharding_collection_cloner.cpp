@@ -183,7 +183,8 @@ public:
                            std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
                            CancellationToken cancelToken,
                            std::vector<OwnedRemoteCursor> remoteCursors,
-                           int numWriteThreads)
+                           int numWriteThreads,
+                           ReshardingMetrics* metrics)
         : _executor(std::move(executor)),
           _cleanupExecutor(std::move(cleanupExecutor)),
           _cancelSource(cancelToken),
@@ -192,7 +193,8 @@ public:
           _numWriteThreads(numWriteThreads),
           _queues(_numWriteThreads),
           _activeCursors(0),
-          _openConsumers(0) {
+          _openConsumers(0),
+          _metrics(metrics) {
         constexpr int kQueueDepthPerDonor = 2;
         MultiProducerSingleConsumerQueue<QueueData>::Options qOptions;
         qOptions.maxQueueDepth = _remoteCursors.size() * kQueueDepthPerDonor;
@@ -273,7 +275,8 @@ public:
 
     void handleOneResponse(const executor::TaskExecutor::ResponseStatus& response,
                            const HostAndPort& hostAndPort,
-                           int index) {
+                           int index,
+                           Milliseconds elapsed) {
         // To ensure that all batches from one donor are handled sequentially, we need to handle
         // those requests by only one writer thread, which is determined by the shardId, which
         // corresponds to the index here.
@@ -289,6 +292,8 @@ public:
                     "elapsed"_attr = response.elapsed,
                     "data"_attr = response.data,
                     "more"_attr = response.moreToCome);
+        _metrics->onCloningRemoteBatchRetrieval(
+            response.elapsed ? duration_cast<Milliseconds>(*response.elapsed) : elapsed);
         uassertStatusOK(response.status);
         reshardingCollectionClonerAbort.executeIf(
             [this](const BSONObj& data) {
@@ -337,30 +342,40 @@ public:
                         "index"_attr = i,
                         "shardId"_attr = _shardIds.back(),
                         "host"_attr = cursorHost);
-
             auto cmdFuture =
                 Future<void>::makeReady()
                     .thenRunOn(_executor)
                     .then([this, i, &cursor, &cursorHost, cmdObj = std::move(cmdObj)] {
+                        auto latencyTimer = std::make_shared<Timer>();
                         // TODO(SERVER-79857): This AsyncTry is being used to simulate the way the
                         // future-enabled scheduleRemoteExhaustCommand works -- the future will be
                         // fulfilled when there are no more responses forthcoming.  When we enable
                         // exhaust we can remove the AsyncTry.
-                        return AsyncTry([this, &cursor, &cursorHost, i, cmdObj = cmdObj] {
+
+                        return AsyncTry([this,
+                                         &cursor,
+                                         &cursorHost,
+                                         i,
+                                         cmdObj = cmdObj,
+                                         latencyTimer]() mutable {
                                    auto opCtx = cc().makeOperationContext();
                                    executor::RemoteCommandRequest request(
                                        cursorHost,
                                        cursor->getCursorResponse().getNSS().dbName(),
                                        cmdObj,
                                        opCtx.get());
+                                   latencyTimer->reset();
                                    return _executor
                                        ->scheduleRemoteCommand(request, _cancelSource.token())
-                                       .then([this, &cursorHost, i](
+                                       .then([this, &cursorHost, i, latencyTimer](
                                                  executor::TaskExecutor::ResponseStatus response) {
+                                           auto duration =
+                                               duration_cast<Milliseconds>(latencyTimer->elapsed());
+
                                            response.moreToCome = response.status.isOK() &&
                                                !response.data["cursor"].eoo() &&
                                                response.data["cursor"]["id"].safeNumberLong() != 0;
-                                           handleOneResponse(response, cursorHost, i);
+                                           handleOneResponse(response, cursorHost, i, duration);
                                            return response;
                                        });
                                })
@@ -436,6 +451,7 @@ private:
     Status _finalResult = Status::OK();  // (M)
     AtomicWord<bool> _failPointHit;
     stdx::condition_variable _allProducerConsumerClosed;
+    ReshardingMetrics* _metrics;
 };
 
 sharded_agg_helpers::DispatchShardPipelineResults
@@ -587,7 +603,8 @@ void ReshardingCollectionCloner::_writeOnceWithNaturalOrder(
         std::move(cleanupExecutor),
         cancelToken,
         std::move(remoteCursors),
-        resharding::gReshardingCollectionClonerWriteThreadCount);
+        resharding::gReshardingCollectionClonerWriteThreadCount,
+        _metrics);
 
     if (reshardingCollectionClonerShouldFailWithStaleConfig.shouldFail()) {
         uassert(StaleConfigInfo(
