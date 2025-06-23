@@ -153,8 +153,12 @@ struct ValidationErrorContext {
           truncate(truncate),
           kMaxDocValidationErrorSize(maxDocValidationErrorSize),
           kMaxConsideredValuesElements(maxConsideredValuesElements) {
-        invariant(kMaxConsideredValuesElements > 0);
-        invariant(kMaxDocValidationErrorSize > 0);
+        tassert(9740300,
+                "Must have postive value for 'kMaxConsideredValuesElements'",
+                kMaxConsideredValuesElements > 0);
+        tassert(9740301,
+                "Must have postive value for 'kMaxDocValidationErrorSize'",
+                kMaxDocValidationErrorSize > 0);
     }
 
     /**
@@ -210,7 +214,7 @@ struct ValidationErrorContext {
         frames.emplace(RuntimeState::kError, frameParams);
     }
     void popFrame() {
-        invariant(!frames.empty());
+        tassert(9740302, "Attempted to pop from empty stack", !frames.empty());
         frames.pop();
     }
 
@@ -218,27 +222,27 @@ struct ValidationErrorContext {
      * Utilities which return members of the current ValidationContextFrame.
      */
     BSONObjBuilder& getCurrentObjBuilder() {
-        invariant(!frames.empty());
+        tassert(9740303, "Attempted to read from empty stack", !frames.empty());
         return frames.top().objBuilder;
     }
     BSONArrayBuilder& getCurrentArrayBuilder() {
-        invariant(!frames.empty());
+        tassert(9740304, "Attempted to read from empty stack", !frames.empty());
         return frames.top().arrayBuilder;
     }
     size_t getCurrentChildIndex() const {
-        invariant(!frames.empty());
+        tassert(9740305, "Attempted to read from empty stack", !frames.empty());
         return frames.top().childIndex;
     }
     void incrementCurrentChildIndex() {
-        invariant(!frames.empty());
+        tassert(9740306, "Attempted to modify empty stack", !frames.empty());
         ++frames.top().childIndex;
     }
     RuntimeState getCurrentRuntimeState() const {
-        invariant(!frames.empty());
+        tassert(9740307, "Attempted to read from empty stack", !frames.empty());
         return frames.top().runtimeState;
     }
     void setCurrentRuntimeState(RuntimeState runtimeState) {
-        invariant(!frames.empty());
+        tassert(9740308, "Attempted to set state on empty stack", !frames.empty());
 
         // If a node has RuntimeState::kNoError, then its runtime state value should never be
         // modified since the node should never contribute to error generation.
@@ -260,11 +264,11 @@ struct ValidationErrorContext {
         return rootDoc;
     }
     void setCurrentInversion(InvertError inversion) {
-        invariant(!frames.empty());
+        tassert(9740309, "Attempted to set state on empty stack", !frames.empty());
         frames.top().currentParams.inversion = inversion;
     }
     InvertError getCurrentInversion() const {
-        invariant(!frames.empty());
+        tassert(9740310, "Attempted to read from empty stack", !frames.empty());
         return frames.top().currentParams.inversion;
     }
 
@@ -368,11 +372,11 @@ struct ValidationErrorContext {
         return tag == "_subschema" || tag == "_propertiesExistList";
     }
     bool isConsideredValuesTruncated() const {
-        invariant(!frames.empty());
+        tassert(9740311, "Attempted to read from empty stack", !frames.empty());
         return frames.top().consideredValuesTruncated;
     }
     void markConsideredValuesAsTruncated() {
-        invariant(!frames.empty());
+        tassert(9740312, "Attempted to set state on empty stack", !frames.empty());
         frames.top().consideredValuesTruncated = true;
     }
 
@@ -600,7 +604,7 @@ void generatePatternPropertyError(const InternalSchemaAllowedPropertiesMatchExpr
     // Generate an error for the previous regular expression. The previous regex is indexed by
     // the current child index minus one since the child expression is offset by one to account
     // for the expression which represents the 'additionalProperties' keyword.
-    invariant(ctx->getCurrentChildIndex() >= 1);
+    tassert(9740313, "Child index was not positive", ctx->getCurrentChildIndex() >= 1);
     auto childIndex = ctx->getCurrentChildIndex() - 1;
     auto& patternSchema = expr.getPatternProperties()[childIndex];
     auto element = findFailingProperty(expr, patternSchema, ctx);
@@ -640,7 +644,10 @@ void generateAdditionalPropertiesSchemaError(
     auto&& additionalProperties = findAdditionalProperties(ctx->getCurrentDocument(), expr);
     auto firstFailingElement = findFirstFailingAdditionalProperty(
         *expr.getChild(0), additionalProperties, ctx->getCurrentDocument());
-    invariant(firstFailingElement);
+    tassert(9740314,
+            "Must have a failing element if generating an error for a property which violates "
+            "'additionalProperties' subschema",
+            firstFailingElement);
     auto& builder = ctx->getCurrentObjBuilder();
     builder.append("operatorName", "additionalProperties");
     appendSchemaAnnotations(*expr.getChild(0), builder);
@@ -886,7 +893,8 @@ public:
             ElementPath path(expr->path(), LeafArrayBehavior::kNoTraversal);
             BSONMatchableDocument doc(_context->getCurrentDocument());
             MatchableDocument::IteratorHolder cursor(&doc, &path);
-            invariant(cursor->more());
+            tassert(
+                9740315, "Must have an encrypted element to generate an error for", cursor->more());
             auto elem = cursor->next().element();
             // Only generate an error in the normal case since if the value exists and it is
             // encrypted, in the inverted case, this node's sibling expression will generate an
@@ -911,7 +919,8 @@ public:
             ElementPath path(expr->path(), LeafArrayBehavior::kNoTraversal);
             BSONMatchableDocument doc(_context->getCurrentDocument());
             MatchableDocument::IteratorHolder cursor(&doc, &path);
-            invariant(cursor->more());
+            tassert(
+                9740316, "Must have an encrypted element to generate an error for", cursor->more());
             auto elem = cursor->next().element();
 
             appendOperatorName(*expr);
@@ -971,12 +980,16 @@ public:
 
             // Attribute should be present and be an array, since it has been ensured by handling of
             // AndMatchExpression with error annotation "items".
-            invariant(attributeValue.type() == BSONType::Array);
+            tassert(9740317,
+                    "Must have array to generate error for",
+                    attributeValue.type() == BSONType::Array);
             auto valueAsArray = BSONArray(attributeValue.embeddedObject());
 
             // If array is shorter than the index the match expression applies to, then document
             // validation should not fail.
-            invariant(expr->arrayIndex() < valueAsArray.nFields());
+            tassert(9740318,
+                    "Failing array index must be in bounds of array",
+                    expr->arrayIndex() < valueAsArray.nFields());
 
             // Append information about array element to the error.
             BSONElement arrayElement = valueAsArray[expr->arrayIndex()];
@@ -1009,7 +1022,9 @@ public:
     }
     void visit(const InternalSchemaObjectMatchExpression* expr) final {
         // This node should never be responsible for generating an error directly.
-        invariant(expr->getErrorAnnotation()->mode != AnnotationMode::kGenerateError);
+        tassert(9740319,
+                "Should never generate error for 'InternalSchemaObjectMatchExpression' directly",
+                expr->getErrorAnnotation()->mode != AnnotationMode::kGenerateError);
 
         // As part of pushing a new frame onto the stack, the runtime state may be set to
         // 'kNoError' if 'expr' matches the current document.
@@ -1020,7 +1035,7 @@ public:
             ElementPath path(expr->path(), LeafArrayBehavior::kNoTraversal);
             BSONMatchableDocument doc(_context->getCurrentDocument());
             MatchableDocument::IteratorHolder cursor(&doc, &path);
-            invariant(cursor->more());
+            tassert(9740320, "Must have element to generate error for", cursor->more());
             auto elem = cursor->next().element();
 
             // If we do not find an object at expr's path, then the subtree rooted at this node will
@@ -1058,7 +1073,10 @@ public:
             auto attributeValueAsArray = BSONArray(attributeValue.embeddedObject());
             appendConsideredValue(attributeValueAsArray);
             auto duplicateValue = expr->findFirstDuplicateValue(attributeValueAsArray);
-            invariant(duplicateValue);
+            tassert(9740321,
+                    "Did not find duplicate value for 'InternalSchemaUniqueItemsMatchExpression' "
+                    "failure",
+                    duplicateValue);
             _context->verifySizeAndAppendAs(
                 duplicateValue, "duplicatedValue", &_context->getCurrentObjBuilder());
         } else {
@@ -1190,7 +1208,8 @@ private:
         // Only append the operator name if 'annotation' has one.
         if (!tag.empty()) {
             // An underscore-prefixed tag describes an internal entity, not an MQL operator.
-            invariant(tag[0] != '_');
+            tassert(
+                9740322, "Should not be generating an error for an internal entity", tag[0] != '_');
             _context->getCurrentObjBuilder().append("operatorName", tag);
         }
     }
@@ -1265,7 +1284,10 @@ private:
         MatchableDocument::IteratorHolder cursor(&doc, &path);
         if (cursor->more()) {
             auto element = cursor->next().element();
-            invariant(!cursor->more());  // We expect only 1 item.
+            tassert(9740323,
+                    "Should not be generating error for multiple items (that is, for implicit "
+                    "array traversal)",
+                    !cursor->more());  // We expect only 1 item.
             return element;
         } else {
             return {};
@@ -1321,9 +1343,13 @@ private:
      */
     void appendErrorReason(const std::string& normalReason, const std::string& invertedReason) {
         if (normalReason.empty()) {
-            invariant(_context->getCurrentInversion() == InvertError::kInverted);
+            tassert(9740324,
+                    "Cannot generate normal error without normal reason",
+                    _context->getCurrentInversion() == InvertError::kInverted);
         } else if (invertedReason.empty()) {
-            invariant(_context->getCurrentInversion() == InvertError::kNormal);
+            tassert(9740325,
+                    "Cannot generate inverted error without inverted reason",
+                    _context->getCurrentInversion() == InvertError::kNormal);
         }
         BSONObjBuilder& bob = _context->getCurrentObjBuilder();
         if (bob.hasField("reason")) {
@@ -1536,7 +1562,9 @@ private:
      * Performs the setup necessary to generate an error for 'expr'.
      */
     void preVisitTreeOperator(const MatchExpression* expr) {
-        invariant(expr->getCategory() == MatchExpression::MatchCategory::kLogical);
+        tassert(9740326,
+                "Can only previsit logical operators",
+                expr->getCategory() == MatchExpression::MatchCategory::kLogical);
         _context->pushNewFrame(*expr);
         if (_context->shouldGenerateError(*expr)) {
             auto annotation = expr->getErrorAnnotation();
@@ -1566,7 +1594,9 @@ private:
         if (_context->shouldGenerateError(expr)) {
             // $all with no children should not translate to an 'AndMatchExpression' and 'enum'
             // must have non-zero children.
-            invariant(expr.numChildren() > 0);
+            tassert(9740327,
+                    "Cannot generate error for logical leaf with no children",
+                    expr.numChildren() > 0);
             appendErrorDetails(expr);
             auto childExpr = expr.getChild(0);
             auto arr = createValuesArray(childExpr->path(), LeafArrayBehavior::kNoTraversal);
@@ -1595,9 +1625,13 @@ private:
             // to generate an error for 'expr' if it evaluates to false in a normal context or
             // if it evaluates to true an inverted context.
             if (expr.isTriviallyFalse()) {
-                invariant(_context->getCurrentInversion() == InvertError::kNormal);
+                tassert(9740328,
+                        "Cannot generate 'alwaysFalse' error in an inverted context",
+                        _context->getCurrentInversion() == InvertError::kNormal);
             } else {
-                invariant(_context->getCurrentInversion() == InvertError::kInverted);
+                tassert(9740329,
+                        "Cannot generate 'alwaysTrue' error in a normal context",
+                        _context->getCurrentInversion() == InvertError::kInverted);
             }
             appendErrorDetails(expr);
             static constexpr auto kNormalReason = "expression always evaluates to false";
@@ -1730,8 +1764,11 @@ private:
         if (expr.numChildren() == 0) {
             return;
         }
-        invariant(expr.getChild(0)->matchType() ==
-                  MatchExpression::MatchType::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX);
+        tassert(9740330,
+                "Can only generate error for 'INTERNAL_SCHEMA_MATCH_ARRAY_INDEX' expression in "
+                "this function",
+                expr.getChild(0)->matchType() ==
+                    MatchExpression::MatchType::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX);
         if (getValueForKeywordExpressionIfShouldGenerateError(*expr.getChild(0),
                                                               {BSONType::Array})) {
             appendOperatorName(expr);
@@ -1780,7 +1817,11 @@ private:
             appendErrorReason(normalReason, invertedReason);
             auto failingElement =
                 expr->findFirstMismatchInArray(attributeValue.embeddedObject(), nullptr);
-            invariant(failingElement);
+            tassert(
+                9740331,
+                "Must have at least one mismatched array element when generating an error for an "
+                "'InternalSchemaAllElemMatchFromIndexMatchExpression' expression",
+                failingElement);
             _context->getCurrentObjBuilder().appendNumber(
                 "itemIndex"_sd, std::stoll(failingElement.fieldNameStringData().toString()));
             _context->setChildInput(toObjectWithPlaceholder(failingElement),
@@ -1850,7 +1891,10 @@ public:
             // 'patternProperties' should generate an error. Since the current index corresponds to
             // one plus the number of patternProperties clauses visited so far, it also represents
             // the next 'patternProperties' clause.
-            invariant(_context->getCurrentChildIndex() < expr->getPatternProperties().size());
+            tassert(
+                9740332,
+                "Current child index must be within the bounds of the total number of subschemas",
+                _context->getCurrentChildIndex() < expr->getPatternProperties().size());
             auto& patternSchema = expr->getPatternProperties()[_context->getCurrentChildIndex()];
             if (auto failingElement = findFailingProperty(*expr, patternSchema, _context)) {
                 setAllowedPropertiesChildInput(failingElement, _context);
@@ -1990,7 +2034,9 @@ public:
             {"implicitFLESchema", {"schemaRulesNotSatisfied", "schemaRulesSatisfied"}},
             {"", {"details", ""}}};
         auto detailsStringPair = detailsStringMap.find(tag);
-        invariant(detailsStringPair != detailsStringMap.end());
+        tassert(9740333,
+                "Tag " + tag + " did not correspond to existing entry in 'detailsStringMap'",
+                detailsStringPair != detailsStringMap.end());
         auto&& stringPair = detailsStringPair->second;
         if (inversion == InvertError::kNormal) {
             postVisitTreeOperator(expr, stringPair.first);
@@ -2082,10 +2128,17 @@ public:
                 patternPropertiesError = patternProperties.obj();
             }
             if (additionalPropertiesError.isEmpty()) {
-                invariant(!patternPropertiesError.isEmpty());
+                tassert(9740334,
+                        "Must have generated a 'patternPropertiesError' if we did not generate an "
+                        "'additionalPropertiesError'",
+                        !patternPropertiesError.isEmpty());
                 _context->latestCompleteError = patternPropertiesError;
             } else if (patternPropertiesError.isEmpty()) {
-                invariant(!additionalPropertiesError.isEmpty());
+                tassert(
+                    9740335,
+                    "Must have generated an 'additionalPropertiesError' if we did not generate a "
+                    "'patternPropertiesError'",
+                    !additionalPropertiesError.isEmpty());
                 _context->latestCompleteError = additionalPropertiesError;
             } else {
                 BSONArrayBuilder arr;
@@ -2197,7 +2250,9 @@ public:
             {"$or", {"clausesNotSatisfied", "clausesSatisfied"}},
             {"anyOf", {"schemasNotSatisfied", ""}}};
         auto detailsStringPair = detailsStringMap.find(tag);
-        invariant(detailsStringPair != detailsStringMap.end());
+        tassert(9740336,
+                "Tag " + tag + " did not correspond to existing entry in 'detailsStringMap'",
+                detailsStringPair != detailsStringMap.end());
         auto stringPair = detailsStringPair->second;
         if (_context->getCurrentInversion() == InvertError::kNormal) {
             postVisitTreeOperator(expr, stringPair.first);
@@ -2278,8 +2333,8 @@ void assertHasErrorAnnotations(const MatchExpression& validatorExpr) {
  * Appends the object id of 'doc' to 'builder' under the 'failingDocumentId' field.
  */
 void appendDocumentId(const BSONObj& doc, BSONObjBuilder* builder) {
-    BSONElement objectIdElement;
-    invariant(doc.getObjectID(objectIdElement));
+    BSONElement objectIdElement = doc["_id"];
+    tassert(9740337, "Failing document must have a value for '_id'", objectIdElement);
     builder->appendAs(objectIdElement, "failingDocumentId"_sd);
 }
 
@@ -2333,9 +2388,11 @@ BSONObj generateErrorHelper(const MatchExpression& validatorExpr,
 
     // There should be no frames when error generation is complete as the finished error will be
     // stored in 'context'.
-    invariant(context.frames.empty());
+    tassert(9740338, "Error generation completed with non-empty stack", context.frames.empty());
     auto error = context.getLatestCompleteErrorObject();
-    invariant(!error.isEmpty());
+    tassert(9740339,
+            "Must have a non-empty error when error generation has completed",
+            !error.isEmpty());
 
     // Add document id to the error object.
     BSONObjBuilder objBuilder;
