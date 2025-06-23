@@ -134,9 +134,9 @@ def get_files_to_lint() -> List[str]:
     # Returns all tracked files and unstaged files
     repo = Repo()
     # all tracked files by git
-    tracked_files = repo.git.execute(["git", "ls-files"]).split("\n")
+    tracked_files = set(repo.git.execute(["git", "ls-files"]).split("\n"))
     # all unstaged files from git
-    tracked_files.extend(
+    tracked_files.update(
         repo.git.execute(["git", "ls-files", "--others", "--exclude-standard"]).split("\n")
     )
     # remove any empty entries

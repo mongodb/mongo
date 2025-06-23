@@ -5,7 +5,7 @@ import subprocess
 import sys
 import tempfile
 from functools import cache
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
 import yaml
 from codeowners.parsers import owners_v1, owners_v2
@@ -37,8 +37,8 @@ def add_file_to_tree(root_node: FileNode, file_parts: List[str]):
         current_node = node_dirs[dir]
 
     assert (
-        current_node.owners_file is None
-    ), f"{'/'.join(file_parts[:-1])} there are two OWNERS files in this directory"
+        current_node.owners_file is None or current_node.owners_file == file_parts[-1]
+    ), f"there are two OWNERS files in the following directory: ./{'/'.join(file_parts[:-1])}"
     current_node.owners_file = file_parts[-1]
 
 
@@ -105,24 +105,27 @@ def validate_generated_codeowners(validator_path: str) -> int:
     try:
         validation_result = run_validator(validator_path)
         if validation_result != 0:
-            print("CODEOWNERS validation failed!", file=sys.stderr)
+            print("CODEOWNERS validation failed!")
             return validation_result
         print("CODEOWNERS validation successful!")
         return 0
     except Exception as exc:
-        print(f"Error during CODEOWNERS validation: {str(exc)}", file=sys.stderr)
+        print(f"Error during CODEOWNERS validation: {str(exc)}")
         return 1
 
 
 @cache
-def get_unowned_files(codeowners_binary_path: str, codeowners_file: str = None) -> Set[str]:
+def get_unowned_and_default_owned_files(
+    codeowners_binary_path: str, codeowners_file: str = None
+) -> Tuple[Set[str], Set[str]]:
     temp_output_file = tempfile.NamedTemporaryFile(delete=False, suffix=".txt")
     temp_output_file.close()
+    default_owner = get_default_owner()
     codeowners_file_arg = ""
     if codeowners_file:
         codeowners_file_arg = f"--file {codeowners_file}"
     # This file can be bigger than the allowed subprocess buffer so we redirect output into a file
-    command = f"{codeowners_binary_path} --unowned --tracked {codeowners_file_arg} > {temp_output_file.name}"
+    command = f"{codeowners_binary_path} --tracked {codeowners_file_arg} > {temp_output_file.name}"
     process = subprocess.run(command, shell=True, stderr=subprocess.PIPE, text=True)
 
     if process.returncode != 0:
@@ -130,15 +133,23 @@ def get_unowned_files(codeowners_binary_path: str, codeowners_file: str = None) 
         raise RuntimeError("Error while trying to find unowned files")
 
     unowned_files = set()
+    default_owned_files = set()
     with open(temp_output_file.name, "r") as file:
         for line in file.read().split("\n"):
             if not line:
                 continue
             parts = line.split()
             file_name = parts[0].strip()
-            unowned_files.add(file_name)
+            owners = parts[1:]
+            if owners[0] == "(unowned)":
+                assert (
+                    len(owners) == 1
+                ), f"There were somehow multiple owners for an unowned file: {parts}"
+                unowned_files.add(file_name)
+            elif default_owner and default_owner in owners:
+                default_owned_files.add(file_name)
 
-    return unowned_files
+    return unowned_files, default_owned_files
 
 
 def check_new_files(codeowners_binary_path: str, expansions_file: str, branch: str) -> int:
@@ -147,23 +158,38 @@ def check_new_files(codeowners_binary_path: str, expansions_file: str, branch: s
         print("No new files were detected.")
         return 0
     print(f"The following new files were detected: {new_files}")
+    default_owner = get_default_owner()
 
-    unowned_files = get_unowned_files(codeowners_binary_path)
+    unowned_files, default_owned_files = get_unowned_and_default_owned_files(codeowners_binary_path)
     allowed_unowned_files = get_allowed_unowned_files()
 
     unowned_new_files = []
+    default_owned_new_files = []
     for file in new_files:
         if file in unowned_files and f"/{file}" not in allowed_unowned_files:
             unowned_new_files.append(file)
+        if file in default_owned_files:
+            default_owned_new_files.append(file)
 
+    has_error = False
     if unowned_new_files:
-        print("The following new files are unowned:", file=sys.stderr)
+        print("The following new files are unowned:")
         for file in unowned_new_files:
-            print(f"- {file}", file=sys.stderr)
-        print(
-            "New files are required to have code owners. See http://go/codeowners-ug",
-            file=sys.stderr,
-        )
+            print(f"- {file}")
+        print("New files are required to have code owners. See http://go/codeowners-ug")
+        has_error = True
+
+    if default_owned_new_files:
+        assert (
+            default_owner
+        ), "There were new files owned by the default owner but there is no default owner detected."
+        print(f"The following new files are owned by the default owner {default_owner}:")
+        for file in default_owned_new_files:
+            print(f"- {file}")
+        print("New files are required to have a non-default owner. See http://go/codeowners-ug")
+        has_error = True
+
+    if has_error:
         return 1
 
     print("There are no new files added that are unowned.")
@@ -175,7 +201,9 @@ def check_orphaned_files(
 ) -> int:
     # This compares the new codeowners file with the old codeowners file on the same working tree
     # This tells us which coverage is lost between codeowners file changes
-    current_unowned_files = get_unowned_files(codeowners_binary_path)
+    current_unowned_files, current_default_owned_files = get_unowned_and_default_owned_files(
+        codeowners_binary_path
+    )
     base_revision = evergreen_git.get_diff_revision(expansions_file, branch)
     previous_codeowners_file_contents = evergreen_git.get_file_at_revision(
         codeowners_file, base_revision
@@ -185,7 +213,9 @@ def check_orphaned_files(
     temp_codeowners_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt")
     temp_codeowners_file.write(previous_codeowners_file_contents)
     temp_codeowners_file.close()
-    old_unowned_files = get_unowned_files(codeowners_binary_path, temp_codeowners_file.name)
+    old_unowned_files, old_default_owned_files = get_unowned_and_default_owned_files(
+        codeowners_binary_path, temp_codeowners_file.name
+    )
     allowed_unowned_files = get_allowed_unowned_files()
 
     unowned_files_difference = current_unowned_files - old_unowned_files
@@ -193,13 +223,21 @@ def check_orphaned_files(
         if f"/{file}" in allowed_unowned_files:
             unowned_files_difference.remove(file)
 
-    if not unowned_files_difference:
+    default_owned_files_difference = current_default_owned_files - old_default_owned_files
+
+    if not unowned_files_difference and not default_owned_files_difference:
         print("No files have lost ownership with these changes.")
         return 0
 
-    print("The following files lost ownership with CODEOWNERS changes:", file=sys.stderr)
-    for file in sorted(unowned_files_difference):
-        print(f"- {file}", file=sys.stderr)
+    if unowned_files_difference:
+        print("The following files lost ownership with CODEOWNERS changes:")
+        for file in sorted(unowned_files_difference):
+            print(f"- {file}")
+
+    if default_owned_files_difference:
+        print("The following files changed to default ownership with CODEOWNERS changes:")
+        for file in sorted(default_owned_files_difference):
+            print(f"- {file}")
 
     return 1
 
@@ -227,6 +265,10 @@ def post_generation_checks(
 
 def get_allowed_unowned_files_path() -> Optional[str]:
     return os.environ.get("ALLOWED_UNOWNED_FILES_PATH", None)
+
+
+def get_default_owner() -> Optional[str]:
+    return os.environ.get("CODEOWNERS_DEFAULT_OWNER", None)
 
 
 @cache
@@ -374,14 +416,9 @@ def main():
         process_dir(output_lines, root_node)
         add_allowed_unowned_files(output_lines)
     except Exception as ex:
-        print("An exception was found while generating the CODEOWNERS file.", file=sys.stderr)
-        print(
-            "Please refer to the docs to see the spec for OWNERS.yml files here :", file=sys.stderr
-        )
-        print(
-            "https://github.com/10gen/mongo/blob/master/docs/owners/owners_format.md",
-            file=sys.stderr,
-        )
+        print("An exception was found while generating the CODEOWNERS file.")
+        print("Please refer to the docs to see the spec for OWNERS.yml files here :")
+        print("https://github.com/10gen/mongo/blob/master/docs/owners/owners_format.md")
         raise ex
 
     old_contents = ""

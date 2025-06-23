@@ -31,6 +31,11 @@ py_binary(
             "ALLOWED_UNOWNED_FILES_PATH": "$(codeowners_allowed_unowned_files_path)",
         },
         "//conditions:default": {},
+    }) | select({
+        ":have_default_owner": {
+            "CODEOWNERS_DEFAULT_OWNER": "$(codeowners_default_owner)",
+        },
+        "//conditions:default": {},
     }),
     main = "codeowners_generate.py",
     visibility = ["//visibility:public"],
@@ -62,5 +67,12 @@ config_setting(
     name = "have_allowed_unowned_files",
     define_values = {
         "codeowners_have_allowed_unowned_files": "True",
+    },
+)
+
+config_setting(
+    name = "have_default_owner",
+    define_values = {
+        "codeowners_have_default_owner": "True",
     },
 )
