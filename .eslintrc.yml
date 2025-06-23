@@ -236,6 +236,7 @@ globals:
   disablePrint: true
   enablePrint: true
   replSetMemberStatePrompt: true
+  hasErrorCode: true
   helloStatePrompt: true
   _validateMemberIndex: true
   help: true

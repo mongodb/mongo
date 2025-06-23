@@ -96,6 +96,7 @@ function runTest(reshardInPlace) {
         assert.soon(() => {
             res = db.runCommand(cmdObj);
 
+            assert(!res.writeErrors || res.writeErrors.length === 1);
             if (expectedTransientErrors.has(res.code) ||
                 (res.writeErrors && expectedTransientErrors.has(res.writeErrors[0].code))) {
                 cmdObj.txnNumber = NumberLong(cmdObj.txnNumber + 1);

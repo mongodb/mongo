@@ -67,17 +67,9 @@ export const $config = (function() {
                 });
             }
 
-            assert.soon(() => {
-                const res = db[collName].insert(docs);
-
-                if (res.code == ErrorCodes.NoProgressMade) {
-                    print(`No progress made while inserting documents. Retrying.`);
-                    return false;
-                }
-
-                TimeseriesTest.assertInsertWorked(res);
-                return true;
-            });
+            retryOnRetryableError(() => {
+                TimeseriesTest.assertInsertWorked(db[collName].insert(docs));
+            }, 100 /* numRetries */, undefined /* sleepMs */, [ErrorCodes.NoProgressMade]);
 
             print(`Finished Inserting documents.`);
         },
