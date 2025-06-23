@@ -390,26 +390,6 @@ bool killExhaust(const Message& in, ServiceEntryPoint* sep, Client* client) {
     return false;
 }
 
-/**
- * Extracts the original network op code from the compression header without decompressing the
- * whole message. If the message is not compressed, it simply returns the message opcode.
- */
-auto extractOriginalOpCode(const Message& message) -> NetworkOp {
-    if (message.operation() != dbCompressed)
-        return message.operation();
-
-    const auto inputHeader = message.header();
-
-    uassert(ErrorCodes::BadValue,
-            "Invalid compressed message header",
-            inputHeader.dataLen() >= static_cast<std::int32_t>(CompressionHeader::size()));
-
-    ConstDataRangeCursor input(inputHeader.data(), inputHeader.data() + inputHeader.dataLen());
-    CompressionHeader compressionHeader{&input};
-
-    return static_cast<NetworkOp>(compressionHeader.originalOpCode);
-}
-
 // Counts the # of responses to completed operations that we were unable to send back to the client.
 auto& unsendableCompletedResponses =
     *MetricBuilder<Counter64>("operation.unsendableCompletedResponses");
@@ -762,8 +742,13 @@ Status SessionWorkflow::Impl::_rateLimit() const {
 DbResponse makeDbResponseErrorForRateLimiting(const Message& message, const Status& status) {
     invariant(!status.isOK());
 
-    const auto opcode = extractOriginalOpCode(message);
-    const auto replyBuilder = rpc::makeReplyBuilder(rpc::protocolForOperation(opcode));
+    // When the MoreToCome flag is set, return an empty response as this is a fire and forget
+    // request.
+    if (OpMsg::isFlagSet(message, OpMsg::kMoreToCome)) {
+        return DbResponse{};
+    }
+
+    const auto replyBuilder = rpc::makeReplyBuilder(rpc::protocolForMessage(message));
     replyBuilder->setCommandReply(status, {});
 
     // We only expect errors to have no error label or system overloaded error label for now
@@ -785,11 +770,11 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
 
     TrafficRecorder::get(_serviceContext).observe(session(), _work->in(), _serviceContext);
 
+    _work->decompressRequest();
+
     if (const auto status = _rateLimit(); !status.isOK()) {
         return makeDbResponseErrorForRateLimiting(_work->in(), status);
     }
-
-    _work->decompressRequest();
 
     networkCounter.hitLogicalIn(NetworkCounter::ConnectionType::kIngress, _work->in().size());
 
