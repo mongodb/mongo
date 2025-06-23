@@ -88,6 +88,35 @@ private:
     TimeoutType _timeout;
 };
 
+template <typename OpType, typename Stream, typename MutableBufferSequence>
+size_t doOperation(OpType op, Stream& stream, MutableBufferSequence buffers, std::error_code& ec) {
+    size_t bytesTransferred = 0;
+    do {
+        const size_t size = op(stream, buffers, ec);
+        // Account for bytes transferred during the latest operation.
+        bytesTransferred += size;
+        buffers += size;
+    } while (ec == asio::error::interrupted);
+    return bytesTransferred;
+}
+
+template <typename Stream, typename MutableBufferSequence>
+size_t readFromStream(Stream& stream, MutableBufferSequence buffers, std::error_code& ec) {
+    return doOperation(
+        [](auto& stream, auto& buffers, auto& ec) { return asio::read(stream, buffers, ec); },
+        stream,
+        std::move(buffers),
+        ec);
+}
+
+template <typename Stream, typename MutableBufferSequence>
+size_t writeToStream(Stream& stream, MutableBufferSequence buffers, std::error_code& ec) {
+    return doOperation(
+        [](auto& stream, auto& buffers, auto& ec) { return asio::write(stream, buffers, ec); },
+        stream,
+        std::move(buffers),
+        ec);
+}
 }  // namespace
 
 
@@ -536,17 +565,13 @@ Future<void> TransportLayerASIO::ASIOSession::opportunisticRead(
             localBuffer = asio::mutable_buffer(buffers.data(), 1);
         }
 
-        do {
-            size = asio::read(stream, localBuffer, ec);
-        } while (ec == asio::error::interrupted);  // retry syscall EINTR
+        size = readFromStream(stream, localBuffer, ec);
 
         if (!ec && buffers.size() > 1) {
             ec = asio::error::would_block;
         }
     } else {
-        do {
-            size = asio::read(stream, buffers, ec);
-        } while (ec == asio::error::interrupted);  // retry syscall EINTR
+        size = readFromStream(stream, buffers, ec);
     }
 
     if (((ec == asio::error::would_block) || (ec == asio::error::try_again)) &&
@@ -604,16 +629,12 @@ Future<void> TransportLayerASIO::ASIOSession::opportunisticWrite(Stream& stream,
             localBuffer = asio::const_buffer(buffers.data(), 1);
         }
 
-        do {
-            size = asio::write(stream, localBuffer, ec);
-        } while (ec == asio::error::interrupted);  // retry syscall EINTR
+        size = writeToStream(stream, localBuffer, ec);
         if (!ec && buffers.size() > 1) {
             ec = asio::error::would_block;
         }
     } else {
-        do {
-            size = asio::write(stream, buffers, ec);
-        } while (ec == asio::error::interrupted);  // retry syscall EINTR
+        size = writeToStream(stream, buffers, ec);
     }
 
     if (((ec == asio::error::would_block) || (ec == asio::error::try_again)) &&
