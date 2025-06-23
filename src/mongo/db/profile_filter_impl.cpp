@@ -69,7 +69,7 @@ bool ProfileFilterImpl::matches(OperationContext* opCtx,
     try {
         return _matcher.matches(_makeBSON({opCtx, op, curop}));
     } catch (const DBException& e) {
-        LOGV2_DEBUG(4910202, 5, "Profile filter threw an exception", "exception"_attr = e);
+        LOGV2_DEBUG(4910202, 5, "Profile filter threw an exception", "exception"_attr = redact(e));
         return false;
     }
 }

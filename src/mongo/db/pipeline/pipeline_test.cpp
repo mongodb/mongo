@@ -68,6 +68,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/logv2/log_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 
@@ -3319,6 +3320,36 @@ TEST(PipelineOptimizationTest, MergeUnwindPipelineWithSortLimitPipelinePlacesLim
         "]";
 
     assertTwoPipelinesOptimizeAndMergeTo(inputPipe1, inputPipe2, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, SerializationForLogging) {
+    std::vector<BSONObj> pipeVec = {fromjson("{$match: {'a.c': {$eq: 5}}}"),
+                                    fromjson("{$project: {_id: true}}")};
+
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    AggregateCommandRequest request(kTestNss, pipeVec);
+    boost::intrusive_ptr<ExpressionContextForTest> ctx =
+        new ExpressionContextForTest(opCtx.get(), request);
+    auto pipeline = Pipeline::parse(pipeVec, ctx);
+
+    Value unredacted = Value(pipeline->serializeToBson());
+    Value redacted = Value(std::vector<BSONObj>{fromjson("{$match: {'a.c': {$eq: '###'}}}"),
+                                                fromjson("{$project: {_id: '###'}}")});
+
+    // With log redaction enabled, all serialization for logging should produce 'redacted'.
+    logv2::setShouldRedactLogs(true);
+    ASSERT_VALUE_EQ(Value(pipeline->serializeForLogging()), redacted);
+    ASSERT_VALUE_EQ(Value(Pipeline::serializePipelineForLogging(pipeVec)), redacted);
+    ASSERT_VALUE_EQ(Value(Pipeline::serializeContainerForLogging(pipeline->getSources())),
+                    redacted);
+
+    // With log redaction disabled, we should get the input pipeline back.
+    logv2::setShouldRedactLogs(false);
+    ASSERT_VALUE_EQ(Value(pipeline->serializeForLogging()), unredacted);
+    ASSERT_VALUE_EQ(Value(Pipeline::serializePipelineForLogging(pipeVec)), unredacted);
+    ASSERT_VALUE_EQ(Value(Pipeline::serializeContainerForLogging(pipeline->getSources())),
+                    unredacted);
 }
 
 }  // namespace Local

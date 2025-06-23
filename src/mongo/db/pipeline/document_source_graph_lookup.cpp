@@ -306,8 +306,8 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
                     "$graphLookup found view definition. ns: {namespace}, pipeline: {pipeline}. "
                     "New $graphLookup sub-pipeline: {new_pipe}",
                     logAttrs(e->getNamespace()),
-                    "pipeline"_attr = Value(e->getPipeline()),
-                    "new_pipe"_attr = _fromPipeline);
+                    "pipeline"_attr = Pipeline::serializePipelineForLogging(e->getPipeline()),
+                    "new_pipe"_attr = Pipeline::serializePipelineForLogging(_fromPipeline));
 
                 // We can now safely optimize and reattempt attaching the cursor source.
                 pipeline = Pipeline::makePipeline(_fromPipeline, _fromExpCtx, pipelineOpts);

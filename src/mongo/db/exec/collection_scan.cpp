@@ -105,8 +105,8 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
     LOGV2_DEBUG(5400802,
                 5,
                 "collection scan bounds",
-                "min"_attr = (!_params.minRecord) ? "none" : _params.minRecord->toString(),
-                "max"_attr = (!_params.maxRecord) ? "none" : _params.maxRecord->toString());
+                "min"_attr = (!_params.minRecord) ? "none" : redact(_params.minRecord->toString()),
+                "max"_attr = (!_params.maxRecord) ? "none" : redact(_params.maxRecord->toString()));
     invariant(!_params.shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
 
     if (params.assertTsHasNotFallenOffOplog) {

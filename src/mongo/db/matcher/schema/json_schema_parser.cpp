@@ -1911,7 +1911,7 @@ StatusWithMatchExpression JSONSchemaParser::parse(
                 5,
                 "Parsing JSON Schema: {schema}",
                 "Parsing JSON Schema",
-                "schema"_attr = schema.jsonString(JsonStringFormat::LegacyStrict));
+                "schema"_attr = redact(schema.jsonString(JsonStringFormat::LegacyStrict)));
     try {
         auto translation =
             _parse(expCtx, boost::none /* path */, schema, allowedFeatures, ignoreUnknownKeywords);
@@ -1921,7 +1921,7 @@ StatusWithMatchExpression JSONSchemaParser::parse(
                         5,
                         "Translated schema match expression: {expression}",
                         "Translated schema match expression",
-                        "expression"_attr = translation.getValue()->debugString());
+                        "expression"_attr = redact(translation.getValue()->debugString()));
         }
         // Tag the top level MatchExpression as '$jsonSchema' if necessary.
         if (translation.isOK()) {

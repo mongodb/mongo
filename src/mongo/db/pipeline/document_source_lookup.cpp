@@ -586,8 +586,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
                         "$lookup found view definition. ns: {namespace}, pipeline: {pipeline}. New "
                         "$lookup sub-pipeline: {new_pipe}",
                         logAttrs(e->getNamespace()),
-                        "pipeline"_attr = Value(e->getPipeline()),
-                        "new_pipe"_attr = _resolvedPipeline);
+                        "pipeline"_attr = Pipeline::serializePipelineForLogging(e->getPipeline()),
+                        "new_pipe"_attr = Pipeline::serializePipelineForLogging(_resolvedPipeline));
 
             // We can now safely optimize and reattempt attaching the cursor source.
             pipeline = Pipeline::makePipeline(_resolvedPipeline, _fromExpCtx, pipelineOpts);
@@ -637,8 +637,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
                         "$lookup found view definition. ns: {namespace}, pipeline: {pipeline}. New "
                         "$lookup sub-pipeline: {new_pipe}",
                         logAttrs(e->getNamespace()),
-                        "pipeline"_attr = Value(e->getPipeline()),
-                        "new_pipe"_attr = _resolvedPipeline);
+                        "pipeline"_attr = Pipeline::serializePipelineForLogging(e->getPipeline()),
+                        "new_pipe"_attr = Pipeline::serializePipelineForLogging(_resolvedPipeline));
 
             // Try to attach the cursor source again.
             pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(

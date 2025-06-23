@@ -517,13 +517,14 @@ boost::optional<Document> CommonMongodProcessInterface::doLookupSingleDocument(
         pipeline = Pipeline::makePipeline(
             aggRequest, foreignExpCtx, boost::none /* shardCursorsSortSpec */, opts);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-        LOGV2_DEBUG(6726700, 1, "Namespace not found while looking up document", "error"_attr = ex);
+        LOGV2_DEBUG(
+            6726700, 1, "Namespace not found while looking up document", "error"_attr = redact(ex));
         return boost::none;
     } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>& ex) {
         LOGV2_DEBUG(9597600,
                     1,
                     "Target collection UUID is different from the expected UUID",
-                    "error"_attr = ex);
+                    "error"_attr = redact(ex));
         return boost::none;
     }
 
