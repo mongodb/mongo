@@ -6,6 +6,8 @@
  *
  * @tags: [
  *   featureFlagRankFusionFull,
+ *   # Needed for the nested $scoreFusion.
+ *   featureFlagSearchHybridScoringFull,
  *   requires_fcv_81
  * ]
  */
@@ -28,4 +30,47 @@ assert.commandFailedWithCode(
     }]),
     9191103);
 
-// TODO: SERVER-104730 add tests for nested $scoreFusion/$rankFusion
+assert.commandFailedWithCode(
+    runPipeline([{
+        $rankFusion: {
+            input: {
+                pipelines:
+                    {nested: [{$rankFusion: {input: {pipelines: {simple: [{$sort: {_id: 1}}]}}}}]}
+            }
+        }
+    }]),
+    10473002);
+
+assert.commandFailedWithCode(
+    runPipeline([{
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    nested: [{
+                        $scoreFusion: {
+                            input: {
+                                pipelines: {simple: [{$score: {score: "$score_50"}}]},
+                                normalization: "sigmoid"
+                            },
+                        }
+                    }]
+                }
+            }
+        }
+    }]),
+    10473002);
+
+assert.commandFailedWithCode(
+    runPipeline([{
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    nested: [
+                        {$limit: 10},
+                        {$rankFusion: {input: {pipelines: {simple: [{$sort: {_id: 1}}]}}}}
+                    ]
+                }
+            }
+        }
+    }]),
+    10170100);

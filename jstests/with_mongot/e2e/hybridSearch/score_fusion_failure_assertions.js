@@ -137,4 +137,64 @@ assert.commandFailedWithCode(
     }]),
     9402502);
 
-// TODO: SERVER-104730 add tests for nested $scoreFusion/$rankFusion
+assert.commandFailedWithCode(
+    runPipeline([{
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    nested: [{
+                        $scoreFusion: {
+                            input: {
+                                pipelines: {simple: [{$score: {score: "$score_50"}}]},
+                                normalization: "sigmoid"
+                            }
+                        }
+                    }]
+                },
+                normalization: "none"
+            }
+        }
+    }]),
+    10473003);
+
+assert.commandFailedWithCode(runPipeline([{
+                                 $scoreFusion: {
+                                     input: {
+                                         pipelines: {
+                                             nested: [{
+                                                 $rankFusion: {
+                                                     input: {
+                                                         pipelines: {simple: [{$sort: {a: 1}}]},
+                                                     }
+                                                 }
+                                             }]
+                                         },
+                                         normalization: "none"
+                                     }
+                                 }
+                             }]),
+                             10473003);
+
+assert.commandFailedWithCode(
+    runPipeline([{
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    nested: [
+                        {$score: 10},
+                        {
+                            $scoreFusion: {
+                                input: {
+                                    pipelines: {simple: [{$score: {score: "$score_50"}}]},
+                                    normalization: "sigmoid"
+                                },
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            }
+        }
+    }]),
+    // TODO SERVER-104725 Change this to the error code from LiteParsedPipeline::validate().
+    10473003);

@@ -913,6 +913,63 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipelineWithSecondPipelin
                        9402500);
 }
 
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNestedRankFusionPipeline) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    agatha: [
+                        { $rankFusion: {
+                            input: {
+                                pipelines: {
+                                    agatha: [
+                                        { $match : { author : "Agatha Christie" } },
+                                        { $sort: {author: 1} }
+                                    ]
+                                }
+                            }
+                        } }
+                    ]
+                },
+                normalization: "none"
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       10473003);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNestedScoreFusionPipeline) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    agatha: [
+                        { $scoreFusion: {
+                            input: {
+                                pipelines: {
+                                    agatha: [
+                                        { $match : { author : "Agatha Christie" } },
+                                        { $score: {author: 1} }
+                                    ]
+                                },
+                                normalization: "none"
+                            }
+                        } }
+                    ]
+                },
+                normalization: "none"
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       10473003);
+}
+
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfEmptyPipeline) {
     auto spec = fromjson(R"({
         $scoreFusion: {

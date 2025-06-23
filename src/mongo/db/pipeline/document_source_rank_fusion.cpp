@@ -96,12 +96,16 @@ static const std::string rankFusionStageName = "rankFusion";
 static void rankFusionBsonPipelineValidator(const std::vector<BSONObj>& pipeline) {
     static const std::string rankPipelineMsg =
         "All subpipelines to the $rankFusion stage must begin with one of $search, "
-        "$vectorSearch, $geoNear, $scoreFusion, $rankFusion or have a custom $sort in "
-        "the pipeline.";
+        "$vectorSearch, $geoNear, or have a custom $sort in the pipeline.";
     uassert(9834300,
             str::stream() << "$rankFusion input pipeline cannot be empty. " << rankPipelineMsg,
             !pipeline.empty());
 
+    uassert(
+        10473002,
+        "$rankFusion input pipeline has a nested hybrid search stage ($rankFusion/$scoreFusion). " +
+            rankPipelineMsg,
+        !hybrid_scoring_util::isHybridSearchPipeline(pipeline));
 
     auto rankedPipelineStatus = hybrid_scoring_util::isRankedPipeline(pipeline);
     if (!rankedPipelineStatus.isOK()) {
@@ -114,8 +118,6 @@ static void rankFusionBsonPipelineValidator(const std::vector<BSONObj>& pipeline
                   selectionPipelineStatus.reason() +
                       " Only stages that retrieve, limit, or order documents are allowed.");
     }
-
-    // TODO: SERVER-104730 explicitly ban nested $scoreFusion/$rankFusion
 }
 
 auto makeSureSortKeyIsOutput(const auto& stageList) {

@@ -432,5 +432,112 @@ TEST_F(BsonPipelineIsScoredPipelineTest, MustBeginWithScoredStageOrHaveScore) {
     ASSERT_TRUE(hybrid_scoring_util::isScoredPipeline(scoreStage, getExpCtx()).isOK());
 }
 
+TEST(BsonPipelineIsHybridSearchPipeline, ScoreFusion) {
+    std::vector<BSONObj> scoreFusionFirstPipeline = {fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $vectorSearch: {
+                                queryVector: [1.0, 2.0, 3.0],
+                                path: "plot_embedding",
+                                numCandidates: 300,
+                                index: "vector_index",
+                                limit: 10
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    })")};
+    ASSERT_TRUE(hybrid_scoring_util::isHybridSearchPipeline(scoreFusionFirstPipeline));
+
+    std::vector<BSONObj> scoreFusionSecondPipeline = {fromjson(R"({
+            $match: {a: {gte: 5}}
+        })"),
+                                                      fromjson(R"({
+            $scoreFusion: {
+                input: {
+                    pipelines: {
+                        name1: [
+                            {
+                                $vectorSearch: {
+                                    queryVector: [1.0, 2.0, 3.0],
+                                    path: "plot_embedding",
+                                    numCandidates: 300,
+                                    index: "vector_index",
+                                    limit: 10
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+    })")};
+    ASSERT_TRUE(hybrid_scoring_util::isHybridSearchPipeline(scoreFusionSecondPipeline));
+}
+
+TEST(BsonPipelineIsHybridSearchPipeline, RankFusion) {
+    std::vector<BSONObj> rankFusionFirstPipeline = {fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $vectorSearch: {
+                                queryVector: [1.0, 2.0, 3.0],
+                                path: "plot_embedding",
+                                numCandidates: 300,
+                                index: "vector_index",
+                                limit: 10
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    })")};
+    ASSERT_TRUE(hybrid_scoring_util::isHybridSearchPipeline(rankFusionFirstPipeline));
+
+    std::vector<BSONObj> rankFusionSecondPipeline = {fromjson(R"({
+            $match: {a: {gte: 5}}
+        })"),
+                                                     fromjson(R"({
+            $rankFusion: {
+                input: {
+                    pipelines: {
+                        name1: [
+                            {
+                                $vectorSearch: {
+                                    queryVector: [1.0, 2.0, 3.0],
+                                    path: "plot_embedding",
+                                    numCandidates: 300,
+                                    index: "vector_index",
+                                    limit: 10
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+    })")};
+    ASSERT_TRUE(hybrid_scoring_util::isHybridSearchPipeline(rankFusionSecondPipeline));
+}
+
+TEST(BsonPipelineIsHybridSearchPipeline, NonHybridSearchStages) {
+    std::vector<BSONObj> otherStagesPipeline = {fromjson(R"(
+        {
+            $match: {a: {gte: 5}}
+        })"),
+                                                fromjson(R"({
+            $limit: 10
+        })"),
+                                                fromjson(R"({
+            $sort: {a: -1}
+    })")};
+    ASSERT_FALSE(hybrid_scoring_util::isHybridSearchPipeline(otherStagesPipeline));
+}
 }  // namespace
 }  // namespace mongo

@@ -385,10 +385,16 @@ static void scoreFusionBsonPipelineValidator(const std::vector<BSONObj>& pipelin
                                              boost::intrusive_ptr<ExpressionContext> expCtx) {
     static const std::string scorePipelineMsg =
         "All subpipelines to the $scoreFusion stage must begin with one of $search, "
-        "$vectorSearch, $rankFusion, $scoreFusion or have a custom $score in the pipeline.";
+        "$vectorSearch, or have a custom $score in the pipeline.";
     uassert(9402503,
             str::stream() << "$scoreFusion input pipeline cannot be empty. " << scorePipelineMsg,
             !pipeline.empty());
+
+    uassert(10473003,
+            "$scoreFusion input pipeline has a nested hybrid search stage "
+            "($rankFusion/$scoreFusion). " +
+                scorePipelineMsg,
+            !hybrid_scoring_util::isHybridSearchPipeline(pipeline));
 
     auto scoredPipelineStatus = hybrid_scoring_util::isScoredPipeline(pipeline, expCtx);
     if (!scoredPipelineStatus.isOK()) {
@@ -401,8 +407,6 @@ static void scoreFusionBsonPipelineValidator(const std::vector<BSONObj>& pipelin
                   selectionPipelineStatus.reason() +
                       " Only stages that retrieve, limit, or order documents are allowed.");
     }
-
-    // TODO: SERVER-104730 explicitly ban nested $scoreFusion/$rankFusion
 }
 
 static void scoreFusionPipelineValidator(const Pipeline& pipeline) {

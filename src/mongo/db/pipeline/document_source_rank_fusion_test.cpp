@@ -304,6 +304,60 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfNotRankedPipeline) {
                        9191100);
 }
 
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedRankFusionPipeline) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    agatha: [
+                        { $rankFusion: {
+                            input: {
+                                pipelines: {
+                                    agatha: [
+                                        { $match : { author : "Agatha Christie" } },
+                                        { $sort: {author: 1} }
+                                    ]
+                                }
+                            }
+                        } }
+                    ]
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       10473002);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedScoreFusionPipeline) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    agatha: [
+                        { $scoreFusion: {
+                            input: {
+                                pipelines: {
+                                    agatha: [
+                                        { $match : { author : "Agatha Christie" } },
+                                        { $score: {author: 1} }
+                                    ]
+                                }
+                            }
+                        } }
+                    ]
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       10473002);
+}
+
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfEmptyPipeline) {
     auto spec = fromjson(R"({
         $rankFusion: {

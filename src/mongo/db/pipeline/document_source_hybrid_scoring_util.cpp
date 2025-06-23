@@ -374,6 +374,25 @@ Status isScoredPipeline(const std::vector<BSONObj>& bsonPipeline,
               "stage.");
 }
 
+bool isHybridSearchPipeline(const std::vector<BSONObj>& bsonPipeline) {
+    tassert(10473000, "Input pipeline must not be empty.", !bsonPipeline.empty());
+
+    // Please keep the following in alphabetical order.
+    static const std::set<StringData> hybridScoringStages{
+        DocumentSourceRankFusion::kStageName,
+        DocumentSourceScoreFusion::kStageName,
+    };
+
+    for (const auto& stage : bsonPipeline) {
+        tassert(10473001, "Input pipeline stage must not be empty.", !stage.isEmpty());
+        if (hybridScoringStages.contains(*(stage.getFieldNames<std::set<std::string>>().begin()))) {
+            return true;
+        }
+    };
+
+    return false;
+}
+
 namespace score_details {
 
 std::pair<std::string, BSONObj> constructScoreDetailsForGrouping(const std::string pipelineName) {
