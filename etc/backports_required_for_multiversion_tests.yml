@@ -454,6 +454,10 @@ last-continuous:
       ticket: SERVER-102825
     - test_file: jstests/core/query/update/update_set_unset.js
       ticket: SERVER-103960
+    - test_file: jstests/core_sharding/resharding/reshard_collection_atlas_log_ingestion.js
+      ticket: SERVER-103993
+    - test_file: jstests/core_sharding/resharding/reshard_collection_atlas_log_ingestion.js
+      ticket: SERVER-103172
   suites: null
 last-lts:
   all:
@@ -963,4 +967,8 @@ last-lts:
       ticket: SERVER-102825
     - test_file: jstests/core/query/update/update_set_unset.js
       ticket: SERVER-103960
+    - test_file: jstests/core_sharding/resharding/reshard_collection_atlas_log_ingestion.js
+      ticket: SERVER-103993
+    - test_file: jstests/core_sharding/resharding/reshard_collection_atlas_log_ingestion.js
+      ticket: SERVER-103172
   suites: null
