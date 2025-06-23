@@ -206,6 +206,7 @@ tasks:
             - "src/src/third_party/mock_ocsp_responder/**"
             - "src/src/third_party/protobuf/**"
             - "src/src/third_party/schemastore.org/**"
+            - "src/tools/**"
             - "src/x509/**"
           exclude_files:
             - "src/*_test.pdb"

@@ -115,7 +115,10 @@ def resmoke_suite_test(
             "//bazel/resmoke:in_evergreen_enabled": ["//:installed-dist-test"],
             "//conditions:default": ["//:install-dist-test"],
         }),
-        deps = deps + [resmoke],
+        deps = deps + [
+            resmoke,
+            "//buildscripts:bazel_local_resources",
+        ],
         main = resmoke_shim,
         args = [
             "run",
@@ -123,7 +126,10 @@ def resmoke_suite_test(
             "--multiversionDir=multiversion_binaries",
             "--continueOnFailure",
         ] + extra_args + resmoke_args,
-        tags = tags + ["no-cache", "local"],
+        tags = tags + ["no-cache", "local", "resources:port_block:1"],
         timeout = timeout,
+        env = {
+            "LOCAL_RESOURCES": "$(LOCAL_RESOURCES)",
+        },
         **kwargs
     )

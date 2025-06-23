@@ -5,6 +5,7 @@ from functools import cache
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
+from buildscripts.bazel_local_resources import acquire_local_resource
 from buildscripts.resmokelib import cli
 
 
@@ -78,4 +79,9 @@ if __name__ == "__main__":
                 link_path,
             )
 
+    lock, base_port = acquire_local_resource("port_block")
+    resmoke_args.append(f"--basePort={base_port}")
+
     cli.main(resmoke_args)
+
+    lock.release()

@@ -145,6 +145,7 @@ ocspbuilder = "^0.10.2"
 ecdsa = "^0.19.0"
 asn1crypto = "^1.5.1"
 toml = ">=0.10.2,<0.11.0"
+filelock = "^3.18.0"
 
 # Werkzeug is needed for ocsp tests in ocsp_mock.py
 # version 3+ fails with "ImportError: cannot import name 'url_quote' from 'werkzeug.urls'"
