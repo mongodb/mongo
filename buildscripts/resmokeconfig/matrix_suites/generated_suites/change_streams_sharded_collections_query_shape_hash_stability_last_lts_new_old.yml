@@ -1,0 +1,66 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_sharded_collections_query_shape_hash_stability_last_lts_new_old.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+description:
+  This suite runs through all existing change streams tests and ensures
+  that the 'queryShapeHash' attribute returned in explain is same for multiple explain
+  invocations, across all nodes of two sharded clusters, with different binaries version.
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval:
+        globalThis.testingReplication = true; await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
+        await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');;
+        await import("jstests/libs/override_methods/query_shape_hash_stability.js");
+      global_vars:
+        TestData:
+          defaultReadConcernLevel: null
+          isMultiShardedClusterFixture: true
+  fixture:
+    class: MultiShardedClusterFixture
+    common_mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+      verbose: ""
+    num_rs_nodes_per_shard: 2
+    num_sharded_clusters: 2
+    num_shards: 1
+    per_sharded_cluster_options:
+      - mixed_bin_versions: old_old
+        old_bin_version: last_lts
+      - {}
+    persist_connection_strings: true
+  hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/change_streams/does_not_implicitly_create_database.js
+    - jstests/change_streams/oplog_rewrite/*.js
+    - jstests/change_streams/projection_fakes_internal_event.js
+    - jstests/change_streams/split_large_event.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/basic_create_collection.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/fle2_bulk_write.js
+  exclude_with_any_tags:
+    - assumes_write_concern_unchanged
+    - assumes_against_mongod_not_mongos
+    - multiversion_incompatible
+    - requires_2_or_more_shards
+    - requires_sharding
+    - multiversion_incompatible
+    - requires_2_or_more_shards
+  roots:
+    - jstests/change_streams/**/*.js
+test_kind: js_test

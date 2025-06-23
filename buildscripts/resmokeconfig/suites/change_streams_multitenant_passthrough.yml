@@ -10,6 +10,7 @@ selector:
 
     # PQS not supported in multi-tenancy.
     - jstests/change_streams/change_stream_query_settings_reject.js
+    - jstests/change_streams/change_streams_query_shapes.js
 
     ##
     # These tests run in sharded clusters. The tenant token cannot be injected to the sharded cluster

@@ -98,6 +98,19 @@
       # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
       - query_intensive_pbt
 
+- name: change_streams_multiversion_excludes
+  value:
+    exclude_files:
+      - jstests/change_streams/does_not_implicitly_create_database.js
+      - jstests/change_streams/oplog_rewrite/*.js
+      - jstests/change_streams/projection_fakes_internal_event.js
+      - jstests/change_streams/split_large_event.js
+    exclude_with_any_tags:
+      - assumes_against_mongod_not_mongos
+      - multiversion_incompatible
+      - requires_2_or_more_shards
+      - requires_sharding
+
 - name: common_multiversion_excludes
   value:
     exclude_files:
@@ -163,6 +176,7 @@
         class: MultiShardedClusterFixture
         num_sharded_clusters: 2
         num_shards: 1
+        num_nodes: null
         num_rs_nodes_per_shard: 2
         mongod_options: null
         common_mongod_options:
@@ -191,6 +205,7 @@
         class: MultiShardedClusterFixture
         num_sharded_clusters: 2
         num_shards: 1
+        num_nodes: null
         num_rs_nodes_per_shard: 2
         mongod_options: null
         common_mongod_options:

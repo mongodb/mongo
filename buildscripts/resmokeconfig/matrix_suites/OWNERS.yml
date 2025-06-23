@@ -8,3 +8,6 @@ filters:
   - "generated_suites/sharding_task_executor_pool_size*":
     approvers:
       - 10gen/server-networking-and-observability
+  - "generated_suites/change_streams_*":
+    approvers:
+      - 10gen/query-execution-change-streams
