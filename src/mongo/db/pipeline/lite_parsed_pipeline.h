@@ -183,6 +183,15 @@ public:
     }
 
     /**
+     * Returns true iff the pipeline has a $score stage.
+     */
+    bool hasScoreStage() const {
+        return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
+            return (spec->getParseTimeName() == "$score");
+        });
+    }
+
+    /**
      * Returns true if the pipeline contains at least one stage that requires the aggregation
      * command to be exempt from ingress admission control.
      */
