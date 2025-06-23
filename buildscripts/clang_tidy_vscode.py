@@ -96,10 +96,11 @@ def main():
         with open(".mongo_checks_module_path") as f:
             checks_so = f.read().strip()
 
-    if os.path.isfile(checks_so):
+    if checks_so and os.path.isfile(checks_so):
         clang_tidy_cmd += [f"-load={checks_so}"]
     else:
         print("ERROR: failed to find mongo tidy checks, run `bazel build compiledb'")
+        sys.exit(1)
 
     files_to_check = []
     other_args = []
@@ -142,21 +143,33 @@ def main():
             except ValueError:
                 pass
             break
-    cfg_dir = pathlib.Path().home() / ".cltcache"
-    cfg_dir.mkdir(parents=True, exist_ok=True)
-    with open(cfg_dir / "cltcache.cfg", "w") as f:
-        f.write(CLTCONFIG % executable)
 
-    full_cmd = (
-        [sys.executable, cltcache_path]
-        + clang_tidy_cmd
-        + files_to_check
-        + other_args
-        + ["--"]
-        + compile_args
-    )
+    # found a cpp file entry with exact compile args, cache it
+    if compile_args:
+        cfg_dir = pathlib.Path().home() / ".cltcache"
+        cfg_dir.mkdir(parents=True, exist_ok=True)
 
-    proc = subprocess.run(full_cmd, capture_output=True)
+        conf_file = cfg_dir / "cltcache.cfg"
+        new_content = CLTCONFIG % executable
+
+        if not conf_file.exists() or conf_file.read_text() != new_content:
+            conf_file.write_text(new_content)
+
+        full_cmd = (
+            [sys.executable, cltcache_path]
+            + clang_tidy_cmd
+            + files_to_check
+            + other_args
+            + ["--"]
+            + compile_args
+        )
+
+        proc = subprocess.run(full_cmd, capture_output=True)
+
+    # probably a header, skip caching and let clang-tidy do its thing:
+    else:
+        proc = subprocess.run(clang_tidy_cmd + files_to_check + other_args, capture_output=True)
+
     sys.stdout.buffer.write(proc.stdout)
     sys.stderr.buffer.write(proc.stderr)
     return proc.returncode
