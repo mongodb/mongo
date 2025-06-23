@@ -8623,5 +8623,549 @@ TEST_F(DocumentSourceScoreFusionTest,
         })");
     ASSERT_BSONOBJ_EQ(fromjson(expectedStages), asOneObj);
 }
+
+TEST_F(DocumentSourceScoreFusionTest,
+       CheckTwoPipelineScoreSigmoidInputPipelinesScoreFusionSigmoidDesugaring) {
+    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
+    getExpCtx()->setResolvedNamespaces(
+        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    single: [
+                        { $score: { score: '$single' , normalization: "sigmoid" } }
+                    ],
+                    double: [
+                        { $score: { score: '$double' , normalization: "sigmoid" } }
+                    ]
+                },
+                normalization: "sigmoid"
+            },
+            combination: {
+                weights: {
+                    single: 0.5,
+                    double: 2
+                },
+                method: "avg"
+            }
+        }
+     })");
+
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+    std::string expectedStages = std::string(R"({
+            "expectedStages": [
+                {
+                    "$setMetadata": {
+                        "score": "$double"
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$divide": [
+                                {
+                                    "$const": 1
+                                },
+                                {
+                                    "$add": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$exp": [
+                                                {
+                                                    "$multiply": [
+                                                        {
+                                                            "$const": -1
+                                                        },
+                                                        {
+                                                            "$meta": "score"
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "double_score": {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$add": [
+                                                {
+                                                    "$const": 1
+                                                },
+                                                {
+                                                    "$exp": [
+                                                        {
+                                                            "$multiply": [
+                                                                {
+                                                                    "$const": -1
+                                                                },
+                                                                {
+                                                                    "$meta": "score"
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": 2
+                                }
+                            ]
+                        }
+                    }
+                },)") +
+        std::string(R"(
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$setMetadata": {
+                                    "score": "$single"
+                                }
+                            },
+                            {
+                                "$setMetadata": {
+                                    "score": {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$exp": [
+                                                            {
+                                                                "$multiply": [
+                                                                    {
+                                                                        "$const": -1
+                                                                    },
+                                                                    {
+                                                                        "$meta": "score"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "single_score": {
+                                        "$multiply": [
+                                            {
+                                                "$divide": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$add": [
+                                                            {
+                                                                "$const": 1
+                                                            },
+                                                            {
+                                                                "$exp": [
+                                                                    {
+                                                                        "$multiply": [
+                                                                            {
+                                                                                "$const": -1
+                                                                            },
+                                                                            {
+                                                                                "$meta": "score"
+                                                                            }
+                                                                        ]
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "$const": 0.5
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },)") +
+        std::string(R"(
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "double_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$double_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "single_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$single_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$double_score",
+                                "$single_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })");
+    ASSERT_BSONOBJ_EQ(fromjson(expectedStages), asOneObj);
+}
+
+TEST_F(DocumentSourceScoreFusionTest,
+       CheckTwoPipelineScoreMinMaxScalerInputPipelinesScoreFusionMinMaxScalerDesugaring) {
+    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
+    getExpCtx()->setResolvedNamespaces(
+        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    single: [
+                        { $score: { score: '$single' , normalization: "minMaxScaler" } }
+                    ],
+                    double: [
+                        { $score: { score: '$double' , normalization: "minMaxScaler" } }
+                    ]
+                },
+                normalization: "minMaxScaler"
+            },
+            combination: {
+                weights: {
+                    single: 0.5,
+                    double: 2
+                },
+                method: "avg"
+            }
+        }
+     })");
+
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+    std::string expectedStages = std::string(R"({
+            "expectedStages": [
+                {
+                    "$setMetadata": {
+                        "score": "$double"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "internal_min_max_scaler_normalization_score": -1
+                        },
+                        "output": {
+                            "internal_min_max_scaler_normalization_score": {
+                                "$minMaxScaler": {
+                                    "input": {
+                                        "$meta": "score"
+                                    },
+                                    "min": 0,
+                                    "max": 1
+                                },
+                                "window": {
+                                    "documents": [
+                                        "unbounded",
+                                        "unbounded"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": "$internal_min_max_scaler_normalization_score"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "double_score": {
+                            "$multiply": [
+                                {
+                                    "$meta": "score"
+                                },
+                                {
+                                    "$const": 2
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "double_score": -1
+                        },
+                        "output": {
+                            "double_score": {
+                                "$minMaxScaler": {
+                                    "input": "$double_score",
+                                    "min": 0,
+                                    "max": 1
+                                },
+                                "window": {
+                                    "documents": [
+                                        "unbounded",
+                                        "unbounded"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },)") +
+        std::string(R"(
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$setMetadata": {
+                                    "score": "$single"
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "internal_min_max_scaler_normalization_score": -1
+                                    },
+                                    "output": {
+                                        "internal_min_max_scaler_normalization_score": {
+                                            "$minMaxScaler": {
+                                                "input": {
+                                                    "$meta": "score"
+                                                },
+                                                "min": 0,
+                                                "max": 1
+                                            },
+                                            "window": {
+                                                "documents": [
+                                                    "unbounded",
+                                                    "unbounded"
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$setMetadata": {
+                                    "score": "$internal_min_max_scaler_normalization_score"
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "single_score": {
+                                        "$multiply": [
+                                            {
+                                                "$meta": "score"
+                                            },
+                                            {
+                                                "$const": 0.5
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "single_score": -1
+                                    },
+                                    "output": {
+                                        "single_score": {
+                                            "$minMaxScaler": {
+                                                "input": "$single_score",
+                                                "min": 0,
+                                                "max": 1
+                                            },
+                                            "window": {
+                                                "documents": [
+                                                    "unbounded",
+                                                    "unbounded"
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },)") +
+        std::string(R"(
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "double_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$double_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "single_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$single_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$double_score",
+                                "$single_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })");
+    ASSERT_BSONOBJ_EQ(fromjson(expectedStages), asOneObj);
+}
 }  // namespace
 }  // namespace mongo

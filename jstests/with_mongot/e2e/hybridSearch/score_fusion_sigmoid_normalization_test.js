@@ -21,7 +21,7 @@ const coll = db[jsTestName()];
 // Test Explanation: Add a field to each document called negative_score with the range [-1,-10].
 
 // Each document's negative_score field will undergo sigmoid normalization when the $score stage is
-// executed because the default normalization for $score is sigmoid. This normalized value, bounded
+// executed because the normalization for $score is sigmoid. This normalized value, bounded
 // between [0,1], will be saved on $meta: score. Then each normalized score metadata value will
 // undergo sigmoid normalization again for the $scoreFusion stage.
 
@@ -222,7 +222,7 @@ const coll = db[jsTestName()];
 // has the range [0,50] and field score_10 has the range [0,10].
 
 // Each document's score field (score_50 and score_10) will undergo sigmoid normalization when the
-// $score stage is executed because the default normalization for $score is sigmoid. This normalized
+// $score stage is executed because the normalization for $score is sigmoid. This normalized
 // value, bounded between [0,1], will be saved on $meta: score. Then each normalized score metadata
 // value will undergo sigmoid normalization again for the $scoreFusion stage.
 

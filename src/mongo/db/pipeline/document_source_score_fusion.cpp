@@ -314,7 +314,6 @@ boost::intrusive_ptr<DocumentSource> addInputPipelineScoreDetails(
 /**
  * Adds the following stages for scoreDetails:
  * {$addFields: {<inputPipelineName>_rawScore: { "$meta": "score" } } }
- * {$setMetadata: {score: "$<inputPipelineName>_score"}
  * {$addFields: {<inputPipelineName>_scoreDetails: ...} }. See addScoreDetails' comment for what the
  * possible values for <inputPipelineName>_scoreDetails are.
  */
@@ -337,6 +336,9 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildInputPipelineScoreDetails(
  * { ... stages of first pipeline ... }
  * { "$replaceRoot": { "newRoot": { "docs": "$$ROOT" } } },
  * { "$addFields": { "name1_score": { "$multiply": [ { $meta: "score" }, { "$const": 5.0 } ] } } }
+ * If scoreDetails is true, include the following stages:
+ * {$addFields: {<inputPipelineName>_rawScore: { "$meta": "score" } } }
+ * {$addFields: {<inputPipelineName>_scoreDetails: ...} }
  */
 std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
     const StringData inputPipelineOneName,
