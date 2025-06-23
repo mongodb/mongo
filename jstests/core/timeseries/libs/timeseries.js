@@ -294,7 +294,7 @@ export var TimeseriesTest = class {
 
     static ensureDataIsDistributedIfSharded(coll, splitPointDate) {
         const db = coll.getDB();
-        const buckets = getTimeseriesBucketsColl(coll);
+        const buckets = getTimeseriesCollForDDLOps(db, coll);
         if (isShardedTimeseries(coll)) {
             const timeFieldName =
                 db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.timeField;
