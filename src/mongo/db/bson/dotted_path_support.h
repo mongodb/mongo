@@ -140,6 +140,12 @@ BSONObj extractElementsBasedOnTemplate(const BSONObj& obj,
                                        bool useNullIfMissing = false);
 
 /**
+ * Returns an owned BSONObj with elements in the same order as they appear in the 'pattern' object.
+ * The value of each element is null.
+ */
+BSONObj extractNullForAllFieldsBasedOnTemplate(const BSONObj& pattern);
+
+/**
  * Compares two objects according to order of elements in the 'sortKey' object. This function
  * returns -1 if 'firstObj' < 'secondObj' according to 'sortKey', 0 if 'firstObj' == 'secondObj'
  * according to 'sortKey', and 1 if 'firstObj' > 'secondObj' according to 'sortKey'.
