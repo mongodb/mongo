@@ -92,8 +92,6 @@
     exclude_files:
       # TODO SERVER-101603 Validate against explain commands in prepared transactions.
       - jstests/core/txns/disallow_operations_on_prepared_transaction.js
-      # TODO SERVER-96805 Investigate why wildcard index candidate plans are non-deterministic.
-      - jstests/core/index/wildcard/*.js
       # TODO SERVER-89207: Ensure that the fallback mechanism works for '$_requestResumeToken'
       # queries.
       - jstests/core/query/find_with_resume_after_param.js
