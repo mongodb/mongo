@@ -120,8 +120,7 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     boost::optional<int64_t> userBatchSize = boost::none,
     std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr,
     std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
-        searchIdLookupMetrics = nullptr,
-    boost::optional<SearchQueryViewSpec> view = boost::none);
+        searchIdLookupMetrics = nullptr);
 
 /**
  * Parallel to establishCursorsForSearchStage() but limited to the arguments expected for

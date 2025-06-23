@@ -28,14 +28,13 @@
  */
 #include "mongo/db/pipeline/search/vector_search_helper.h"
 
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 
 namespace mongo {
 namespace {
 executor::RemoteCommandRequest getRemoteCommandRequestForVectorSearchQuery(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const BSONObj& request,
-    boost::optional<SearchQueryViewSpec> view = boost::none) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& request) {
     BSONObjBuilder cmdBob;
     cmdBob.append(mongot_cursor::kVectorSearchCmd, expCtx->getNamespaceString().coll());
     uassert(7828001,
@@ -49,8 +48,13 @@ executor::RemoteCommandRequest getRemoteCommandRequestForVectorSearchQuery(
                       BSON("verbosity" << ExplainOptions::verbosityString(*expCtx->getExplain())));
     }
 
+    // Attempt to get the view from the request.
+    boost::optional<SearchQueryViewSpec> view = search_helpers::getViewFromBSONObj(request);
     if (view) {
+        // mongot only expects the view's name but request currently holds the entire view object.
+        // Set the view name and remove the view object from the request.
         cmdBob.append(mongot_cursor::kViewNameField, view->getNss().coll());
+        request.removeField(search_helpers::kViewFieldName);
     }
 
     auto commandObj = cmdBob.obj();
@@ -65,8 +69,7 @@ namespace search_helpers {
 std::unique_ptr<executor::TaskExecutorCursor> establishVectorSearchCursor(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const BSONObj& request,
-    std::shared_ptr<executor::TaskExecutor> taskExecutor,
-    boost::optional<SearchQueryViewSpec> view) {
+    std::shared_ptr<executor::TaskExecutor> taskExecutor) {
     // Note that we always pre-fetch the next batch here. This is because we generally expect
     // everything to fit into one batch, since we give mongot the exact upper bound initially - we
     // will only see multiple batches if this upper bound doesn't fit in 16MB. This should be a rare
@@ -76,7 +79,7 @@ std::unique_ptr<executor::TaskExecutorCursor> establishVectorSearchCursor(
         /*preFetchNextBatch*/ true);
     auto cursors = mongot_cursor::establishCursors(
         expCtx,
-        getRemoteCommandRequestForVectorSearchQuery(expCtx, request, view),
+        getRemoteCommandRequestForVectorSearchQuery(expCtx, request),
         taskExecutor,
         std::move(getMoreStrategy));
     // Should always have one results cursor.

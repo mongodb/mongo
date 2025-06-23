@@ -67,11 +67,9 @@ public:
         return constraints;
     }
 
-    DocumentSourceInternalSearchMongotRemote(
-        InternalSearchMongotRemoteSpec spec,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        std::shared_ptr<executor::TaskExecutor> taskExecutor,
-        boost::optional<SearchQueryViewSpec> view = boost::none);
+    DocumentSourceInternalSearchMongotRemote(InternalSearchMongotRemoteSpec spec,
+                                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                             std::shared_ptr<executor::TaskExecutor> taskExecutor);
 
     StageConstraints constraints(PipelineSplitState pipeState) const override {
         return getSearchDefaultConstraints();
@@ -100,7 +98,7 @@ public:
         auto spec = InternalSearchMongotRemoteSpec::parseOwned(IDLParserContext(kStageName),
                                                                _spec.toBSON());
         return make_intrusive<DocumentSourceInternalSearchMongotRemote>(
-            std::move(spec), expCtx, _taskExecutor, _view);
+            std::move(spec), expCtx, _taskExecutor);
     }
 
     const InternalSearchMongotRemoteSpec& getMongotRemoteSpec() const {
@@ -189,7 +187,7 @@ public:
     }
 
     boost::optional<SearchQueryViewSpec> getView() {
-        return _view;
+        return _spec.getView();
     }
 
 protected:
@@ -225,13 +223,6 @@ protected:
     std::unique_ptr<Pipeline, PipelineDeleter> _mergingPipeline;
 
     std::unique_ptr<executor::TaskExecutorCursor> _cursor;
-
-    /**
-     * For mongot queries on views, $_internalSearchMongotRemote is only required to know the
-     * view's nss. However, DocumentSourceSearchMeta derives from this class and needs both the
-     * view name and the view pipeline. As such, we keep track of the entire view struct.
-     */
-    boost::optional<SearchQueryViewSpec> _view;
 
 private:
     /**

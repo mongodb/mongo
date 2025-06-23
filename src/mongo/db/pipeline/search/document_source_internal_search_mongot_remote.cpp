@@ -88,14 +88,12 @@ using executor::TaskExecutorCursor;
 DocumentSourceInternalSearchMongotRemote::DocumentSourceInternalSearchMongotRemote(
     InternalSearchMongotRemoteSpec spec,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    std::shared_ptr<executor::TaskExecutor> taskExecutor,
-    boost::optional<SearchQueryViewSpec> view)
+    std::shared_ptr<executor::TaskExecutor> taskExecutor)
     : DocumentSource(kStageName, expCtx),
       exec::agg::Stage(kStageName, expCtx),
       _mergingPipeline(spec.getMergingPipeline().has_value()
                            ? mongo::Pipeline::parse(*spec.getMergingPipeline(), expCtx)
                            : nullptr),
-      _view(view),
       _spec(std::move(spec)),
       _taskExecutor(taskExecutor) {
     LOGV2_DEBUG(9497006,
@@ -180,7 +178,7 @@ Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
 
     BSONObj explainInfo = explainResponse.value_or_eval([&] {
         return mongot_cursor::getSearchExplainResponse(
-            pExpCtx.get(), _spec.getMongotQuery(), _taskExecutor.get(), optFlags, _view);
+            pExpCtx.get(), _spec.getMongotQuery(), _taskExecutor.get(), optFlags);
     });
 
     MutableDocument mDoc;
@@ -352,7 +350,7 @@ DocumentSourceInternalSearchMongotRemote::establishCursor() {
     // DocumentSourceInternalSearchMongotRemote if we establish the cursors during search_helper
     // pipeline preparation instead.
     auto cursors = mongot_cursor::establishCursorsForSearchStage(
-        pExpCtx, _spec, _taskExecutor, boost::none, nullptr, getSearchIdLookupMetrics(), _view);
+        pExpCtx, _spec, _taskExecutor, boost::none, nullptr, getSearchIdLookupMetrics());
     // Should be called only in unsharded scenario, therefore only expect a results cursor and no
     // metadata cursor.
     tassert(5253301, "Expected exactly one cursor from mongot", cursors.size() == 1);

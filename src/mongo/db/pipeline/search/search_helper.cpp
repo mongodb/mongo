@@ -396,8 +396,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
                                                       origSearchStage->getTaskExecutor(),
                                                       userBatchSize,
                                                       nullptr,
-                                                      origSearchStage->getSearchIdLookupMetrics(),
-                                                      origSearchStage->getView());
+                                                      origSearchStage->getSearchIdLookupMetrics());
 
     // mongot can return zero cursors for an empty collection, one without metadata, or two for
     // results and metadata.
@@ -625,27 +624,31 @@ std::unique_ptr<RemoteExplainVector> getSearchRemoteExplains(
     return nullptr;
 }
 
-boost::optional<SearchQueryViewSpec> getViewFromBSONObj(
-    boost::intrusive_ptr<ExpressionContext> expCtx, BSONObj spec) {
-    // First, check if the view is held on the spec object (sharded scenarios).
-    boost::optional<SearchQueryViewSpec> view;
-    if (spec.hasField("view") && spec["view"].type() == BSONType::object) {
-        // If we are setting the view from the spec, the spec must be from an internal client. This
-        // is to prevent users from injecting a view into a search stage definition.
-        assertAllowedInternalIfRequired(
-            expCtx->getOperationContext(), "view", AllowedWithClientType::kInternal);
-        view = SearchQueryViewSpec::parse(IDLParserContext("unpack SearchQueryViewSpec"),
-                                          spec["view"].embeddedObject());
-    }
-
-    // If the view struct is not found on the spec document, check the expression context to see
-    // if the command is being executed on a view (non-sharded scenarios).
-    if (!view && expCtx->getView()) {
+boost::optional<SearchQueryViewSpec> getViewFromExpCtx(
+    boost::intrusive_ptr<ExpressionContext> expCtx) {
+    if (expCtx->getView()) {
         auto expCtxView = *expCtx->getView();
-        view = boost::make_optional(SearchQueryViewSpec(expCtxView.first, expCtxView.second));
+        return boost::make_optional(SearchQueryViewSpec(expCtxView.first, expCtxView.second));
     }
 
-    return view;
+    return boost::none;
 }
+
+boost::optional<SearchQueryViewSpec> getViewFromBSONObj(const BSONObj& spec) {
+    if (spec.hasField(kViewFieldName) && spec[kViewFieldName].type() == BSONType::object) {
+        return SearchQueryViewSpec::parse(IDLParserContext("unpack SearchQueryViewSpec"),
+                                          spec[kViewFieldName].embeddedObject());
+    }
+
+    return boost::none;
+}
+
+void validateViewNotSetByUser(boost::intrusive_ptr<ExpressionContext> expCtx, const BSONObj& spec) {
+    if (spec.hasField(kViewFieldName)) {
+        assertAllowedInternalIfRequired(
+            expCtx->getOperationContext(), kViewFieldName, AllowedWithClientType::kInternal);
+    }
+}
+
 }  // namespace search_helpers
 }  // namespace mongo

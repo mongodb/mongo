@@ -88,11 +88,7 @@ Value DocumentSourceSearch::serialize(const SerializationOptions& opts) const {
     // Otherwise, just serialize the mongotQuery.
     if ((!opts.isSerializingForQueryStats() && !opts.isSerializingForExplain()) ||
         pExpCtx->getInRouter()) {
-        MutableDocument spec{Document(_spec.toBSON())};
-        if (_view) {
-            spec["view"] = Value(_view->toBSON());
-        }
-        return Value(Document{{getSourceName(), spec.freezeToValue()}});
+        return Value(Document{{getSourceName(), _spec.toBSON()}});
     }
     return Value(DOC(getSourceName() << opts.serializeLiteral(_spec.getMongotQuery())));
 }
@@ -105,6 +101,9 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
             str::stream() << "$search value must be an object. Found: " << typeName(elem.type()),
             elem.type() == BSONType::object);
     auto specObj = elem.embeddedObject();
+
+    search_helpers::validateViewNotSetByUser(expCtx, specObj);
+
     // If kMongotQueryFieldName is present, this is the case that we re-create the
     // DocumentSource from a serialized DocumentSourceSearch that was originally parsed on a
     // router.
@@ -117,9 +116,13 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
         ? InternalSearchMongotRemoteSpec::parse(IDLParserContext(kStageName), specObj)
         : InternalSearchMongotRemoteSpec(specObj.getOwned());
 
-    auto view = search_helpers::getViewFromBSONObj(expCtx, specObj);
+    // If there is no view on the spec, check the expression context for one. getViewFromExpCtx will
+    // return boost::none if there is no view there either.
+    if (!spec.getView()) {
+        spec.setView(search_helpers::getViewFromExpCtx(expCtx));
+    }
 
-    return make_intrusive<DocumentSourceSearch>(expCtx, std::move(spec), view);
+    return make_intrusive<DocumentSourceSearch>(expCtx, std::move(spec));
 }
 
 std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
@@ -141,15 +144,8 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
     // DocumentSourceInternalSearchMongotRemote.
     spec.setMergingPipeline(boost::none);
 
-    // Extract the viewPipeline to share with DocumentSourceInternalSearchIdLookUp as it is required
-    // for mongot-indexed views.
-    boost::optional<std::vector<BSONObj>> viewPipeline;
-    if (_view) {
-        viewPipeline = boost::make_optional(_view->getEffectivePipeline());
-    }
-
     auto mongoTRemoteStage = make_intrusive<DocumentSourceInternalSearchMongotRemote>(
-        std::move(spec), pExpCtx, executor, _view);
+        std::move(spec), pExpCtx, executor);
     desugaredPipeline.push_back(mongoTRemoteStage);
 
     // If 'returnStoredSource' is true, we don't want to do idLookup. Instead, promote the fields in
@@ -177,7 +173,7 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
             pExpCtx,
             _spec.getLimit().value_or(0),
             buildExecShardFilterPolicy(shardFilterer),
-            viewPipeline);
+            _spec.getView());
         desugaredPipeline.insert(std::next(desugaredPipeline.begin()), idLookupStage);
         // In this case, connect the shared search state of these two stages of the pipeline
         // for batch size tuning.

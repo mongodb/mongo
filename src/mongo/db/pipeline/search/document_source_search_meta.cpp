@@ -95,7 +95,7 @@ std::unique_ptr<executor::TaskExecutorCursor> DocumentSourceSearchMeta::establis
                                                           getTaskExecutor(),
                                                           getIntermediateResultsProtocolVersion(),
                                                           nullptr,
-                                                          _view);
+                                                          getView());
 
     // TODO SERVER-91594: Since mongot will no longer only return explain, remove this block.
     // Mongot can return only an explain object or an explain with a cursor. If mongot returned
@@ -154,6 +154,8 @@ DocumentSource::GetNextResult DocumentSourceSearchMeta::getNextAfterSetup() {
 namespace {
 InternalSearchMongotRemoteSpec prepareInternalSearchMetaMongotSpec(
     const BSONObj& spec, const intrusive_ptr<ExpressionContext>& expCtx) {
+    search_helpers::validateViewNotSetByUser(expCtx, spec);
+
     if (spec.hasField(InternalSearchMongotRemoteSpec::kMongotQueryFieldName)) {
         // The existence of this field name indicates that this spec was already serialized from a
         // mongos process. Parse out of the IDL spec format, rather than just expecting only the
@@ -164,6 +166,13 @@ InternalSearchMongotRemoteSpec prepareInternalSearchMetaMongotSpec(
                     4,
                     "Parsing as $internalSearchMongotRemote",
                     "params"_attr = redact(params.toBSON()));
+
+        // Get the view from the expCtx if it doesn't already exist on the spec. getViewFromExpCtx
+        // will return boost::none if no view exists there either.
+        if (!params.getView()) {
+            params.setView(search_helpers::getViewFromExpCtx(expCtx));
+        }
+
         return params;
     }
 
@@ -214,13 +223,12 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearchMeta::createFromBso
             elem.type() == BSONType::object);
 
     auto specObj = elem.embeddedObject();
-    auto view = search_helpers::getViewFromBSONObj(expCtx, specObj);
     auto executor =
         executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
     auto internalRemoteSpec = prepareInternalSearchMetaMongotSpec(specObj, expCtx);
 
-    return {make_intrusive<DocumentSourceSearchMeta>(
-        std::move(internalRemoteSpec), expCtx, executor, view)};
+    return {
+        make_intrusive<DocumentSourceSearchMeta>(std::move(internalRemoteSpec), expCtx, executor)};
 }
 
 }  // namespace mongo

@@ -282,8 +282,7 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     boost::optional<int64_t> userBatchSize,
     std::unique_ptr<PlanYieldPolicy> yieldPolicy,
     std::shared_ptr<DocumentSourceInternalSearchIdLookUp::SearchIdLookupMetrics>
-        searchIdLookupMetrics,
-    boost::optional<SearchQueryViewSpec> view) {
+        searchIdLookupMetrics) {
     // UUID is required for mongot queries. If not present, no results for the query as the
     // collection has not been created yet.
     if (!expCtx->getUUID()) {
@@ -328,6 +327,8 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     // generate unmerged metadata documents that we won't be set up to merge.
     const auto& protocolVersion =
         expCtx->getNeedsMerge() ? spec.getMetadataMergeProtocolVersion() : boost::none;
+
+    const auto& view = spec.getView();
 
     return establishCursors(
         expCtx,

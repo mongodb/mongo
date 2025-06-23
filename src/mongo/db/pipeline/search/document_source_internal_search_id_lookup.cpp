@@ -49,12 +49,12 @@ DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
     const intrusive_ptr<ExpressionContext>& expCtx,
     long long limit,
     ExecShardFilterPolicy shardFilterPolicy,
-    boost::optional<std::vector<BSONObj>> viewPipeline)
+    boost::optional<SearchQueryViewSpec> view)
     : DocumentSource(kStageName, expCtx),
       exec::agg::Stage(kStageName, expCtx),
       _limit(limit),
       _shardFilterPolicy(shardFilterPolicy),
-      _viewPipeline(viewPipeline ? Pipeline::parse(*viewPipeline, pExpCtx) : nullptr) {
+      _viewPipeline(view ? Pipeline::parse(view->getEffectivePipeline(), pExpCtx) : nullptr) {
     // We need to reset the docsSeenByIdLookup/docsReturnedByIdLookup in the state sharedby the
     // DocumentSourceInternalSearchMongotRemote and DocumentSourceInternalSearchIdLookup stages when
     // we create a new DocumentSourceInternalSearchIdLookup stage. This is because if $search is

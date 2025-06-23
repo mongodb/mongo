@@ -55,6 +55,9 @@ using RemoteExplainVector = std::vector<BSONObj>;
 
 extern FailPoint searchReturnEofImmediately;
 namespace search_helpers {
+
+static constexpr StringData kViewFieldName = "view"_sd;
+
 /**
  * Consult mongot to get planning information for sharded search queries, used to configure the
  * metadataMergeProtocolVersion, metaPipeline, and sortSpec fields in the existing mongot remote
@@ -192,8 +195,12 @@ std::unique_ptr<RemoteExplainVector> getSearchRemoteExplains(
     const ExpressionContext* expCtx,
     const std::vector<boost::intrusive_ptr<DocumentSource>>& cqPipeline);
 
-boost::optional<SearchQueryViewSpec> getViewFromBSONObj(
-    boost::intrusive_ptr<ExpressionContext> expCtx, BSONObj spec);
+boost::optional<SearchQueryViewSpec> getViewFromExpCtx(
+    boost::intrusive_ptr<ExpressionContext> expCtx);
+
+boost::optional<SearchQueryViewSpec> getViewFromBSONObj(const BSONObj& spec);
+
+void validateViewNotSetByUser(boost::intrusive_ptr<ExpressionContext> expCtx, const BSONObj& spec);
 
 }  // namespace search_helpers
 }  // namespace mongo

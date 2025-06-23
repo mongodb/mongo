@@ -47,11 +47,11 @@ public:
     static constexpr StringData kFilterFieldName = "filter"_sd;
     static constexpr StringData kIndexFieldName = "index"_sd;
     static constexpr StringData kNumCandidatesFieldName = "numCandidates"_sd;
+    static constexpr StringData kViewFieldName = "view"_sd;
 
     DocumentSourceVectorSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                std::shared_ptr<executor::TaskExecutor> taskExecutor,
-                               BSONObj originalSpec,
-                               boost::optional<SearchQueryViewSpec> view = boost::none);
+                               BSONObj originalSpec);
 
     static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -95,7 +95,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
         auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
         return make_intrusive<DocumentSourceVectorSearch>(
-            expCtx, _taskExecutor, _originalSpec.copy(), _view);
+            expCtx, _taskExecutor, _originalSpec.copy());
     }
 
     StageConstraints constraints(PipelineSplitState pipeState) const final {
@@ -169,8 +169,5 @@ private:
     // Keep track of the original request BSONObj's extra fields in case there were fields mongod
     // doesn't know about that mongot will need later.
     BSONObj _originalSpec;
-
-    // If applicable, hold the view information.
-    boost::optional<SearchQueryViewSpec> _view;
 };
 }  // namespace mongo

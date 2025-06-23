@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/lite_parsed_search.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/search/vector_search_helper.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -58,13 +59,11 @@ ALLOCATE_DOCUMENT_SOURCE_ID(vectorSearch, DocumentSourceVectorSearch::id)
 DocumentSourceVectorSearch::DocumentSourceVectorSearch(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
-    BSONObj originalSpec,
-    boost::optional<SearchQueryViewSpec> view)
+    BSONObj originalSpec)
     : DocumentSource(kStageName, expCtx),
       exec::agg::Stage(kStageName, expCtx),
       _taskExecutor(taskExecutor),
-      _originalSpec(originalSpec.getOwned()),
-      _view(view) {
+      _originalSpec(originalSpec.getOwned()) {
     if (auto limitElem = _originalSpec.getField(kLimitFieldName)) {
         uassert(
             8575100, "Expected limit field to be a number in $vectorSearch", limitElem.isNumber());
@@ -120,14 +119,7 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
     // We don't want router to make a remote call to mongot even though it can generate explain
     // output.
     if (!opts.verbosity || pExpCtx->getInRouter()) {
-        MutableDocument spec{Document(_originalSpec)};
-        // If the request is on a view, include the view information when mongos is serializing the
-        // query to the shards, but do not include in explain output for this stage as the view
-        // information will be present in $_internalSearchIdLookup and thus would be redundant.
-        if (_view) {
-            spec["view"] = Value(_view->toBSON());
-        }
-        return Value(Document{{kStageName, spec.freezeToValue()}});
+        return Value(Document{{kStageName, _originalSpec}});
     }
 
     // If the query is an explain that executed the query, we obtain the explain object from the
@@ -223,8 +215,8 @@ DocumentSource::GetNextResult DocumentSourceVectorSearch::doGetNext() {
 
     // If this is the first call, establish the cursor.
     if (!_cursor) {
-        _cursor = search_helpers::establishVectorSearchCursor(
-            pExpCtx, _originalSpec, _taskExecutor, _view);
+        _cursor =
+            search_helpers::establishVectorSearchCursor(pExpCtx, _originalSpec, _taskExecutor);
     }
 
     return getNextAfterSetup();
@@ -241,12 +233,18 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::createFromB
 
     auto spec = elem.embeddedObject();
 
-    auto view = search_helpers::getViewFromBSONObj(expCtx, spec);
+    // Validate the source of the view if it exists on the spec, otherwise check expCtx for the
+    // view.
+    if (search_helpers::getViewFromBSONObj(spec)) {
+        search_helpers::validateViewNotSetByUser(expCtx, spec);
+    } else if (auto view = search_helpers::getViewFromExpCtx(expCtx)) {
+        spec = spec.addField(BSON(kViewFieldName << view->toBSON()).firstElement());
+    }
 
     auto serviceContext = expCtx->getOperationContext()->getServiceContext();
     std::list<intrusive_ptr<DocumentSource>> desugaredPipeline = {
         make_intrusive<DocumentSourceVectorSearch>(
-            expCtx, executor::getMongotTaskExecutor(serviceContext), elem.embeddedObject(), view)};
+            expCtx, executor::getMongotTaskExecutor(serviceContext), spec.getOwned())};
     return desugaredPipeline;
 }
 
@@ -256,15 +254,14 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::desugar() {
         executor::getMongotTaskExecutor(pExpCtx->getOperationContext()->getServiceContext());
 
     std::list<intrusive_ptr<DocumentSource>> desugaredPipeline = {
-        make_intrusive<DocumentSourceVectorSearch>(
-            pExpCtx, executor, _originalSpec.getOwned(), _view)};
+        make_intrusive<DocumentSourceVectorSearch>(pExpCtx, executor, _originalSpec.getOwned())};
 
     auto shardFilterer = DocumentSourceInternalShardFilter::buildIfNecessary(pExpCtx);
     auto idLookupStage = make_intrusive<DocumentSourceInternalSearchIdLookUp>(
         pExpCtx,
         _limit.value_or(0),
         buildExecShardFilterPolicy(shardFilterer),
-        _view ? boost::make_optional(_view->getEffectivePipeline()) : boost::none);
+        search_helpers::getViewFromBSONObj(_originalSpec));
     desugaredPipeline.insert(std::next(desugaredPipeline.begin()), idLookupStage);
     if (shardFilterer)
         desugaredPipeline.push_back(std::move(shardFilterer));

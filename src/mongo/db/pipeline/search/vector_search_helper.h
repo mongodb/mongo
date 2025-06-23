@@ -40,8 +40,7 @@ namespace mongo::search_helpers {
 std::unique_ptr<executor::TaskExecutorCursor> establishVectorSearchCursor(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const BSONObj& request,
-    std::shared_ptr<executor::TaskExecutor> taskExecutor,
-    boost::optional<SearchQueryViewSpec> view = boost::none);
+    std::shared_ptr<executor::TaskExecutor> taskExecutor);
 
 /**
  * Wrapper function to run getExplainResponse with vectorSearch command.

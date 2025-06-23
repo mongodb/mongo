@@ -34,6 +34,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/search/search_query_view_spec_gen.h"
 
 namespace mongo {
 
@@ -58,7 +59,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         long long limit = 0,
         ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{},
-        boost::optional<std::vector<BSONObj>> viewPipeline = boost::none);
+        boost::optional<SearchQueryViewSpec> view = boost::none);
 
     const char* getSourceName() const final;
 

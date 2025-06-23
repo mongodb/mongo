@@ -70,12 +70,10 @@ public:
     static bool canMovePastDuringSplit(const DocumentSource& ds);
 
     DocumentSourceSearch(const boost::intrusive_ptr<ExpressionContext> expCtx,
-                         InternalSearchMongotRemoteSpec spec,
-                         boost::optional<SearchQueryViewSpec> view = boost::none)
+                         InternalSearchMongotRemoteSpec spec)
         : DocumentSource(kStageName, expCtx),
           exec::agg::Stage(kStageName, expCtx),
-          _spec(std::move(spec)),
-          _view(view) {}
+          _spec(std::move(spec)) {}
 
     const char* getSourceName() const override;
     StageConstraints constraints(PipelineSplitState pipeState) const override;
@@ -89,14 +87,10 @@ public:
         return id;
     }
 
-    // A custom clone implementation is necessary to ensure that the _view information gets passed
-    // along to the new object. In sharded scenarios, if _view doesn't exist on the object then
-    // expCtx is checked for the view, which could hold incorrect information (see:
-    // createFromBson()).
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
         auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
-        return make_intrusive<DocumentSourceSearch>(expCtx, _spec, _view);
+        return make_intrusive<DocumentSourceSearch>(expCtx, _spec);
     }
 
     auto isStoredSource() const {
@@ -201,9 +195,6 @@ private:
     std::unique_ptr<executor::TaskExecutorCursor> _cursor;
     std::unique_ptr<executor::TaskExecutorCursor> _metadataCursor;
     boost::optional<BSONObj> _remoteCursorVars;
-
-    // If applicable, hold the view information.
-    boost::optional<SearchQueryViewSpec> _view;
 };
 
 }  // namespace mongo

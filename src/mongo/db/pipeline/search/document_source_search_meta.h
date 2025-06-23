@@ -83,7 +83,7 @@ public:
             spec.setMergingPipeline(_mergingPipeline->serializeToBson());
         }
 
-        return make_intrusive<DocumentSourceSearchMeta>(std::move(spec), expCtx, executor, _view);
+        return make_intrusive<DocumentSourceSearchMeta>(std::move(spec), expCtx, executor);
     }
 
     size_t getRemoteCursorId() {
