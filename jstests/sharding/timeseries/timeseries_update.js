@@ -100,7 +100,7 @@ function testShardedUpdate({
     // Updates on sharded timeseries meta fields are only allowed as long as the field updated is
     // not in the shard key.
     if (updatesMetaFieldInShardKey) {
-        failCode = [ErrorCodes.InvalidOptions, 31025];
+        failCode = [ErrorCodes.InvalidOptions, ErrorCodes.IllegalOperation, 31025];
         n = 0;
         nModified = 0;
         resultDocList = initialDocList;

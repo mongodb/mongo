@@ -228,6 +228,21 @@ private:
     StatusWith<std::vector<ShardEndpoint>> _targetQuery(const CanonicalQuery& query) const;
 
     /**
+     * Returns a vector of ShardEndpoints for a potentially multi-shard query.
+     *
+     * This method is an alternative to _targetQuery that is intended to be used for multi:true
+     * upsert queries only.
+     *
+     * This method attempts to extract a shard key from the CanonicalQuery and then attempts target
+     * a single shard using this shard key.
+     *
+     * Returns !OK with message if a shard key could not be extracted or a single shard could not
+     * be targeted due to collation.
+     */
+    StatusWith<std::vector<ShardEndpoint>> _targetQueryForMultiUpsert(
+        const CanonicalQuery& query) const;
+
+    /**
      * Returns a ShardEndpoint for an exact shard key query.
      *
      * Also has the side effect of updating the chunks stats with an estimate of the amount of

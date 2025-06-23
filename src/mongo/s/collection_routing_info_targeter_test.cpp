@@ -389,20 +389,16 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedSha
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "1");
 
-    // For op-style updates, query on _id gets targeted to all shards.
+    // For op-style updates and replacement style updates, query on _id gets targeted to all shards.
     auto requestOpUpdate =
         buildUpdate(kNss, fromjson("{_id: 1}"), fromjson("{$set: {p: 111}}"), false);
     res = criTargeter.targetUpdate(operationContext(), BatchItemRef(&requestOpUpdate, 0)).endpoints;
     ASSERT_EQUALS(res.size(), 5);
 
-    // For replacement style updates, query on _id uses replacement doc to target. If the
-    // replacement doc doesn't have shard key fields, then update should be routed to the shard
-    // holding 'null' shard key documents.
     auto requestReplUpdate = buildUpdate(kNss, fromjson("{_id: 1}"), fromjson("{p: 111}"), false);
     res =
         criTargeter.targetUpdate(operationContext(), BatchItemRef(&requestReplUpdate, 0)).endpoints;
-    ASSERT_EQUALS(res.size(), 1);
-    ASSERT_EQUALS(res[0].shardName, "1");
+    ASSERT_EQUALS(res.size(), 5);
 
     // Upsert without full shard key.
     auto requestFullKey =

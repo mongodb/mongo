@@ -143,7 +143,6 @@ assertUpdateWorkedWithNoMatchingDoc({x: 100, y: 51, a: 5}, {x: 110, y: 55, z: 3,
 
 // When query doesn't match any doc.
 assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0}, {x: 110, y: 55, z: 3, a: 110}, false);
-assertUpdateWorkedWithNoMatchingDoc({_id: 1}, {x: 110, y: 55, z: 3, a: 110}, false);
 
 // When query matches a doc and updates sucessfully.
 assertUpdateWorked({_id: 0, y: 3}, {z: 3, x: 4, y: 3, a: 2}, false, 0);
@@ -179,11 +178,12 @@ try {
     assert.eq(updateResult.getWriteError().code, ErrorCodes.IllegalOperation);
     assert(updateResult.getWriteError().errmsg.includes(
         "Must run update to shard key field in a multi-statement transaction or with " +
-        "retryWrites: true."));
+        "retryWrites: true"));
 }
 
 assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update({_id: 2}, {x: 110, y: 55, z: 3, a: 110}, false), 31025);
+    st.s.getDB(kDbName).coll.update({_id: 2}, {x: 110, y: 55, z: 3, a: 110}, false),
+    [ErrorCodes.IllegalOperation, 31025]);
 
 //
 // Test upsert-specific behaviours.

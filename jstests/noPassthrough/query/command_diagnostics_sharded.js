@@ -272,7 +272,7 @@ function runTests(onMongos = false) {
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"bulkWrite\\"`,
             // Ensure sub-operations are included in the diagnostic log.
-            'update: 0',
+            'update: 1',
             'filter: { a: 1.0, b: 1.0 }',
             'updateMods: { a: 1.0 }',
             onMongos ? (`'test.differentNamespace': omitted: collection isn't sharded`,

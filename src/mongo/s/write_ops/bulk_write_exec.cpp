@@ -104,12 +104,13 @@ const int kMaxRoundsWithoutProgress(5);
  * Send and process the child batches. Each child batch is targeted at a unique shard: therefore one
  * shard will have only one batch incoming.
  */
-void executeChildBatches(OperationContext* opCtx,
-                         const std::vector<std::unique_ptr<NSTargeter>>& targeters,
-                         TargetedBatchMap& childBatches,
-                         BulkWriteOp& bulkWriteOp,
-                         stdx::unordered_map<NamespaceString, TrackedErrors>& errorsPerNamespace,
-                         boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) {
+void executeChildBatches(
+    OperationContext* opCtx,
+    const std::vector<std::unique_ptr<NSTargeter>>& targeters,
+    TargetedBatchMap& childBatches,
+    BulkWriteOp& bulkWriteOp,
+    stdx::unordered_map<NamespaceString, TrackedErrors>& errorsPerNamespace,
+    boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery = boost::none) {
     // We are starting a new round of execution and so this should have been reset to false.
     invariant(!bulkWriteOp.shouldStopCurrentRound());
     std::vector<AsyncRequestsSender::Request> requests;
@@ -579,120 +580,107 @@ void executeWriteWithoutShardKey(
     auto allowShardKeyUpdatesWithoutFullShardKeyInQuery =
         opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
 
-    // If there is only 1 targetable shard, we can skip using the two phase write protocol.
-    if (childBatches.size() == 1) {
-        executeChildBatches(opCtx,
-                            targeters,
-                            childBatches,
-                            bulkWriteOp,
-                            errorsPerNamespace,
-                            allowShardKeyUpdatesWithoutFullShardKeyInQuery);
-    } else {
-        // Execute the two phase write protocol for writes that cannot directly target a shard.
+    // If there is a targeted write with a sampleId, use that write instead in order to pass the
+    // sampleId to the two phase write protocol. Otherwise, just choose the first targeted write.
+    const auto targetedWriteBatch = [&] {
+        for (auto&& [_ /* shardId */, childBatch] : childBatches) {
+            auto nextBatch = childBatch.get();
 
-        const auto targetedWriteBatch = [&] {
-            // If there is a targeted write with a sampleId, use that write instead in order to pass
-            // the sampleId to the two phase write protocol. Otherwise, just choose the first
-            // targeted write.
-            for (auto&& [_ /* shardId */, childBatch] : childBatches) {
-                auto nextBatch = childBatch.get();
+            // For a write without shard key, we expect each TargetedWriteBatch in childBatches
+            // to contain only one TargetedWrite directed to each shard.
+            tassert(7787100,
+                    "There must be only 1 targeted write in this targeted write batch.",
+                    nextBatch->getWrites().size() == 1);
 
-                // For a write without shard key, we expect each TargetedWriteBatch in childBatches
-                // to contain only one TargetedWrite directed to each shard.
-                tassert(7787100,
-                        "There must be only 1 targeted write in this targeted write batch.",
-                        nextBatch->getWrites().size() == 1);
-
-                auto targetedWrite = nextBatch->getWrites().begin()->get();
-                if (targetedWrite->sampleId) {
-                    return nextBatch;
-                }
-            }
-            return childBatches.begin()->second.get();
-        }();
-
-        // Note: It is fine to use 'getAproxNShardsOwningChunks' here because the result is only
-        // used to update stats.
-        bulkWriteOp.noteTwoPhaseWriteProtocol(
-            *targetedWriteBatch, nsIdx, targeter->getAproxNShardsOwningChunks());
-
-        auto cmdObj = bulkWriteOp
-                          .buildBulkCommandRequest(targeters,
-                                                   *targetedWriteBatch,
-                                                   allowShardKeyUpdatesWithoutFullShardKeyInQuery)
-                          .toBSON();
-
-        boost::optional<WriteConcernErrorDetail> wce;
-        auto swRes = write_without_shard_key::runTwoPhaseWriteProtocol(
-            opCtx, targeter->getNS(), std::move(cmdObj), wce);
-
-        BulkWriteCommandReply bulkWriteResponse;
-        WriteConcernErrorDetail wcError;
-        if (wce.has_value()) {
-            wcError = std::move(*wce);
-        }
-
-        Status responseStatus = swRes.getStatus();
-        if (swRes.isOK()) {
-            std::string errMsg;
-            if (swRes.getValue().getResponse().isEmpty()) {
-                // When we get an empty response, it means that the predicate didn't match anything
-                // and no write was done. So we can just set a trivial ok response. Unless we are
-                // running errors only in which case we set an empty vector.
-                auto items = std::vector<mongo::BulkWriteReplyItem>{};
-                if (!bulkWriteOp.getClientRequest().getErrorsOnly()) {
-                    items.push_back(BulkWriteReplyItem(0));
-                }
-                bulkWriteResponse.setCursor(
-                    BulkWriteCommandResponseCursor(0,  // cursorId
-                                                   items,
-                                                   NamespaceString::makeBulkWriteNSS(boost::none)));
-                bulkWriteResponse.setNErrors(0);
-                bulkWriteResponse.setNInserted(0);
-                bulkWriteResponse.setNMatched(0);
-                bulkWriteResponse.setNModified(0);
-                bulkWriteResponse.setNUpserted(0);
-                bulkWriteResponse.setNDeleted(0);
-            } else {
-                try {
-                    bulkWriteResponse = BulkWriteCommandReply::parse(
-                        IDLParserContext("BulkWriteCommandReplyForWriteWithoutShardKey"),
-                        swRes.getValue().getResponse());
-                } catch (const DBException& ex) {
-                    responseStatus = ex.toStatus().withContext(
-                        "Failed to parse response from writes without shard key");
-                }
+            auto targetedWrite = nextBatch->getWrites().begin()->get();
+            if (targetedWrite->sampleId) {
+                return nextBatch;
             }
         }
+        return childBatches.begin()->second.get();
+    }();
 
-        if (!responseStatus.isOK()) {
-            // Set an error for the operation.
-            bulkWriteResponse = createEmulatedErrorReply(responseStatus, 1, boost::none);
-        }
+    // Note: It is fine to use 'getAproxNShardsOwningChunks' here because the result is only
+    // used to update stats.
+    bulkWriteOp.noteTwoPhaseWriteProtocol(
+        *targetedWriteBatch, nsIdx, targeter->getAproxNShardsOwningChunks());
 
-        // We should get back just one reply item for the single update we are running.
-        const auto& replyItems = bulkWriteResponse.getCursor().getFirstBatch();
-        tassert(7298301,
-                "unexpected bulkWrite reply for writes without shard key",
-                replyItems.size() == 1 || replyItems.size() == 0);
-        boost::optional<BulkWriteReplyItem> replyItem = boost::none;
-        if (replyItems.size() == 1) {
-            replyItem = replyItems[0];
-        }
+    auto cmdObj = bulkWriteOp
+                      .buildBulkCommandRequest(targeters,
+                                               *targetedWriteBatch,
+                                               allowShardKeyUpdatesWithoutFullShardKeyInQuery)
+                      .toBSON();
 
-        LOGV2_DEBUG(7298302,
-                    4,
-                    "Processing bulk write response for writes without shard key",
-                    "opIdx"_attr = opIdx,
-                    "replyItem"_attr = replyItem,
-                    "wcError"_attr = wcError.toString());
+    boost::optional<WriteConcernErrorDetail> wce;
+    auto swRes = write_without_shard_key::runTwoPhaseWriteProtocol(
+        opCtx, targeter->getNS(), std::move(cmdObj), wce);
 
-        bulkWriteOp.noteWriteOpFinalResponse(opIdx,
-                                             replyItem,
-                                             bulkWriteResponse,
-                                             ShardWCError(childBatches.begin()->first, wcError),
-                                             bulkWriteResponse.getRetriedStmtIds());
+    BulkWriteCommandReply bulkWriteResponse;
+    WriteConcernErrorDetail wcError;
+    if (wce.has_value()) {
+        wcError = std::move(*wce);
     }
+
+    Status responseStatus = swRes.getStatus();
+    if (swRes.isOK()) {
+        std::string errMsg;
+        if (swRes.getValue().getResponse().isEmpty()) {
+            // When we get an empty response, it means that the predicate didn't match anything
+            // and no write was done. So we can just set a trivial ok response. Unless we are
+            // running errors only in which case we set an empty vector.
+            auto items = std::vector<mongo::BulkWriteReplyItem>{};
+            if (!bulkWriteOp.getClientRequest().getErrorsOnly()) {
+                items.push_back(BulkWriteReplyItem(0));
+            }
+            bulkWriteResponse.setCursor(
+                BulkWriteCommandResponseCursor(0,  // cursorId
+                                               items,
+                                               NamespaceString::makeBulkWriteNSS(boost::none)));
+            bulkWriteResponse.setNErrors(0);
+            bulkWriteResponse.setNInserted(0);
+            bulkWriteResponse.setNMatched(0);
+            bulkWriteResponse.setNModified(0);
+            bulkWriteResponse.setNUpserted(0);
+            bulkWriteResponse.setNDeleted(0);
+        } else {
+            try {
+                bulkWriteResponse = BulkWriteCommandReply::parse(
+                    IDLParserContext("BulkWriteCommandReplyForWriteWithoutShardKey"),
+                    swRes.getValue().getResponse());
+            } catch (const DBException& ex) {
+                responseStatus = ex.toStatus().withContext(
+                    "Failed to parse response from writes without shard key");
+            }
+        }
+    }
+
+    if (!responseStatus.isOK()) {
+        // Set an error for the operation.
+        bulkWriteResponse = createEmulatedErrorReply(responseStatus, 1, boost::none);
+    }
+
+    // We should get back just one reply item for the single update we are running.
+    const auto& replyItems = bulkWriteResponse.getCursor().getFirstBatch();
+    tassert(7298301,
+            "unexpected bulkWrite reply for writes without shard key",
+            replyItems.size() == 1 || replyItems.size() == 0);
+    boost::optional<BulkWriteReplyItem> replyItem = boost::none;
+    if (replyItems.size() == 1) {
+        replyItem = replyItems[0];
+    }
+
+    LOGV2_DEBUG(7298302,
+                4,
+                "Processing bulk write response for writes without shard key",
+                "opIdx"_attr = opIdx,
+                "replyItem"_attr = replyItem,
+                "wcError"_attr = wcError.toString());
+
+    bulkWriteOp.noteWriteOpFinalResponse(opIdx,
+                                         replyItem,
+                                         bulkWriteResponse,
+                                         ShardWCError(childBatches.begin()->first, wcError),
+                                         bulkWriteResponse.getRetriedStmtIds());
 }
 
 void executeNonTargetedWriteWithoutShardKeyWithId(
@@ -1131,8 +1119,30 @@ bool BulkWriteOp::isFinished() const {
     for (auto& writeOp : _writeOps) {
         if (writeOp.getWriteState() < WriteOpState_Completed) {
             return false;
-        } else if ((ordered || _inTransaction) && writeOp.getWriteState() == WriteOpState_Error) {
-            return true;
+        } else if (writeOp.getWriteState() == WriteOpState_Error) {
+            // If the WriteOp's state is "WriteOpState_Error" and if '_inTransaction || ordered'
+            // is true, then normally isFinished() will return true. Doing this allows the operation
+            // to be aborted quickly, without having to wait for any remaining child ops.
+            //
+            // However, the logic in "cluster_write_cmd.cpp" and "cluster_find_and_modify_cmd.cpp"
+            // that handles WouldChangeOwningShard errors requires that the current transaction
+            // (if any) not be aborted when a WouldChangeOwningShard error occurs.
+            //
+            // Thus, if the WriteOp's state is "WriteOpState_Error" with a WouldChangeOwningShard
+            // error and '_inTransaction || ordered' is true, and if the WriteOp still has pending
+            // child ops, then isFinished() must return false to allow the pending child ops to
+            // finish cleanly (to avoid causing the transaction to abort).
+            if (writeOp.getOpError().getStatus().code() == ErrorCodes::WouldChangeOwningShard &&
+                writeOp.hasPendingChildOps() && _inTransaction) {
+                return false;
+            }
+
+            // If the BulkWriteOp is ordered or we're in a transaction -AND- if this WriteOp
+            // encountered an error (excluding the WouldChangeOwningShard case handled above),
+            // then return true to indicate that this BulkWriteOp is finished.
+            if (_inTransaction || ordered) {
+                return true;
+            }
         }
     }
     return true;

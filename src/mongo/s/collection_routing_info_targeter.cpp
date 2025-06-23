@@ -138,49 +138,6 @@ void validateUpdateDoc(const UpdateRef& updateRef) {
 }
 
 /**
- * Obtain the update expression from the given update doc. If this is a replacement-style update,
- * and the shard key includes _id but the replacement document does not, we attempt to find an exact
- * _id match in the query component and add it to the doc. We do this because mongoD will propagate
- * _id from the existing document if this is an update, and will extract _id from the query when
- * generating the new document in the case of an upsert. It is therefore always correct to target
- * the operation on the basis of the combined updateExpr and query.
- */
-BSONObj getUpdateExprForTargeting(const boost::intrusive_ptr<ExpressionContext> expCtx,
-                                  const ShardKeyPattern& shardKeyPattern,
-                                  const BSONObj& updateQuery,
-                                  const write_ops::UpdateModification& updateMod) {
-    // If this is not a replacement update, then the update expression remains unchanged.
-    if (updateMod.type() != UpdateType::kReplacement) {
-        BSONObjBuilder objBuilder;
-        updateMod.serializeToBSON("u", &objBuilder);
-        return objBuilder.obj();
-    }
-
-    // Extract the raw update expression from the request.
-    invariant(updateMod.type() == UpdateType::kReplacement);
-
-    // Replace any non-existent shard key values with a null value.
-    auto updateExpr =
-        shardKeyPattern.emplaceMissingShardKeyValuesForDocument(updateMod.getUpdateReplacement());
-
-    // If we aren't missing _id, return the update expression as-is.
-    if (updateExpr.hasField(kIdFieldName)) {
-        return updateExpr;
-    }
-
-    // We are missing _id, so attempt to extract it from an exact match in the update's query spec.
-    // This will guarantee that we can target a single shard, but it is not necessarily fatal if no
-    // exact _id can be found.
-    const auto idFromQuery = uassertStatusOK(
-        extractShardKeyFromBasicQueryWithContext(expCtx, kVirtualIdShardKey, updateQuery));
-    if (auto idElt = idFromQuery[kIdFieldName]) {
-        updateExpr = updateExpr.addField(idElt);
-    }
-
-    return updateExpr;
-}
-
-/**
  * Returns true if the two CollectionRoutingInfo objects are different.
  */
 bool isMetadataDifferent(const CollectionRoutingInfo& criA, const CollectionRoutingInfo& criB) {
@@ -454,21 +411,6 @@ bool isRetryableWrite(OperationContext* opCtx) {
 NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
     OperationContext* opCtx, const BatchItemRef& itemRef) const {
     NSTargeter::TargetingResult result;
-
-    // If the update is replacement-style:
-    // 1. Attempt to target using the query. If this fails, AND the query targets more than one
-    //    shard,
-    // 2. Fall back to targeting using the replacement document.
-    //
-    // If the update is an upsert:
-    // 1. Always attempt to target using the query. Upserts must have the full shard key in the
-    //    query.
-    //
-    // NOTE: A replacement document is allowed to have missing shard key values, because we target
-    // as if the shard key values are specified as NULL. A replacement document is also allowed
-    // to have a missing '_id', and if the '_id' exists in the query, it will be emplaced in the
-    // replacement document for targeting purposes.
-
     const auto& updateOp = itemRef.getUpdateRef();
     const bool isMulti = updateOp.getMulti();
 
@@ -484,7 +426,6 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
     }
 
     // Collection is sharded
-    const auto& shardKeyPattern = _cri.getChunkManager().getShardKeyPattern();
     const auto collation = write_ops::collationOf(updateOp);
 
     auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
@@ -530,71 +471,20 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
     }
 
     validateUpdateDoc(updateOp);
-    const auto updateExpr =
-        getUpdateExprForTargeting(expCtx, shardKeyPattern, query, updateOp.getUpdateMods());
 
     // Parse update query.
     const auto cq = uassertStatusOKWithContext(
         _canonicalize(opCtx, expCtx, _nss, query, collation, _cri.getChunkManager()),
         str::stream() << "Could not parse update query " << query);
 
-    const bool isExactId =
-        _isExactIdQuery(*cq, _cri.getChunkManager()) && !_isRequestOnTimeseriesViewNamespace;
-    const bool isMultiUpsert = isMulti && isUpsert;
-    const bool isReplacementUpdateWithExactId = !isMulti && isExactId &&
-        updateOp.getUpdateMods().type() == write_ops::UpdateModification::Type::kReplacement;
-
     // Target based on the update's filter.
-    auto endpoints = uassertStatusOK(_targetQuery(*cq));
-    bool multipleEndpoints = endpoints.size() > 1u;
-
-    // Attempt to extract the shard key from the query or the replacement doc if appropriate.
-    // If extraction fails, or if extraction wasn't attempted because it isn't needed, 'shardKey'
-    // will be set to an empty object.
-    BSONObj shardKey;
-
-    // Replacement-style updates with an "_id" equality must always target a single shard. If
-    // 'multipleEndpoints' is true (which implies extracting the shard key from the query isn't
-    // possible), then we will attempt extract the shard key from the replacement doc to preserve
-    // legacy behavior.
-    const bool extractShardKeyFromReplacement = isReplacementUpdateWithExactId && multipleEndpoints;
-
-    // Attempt to extract the shard key from the query or the replacement doc as appropriate.
-    if (extractShardKeyFromReplacement) {
-        shardKey = shardKeyPattern.extractShardKeyFromDoc(updateExpr);
-    } else if (!multipleEndpoints || isMultiUpsert) {
-        shardKey = extractShardKeyFromQuery(shardKeyPattern, *cq);
-    }
-
-    // If 'shardKey' is not an empty object, call _targetShardKey() and store the result.
-    boost::optional<StatusWith<ShardEndpoint>> targetByShardKeyResult;
-    if (!shardKey.isEmpty()) {
-        targetByShardKeyResult = _targetShardKey(shardKey, collation);
-    }
-
-    const bool canTargetByShardKey = targetByShardKeyResult && targetByShardKeyResult->isOK();
-
-    // For multi:true upserts, and for multi:false replacement updates/upserts with an "_id"
-    // equality where _targetQuery() targeted multiple shards, we use _targetShardKey() for
-    // targeting instead. If we are unable to target a single shard via _targetShardKey(),
-    // then we throw an error.
-    if (extractShardKeyFromReplacement || isMultiUpsert) {
-        const char* errorMsg = extractShardKeyFromReplacement
-            ? "Failed to target update by replacement document"
-            : "Failed to target upsert by query";
-
-        uassert(ErrorCodes::ShardKeyNotFound,
-                str::stream() << errorMsg << " :: could not extract exact shard key",
-                targetByShardKeyResult.has_value());
-
-        // Clear 'endpoints' and then re-populate it using the result from _targetShardKey().
-        endpoints.clear();
-        endpoints.emplace_back(uassertStatusOKWithContext(*targetByShardKeyResult, errorMsg));
-        // 'endpoints' now only has 1 element, so set 'multipleEndpoints' to false.
-        multipleEndpoints = false;
-    }
-
-    result.endpoints = std::move(endpoints);
+    //
+    // If this is a multi:true upsert, we call _targetQueryForMultiUpsert() to do targeting.
+    // For all other kinds of updates, we call _targetQuery() to do targeting.
+    //
+    // In either case, if a non-OK status is returned we will throw an exception here.
+    result.endpoints = isMulti && isUpsert ? uassertStatusOK(_targetQueryForMultiUpsert(*cq))
+                                           : uassertStatusOK(_targetQuery(*cq));
 
     // For multi:true updates/upserts, there are no other checks to perform. Increment query
     // counters as appropriate and return 'result'.
@@ -603,11 +493,14 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
         return result;
     }
 
-    // For multi:false upserts whose filter has an "_id" equality, use the two phase write protocol
-    // if 'multipleEndpoints' is true. For multi:false updates/upserts whose filter doesn't have an
-    // "_id" equality, use the two phase write protocol if 'canTargetByShardKey' is false.
-    result.useTwoPhaseWriteProtocol =
-        (isExactId && isUpsert && multipleEndpoints) || (!isExactId && !canTargetByShardKey);
+    bool multipleEndpoints = result.endpoints.size() > 1u;
+    const bool isExactId =
+        _isExactIdQuery(*cq, _cri.getChunkManager()) && !_isRequestOnTimeseriesViewNamespace;
+
+    // For multi:false upserts that involve multiple shards, and for multi:false non-upsert updates
+    // whose filter doesn't have an "_id" equality that involve multiple shards, we use the two
+    // phase write protocol.
+    result.useTwoPhaseWriteProtocol = multipleEndpoints && (!isExactId || isUpsert);
 
     // For retryable multi:false non-upsert updates whose filter has an "_id" equality that involve
     // multiple shards (i.e. 'multipleEndpoints' is true), we execute by broadcasting the query to
@@ -615,13 +508,11 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
     // TODO SPM-3673: Implement a similar approach for non-retryable or sessionless multi:false
     // non-upsert updates with an "_id" equality that involve multiple shards.
     result.isNonTargetedRetryableWriteWithId =
-        isExactId && !isUpsert && multipleEndpoints && isRetryableWrite(opCtx);
+        multipleEndpoints && isExactId && !isUpsert && isRetryableWrite(opCtx);
 
     // Increment query counters as appropriate.
     if (!multipleEndpoints) {
-        if (!extractShardKeyFromReplacement) {
-            getQueryCounters(opCtx).updateOneTargetedShardedCount.increment(1);
-        }
+        getQueryCounters(opCtx).updateOneTargetedShardedCount.increment(1);
     } else {
         getQueryCounters(opCtx).updateOneNonTargetedShardedCount.increment(1);
 
@@ -791,6 +682,33 @@ StatusWith<std::vector<ShardEndpoint>> CollectionRoutingInfoTargeter::_targetQue
         endpoints.emplace_back(std::move(shardId), std::move(shardVersion), boost::none);
     }
 
+    return endpoints;
+}
+
+StatusWith<std::vector<ShardEndpoint>> CollectionRoutingInfoTargeter::_targetQueryForMultiUpsert(
+    const CanonicalQuery& query) const {
+    // Attempt to extract the shard key from the query.
+    const auto& shardKeyPattern = _cri.getChunkManager().getShardKeyPattern();
+    BSONObj shardKey = extractShardKeyFromQuery(shardKeyPattern, query);
+
+    // If extracting the shard key failed, return a non-OK Status.
+    if (shardKey.isEmpty()) {
+        return Status{ErrorCodes::ShardKeyNotFound,
+                      "Failed to target upsert by query :: could not extract exact shard key"};
+    }
+
+    // Call _targetShardKey() and throw an error if this fails.
+    const BSONObj& collation = query.getFindCommandRequest().getCollation();
+    auto swEndpoint = _targetShardKey(shardKey, collation);
+
+    // If _targetShardKey() returned a non-OK Status, return that status with added context.
+    if (!swEndpoint.isOK()) {
+        return swEndpoint.getStatus().withContext("Failed to target upsert by query");
+    }
+
+    // Store the result of _targetShardKey() into a vector and return the vector.
+    std::vector<ShardEndpoint> endpoints;
+    endpoints.emplace_back(std::move(swEndpoint.getValue()));
     return endpoints;
 }
 

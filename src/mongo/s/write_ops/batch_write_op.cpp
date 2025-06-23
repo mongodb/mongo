@@ -753,8 +753,8 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
         return;
     }
 
-    bool shouldDeferWriteWithoutShardKeyReponse = isWriteWithoutShardKeyWithId && batchSize > 1;
-    if (!shouldDeferWriteWithoutShardKeyReponse) {
+    bool shouldDeferWriteWithoutShardKeyResponse = isWriteWithoutShardKeyWithId && batchSize > 1;
+    if (!shouldDeferWriteWithoutShardKeyResponse) {
         // Increment stats for this batch
         _incBatchStats(response);
     } else {

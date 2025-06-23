@@ -289,6 +289,8 @@ public:
     boost::optional<BulkWriteReplyItem> combineBulkWriteReplyItems(
         std::vector<BulkWriteReplyItem const*> replies);
 
+    bool hasPendingChildOps() const;
+
     const std::vector<ChildWriteOp>& getChildWriteOps_forTest() const;
 
 private:
