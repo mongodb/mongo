@@ -489,7 +489,7 @@ void AccumulatorPushForBucketAuto::processInternal(const Value& compoundInput, b
         // If we're merging, we need to take apart the arrays we receive and put their elements into
         // the array we are collecting.  If we didn't, then we'd get an array of arrays, with one
         // array from each merge source.
-        invariant(compoundInput.getType() == Array);
+        assertMergingInputType(compoundInput, Array);
 
         const std::vector<Value>& vec = compoundInput.getArray();
         for (auto&& val : vec) {

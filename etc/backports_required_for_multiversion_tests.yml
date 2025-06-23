@@ -25,6 +25,8 @@ last-continuous:
     ticket: SERVER-100345
   - test_file: jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js
     ticket: SERVER-95869
+  - test_file: jstests/aggregation/accumulators/group_doing_merge.js
+    ticket: SERVER-99616
   - test_file: jstests/change_streams/ddl_create_event.js
     ticket: SERVER-88142
   - test_file: jstests/change_streams/ddl_view_events.js
@@ -842,6 +844,8 @@ last-lts:
     ticket: SERVER-100345
   - test_file: jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js
     ticket: SERVER-95869
+  - test_file: jstests/aggregation/accumulators/group_doing_merge.js
+    ticket: SERVER-99616
   - test_file: jstests/change_streams/ddl_create_event.js
     ticket: SERVER-88142
   - test_file: jstests/change_streams/ddl_view_events.js

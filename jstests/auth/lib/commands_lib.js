@@ -8094,6 +8094,26 @@ export const authCommandsLib = {
           testcases: testcases_transformationOnly,
         },
         {
+          testname: "aggregate_$group_$doingMerge",
+          command: {
+              aggregate: "foo",
+              pipeline: [{$group: {_id: "$bar", avg: {$avg: "$b"}, $doingMerge: true}}],
+              cursor: {},
+          },
+          testcases: [
+            {
+                runOnDb: firstDbName,
+                privileges: [{resource: {db: firstDbName, collection: "foo"}, actions: ["find"]}],
+                expectAuthzFailure: true,
+            },
+            {
+              runOnDb: firstDbName,
+              roles: { __system: 1 },
+              expectFailure: true,
+            }
+          ]
+        },
+        {
           testname: "aggregate_$limit",
           command: {
               aggregate: "foo",

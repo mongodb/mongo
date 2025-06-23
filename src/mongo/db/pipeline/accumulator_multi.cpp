@@ -101,7 +101,7 @@ void AccumulatorN::processInternal(const Value& input, bool merging) {
     tassert(5787802, "'n' must be initialized", _n);
 
     if (merging) {
-        tassert(5787803, "input must be an array when 'merging' is true", input.isArray());
+        assertMergingInputType(input, Array);
         const auto& array = input.getArray();
         for (auto&& val : array) {
             _processValue(val);
@@ -690,14 +690,14 @@ void AccumulatorTopBottomN<sense, single>::processInternal(const Value& input, b
             // shard because we may need to spill to disk.
             auto doc = input.getDocument();
             auto vals = doc[kFieldNameOutput];
-            tassert(5872600, "Expected 'output' field to contain an array", vals.isArray());
+            assertMergingInputType(vals, Array);
             for (auto&& val : vals.getArray()) {
                 _processValue(val);
             }
         } else {
-            tasserted(5872602,
-                      "argument to top/bottom processInternal must be an array or an "
-                      "object when merging");
+            uasserted(ErrorCodes::TypeMismatch,
+                      "argument to top/bottom processInternal must be an array or an object when "
+                      "merging");
         }
     } else {
         _processValue(input);

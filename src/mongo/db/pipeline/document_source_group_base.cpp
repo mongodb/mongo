@@ -315,6 +315,13 @@ void DocumentSourceGroupBase::initializeFromBson(BSONElement elem) {
             _groupProcessor.setIdExpression(parseIdExpression(pExpCtx, groupField, vps));
             invariant(!idExpressions.empty());
         } else if (pFieldName == "$doingMerge") {
+            uassert(ErrorCodes::Unauthorized,
+                    "Setting '$doingMerge' is not allowed in user requests",
+                    AuthorizationSession::get(pExpCtx->opCtx->getClient())
+                        ->isAuthorizedForPrivilege(
+                            Privilege(ResourcePattern::forClusterResource(boost::none),
+                                      ActionSet{ActionType::internal})));
+
             massert(17030, "$doingMerge should be true if present", groupField.Bool());
 
             _groupProcessor.setDoingMerge(true);
