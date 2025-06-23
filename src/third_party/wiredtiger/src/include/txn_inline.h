@@ -1671,13 +1671,75 @@ __txn_clear_bytes_dirty(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __txn_remove_from_global_table --
+ *     Remove the transaction id from the global transaction table.
+ */
+static WT_INLINE void
+__txn_remove_from_global_table(WT_SESSION_IMPL *session)
+{
+#ifdef HAVE_DIAGNOSTIC
+    WT_TXN *txn;
+    WT_TXN_GLOBAL *txn_global;
+    WT_TXN_SHARED *txn_shared;
+
+    txn = session->txn;
+    txn_global = &S2C(session)->txn_global;
+    txn_shared = WT_SESSION_TXN_SHARED(session);
+
+    WT_ASSERT(session, txn->id >= __wt_atomic_loadv64(&txn_global->last_running));
+    WT_ASSERT(
+      session, txn->id != WT_TXN_NONE && __wt_atomic_loadv64(&txn_shared->id) != WT_TXN_NONE);
+#else
+    WT_TXN_SHARED *txn_shared;
+
+    txn_shared = WT_SESSION_TXN_SHARED(session);
+#endif
+    WT_RELEASE_WRITE_WITH_BARRIER(txn_shared->id, WT_TXN_NONE);
+}
+
+/*
+ * __wt_txn_claim_prepared_txn --
+ *     Claim a prepared transaction.
+ */
+static WT_INLINE int
+__wt_txn_claim_prepared_txn(WT_SESSION_IMPL *session, wt_timestamp_t prepared_transaction_id)
+{
+    WT_SESSION_IMPL *prepared_session;
+    WT_TXN *tmp;
+
+    WT_RET(__wt_prepared_discover_find_or_create_transaction(
+      session, prepared_transaction_id, &prepared_session));
+
+    WT_ASSERT(prepared_session, F_ISSET(prepared_session->txn, WT_TXN_PREPARE));
+
+    /* Release our snapshot in case it is keeping data pinned. */
+    __wt_txn_release_snapshot(prepared_session);
+
+    /*
+     * Clear the transaction's ID from the global table, to facilitate prepared data visibility, but
+     * not from local transaction structure.
+     */
+    if (F_ISSET(prepared_session->txn, WT_TXN_HAS_ID))
+        __txn_remove_from_global_table(prepared_session);
+
+    /* Exchange transactions */
+    tmp = session->txn;
+    session->txn = prepared_session->txn;
+    prepared_session->txn = tmp;
+
+    return (0);
+}
+
+/*
  * __wt_txn_begin --
  *     Begin a transaction.
  */
 static WT_INLINE int
 __wt_txn_begin(WT_SESSION_IMPL *session, WT_CONF *conf)
 {
+    WT_CONFIG_ITEM cval;
     WT_TXN *txn;
+    wt_timestamp_t prepared_transaction_id;
 
     txn = session->txn;
     txn->isolation = session->isolation;
@@ -1689,6 +1751,16 @@ __wt_txn_begin(WT_SESSION_IMPL *session, WT_CONF *conf)
     WT_ASSERT(session, !F_ISSET(txn, WT_TXN_RUNNING));
 
     WT_RET(__wt_txn_config(session, conf));
+
+    if (conf != NULL) {
+        WT_RET(__wt_conf_gets_def(session, conf, claim_prepared_id, 0, &cval));
+        if (cval.len != 0) {
+            WT_RET(__wt_txn_parse_timestamp(
+              session, "prepared_transaction_id", &prepared_transaction_id, &cval));
+            WT_RET(__wt_txn_claim_prepared_txn(session, prepared_transaction_id));
+            return (0);
+        }
+    }
 
     /*
      * Allocate a snapshot if required or update the existing snapshot. Do not update the existing

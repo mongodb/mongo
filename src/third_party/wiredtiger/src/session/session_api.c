@@ -706,6 +706,11 @@ __session_open_cursor_int(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *
             WT_RET(__wt_curbackup_open(session, uri, other, cfg, cursorp));
         }
         break;
+    case 'p':
+        if (WT_PREFIX_MATCH(uri, "prepared_discover:")) {
+            WT_RET(__wt_cursor_prepared_discover_open(session, uri, other, cfg, cursorp));
+        }
+        break;
     case 's':
         if (WT_PREFIX_MATCH(uri, "statistics:")) {
             WT_ASSERT(session, other == NULL);

@@ -330,8 +330,13 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
      * Ignore reads of pages already known to be in cache, otherwise the eviction server can
      * dominate these statistics.
      */
-    if (!LF_ISSET(WT_READ_CACHE))
+    if (!LF_ISSET(WT_READ_CACHE)) {
         WT_STAT_CONN_DSRC_INCR(session, cache_pages_requested);
+        if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
+            WT_STAT_CONN_DSRC_INCR(session, cache_pages_requested_internal);
+        else
+            WT_STAT_CONN_DSRC_INCR(session, cache_pages_requested_leaf);
+    }
 
     if (LF_ISSET(WT_READ_PREFETCH))
         WT_STAT_CONN_INCR(session, cache_pages_prefetch);

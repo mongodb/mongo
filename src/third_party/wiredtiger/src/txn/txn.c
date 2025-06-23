@@ -62,33 +62,6 @@ __snapsort(uint64_t *array, uint32_t size)
 }
 
 /*
- * __txn_remove_from_global_table --
- *     Remove the transaction id from the global transaction table.
- */
-static WT_INLINE void
-__txn_remove_from_global_table(WT_SESSION_IMPL *session)
-{
-#ifdef HAVE_DIAGNOSTIC
-    WT_TXN *txn;
-    WT_TXN_GLOBAL *txn_global;
-    WT_TXN_SHARED *txn_shared;
-
-    txn = session->txn;
-    txn_global = &S2C(session)->txn_global;
-    txn_shared = WT_SESSION_TXN_SHARED(session);
-
-    WT_ASSERT(session, txn->id >= __wt_atomic_loadv64(&txn_global->last_running));
-    WT_ASSERT(
-      session, txn->id != WT_TXN_NONE && __wt_atomic_loadv64(&txn_shared->id) != WT_TXN_NONE);
-#else
-    WT_TXN_SHARED *txn_shared;
-
-    txn_shared = WT_SESSION_TXN_SHARED(session);
-#endif
-    WT_RELEASE_WRITE_WITH_BARRIER(txn_shared->id, WT_TXN_NONE);
-}
-
-/*
  * __txn_sort_snapshot --
  *     Sort a snapshot for faster searching and set the min/max bounds.
  */
@@ -2194,6 +2167,11 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
         /* Metadata updates should never be rolled back. */
         WT_ASSERT(session, !WT_IS_METADATA(op->btree->dhandle));
         if (WT_IS_METADATA(op->btree->dhandle))
+            continue;
+
+        /* If this is a rollback during shutdown, prepared transaction work should not be a undone
+         */
+        if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING) && prepare)
             continue;
 
         switch (op->type) {

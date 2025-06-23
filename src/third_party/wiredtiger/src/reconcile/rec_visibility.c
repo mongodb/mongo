@@ -556,6 +556,7 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *first_up
     WT_UPDATE *upd;
     wt_timestamp_t max_ts;
     uint64_t max_txn, session_txnid, txnid;
+    uint8_t prepare_state;
     bool is_hs_page, seen_prepare;
 
     max_ts = WT_TS_NONE;
@@ -619,13 +620,44 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *first_up
             continue;
         }
 
-        /* Ignore prepared updates if it is checkpoint. */
-        if (upd->prepare_state == WT_PREPARE_LOCKED ||
-          upd->prepare_state == WT_PREPARE_INPROGRESS) {
+        /*
+         * Only checkpoint should ever encounter resolving prepared transactions. If it does, then
+         * it needs to wait to see whether they should be included or not.
+         */
+        WT_READ_ONCE(prepare_state, upd->prepare_state);
+        while (prepare_state == WT_PREPARE_LOCKED) {
+            WT_ASSERT_ALWAYS(session, F_ISSET(r, WT_REC_CHECKPOINT),
+              "Eviction should never occur on a page that has resolving prepared records.");
+            /*
+             * FIXME: WT-14826. This while loop can be removed if we start to use the new prepared
+             * timestamp field.
+             */
+            __wt_sleep(0, 100);
+            WT_READ_ONCE(prepare_state, upd->prepare_state);
+        }
+
+        /*
+         * An interesting case this code will need to deal with is the case where a prepare (start)
+         * timestamp is old enough that it should be included in a checkpoint, but the commit
+         * timestamp is new enough that it should be excluded. If non-precise checkpoints are
+         * configured, the full record can be included and rollback-to-stable will fix up content on
+         * recovery (it will need to be able to do that for out-front evictions anyway). For precise
+         * checkpoints the reconciliation code will need to write a record as it was before it was
+         * committed, and also leave the page/update in a state that makes sense (i.e: we might need
+         * a new flag like WT_UPDATE_DS, but indicating that it's partially in the datastore).
+         * Question: does this become tricky if a prepare makes multiple changes to the same key?
+         */
+        if (prepare_state == WT_PREPARE_INPROGRESS) {
             WT_ASSERT_ALWAYS(session,
               upd_select->upd == NULL || upd_select->upd->txnid == upd->txnid,
               "Cannot have two different prepared transactions active on the same key");
-            if (F_ISSET(r, WT_REC_CHECKPOINT)) {
+            /*
+             * Don't save the record if it's prepare time is greater than the checkpoint timestamp
+             * when preserve prepared is enabled.
+             */
+            if (F_ISSET(r, WT_REC_CHECKPOINT) &&
+              (!S2C(session)->preserve_prepared ||
+                upd->start_ts > S2C(session)->txn_global.checkpoint_timestamp)) {
                 *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
                 *has_newer_updatesp = true;
                 seen_prepare = true;
@@ -639,7 +671,7 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *first_up
                  * back to the data store later. Otherwise, it removes the key.
                  */
                 WT_ASSERT_ALWAYS(session,
-                  F_ISSET(r, WT_REC_EVICT) ||
+                  F_ISSET(r, WT_REC_CHECKPOINT) || F_ISSET(r, WT_REC_EVICT) ||
                     (F_ISSET(r, WT_REC_VISIBILITY_ERR) &&
                       F_ISSET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS)),
                   "Should never salvage a prepared update not from disk.");

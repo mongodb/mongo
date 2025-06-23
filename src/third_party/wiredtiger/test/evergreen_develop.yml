@@ -7,7 +7,7 @@ variables:
 # Template for perf-tasks
 - &perf-tasks-template
   batchtime: 1440 # 1 day
-  expansions: &ubuntu2004-perf-tests-expansions-template
+  expansions: &perf-tests-expansions-template
     additional_env_vars: export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$WT_BUILDDIR/test/utility/"
     ENABLE_TCMALLOC: 1
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=Release
@@ -39,7 +39,7 @@ buildvariants:
   run_on:
     - ubuntu2004-perf-testing
   expansions:
-    <<: *ubuntu2004-perf-tests-expansions-template
+    <<: *perf-tests-expansions-template
     collection: AllPerfTests
 
 - <<: *perf-tasks-template
@@ -48,17 +48,17 @@ buildvariants:
   run_on:
    - amazon2023-arm64-large-m8g-wt
   expansions:
-    <<: *ubuntu2004-perf-tests-expansions-template
+    <<: *perf-tests-expansions-template
     collection: AllPerfTestsARM64_v9
 
 - <<: *perf-tasks-template
-  name: ubuntu2004-perf-tests-arm64-only
-  display_name: ~ Ubuntu 20.04 Performance tests (ARM64 only)
+  name: amazon2023-perf-tests-arm64-only
+  display_name: (ARMV9) Amazon Linux 2023 Performance tests (ARM64 only)
   run_on:
-    - ubuntu2004-arm64-perf-testing
+    - amazon2023-arm64-large-m8g-wt
   expansions:
-    <<: *ubuntu2004-perf-tests-expansions-template
-    collection: AllPerfTestsARM64
+    <<: *perf-tests-expansions-template
+    collection: AllPerfTestsARM64_v9
   tasks:
     - name: compile
     - ".cppsuite-perf-test-arm"
