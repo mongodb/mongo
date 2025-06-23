@@ -80,7 +80,10 @@ TEST(SystemTickSourceTest, GetTicks) {
     // sleep longer than the duration specified with high margin of error.
     const static double kMaxError = 5.0;
 #else
-    const static double kMaxError = 0.1;
+    // Even if sleep is strict, there's no guarantee the scheduler will
+    // immediately schedule your process when it's done sleeping. We
+    // need to allow for that in the upper bound.
+    const static double kMaxError = 0.3;
 #endif
     // Because sleep_for guarantees blocking for at least sleep duration, the error lower
     // bound only needs to account for the potential time difference between the intervals
