@@ -7,6 +7,8 @@ build_variant_large_distro_exceptions:
   - enterprise-amazon2023
   # TODO(SERVER-85904) - enterprise-amazon2023-lto
   - enterprise-amazon2023-arm64
+  - enterprise-amazon2023-arm64-fuzzers
+  - enterprise-amazon2023-arm64-fuzzers-roll-back-incremental-feature-flags
   - enterprise-amazon2023-arm64-grav4
   # TODO(SERVER-85904) - enterprise-amazon2023-arm64-lto
   - enterprise-debian12-64
@@ -40,6 +42,7 @@ build_variant_large_distro_exceptions:
   - macos-arm64-oss-llvm-clang
   - macos-debug-suggested
   - rhel8
+  - rhel8-asan
   - rhel8-debug-asan
   - rhel8-debug-asan-all-feature-flags
   - rhel8-debug-asan-classic-engine
