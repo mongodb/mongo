@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/options_parser/environment.h"
 
 #include <cstddef>
@@ -75,6 +76,8 @@ public:
     std::string indexConfig;
 
     static Status validateWiredTigerCompressor(const std::string&);
+    static Status validateSpillWiredTigerCompressor(const std::string&,
+                                                    const boost::optional<TenantId>&);
     static Status validateWiredTigerLiveRestoreReadSizeMB(int);
 
 

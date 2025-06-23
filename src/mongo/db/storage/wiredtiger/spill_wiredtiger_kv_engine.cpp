@@ -130,11 +130,11 @@ std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::makeTemporaryRecordStore(
     RecoveryUnit& ru, StringData ident, KeyFormat keyFormat) {
     WiredTigerSession session(_connection.get());
 
-    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
-        getWiredTigerTableConfigFromStartupOptions(true /* usingSpillWiredTigerKVEngine */);
+    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
     wtTableConfig.keyFormat = keyFormat;
     // We don't log writes to spill tables.
     wtTableConfig.logEnabled = false;
+    wtTableConfig.blockCompressor = gSpillWiredTigerBlockCompressor;
     wtTableConfig.extraCreateOptions = _rsOptions;
     std::string config =
         WiredTigerRecordStore::generateCreateString({} /* internal table */, wtTableConfig);

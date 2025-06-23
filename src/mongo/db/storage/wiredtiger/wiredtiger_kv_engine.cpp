@@ -1562,9 +1562,9 @@ Status WiredTigerKVEngine::_createRecordStore(const NamespaceString& nss,
                                               boost::optional<std::string> customBlockCompressor) {
     WiredTigerSession session(_connection.get());
 
-    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
-        getWiredTigerTableConfigFromStartupOptions();
+    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
     wtTableConfig.keyFormat = keyFormat;
+    wtTableConfig.blockCompressor = wiredTigerGlobalOptions.collectionBlockCompressor;
     wtTableConfig.extraCreateOptions = _rsOptions;
     wtTableConfig.logEnabled =
         WiredTigerUtil::useTableLogging(nss, _isReplSet, _shouldRecoverFromOplogAsStandalone);
@@ -1897,9 +1897,9 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Recove
                                                                           KeyFormat keyFormat) {
     WiredTigerSession session(_connection.get());
 
-    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
-        getWiredTigerTableConfigFromStartupOptions();
+    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
     wtTableConfig.keyFormat = keyFormat;
+    wtTableConfig.blockCompressor = wiredTigerGlobalOptions.collectionBlockCompressor;
     // We don't log writes to temporary record stores.
     wtTableConfig.logEnabled = false;
     wtTableConfig.extraCreateOptions = _rsOptions;
@@ -3219,7 +3219,6 @@ WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
     wtConfig.liveRestoreThreadsMax = wiredTigerGlobalOptions.liveRestoreThreads;
     wtConfig.liveRestoreReadSizeMB = wiredTigerGlobalOptions.liveRestoreReadSizeMB;
     wtConfig.statisticsLogWaitSecs = wiredTigerGlobalOptions.statisticsLogDelaySecs;
-    wtConfig.zstdCompressorLevel = wiredTigerGlobalOptions.zstdCompressorLevel;
 
     if (!usingSpillWiredTigerKVEngine) {
         // Config fuzzer tests fail for SpillWiredTigerKVEngine due to eviction thresholds being
@@ -3238,14 +3237,6 @@ WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
     }
 
     return wtConfig;
-}
-
-WiredTigerRecordStore::WiredTigerTableConfig getWiredTigerTableConfigFromStartupOptions(
-    bool usingSpillWiredTigerKVEngine) {
-    // TODO(SERVER-103279): Optimally configure SpillWiredTigerRecordStore.
-    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
-    wtTableConfig.blockCompressor = wiredTigerGlobalOptions.collectionBlockCompressor;
-    return wtTableConfig;
 }
 
 }  // namespace mongo

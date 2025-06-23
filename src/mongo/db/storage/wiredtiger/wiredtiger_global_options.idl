@@ -347,6 +347,31 @@ server_parameters:
             lte: 100
         redact: false
 
+    spillWiredTigerBlockCompressor:
+        description: >-
+            The block compressor [none|snappy|zlib|zstd] to use data written by the spill WiredTiger
+            instance.
+        set_at: startup
+        cpp_vartype: std::string
+        cpp_varname: gSpillWiredTigerBlockCompressor
+        default: "zstd"
+        validator:
+            callback: WiredTigerGlobalOptions::validateSpillWiredTigerCompressor
+        redact: false
+
+    spillWiredTigerZstdCompressionLevel:
+        description: >-
+            The zstd compression level to use for the spill WiredTiger instance. Has no effect if
+            spillWiredTigerBlockCompressor is not set to zstd.
+        set_at: startup
+        cpp_vartype: int32_t
+        cpp_varname: gSpillWiredTigerZstdCompressionLevel
+        default: 3
+        validator:
+            gte: -7
+            lte: 22
+        redact: false
+
     enableTemporarilyUnavailableExceptions:
         description:
             "Enables the use of TemporarilyUnavailableExceptions. When disabled, reverts to

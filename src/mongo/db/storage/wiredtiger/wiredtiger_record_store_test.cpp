@@ -43,6 +43,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
@@ -632,9 +633,9 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     const std::string ns = "testRecordStore";
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
     const std::string uri = WiredTigerUtil::kTableUriPrefix + ns;
-    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
-        getWiredTigerTableConfigFromStartupOptions();
+    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
     wtTableConfig.keyFormat = KeyFormat::String;
+    wtTableConfig.blockCompressor = wiredTigerGlobalOptions.collectionBlockCompressor;
     bool isReplSet = false;
     bool shouldRecoverFromOplogAsStandalone = false;
     wtTableConfig.logEnabled =
@@ -823,8 +824,8 @@ TEST(WiredTigerRecordStoreTest, EnforceTableCreateExclusiveSameConfiguration) {
     const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("testRecordStore");
-    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
-        getWiredTigerTableConfigFromStartupOptions();
+    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
+    wtTableConfig.blockCompressor = wiredTigerGlobalOptions.collectionBlockCompressor;
     const auto config =
         WiredTigerRecordStore::generateCreateString(nss.toString_forTest(), wtTableConfig);
     const std::string ident = "uniqueIdentifierForTableFile";
@@ -849,8 +850,8 @@ TEST(WiredTigerRecordStoreTest, EnforceTableCreateExclusiveDifferentConfiguratio
     const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("testRecordStore");
-    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
-        getWiredTigerTableConfigFromStartupOptions();
+    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
+    wtTableConfig.blockCompressor = wiredTigerGlobalOptions.collectionBlockCompressor;
     const std::string config =
         WiredTigerRecordStore::generateCreateString(nss.toString_forTest(), wtTableConfig);
     const std::string ident = "uniqueIdentifierForTableFile";

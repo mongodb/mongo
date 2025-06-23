@@ -85,6 +85,11 @@ Status WiredTigerGlobalOptions::validateWiredTigerCompressor(const std::string& 
     return Status::OK();
 }
 
+Status WiredTigerGlobalOptions::validateSpillWiredTigerCompressor(
+    const std::string& value, const boost::optional<TenantId>&) {
+    return validateWiredTigerCompressor(value);
+}
+
 Status WiredTigerGlobalOptions::validateWiredTigerLiveRestoreReadSizeMB(const int value) {
     if (value < 1) {
         return {ErrorCodes::BadValue,

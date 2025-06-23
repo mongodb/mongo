@@ -147,6 +147,7 @@ public:
         if (params.inMemory) {
             wtConfig.logEnabled = false;
         }
+        wtConfig.zstdCompressorLevel = wiredTigerGlobalOptions.zstdCompressorLevel;
         auto kv = std::make_unique<WiredTigerKVEngine>(
             std::string{getCanonicalName()},
             params.dbpath,
@@ -181,6 +182,7 @@ public:
             wtConfig.logEnabled = false;
             wtConfig.prefetchEnabled = false;
             wtConfig.restoreEnabled = false;
+            wtConfig.zstdCompressorLevel = gSpillWiredTigerZstdCompressionLevel;
             spillWiredTigerKVEngine = std::make_unique<SpillWiredTigerKVEngine>(
                 std::string{getCanonicalName()},
                 params.getSpillDbPath(),
