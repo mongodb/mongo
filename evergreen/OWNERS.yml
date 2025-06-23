@@ -27,3 +27,6 @@ filters:
   - "packager_crypt_py_run.sh":
     approvers:
       - 10gen/devprod-build
+  - "perf-submission.sh":
+    approvers:
+      - 10gen/devprod-performance-analysis

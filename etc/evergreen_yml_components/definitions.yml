@@ -723,14 +723,24 @@ functions:
     - *upload_network_diagnostics
 
   "send benchmark results": &send_benchmark_results
-    command: perf.send
+    command: subprocess.exec
     display_name: "send benchmark results"
     params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      bucket: mciuploads
-      prefix: ${task_id}_${execution}
-      file: src/cedar_report.json
+      binary: bash
+      args:
+        - "./src/evergreen/perf-submission.sh"
+      include_expansions_in_env:
+        - requester
+        - revision_order_id
+        - project_id
+        - version_id
+        - build_variant
+        - parsed_order_id
+        - task_name
+        - task_id
+        - execution
+        - is_mainline
+    type: test
 
   "cleanup environment": &cleanup_environment
     command: subprocess.exec
