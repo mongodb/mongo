@@ -71,9 +71,9 @@ if env.TargetOSIs('windows'):
         CFLAGS=["/wd4090"],  # Ignore warning about mismatched const qualifiers
     )
 
-    if env['MONGO_ALLOCATOR'] in ['tcmalloc-gperftools']:
+    if env['MONGO_ALLOCATOR'] in ['tcmalloc-gperf']:
         env.InjectThirdParty(libraries=['gperftools'])
-        env.Append(CPPDEFINES=['HAVE_LIBTCMALLOC'])
+        env.Append(CPPDEFINES=['HAVE_LIBTCMALLOC', 'ENABLE_WINDOWS_TCMALLOC_COMMUNITY_SUPPORT'])
 
     if env['MONGO_ALLOCATOR'] in ['tcmalloc-google']:
         env.InjectThirdParty(libraries=['tcmalloc'])
