@@ -38,6 +38,8 @@ namespace resharding {
 
 class DaoStorageClient {
 public:
+    virtual ~DaoStorageClient() = default;
+
     virtual void alterState(OperationContext* opCtx, const BatchedCommandRequest& request) = 0;
     virtual ReshardingCoordinatorDocument readState(OperationContext* opCtx,
                                                     const UUID& reshardingUUID) = 0;

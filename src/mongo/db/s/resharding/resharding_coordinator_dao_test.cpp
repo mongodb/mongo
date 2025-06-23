@@ -64,154 +64,143 @@ private:
     ReshardingCoordinatorDocument _state;
 };
 
-TEST(ReshardingCoordinatorDaoTest, TransitionToCloningPhase) {
-    ClockSourceMock clock;
-    SpyingDaoStorageClient updater;
-    updater.getOnDiskStateForModification().setState(CoordinatorStateEnum::kPreparingToDonate);
-    ReshardingCoordinatorDao dao;
-    OperationContext* opCtx = nullptr;
+class ReshardingCoordinatorDaoFixture : public unittest::Test {
+protected:
+    void runPhaseTransition(CoordinatorStateEnum initialPhase,
+                            std::function<void()> transitionToNextPhase) {
+        _client->getOnDiskStateForModification().setState(initialPhase);
+        transitionToNextPhase();
+    }
 
-    auto uuid = UUID::gen();
-    auto cloneTimestamp = Timestamp(10, 50);
+    UUID _uuid{UUID::gen()};
+    OperationContext* _opCtx = nullptr;
+    std::unique_ptr<ClockSourceMock> _clock = std::make_unique<ClockSourceMock>();
+    std::unique_ptr<SpyingDaoStorageClient> _client = std::make_unique<SpyingDaoStorageClient>();
+    std::unique_ptr<ReshardingCoordinatorDao> _dao = std::make_unique<ReshardingCoordinatorDao>();
+};
 
+TEST_F(ReshardingCoordinatorDaoFixture, GetPhase) {
+    _client->getOnDiskStateForModification().setState(CoordinatorStateEnum::kCloning);
+    auto phase = _dao->getPhase(_opCtx, _client.get(), _uuid);
+    ASSERT_EQUALS(phase, CoordinatorStateEnum::kCloning);
+
+    // Test with a different phase.
+    _client->getOnDiskStateForModification().setState(CoordinatorStateEnum::kApplying);
+    phase = _dao->getPhase(_opCtx, _client.get(), _uuid);
+    ASSERT_EQUALS(phase, CoordinatorStateEnum::kApplying);
+}
+
+TEST_F(ReshardingCoordinatorDaoFixture, TransitionToCloningPhaseSucceeds) {
+    auto bytesToCopy = 100;
+    auto documentsToCopy = 5;
     ReshardingApproxCopySize approxCopySize;
-    approxCopySize.setApproxBytesToCopy(100);
-    approxCopySize.setApproxDocumentsToCopy(5);
+    approxCopySize.setApproxBytesToCopy(bytesToCopy);
+    approxCopySize.setApproxDocumentsToCopy(documentsToCopy);
 
-    auto cloneStartTime = clock.now();
-    dao.transitionToCloningPhase(
-        opCtx, &updater, cloneStartTime, cloneTimestamp, approxCopySize, uuid);
-    const auto& lastRequest = updater.getLastRequest();
+    Timestamp cloneTimestamp(10, 50);
+    auto cloneStartTime = _clock->now();
 
-    auto expectedUpdates = BSON_ARRAY(BSON(
-        "q" << BSON("_id" << uuid) << "u"
-            << BSON("$set" << BSON("state" << "cloning"
-                                           << "cloneTimestamp" << cloneTimestamp
-                                           << "approxBytesToCopy" << 100 << "approxDocumentsToCopy"
-                                           << 5 << "metrics.documentCopy.start" << cloneStartTime))
-            << "multi" << false << "upsert" << false));
+    runPhaseTransition(CoordinatorStateEnum::kPreparingToDonate, [&]() {
+        _dao->transitionToCloningPhase(
+            _opCtx, _client.get(), cloneStartTime, cloneTimestamp, approxCopySize, _uuid);
+    });
 
+    auto expectedUpdates = BSON_ARRAY(
+        BSON("q" << BSON("_id" << _uuid) << "u"
+                 << BSON("$set" << BSON("state" << "cloning"
+                                                << "cloneTimestamp" << cloneTimestamp
+                                                << "approxBytesToCopy" << bytesToCopy
+                                                << "approxDocumentsToCopy" << documentsToCopy
+                                                << "metrics.documentCopy.start" << cloneStartTime))
+                 << "multi" << false << "upsert" << false));
+
+    const auto& lastRequest = _client->getLastRequest();
     ASSERT_EQUALS(lastRequest.getStringField("update"),
                   NamespaceString::kConfigReshardingOperationsNamespace.coll());
     auto updates = lastRequest.getObjectField("updates");
     ASSERT_BSONOBJ_EQ(updates, expectedUpdates);
 }
 
-DEATH_TEST(ReshardingCoordinatorDaoTest,
-           TransitionToCloningPhasePreviousStateInvariant,
-           "invariant") {
-    ClockSourceMock clock;
-    SpyingDaoStorageClient updater;
-    updater.getOnDiskStateForModification().setState(CoordinatorStateEnum::kCloning);
-    ReshardingCoordinatorDao dao;
-    OperationContext* opCtx = nullptr;
-
-    auto uuid = UUID::gen();
-    auto cloneTimestamp = Timestamp(10, 50);
-
+DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
+             TransitionToCloningFailsFromInvalidPreviousPhase,
+             "invariant") {
     ReshardingApproxCopySize approxCopySize;
     approxCopySize.setApproxBytesToCopy(100);
     approxCopySize.setApproxDocumentsToCopy(5);
 
-    auto cloneStartTime = clock.now();
-    dao.transitionToCloningPhase(
-        opCtx, &updater, cloneStartTime, cloneTimestamp, approxCopySize, uuid);
+    Timestamp cloneTimestamp(10, 50);
+    auto cloneStartTime = _clock->now();
+
+    runPhaseTransition(CoordinatorStateEnum::kCloning, [&]() {
+        _dao->transitionToCloningPhase(
+            _opCtx, _client.get(), cloneStartTime, cloneTimestamp, approxCopySize, _uuid);
+    });
 }
 
-TEST(ReshardingCoordinatorDaoTest, TransitionToApplyingPhase) {
-    ClockSourceMock clock;
-    SpyingDaoStorageClient updater;
-    updater.getOnDiskStateForModification().setState(CoordinatorStateEnum::kCloning);
-    ReshardingCoordinatorDao dao;
-    OperationContext* opCtx = nullptr;
+TEST_F(ReshardingCoordinatorDaoFixture, TransitionToApplyingPhaseSucceeds) {
+    auto applyStartTime = _clock->now();
 
-    auto uuid = UUID::gen();
-    auto applyStartTime = clock.now();
-    dao.transitionToApplyingPhase(opCtx, &updater, applyStartTime, uuid);
-    const auto& lastRequest = updater.getLastRequest();
+    runPhaseTransition(CoordinatorStateEnum::kCloning, [&]() {
+        _dao->transitionToApplyingPhase(_opCtx, _client.get(), applyStartTime, _uuid);
+    });
 
     auto expectedUpdates = BSON_ARRAY(BSON(
-        "q" << BSON("_id" << uuid) << "u"
+        "q" << BSON("_id" << _uuid) << "u"
             << BSON("$set" << BSON("state" << "applying"
                                            << "metrics.documentCopy.stop" << applyStartTime
                                            << "metrics.oplogApplication.start" << applyStartTime))
             << "multi" << false << "upsert" << false));
 
+    const auto& lastRequest = _client->getLastRequest();
     ASSERT_EQUALS(lastRequest.getStringField("update"),
                   NamespaceString::kConfigReshardingOperationsNamespace.coll());
     auto updates = lastRequest.getObjectField("updates");
     ASSERT_BSONOBJ_EQ(updates, expectedUpdates);
 }
 
-DEATH_TEST(ReshardingCoordinatorDaoTest,
-           TransitionToApplyingPhasePreviousStateInvariant,
-           "invariant") {
-    ClockSourceMock clock;
-    SpyingDaoStorageClient updater;
-    updater.getOnDiskStateForModification().setState(CoordinatorStateEnum::kApplying);
-    ReshardingCoordinatorDao dao;
-    OperationContext* opCtx = nullptr;
+DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
+             TransitionToApplyingFailsFromInvalidPreviousPhase,
+             "invariant") {
+    auto applyStartTime = _clock->now();
 
-    auto uuid = UUID::gen();
-    auto applyStartTime = clock.now();
-    dao.transitionToApplyingPhase(opCtx, &updater, applyStartTime, uuid);
+    runPhaseTransition(CoordinatorStateEnum::kApplying, [&]() {
+        _dao->transitionToApplyingPhase(_opCtx, _client.get(), applyStartTime, _uuid);
+    });
 }
 
-
-TEST(ReshardingCoordinatorDaoTest, GetPhase) {
-    SpyingDaoStorageClient client;
-    client.getOnDiskStateForModification().setState(CoordinatorStateEnum::kCloning);
-    ReshardingCoordinatorDao dao;
-    OperationContext* opCtx = nullptr;
-    auto uuid = UUID::gen();
-    auto phase = dao.getPhase(opCtx, &client, uuid);
-    ASSERT_EQUALS(phase, CoordinatorStateEnum::kCloning);
-
-    // Test with a different phase.
-    client.getOnDiskStateForModification().setState(CoordinatorStateEnum::kApplying);
-    phase = dao.getPhase(opCtx, &client, uuid);
-    ASSERT_EQUALS(phase, CoordinatorStateEnum::kApplying);
-}
-
-TEST(ReshardingCoordinatorDaoTest, TransitionToBlockingWritesPhase) {
-    ClockSourceMock clock;
-    SpyingDaoStorageClient updater;
-    updater.getOnDiskStateForModification().setState(CoordinatorStateEnum::kApplying);
-    ReshardingCoordinatorDao dao;
-    OperationContext* opCtx = nullptr;
-
-    auto uuid = UUID::gen();
-    auto now = clock.now();
+TEST_F(ReshardingCoordinatorDaoFixture, TransitionToBlockingWritesPhaseSucceeds) {
+    auto now = _clock->now();
     auto criticalSectionExpiresAt = now + Seconds(5);
-    dao.transitionToBlockingWritesPhase(opCtx, &updater, now, criticalSectionExpiresAt, uuid);
-    const auto& lastRequest = updater.getLastRequest();
+
+    runPhaseTransition(CoordinatorStateEnum::kApplying, [&]() {
+        _dao->transitionToBlockingWritesPhase(
+            _opCtx, _client.get(), now, criticalSectionExpiresAt, _uuid);
+    });
 
     auto expectedUpdates = BSON_ARRAY(BSON(
-        "q" << BSON("_id" << uuid) << "u"
+        "q" << BSON("_id" << _uuid) << "u"
             << BSON("$set" << BSON("state" << "blocking-writes"
                                            << "criticalSectionExpiresAt" << criticalSectionExpiresAt
                                            << "metrics.oplogApplication.stop" << now))
             << "multi" << false << "upsert" << false));
 
+    const auto& lastRequest = _client->getLastRequest();
     ASSERT_EQUALS(lastRequest.getStringField("update"),
                   NamespaceString::kConfigReshardingOperationsNamespace.coll());
     auto updates = lastRequest.getObjectField("updates");
     ASSERT_BSONOBJ_EQ_UNORDERED(updates, expectedUpdates);
 }
 
-DEATH_TEST(ReshardingCoordinatorDaoTest,
-           TransitionToBlockingWritesPhasePreviousStateInvariant,
-           "invariant") {
-    ClockSourceMock clock;
-    SpyingDaoStorageClient updater;
-    updater.getOnDiskStateForModification().setState(CoordinatorStateEnum::kAborting);
-    ReshardingCoordinatorDao dao;
-    OperationContext* opCtx = nullptr;
-
-    auto uuid = UUID::gen();
-    auto now = clock.now();
+DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
+             TransitionToBlockingWritesPhasePreviousStateInvariant,
+             "invariant") {
+    auto now = _clock->now();
     auto criticalSectionExpiresAt = now + Seconds(5);
-    dao.transitionToBlockingWritesPhase(opCtx, &updater, now, criticalSectionExpiresAt, uuid);
+
+    runPhaseTransition(CoordinatorStateEnum::kAborting, [&]() {
+        _dao->transitionToBlockingWritesPhase(
+            _opCtx, _client.get(), now, criticalSectionExpiresAt, _uuid);
+    });
 }
 
 }  // namespace resharding
