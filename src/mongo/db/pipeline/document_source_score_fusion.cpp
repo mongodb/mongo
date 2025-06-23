@@ -423,9 +423,8 @@ static void scoreFusionPipelineValidator(const Pipeline& pipeline) {
  * { "$group": { "_id": "$docs._id", "docs": { "$first": "$docs" },
  * "name1_score": { "$max": {"$ifNull": [ "$name1_score", 0 ] } } } }
  */
-BSONObj groupEachScore(
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& pipelines,
-    const bool includeScoreDetails) {
+BSONObj groupEachScore(const std::vector<std::string>& pipelineNames,
+                       const bool includeScoreDetails) {
     // For each sub-pipeline, build the following obj:
     // name_score: {$max: {ifNull: ["$name_score", 0]}}
     // If scoreDetails is enabled, build:
@@ -437,8 +436,7 @@ BSONObj groupEachScore(
         groupBob.append("_id", "$docs._id");
         groupBob.append("docs", BSON("$first" << "$docs"));
 
-        for (auto pipeline_it = pipelines.begin(); pipeline_it != pipelines.end(); pipeline_it++) {
-            const auto& pipelineName = pipeline_it->first;
+        for (const auto& pipelineName : pipelineNames) {
             const std::string scoreName = getScoreFieldFromPipelineName(pipelineName);
             groupBob.append(
                 scoreName,
@@ -467,7 +465,7 @@ BSONObj groupEachScore(
  */
 boost::intrusive_ptr<DocumentSource> buildSetScoreStage(
     const auto& expCtx,
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputPipelines,
+    const std::vector<std::string>& pipelineNames,
     const ScoreFusionScoringOptions scoreFusionScoringOptions) {
     ScoreFusionCombinationMethodEnum combinationMethod =
         scoreFusionScoringOptions.getCombinationMethod();
@@ -483,11 +481,9 @@ boost::intrusive_ptr<DocumentSource> buildSetScoreStage(
             // Assemble $let.vars field. It is a BSON obj of pipeline names to their corresponding
             // pipeline score field. Ex: {geo_doc: "$geo_doc_score"}.
             BSONObjBuilder varsAndInFields;
-            for (auto pipeline_it = inputPipelines.begin(); pipeline_it != inputPipelines.end();
-                 pipeline_it++) {
-                std::string fieldScoreName =
-                    getScoreFieldFromPipelineName(pipeline_it->first, true);
-                varsAndInFields.appendElements(BSON(pipeline_it->first << fieldScoreName));
+            for (const auto& pipelineName : pipelineNames) {
+                std::string fieldScoreName = getScoreFieldFromPipelineName(pipelineName, true);
+                varsAndInFields.appendElements(BSON(pipelineName << fieldScoreName));
             }
             varsAndInFields.done();
 
@@ -513,10 +509,8 @@ boost::intrusive_ptr<DocumentSource> buildSetScoreStage(
         case ScoreFusionCombinationMethodEnum::kAvg: {
             // Construct an array of the score field path names for AccumulatorAvg.
             BSONArrayBuilder expressionFieldPaths;
-            for (auto pipeline_it = inputPipelines.begin(); pipeline_it != inputPipelines.end();
-                 pipeline_it++) {
-                std::string fieldScoreName =
-                    getScoreFieldFromPipelineName(pipeline_it->first, true);
+            for (const auto& pipelineName : pipelineNames) {
+                std::string fieldScoreName = getScoreFieldFromPipelineName(pipelineName, true);
                 expressionFieldPaths.append(fieldScoreName);
             }
             expressionFieldPaths.done();
@@ -633,14 +627,14 @@ boost::intrusive_ptr<DocumentSource> constructScoreDetailsMetadata(
  * metadata will be set, and then the $sort and $replaceRoot stages will follow.
  */
 std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputPipelines,
+    const std::vector<std::string>& pipelineNames,
     const ScoreFusionScoringOptions metadata,
     const StringMap<double>& weights,
     const bool includeScoreDetails,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto group = DocumentSourceGroup::createFromBson(
-        groupEachScore(inputPipelines, includeScoreDetails).firstElement(), expCtx);
-    auto setScoreMeta = buildSetScoreStage(expCtx, inputPipelines, metadata);
+        groupEachScore(pipelineNames, includeScoreDetails).firstElement(), expCtx);
+    auto setScoreMeta = buildSetScoreStage(expCtx, pipelineNames, metadata);
 
     // Note that the scoreDetails fields go here in the pipeline. We create them below to be
     // able to return them immediately once all stages are generated.
@@ -659,7 +653,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
     if (includeScoreDetails) {
         auto addFieldsScoreDetails =
             hybrid_scoring_util::score_details::constructCalculatedFinalScoreDetails(
-                inputPipelines, weights, false, expCtx);
+                pipelineNames, weights, false, expCtx);
         auto setScoreDetails = constructScoreDetailsMetadata(metadata, expCtx);
         scoreAndMergeStages.splice(scoreAndMergeStages.end(),
                                    {std::move(addFieldsScoreDetails), std::move(setScoreDetails)});
@@ -741,9 +735,16 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
     ScoreFusionNormalizationEnum normalization = spec.getInput().getNormalization();
     const bool includeScoreDetails = spec.getScoreDetails();
     std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
+    // Array to store pipeline names separately because Pipeline objects in the inputPipelines map
+    // will be moved eventually to other structures, rendering inputPipelines unusable. With this
+    // array, we can safely use/pass the pipeline names information without using inputPipelines.
+    // Note that pipeline names are stored in the same order in which pipelines are desugared.
+    std::vector<std::string> pipelineNames;
     for (auto pipeline_it = inputPipelines.begin(); pipeline_it != inputPipelines.end();
          pipeline_it++) {
         const auto& [inputPipelineName, inputPipelineStages] = *pipeline_it;
+
+        pipelineNames.push_back(inputPipelineName);
 
         // Check if an explicit weight for this pipeline has been specified.
         // If not, the default is one.
@@ -783,7 +784,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
     // Average is the default combination method if no other method is specified.
     ScoreFusionScoringOptions scoreFusionScoringOptions(spec);
     auto finalStages = buildScoreAndMergeStages(
-        inputPipelines, scoreFusionScoringOptions, weights, includeScoreDetails, pExpCtx);
+        pipelineNames, scoreFusionScoringOptions, weights, includeScoreDetails, pExpCtx);
     outputStages.splice(outputStages.end(), std::move(finalStages));
     return outputStages;
 }

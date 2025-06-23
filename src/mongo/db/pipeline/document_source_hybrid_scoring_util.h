@@ -144,7 +144,7 @@ std::pair<std::string, BSONObj> constructScoreDetailsForGrouping(std::string pip
     }}
 */
 boost::intrusive_ptr<DocumentSource> constructCalculatedFinalScoreDetails(
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputs,
+    const std::vector<std::string>& pipelineNames,
     const StringMap<double>& weights,
     bool isRankFusion,
     const boost::intrusive_ptr<ExpressionContext>& expCtx);

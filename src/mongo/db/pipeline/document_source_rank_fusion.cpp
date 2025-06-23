@@ -263,9 +263,8 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
     return outputStages;
 }
 
-BSONObj groupEachScore(
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& pipelines,
-    const bool includeScoreDetails) {
+BSONObj groupEachScore(const std::vector<std::string>& pipelineNames,
+                       const bool includeScoreDetails) {
     // For each sub-pipeline, build the following obj:
     // name_score: {$max: {ifNull: ["$name_score", 0]}}
     // If scoreDetails is enabled, build:
@@ -277,8 +276,7 @@ BSONObj groupEachScore(
         groupBob.append("_id", "$docs._id");
         groupBob.append("docs", BSON("$first" << "$docs"));
 
-        for (auto it = pipelines.begin(); it != pipelines.end(); it++) {
-            const auto& pipelineName = it->first;
+        for (const auto& pipelineName : pipelineNames) {
             const std::string scoreName = fmt::format("{}_score", pipelineName);
             groupBob.append(
                 scoreName,
@@ -301,17 +299,16 @@ BSONObj groupEachScore(
     return bob.obj();
 }
 
-BSONObj calculateFinalScore(
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputs) {
+BSONObj calculateFinalScore(const std::vector<std::string>& pipelineNames) {
     // Generate a $add object with an array of all the fields containing a score for a given
     // pipeline.
     const auto& allInputs = [&] {
         BSONObjBuilder addBob;
 
         BSONArrayBuilder addArrBuilder(addBob.subarrayStart("$add"_sd));
-        for (auto it = inputs.begin(); it != inputs.end(); it++) {
+        for (const auto& pipelineName : pipelineNames) {
             StringBuilder sb;
-            sb << "$" << it->first << "_score";
+            sb << "$" << pipelineName << "_score";
             addArrBuilder.append(sb.str());
         }
         addArrBuilder.done();
@@ -321,13 +318,12 @@ BSONObj calculateFinalScore(
 }
 
 boost::intrusive_ptr<DocumentSource> calculateFinalScoreMetadata(
-    const auto& expCtx,
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputs) {
+    const auto& expCtx, const std::vector<std::string>& pipelineNames) {
     // Generate an array of all the fields containing a score for a given pipeline.
     Expression::ExpressionVector allInputScores;
-    for (auto it = inputs.begin(); it != inputs.end(); it++) {
+    for (const auto& pipelineName : pipelineNames) {
         allInputScores.push_back(ExpressionFieldPath::createPathFromString(
-            expCtx.get(), it->first + "_score", expCtx->variablesParseState));
+            expCtx.get(), pipelineName + "_score", expCtx->variablesParseState));
     }
 
     // Return a $setMetadata stage that sets score to an $add object that takes the generated array
@@ -387,14 +383,14 @@ boost::intrusive_ptr<DocumentSource> constructScoreDetailsMetadata(
 }
 
 std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputPipelines,
+    const std::vector<std::string>& pipelineNames,
     const StringMap<double>& weights,
     const bool includeScoreDetails,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto group = DocumentSourceGroup::createFromBson(
-        groupEachScore(inputPipelines, includeScoreDetails).firstElement(), expCtx);
+        groupEachScore(pipelineNames, includeScoreDetails).firstElement(), expCtx);
     auto addFields = DocumentSourceAddFields::createFromBson(
-        calculateFinalScore(inputPipelines).firstElement(), expCtx);
+        calculateFinalScore(pipelineNames).firstElement(), expCtx);
 
     // Note that the scoreDetails fields go here in the pipeline. We create them below to be able
     // to return them immediately once all stages are generated.
@@ -411,7 +407,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
     if (includeScoreDetails) {
         boost::intrusive_ptr<DocumentSource> addFieldsDetails =
             hybrid_scoring_util::score_details::constructCalculatedFinalScoreDetails(
-                inputPipelines, weights, true, expCtx);
+                pipelineNames, weights, true, expCtx);
         auto setScoreDetails =
             constructScoreDetailsMetadata(rankFusionScoreDetailsDescription, expCtx);
         return {group, addFields, addFieldsDetails, setScoreDetails, sort, restoreUserDocs};
@@ -419,7 +415,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
     // TODO SERVER-85426: Remove this check once all feature flags have been removed.
     if (feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        auto setScore = calculateFinalScoreMetadata(expCtx, inputPipelines);
+        auto setScore = calculateFinalScoreMetadata(expCtx, pipelineNames);
         return {group, addFields, setScore, sort, restoreUserDocs};
     }
     return {group, addFields, sort, restoreUserDocs};
@@ -509,9 +505,16 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
     }
 
     std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
+    // Array to store pipeline names separately because Pipeline objects in the inputPipelines map
+    // will be moved eventually to other structures, rendering inputPipelines unusable. With this
+    // array, we can safely use/pass the pipeline names information without using inputPipelines.
+    // Note that pipeline names are stored in the same order in which pipelines are desugared.
+    std::vector<std::string> pipelineNames;
     for (auto it = inputPipelines.begin(); it != inputPipelines.end(); it++) {
         const auto& name = it->first;
         auto& pipeline = it->second;
+
+        pipelineNames.push_back(name);
 
         // Check if an explicit weight for this pipeline has been specified.
         // If not, the default is one.
@@ -555,7 +558,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
 
     // Build all remaining stages to perform the fusion.
     auto finalStages =
-        buildScoreAndMergeStages(inputPipelines, weights, includeScoreDetails, pExpCtx);
+        buildScoreAndMergeStages(pipelineNames, weights, includeScoreDetails, pExpCtx);
     outputStages.splice(outputStages.end(), std::move(finalStages));
 
     return outputStages;

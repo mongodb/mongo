@@ -402,13 +402,12 @@ std::pair<std::string, BSONObj> constructScoreDetailsForGrouping(const std::stri
 }
 
 boost::intrusive_ptr<DocumentSource> constructCalculatedFinalScoreDetails(
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputs,
+    const std::vector<std::string>& pipelineNames,
     const StringMap<double>& weights,
     const bool isRankFusion,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     std::vector<boost::intrusive_ptr<Expression>> detailsChildren;
-    for (auto it = inputs.begin(); it != inputs.end(); it++) {
-        const std::string& pipelineName = it->first;
+    for (const auto& pipelineName : pipelineNames) {
         const std::string scoreDetailsFieldName = fmt::format("${}_scoreDetails", pipelineName);
         double weight = hybrid_scoring_util::getPipelineWeight(weights, pipelineName);
 
