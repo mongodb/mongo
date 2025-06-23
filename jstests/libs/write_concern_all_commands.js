@@ -768,7 +768,7 @@ const wcCommandsTests = {
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorkedIgnoringWriteConcernErrors(res);
+                assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
                 assert.eq(coll.getDB().getCollectionInfos({name: collName}).length, 1);
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
@@ -783,8 +783,7 @@ const wcCommandsTests = {
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorkedIgnoringWriteConcernErrors(res);
-                assert.eq(coll.getDB().getCollectionInfos({name: collName}).length, 1);
+                assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
         },
@@ -3516,7 +3515,7 @@ const wcTimeseriesViewsCommandsTests = {
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorkedIgnoringWriteConcernErrors(res);
+                assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
                 assert.eq(coll.getDB().getCollectionInfos({name: collName}).length, 1);
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
@@ -3529,8 +3528,7 @@ const wcTimeseriesViewsCommandsTests = {
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorkedIgnoringWriteConcernErrors(res);
-                assert.eq(coll.getDB().getCollectionInfos({name: collName}).length, 1);
+                assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
         },
@@ -3549,7 +3547,6 @@ const wcTimeseriesViewsCommandsTests = {
                 } else {
                     assert.commandFailedWithCode(res, ErrorCodes.OptionNotSupportedOnView);
                 }
-                assert.eq(coll.find().itcount(), 1);
                 assert(!coll.getDB().getCollectionNames().includes("nonexistentColl"));
 
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
@@ -5787,6 +5784,14 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
         return true;
     }
 
+    if (command == "create" && TestData.implicitClusterCollections) {
+        // More information about this in SERVER-102058.
+        jsTestLog(
+            "Skipping " + command +
+            " because implicitly clustering collections through the failpoint 'clusterAllCollectionsByDefault' makes it not idempotent.");
+        return true;
+    }
+
     if (testCase == "noop") {
         // TODO SERVER-100935 dropAllUsersFromDatabase does not return WCE
         // TODO SERVER-100935 grantPrivilegesToRole does not return WCE
@@ -5798,13 +5803,11 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
         // TODO SERVER-100935 updateUser does not return WCE
         // TODO SERVER-100935 dropAllRolesFromDatabase does not return WCE
 
-        // TODO SERVER-100936 create does not return WCE
-
         // TODO SERVER-100309 adapt/enable setFeatureCompatibilityVersion no-op case once the
         // upgrade procedure will not proactively shard the sessions collection.
 
         if (clusterType == "sharded" &&
-            (shardedDDLCommandsRequiringMajorityCommit.includes(command) || command == "create" ||
+            (shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
              command == "dropAllUsersFromDatabase" || command == "grantPrivilegesToRole" ||
              command == "grantRolesToRole" || command == "grantRolesToUser" ||
              command == "revokePrivilegesFromRole" || command == "revokeRolesFromRole" ||
@@ -5817,11 +5820,9 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
     }
 
     if (testCase == "success") {
-        // TODO SERVER-100936 create does not return WCE
         if (clusterType == "sharded" &&
-                (shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
-                 command == "create") ||
-            (TestData.configShard && command == "enableSharding")) {
+            (shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
+             (TestData.configShard && command == "enableSharding"))) {
             jsTestLog("Skipping " + command + " test for success case.");
             return true;
         }
