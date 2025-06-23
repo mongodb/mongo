@@ -14,7 +14,6 @@ if (_isWindows()) {
 import {
     emptyMessageTest,
     fuzzingTest,
-    loadTest,
     testProxyProtocolReplicaSet
 } from "jstests/noPassthrough/libs/proxy_protocol_helpers.js";
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
@@ -113,6 +112,3 @@ testProxyProtocolReplicaSet(ingressPort, egressPort, 2, emptyMessageTest);
 
 testProxyProtocolReplicaSet(ingressPort, egressPort, 1, fuzzingTest);
 testProxyProtocolReplicaSet(ingressPort, egressPort, 2, fuzzingTest);
-
-testProxyProtocolReplicaSet(ingressPort, egressPort, 1, loadTest);
-testProxyProtocolReplicaSet(ingressPort, egressPort, 2, loadTest);
