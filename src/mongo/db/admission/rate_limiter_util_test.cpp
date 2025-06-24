@@ -429,12 +429,12 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
 
         // Make sure we've enqueued all the remaining waiters so that we don't race with advancing
         // the mock clock.
-        int64_t maxBackoffMillis{5000};
-        int64_t backoffTimeMillis{2};
-        while (rateLimiter.queued() != numThreads - maxTokens &&
-               backoffTimeMillis < maxBackoffMillis) {
+        int64_t numRetries = 0;
+        const int64_t maxRetries = 5;
+        int64_t backoffTimeMillis{5};
+        while (rateLimiter.queued() != numThreads - maxTokens && numRetries++ < maxRetries) {
             sleepmillis(backoffTimeMillis);
-            backoffTimeMillis *= backoffTimeMillis;
+            backoffTimeMillis *= 5;
         }
 
         // Until we start moving the mock clock forward, no other requests will be fulfilled and all
