@@ -74,6 +74,7 @@ MONGO_FAIL_POINT_DEFINE(hangWhileBuildingDocumentSourceOutBatch);
 MONGO_FAIL_POINT_DEFINE(outWaitAfterTempCollectionCreation);
 MONGO_FAIL_POINT_DEFINE(outWaitBeforeTempCollectionRename);
 MONGO_FAIL_POINT_DEFINE(outWaitAfterTempCollectionRenameBeforeView);
+MONGO_FAIL_POINT_DEFINE(outImplictlyCreateDBOnSpecificShard);
 MONGO_FAIL_POINT_DEFINE(hangDollarOutAfterInsert);
 
 REGISTER_DOCUMENT_SOURCE(out,
@@ -263,9 +264,17 @@ void DocumentSourceOut::createTemporaryCollection() {
         createCommandOptions.appendElementsUnique(_originalOutOptions);
     }
 
-    // If the output collection exists, we should create the temp collection on the shard that
-    // owns the output collection.
-    auto targetShard = getMergeShardId();
+    auto targetShard = [&]() -> boost::optional<ShardId> {
+        if (auto fpTarget = outImplictlyCreateDBOnSpecificShard.scoped();
+            // Used for consistently picking a shard in testing.
+            MONGO_unlikely(fpTarget.isActive())) {
+            return ShardId(fpTarget.getData()["shardId"].String());
+        } else {
+            // If the output collection exists, we should create the temp collection on the shard
+            // that owns the output collection.
+            return getMergeShardId();
+        }
+    }();
 
     // Set the enum state to 'kTmpCollExists' first, because 'createTempCollection' can throw
     // after constructing the collection.
@@ -536,9 +545,8 @@ void DocumentSourceOut::waitWhileFailPointEnabled() {
         pExpCtx->opCtx,
         "hangWhileBuildingDocumentSourceOutBatch",
         []() {
-            LOGV2(
-                20902,
-                "Hanging aggregation due to  'hangWhileBuildingDocumentSourceOutBatch' failpoint");
+            LOGV2(20902,
+                  "Hanging aggregation due to 'hangWhileBuildingDocumentSourceOutBatch' failpoint");
         });
 }
 
