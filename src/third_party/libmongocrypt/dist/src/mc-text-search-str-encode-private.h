@@ -35,6 +35,8 @@ typedef struct {
     mc_substring_set_t *substring_set;
     // Encoded exact string.
     _mongocrypt_buffer_t exact;
+    // Total number of tags over all the sets and the exact string.
+    uint32_t msize;
 } mc_str_encode_sets_t;
 
 // Run StrEncode with the given spec.

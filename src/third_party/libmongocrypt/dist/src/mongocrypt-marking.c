@@ -512,14 +512,21 @@ static bool _fle2_placeholder_aes_aead_encrypt(_mongocrypt_key_broker_t *kb,
 //                            ECCDerivedFromDataTokenAndContentionFactor)
 // FLE V2: p := EncryptCTR(ECOCToken, ESCDerivedFromDataTokenAndContentionFactor)
 // Range V2: p := EncryptCTR(ECOCToken, ESCDerivedFromDataTokenAndContentionFactor || isLeaf)
+// Text search: p := EncryptCTR(ECOCToken, ESCDerivedFromDataTokenAndContentionFactor || msize)
+struct encrypted_token_metadata {
+    mc_optional_bool_t is_leaf; // isLeaf for Range V2, none for all other cases
+    mc_optional_uint32_t msize; // msize for text search, none for all other cases
+};
+
 static bool _fle2_derive_encrypted_token(_mongocrypt_crypto_t *crypto,
                                          _mongocrypt_buffer_t *out,
-                                         bool concatentate_leaf,
                                          const mc_CollectionsLevel1Token_t *collectionsLevel1Token,
                                          const _mongocrypt_buffer_t *escDerivedToken,
                                          const _mongocrypt_buffer_t *eccDerivedToken,
-                                         mc_optional_bool_t is_leaf,
+                                         struct encrypted_token_metadata token_metadata,
                                          mongocrypt_status_t *status) {
+    // isLeaf and msize should never both be set.
+    BSON_ASSERT(!token_metadata.is_leaf.set || !token_metadata.msize.set);
     mc_ECOCToken_t *ecocToken = mc_ECOCToken_new(crypto, collectionsLevel1Token, status);
     if (!ecocToken) {
         return false;
@@ -531,10 +538,10 @@ static bool _fle2_derive_encrypted_token(_mongocrypt_crypto_t *crypto,
     const _mongocrypt_buffer_t *p = &tmp;
     if (!eccDerivedToken) {
         // FLE2v2
-        if (concatentate_leaf && is_leaf.set) {
+        if (token_metadata.is_leaf.set) {
             // Range V2; concat isLeaf
             _mongocrypt_buffer_t isLeafBuf;
-            if (!_mongocrypt_buffer_copy_from_data_and_size(&isLeafBuf, (uint8_t[]){is_leaf.value}, 1)) {
+            if (!_mongocrypt_buffer_copy_from_data_and_size(&isLeafBuf, (uint8_t[]){token_metadata.is_leaf.value}, 1)) {
                 CLIENT_ERR("failed to create is_leaf buffer");
                 goto fail;
             }
@@ -544,6 +551,21 @@ static bool _fle2_derive_encrypted_token(_mongocrypt_crypto_t *crypto,
                 goto fail;
             }
             _mongocrypt_buffer_cleanup(&isLeafBuf);
+        } else if (token_metadata.msize.set) {
+            // Text search; concat msize
+            _mongocrypt_buffer_t msizeBuf;
+            // msize is a 3-byte value, so copy the 3 least significant bytes into the buffer in little-endian order.
+            uint32_t le_msize = BSON_UINT32_TO_LE(token_metadata.msize.value);
+            if (!_mongocrypt_buffer_copy_from_data_and_size(&msizeBuf, (uint8_t *)&le_msize, 3)) {
+                CLIENT_ERR("failed to create msize buffer");
+                goto fail;
+            }
+            if (!_mongocrypt_buffer_concat(&tmp, (_mongocrypt_buffer_t[]){*escDerivedToken, msizeBuf}, 2)) {
+                CLIENT_ERR("failed to allocate buffer");
+                _mongocrypt_buffer_cleanup(&msizeBuf);
+                goto fail;
+            }
+            _mongocrypt_buffer_cleanup(&msizeBuf);
         } else {
             p = escDerivedToken;
         }
@@ -753,16 +775,23 @@ static bool _mongocrypt_fle2_placeholder_to_insert_update_common(_mongocrypt_key
 
     // p := EncryptCTR(ECOCToken, ESCDerivedFromDataTokenAndContentionFactor)
     // Or in Range V2, when using range: p := EncryptCTR(ECOCToken, ESCDerivedFromDataTokenAndContentionFactor || 0x00)
-    if (!_fle2_derive_encrypted_token(
-            crypto,
-            &out->encryptedTokens,
-            true,
-            common->collectionsLevel1Token,
-            &out->escDerivedToken,
-            NULL, // unused in v2
-            // If this is a range insert, we append isLeaf to the encryptedTokens. Otherwise, we don't.
-            placeholder->algorithm == MONGOCRYPT_FLE2_ALGORITHM_RANGE ? OPT_BOOL(false) : (mc_optional_bool_t){0},
-            status)) {
+    // Or in Text Search, when using msize: p := EncryptCTR(ECOCToken, ESCDerivedFromDataTokenAndContentionFactor ||
+    // 0x000000)
+    struct encrypted_token_metadata et_meta = {{0}};
+    if (placeholder->algorithm == MONGOCRYPT_FLE2_ALGORITHM_RANGE) {
+        // For range, we append isLeaf to the encryptedTokens.
+        et_meta.is_leaf = OPT_BOOL(false);
+    } else if (placeholder->algorithm == MONGOCRYPT_FLE2_ALGORITHM_TEXT_SEARCH) {
+        // For text search, we append msize to the encryptedTokens.
+        et_meta.msize = OPT_U32(0);
+    }
+    if (!_fle2_derive_encrypted_token(crypto,
+                                      &out->encryptedTokens,
+                                      common->collectionsLevel1Token,
+                                      &out->escDerivedToken,
+                                      NULL, // unused in v2
+                                      et_meta,
+                                      status)) {
         goto fail;
     }
 
@@ -1021,11 +1050,10 @@ static bool _mongocrypt_fle2_placeholder_to_insert_update_ciphertextForRange(_mo
             // Or in Range V2: p := EncryptCTR(ECOCToken, ESCDerivedFromDataTokenAndContentionFactor || isLeaf)
             if (!_fle2_derive_encrypted_token(kb->crypt->crypto,
                                               &etc.encryptedTokens,
-                                              true,
                                               edge_tokens.collectionsLevel1Token,
                                               &etc.escDerivedToken,
                                               NULL, // ecc unsed in FLE2v2
-                                              OPT_BOOL(is_leaf),
+                                              (struct encrypted_token_metadata){.is_leaf = OPT_BOOL(is_leaf)},
                                               status)) {
                 goto fail_loop;
             }
@@ -1087,6 +1115,7 @@ fail:
                                                     mc_Text##Type##TokenSet_t *out,                                    \
                                                     const _mongocrypt_buffer_t *value,                                 \
                                                     int64_t contentionFactor,                                          \
+                                                    uint32_t msize,                                                    \
                                                     const mc_CollectionsLevel1Token_t *collLevel1Token,                \
                                                     const mc_ServerTokenDerivationLevel1Token_t *serverLevel1Token,    \
                                                     mongocrypt_status_t *status) {                                     \
@@ -1124,11 +1153,10 @@ fail:
         }                                                                                                              \
         if (!_fle2_derive_encrypted_token(kb->crypt->crypto,                                                           \
                                           &out->encryptedTokens,                                                       \
-                                          false,                                                                       \
                                           collLevel1Token,                                                             \
                                           &out->escDerivedToken,                                                       \
                                           NULL,                                                                        \
-                                          (mc_optional_bool_t){0},                                                     \
+                                          (struct encrypted_token_metadata){.msize = OPT_U32(msize)},                  \
                                           status)) {                                                                   \
             return false;                                                                                              \
         }                                                                                                              \
@@ -1230,6 +1258,8 @@ static bool _fle2_generate_TextSearchTokenSets(_mongocrypt_key_broker_t *kb,
                                               &tsts->exact,
                                               &asBsonValue,
                                               contentionFactor,
+                                              // For the exact token, report total msize of the token set.
+                                              encodeSets->msize,
                                               common.collectionsLevel1Token,
                                               common.serverTokenDerivationLevel1Token,
                                               status)) {
@@ -1258,10 +1288,12 @@ static bool _fle2_generate_TextSearchTokenSets(_mongocrypt_key_broker_t *kb,
             _mongocrypt_buffer_init(&asBsonValue);
             _mongocrypt_buffer_copy_from_string_as_bson_value(&asBsonValue, substring, (int)bytelen);
 
+            // For substring, prefix, and suffix tokens, report 0 as the msize.
             if (!_fle2_generate_TextSubstringTokenSet(kb,
                                                       &tset,
                                                       &asBsonValue,
                                                       contentionFactor,
+                                                      0 /* msize */,
                                                       common.collectionsLevel1Token,
                                                       common.serverTokenDerivationLevel1Token,
                                                       status)) {
@@ -1302,6 +1334,7 @@ static bool _fle2_generate_TextSearchTokenSets(_mongocrypt_key_broker_t *kb,
                                                    &tset,
                                                    &asBsonValue,
                                                    contentionFactor,
+                                                   0 /* msize */,
                                                    common.collectionsLevel1Token,
                                                    common.serverTokenDerivationLevel1Token,
                                                    status)) {
@@ -1342,6 +1375,7 @@ static bool _fle2_generate_TextSearchTokenSets(_mongocrypt_key_broker_t *kb,
                                                    &tset,
                                                    &asBsonValue,
                                                    contentionFactor,
+                                                   0 /* msize */,
                                                    common.collectionsLevel1Token,
                                                    common.serverTokenDerivationLevel1Token,
                                                    status)) {
@@ -1543,16 +1577,15 @@ static bool _mongocrypt_fle2_placeholder_to_insert_update_ciphertextForTextSearc
     _mongocrypt_buffer_copy_to(&payload.edcDerivedToken, &payload.escDerivedToken);
     _mongocrypt_buffer_copy_to(&payload.edcDerivedToken, &payload.serverDerivedFromDataToken);
 
-    // p := EncryptCTR(ECOCToken, ESCDerivedFromDataTokenAndContentionFactor)
+    // p := EncryptCTR(ECOCToken, ESCDerivedFromDataTokenAndContentionFactor | 0x000000)
     // Since p is never used for text search, this just sets p to a bogus ciphertext of
     // the correct length.
     if (!_fle2_derive_encrypted_token(kb->crypt->crypto,
                                       &payload.encryptedTokens,
-                                      false,
                                       common.collectionsLevel1Token,
                                       &payload.escDerivedToken, // bogus
                                       NULL,                     // unused in FLE2v2
-                                      (mc_optional_bool_t){0},
+                                      (struct encrypted_token_metadata){.msize = OPT_U32(0)},
                                       status)) {
         goto fail;
     }

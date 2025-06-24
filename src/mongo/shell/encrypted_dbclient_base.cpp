@@ -44,6 +44,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/aead_encryption.h"
+#include "mongo/crypto/encryption_fields_util.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
@@ -651,7 +652,9 @@ void EncryptedDBClientBase::compact(JSContext* cx, JS::CallArgs args) {
     }
 
     if (efc && extra["encryptionInformation"_sd].eoo() &&
-        hasQueryType(*efc, QueryTypeEnum::Range)) {
+        hasQueryTypeMatching(*efc, [](QueryTypeEnum type) {
+            return type == QueryTypeEnum::Range || isFLE2TextQueryType(type);
+        })) {
         EncryptionInformation ei;
         ei.setSchema(BSON(nss.serializeWithoutTenantPrefix_UNSAFE() << efc->toBSON()));
         builder.append("encryptionInformation"_sd, ei.toBSON());

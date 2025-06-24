@@ -49,6 +49,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/crypto/encryption_fields_gen.h"
+#include "mongo/crypto/encryption_fields_util.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_options_gen.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -353,10 +354,14 @@ stdx::unordered_set<ECOCCompactionDocumentV2> getUniqueCompactionDocuments(
                     fmt::format("Compaction token for field '{}' is of type '{}', but ECOCDocument "
                                 "is of type '{}'",
                                 compactionToken.fieldPathName,
-                                compactionToken.isRange() ? "range"_sd : "equality"_sd,
-                                ecocDoc.isRange() ? "range"_sd : "equality"_sd),
-                    ecocDoc.isRange() == compactionToken.isRange());
-            if (compactionToken.isRange()) {
+                                compactionToken.hasPaddingToken() ? "range-or-text-search"_sd
+                                                                  : "equality"_sd,
+                                ecocDoc.isRange()            ? "range"_sd
+                                    : ecocDoc.isTextSearch() ? "text-search"_sd
+                                                             : "equality"_sd),
+                    (ecocDoc.isRange() || ecocDoc.isTextSearch()) ==
+                        compactionToken.hasPaddingToken());
+            if (compactionToken.hasPaddingToken()) {
                 ecocDoc.anchorPaddingRootToken = compactionToken.anchorPaddingToken;
             }
             c.insert(std::move(ecocDoc));
@@ -435,37 +440,19 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
     stats.addInserts(1);
 }
 
-
-void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
-                             HmacContext* hmacCtx,
-                             const NamespaceString& escNss,
-                             StringData fieldPath,
-                             BSONType fieldType,
-                             const QueryTypeConfig& queryTypeConfig,
-                             double anchorPaddingFactor,
-                             std::size_t uniqueLeaves,
-                             std::size_t uniqueTokens,
-                             const AnchorPaddingRootToken& anchorPaddingRootToken,
-                             ECStats* escStats,
-                             std::size_t maxDocsPerInsert) {
+void padOneField(FLEQueryInterface* queryImpl,
+                 HmacContext* hmacCtx,
+                 const NamespaceString& escNss,
+                 size_t numPads,
+                 const AnchorPaddingRootToken& anchorPaddingRootToken,
+                 ECStats* escStats,
+                 std::size_t maxDocsPerInsert) {
     CompactStatsCounter<ECStats> stats(escStats);
-    // Compact 4.e, Calculate pathLength := #Edges_SPH(lb, lb, uh, prc, theta)
-    const auto pathLength = getEdgesLength(fieldType, fieldPath, queryTypeConfig);
-    // Compact 4.f, Calculate numPads := ceil( gamma * (pathLength * uniqueLeaves - len(C_f)) )
-    // This assumes that (pathLength * uniqueLeaves) >= uniqueTokens
-    dassert((pathLength * uniqueLeaves) >= uniqueTokens);
-    const size_t numPads =
-        std::ceil(anchorPaddingFactor * ((pathLength * uniqueLeaves) - uniqueTokens));
-    if (numPads <= 0) {
-        // Nothing to do.
-        return;
-    }
-
-    // Compact 4.g, Calculate S_1,d := F_s^esc_f,d(1), S_2,d := F_s^esc_f,d(2)
+    // Compact 4.f.iii/4.g.ii, Calculate S_1,d := F_s^esc_f,d(1), S_2,d := F_s^esc_f,d(2)
     const auto anchorPaddingKeyToken = AnchorPaddingKeyToken::deriveFrom(anchorPaddingRootToken);
     const auto anchorPaddingValueToken =
         AnchorPaddingValueToken::deriveFrom(anchorPaddingRootToken);
-    // Compact 4.h, Calculate a := AnchorBinaryHops(AnchorPaddingTokenKey,
+    // Compact 4.f.iv/4.g.iii, Calculate a := AnchorBinaryHops(AnchorPaddingTokenKey,
     // AnchorPaddingTokenValue)
     // Use a call to getQueryableEncryptionCountInfo to get count info in one roundtrip rather than
     // using anchorBinaryHops, which would take multiple
@@ -482,16 +469,9 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
     // If the apos returned is null, read the null anchor document for correct apos.
     auto apos = optA ? *optA : countInfo.nullAnchorCounts.value().apos;
 
-    // Compact 4.i, for all i in numPads: esc.insert(anchorPaddingDocument)
+    // Compact 4.f.v/4.g.iv, for all i in numPads: esc.insert(anchorPaddingDocument)
     // {_id   : F(AnchorPaddingKeyToken, null || a + i),
     //  value : Enc(AnchorPaddingValueToken, 0 || 0 )}
-    LOGV2_DEBUG(9165601,
-                2,
-                "Inserting padding documents for range field",
-                "edgesLength"_attr = pathLength,
-                "uniqueLeaves"_attr = uniqueLeaves,
-                "uniqueTokens"_attr = uniqueTokens);
-
     std::vector<BSONObj> batchWrite;
     StmtId stmtId = kUninitializedStmtId;
     maxDocsPerInsert = (maxDocsPerInsert > 0) ? std::min(numPads, maxDocsPerInsert) : numPads;
@@ -511,6 +491,69 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
     }
 }
 
+void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
+                             HmacContext* hmacCtx,
+                             const NamespaceString& escNss,
+                             StringData fieldPath,
+                             BSONType fieldType,
+                             const QueryTypeConfig& queryTypeConfig,
+                             double anchorPaddingFactor,
+                             std::size_t uniqueLeaves,
+                             std::size_t uniqueTokens,
+                             const AnchorPaddingRootToken& anchorPaddingRootToken,
+                             ECStats* escStats,
+                             std::size_t maxDocsPerInsert) {
+    // Compact 4.f.i, Calculate pathLength := #Edges_SPH(lb, lb, uh, prc, theta)
+    const auto pathLength = getEdgesLength(fieldType, fieldPath, queryTypeConfig);
+    // Compact 4.f.ii, Calculate numPads := ceil( gamma * (pathLength * uniqueLeaves - len(C_f)) )
+    // This assumes that (pathLength * uniqueLeaves) >= uniqueTokens
+    dassert((pathLength * uniqueLeaves) >= uniqueTokens);
+    const size_t numPads =
+        std::ceil(anchorPaddingFactor * ((pathLength * uniqueLeaves) - uniqueTokens));
+    if (numPads <= 0) {
+        // Nothing to do.
+        return;
+    }
+    LOGV2_DEBUG(9165601,
+                2,
+                "Inserting padding documents for range field",
+                "numPads"_attr = numPads,
+                "edgesLength"_attr = pathLength,
+                "uniqueLeaves"_attr = uniqueLeaves,
+                "uniqueTokens"_attr = uniqueTokens);
+
+    padOneField(
+        queryImpl, hmacCtx, escNss, numPads, anchorPaddingRootToken, escStats, maxDocsPerInsert);
+}
+
+void compactOneTextSearchFieldPad(FLEQueryInterface* queryImpl,
+                                  HmacContext* hmacCtx,
+                                  const NamespaceString& escNss,
+                                  StringData fieldPath,
+                                  std::size_t totalMsize,
+                                  std::size_t uniqueTokens,
+                                  const AnchorPaddingRootToken& anchorPaddingRootToken,
+                                  ECStats* escStats,
+                                  std::size_t maxDocsPerInsert) {
+    CompactStatsCounter<ECStats> stats(escStats);
+    // Compact 4.g.i, Calculate numPads := totalMsize - len(C_f)
+    // This assumes that totalMsize >= uniqueTokens
+    dassert(totalMsize >= uniqueTokens);
+    const size_t numPads = totalMsize - uniqueTokens;
+    if (numPads == 0) {
+        // Nothing to do.
+        return;
+    }
+    LOGV2_DEBUG(10523000,
+                2,
+                "Inserting padding documents for text search field",
+                "numPads"_attr = numPads,
+                "totalMsize"_attr = totalMsize,
+                "uniqueTokens"_attr = uniqueTokens);
+
+    padOneField(
+        queryImpl, hmacCtx, escNss, numPads, anchorPaddingRootToken, escStats, maxDocsPerInsert);
+}
 namespace {
 auto generateCompactionTokenPair(const ESCDerivedFromDataTokenAndContentionFactorToken& rootToken) {
     return std::make_tuple(ESCTwiceDerivedTagToken::deriveFrom(rootToken),
@@ -664,7 +707,8 @@ std::vector<PrfBlock> cleanupOneFieldValuePair(FLEQueryInterface* queryImpl,
             FLEQueryInterface::TagQueryType::kCleanup);
     } else {
         invariant(mode == FLECleanupOneMode::kPadding);
-        if (!ecocDoc.isRange() || !ecocDoc.anchorPaddingRootToken) {
+        if (ecocDoc.isEquality() || !ecocDoc.anchorPaddingRootToken) {
+            // Equality fields are not padded.
             return {};
         }
         return cleanupOneFieldValuePairImpl<ESCCollectionAnchorPadding>(
@@ -691,7 +735,8 @@ void processFLECompactV2(OperationContext* opCtx,
     auto uniqueEcocEntries = readUniqueECOCEntriesInTxn(
         opCtx, getTxn, namespaces.ecocRenameNss, request.getCompactionTokens(), ecocStats);
 
-    // Collect all Range fields, counting unique leaves and tokens.
+    // Collect all range & text search fields, counting unique leaves and tokens for range, and
+    // msize for text search.
     struct RangeFieldInfo {
         std::size_t uniqueLeaves{0};
         std::size_t uniqueTokens{0};
@@ -699,29 +744,43 @@ void processFLECompactV2(OperationContext* opCtx,
         QueryTypeConfig queryTypeConfig;
         BSONType fieldType;
     };
+    struct TextSearchFieldInfo {
+        std::size_t totalMsize{0};
+        std::size_t uniqueTokens{0};
+        boost::optional<AnchorPaddingRootToken> anchorPaddingRootToken;
+    };
     std::map<StringData, RangeFieldInfo> rangeFields;
+    std::map<StringData, TextSearchFieldInfo> textSearchFields;
     for (auto& ecocDoc : *uniqueEcocEntries) {
-        if (!ecocDoc.isRange()) {
-            continue;
-        }
-        auto& rangeField = rangeFields[ecocDoc.fieldName];
-        ++rangeField.uniqueTokens;
-        if (ecocDoc.isLeaf.get_value_or(false)) {
-            // Compact 4.d.iv.B, count uniqueLeaves in range fields
-            ++rangeField.uniqueLeaves;
-        }
-        if (!rangeField.anchorPaddingRootToken) {
-            // Prereq for Compact 4.g, Compute F_s^esc_f,d
-            rangeField.anchorPaddingRootToken = ecocDoc.anchorPaddingRootToken;
+        if (ecocDoc.isRange()) {
+            auto& rangeField = rangeFields[ecocDoc.fieldName];
+            ++rangeField.uniqueTokens;
+            if (ecocDoc.isLeaf.get_value_or(false)) {
+                // Compact 4.d.iv.B, count uniqueLeaves in range fields
+                ++rangeField.uniqueLeaves;
+            }
+            if (!rangeField.anchorPaddingRootToken) {
+                // Prereq for Compact 4.g, Compute F_s^esc_f,d
+                rangeField.anchorPaddingRootToken = ecocDoc.anchorPaddingRootToken;
+            }
+        } else if (ecocDoc.isTextSearch()) {
+            auto& textSearchField = textSearchFields[ecocDoc.fieldName];
+            ++textSearchField.uniqueTokens;
+            textSearchField.totalMsize += ecocDoc.msize.value_or(0);
+            if (!textSearchField.anchorPaddingRootToken) {
+                // Prereq for Compact 4.g, Compute F_s^esc_f,d
+                textSearchField.anchorPaddingRootToken = ecocDoc.anchorPaddingRootToken;
+            }
         }
     }
 
-    // Validate that we have an EncryptedFieldConfig for each range field.
-    if (!rangeFields.empty()) {
+    // Validate that we have an EncryptedFieldConfig for each range and text search field.
+    if (!rangeFields.empty() || !textSearchFields.empty()) {
         uassert(8574702,
-                fmt::format("Command '{}' requires field '{}' when range fields are present",
-                            CompactStructuredEncryptionData::kCommandName,
-                            CompactStructuredEncryptionData::kEncryptionInformationFieldName),
+                fmt::format(
+                    "Command '{}' requires field '{}' when range or text search fields are present",
+                    CompactStructuredEncryptionData::kCommandName,
+                    CompactStructuredEncryptionData::kEncryptionInformationFieldName),
                 request.getEncryptionInformation());
         auto efc = EncryptionInformationHelpers::getAndValidateSchema(
             request.getNamespace(), request.getEncryptionInformation().get());
@@ -743,6 +802,24 @@ void processFLECompactV2(OperationContext* opCtx,
                                 CompactStructuredEncryptionData::kEncryptionInformationFieldName),
                     fieldConfig->getBsonType().has_value());
             rfIt.second.fieldType = typeFromName(fieldConfig->getBsonType().value());
+        }
+        for (const auto& [fieldPath, _] : textSearchFields) {
+            auto fieldConfig = std::find_if(efcFields.begin(), efcFields.end(), [&](const auto& f) {
+                return fieldPath == f.getPath();
+            });
+            uassert(10523001,
+                    fmt::format("Missing text search field '{}' in '{}'",
+                                fieldPath,
+                                CompactStructuredEncryptionData::kEncryptionInformationFieldName),
+                    fieldConfig != efcFields.end());
+
+            uassert(
+                10523002,
+                fmt::format(
+                    "Text search field '{}' in '{}' must have at least one text search query type",
+                    fieldPath,
+                    CompactStructuredEncryptionData::kEncryptionInformationFieldName),
+                hasQueryTypeMatching(*fieldConfig, isFLE2TextQueryType));
         }
     }
 
@@ -791,8 +868,8 @@ void processFLECompactV2(OperationContext* opCtx,
                 .getCompactAnchorPaddingFactor()
                 .get_value_or(kDefaultAnchorPaddingFactor));
         for (const auto& [fieldPath, rangeField] : rangeFields) {
-            // The function that handles the transaction may outlive this function so we need to use
-            // shared_ptrs
+            // The function that handles the transaction may outlive this function so we need to
+            // use shared_ptrs
             auto argsBlock = std::make_tuple(
                 namespaces.escNss, anchorPaddingFactor, rangeField, std::string{fieldPath});
             auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
@@ -826,6 +903,38 @@ void processFLECompactV2(OperationContext* opCtx,
                         }))
                     .getEffectiveStatus());
         }
+    }
+
+    for (const auto& [fieldPath, tsField] : textSearchFields) {
+        // The function that handles the transaction may outlive this function so we need to use
+        // shared_ptrs
+        auto argsBlock = std::make_tuple(namespaces.escNss, tsField, std::string{fieldPath});
+        auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
+        auto service = opCtx->getService();
+
+        std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
+        uassertStatusOK(
+            uassertStatusOK(
+                trun->runNoThrow(
+                    opCtx,
+                    [service, sharedBlock, innerEscStats](
+                        const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                        FLEQueryInterfaceImpl queryImpl(txnClient, service);
+                        HmacContext hmacCtx;
+
+                        auto [escNss, tsField, fieldPath] = *sharedBlock.get();
+                        compactOneTextSearchFieldPad(&queryImpl,
+                                                     &hmacCtx,
+                                                     escNss,
+                                                     fieldPath,
+                                                     tsField.totalMsize,
+                                                     tsField.uniqueTokens,
+                                                     tsField.anchorPaddingRootToken.get(),
+                                                     innerEscStats.get());
+
+                        return SemiFuture<void>::makeReady();
+                    }))
+                .getEffectiveStatus());
     }
 
     // Update stats

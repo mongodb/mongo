@@ -18,6 +18,7 @@ if grep -q Microsoft /proc/version; then
 fi
 
 NAME=libmongocrypt
+# TODO SERVER-106496 Update version number
 VERSION=1.14.0
 
 if grep -q Microsoft /proc/version; then
@@ -43,7 +44,9 @@ if [ ! -d $SRC ]; then
     $GIT_EXE clone https://github.com/mongodb/libmongocrypt $CLONE_DEST
 
     pushd $SRC
-    $GIT_EXE checkout $VERSION
+    # TODO: SERVER-106496 Revert back to `$VERSION` upon new release of libmongocrypt
+    # $GIT_EXE checkout $VERSION
+    $GIT_EXE checkout 0840a84aa78578b50ef586ebbb12e5318108db9b
     popd
 fi
 

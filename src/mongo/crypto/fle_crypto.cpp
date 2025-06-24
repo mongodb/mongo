@@ -2067,8 +2067,10 @@ BSONObj FLEClientCrypto::generateCompactionTokens(const EncryptedFieldConfig& cf
         auto collToken = CollectionsLevel1Token::deriveFrom(indexKey.key);
         auto ecocToken = ECOCToken::deriveFrom(collToken);
         auto tokenCdr = ecocToken.toCDR();
-        if (hasQueryType(field, QueryTypeEnum::RangePreviewDeprecated) ||
-            hasQueryType(field, QueryTypeEnum::Range)) {
+        if (hasQueryTypeMatching(field, [](QueryTypeEnum type) {
+                return type == QueryTypeEnum::RangePreviewDeprecated ||
+                    type == QueryTypeEnum::Range || isFLE2TextQueryType(type);
+            })) {
             BSONObjBuilder token(tokensBuilder.subobjStart(field.getPath()));
             token.appendBinData(CompactionTokenDoc::kECOCTokenFieldName,
                                 tokenCdr.length(),

@@ -218,8 +218,10 @@ protected:
 
     ESCTestTokens getTestESCTokens(BSONObj obj);
 
-    ECOCCompactionDocumentV2 generateTestECOCDocumentV2(BSONObj obj,
-                                                        const boost::optional<bool>& = boost::none);
+    ECOCCompactionDocumentV2 generateTestECOCDocumentV2(
+        BSONObj obj,
+        const boost::optional<bool>& = boost::none,
+        const boost::optional<uint32_t>& = boost::none);
 
     EncryptedFieldConfig generateEncryptedFieldConfig(
         const std::set<std::string>& encryptedFieldNames);
@@ -241,10 +243,14 @@ protected:
                                   uint64_t insertsPerCycle = 1);
 
     template <typename Value>
-    void testCompactValueV2_NoNullAnchors(const Value& value, const boost::optional<bool>& isLeaf);
+    void testCompactValueV2_NoNullAnchors(const Value& value,
+                                          const boost::optional<bool>& isLeaf,
+                                          const boost::optional<std::uint32_t>& msize);
 
     template <typename Value>
-    void testCompactValueV2_WithNullAnchor(const Value& value, const boost::optional<bool>& isLeaf);
+    void testCompactValueV2_WithNullAnchor(const Value& value,
+                                           const boost::optional<bool>& isLeaf,
+                                           const boost::optional<std::uint32_t>& msize);
 
 protected:
     ServiceContext::UniqueOperationContext _opCtx;
@@ -367,12 +373,13 @@ FleCompactTest::ESCTestTokens FleCompactTest::getTestESCTokens(BSONObj obj) {
 }
 
 ECOCCompactionDocumentV2 FleCompactTest::generateTestECOCDocumentV2(
-    BSONObj obj, const boost::optional<bool>& isLeaf) {
+    BSONObj obj, const boost::optional<bool>& isLeaf, const boost::optional<std::uint32_t>& msize) {
     auto tokens = getTestESCTokens(obj);
     ECOCCompactionDocumentV2 doc;
     doc.fieldName = obj.firstElementFieldName();
     doc.esc = tokens.contentionDerived;
     doc.isLeaf = isLeaf;
+    doc.msize = msize;
     doc.anchorPaddingRootToken = tokens.anchorPaddingRoot;
     return doc;
 }
@@ -568,14 +575,16 @@ QueryTypeConfig generateQueryTypeConfigForTest(const T& min,
 
 template <typename Value>
 void FleCompactTest::testCompactValueV2_NoNullAnchors(const Value& value,
-                                                      const boost::optional<bool>& isLeaf) {
+                                                      const boost::optional<bool>& isLeaf,
+                                                      const boost::optional<std::uint32_t>& msize) {
     ECStats escStats;
     std::map<Value, InsertionState> values;
     constexpr auto key = "first"_sd;
     auto testPair = BSON(key << value);
-    auto ecocDoc = generateTestECOCDocumentV2(testPair, isLeaf);
+    auto ecocDoc = generateTestECOCDocumentV2(testPair, isLeaf, msize);
     const bool isRange = isLeaf != boost::none;
-    auto queryTypeConfig = generateQueryTypeConfigForTest(0LL, 100LL);
+    const bool isTextSearch = msize != boost::none;
+    auto rangeQueryTypeConfig = generateQueryTypeConfigForTest(0LL, 100LL);
 
     uint64_t edcCount = 0;
     uint64_t escCount = 0;
@@ -613,13 +622,23 @@ void FleCompactTest::testCompactValueV2_NoNullAnchors(const Value& value,
                                 _namespaces.escNss,
                                 "rangeField"_sd,
                                 BSONType::numberLong,
-                                queryTypeConfig,
+                                rangeQueryTypeConfig,
                                 0.42,
                                 1,
                                 1,
                                 *ecocDoc.anchorPaddingRootToken,
                                 &escStats);
         escCount += 3;
+    } else if (isTextSearch) {
+        compactOneTextSearchFieldPad(_queryImpl.get(),
+                                     &hmacCtx,
+                                     _namespaces.escNss,
+                                     "textSearchField"_sd,
+                                     *msize,
+                                     1,
+                                     *ecocDoc.anchorPaddingRootToken,
+                                     &escStats);
+        escCount += *msize - 1;
     }
     assertDocumentCounts(edcCount, escCount, ecocCount);
 
@@ -645,13 +664,23 @@ void FleCompactTest::testCompactValueV2_NoNullAnchors(const Value& value,
                                 _namespaces.escNss,
                                 "rangeField"_sd,
                                 BSONType::numberLong,
-                                queryTypeConfig,
+                                rangeQueryTypeConfig,
                                 0.42,
                                 1,
                                 1,
                                 *ecocDoc.anchorPaddingRootToken,
                                 &escStats);
         escCount += 3;
+    } else if (isTextSearch) {
+        compactOneTextSearchFieldPad(_queryImpl.get(),
+                                     &hmacCtx,
+                                     _namespaces.escNss,
+                                     "textSearchField"_sd,
+                                     *msize,
+                                     1,
+                                     *ecocDoc.anchorPaddingRootToken,
+                                     &escStats);
+        escCount += *msize - 1;
     }
     assertDocumentCounts(edcCount, escCount, ecocCount);
     assertESCAnchorDocument(testPair, true, 2, 30);
@@ -659,11 +688,15 @@ void FleCompactTest::testCompactValueV2_NoNullAnchors(const Value& value,
 }
 
 TEST_F(FleCompactTest, CompactValueV2_NoNullAnchors) {
-    testCompactValueV2_NoNullAnchors(std::string("value"), boost::none);
+    testCompactValueV2_NoNullAnchors(std::string("value"), boost::none, boost::none);
 }
 
 TEST_F(FleCompactTest, CompactValueV2_NoNullAnchors_Range) {
-    testCompactValueV2_NoNullAnchors(42LL, true);
+    testCompactValueV2_NoNullAnchors(42LL, true, boost::none);
+}
+
+TEST_F(FleCompactTest, CompactValueV2_NoNullAnchors_TextSearch) {
+    testCompactValueV2_NoNullAnchors(std::string("value"), boost::none, 11);
 }
 
 // Ignore this, it will not be in the final version.
@@ -679,12 +712,14 @@ void logCounts(const std::unique_ptr<FLEQueryInterfaceMock>& queryImpl,
 }
 
 template <typename Value>
-void FleCompactTest::testCompactValueV2_WithNullAnchor(const Value& value,
-                                                       const boost::optional<bool>& isLeaf) {
+void FleCompactTest::testCompactValueV2_WithNullAnchor(
+    const Value& value,
+    const boost::optional<bool>& isLeaf,
+    const boost::optional<std::uint32_t>& msize) {
     ECStats escStats;
     constexpr auto key = "first"_sd;
     auto testPair = BSON(key << value);
-    auto ecocDoc = generateTestECOCDocumentV2(testPair, isLeaf);
+    auto ecocDoc = generateTestECOCDocumentV2(testPair, isLeaf, msize);
     std::map<Value, InsertionState> values = {{value, {}}};
 
     uint64_t edcCount = 0;
@@ -757,11 +792,15 @@ void FleCompactTest::testCompactValueV2_WithNullAnchor(const Value& value,
 }
 
 TEST_F(FleCompactTest, CompactValueV2_WithNullAnchor) {
-    testCompactValueV2_WithNullAnchor(std::string("value"), boost::none);
+    testCompactValueV2_WithNullAnchor(std::string("value"), boost::none, boost::none);
 }
 
 TEST_F(FleCompactTest, CompactValueV2_WithNullAnchor_Range) {
-    testCompactValueV2_WithNullAnchor(42LL, true);
+    testCompactValueV2_WithNullAnchor(42LL, true, boost::none);
+}
+
+TEST_F(FleCompactTest, CompactValueV2_WithNullAnchor_TextSearch) {
+    testCompactValueV2_WithNullAnchor(std::string("value"), boost::none, 11);
 }
 
 TEST_F(FleCompactTest, RandomESCNonAnchorDeletions) {

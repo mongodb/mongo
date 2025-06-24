@@ -601,8 +601,7 @@ struct ECOCCompactionDocumentV2 {
                                                     const ECOCToken& token);
 
     bool operator==(const ECOCCompactionDocumentV2& other) const {
-        return (fieldName == other.fieldName) && (esc == other.esc) && (msize == other.msize) &&
-            (isLeaf == other.isLeaf);
+        return (fieldName == other.fieldName) && (esc == other.esc);
     }
 
     template <typename H>
@@ -1133,7 +1132,7 @@ struct CompactionToken {
         return anchorPaddingToken == boost::none;
     }
 
-    bool isRange() const {
+    bool hasPaddingToken() const {
         return anchorPaddingToken != boost::none;
     }
 };

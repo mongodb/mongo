@@ -131,6 +131,19 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
                              std::size_t maxDocsPerInsert = write_ops::kMaxWriteBatchSize);
 
 /**
+ * Performs compaction for text search fields to add additional padding tags.
+ */
+void compactOneTextSearchFieldPad(FLEQueryInterface* queryImpl,
+                                  HmacContext* hmacCtx,
+                                  const NamespaceString& escNss,
+                                  StringData fieldPath,
+                                  std::size_t totalMsize,
+                                  std::size_t uniqueTokens,
+                                  const AnchorPaddingRootToken& anchorPaddingRootToken,
+                                  ECStats* escStats,
+                                  std::size_t maxDocsPerInsert = write_ops::kMaxWriteBatchSize);
+
+/**
  * Performs cleanup of the ESC entries for the encrypted field/value pair
  * whose tokens are in the provided ECOC compaction document.
  * Returns a list of the IDs of anchors to be deleted from the ESC. The length

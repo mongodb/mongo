@@ -695,15 +695,20 @@ static moe_result must_omit_encryptionInformation(const char *command_name,
         // `compactStructuredEncryptionData` is a special case:
         // - Server 7.0 prohibits `encryptionInformation`.
         // - Server 8.0 requires `encryptionInformation` if "range" fields are referenced. Otherwise ignores.
-        // Only send `encryptionInformation` if "range" fields are present to support both server versions.
-        bool uses_range_fields = false;
+        // - Server 8.2 requires `encryptionInformation` if any range or text-search fields are referenced. Otherwise
+        // ignores.
+        // Only send `encryptionInformation` if range or text-search fields are present to support all server
+        // versions.
+        bool has_fields_requiring_ei = false;
         for (const mc_EncryptedField_t *ef = efc->fields; ef != NULL; ef = ef->next) {
-            if (ef->supported_queries & SUPPORTS_RANGE_QUERIES) {
-                uses_range_fields = true;
+            if (ef->supported_queries
+                & (SUPPORTS_RANGE_QUERIES | SUPPORTS_SUBSTRING_PREVIEW_QUERIES | SUPPORTS_SUFFIX_PREVIEW_QUERIES
+                   | SUPPORTS_PREFIX_PREVIEW_QUERIES)) {
+                has_fields_requiring_ei = true;
                 break;
             }
         }
-        return (moe_result){.ok = true, .must_omit = !uses_range_fields};
+        return (moe_result){.ok = true, .must_omit = !has_fields_requiring_ei};
     }
 
     for (i = 0; i < sizeof(prohibited_commands) / sizeof(prohibited_commands[0]); i++) {
@@ -817,7 +822,9 @@ static bool _fle2_append_compactionTokens(mongocrypt_t *crypt,
 
         const _mongocrypt_buffer_t *ecoct_buf = mc_ECOCToken_get(ecoct);
 
-        if ((ptr->supported_queries & SUPPORTS_RANGE_QUERIES)) {
+        if (ptr->supported_queries
+            & (SUPPORTS_RANGE_QUERIES | SUPPORTS_SUBSTRING_PREVIEW_QUERIES | SUPPORTS_SUFFIX_PREVIEW_QUERIES
+               | SUPPORTS_PREFIX_PREVIEW_QUERIES)) {
             // Append the document {ecoc: <ECOCToken>, anchorPaddingToken: <AnchorPaddingTokenRoot>}
             esct = mc_ESCToken_new(crypto, cl1t, status);
             if (!esct) {
@@ -1259,6 +1266,7 @@ static bool FLE2RangeFindDriverSpec_to_ciphertexts(mongocrypt_ctx_t *ctx, mongoc
                                                   &iter,
                                                   &with_ciphertexts,
                                                   ctx->status)) {
+            _mongocrypt_ctx_fail(ctx);
             goto fail;
         }
     }
