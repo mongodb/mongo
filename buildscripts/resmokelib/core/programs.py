@@ -288,6 +288,7 @@ def mongo_shell_program(
         "wiredTigerCollectionConfigString": (config.WT_COLL_CONFIG, ""),
         "wiredTigerEngineConfigString": (config.WT_ENGINE_CONFIG, ""),
         "wiredTigerIndexConfigString": (config.WT_INDEX_CONFIG, ""),
+        "pauseAfterPopulate": (config.PAUSE_AFTER_POPULATE, None),
     }
 
     test_data = global_vars.get("TestData", {}).copy()

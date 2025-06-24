@@ -2052,6 +2052,16 @@ class RunPlugin(PluginInterface):
             ),
         )
 
+        internal_options.add_argument(
+            "--pauseAfterPopulate",
+            dest="pause_after_populate",
+            action="store_true",
+            help=(
+                "Sets TestData.pauseAfterPopulate so that golden tests can pause after data population"
+                " to allow for easier debugging"
+            ),
+        )
+
         evergreen_options = parser.add_argument_group(
             title=_EVERGREEN_ARGUMENT_TITLE,
             description=(

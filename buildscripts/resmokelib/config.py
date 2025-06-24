@@ -202,6 +202,8 @@ DEFAULTS = {
     "docker_compose_tag": "development",
     # Whether or not this resmoke suite is running against an External System Under Test
     "external_sut": False,
+    # Whether or not to signal tests to pause after dataset population.
+    "pause_after_populate": None,
 }
 
 _SuiteOptions = collections.namedtuple(
@@ -809,3 +811,7 @@ MOZJS_JS_GC_ZEAL = None
 
 # If resmoke should check that all paths in suite config selectors are valid.
 VALIDATE_SELECTOR_PATHS = True
+
+# If set, resmoke.py will set Testdata.pauseAfterPopulate to allow tests that check this
+# flag to pause after populating their initial datasets.
+PAUSE_AFTER_POPULATE = None

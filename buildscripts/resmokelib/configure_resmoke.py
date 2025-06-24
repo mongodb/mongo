@@ -695,6 +695,7 @@ flags in common: {common_set}
     _config.LOG_FORMAT = config.pop("log_format")
     _config.LOG_LEVEL = config.pop("log_level")
     _config.SANITY_CHECK = config.pop("sanity_check")
+    _config.PAUSE_AFTER_POPULATE = config.pop("pause_after_populate")
 
     # Internal testing options.
     _config.INTERNAL_PARAMS = config.pop("internal_params")
