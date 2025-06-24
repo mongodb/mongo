@@ -92,7 +92,6 @@ export function getMatchPredicateSpec({
             leafConditionArb,
             // TODO SERVER-101007
             // TODO SERVER-101260
-            // TODO SERVER-101795
             // After these tickets are complete, re-enable $elemMatch.
             // tie('elemMatch')
         ];

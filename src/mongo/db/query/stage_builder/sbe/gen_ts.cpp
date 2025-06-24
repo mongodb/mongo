@@ -369,6 +369,9 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildUnpackTsBucket(
         DepsTracker eventFilterDeps;
         match_expression::addDependencies(eventFilter, &eventFilterDeps);
         for (const std::string& eventFilterPath : eventFilterDeps.fields) {
+            if (eventFilterPath.empty()) {
+                continue;
+            }
             const auto& name =
                 std::pair(PlanStageSlots::kField, std::string{FieldPath(eventFilterPath).front()});
             if (!outputs.has(name)) {
