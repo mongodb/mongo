@@ -41,6 +41,7 @@ __sweep_file_dhandle_check_and_reset_tod(WT_SESSION_IMPL *session, WT_DATA_HANDL
          */
         if (ret == 0) {
             dhandle->timeofdeath = 0;
+            session->dhandle = NULL;
             return (ret);
         }
     }
@@ -102,6 +103,9 @@ __sweep_mark(WT_SESSION_IMPL *session, uint64_t now)
         if (WT_IS_HS(dhandle))
             continue;
 
+        __wt_verbose_level(session, WT_VERB_SWEEP, WT_VERBOSE_DEBUG_3,
+          "Sweep server setting the time of death for dhandle %s", dhandle->name);
+
         dhandle->timeofdeath = now;
         WT_STAT_CONN_INCR(session, dh_sweep_tod);
     }
@@ -144,7 +148,6 @@ static int
 __sweep_expire_one(WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
-
     /*
      * Acquire an exclusive lock on the handle and mark it dead.
      *
@@ -229,7 +232,6 @@ __sweep_discard_trees(WT_SESSION_IMPL *session, u_int *dead_handlesp)
 
         if (!F_ISSET(dhandle, WT_DHANDLE_OPEN) || !F_ISSET(dhandle, WT_DHANDLE_DEAD))
             continue;
-
         /* If the handle is marked dead, flush it from cache. */
         WT_WITH_DHANDLE(
           session, dhandle, ret = __wt_conn_dhandle_close(session, false, false, false));
@@ -372,7 +374,7 @@ __sweep_check_session_callback(
         if (!array_session->sweep_warning_60min) {
             array_session->sweep_warning_60min = 1;
             WT_STAT_CONN_INCR(session, no_session_sweep_60min);
-            __wt_verbose_warning(session, WT_VERB_DEFAULT,
+            __wt_verbose_warning(session, WT_VERB_SWEEP,
               "Session %" PRIu32 " (@: 0x%p name: %s) did not run a sweep for 60 minutes.",
               array_session->id, (void *)array_session,
               array_session->name == NULL ? "EMPTY" : array_session->name);
@@ -474,6 +476,9 @@ __sweep_server(void *arg)
         /*
          * Check for any "rogue" sessions, which did not run a session sweep in a long time.
          */
+        __wt_verbose_level(session, WT_VERB_SWEEP, WT_VERBOSE_DEBUG_3,
+          "Sweep server performing a session check after removing %u dead handles", dead_handles);
+
         __sweep_check_session_sweep(session, now);
 
         /* Remember the last sweep time. */

@@ -290,7 +290,7 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
 static bool
 __evict_thread_chk(WT_SESSION_IMPL *session)
 {
-    return (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_EVICTION_RUN));
+    return (FLD_ISSET(S2C(session)->server_flags, WT_CONN_SERVER_EVICTION));
 }
 
 /*
@@ -340,7 +340,8 @@ __evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
          */
         if (was_intr)
             while (__wt_atomic_loadv32(&evict->pass_intr) != 0 &&
-              F_ISSET_ATOMIC_32(conn, WT_CONN_EVICTION_RUN) && F_ISSET(thread, WT_THREAD_RUN))
+              FLD_ISSET(conn->server_flags, WT_CONN_SERVER_EVICTION) &&
+              F_ISSET(thread, WT_THREAD_RUN))
                 __wt_yield();
         else {
             __wt_verbose_debug2(session, WT_VERB_EVICTION, "%s", "sleeping");
@@ -459,7 +460,7 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
     /* Evict pages from the cache as needed. */
     WT_RET(__evict_pass(session));
 
-    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_EVICTION_RUN) ||
+    if (!FLD_ISSET(conn->server_flags, WT_CONN_SERVER_EVICTION) ||
       __wt_atomic_loadv32(&evict->pass_intr) != 0)
         return (0);
 
@@ -586,7 +587,7 @@ __wt_evict_threads_create(WT_SESSION_IMPL *session)
 
     WT_ASSERT(session, conn->evict_threads_min > 0);
     /* Set first, the thread might run before we finish up. */
-    F_SET_ATOMIC_32(conn, WT_CONN_EVICTION_RUN);
+    FLD_SET(conn->server_flags, WT_CONN_SERVER_EVICTION);
 
     /*
      * Create the eviction thread group. Set the group size to the maximum allowed sessions.
@@ -639,7 +640,7 @@ __wt_evict_threads_destroy(WT_SESSION_IMPL *session)
     /*
      * Signal the threads to finish and stop populating the queue.
      */
-    F_CLR_ATOMIC_32(conn, WT_CONN_EVICTION_RUN);
+    FLD_CLR(conn->server_flags, WT_CONN_SERVER_EVICTION);
     __wt_atomic_storebool(&conn->evict_server_running, false);
     __wt_evict_server_wake(session);
 
@@ -682,7 +683,7 @@ __evict_update_work(WT_SESSION_IMPL *session)
     /* Build up the new state. */
     flags = 0;
 
-    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_EVICTION_RUN)) {
+    if (!FLD_ISSET(conn->server_flags, WT_CONN_SERVER_EVICTION)) {
         __wt_atomic_store32(&evict->flags, 0);
         return (false);
     }
@@ -1353,7 +1354,7 @@ __evict_lru_pages(WT_SESSION_IMPL *session, bool is_server)
      * Reconcile and discard some pages: EBUSY is returned if a page fails eviction because it's
      * unavailable, continue in that case.
      */
-    while (F_ISSET_ATOMIC_32(conn, WT_CONN_EVICTION_RUN) && ret == 0)
+    while (FLD_ISSET(conn->server_flags, WT_CONN_SERVER_EVICTION) && ret == 0)
         if ((ret = __evict_page(session, is_server)) == EBUSY)
             ret = 0;
 
@@ -1361,7 +1362,7 @@ __evict_lru_pages(WT_SESSION_IMPL *session, bool is_server)
     WT_TRET(__wt_session_release_resources(session));
 
     /* If a worker thread found the queue empty, pause. */
-    if (ret == WT_NOTFOUND && !is_server && F_ISSET_ATOMIC_32(conn, WT_CONN_EVICTION_RUN))
+    if (ret == WT_NOTFOUND && !is_server && FLD_ISSET(conn->server_flags, WT_CONN_SERVER_EVICTION))
         __wt_cond_wait(session, conn->evict_threads.wait_cond, 10 * WT_THOUSAND, NULL);
 
     WT_TRACK_OP_END(session);

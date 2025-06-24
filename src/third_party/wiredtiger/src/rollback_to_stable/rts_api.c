@@ -295,7 +295,7 @@ __rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[], bool no_ckpt)
     }
 
     /* Disable RTS for now if we want to preserve prepared. */
-    if (S2C(session)->preserve_prepared)
+    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_PRESERVE_PREPARED))
         return (0);
     /*
      * Don't use the connection's default session: we are working on data handles and (a) don't want

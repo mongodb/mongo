@@ -37,10 +37,17 @@ class test_sweep05(wttest.WiredTigerTestCase):
     '''
     Test detection of sessions without recent session sweep.
     '''
-    conn_config = 'statistics=(all)'
+    conn_config = 'statistics=(all),' + \
+                  'verbose=(sweep:3)'
     create_params = 'key_format=i,value_format=i'
     table_numkv = 10
     table_uri_format = 'table:test_sweep05_%s'
+
+    # We enabled verbose log level DEBUG_3 in this test to catch an invalid pointer in dhandle.
+    # However, this also causes the log line 'session dhandle name' to appear, which we want to ignore.
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ignoreStdoutPattern('WT_VERB_SWEEP')
 
     def get_stats(self):
         r = dict()

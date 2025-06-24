@@ -863,6 +863,7 @@ connection_runtime_config = [
             'salvage',
             'shared_cache',
             'split',
+            'sweep',
             'temporary',
             'thread_group',
             'tiered',

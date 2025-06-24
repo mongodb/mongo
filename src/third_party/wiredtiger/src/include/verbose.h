@@ -48,6 +48,7 @@
     "WT_VERB_RECOVERY_PROGRESS", \
     "WT_VERB_RTS", \
     "WT_VERB_SALVAGE", \
+    "WT_VERB_SWEEP", \
     "WT_VERB_SHARED_CACHE", \
     "WT_VERB_SPLIT", \
     "WT_VERB_TEMPORARY", \

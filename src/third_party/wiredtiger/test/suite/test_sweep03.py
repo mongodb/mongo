@@ -44,7 +44,8 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
     numkv = 100
     conn_config = 'file_manager=(close_handle_minimum=10,' + \
                   'close_idle_time=0,close_scan_interval=1),' + \
-                  'statistics=(fast),'
+                  'statistics=(fast),' + \
+                  'verbose=(sweep:3)'
 
     types = [
         ('row', dict(tabletype='row',
@@ -56,6 +57,12 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
     ]
 
     scenarios = make_scenarios(types)
+
+    # We enabled verbose log level DEBUG_3 in this test to catch an invalid pointer in dhandle.
+    # However, this also causes the log line 'session dhandle name' to appear, which we want to ignore.
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ignoreStdoutPattern('WT_VERB_SWEEP')
 
     # Wait for the sweep server to run - let it run twice, since the statistic
     # is incremented at the start of a sweep and the test relies on sweep
@@ -99,7 +106,6 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         close1 = stat_cursor[stat.conn.dh_sweep_dead_close][2]
         stat_cursor.close()
-
         # We expect nothing to have been closed.
         self.assertEqual(close1, 0)
 

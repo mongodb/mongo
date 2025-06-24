@@ -44,7 +44,7 @@ __wti_rts_progress_msg(WT_SESSION_IMPL *session, WT_TIMER *rollback_start, uint6
 static bool
 __rts_thread_chk(WT_SESSION_IMPL *session)
 {
-    return (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RTS_THREAD_RUN));
+    return (FLD_ISSET(S2C(session)->server_flags, WT_CONN_SERVER_RTS));
 }
 
 /*
@@ -61,7 +61,7 @@ __rts_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
     WT_UNUSED(thread);
 
     /* Wait here. */
-    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RTS_THREAD_RUN))
+    if (FLD_ISSET(S2C(session)->server_flags, WT_CONN_SERVER_RTS))
         __wt_cond_wait(session, S2C(session)->rts->thread_group.wait_cond, 10 * WT_THOUSAND, NULL);
 
     /* Mark the RTS thread session as a rollback to stable session. */
@@ -114,7 +114,7 @@ __rts_thread_create(WT_SESSION_IMPL *session)
         return (0);
 
     /* Set first, the thread might run before we finish up. */
-    F_SET_ATOMIC_32(conn, WT_CONN_RTS_THREAD_RUN);
+    FLD_SET(conn->server_flags, WT_CONN_SERVER_RTS);
 
     /* RTS work unit list */
     TAILQ_INIT(&conn->rts->rtsqh);
@@ -148,7 +148,7 @@ __rts_thread_destroy(WT_SESSION_IMPL *session)
     __wt_writelock(session, &conn->rts->thread_group.lock);
 
     /* Signal the threads to finish. */
-    F_CLR_ATOMIC_32(conn, WT_CONN_RTS_THREAD_RUN);
+    FLD_CLR(conn->server_flags, WT_CONN_SERVER_RTS);
     __wt_cond_signal(session, conn->rts->thread_group.wait_cond);
 
     __wt_verbose(

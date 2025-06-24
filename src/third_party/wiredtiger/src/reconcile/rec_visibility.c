@@ -656,7 +656,7 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *first_up
              * when preserve prepared is enabled.
              */
             if (F_ISSET(r, WT_REC_CHECKPOINT) &&
-              (!S2C(session)->preserve_prepared ||
+              (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_PRESERVE_PREPARED) ||
                 upd->start_ts > S2C(session)->txn_global.checkpoint_timestamp)) {
                 *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
                 *has_newer_updatesp = true;
