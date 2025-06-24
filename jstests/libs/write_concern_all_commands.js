@@ -2106,6 +2106,7 @@ const wcCommandsTests = {
         },
     },
     repairShardedCollectionChunksHistory: {skip: "does not accept write concern"},
+    replicateSearchIndexCommand: {skip: "internal command for testing only"},
     replSetAbortPrimaryCatchUp: {skip: "does not accept write concern"},
     replSetFreeze: {skip: "does not accept write concern"},
     replSetGetConfig: {skip: "does not accept write concern"},
