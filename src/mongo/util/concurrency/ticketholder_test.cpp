@@ -467,14 +467,19 @@ TEST_F(TicketHolderTest, HighlyConcurrentAcquireReleaseTicket) {
     constexpr int numThreads = 10;
 
     Hotel hotel{numRooms};
-    OperationContext* opCtx = _opCtx.get();
     auto holder = std::make_unique<TicketHolder>(getServiceContext(),
                                                  numRooms,
                                                  false /* trackPeakUsed */,
                                                  TicketHolder::kDefaultMaxQueueDepth);
 
     for (size_t i = 0; i < numThreads; ++i) {
-        threads.emplace_back([&, numCheckIns]() {
+        threads.emplace_back([&, i, numCheckIns]() {
+            std::string clientName = "Client ";
+            clientName += std::to_string(i);
+            auto client = getService()->makeClient(clientName);
+            ServiceContext::UniqueOperationContext opCtxOwned = client->makeOperationContext();
+            OperationContext* opCtx = opCtxOwned.get();
+
             MockAdmissionContext admCtx{};
             for (size_t checkIn = 0; checkIn < numCheckIns; checkIn++) {
                 auto ticket = holder->waitForTicket(opCtx, &admCtx);

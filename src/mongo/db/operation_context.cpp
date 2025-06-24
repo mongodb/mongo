@@ -34,6 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/operation_key_manager.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -77,11 +78,16 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(checkForInterruptFail);
 
 const auto kNoWaiterThread = stdx::thread::id();
+
+Milliseconds interruptCheckPeriod() {
+    return Milliseconds{gOverdueInterruptCheckIntervalMillis.loadRelaxed()};
+}
 }  // namespace
 
 OperationContext::OperationContext(Client* client, OperationId opId)
     : _client(client),
       _opId(opId),
+      _interruptCheckWindowStartTime(getServiceContext()->getFastClockSource()->now()),
       _elapsedTime(client ? client->getServiceContext()->getTickSource()
                           : globalSystemTickSource()) {}
 
@@ -217,6 +223,9 @@ bool opShouldFail(Client* client, const BSONObj& failPointInfo) {
 }  // namespace
 
 Status OperationContext::checkForInterruptNoAssert() noexcept {
+    updateOverdueInterruptCheckCounters();
+
+    ++_overdueInterruptCheckStats.totalInterruptChecks;
     if (getClient()->getKilled() && !_isExecutingShutdown) {
         return Status(ErrorCodes::ClientMarkedKilled, "client has been killed");
     }
@@ -261,6 +270,25 @@ Status OperationContext::checkForInterruptNoAssert() noexcept {
     }
 
     return Status::OK();
+}
+
+void OperationContext::updateOverdueInterruptCheckCounters() {
+    ClockSource* clockSource = getServiceContext()->getFastClockSource();
+    const Date_t now = clockSource->now();
+    const Date_t prevStart = std::exchange(_interruptCheckWindowStartTime, now);
+
+    if (_ignoreInterrupts || isWaitingForConditionOrInterrupt()) {
+        // If we're ignoring interrupts or we're in an interruptible wait, we update the time of
+        // the last interrupt check, but we do not bump the overdue counters.
+        return;
+    }
+
+    if (auto overdue = (now - prevStart) - interruptCheckPeriod(); overdue > Milliseconds{0}) {
+        auto& stats = _overdueInterruptCheckStats;
+        ++stats.overdueInterruptChecks;
+        stats.overdueAccumulator += overdue;
+        stats.overdueMaxTime = std::max(stats.overdueMaxTime, overdue);
+    }
 }
 
 void OperationContext::_schedulePeriodicClientConnectedCheck() {
@@ -496,5 +524,4 @@ Date_t OperationContext::getExpirationDateForWaitForValue(Milliseconds waitFor) 
 bool OperationContext::isIgnoringInterrupts() const {
     return _ignoreInterrupts;
 }
-
 }  // namespace mongo

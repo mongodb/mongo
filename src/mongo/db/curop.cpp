@@ -90,6 +90,44 @@ namespace {
 
 auto& oplogGetMoreStats = *MetricBuilder<TimerStats>("repl.network.oplogGetMoresProcessed");
 
+// Server operations are expected to regularly call OperationContext::checkForInterrupt() to see
+// whether they have been killed and should halt execution. These counters track how many interrupt
+// checks occur, over all operations, as well as information about overdue interrupt checks.
+
+// Accumulates total number of interrupt checks across all operations.
+auto& totalInterruptChecks = *MetricBuilder<Counter64>("operation.totalInterruptChecks");
+
+// Counts how many operations had at least one overdue interrupt check.
+auto& opsWithOverdueInterruptCheck = *MetricBuilder<Counter64>("operation.overdueInterruptOps");
+
+// Counts total number of overdue interrupt checks.
+auto& overdueInterruptChecks = *MetricBuilder<Counter64>("operation.overdueInterruptChecks");
+
+// Computes total time overdue for interrupt check.
+auto& overdueInterruptTotalTimeMillis =
+    *MetricBuilder<Counter64>("operation.overdueInterruptTotalMillis");
+
+// Approximate max time any operation was overdue for interrupt check.
+auto& overdueInterruptApproxMaxTimeMillis =
+    *MetricBuilder<Atomic64Metric>("operation.overdueInterruptApproxMaxMillis");
+
+void reportOverdueOpStats(const OperationContext& opCtx) {
+    opsWithOverdueInterruptCheck.increment();
+
+    const auto& stats = opCtx.overdueInterruptCheckStats();
+    overdueInterruptChecks.increment(stats.overdueInterruptChecks);
+    overdueInterruptTotalTimeMillis.increment(
+        durationCount<Milliseconds>(stats.overdueAccumulator));
+    totalInterruptChecks.increment(stats.totalInterruptChecks);
+
+    // Note that if we wanted the exact maximum, we would use a CAS loop, since it's possible a new
+    // maximum will be entered between the set() and get() here. The approximate maximum is good
+    // enough though.
+    overdueInterruptApproxMaxTimeMillis.set(
+        std::max(overdueInterruptApproxMaxTimeMillis.get(),
+                 static_cast<int64_t>(durationCount<Milliseconds>(stats.overdueMaxTime))));
+}
+
 BSONObj serializeDollarDbInOpDescription(boost::optional<TenantId> tenantId,
                                          const BSONObj& cmdObj,
                                          const SerializationContext& sc) {
@@ -617,6 +655,11 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
     _debug.additiveMetrics.executionTime = elapsedTimeExcludingPauses();
     const auto executionTimeMillis =
         durationCount<Milliseconds>(*_debug.additiveMetrics.executionTime);
+
+    opCtx->updateOverdueInterruptCheckCounters();
+    if (opCtx->hadOverdueInterruptCheck()) {
+        reportOverdueOpStats(*opCtx);
+    }
 
     // Do not log the slow query information if asked to omit it
     if (shouldCurOpStackOmitDiagnosticInformation(this)) {

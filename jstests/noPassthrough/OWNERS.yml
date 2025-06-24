@@ -21,3 +21,6 @@ filters:
   - "*failcommand*":
     approvers:
       - 10gen/server-programmability
+  - "delinquent*":
+    approvers:
+      - 10gen/server-workload-scheduling

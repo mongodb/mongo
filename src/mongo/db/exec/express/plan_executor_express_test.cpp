@@ -31,24 +31,12 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 
 namespace mongo {
 namespace {
-std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr, bool setLimit1 = false) {
-    auto nss = NamespaceString::createNamespaceString_forTest("test.collection");
-    auto opCtx = OperationContext(nullptr, 5);
-    auto findCommand = std::make_unique<FindCommandRequest>(nss);
-    findCommand->setFilter(fromjson(queryStr));
-    if (setLimit1) {
-        findCommand->setLimit(1);
-    }
-    return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = ExpressionContextBuilder{}.fromRequest(&opCtx, *findCommand).build(),
-        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
-}
-
 IndexEntry createIndexEntry(BSONObj keyPattern, bool unique, bool sparse = false) {
     return IndexEntry(keyPattern,
                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
@@ -66,9 +54,34 @@ IndexEntry createIndexEntry(BSONObj keyPattern, bool unique, bool sparse = false
 }
 
 
+class ExpressTest : public ServiceContextTest {
+public:
+    std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr, bool setLimit1 = false) {
+        auto nss = NamespaceString::createNamespaceString_forTest("test.collection");
+        auto findCommand = std::make_unique<FindCommandRequest>(nss);
+        findCommand->setFilter(fromjson(queryStr));
+        if (setLimit1) {
+            findCommand->setLimit(1);
+        }
+        return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
+            .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    }
+
+    OperationContext* opCtx() {
+        if (!_opCtxOwned) {
+            _opCtxOwned = makeOperationContext();
+        }
+
+        return _opCtxOwned.get();
+    }
+
+    ServiceContext::UniqueOperationContext _opCtxOwned;
+};
+
 }  // namespace
 
-TEST(getIndexForExpressEquality, idIndexEligibility) {
+TEST_F(ExpressTest, idIndexEligibility) {
     auto cq = canonicalize("{_id: 2}");
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
@@ -88,7 +101,7 @@ TEST(getIndexForExpressEquality, idIndexEligibility) {
     ASSERT_EQUALS(ent, want);
 }
 
-TEST(getIndexForExpressEquality, compoundIdIndexEligibility) {
+TEST_F(ExpressTest, compoundIdIndexEligibility) {
     auto cq = canonicalize("{_id: 2}", /* limit 1*/ true);
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
@@ -116,7 +129,7 @@ TEST(getIndexForExpressEquality, compoundIdIndexEligibility) {
 }
 
 // Non-_id query prefers unique, single-field index.
-TEST(getIndexForExpressEquality, singleFieldIndexEligibility) {
+TEST_F(ExpressTest, singleFieldIndexEligibility) {
     auto cq = canonicalize("{a: 2}");
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
@@ -137,7 +150,7 @@ TEST(getIndexForExpressEquality, singleFieldIndexEligibility) {
 
 // Non-unique single-field or compound indexes are ineligible without limit(1) and no
 // shard filtering. The query must be guaranteed to produce at most 1 result.
-TEST(getIndexForExpressEquality, nonUniqueIndexEligibility) {
+TEST_F(ExpressTest, nonUniqueIndexEligibility) {
     auto cq = canonicalize("{a: 2}");
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
@@ -166,7 +179,7 @@ TEST(getIndexForExpressEquality, nonUniqueIndexEligibility) {
     ASSERT_EQUALS(ent, params.mainCollectionInfo.indexes[1]);
 }
 
-TEST(getIndexForExpressEquality, compoundUniqueIndexEligibility) {
+TEST_F(ExpressTest, compoundUniqueIndexEligibility) {
     auto cq = canonicalize("{a: 2}", true /* limit 1 */);
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
@@ -200,7 +213,7 @@ TEST(getIndexForExpressEquality, compoundUniqueIndexEligibility) {
     ASSERT_EQUALS(ent, boost::none);
 }
 
-TEST(getIndexForExpressEquality, sparseIndexIneligibility) {
+TEST_F(ExpressTest, sparseIndexIneligibility) {
     auto cq = canonicalize("{a: 2}");
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
@@ -228,7 +241,7 @@ TEST(getIndexForExpressEquality, sparseIndexIneligibility) {
     ASSERT_EQUALS(ent, boost::none);
 }
 
-TEST(getIndexForExpressEquality, nonBtreeEligibility) {
+TEST_F(ExpressTest, nonBtreeEligibility) {
     auto cq = canonicalize("{a: 2}");
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
@@ -240,7 +253,7 @@ TEST(getIndexForExpressEquality, nonBtreeEligibility) {
     ASSERT_EQUALS(ent, boost::none);
 }
 
-TEST(getIndexForExpressEquality, collationMismatchEligibility) {
+TEST_F(ExpressTest, collationMismatchEligibility) {
     CollatorInterfaceMock revCollator(CollatorInterfaceMock::MockType::kReverseString);
     auto cq = canonicalize("{a: \"foo\"}");
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
@@ -256,7 +269,7 @@ TEST(getIndexForExpressEquality, collationMismatchEligibility) {
     ASSERT_EQUALS(ent, boost::none);
 }
 
-TEST(getIndexForExpressEquality, partialIndexEligibility) {
+TEST_F(ExpressTest, partialIndexEligibility) {
     auto cq = canonicalize("{a: 1}");
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;

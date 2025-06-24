@@ -2236,6 +2236,11 @@ mongo_cc_library(
     ],
 )
 
+idl_generator(
+    name = "operation_context_options_gen",
+    src = "operation_context_options.idl",
+)
+
 mongo_cc_library(
     name = "service_context",
     srcs = [
@@ -2246,6 +2251,7 @@ mongo_cc_library(
         "default_baton.cpp",
         "operation_context.cpp",
         "operation_context_group.cpp",
+        "operation_context_options_gen",
         "operation_cpu_timer.cpp",
         "operation_id.cpp",
         "operation_key_manager.cpp",
@@ -4124,6 +4130,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/stats:counters",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/util/concurrency:thread_pool",
         "//src/third_party/asio-master:asio",
