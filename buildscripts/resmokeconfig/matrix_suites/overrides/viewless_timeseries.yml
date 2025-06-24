@@ -224,6 +224,7 @@
         - jstests/noPassthrough/timeseries/write/timeseries_compressed_bucket_size.js
         - jstests/noPassthrough/timeseries/write/timeseries_dynamic_bucket_sizing.js
         - jstests/noPassthrough/timeseries/write/timeseries_dynamic_bucket_sizing_large.js
+        - jstests/noPassthrough/timeseries/write/timeseries_find_and_modify_without_shard_key_raw_data.js
         - jstests/noPassthrough/timeseries/write/timeseries_idle_buckets.js
         - jstests/noPassthrough/timeseries/write/timeseries_insert_after_failed_insert.js
         - jstests/noPassthrough/timeseries/write/timeseries_insert_invalid_timefield.js

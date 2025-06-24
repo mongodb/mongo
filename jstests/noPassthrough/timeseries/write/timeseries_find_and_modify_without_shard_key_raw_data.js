@@ -9,6 +9,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {
     getRawOperationSpec,
@@ -37,7 +38,6 @@ const st = new ShardingTest({shards: 2});
 const db = st.s0.getDB(dbName);
 
 const coll = db[jsTestName()];
-const fullBucketsCollName = `${dbName}.${TimeseriesTest.getBucketsCollName(jsTestName())}`;
 assert.commandWorked(db.adminCommand({
     shardCollection: coll.getFullName(),
     key: {[metaFieldName]: 1},
@@ -51,12 +51,13 @@ coll.insertMany([
     {[timeFieldName]: ISODate(), [metaFieldName]: 4, data: 4},
 ]);
 
-assert.commandWorked(db.adminCommand({split: fullBucketsCollName, middle: {[metaFieldName]: 2}}));
+assert.commandWorked(db.adminCommand(
+    {split: getTimeseriesCollForDDLOps(db, coll).getFullName(), middle: {[metaFieldName]: 2}}));
 
 const primaryShard = st.getPrimaryShard(dbName);
 const otherShard = st.getOther(primaryShard);
 assert.commandWorked(db.adminCommand({
-    moveChunk: fullBucketsCollName,
+    moveChunk: getTimeseriesCollForDDLOps(db, coll).getFullName(),
     find: {[metaFieldName]: 1},
     to: otherShard.shardName,
 }));

@@ -87,6 +87,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/start_chunk_clone_request.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/session_catalog.h"
@@ -886,6 +887,11 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
                                    repl::ReadConcernLevel::kLocalReadConcern);
         listIndexesCmd.setReadConcern(args);
     }
+    if (gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        listIndexesCmd.setRawData(true);
+    }
 
     // Get indexes by calling listIndexes against the donor.
     auto indexes = uassertStatusOK(
@@ -959,6 +965,11 @@ MigrationDestinationManager::getCollectionOptions(OperationContext* opCtx,
         listCollectionsCmd.setFilter(BSON("name" << nssOrUUID.nss().coll()));
     } else {
         listCollectionsCmd.setFilter(BSON("info.uuid" << nssOrUUID.uuid()));
+    }
+    if (gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        listCollectionsCmd.setRawData(true);
     }
 
     if (dbVersion) {
