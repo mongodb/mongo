@@ -728,7 +728,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
                 uassert(5346503,
                         "include or exclude field element must be a single-element field path",
                         field.find('.') == std::string::npos);
-                // TODO SERVER-98589: Remove when BSON field name type is implemented.
                 uassert(9568705,
                         "include or exclude field element must not contain an embedded null byte",
                         field.find('\0') == std::string::npos);
@@ -747,7 +746,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
                     str::stream() << "timeField field must be a string, got: " << elem.type(),
                     elem.type() == BSONType::string);
             auto timeField = elem.str();
-            // TODO SERVER-98589: Remove when BSON field name type is implemented.
             uassert(9568701,
                     str::stream() << "timeField must not contain an embedded null byte",
                     timeField.find('\0') == std::string::npos);
@@ -761,7 +759,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
             uassert(5545700,
                     str::stream() << "metaField field must be a single-element field path",
                     metaField.find('.') == std::string::npos);
-            // TODO SERVER-98589: Remove when BSON field name type is implemented.
             uassert(9568702,
                     str::stream() << "metaField field must not contain an embedded null byte",
                     metaField.find('\0') == std::string::npos);
@@ -792,7 +789,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
                 uassert(5509902,
                         "computedMetaProjFields field element must be a single-element field path",
                         field.find('.') == std::string::npos);
-                // TODO SERVER-98589: Remove when BSON field name type is implemented.
                 uassert(9568706,
                         "computedMetaProjFields field must not contain an embedded null byte",
                         field.find('\0') == std::string::npos);
@@ -884,7 +880,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
             uassert(5612401,
                     str::stream() << "timeField field must be a string, got: " << elem.type(),
                     elem.type() == BSONType::string);
-            // TODO SERVER-98589: Remove when BSON field name type is implemented.
             uassert(9568703,
                     str::stream() << "timeField must not contain an embedded null byte",
                     timeField.find('\0') == std::string::npos);
@@ -898,7 +893,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
             uassert(5612403,
                     str::stream() << "metaField field must be a single-element field path",
                     metaField.find('.') == std::string::npos);
-            // TODO SERVER-98589: Remove when BSON field name type is implemented.
             uassert(9568704,
                     str::stream() << "metaField field must not contain an embedded null byte",
                     metaField.find('\0') == std::string::npos);
