@@ -7,16 +7,17 @@ import sys
 from dataclasses import dataclass
 from functools import cached_property, partial
 from pathlib import Path
-from typing import Any, NamedTuple, Protocol
+from typing import Any, Callable, Literal, NamedTuple, Protocol
 
 import tree_sitter
 import tree_sitter_cpp
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding, BindingType
-from textual.containers import Horizontal
+from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
-from textual.widgets import Footer, TextArea, Tree
+from textual.screen import ModalScreen
+from textual.widgets import Button, Footer, Label, TextArea, Tree
 from textual.widgets.text_area import Selection, TextAreaTheme
 from textual.widgets.tree import TreeNode
 
@@ -195,6 +196,18 @@ class File:
         return unknown_count(self.top_level_decls) + unknown_count(self.detached_decls)
 
 
+def is_submodule_usage(decl: Decl, mod: str) -> bool:
+    return decl.mod == mod or mod.startswith(decl.mod + ".")
+
+
+def is_modified_since_scan(path: str | Path) -> bool:
+    if not isinstance(path, Path):
+        path = Path(path)
+    if not path.exists():
+        return True  # deleted counts as a modification
+    return path.stat().st_mtime > Path(input_path).stat().st_mtime
+
+
 def add_decl_node(node: TreeNode, d: Decl):
     # Highlight the "main" part of the name.
     # Assume that the last instance of the name is the main one.
@@ -202,6 +215,7 @@ def add_decl_node(node: TreeNode, d: Decl):
     label = f"[bold bright_white]{d.spelling}[/]".join(d.display_name.rsplit(d.spelling, 1))
     label += f" [i]unknowns:[/]{unknown_count(d)}"
     label += f" [i]usages:[/]{sum(len(u) for u in d.transitive_usages.values())}"
+    label += f" [i]external:[/]{sum(len(u) for m, u in d.transitive_usages.items() if not is_submodule_usage(d, m))}"
     if d.sem_children:
         label += f" [i]children:[/]{len(d.sem_children)}"
     if d.lex_children:
@@ -214,28 +228,15 @@ def add_decl_nodes(node: TreeNode, ds: list[Decl]):
         add_decl_node(node, d)
 
 
-def add_mod_loc_mapping_nodes(node: TreeNode, usages: Usages, kind: str, expand=False):
-    node = node.add(f"[i]{kind}:[/] ", expand=expand)
+def add_mod_loc_mapping_nodes(node: TreeNode, usages: Usages, kind: str):
+    node = node.add(f"[i]{kind}:[/] ")
     tot = 0
     for mod, locs in sorted(usages.items()):
         tot += len(locs)
-        mod_node = node.add(f"{mod}: {len(locs)}", expand=expand)
-        for loc in sorted(locs):
-            if isinstance(loc, Loc):
-                mod_node.add_leaf(Text(str(loc.loc)), loc.loc)
-                continue
+        node.add(f"{mod}: {len(locs)}", data=locs)
 
-            # Currently only STATIC_ASSERT doesn't have a name.
-            kind, _, name = loc.ctx.partition(" ")
-            mod_node.add_leaf(
-                Text.assemble(
-                    fancy_kind(kind),
-                    Text(" " + name, style="bold bright_white") if name else "",
-                    f" {loc.loc}",
-                ),
-                loc.loc,
-            )
     node.label += str(tot)
+    return node
 
 
 VIM_BINDINGS: list[BindingType] = [
@@ -258,20 +259,30 @@ class CodePreview(TextArea):
         self.loc = self.app.query_exactly_one(FilesTree).loc
 
     def watch_loc(self, old: Loc | None, new: Loc | None):
-        print("preview new loc", new)
         if new is None:
             self.clear()
             return
 
         if old is None or old.file != new.file:
-            if not os.path.exists(new.file):
+            newPath = Path(new.file)
+
+            app: ModularityApp = self.app  # type: ignore
+            if not app.prompted_for_rescan and is_modified_since_scan(newPath):
+                app.prompted_for_rescan = True
+                app.call_after_refresh(
+                    app.prompt_for_scan,
+                    "This file has been modified since the last scan.\n"
+                    "Would you like to rescan the source code?\n"
+                    "It may take a few minutes.",
+                )
+
+            if not newPath.exists():
                 self.notify(f"cannot open file '{new.file}'")
                 self.loc = None
                 return
 
-            with open(new.file) as file:
-                self.border_title = f"[blue]{new.file}/[/]"
-                self.load_text(file.read())
+            self.border_title = f"[blue]{new.file}/[/]"
+            self.load_text(newPath.read_text())
 
         start = (new.line - 1, new.col - 1)  # 0-indexed :(
         self.move_cursor(start)
@@ -315,18 +326,31 @@ class FilesTree(Tree):
         ),
     ]
 
-    files = reactive(list[File]())
+    all_files = reactive(list[File](), always_update=True)
+    mod = reactive("ALL")
+    files = reactive(list[File](), always_update=True)
     loc: reactive[Loc | None] = reactive(None)
+    modules = set[str]
 
-    def __init__(self, files: dict[str, File]):
+    def __init__(self):
         super().__init__(label="files")
         self.show_root = False
-        self.all_files = list(files.values())
-        self.files = self.all_files
+        if os.path.exists(input_path):
+            self.all_files = load_decls()
+        else:
+            self.app.call_after_refresh(
+                self.app.prompt_for_scan,
+                "Would you like to scan the source code?\nIt may take a few minutes.",
+            )
+
+    def watch_all_files(self):
+        self.modules = {f.mod for f in self.all_files}
+        self.update_files()
+
+    def watch_mod(self):
+        self.update_files()
 
     def watch_files(self, old: list[File], new: list[File]):
-        print(len(new))
-        print(len(old))
         if len(old) == len(new) and all(id(old[i]) == id(new[i]) for i in range(len(old))):
             return
 
@@ -339,9 +363,7 @@ class FilesTree(Tree):
             )
 
     def watch_loc(self, new: Loc | None):
-        print("new loc", new)
         for preview in self.app.query(CodePreview):
-            print("found preview")
             preview.loc = new
 
     def on_tree_node_highlighted(self, event: Tree.NodeHighlighted):
@@ -357,6 +379,12 @@ class FilesTree(Tree):
 
     def action_goto(self):
         if self.loc:
+            if is_modified_since_scan(self.loc.file):
+                self.app.notify(
+                    "This file has been modified since the last scan.\n"
+                    "If you would like to rescan the source code, press `r`.",
+                )
+
             if "VSCODE_IPC_HOOK_CLI" in os.environ:
                 if not shutil.which("code"):
                     return self.app.notify(
@@ -379,20 +407,22 @@ class FilesTree(Tree):
             else:
                 self.app.notify("GoTo only works inside VSCode or nvim terminal")
 
+    def update_files(self):
+        # Triggers watch_files to update the tree.
+        if self.mod == "ALL":
+            self.files = self.all_files
+        else:
+            self.files = [f for f in self.all_files if f.mod == self.mod]
+
     def action_mod_select(self):
         def handle_selection(mod):
-            print(mod)
-            if not mod:
-                return
-
-            if mod == "ALL":
-                self.files = self.all_files
-            else:
-                self.files = [f for f in self.all_files if f.mod == mod]
+            self.mod = mod
 
         self.app.search_commands(
             placeholder="Module:",
-            commands=[(mod, partial(handle_selection, mod)) for mod in ["ALL"] + sorted(modules)],
+            commands=[
+                (mod, partial(handle_selection, mod)) for mod in ["ALL"] + sorted(self.modules)
+            ],
         )
 
     def on_tree_node_expanded(self, event: Tree.NodeExpanded):
@@ -404,6 +434,8 @@ class FilesTree(Tree):
             return self.fill_file_node(node)
         if type(node.data) == Decl:
             return self.fill_decl_node(node)
+        if type(node.data) in (list, set):
+            return self.fill_locs_node(node)
         raise ValueError(f"unexpected data of type {type(node.data)}")
 
     def fill_file_node(self, node: TreeNode[File]):
@@ -430,13 +462,12 @@ class FilesTree(Tree):
 
     def fill_decl_node(self, node: TreeNode[Decl]):
         d = node.data
-        node.add_leaf(f"[i]loc:[/] {d.loc}")
-        node.add_leaf(f"[i]usr:[/] {d.usr}")  # TODO: hide unless in "developer mode"
+        node.add_leaf(Text.assemble(("loc: ", "italic"), str(d.loc)))
         if d.alt:
-            node.add_leaf(f"[i]replacement:[/] {d.alt}")
+            node.add_leaf(Text.assemble(("replacement: ", "italic"), d.alt))
 
         if d.other_mods:
-            add_mod_loc_mapping_nodes(node, d.other_mods, "declared in other_mods", expand=True)
+            add_mod_loc_mapping_nodes(node, d.other_mods, "declared in other_mods").expand_all()
 
         add_mod_loc_mapping_nodes(node, d.direct_usages, "direct usages")
 
@@ -451,6 +482,23 @@ class FilesTree(Tree):
             add_decl_nodes(
                 node.add("lexical but [b]not[/] semantic children"),
                 d.lex_children,
+            )
+
+    def fill_locs_node(self, node: TreeNode) -> None:
+        for loc in sorted(node.data):
+            if isinstance(loc, Loc):
+                node.add_leaf(Text(str(loc.loc)), loc.loc)
+                continue
+
+            # Currently only STATIC_ASSERT doesn't have a name.
+            kind, _, name = loc.ctx.partition(" ")
+            node.add_leaf(
+                Text.assemble(
+                    fancy_kind(kind),
+                    Text(" " + name, style="bold bright_white") if name else "",
+                    f" {loc.loc}",
+                ),
+                loc.loc,
             )
 
     def action_find_file(self):
@@ -472,12 +520,76 @@ class FilesTree(Tree):
         )
 
 
+class Confirm(ModalScreen):
+    # This plugin will add highlighting for textual CSS
+    # https://marketplace.visualstudio.com/items?itemName=Textualize.textual-syntax-highlighter
+    CSS = """
+        Confirm {
+            align: center middle;
+        }
+        #dialog {
+            height: auto;
+            width: 75;
+            color: $text;
+            border: tall white;
+            padding: 1 2;
+            align: center middle;
+        }
+        Button {
+            margin: 0 4;
+            width: 1fr;
+        }
+        #question {
+            text-align: center;
+            text-style: bold;
+            margin-bottom: 1;
+        }
+        #buttons {
+            height: auto;
+            dock: bottom;
+        }
+    """
+
+    def __init__(self, message: str, cb: Callable[[Literal["yes", "no"]], None]):
+        super().__init__()
+        self.message = message
+        self.cb = cb
+
+    def compose(self) -> ComposeResult:
+        yield Vertical(
+            Label(self.message, id="question"),
+            Horizontal(
+                Button("Yes", variant="success", id="yes"),
+                Button("No", variant="error", id="no"),
+                id="buttons",
+            ),
+            id="dialog",
+        )
+
+    def key_y(self) -> None:
+        self.query_exactly_one("#yes", Button).press()
+
+    def key_n(self) -> None:
+        self.query_exactly_one("#no", Button).press()
+
+    def key_escape(self) -> None:
+        self.key_n()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss()
+        assert event.button.id in ("yes", "no")
+        self.cb(event.button.id)  # type: ignore # mypy can't narrow to literals based on assert
+
+
 class ModularityApp(App):
     BINDINGS = [
         ("q", "quit", "Quit"),
         ("?", "toggle_help", "Toggle Help"),
         ("p", "toggle_preview", "Toggle Code Preview"),
+        ("r", "rescan", "Rescan Source Code"),
     ]
+
+    prompted_for_rescan = False
 
     # def __init__(self, decls: list[Decl]):
     #     self.decls = decls
@@ -489,7 +601,7 @@ class ModularityApp(App):
         """Create child widgets for the app."""
         # yield Header()
         yield Footer()
-        yield Horizontal(FilesTree(files))
+        yield Horizontal(FilesTree())
 
     def action_toggle_help(self):
         if self.query("HelpPanel"):
@@ -503,78 +615,107 @@ class ModularityApp(App):
         else:
             self.query_exactly_one(Horizontal).mount(CodePreview())
 
+    def action_rescan(self):
+        self.prompt_for_scan("Rescanning may take a few minutes. Are you sure?")
 
-input = "merged_decls.json"
+    def prompt_for_scan(self, message: str):
+        def cb(event: Literal["yes", "no"]):
+            tree = self.query_exactly_one(FilesTree)
+            if event == "no":
+                if not tree.all_files:
+                    self.exit()
+                return
+
+            self.prompted_for_rescan = False  # allow prompting if files are modified again
+
+            with self.suspend():
+                print("\n\nRunning modules_poc/merge_decls.py --intra-module:")
+                if os.system("modules_poc/merge_decls.py --intra-module") != 0:
+                    input("Error rescanning, press Enter to continue")
+                    return
+
+                print("Done! Parsing declarations into browser...")
+
+                tree.all_files = load_decls()
+                tree.refresh()
+
+        self.push_screen(Confirm(message, cb))
+
+
+input_path = "merged_decls.json"
 if len(sys.argv) > 1:
-    input = sys.argv[1]
-with open(input, "rb") as file:
-    raw_decls = json.load(file)
-
-for d in raw_decls:
-    d["loc"] = Loc.parse(d["loc"])
-    d["_raw_used_from"] = d["used_from"]
-    del d["used_from"]
-    if "other_mods" in d:
-        for mod, locs in d["other_mods"].items():
-            locs.sort()
-            d["other_mods"][mod] = [Loc.parse(loc) for loc in locs]
-    # For now these aren't used in the browser
-    del d["vis_from"]
-    del d["vis_from_non_ns"]
-
-decls = sorted((Decl(**d) for d in raw_decls), key=lambda d: d.loc)
-del raw_decls
-
-decl_ix = {d.usr: d for d in decls}
-files = dict[str, File]()
+    input_path = sys.argv[1]
 
 
-def getFile(d: Decl):
-    name = d.loc.file
-    if name in files:
-        return files[name]
+def load_decls() -> list[File]:
+    files = dict[str, File]()
+
+    with open(input_path, "rb") as file:
+        raw_decls = json.load(file)
+
+    for d in raw_decls:
+        d["loc"] = Loc.parse(d["loc"])
+        d["_raw_used_from"] = d["used_from"]
+        del d["used_from"]
+        if "other_mods" in d:
+            for mod, locs in d["other_mods"].items():
+                locs.sort()
+                d["other_mods"][mod] = [Loc.parse(loc) for loc in locs]
+        # For now these aren't used in the browser
+        del d["vis_from"]
+        del d["vis_from_non_ns"]
+
+    decls = sorted((Decl(**d) for d in raw_decls), key=lambda d: d.loc)
+    decl_ix = {d.usr: d for d in decls}
+
+    def getFile(d: Decl):
+        name = d.loc.file
+        if name in files:
+            return files[name]
+        else:
+            file = File(name, d.mod)
+            files[name] = file
+            return file
+
+    top_level_usrs = {d.usr for d in decls}
+    for d in decls:
+        getFile(d).all_decls.append(d)
+        if d.sem_par in decl_ix:
+            decl_ix[d.sem_par].sem_children.append(d)
+            top_level_usrs.remove(d.usr)
+
+            if decl_ix[d.sem_par].loc.file != d.loc.file:
+                getFile(d).detached_decls.append(d)
+                if decl_ix[d.sem_par].mod != d.mod:
+                    print(
+                        f"warning: {d.display_name} defined in {d.mod}, but parent is in {decl_ix[d.sem_par].mod}"
+                    )
+
+        if d.lex_par != d.sem_par and d.lex_par in decl_ix:
+            decl_ix[d.lex_par].lex_children.append(d)
+            # top_level_usrs.remove(d.usr)
+            assert decl_ix[d.lex_par].loc.file == d.loc.file
+
+    for u in top_level_usrs:
+        d = decl_ix[u]
+        getFile(d).top_level_decls.append(d)
+
+    for f in files.values():
+        f.all_decls.sort(key=lambda d: d.loc)
+        f.top_level_decls.sort(key=lambda d: d.loc)
+        f.detached_decls.sort(key=lambda d: d.loc)
+
+    return sorted(files.values(), key=lambda f: f.unknown_count, reverse=True)
+
+
+if __name__ == "__main__":
+    if "--parse-only" in sys.argv:
+        load_decls()
     else:
-        file = File(name, d.mod)
-        files[name] = file
-        return file
-
-
-top_level_usrs = {d.usr for d in decls}
-for d in decls:
-    getFile(d).all_decls.append(d)
-    if d.sem_par in decl_ix:
-        decl_ix[d.sem_par].sem_children.append(d)
-        top_level_usrs.remove(d.usr)
-
-        if decl_ix[d.sem_par].loc.file != d.loc.file:
-            getFile(d).detached_decls.append(d)
-            if decl_ix[d.sem_par].mod != d.mod:
-                print(
-                    f"warning: {d.display_name} defined in {d.mod}, but parent is in {decl_ix[d.sem_par].mod}"
-                )
-
-    if d.lex_par != d.sem_par and d.lex_par in decl_ix:
-        decl_ix[d.lex_par].lex_children.append(d)
-        # top_level_usrs.remove(d.usr)
-        assert decl_ix[d.lex_par].loc.file == d.loc.file
-
-for u in top_level_usrs:
-    d = decl_ix[u]
-    getFile(d).top_level_decls.append(d)
-
-for f in files.values():
-    f.all_decls.sort(key=lambda d: d.loc)
-    f.top_level_decls.sort(key=lambda d: d.loc)
-    f.detached_decls.sort(key=lambda d: d.loc)
-
-files = {k: v for k, v in sorted(files.items(), key=lambda kv: kv[1].unknown_count, reverse=True)}
-modules = {d.mod for d in decls}
-
-if __name__ == "__main__" and "--parse-only" not in sys.argv:
-    app = ModularityApp()
-    app.run()
+        app = ModularityApp()
+        app.run()
 
     # Don't waste time running GC on exit
     os._exit(0)
 
-# cSpell:words usrs
+# cSpell:words usrs nvim rescan rescanning

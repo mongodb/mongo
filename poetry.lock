@@ -4221,15 +4221,15 @@ test = ["pytest", "tornado (>=4.5)", "typeguard"]
 
 [[package]]
 name = "textual"
-version = "1.0.0"
+version = "3.5.0"
 description = "Modern Text User Interface framework"
 optional = false
 python-versions = "<4.0.0,>=3.8.1"
 groups = ["modules_poc"]
 markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
 files = [
-    {file = "textual-1.0.0-py3-none-any.whl", hash = "sha256:2d4a701781c05104925e463ae370c630567c70c2880e92ab838052e3e23c986f"},
-    {file = "textual-1.0.0.tar.gz", hash = "sha256:bec9fe63547c1c552569d1b75d309038b7d456c03f86dfa3706ddb099b151399"},
+    {file = "textual-3.5.0-py3-none-any.whl", hash = "sha256:7c960efb70391b754e66201776793de2b26d699d51fb91f5f78401d13cec79a1"},
+    {file = "textual-3.5.0.tar.gz", hash = "sha256:c4a440338694672acf271c74904f1cf1e4a64c6761c056b02a561774b81a04f4"},
 ]
 
 [package.dependencies]
@@ -4247,15 +4247,15 @@ tree-sitter-json = {version = ">=0.24.0", optional = true, markers = "python_ver
 tree-sitter-markdown = {version = ">=0.3.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
 tree-sitter-python = {version = ">=0.23.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
 tree-sitter-regex = {version = ">=0.24.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
-tree-sitter-rust = {version = ">=0.23.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
-tree-sitter-sql = {version = ">=0.3.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
+tree-sitter-rust = {version = ">=0.23.0,<=0.23.2", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
+tree-sitter-sql = {version = ">=0.3.0,<0.3.8", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
 tree-sitter-toml = {version = ">=0.6.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
 tree-sitter-xml = {version = ">=0.7.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
 tree-sitter-yaml = {version = ">=0.6.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
 typing-extensions = ">=4.4.0,<5.0.0"
 
 [package.extras]
-syntax = ["tree-sitter (>=0.23.0)", "tree-sitter-bash (>=0.23.0)", "tree-sitter-css (>=0.23.0)", "tree-sitter-go (>=0.23.0)", "tree-sitter-html (>=0.23.0)", "tree-sitter-java (>=0.23.0)", "tree-sitter-javascript (>=0.23.0)", "tree-sitter-json (>=0.24.0)", "tree-sitter-markdown (>=0.3.0)", "tree-sitter-python (>=0.23.0)", "tree-sitter-regex (>=0.24.0)", "tree-sitter-rust (>=0.23.0)", "tree-sitter-sql (>=0.3.0)", "tree-sitter-toml (>=0.6.0)", "tree-sitter-xml (>=0.7.0)", "tree-sitter-yaml (>=0.6.0)"]
+syntax = ["tree-sitter (>=0.23.0)", "tree-sitter-bash (>=0.23.0)", "tree-sitter-css (>=0.23.0)", "tree-sitter-go (>=0.23.0)", "tree-sitter-html (>=0.23.0)", "tree-sitter-java (>=0.23.0)", "tree-sitter-javascript (>=0.23.0)", "tree-sitter-json (>=0.24.0)", "tree-sitter-markdown (>=0.3.0)", "tree-sitter-python (>=0.23.0)", "tree-sitter-regex (>=0.24.0)", "tree-sitter-rust (>=0.23.0,<=0.23.2)", "tree-sitter-sql (>=0.3.0,<0.3.8)", "tree-sitter-toml (>=0.6.0)", "tree-sitter-xml (>=0.7.0)", "tree-sitter-yaml (>=0.6.0)"]
 
 [[package]]
 name = "toml"
@@ -5411,4 +5411,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "4802ba1c19f3da612e4d17e6265e82ede28ed4650cd18bb4008030903e67f5e3"
+content-hash = "4adbaf602d1abb198a2f0339c0882e862e61490616ee5002559e8a324bcf7548"

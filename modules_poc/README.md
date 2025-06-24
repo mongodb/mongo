@@ -131,22 +131,27 @@ buildscripts/poetry_sync.sh # make sure the python env has the right packages in
 python modules_poc/merge_decls.py
 ```
 
-`merge_decls.py` takes an optional flag `--intra-module` if you want to include intra module accesses
-and declarations that are only used from within their module. Typically, you don't so it defaults to
-omitting them.
+`merge_decls.py` takes an optional flag `--[no-]intra-module` to indicate whether you want to include
+intra module accesses and declarations that are only used from within their module or submodules. It
+defaults to `--intra-module`, which provides the most information to consumers.
 
 Running `merge_decls.py` also validates that private APIs aren't being used
-outside their own module. If any are, the script will fail, though
+outside of where they are permitted. If any are, the script will fail, though
 `merged_decls.json` will still be generated, and the
 invalid uses will be printed to stdout.
 
-If you only wish to include the files linked in to a given executable, replace the `bazel build` command with the following commands:
+<!--
+Commenting this section out for now since it no longer works now that the merger
+invokes the scanner automatically. Unsure if we want to support this use case again.
 
-```bash
-TARGET="//src/mongo/db:mongod"
-bazel cquery --config=mod-scanner "filter(//src/mongo, kind(cc_*, deps($TARGET)))"  | awk '{print $1}' > targets.file
-bazel build --config=mod-scanner --target_pattern_file=targets.file
-```
+      If you only wish to include the files linked in to a given executable, replace the `bazel build` command with the following commands:
+
+      ```bash
+      TARGET="//src/mongo/db:mongod"
+      bazel cquery --config=mod-scanner "filter(//src/mongo, kind(cc_*, deps($TARGET)))"  | awk '{print $1}' > targets.file
+      bazel build --config=mod-scanner --target_pattern_file=targets.file
+      ```
+-->
 
 ### Note for implementers
 
@@ -161,8 +166,9 @@ modules_poc/mod_scanner.py src/mongo/bson/bsonobj.cpp
 
 ## Browsing
 
-Once you have produced a `merged_decls.json` file, you can browse it by running
-`modules_poc/browse.py`. It will show the available keybindings on the right, which can be toggled
+You can start the browser by running `modules_poc/browse.py`. If `merged_decls.json` is not present, it will
+ask if you want it to run the scanner for you. You can rescan at any time by pressing <kbd>r</kbd>.
+It will show the available keybindings on the right, which can be toggled
 by pressing <kbd>?</kbd>. If you are running from a VSCode or neovim terminal, you can press
 <kbd>g</kbd> to go to any location in your editor. You can also press <kbd>p</kbd> to toggle an
 embedded preview of the location the current line is currently on (you probably want to hide the

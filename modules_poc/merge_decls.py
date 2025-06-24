@@ -122,10 +122,15 @@ def is_submodule_usage(decl: Decl, mod: str) -> bool:
 
 def get_paths(timer: Timer):
     project_root = os.path.dirname(os.path.abspath(sys.argv[0])) + "/.."
-    subprocess.run(
-        ["bazel", "build", "--config=mod-scanner", "//src/mongo/..."], cwd=project_root, check=True
+    proc = subprocess.run(
+        ["bazel", "build", "--config=mod-scanner", "//src/mongo/..."],
+        text=True,  # unnecessary since we don't use stdout, but makes the types match
+        cwd=project_root,
+        check=False,
     )
-    timer.mark("built")
+    timer.mark("scanned sources")
+    if proc.returncode != 0:
+        sys.exit(proc.returncode)
 
     proc = subprocess.run(
         [
@@ -148,13 +153,13 @@ def get_paths(timer: Timer):
             m = re.search("MOD_SCANNER_OUTPUT=([^,]+),", line)
             if m:
                 outputs.append(m.group(1))
-    timer.mark("sources_found")
+    timer.mark("queried bazel for mod_scanner outputs")
     return outputs
 
 
 def main(
     jobs: int = typer.Option(os.cpu_count(), "--jobs", "-j"),
-    intra_module: bool = typer.Option(False, help="Include intra-module accesses"),
+    intra_module: bool = typer.Option(True, help="Include intra-module accesses"),
 ):
     timer = Timer()
     paths = get_paths(timer)
