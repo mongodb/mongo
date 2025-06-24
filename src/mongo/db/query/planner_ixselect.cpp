@@ -338,10 +338,10 @@ std::vector<IndexEntry> QueryPlannerIXSelect::expandIndexes(const RelevantFieldI
     std::vector<IndexEntry> out;
     // Filter out fields that cannot be answered by any sparse index. We know wildcard indexes are
     // sparse, so we don't want to expand the wildcard index based on such fields.
-    std::set<std::string> sparseIncompatibleFields;
+    std::set<std::string> sparseCompatibleFields;
     for (auto&& [fieldName, idxProperty] : fields) {
         if (idxProperty.isSparse || indexHinted) {
-            sparseIncompatibleFields.insert(fieldName);
+            sparseCompatibleFields.insert(fieldName);
         }
     }
     for (auto&& entry : relevantIndices) {
@@ -349,7 +349,7 @@ std::vector<IndexEntry> QueryPlannerIXSelect::expandIndexes(const RelevantFieldI
             continue;
         }
         if (entry.type == IndexType::INDEX_WILDCARD) {
-            wcp::expandWildcardIndexEntry(entry, sparseIncompatibleFields, &out);
+            wcp::expandWildcardIndexEntry(entry, sparseCompatibleFields, &out);
         } else {
             out.push_back(std::move(entry));
         }
