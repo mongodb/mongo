@@ -175,10 +175,13 @@ public:
             try {
                 section->appendSection(opCtx, elem, &result);
             } catch (...) {
-                LOGV2_ERROR(9761501,
-                            "Section threw an error",
-                            "error"_attr = exceptionToStatus(),
-                            "section"_attr = section->getSectionName());
+                auto status = exceptionToStatus();
+                if (!ErrorCodes::isA<ErrorCategory::ShutdownError>(status.code())) {
+                    LOGV2_ERROR(9761501,
+                                "Section threw an error",
+                                "error"_attr = status,
+                                "section"_attr = section->getSectionName());
+                }
                 throw;
             }
             timeBuilder.appendNumber(
