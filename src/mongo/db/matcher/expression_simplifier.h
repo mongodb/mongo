@@ -37,7 +37,7 @@ namespace mongo {
  */
 struct ExpressionSimplifierSettings {
     /**
-     * Default contructor with minimum restrictions on boolean expression simplification. Useful
+     * Default constructor with minimum restrictions on boolean expression simplification. Useful
      * for tests and benchmarks.
      */
     ExpressionSimplifierSettings()

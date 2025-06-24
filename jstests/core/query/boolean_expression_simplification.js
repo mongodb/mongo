@@ -1,5 +1,5 @@
 /**
- * Tests boolean expression simplifer produces expected results.
+ * Tests boolean expression simplifier produces expected results.
  * @tags: [
  * requires_fcv_72,
  * # explain command, used by the test, does not support majority read concern.
@@ -10,10 +10,10 @@
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const parameterName = "internalQueryEnableBooleanExpressionsSimplifier";
-const isSImplifierEnabled =
+const isSimplifierEnabled =
     assert.commandWorked(db.adminCommand({getParameter: 1, [parameterName]: 1}))[parameterName];
-if (!isSImplifierEnabled) {
-    jsTest.log("Skipping the Boolean simplier tests, since the simplifier is disabled...");
+if (!isSimplifierEnabled) {
+    jsTest.log("Skipping the Boolean simplifier tests, since the simplifier is disabled...");
     quit();
 }
 
