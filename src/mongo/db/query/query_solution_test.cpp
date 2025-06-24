@@ -837,7 +837,7 @@ TEST(QuerySolutionTest, WildcardIndexSupportsSortWhenIndexOnlyNeedsToLookAtOnePa
     // The following setup mimics a query that queries against fields "a", "b.d", and "c". This
     // matches the bounds we generate for those fields below. However, only pass "b.d" as 'fields'
     // here, because we only want to consider the expanded index with that field plugged in.
-    stdx::unordered_set<std::string> fields{"b.d"};
+    std::set<std::string> fields{"b.d"};
     std::vector<IndexEntry> expandedIndexes{};
     mongo::wildcard_planning::expandWildcardIndexEntry(
         *wildcardIndex.indexEntry, fields, &expandedIndexes);
@@ -891,7 +891,7 @@ TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenIndexNeedsToLookAtMul
     // here, because we only want to consider the expanded index with that field plugged in.
     mongo::wildcard_planning::WildcardIndexEntryMock wildcardIndex{
         BSON("a" << 1 << "b.$**" << 1 << "c" << 1), BSONObj{}, {}};
-    stdx::unordered_set<std::string> fields{"b"};
+    std::set<std::string> fields{"b"};
     std::vector<IndexEntry> expandedIndexes{};
     mongo::wildcard_planning::expandWildcardIndexEntry(
         *wildcardIndex.indexEntry, fields, &expandedIndexes);
@@ -940,7 +940,7 @@ TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenCollationDoesntMatch)
     // here, because we only want to consider the expanded index with that field plugged in.
     mongo::wildcard_planning::WildcardIndexEntryMock wildcardIndex{
         BSON("a" << 1 << "b.$**" << 1 << "c" << 1), BSONObj{}, {}};
-    stdx::unordered_set<std::string> fields{"b.d"};
+    std::set<std::string> fields{"b.d"};
     std::vector<IndexEntry> expandedIndexes{};
     mongo::wildcard_planning::expandWildcardIndexEntry(
         *wildcardIndex.indexEntry, fields, &expandedIndexes);
@@ -996,7 +996,7 @@ TEST(QuerySolutionTest, WildcardIndexDoesNotSupportSortWhenCollationDoesntMatchW
     // here, because we only want to consider the expanded index with that field plugged in.
     mongo::wildcard_planning::WildcardIndexEntryMock wildcardIndex{
         BSON("a" << 1 << "b.$**" << 1 << "c" << 1), BSONObj{}, {}};
-    stdx::unordered_set<std::string> fields{"b.d"};
+    std::set<std::string> fields{"b.d"};
     std::vector<IndexEntry> expandedIndexes{};
     mongo::wildcard_planning::expandWildcardIndexEntry(
         *wildcardIndex.indexEntry, fields, &expandedIndexes);

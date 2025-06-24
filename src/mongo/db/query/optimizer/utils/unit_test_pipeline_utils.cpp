@@ -59,6 +59,7 @@
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/intrusive_counter.h"
@@ -392,6 +393,7 @@ std::string ABTGoldenTestFixture::testParameterizedABTTranslation(StringData var
                                                                   StringData pipelineStr,
                                                                   std::string scanDefName,
                                                                   Metadata metadata) {
+    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
     auto&& stream = _ctx->outStream();
 
     bool isFindCmd = findCmd != "";

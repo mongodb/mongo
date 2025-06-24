@@ -15,6 +15,10 @@
  *   multiversion_incompatible,
  *   # Does not support multiplanning, because it caches more plans
  *   does_not_support_multiplanning_single_solutions,
+ *   # The test examines the SBE plan cache, which initial sync may change the contents of.
+ *   examines_sbe_cache,
+ *   # The test runs commands that are not allowed with security token: planCacheClear.
+ *   not_allowed_with_signed_security_token
  * ]
  */
 import {
@@ -102,6 +106,59 @@ function predicateTest(explainMode) {
     assertWinningPlanCacheStatus(coll.find({a: {$eq: 2}}).explain(explainMode), true);
     assertWinningPlanCacheStatus(
         getAggPlannerExplain(explainMode, [{$match: {a: 2}}, {$unwind: "$d"}]), true);
+
+    // Test with rooted OR.
+    coll.getPlanCache().clear();
+    for (let i = 0; i < 5; i++) {
+        coll.find({$or: [{a: {$eq: 1}}, {b: {$eq: 1}}]}).toArray();
+    }
+    // The query will use sub-planning so don't expect the top-level query to hit the cache when SBE
+    // isn't enabled. However when SBE is fully enabled, we cache the full plan.
+    assertWinningPlanCacheStatus(
+        coll.find({$or: [{a: {$eq: 4}}, {b: {$eq: 4}}]}).explain(explainMode), isUsingSbePlanCache);
+
+    // Test with a contained OR. The query will be planned as a whole so we do expect it to hit the
+    // cache.
+    coll.getPlanCache().clear();
+    for (let i = 0; i < 5; i++) {
+        coll.find({
+                $and: [
+                    {$or: [{a: 10}, {b: {$gt: 99}}]},
+                    {$or: [{a: {$in: [5, 1]}}, {b: {$in: [7, 99]}}]}
+                ]
+            })
+            .toArray();
+    }
+    assert.eq(coll.getPlanCache().list().length, 1);
+    assertWinningPlanCacheStatus(coll.find({
+                                         $and: [
+                                             {$or: [{a: 2}, {b: {$gt: 100}}]},
+                                             {$or: [{a: {$in: [6, 2]}}, {b: {$in: [7, 100]}}]}
+                                         ]
+                                     })
+                                     .explain(explainMode),
+                                 true);
+}
+
+function sortOnlyTest(explainMode) {
+    coll.drop();
+    assert.commandWorked(coll.insert({_id: 1, a: NumberInt(9)}));
+    assert.commandWorked(coll.createIndex({a: 1}));
+    assert.commandWorked(coll.createIndex({a: -1}));
+
+    // Nothing should be cached at first.
+    assert.eq(coll.getPlanCache().list().length, 0);
+    assertWinningPlanCacheStatus(coll.find().sort({a: 1}).explain(explainMode), false);
+
+    // Run the query to get it cached.
+    for (let i = 0; i < 5; i++) {
+        coll.find().sort({a: 1}).toArray();
+    }
+
+    assert.eq(coll.getPlanCache().list().length, 1);
+
+    // Only the winning plan should have 'isCached' set to true.
+    assertWinningPlanCacheStatus(coll.find().sort({a: 1}).explain(explainMode), true);
 }
 
 /*
@@ -156,4 +213,5 @@ for (const explainMode of ["queryPlanner", "executionStats", "allPlansExecution"
     collScanTest(explainMode);
     predicateTest(explainMode);
     dataChangeTest(explainMode);
+    sortOnlyTest(explainMode);
 }

@@ -177,6 +177,11 @@ Status tagOrChildAccordingToCache(const SolutionCacheData* branchCacheData,
     return Status::OK();
 }
 
+size_t hashTaggedMatchExpression(MatchExpression* expr) {
+    const MatchExpressionHasher hash{MatchExpressionHashParams{HashValuesOrParams::kHashIndexTags}};
+    return hash(expr);
+}
+
 /**
  * Returns whether the hint matches the given index. When hinting by index name, 'hintObj' takes the
  * shape of {$hint: <indexName>}. When hinting by key pattern, 'hintObj' represents the actual key
@@ -1572,6 +1577,14 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                 cacheData = std::move(statusWithCacheData.getValue());
             }
 
+            // We must hash the tagged MatchExpression tree before sorting it in
+            // 'prepareForAccessPlanning()' to be able to distinguish some plans. E.g. {a: 1, a: 2}
+            // will be sorted such that the tagged comparison is always in the same place, and since
+            // both comparisons have the same type and are on the same path, {(tag)a: 1, a: 2} and
+            // {(tag)a: 2, a: 1} will get the same hash when constants are ignored.
+            const size_t taggedMatchExpressionHash =
+                hashTaggedMatchExpression(nextTaggedTree.get());
+
             // We have already cached the tree in canonical order, so now we can order the nodes
             // for access planning.
             prepareForAccessPlanning(nextTaggedTree.get());
@@ -1586,6 +1599,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
             auto soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
             if (soln) {
+                soln->taggedMatchExpressionHash = taggedMatchExpressionHash;
                 soln->_enumeratorExplainInfo.merge(planEnumerator._explainInfo);
                 LOGV2_DEBUG(20978,
                             5,
@@ -2146,6 +2160,11 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::choosePlanForSubqueries
         }
     }
 
+    // We must hash the tagged MatchExpression tree before sorting it in
+    // 'prepareForAccessPlanning()' to be able to distinguish some plans.
+    const size_t taggedMatchExpressionHash =
+        hashTaggedMatchExpression(planningResult.orExpression.get());
+
     // Must do this before using the planner functionality.
     prepareForAccessPlanning(planningResult.orExpression.get());
 
@@ -2170,6 +2189,8 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::choosePlanForSubqueries
         ss << "Failed to analyze subplanned query";
         return Status(ErrorCodes::NoQueryExecutionPlans, ss);
     }
+
+    compositeSolution->taggedMatchExpressionHash = taggedMatchExpressionHash;
 
     LOGV2_DEBUG(20603,
                 5,
