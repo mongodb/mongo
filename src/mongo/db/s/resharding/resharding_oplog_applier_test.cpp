@@ -52,7 +52,6 @@
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
@@ -209,12 +208,13 @@ public:
 
         _cm = createChunkManagerForOriginalColl();
 
-        _metrics = ReshardingMetrics::makeInstance(kCrudUUID,
-                                                   BSON("y" << 1),
-                                                   kCrudNs,
-                                                   ReshardingMetrics::Role::kRecipient,
-                                                   getServiceContext()->getFastClockSource()->now(),
-                                                   getServiceContext());
+        _metrics = ReshardingMetrics::makeInstance_forTest(
+            kCrudUUID,
+            BSON("y" << 1),
+            kCrudNs,
+            ReshardingMetrics::Role::kRecipient,
+            getServiceContext()->getFastClockSource()->now(),
+            getServiceContext());
         _applierMetrics = std::make_unique<ReshardingOplogApplierMetrics>(
             _sourceId.getShardId(), _metrics.get(), boost::none);
 

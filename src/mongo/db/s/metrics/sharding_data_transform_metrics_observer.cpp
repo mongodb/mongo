@@ -34,7 +34,7 @@
 namespace mongo {
 
 ShardingDataTransformMetricsObserver::ShardingDataTransformMetricsObserver(
-    ShardingDataTransformInstanceMetrics* metrics)
+    ReshardingMetrics* metrics)
     : _metrics(metrics) {}
 
 boost::optional<Milliseconds>

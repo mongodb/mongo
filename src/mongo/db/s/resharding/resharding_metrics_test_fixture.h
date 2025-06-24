@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
-#include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"
@@ -99,7 +98,7 @@ public:
     }
 };
 
-class ShardingDataTransformMetricsTestFixture : public unittest::Test {
+class ReshardingMetricsTestFixture : public unittest::Test {
 
 public:
     using Role = ShardingDataTransformMetrics::Role;
@@ -121,7 +120,9 @@ public:
                                                role,
                                                clock->now(),
                                                clock,
-                                               _cumulativeMetrics.get());
+                                               _cumulativeMetrics.get(),
+                                               ReshardingMetrics::getDefaultState(role),
+                                               ReshardingProvenanceEnum::kReshardCollection);
 
             // Reports 0 before timed section entered.
             clock->advance(kIncrement);
@@ -187,22 +188,20 @@ protected:
         return getReportSection(getCumulativeMetricsReport(), section);
     }
 
-    void assertAltersCumulativeMetrics(
-        ShardingDataTransformInstanceMetrics* metrics,
-        const std::function<void(ShardingDataTransformInstanceMetrics*)>& mutateFn,
-        const std::function<bool(BSONObj, BSONObj)>& verifyFn) {
+    void assertAltersCumulativeMetrics(ReshardingMetrics* metrics,
+                                       const std::function<void(ReshardingMetrics*)>& mutateFn,
+                                       const std::function<bool(BSONObj, BSONObj)>& verifyFn) {
         auto before = getCumulativeMetricsReport();
         mutateFn(metrics);
         auto after = getCumulativeMetricsReport();
         ASSERT_TRUE(verifyFn(before, after));
     }
 
-    void assertAltersCumulativeMetricsField(
-        ShardingDataTransformInstanceMetrics* metrics,
-        const std::function<void(ShardingDataTransformInstanceMetrics*)>& mutateFn,
-        Section section,
-        StringData fieldName,
-        const std::function<bool(int, int)>& verifyFn) {
+    void assertAltersCumulativeMetricsField(ReshardingMetrics* metrics,
+                                            const std::function<void(ReshardingMetrics*)>& mutateFn,
+                                            Section section,
+                                            StringData fieldName,
+                                            const std::function<bool(int, int)>& verifyFn) {
         assertAltersCumulativeMetrics(metrics, mutateFn, [&](auto reportBefore, auto reportAfter) {
             auto before = getReportSection(reportBefore, section).getIntField(fieldName);
             auto after = getReportSection(reportAfter, section).getIntField(fieldName);
@@ -211,8 +210,8 @@ protected:
     }
 
     void assertIncrementsCumulativeMetricsField(
-        ShardingDataTransformInstanceMetrics* metrics,
-        const std::function<void(ShardingDataTransformInstanceMetrics*)>& mutateFn,
+        ReshardingMetrics* metrics,
+        const std::function<void(ReshardingMetrics*)>& mutateFn,
         Section section,
         StringData fieldName) {
         assertAltersCumulativeMetricsField(
@@ -222,8 +221,8 @@ protected:
     }
 
     void assertDecrementsCumulativeMetricsField(
-        ShardingDataTransformInstanceMetrics* metrics,
-        const std::function<void(ShardingDataTransformInstanceMetrics*)>& mutateFn,
+        ReshardingMetrics* metrics,
+        const std::function<void(ReshardingMetrics*)>& mutateFn,
         Section section,
         StringData fieldName) {
         assertAltersCumulativeMetricsField(

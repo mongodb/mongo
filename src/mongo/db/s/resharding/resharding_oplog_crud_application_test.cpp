@@ -185,13 +185,13 @@ public:
                         CollectionMetadata(makeChunkManagerForOutputCollection(), _myDonorId));
             }
 
-            _metrics =
-                ReshardingMetrics::makeInstance(_sourceUUID,
-                                                BSON(_newShardKey << 1),
-                                                _outputNss,
-                                                ShardingDataTransformMetrics::Role::kRecipient,
-                                                serviceContext->getFastClockSource()->now(),
-                                                serviceContext);
+            _metrics = ReshardingMetrics::makeInstance_forTest(
+                _sourceUUID,
+                BSON(_newShardKey << 1),
+                _outputNss,
+                ShardingDataTransformMetrics::Role::kRecipient,
+                serviceContext->getFastClockSource()->now(),
+                serviceContext);
             _oplogApplierMetrics = std::make_unique<ReshardingOplogApplierMetrics>(
                 _myDonorId, _metrics.get(), boost::none);
             _applier = std::make_unique<ReshardingOplogApplicationRules>(

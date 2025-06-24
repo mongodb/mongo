@@ -69,7 +69,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_noop_o2_field_gen.h"
@@ -220,12 +219,13 @@ public:
 
     void resetResharding() {
         _reshardingUUID = UUID::gen();
-        _metrics = ReshardingMetrics::makeInstance(_reshardingUUID,
-                                                   kShardKey,
-                                                   NamespaceString::kEmpty,
-                                                   ReshardingMetrics::Role::kRecipient,
-                                                   getServiceContext()->getFastClockSource()->now(),
-                                                   getServiceContext());
+        _metrics = ReshardingMetrics::makeInstance_forTest(
+            _reshardingUUID,
+            kShardKey,
+            NamespaceString::kEmpty,
+            ReshardingMetrics::Role::kRecipient,
+            getServiceContext()->getFastClockSource()->now(),
+            getServiceContext());
         _fetchTimestamp = queryOplog(BSONObj())["ts"].timestamp();
         _donorShard = kTwoShardIdList[0];
         _destinationShard = kTwoShardIdList[1];

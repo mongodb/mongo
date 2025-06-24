@@ -50,7 +50,6 @@
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/recipient_resume_document_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
@@ -170,12 +169,13 @@ protected:
                 operationContext(), _tempNss.dbName(), BSON("create" << _tempNss.coll())));
         }
 
-        _metrics = ReshardingMetrics::makeInstance(_sourceUUID,
-                                                   newShardKeyPattern.toBSON(),
-                                                   _sourceNss,
-                                                   ReshardingMetrics::Role::kRecipient,
-                                                   getServiceContext()->getFastClockSource()->now(),
-                                                   getServiceContext());
+        _metrics = ReshardingMetrics::makeInstance_forTest(
+            _sourceUUID,
+            newShardKeyPattern.toBSON(),
+            _sourceNss,
+            ReshardingMetrics::Role::kRecipient,
+            getServiceContext()->getFastClockSource()->now(),
+            getServiceContext());
 
         _cloner = std::make_unique<ReshardingCollectionCloner>(
             _metrics.get(),

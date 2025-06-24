@@ -37,7 +37,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
@@ -97,7 +96,7 @@ public:
                 AuthorizationSession::get(*client)->grantInternalAuthorization();
             };
 
-            auto metrics = ReshardingMetrics::makeInstance(
+            auto metrics = ReshardingMetrics::makeInstance_forTest(
                 request().getUuid(),
                 request().getShardKey(),
                 ns(),

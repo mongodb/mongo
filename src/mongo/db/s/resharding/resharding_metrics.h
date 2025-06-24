@@ -34,8 +34,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/metrics/metrics_state_holder.h"
+#include "mongo/db/s/metrics/phase_duration_tracker.h"
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
-#include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
@@ -53,6 +53,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <shared_mutex>
 #include <string>
 #include <variant>
 
@@ -60,11 +61,48 @@
 
 namespace mongo {
 
-class ReshardingMetrics : public ShardingDataTransformInstanceMetrics {
+namespace resharding_metrics {
+
+enum TimedPhase { kCloning, kApplying, kCriticalSection, kBuildingIndex };
+constexpr auto kNumTimedPhase = 4;
+using PhaseDurationTracker = PhaseDurationTracker<TimedPhase, kNumTimedPhase>;
+
+}  // namespace resharding_metrics
+
+class ReshardingMetrics {
 public:
     using State = ReshardingCumulativeMetrics::AnyState;
-    using Base = ShardingDataTransformInstanceMetrics;
     using TimedPhase = resharding_metrics::TimedPhase;
+    using TimedPhaseNameMap = resharding_metrics::PhaseDurationTracker::TimedPhaseNameMap;
+    using Role = ShardingDataTransformMetrics::Role;
+    using FieldNameProviderPtr =
+        std::unique_ptr<ShardingDataTransformInstanceMetricsFieldNameProvider>;
+    using ObserverPtr = std::unique_ptr<ShardingDataTransformMetricsObserverInterface>;
+
+    /**
+     * To be used by recipients only. Tracks the exponential moving average of the time it takes for
+     * a recipient to fetch an oplog entry from a donor and apply an oplog entry after it has been
+     * fetched.
+     */
+    struct OplogLatencyMetrics {
+    public:
+        OplogLatencyMetrics(ShardId donorShardId);
+
+        void updateAverageTimeToFetch(Milliseconds timeToFetch);
+        void updateAverageTimeToApply(Milliseconds timeToApply);
+
+        boost::optional<Milliseconds> getAverageTimeToFetch() const;
+        boost::optional<Milliseconds> getAverageTimeToApply() const;
+
+    private:
+        const ShardId _donorShardId;
+
+        mutable stdx::mutex _timeToFetchMutex;
+        boost::optional<Milliseconds> _avgTimeToFetch;
+
+        mutable stdx::mutex _timeToApplyMutex;
+        boost::optional<Milliseconds> _avgTimeToApply;
+    };
 
     struct ExternallyTrackedRecipientFields {
     public:
@@ -97,27 +135,29 @@ public:
                       Role role,
                       Date_t startTime,
                       ClockSource* clockSource,
-                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
+                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+                      State state,
+                      ReshardingProvenanceEnum provenance);
 
-    ReshardingMetrics(
-        UUID instanceId,
-        BSONObj shardKey,
-        NamespaceString nss,
-        Role role,
-        Date_t startTime,
-        ClockSource* clockSource,
-        ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
-        State state,
-        ReshardingProvenanceEnum provenance = ReshardingProvenanceEnum::kReshardCollection);
+    ReshardingMetrics(UUID instanceId,
+                      BSONObj shardKey,
+                      NamespaceString nss,
+                      Role role,
+                      Date_t startTime,
+                      ClockSource* clockSource,
+                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+                      State state,
+                      ObserverPtr observer,
+                      ReshardingProvenanceEnum provenance);
 
-    ~ReshardingMetrics() override;
+    ~ReshardingMetrics();
 
-    static std::unique_ptr<ReshardingMetrics> makeInstance(UUID instanceId,
-                                                           BSONObj shardKey,
-                                                           NamespaceString nss,
-                                                           Role role,
-                                                           Date_t startTime,
-                                                           ServiceContext* serviceContext);
+    static std::unique_ptr<ReshardingMetrics> makeInstance_forTest(UUID instanceId,
+                                                                   BSONObj shardKey,
+                                                                   NamespaceString nss,
+                                                                   Role role,
+                                                                   Date_t startTime,
+                                                                   ServiceContext* serviceContext);
 
     template <typename T>
     static auto initializeFrom(const T& document,
@@ -158,6 +198,128 @@ public:
         return initializeFrom(document, serviceContext->getFastClockSource(), cumulativeMetrics);
     }
 
+    static State getDefaultState(Role role);
+
+    BSONObj reportForCurrentOp() const;
+
+    enum class CalculationLogOption { Hide, Show };
+
+    boost::optional<Milliseconds> getHighEstimateRemainingTimeMillis(
+        CalculationLogOption logOption = CalculationLogOption::Hide) const;
+    boost::optional<Milliseconds> getLowEstimateRemainingTimeMillis() const;
+    Date_t getStartTimestamp() const;
+    const UUID& getInstanceId() const;
+
+    void onDocumentsProcessed(int64_t documentCount,
+                              int64_t totalDocumentsSizeBytes,
+                              Milliseconds elapsed);
+    int64_t getDocumentsProcessedCount() const;
+    int64_t getBytesWrittenCount() const;
+    int64_t getApproxBytesToScanCount() const;
+    int64_t getWritesDuringCriticalSection() const;
+
+    void setDocumentsToProcessCounts(int64_t documentCount, int64_t totalDocumentsSizeBytes);
+    void setCoordinatorHighEstimateRemainingTimeMillis(Milliseconds milliseconds);
+    void setCoordinatorLowEstimateRemainingTimeMillis(Milliseconds milliseconds);
+
+    void onCloningRemoteBatchRetrieval(Milliseconds elapsed);
+    void onWriteToStashedCollections();
+
+    void onReadDuringCriticalSection();
+    void onWriteDuringCriticalSection();
+
+    Role getRole() const;
+    Seconds getOperationRunningTimeSecs() const;
+
+    void setLastOpEndingChunkImbalance(int64_t imbalanceCount);
+
+    ReshardingCumulativeMetrics::AnyState getState() const {
+        return _state.load();
+    }
+
+    template <typename T>
+    void onStateTransition(T before, boost::none_t after) {
+        getTypedCumulativeMetrics()->template onStateTransition<T>(before, boost::none);
+    }
+
+    template <typename T>
+    void onStateTransition(boost::none_t before, T after) {
+        setState(after);
+        getTypedCumulativeMetrics()->template onStateTransition<T>(boost::none, after);
+    }
+
+    template <typename T>
+    void onStateTransition(T before, T after) {
+        setState(after);
+        getTypedCumulativeMetrics()->template onStateTransition<T>(before, after);
+    }
+
+    void onInsertApplied();
+    void onUpdateApplied();
+    void onDeleteApplied();
+    void onOplogEntriesFetched(int64_t numEntries);
+    void onOplogEntriesApplied(int64_t numEntries);
+
+    /**
+     * To be used by recipients only. Registers the donors with the given shard ids. The donor
+     * registration must be done exactly once and before the oplog fetchers and appliers start.
+     * Throws an error if any of the criteria are violated.
+     */
+    void registerDonors(const std::vector<ShardId>& donorShardIds);
+
+    /**
+     * Updates the exponential moving average of the time it takes to fetch an oplog entry from the
+     * given donor. Throws an error if the donor has not been registered.
+     */
+    void updateAverageTimeToFetchOplogEntries(const ShardId& donorShardId,
+                                              Milliseconds timeToFetch);
+
+    /**
+     * Updates the exponential moving average of the time it takes to apply an oplog entry after it
+     * has been fetched from the given donor. Throws an error if the donor has not been registered.
+     */
+    void updateAverageTimeToApplyOplogEntries(const ShardId& donorShardId,
+                                              Milliseconds timeToApply);
+
+    /**
+     * Returns the exponential moving average of the time it takes to fetch an oplog entry from the
+     * given donor. Throws an error if the donor has not been registered.
+     */
+    boost::optional<Milliseconds> getAverageTimeToFetchOplogEntries(
+        const ShardId& donorShardId) const;
+
+    /**
+     * Returns the exponential moving average of the time it takes to apply an oplog entry after it
+     * has been fetched from the given donor. Throws an error if the donor has not been registered.
+     */
+    boost::optional<Milliseconds> getAverageTimeToApplyOplogEntries(
+        const ShardId& donorShardId) const;
+
+    /**
+     * Returns the maximum exponential moving average of the time it takes to fetch and apply an
+     * oplog entry across all donors. Returns none if the metrics for any of the donors are not
+     * available yet. If the calculation logging is enabled, logs the average time to fetch and
+     * apply oplog entries for each donor.
+     */
+    boost::optional<Milliseconds> getMaxAverageTimeToFetchAndApplyOplogEntries(
+        CalculationLogOption logOption) const;
+
+    void onBatchRetrievedDuringOplogFetching(Milliseconds elapsed);
+    void onLocalInsertDuringOplogFetching(const Milliseconds& elapsed);
+    void onBatchRetrievedDuringOplogApplying(const Milliseconds& elapsed);
+    void onOplogLocalBatchApplied(Milliseconds elapsed);
+
+    boost::optional<ReshardingMetricsTimeInterval> getIntervalFor(TimedPhase phase) const;
+    boost::optional<Date_t> getStartFor(TimedPhase phase) const;
+    boost::optional<Date_t> getEndFor(TimedPhase phase) const;
+    void setStartFor(TimedPhase phase, Date_t date);
+    void setEndFor(TimedPhase phase, Date_t date);
+
+    template <typename TimeUnit>
+    boost::optional<TimeUnit> getElapsed(TimedPhase phase, ClockSource* clock) const {
+        return _phaseDurations.getElapsed<TimeUnit>(phase, clock);
+    }
+
     template <typename StateOrStateVariant>
     static bool mustRestoreExternallyTrackedRecipientFields(StateOrStateVariant stateOrVariant) {
         if constexpr (std::is_same_v<StateOrStateVariant, State>) {
@@ -171,8 +333,6 @@ public:
     void deregisterMetrics() {
         _scopedObserver.reset();
     }
-
-    BSONObj reportForCurrentOp() const override;
 
     void restoreExternallyTrackedRecipientFields(const ExternallyTrackedRecipientFields& values);
 
@@ -190,13 +350,74 @@ public:
     void setIndexesToBuild(int64_t numIndexes);
     void setIndexesBuilt(int64_t numIndexes);
 
-protected:
-    boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis(
-        CalculationLogOption logOption) const override;
-    StringData getStateString() const override;
-
 private:
-    std::string createOperationDescription() const override;
+    static constexpr auto kNoDate = Date_t::min();
+    using UniqueScopedObserver = ShardingDataTransformCumulativeMetrics::UniqueScopedObserver;
+
+    template <typename T>
+    T getElapsed(const AtomicWord<Date_t>& startTime,
+                 const AtomicWord<Date_t>& endTime,
+                 ClockSource* clock) const {
+        auto start = startTime.load();
+        if (start == kNoDate) {
+            return T{0};
+        }
+        auto end = endTime.load();
+        if (end == kNoDate) {
+            end = clock->now();
+        }
+        return duration_cast<T>(end - start);
+    }
+
+    template <typename T>
+    void setState(T state) {
+        static_assert(std::is_assignable_v<ReshardingCumulativeMetrics::AnyState, T>);
+        _state.store(state);
+    }
+
+    void restoreDocumentsProcessed(int64_t documentCount, int64_t totalDocumentsSizeBytes);
+    void restoreWritesToStashCollections(int64_t writesToStashCollections);
+
+    ShardingDataTransformCumulativeMetrics* getCumulativeMetrics();
+    ReshardingCumulativeMetrics* getTypedCumulativeMetrics();
+    ClockSource* getClockSource() const;
+    UniqueScopedObserver registerInstanceMetrics();
+
+    int64_t getInsertsApplied() const;
+    int64_t getUpdatesApplied() const;
+    int64_t getDeletesApplied() const;
+    int64_t getOplogEntriesFetched() const;
+    int64_t getOplogEntriesApplied() const;
+    void restoreInsertsApplied(int64_t count);
+    void restoreUpdatesApplied(int64_t count);
+    void restoreDeletesApplied(int64_t count);
+    void restoreOplogEntriesFetched(int64_t count);
+    void restoreOplogEntriesApplied(int64_t count);
+
+    template <typename FieldNameProvider>
+    void reportOplogApplicationCountMetrics(const FieldNameProvider* names,
+                                            BSONObjBuilder* bob) const {
+
+        bob->append(names->getForOplogEntriesFetched(), getOplogEntriesFetched());
+        bob->append(names->getForOplogEntriesApplied(), getOplogEntriesApplied());
+        bob->append(names->getForInsertsApplied(), getInsertsApplied());
+        bob->append(names->getForUpdatesApplied(), getUpdatesApplied());
+        bob->append(names->getForDeletesApplied(), getDeletesApplied());
+    }
+
+    template <typename TimeUnit>
+    void reportDurationsForAllPhases(const TimedPhaseNameMap& names,
+                                     ClockSource* clock,
+                                     BSONObjBuilder* bob,
+                                     boost::optional<TimeUnit> defaultValue = boost::none) const {
+        _phaseDurations.reportDurationsForAllPhases(names, clock, bob, defaultValue);
+    }
+
+    boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis(
+        CalculationLogOption logOption) const;
+    StringData getStateString() const;
+
+    std::string createOperationDescription() const;
     void restoreRecipientSpecificFields(const ReshardingRecipientDocument& document);
     void restoreCoordinatorSpecificFields(const ReshardingCoordinatorDocument& document);
     void restoreIndexBuildDurationFields(const ReshardingRecipientMetrics& metrics);
@@ -263,13 +484,58 @@ private:
         std::invoke(fn, this, *args...);
     }
 
+    const UUID _instanceId;
+    const BSONObj _originalCommand;
+    const NamespaceString _sourceNs;
+    const Role _role;
+    FieldNameProviderPtr _fieldNames;
+
+    const Date_t _startTime;
+
+    ClockSource* _clockSource;
+    ObserverPtr _observer;
+    ShardingDataTransformCumulativeMetrics* _cumulativeMetrics;
+
+    AtomicWord<int64_t> _approxDocumentsToProcess;
+    AtomicWord<int64_t> _documentsProcessed;
+    AtomicWord<int64_t> _approxBytesToScan;
+    AtomicWord<int64_t> _bytesWritten;
+
+    AtomicWord<int64_t> _writesToStashCollections;
+
+    AtomicWord<Milliseconds> _coordinatorHighEstimateRemainingTimeMillis;
+    AtomicWord<Milliseconds> _coordinatorLowEstimateRemainingTimeMillis;
+
+    AtomicWord<int64_t> _readsDuringCriticalSection;
+    AtomicWord<int64_t> _writesDuringCriticalSection;
+
+    AtomicWord<ReshardingCumulativeMetrics::AnyState> _state;
+
+    AtomicWord<int64_t> _insertsApplied{0};
+    AtomicWord<int64_t> _updatesApplied{0};
+    AtomicWord<int64_t> _deletesApplied{0};
+    AtomicWord<int64_t> _oplogEntriesApplied{0};
+    AtomicWord<int64_t> _oplogEntriesFetched{0};
+
+    // To be used by recipients only. This map stores the OplogLatencyMetrics for each donor that a
+    // recipient is copying data from. The map is populated by 'registerDonors' before the oplog
+    // fetchers and appliers start running. After that, no inserting or erasing is permitted since
+    // the oplog fetchers and appliers only take a shared mutex on the map. The rationale for this
+    // setup is to avoid unnecessary lock contention by enabling the fetchers and appliers for
+    // different donors to update the metrics without needing to take an exclusive mutex on the
+    // map, in addition to an exclusive mutex on their respective OplogLatencyMetrics.
+    mutable std::shared_mutex _oplogLatencyMetricsMutex;  // NOLINT
+    std::map<ShardId, std::unique_ptr<OplogLatencyMetrics>> _oplogLatencyMetrics;
+
+    resharding_metrics::PhaseDurationTracker _phaseDurations;
+
     AtomicWord<bool> _ableToEstimateRemainingRecipientTime;
 
     AtomicWord<bool> _isSameKeyResharding;
     AtomicWord<int64_t> _indexesToBuild;
     AtomicWord<int64_t> _indexesBuilt;
 
-    ShardingDataTransformInstanceMetrics::UniqueScopedObserver _scopedObserver;
+    UniqueScopedObserver _scopedObserver;
     ReshardingMetricsFieldNameProvider* _reshardingFieldNames;
     const ReshardingProvenanceEnum _provenance;
 };

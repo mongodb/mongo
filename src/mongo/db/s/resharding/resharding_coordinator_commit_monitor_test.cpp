@@ -43,7 +43,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
-#include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
 #include "mongo/db/s/resharding/resharding_coordinator_commit_monitor.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
@@ -208,14 +207,15 @@ void CoordinatorCommitMonitorTest::setUp() {
     _cancellationSource = std::make_unique<CancellationSource>();
 
     auto clockSource = getServiceContext()->getFastClockSource();
-    _metrics = std::make_shared<ReshardingMetrics>(
-        UUID::gen(),
-        BSON("y" << 1),
-        _ns,
-        ShardingDataTransformInstanceMetrics::Role::kCoordinator,
-        clockSource->now(),
-        clockSource,
-        &_cumulativeMetrics);
+    _metrics = std::make_shared<ReshardingMetrics>(UUID::gen(),
+                                                   BSON("y" << 1),
+                                                   _ns,
+                                                   ReshardingMetrics::Role::kCoordinator,
+                                                   clockSource->now(),
+                                                   clockSource,
+                                                   &_cumulativeMetrics,
+                                                   CoordinatorStateEnum::kApplying,
+                                                   ReshardingProvenanceEnum::kReshardCollection);
 
     _commitMonitor = std::make_shared<CoordinatorCommitMonitor>(_metrics,
                                                                 _ns,

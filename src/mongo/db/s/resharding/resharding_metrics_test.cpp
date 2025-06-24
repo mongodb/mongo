@@ -35,8 +35,9 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
-#include "mongo/db/s/metrics/sharding_data_transform_metrics_test_fixture.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_metrics_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -69,7 +70,7 @@ constexpr auto kRunningTime = Seconds(12345);
 constexpr auto kResharding = "resharding";
 const auto kShardKey = BSON("newKey" << 1);
 
-class ReshardingMetricsTest : public ShardingDataTransformMetricsTestFixture {
+class ReshardingMetricsTest : public ReshardingMetricsTestFixture {
 
 public:
     std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics() override {
@@ -85,7 +86,9 @@ public:
                                                    role,
                                                    clockSource->now(),
                                                    clockSource,
-                                                   getCumulativeMetrics());
+                                                   getCumulativeMetrics(),
+                                                   ReshardingMetrics::getDefaultState(role),
+                                                   ReshardingProvenanceEnum::kReshardCollection);
     }
 
     StringData getRootSectionName() override {
@@ -271,6 +274,28 @@ private:
 protected:
     ShardId shardId0{"shard0"};
     ShardId shardId1{"shard1"};
+};
+
+class ReshardingMetricsWithObserverMock {
+public:
+    ReshardingMetricsWithObserverMock(Date_t startTime,
+                                      int64_t timeRemaining,
+                                      ClockSource* clockSource,
+                                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
+        : _impl{UUID::gen(),
+                BSON("command" << "test"),
+                NamespaceString::createNamespaceString_forTest("test.source"),
+                ReshardingMetrics::Role::kDonor,
+                startTime,
+                clockSource,
+                cumulativeMetrics,
+                ReshardingMetrics::getDefaultState(ReshardingMetrics::Role::kDonor),
+                std::make_unique<ObserverMock>(startTime, timeRemaining),
+                ReshardingProvenanceEnum::kReshardCollection} {}
+
+
+private:
+    ReshardingMetrics _impl;
 };
 
 TEST_F(ReshardingMetricsTest, ReportForCurrentOpShouldHaveReshardingMetricsDescription) {
@@ -1340,6 +1365,260 @@ TEST_F(ReshardingMetricsTest, OnFailedInformsCumulativeMetrics) {
             ASSERT_EQ(report.getObjectField(kResharding).getIntField("countFailed"), 1);
             return true;
         });
+}
+
+TEST_F(ReshardingMetricsTest, RegisterAndDeregisterMetrics) {
+    for (auto i = 0; i < 100; i++) {
+        auto metrics = createInstanceMetrics(getClockSource());
+        ASSERT_EQ(_cumulativeMetrics->getObservedMetricsCount(), 1);
+    }
+    ASSERT_EQ(_cumulativeMetrics->getObservedMetricsCount(), 0);
+}
+
+TEST_F(ReshardingMetricsTest, RegisterAndDeregisterMetricsAtOnce) {
+    {
+        std::vector<std::unique_ptr<ReshardingMetrics>> registered;
+        for (auto i = 0; i < 100; i++) {
+            registered.emplace_back(createInstanceMetrics(getClockSource()));
+            ASSERT_EQ(_cumulativeMetrics->getObservedMetricsCount(), registered.size());
+        }
+    }
+    ASSERT_EQ(_cumulativeMetrics->getObservedMetricsCount(), 0);
+}
+
+TEST_F(ReshardingMetricsTest, RandomOperations) {
+    doRandomOperationsTest<ReshardingMetricsWithObserverMock>();
+}
+
+TEST_F(ReshardingMetricsTest, RandomOperationsMultithreaded) {
+    doRandomOperationsMultithreadedTest<ReshardingMetricsWithObserverMock>();
+}
+
+TEST_F(ReshardingMetricsTest, GetRoleNameShouldReturnCorrectName) {
+    std::vector<std::pair<Role, std::string>> roles{
+        {Role::kCoordinator, "Coordinator"},
+        {Role::kDonor, "Donor"},
+        {Role::kRecipient, "Recipient"},
+    };
+
+    std::for_each(roles.begin(), roles.end(), [&](auto role) {
+        ASSERT_EQ(ShardingDataTransformMetrics::getRoleName(role.first), role.second);
+    });
+}
+
+TEST_F(ReshardingMetricsTest, DonorIncrementWritesDuringCriticalSection) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kDonor);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("countWritesDuringCriticalSection"), 0);
+    metrics->onWriteDuringCriticalSection();
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("countWritesDuringCriticalSection"), 1);
+}
+
+TEST_F(ReshardingMetricsTest, DonorIncrementReadsDuringCriticalSection) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kDonor);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("countReadsDuringCriticalSection"), 0);
+    metrics->onReadDuringCriticalSection();
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("countReadsDuringCriticalSection"), 1);
+}
+
+TEST_F(ReshardingMetricsTest, RecipientSetsDocumentsAndBytesToCopy) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("approxDocumentsToCopy"), 0);
+    ASSERT_EQ(report.getIntField("approxBytesToCopy"), 0);
+    metrics->setDocumentsToProcessCounts(5, 1000);
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("approxDocumentsToCopy"), 5);
+    ASSERT_EQ(report.getIntField("approxBytesToCopy"), 1000);
+
+    metrics->setDocumentsToProcessCounts(3, 750);
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("approxDocumentsToCopy"), 3);
+    ASSERT_EQ(report.getIntField("approxBytesToCopy"), 750);
+}
+
+TEST_F(ReshardingMetricsTest, RecipientIncrementsDocumentsAndBytesWritten) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("documentsCopied"), 0);
+    ASSERT_EQ(report.getIntField("bytesCopied"), 0);
+    metrics->onDocumentsProcessed(5, 1000, Milliseconds(1));
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("documentsCopied"), 5);
+    ASSERT_EQ(report.getIntField("bytesCopied"), 1000);
+}
+
+TEST_F(ReshardingMetricsTest, CurrentOpReportsRunningTime) {
+    auto* clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kRecipient);
+    constexpr auto kTimeElapsed = 15;
+    clock->advance(Seconds(kTimeElapsed));
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("totalOperationTimeElapsedSecs"), kTimeElapsed);
+}
+
+TEST_F(ReshardingMetricsTest, OnWriteToStasheddShouldIncrementCurOpFields) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("countWritesToStashCollections"), 0);
+    metrics->onWriteToStashedCollections();
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("countWritesToStashCollections"), 1);
+}
+
+TEST_F(ReshardingMetricsTest, SetLowestOperationTimeShouldBeReflectedInCurrentOp) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kCoordinator);
+    metrics->setCoordinatorLowEstimateRemainingTimeMillis(Milliseconds(2000));
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("allShardsLowestRemainingOperationTimeEstimatedSecs"), 2);
+}
+
+TEST_F(ReshardingMetricsTest, SetHighestOperationTimeShouldBeReflectedInCurrentOp) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kCoordinator);
+    metrics->setCoordinatorHighEstimateRemainingTimeMillis(Milliseconds(12000));
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("allShardsHighestRemainingOperationTimeEstimatedSecs"), 12);
+}
+
+TEST_F(ReshardingMetricsTest, CoordinatorHighEstimateNoneIfNotSet) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kCoordinator);
+    ASSERT_EQ(metrics->getHighEstimateRemainingTimeMillis(), boost::none);
+}
+
+TEST_F(ReshardingMetricsTest, CoordinatorLowEstimateNoneIfNotSet) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kCoordinator);
+    ASSERT_EQ(metrics->getLowEstimateRemainingTimeMillis(), boost::none);
+}
+
+TEST_F(ReshardingMetricsTest, CurrentOpDoesNotReportCoordinatorHighEstimateIfNotSet) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kCoordinator);
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_FALSE(report.hasField("allShardsHighestRemainingOperationTimeEstimatedSecs"));
+}
+
+TEST_F(ReshardingMetricsTest, CurrentOpDoesNotReportCoordinatorLowEstimateIfNotSet) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kCoordinator);
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_FALSE(report.hasField("allShardsLowestRemainingOperationTimeEstimatedSecs"));
+}
+
+TEST_F(ReshardingMetricsTest, SetChunkImbalanceIncrementsCumulativeMetrics) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->setLastOpEndingChunkImbalance(1); },
+        Section::kRoot,
+        "lastOpEndingChunkImbalance");
+}
+
+TEST_F(ReshardingMetricsTest, OnReadDuringCriticalSectionIncrementsCumulativeMetrics) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onReadDuringCriticalSection(); },
+        Section::kActive,
+        "countReadsDuringCriticalSection");
+}
+
+TEST_F(ReshardingMetricsTest, OnWriteDuringCriticalSectionIncrementsCumulativeMetrics) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onWriteDuringCriticalSection(); },
+        Section::kActive,
+        "countWritesDuringCriticalSection");
+}
+
+TEST_F(ReshardingMetricsTest, OnWriteToStashCollectionsIncrementsCumulativeMetrics) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onWriteToStashedCollections(); },
+        Section::kActive,
+        "countWritesToStashCollections");
+}
+
+TEST_F(ReshardingMetricsTest, OnCloningRemoteBatchRetrievalIncrementsCumulativeMetricsCount) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onCloningRemoteBatchRetrieval(Milliseconds{0}); },
+        Section::kLatencies,
+        "collectionCloningTotalRemoteBatchesRetrieved");
+}
+
+TEST_F(ReshardingMetricsTest, OnCloningRemoteBatchRetrievalIncrementsCumulativeMetricsTime) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onCloningRemoteBatchRetrieval(Milliseconds{1}); },
+        Section::kLatencies,
+        "collectionCloningTotalRemoteBatchRetrievalTimeMillis");
+}
+
+TEST_F(ReshardingMetricsTest, OnDocumentsProcessedIncrementsCumulativeMetricsDocumentCount) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onDocumentsProcessed(1, 0, Milliseconds{0}); },
+        Section::kActive,
+        "documentsCopied");
+}
+
+TEST_F(ReshardingMetricsTest, OnDocumentsProcessedIncrementsCumulativeMetricsLocalInserts) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onDocumentsProcessed(1, 0, Milliseconds{0}); },
+        Section::kLatencies,
+        "collectionCloningTotalLocalInserts");
+}
+
+TEST_F(ReshardingMetricsTest, OnDocumentsProcessedIncrementsCumulativeMetricsByteCount) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onDocumentsProcessed(0, 1, Milliseconds{0}); },
+        Section::kActive,
+        "bytesCopied");
+}
+
+TEST_F(ReshardingMetricsTest, OnDocumentsProcessedIncrementsCumulativeMetricsLocalInsertTime) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onDocumentsProcessed(0, 0, Milliseconds{1}); },
+        Section::kLatencies,
+        "collectionCloningTotalLocalInsertTimeMillis");
+}
+
+TEST_F(ReshardingMetricsTest, TestSetStartForIdempotency) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
+    auto start = metrics->getStartFor(resharding_metrics::TimedPhase::kCriticalSection);
+    ASSERT_EQ(start, boost::none);
+
+    auto now = getClockSource()->now();
+
+    metrics->setStartFor(resharding_metrics::TimedPhase::kCriticalSection, now);
+    start = metrics->getStartFor(resharding_metrics::TimedPhase::kCriticalSection);
+    ASSERT_EQ(start, now);
+
+    auto later = now + Seconds(10);
+
+    metrics->setStartFor(resharding_metrics::TimedPhase::kCriticalSection, later);
+    start = metrics->getStartFor(resharding_metrics::TimedPhase::kCriticalSection);
+    ASSERT_EQ(start, now);
+}
+
+TEST_F(ReshardingMetricsTest, TestSetEndForIdempotency) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
+    auto start = metrics->getEndFor(resharding_metrics::TimedPhase::kCriticalSection);
+    ASSERT_EQ(start, boost::none);
+
+    auto now = getClockSource()->now();
+
+    metrics->setEndFor(resharding_metrics::TimedPhase::kCriticalSection, now);
+    start = metrics->getEndFor(resharding_metrics::TimedPhase::kCriticalSection);
+    ASSERT_EQ(start, now);
+
+    auto later = now + Seconds(10);
+
+    metrics->setEndFor(resharding_metrics::TimedPhase::kCriticalSection, later);
+    start = metrics->getEndFor(resharding_metrics::TimedPhase::kCriticalSection);
+    ASSERT_EQ(start, now);
 }
 
 }  // namespace

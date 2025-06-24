@@ -189,13 +189,13 @@ public:
                     opCtx.get(), nss, CollectionOptions{});
             }
 
-            _metrics =
-                ReshardingMetrics::makeInstance(UUID::gen(),
-                                                BSON("y" << 1),
-                                                _outputNss,
-                                                ShardingDataTransformMetrics::Role::kRecipient,
-                                                serviceContext->getFastClockSource()->now(),
-                                                serviceContext);
+            _metrics = ReshardingMetrics::makeInstance_forTest(
+                UUID::gen(),
+                BSON("y" << 1),
+                _outputNss,
+                ShardingDataTransformMetrics::Role::kRecipient,
+                serviceContext->getFastClockSource()->now(),
+                serviceContext);
             _metrics->registerDonors({_myDonorId});
 
             _applierMetrics = std::make_unique<ReshardingOplogApplierMetrics>(

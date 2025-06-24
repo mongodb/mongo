@@ -44,7 +44,6 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/index_on_config.h"
-#include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_external_state.h"
@@ -130,12 +129,13 @@ protected:
         TransactionCoordinatorService::get(operationContext())
             ->initializeIfNeeded(operationContext(), /* term */ 1);
 
-        _metrics = ReshardingMetrics::makeInstance(_originalUUID,
-                                                   _newShardKey.toBSON(),
-                                                   _originalNss,
-                                                   ReshardingMetrics::Role::kCoordinator,
-                                                   getServiceContext()->getFastClockSource()->now(),
-                                                   getServiceContext());
+        _metrics = ReshardingMetrics::makeInstance_forTest(
+            _originalUUID,
+            _newShardKey.toBSON(),
+            _originalNss,
+            ReshardingMetrics::Role::kCoordinator,
+            getServiceContext()->getFastClockSource()->now(),
+            getServiceContext());
     }
 
     void tearDown() override {

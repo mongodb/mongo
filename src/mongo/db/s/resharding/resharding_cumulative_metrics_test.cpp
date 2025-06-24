@@ -32,7 +32,8 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
-#include "mongo/db/s/metrics/sharding_data_transform_metrics_test_fixture.h"
+#include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
+#include "mongo/db/s/resharding/resharding_metrics_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -59,10 +60,10 @@ namespace {
 
 constexpr auto kResharding = "resharding";
 
-class ReshardingCumulativeMetricsTest : public ShardingDataTransformMetricsTestFixture {
+class ReshardingCumulativeMetricsTest : public ReshardingMetricsTestFixture {
 protected:
     void setUp() override {
-        ShardingDataTransformMetricsTestFixture::setUp();
+        ReshardingMetricsTestFixture::setUp();
         _reshardingCumulativeMetrics =
             static_cast<ReshardingCumulativeMetrics*>(_cumulativeMetrics.get());
         _fieldNames = std::make_unique<ReshardingCumulativeMetricsFieldNameProvider>();

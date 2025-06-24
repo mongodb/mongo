@@ -33,9 +33,9 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
-#include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
-#include "mongo/db/s/metrics/sharding_data_transform_metrics_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
+#include "mongo/db/s/resharding/resharding_metrics_test_fixture.h"
+#include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/uuid.h"
@@ -51,7 +51,7 @@
 namespace mongo {
 namespace {
 
-class ReshardingOplogApplierMetricsTest : public ShardingDataTransformMetricsTestFixture {
+class ReshardingOplogApplierMetricsTest : public ReshardingMetricsTestFixture {
 public:
     std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics() override {
         return std::make_unique<ReshardingCumulativeMetrics>();
@@ -64,7 +64,9 @@ public:
                                                    ReshardingMetrics::Role::kRecipient,
                                                    getClockSource()->now(),
                                                    getClockSource(),
-                                                   _cumulativeMetrics.get());
+                                                   _cumulativeMetrics.get(),
+                                                   RecipientStateEnum::kApplying,
+                                                   ReshardingProvenanceEnum::kReshardCollection);
     }
 
 protected:
