@@ -284,15 +284,14 @@ protected:
     /**
      * Deletes all records in this WiredTiger table.
      */
-    Status wtTruncate(OperationContext* opCtx, WiredTigerRecoveryUnit& wtRu);
+    void wtTruncate(OperationContext* opCtx, WiredTigerRecoveryUnit& wtRu);
 
     /**
      * Deletes all Records in the range [minRecordId, maxRecordId].
      */
-    Status wtRangeTruncate(OperationContext* opCtx,
-                           WiredTigerRecoveryUnit& wtRu,
-                           const RecordId& minRecordId = RecordId(),
-                           const RecordId& maxRecordId = RecordId());
+    void wtRangeTruncate(WiredTigerRecoveryUnit& wtRu,
+                         const RecordId& minRecordId = RecordId(),
+                         const RecordId& maxRecordId = RecordId());
 
     /**
      * Compacts this WiredTiger table to attempt to reduce its storage space.

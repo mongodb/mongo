@@ -354,12 +354,9 @@ public:
     static Status canRunAutoCompact(bool isEphemeral);
 
     /**
-     * Truncates the table identified by tableId and uri, removing all entries from it.
+     * Truncates the table identified by uri, removing all entries from it.
      */
-    static Status truncate(OperationContext* opCtx,
-                           WiredTigerRecoveryUnit& ru,
-                           uint64_t tableId,
-                           const std::string& uri);
+    static void truncate(WiredTigerRecoveryUnit& ru, StringData uri);
 
     static uint64_t genTableId();
 

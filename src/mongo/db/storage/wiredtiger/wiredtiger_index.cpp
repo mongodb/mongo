@@ -463,7 +463,8 @@ StatusWith<int64_t> WiredTigerIndex::compact(OperationContext* opCtx,
 }
 
 Status WiredTigerIndex::truncate(OperationContext* opCtx, RecoveryUnit& ru) {
-    return WiredTigerUtil::truncate(opCtx, WiredTigerRecoveryUnit::get(ru), _tableId, _uri);
+    WiredTigerUtil::truncate(WiredTigerRecoveryUnit::get(ru), _uri);
+    return Status::OK();
 }
 
 boost::optional<RecordId> WiredTigerIndex::_keyExists(OperationContext* opCtx,

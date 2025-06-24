@@ -426,38 +426,26 @@ Status WiredTigerRecordStore::wtUpdateRecord(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status WiredTigerRecordStore::wtTruncate(OperationContext* opCtx, WiredTigerRecoveryUnit& wtRu) {
-    return WiredTigerUtil::truncate(opCtx, wtRu, _tableId, _uri);
+void WiredTigerRecordStore::wtTruncate(OperationContext* opCtx, WiredTigerRecoveryUnit& wtRu) {
+    WiredTigerUtil::truncate(wtRu, _uri);
 }
 
-Status WiredTigerRecordStore::wtRangeTruncate(OperationContext* opCtx,
-                                              WiredTigerRecoveryUnit& wtRu,
-                                              const RecordId& minRecordId,
-                                              const RecordId& maxRecordId) {
+void WiredTigerRecordStore::wtRangeTruncate(WiredTigerRecoveryUnit& wtRu,
+                                            const RecordId& minRecordId,
+                                            const RecordId& maxRecordId) {
     auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
-    WiredTigerCursor startWrap(std::move(cursorParams), _uri, *wtRu.getSession());
-    WT_CURSOR* start = startWrap.get();
-    int ret = wiredTigerPrepareConflictRetry(
-        *opCtx, StorageExecutionContext::get(opCtx)->getPrepareConflictTracker(), wtRu, [&] {
-            return start->next(start);
-        });
-    // Empty collections don't have anything to truncate.
-    if (ret == WT_NOTFOUND) {
-        return Status::OK();
-    }
-    invariantWTOK(ret, start->session);
-    // Make sure to reset the cursor since we have to replace it with what the user provided us.
-    invariantWTOK(start->reset(start), start->session);
 
+    WiredTigerCursor startWrap(cursorParams, _uri, *wtRu.getSession());
     boost::optional<CursorKey> startKey;
-    if (minRecordId != RecordId()) {
+    WT_CURSOR* start = [&]() -> WT_CURSOR* {
+        if (minRecordId == RecordId()) {
+            return nullptr;
+        }
         startKey = makeCursorKey(minRecordId, _keyFormat);
-        setKey(start, &(*startKey));
-    } else {
-        start = nullptr;
-    }
+        setKey(startWrap.get(), &(*startKey));
+        return startWrap.get();
+    }();
 
-    cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
     WiredTigerCursor endWrap(std::move(cursorParams), _uri, *wtRu.getSession());
     boost::optional<CursorKey> endKey;
     WT_CURSOR* finish = [&]() -> WT_CURSOR* {
@@ -471,7 +459,6 @@ Status WiredTigerRecordStore::wtRangeTruncate(OperationContext* opCtx,
 
     WiredTigerSession* session = wtRu.getSession();
     invariantWTOK(WT_OP_CHECK(session->truncate(nullptr, start, finish, nullptr)), *session);
-    return Status::OK();
 }
 
 StatusWith<int64_t> WiredTigerRecordStore::wtCompact(OperationContext* opCtx,
@@ -1008,13 +995,8 @@ std::unique_ptr<RecordCursor> WiredTigerRecordStore::getRandomCursor(OperationCo
 
 Status WiredTigerRecordStore::_truncate(OperationContext* opCtx, RecoveryUnit& ru) {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
-    auto status = wtTruncate(opCtx, wtRu);
-    if (!status.isOK()) {
-        return status;
-    }
-
+    wtTruncate(opCtx, wtRu);
     _changeNumRecordsAndDataSize(wtRu, -numRecords(), -dataSize());
-
     return Status::OK();
 }
 
@@ -1025,11 +1007,7 @@ Status WiredTigerRecordStore::_rangeTruncate(OperationContext* opCtx,
                                              int64_t hintDataSizeDiff,
                                              int64_t hintNumRecordsDiff) {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
-    auto status = wtRangeTruncate(opCtx, wtRu, minRecordId, maxRecordId);
-    if (!status.isOK()) {
-        return status;
-    }
-
+    wtRangeTruncate(wtRu, minRecordId, maxRecordId);
     _changeNumRecordsAndDataSize(wtRu, hintNumRecordsDiff, hintDataSizeDiff);
     return Status::OK();
 }

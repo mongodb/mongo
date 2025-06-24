@@ -1440,24 +1440,9 @@ long long WiredTigerUtil::getCancelledCacheMetric_forTest() {
     return cancelledCacheMetric.get();
 }
 
-Status WiredTigerUtil::truncate(OperationContext* opCtx,
-                                WiredTigerRecoveryUnit& ru,
-                                uint64_t tableId,
-                                const std::string& uri) {
-    auto cursorParams = getWiredTigerCursorParams(ru, tableId);
-    WiredTigerCursor curwrap(std::move(cursorParams), uri, *ru.getSession());
-    WT_CURSOR* c = curwrap.get();
-    int ret = wiredTigerPrepareConflictRetry(
-        *opCtx, StorageExecutionContext::get(opCtx)->getPrepareConflictTracker(), ru, [&] {
-            return c->next(c);
-        });
-    if (ret == WT_NOTFOUND) {  // i.e. table is already empty
-        return Status::OK();
-    }
-    invariantWTOK(ret, c->session);
-
-    invariantWTOK(WT_OP_CHECK(ru.getSession()->truncate(nullptr, c, nullptr, nullptr)), c->session);
-    return Status::OK();
+void WiredTigerUtil::truncate(WiredTigerRecoveryUnit& ru, StringData uri) {
+    invariantWTOK(WT_OP_CHECK(ru.getSession()->truncate(uri.data(), nullptr, nullptr, nullptr)),
+                  *ru.getSession());
 }
 
 }  // namespace mongo
