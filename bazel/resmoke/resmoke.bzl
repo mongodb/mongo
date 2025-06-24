@@ -125,6 +125,8 @@ def resmoke_suite_test(
             "--suites=$(location %s)" % native.package_relative_label(generated_config),
             "--multiversionDir=multiversion_binaries",
             "--continueOnFailure",
+            "--mongoVersionFile=$(location //bazel/resmoke:resmoke_mongo_version)",
+            "--releasesFile=$(location //src/mongo/util/version:releases.yml)",
         ] + extra_args + resmoke_args,
         tags = tags + ["no-cache", "local", "resources:port_block:1"],
         timeout = timeout,

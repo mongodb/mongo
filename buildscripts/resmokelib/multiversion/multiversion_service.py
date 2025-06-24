@@ -11,9 +11,6 @@ import yaml
 from packaging.version import Version
 from pydantic import BaseModel, Field
 
-# These values must match the include paths for artifacts.tgz in evergreen.yml.
-MONGO_VERSION_YAML = ".resmoke_mongo_version.yml"
-RELEASES_YAML = ".resmoke_mongo_release_values.yml"
 VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+")
 LOGGER = structlog.getLogger(__name__)
 

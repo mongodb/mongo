@@ -6,7 +6,7 @@ from typing import List, Optional
 import yaml
 from pydantic import BaseModel
 
-from buildscripts.resmokelib import configure_resmoke
+from buildscripts.resmokelib import config, configure_resmoke
 from buildscripts.resmokelib.multiversion.multiversion_service import (
     MongoReleases,
     MongoVersion,
@@ -60,8 +60,8 @@ class MultiversionConfigSubcommand(Subcommand):
         from buildscripts.resmokelib import multiversionconstants
 
         multiversion_service = MultiversionService(
-            mongo_version=MongoVersion.from_yaml_file(multiversionconstants.MONGO_VERSION_YAML),
-            mongo_releases=MongoReleases.from_yaml_file(multiversionconstants.RELEASES_YAML),
+            mongo_version=MongoVersion.from_yaml_file(config.MONGO_VERSION_FILE),
+            mongo_releases=MongoReleases.from_yaml_file(config.RELEASES_FILE),
         )
         version_constants = multiversion_service.calculate_version_constants()
         return MultiversionConfig(

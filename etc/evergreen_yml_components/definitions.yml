@@ -1683,9 +1683,6 @@ functions:
     - *f_expansions_write
     - *set_up_remote_credentials
     - *f_expansions_write
-    - *determine_resmoke_jobs
-    - *update_resmoke_jobs_expansions
-    - *f_expansions_write
     - *configure_evergreen_api_credentials
     - *determine_task_timeout
     - *update_task_timeout_expansions
@@ -1713,9 +1710,6 @@ functions:
     - *set_code_coverage_expansion
     - *f_expansions_write
     - *set_up_remote_credentials
-    - *f_expansions_write
-    - *determine_resmoke_jobs
-    - *update_resmoke_jobs_expansions
     - *f_expansions_write
     - *configure_evergreen_api_credentials
     - *determine_task_timeout

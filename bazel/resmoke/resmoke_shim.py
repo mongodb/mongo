@@ -67,17 +67,19 @@ if __name__ == "__main__":
         resmoke_args.append(f"--taskWorkDir={undeclared_output_dir}")
         resmoke_args.append(f"--reportFile={os.path.join(undeclared_output_dir,'report.json')}")
 
-    if os.environ.get("TEST_SRCDIR"):
-        test_srcdir = os.environ.get("TEST_SRCDIR")
-        version_file = os.path.join(
-            test_srcdir, "_main", "bazel", "resmoke", ".resmoke_mongo_version.yml"
-        )
-        link_path = os.path.join(test_srcdir, "_main", ".resmoke_mongo_version.yml")
-        if not os.path.exists(link_path):
-            os.symlink(
-                version_file,
-                link_path,
-            )
+    if os.environ.get("TEST_SHARD_INDEX") and os.environ.get("TEST_TOTAL_SHARDS"):
+        shard_count = os.environ.get("TEST_TOTAL_SHARDS")
+        shard_index = os.environ.get("TEST_SHARD_INDEX")
+
+        resmoke_args.append(f"--shardIndex={shard_index}")
+        resmoke_args.append(f"--shardCount={shard_count}")
+        if os.environ.get("TEST_SHARD_STATUS_FILE"):
+            open(os.environ["TEST_SHARD_STATUS_FILE"], "w").close()
+
+        report = f"report_shard_{shard_index}_of_{shard_count}.json"
+    else:
+        report = "report.json"
+    resmoke_args.append(f"--reportFile={os.path.join(undeclared_output_dir, report)}")
 
     lock, base_port = acquire_local_resource("port_block")
     resmoke_args.append(f"--basePort={base_port}")

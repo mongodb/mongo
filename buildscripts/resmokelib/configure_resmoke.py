@@ -27,7 +27,7 @@ from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
 
 from buildscripts.idl import gen_all_feature_flag_list
 from buildscripts.resmokelib import config as _config
-from buildscripts.resmokelib import mongo_fuzzer_configs, utils
+from buildscripts.resmokelib import mongo_fuzzer_configs, multiversionsetupconstants, utils
 from buildscripts.resmokelib.utils.batched_baggage_span_processor import BatchedBaggageSpanProcessor
 from buildscripts.resmokelib.utils.file_span_exporter import FileSpanExporter
 from buildscripts.util.read_config import read_config_file
@@ -502,6 +502,15 @@ flags in common: {common_set}
     shard_count = config.pop("shard_count")
     _config.SHARD_INDEX = int(shard_index) if shard_index is not None else None
     _config.SHARD_COUNT = int(shard_count) if shard_count is not None else None
+
+    mongo_version_file = config.pop("mongo_version_file")
+    if mongo_version_file is not None:
+        _config.MONGO_VERSION_FILE = mongo_version_file
+
+    releases_file = config.pop("releases_file")
+    if releases_file is not None:
+        multiversionsetupconstants.USE_EXISTING_RELEASES_FILE = True
+        _config.RELEASES_FILE = releases_file
 
     _config.INSTALL_DIR = config.pop("install_dir")
     if values.command == "run" and _config.INSTALL_DIR is None:

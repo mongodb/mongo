@@ -27,8 +27,6 @@ if [ -n "${build_timeout_seconds}" ]; then
   TIMEOUT_CMD="timeout ${build_timeout_seconds}"
 fi
 
-bazel_args="${bazel_args} --test_arg=--jobs=${resmoke_jobs}"
-
 if [ ${should_shuffle} = true ]; then
   bazel_args="${bazel_args} --test_arg=--shuffle"
 elif [ ${should_shuffle} = false ]; then
@@ -69,17 +67,14 @@ done
 eval ${BAZEL_BINARY} test ${bazel_args} ${targets}
 RET=$?
 
-# For a target //path:test, the undeclared test outputs are in
-# bazel-testlogs/path/test/test.outputs/outputs.zip
-outputs=bazel-testlogs/$(sed "s|//||;s|:|/|" <<< ${targets})/test.outputs/outputs.zip
-if [ -f $outputs ]; then
-  unzip $outputs -d ../
-fi
-
-if [ -f ../report.json ]; then
-  mv ../report.json report.json
-fi
-
 set -o errexit
+
+# For a target //path:test, the undeclared test outputs are in
+# bazel-testlogs/path/test/test.outputs/outputs.zip. Extract them
+# to the root of the task working directory
+find bazel-testlogs/$(sed "s|//||;s|:|/|" <<< ${targets}) -name outputs.zip | xargs -I {} unzip -qo {} -d ../
+
+# Combine reports from potentially multiple tests/shards.
+find ../ -name report*.json | xargs $python buildscripts/combine_reports.py --no-report-exit -o report.json
 
 exit $RET

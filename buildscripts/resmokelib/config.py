@@ -123,6 +123,8 @@ DEFAULTS = {
     "enable_enterprise_tests": "on",
     "enable_evergreen_api_test_selection": False,
     "test_selection_strategies_array": None,
+    "mongo_version_file": None,
+    "releases_file": None,
     "shell_seed": None,
     "storage_engine": "wiredTiger",
     "storage_engine_cache_size_gb": None,
@@ -365,6 +367,12 @@ ENABLE_EVERGREEN_API_TEST_SELECTION = None
 
 # If set, requests Evergreen to use the specified test selection strategies.
 EVERGREEN_TEST_SELECTION_STRATEGY = None
+
+# Path to the YAML file containing the current `mongo_version`
+MONGO_VERSION_FILE = ".resmoke_mongo_version.yml"
+
+# Path to the releases YAML file.
+RELEASES_FILE = ".resmoke_mongo_release_values.yml"
 
 # URL to connect to the Evergreen service.
 EVERGREEN_URL = None

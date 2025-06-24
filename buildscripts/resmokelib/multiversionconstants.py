@@ -12,8 +12,6 @@ from retry import retry
 
 import buildscripts.resmokelib.config as _config
 from buildscripts.resmokelib.multiversion.multiversion_service import (
-    MONGO_VERSION_YAML,
-    RELEASES_YAML,
     MongoReleases,
     MongoVersion,
     MultiversionService,
@@ -43,7 +41,7 @@ def generate_mongo_version_file():
         raise ChildProcessError("Failed to run git describe to get the latest tag") from exp
 
     # Write the current MONGO_VERSION to a data file.
-    with open(MONGO_VERSION_YAML, "w") as mongo_version_fh:
+    with open(_config.MONGO_VERSION_FILE, "w") as mongo_version_fh:
         # E.g. res = 'r5.1.0-alpha-597-g8c345c6693\n'
         res = res[1:]  # Remove the leading "r" character.
         mongo_version_fh.write("mongo_version: " + res)
@@ -53,7 +51,7 @@ def generate_mongo_version_file():
 def get_releases_file_from_remote():
     """Get the latest releases.yml from github."""
     try:
-        with open(RELEASES_YAML, "wb") as file:
+        with open(_config.RELEASES_FILE, "wb") as file:
             response = requests.get(MASTER_RELEASES_REMOTE_FILE)
             if response.status_code != http.HTTPStatus.OK:
                 raise RuntimeError(
@@ -71,7 +69,11 @@ def get_releases_file_locally_or_fallback_to_remote():
     """Get the latest releases.yml locally or fallback to getting it from github."""
     if os.path.exists(RELEASES_LOCAL_FILE):
         LOGGER.info(f"Found releases.yml file locally: {RELEASES_LOCAL_FILE}")
-        shutil.copyfile(RELEASES_LOCAL_FILE, RELEASES_YAML)
+        with open(RELEASES_LOCAL_FILE, "rb") as file:
+            print(file.read())
+            print("copyfile here")
+        shutil.copyfile(RELEASES_LOCAL_FILE, _config.RELEASES_FILE)
+
     else:
         LOGGER.warning(f"Could not find releases.yml file locally: {RELEASES_LOCAL_FILE}")
         get_releases_file_from_remote()
@@ -131,8 +133,8 @@ def evg_project_str(version):
 
 
 multiversion_service = MultiversionService(
-    mongo_version=MongoVersion.from_yaml_file(MONGO_VERSION_YAML),
-    mongo_releases=MongoReleases.from_yaml_file(RELEASES_YAML),
+    mongo_version=MongoVersion.from_yaml_file(_config.MONGO_VERSION_FILE),
+    mongo_releases=MongoReleases.from_yaml_file(_config.RELEASES_FILE),
 )
 
 version_constants = multiversion_service.calculate_version_constants()

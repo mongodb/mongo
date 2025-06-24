@@ -26,6 +26,7 @@ resmoke_suite_test(
     resmoke_args = [
         "--storageEngineCacheSizeGB=1",
     ],
+    shard_count = 2,
     tags = [
         "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
     ],
