@@ -89,7 +89,7 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
         repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getSettings().isReplSet();
     auto state = repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getMemberState();
 
-    stdx::unique_lock<stdx::mutex> lock(_stateMutex);
+    std::shared_lock lock(_stateMutex);
 
     // Downgrade Write intent to LocalWrite during initial sync.
     if (intent == Intent::Write && isReplSet &&
@@ -131,25 +131,12 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
         stdx::unique_lock<stdx::mutex> lockTokenMap(tokenMap.lock);
         tokenMap.map.insert({token.id(), opCtx});
     }
-    {
-        stdx::unique_lock<stdx::mutex> lockOpCtxIntentMap(_opCtxIntentMap.lock);
-        _opCtxIntentMap.map.insert({opCtx, token.intent()});
-    }
 
     return token;
 }
 void IntentRegistry::deregisterIntent(IntentRegistry::IntentToken token) {
     auto& tokenMap = _tokenMaps[(size_t)token.intent()];
     stdx::lock_guard<stdx::mutex> lock(tokenMap.lock);
-    {
-        stdx::unique_lock<stdx::mutex> lockOpCtxIntentMap(_opCtxIntentMap.lock);
-        // Find IntentToken:opCtx pair in tokenMap.
-        auto tokenMapIter = tokenMap.map.find(token.id());
-        if (tokenMapIter != tokenMap.map.end()) {
-            auto opCtx = tokenMapIter->second;
-            _opCtxIntentMap.map.erase(opCtx);
-        }
-    }
 
     (void)tokenMap.map.erase(token.id());
     if (tokenMap.map.empty()) {
@@ -167,7 +154,7 @@ bool IntentRegistry::canDeclareIntent(Intent intent, OperationContext* opCtx) {
         repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getSettings().isReplSet();
     auto state = repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getMemberState();
 
-    stdx::unique_lock<stdx::mutex> lock(_stateMutex);
+    std::shared_lock lock(_stateMutex);
 
     // Downgrade Write intent to LocalWrite during initial sync.
     if (intent == Intent::Write && isReplSet &&
@@ -198,7 +185,7 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
     auto timeOutSec = stdx::chrono::seconds(
         timeout_sec ? *timeout_sec : repl::fassertOnLockTimeoutForStepUpDown.load());
     {
-        stdx::unique_lock<stdx::mutex> lock(_stateMutex);
+        stdx::unique_lock lock(_stateMutex);
         if (_interruptionCtx) {
             LOGV2(9945001, "Existing kill ongoing. Blocking until it is finished.");
         }
@@ -264,7 +251,7 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
         _totalOpsKilled = 0;
 
         return ReplicationStateTransitionGuard([&]() {
-            stdx::lock_guard<stdx::mutex> lock(_stateMutex);
+            stdx::lock_guard lock(_stateMutex);
             _interruptionCtx = nullptr;
             _lastInterruption = InterruptionType::None;
             _activeInterruptionCV.notify_one();
@@ -287,7 +274,7 @@ void IntentRegistry::updateAndLogStateTransitionMetrics(IntentRegistry::Interrup
 }
 
 void IntentRegistry::enable() {
-    stdx::lock_guard<stdx::mutex> lock(_stateMutex);
+    stdx::lock_guard lock(_stateMutex);
     _enabled = true;
     _lastInterruption = InterruptionType::None;
     _interruptionCtx = nullptr;
@@ -295,23 +282,8 @@ void IntentRegistry::enable() {
 }
 
 void IntentRegistry::disable() {
-    stdx::lock_guard<stdx::mutex> lock(_stateMutex);
+    stdx::lock_guard lock(_stateMutex);
     _enabled = false;
-}
-
-boost::optional<IntentRegistry::Intent> IntentRegistry::getHeldIntent(
-    OperationContext* opCtx) const {
-    stdx::unique_lock<stdx::mutex> lockOpCtxIntentMap(_opCtxIntentMap.lock);
-    auto iter = _opCtxIntentMap.map.find(opCtx);
-    if (iter != _opCtxIntentMap.map.end()) {
-        return iter->second;
-    } else {
-        return boost::none;
-    }
-}
-
-bool IntentRegistry::isIntentHeld(OperationContext* opCtx) const {
-    return (getHeldIntent(opCtx) != boost::none);
 }
 
 bool IntentRegistry::_validIntent(IntentRegistry::Intent intent) const {

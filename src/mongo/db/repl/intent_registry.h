@@ -34,6 +34,7 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/mutex.h"
@@ -179,16 +180,6 @@ public:
      */
     void disable();
 
-    /**
-     * Returns the Intent held by an opCtx (boost::none if it is not holding any).
-     */
-    boost::optional<Intent> getHeldIntent(OperationContext* opCtx) const;
-
-    /**
-     * Checks if the opCtx is holding an Intent.
-     */
-    bool isIntentHeld(OperationContext* opCtx) const;
-
     static std::string intentToString(Intent intent);
 
     static std::string interruptionToString(InterruptionType interrupt);
@@ -201,24 +192,19 @@ private:
     struct tokenMap {
         mutable stdx::mutex lock;
         stdx::condition_variable cv;
-        stdx::unordered_map<IntentToken::idType, OperationContext*> map;
+        absl::flat_hash_map<IntentToken::idType, OperationContext*> map;
     };
 
-    struct opCtxIntentMap {
-        stdx::mutex lock;
-        stdx::unordered_map<OperationContext*, Intent> map;
-    };
     bool _validIntent(Intent intent) const;
     void _killOperationsByIntent(Intent intent, bool forShutdown);
     void _waitForDrain(Intent intent, stdx::chrono::milliseconds timeout);
 
     bool _enabled = true;
-    stdx::mutex _stateMutex;
+    RWMutex _stateMutex;
     stdx::condition_variable _activeInterruptionCV;
     InterruptionType _lastInterruption = InterruptionType::None;
     OperationContext* _interruptionCtx = nullptr;
     std::vector<tokenMap> _tokenMaps;
-    mutable opCtxIntentMap _opCtxIntentMap;
 
     // Tracks number of operations killed on state transition.
     size_t _totalOpsKilled = 0;
