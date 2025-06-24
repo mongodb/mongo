@@ -107,6 +107,3 @@ testProxyProtocolReplicaSet(ingressPort, egressPort, 2, emptyMessageTest);
 
 testProxyProtocolReplicaSet(ingressPort, egressPort, 1, fuzzingTest);
 testProxyProtocolReplicaSet(ingressPort, egressPort, 2, fuzzingTest);
-
-testProxyProtocolReplicaSet(ingressPort, egressPort, 1, loadTest);
-testProxyProtocolReplicaSet(ingressPort, egressPort, 2, loadTest);

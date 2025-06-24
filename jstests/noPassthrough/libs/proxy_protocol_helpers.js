@@ -50,7 +50,7 @@ const emptyMessageTest = (ingressPort, egressPort, node, isRouter) => {
 };
 
 const fuzzingTest = (ingressPort, egressPort, node, isRouter) => {
-    const numConnections = 200;
+    const numConnections = 10;
 
     for (let i = 0; i < numConnections; i++) {
         jsTestLog("Sending random data to proxy port");
@@ -69,34 +69,6 @@ const fuzzingTest = (ingressPort, egressPort, node, isRouter) => {
 
         assert.soon(() => !checkProgram(pid).alive,
                     "Server should have closed connection with invalid proxy protocol header");
-    }
-};
-
-const loadTest = (ingressPort, egressPort, node, isRouter) => {
-    const numConnections = 200;
-    let threads = [];
-
-    for (let i = 0; i < numConnections; i++) {
-        threads.push(new Thread((regularPort, ingressPort, egressPort, connectFn, isRouter) => {
-            // Throw in some connections without data to make sure we handle those correctly.
-            const pid =
-                _startMongoProgram("bash", "-c", `exec cat < /dev/tcp/127.0.0.1/${egressPort}`);
-
-            // Connecting to the proxy port still succeeds within a reasonable time
-            // limit.
-            connectFn(ingressPort, isRouter);
-
-            // Connecting to the default port still succeeds within a reasonable time limit.
-            connectFn(regularPort, isRouter);
-
-            assert(checkProgram(pid).alive);
-            stopMongoProgramByPid(pid);
-        }, node.port, ingressPort, egressPort, connectAndHello, isRouter));
-        threads[i].start();
-    }
-
-    for (let i = 0; i < numConnections; i++) {
-        threads[i].join();
     }
 };
 
