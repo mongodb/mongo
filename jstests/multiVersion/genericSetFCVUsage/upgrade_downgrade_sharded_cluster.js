@@ -167,6 +167,20 @@ for (const oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     jsTest.log('Upgrading binaries to latest version');
     st.upgradeCluster('latest');
 
+    const newNode = st.shard0.rs.add({shardsvr: "", rsConfig: {priority: 0, votes: 0}});
+    st.shard0.rs.reInitiate();
+    st.shard0.rs.awaitSecondaryNodes();
+
+    let shard;
+    assert.soon(
+        () => {
+            shard = st.s.getCollection("config.shards").findOne({_id: st.shard0.shardName});
+            const hosts = MongoURI(shard.host).servers.map(x => x.server);
+            return hosts.includes(newNode.host);
+        },
+        () => `timed out waiting for replica set shard primary to add ${
+            newNode.host} to config.shards entry: ${tojson(shard)}`);
+
     checkClusterAfterBinaryUpgrade();
 
     jsTest.log('Upgrading FCV to ' + latestFCV);
