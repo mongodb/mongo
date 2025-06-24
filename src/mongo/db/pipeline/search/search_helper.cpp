@@ -628,7 +628,8 @@ boost::optional<SearchQueryViewSpec> getViewFromExpCtx(
     boost::intrusive_ptr<ExpressionContext> expCtx) {
     if (expCtx->getView()) {
         auto expCtxView = *expCtx->getView();
-        return boost::make_optional(SearchQueryViewSpec(expCtxView.first, expCtxView.second));
+        return boost::make_optional(
+            SearchQueryViewSpec(std::string(expCtxView.first.coll()), expCtxView.second));
     }
 
     return boost::none;

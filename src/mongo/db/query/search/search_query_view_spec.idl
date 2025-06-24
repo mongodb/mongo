@@ -39,10 +39,10 @@ structs:
             The document sources specific to mongot stages also hold this struct to retain the view information necessary to perform mongot-indexed view logic during query execution.
         strict: true
         fields:
-            nss:
+            name:
                 description: >-
-                    When passing the view between shards, we need to include the entire NSS in order to add the corresponding view pipeline to the resolvedNamespaces dict on the expression context.
-                type: namespacestring
+                    The name of the view.
+                type: string
                 optional: false
             effectivePipeline:
                 description: >-

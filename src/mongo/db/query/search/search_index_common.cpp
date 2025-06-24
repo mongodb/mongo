@@ -62,11 +62,7 @@ executor::RemoteCommandRequest createManageSearchIndexRemoteCommandRequest(
     manageSearchIndexRequest.setManageSearchIndex(nss.coll());
     manageSearchIndexRequest.setCollectionUUID(uuid);
     manageSearchIndexRequest.setUserCommand(userCmd);
-
-    if (view) {
-        manageSearchIndexRequest.setView(boost::make_optional(
-            MongotQueryViewSpec(std::string{view->getNss().coll()}, view->getEffectivePipeline())));
-    }
+    manageSearchIndexRequest.setView(view);
 
     // Create a RemoteCommandRequest with the request and host-and-port.
     executor::RemoteCommandRequest remoteManageSearchIndexRequest(executor::RemoteCommandRequest(
@@ -122,7 +118,7 @@ retrieveCollectionUUIDAndResolveView(OperationContext* opCtx,
         sourceCollectionNss = resolvedView.value().getNamespace();
 
         // Construct a SearchQueryViewSpec object.
-        view.emplace(currentOperationNss, resolvedView.value().getPipeline());
+        view.emplace(std::string(currentOperationNss.coll()), resolvedView.value().getPipeline());
     }
     return std::make_tuple(collUUID, sourceCollectionNss, view);
 }

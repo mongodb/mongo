@@ -110,36 +110,37 @@ export function assertViewNotApplied(explainOutput, userPipeline, viewPipeline) 
  * @param {Object} explainOutput The explain output from the whole aggregation.
  * @param {Object} collNss The underlying collection namespace of the view that the $unionWith stage
  *     is run on.
- * @param {Object} viewNss The view namespace that the $unionWith stage is run on.
+ * @param {Object} viewName The view name that the $unionWith stage is run on.
  * @param {Array} viewPipeline The view pipeline referenced by the search query inside of the
  *     $unionWith.
  * @param {boolean} isStoredSource Whether the $search query is storedSource or not.
  */
 export function assertUnionWithSearchSubPipelineAppliedViews(
-    explainOutput, collNss, viewNss, viewPipeline, isStoredSource = false) {
+    explainOutput, collNss, viewName, viewPipeline, isStoredSource = false) {
     const unionWithStage = getUnionWithStage(explainOutput);
     const unionWithExplain = prepareUnionWithExplain(unionWithStage.$unionWith.pipeline);
     if (!isStoredSource) {
-        // In fully-sharded environments, check for the correct viewNss on the view object and
+        // In fully-sharded environments, check for the correct view name on the view object and
         // $unionWith stage. For single node and single shard environments, there is no view object
         // that will exist on the $unionWith explain output. We can still assert that the
-        // $unionWith.coll is "resolved" to its collNss. Note that the viewNss is not resolved to
+        // $unionWith.coll is "resolved" to its collNss. Note that the view name is not resolved to
         // its collNss in full-sharded environments, and this is intended behavior.
         if (unionWithExplain.hasOwnProperty("splitPipeline") &&
             unionWithExplain["splitPipeline"] !== null) {
             const firstStage = unionWithExplain.splitPipeline.shardsPart[0];
 
+            print("explainOutput: " + tojson(explainOutput));
             // The first stage is either $search or $vectorSearch.
             if (firstStage.hasOwnProperty("$search")) {
-                assert.eq(firstStage.$search.view.nss, viewNss);
+                assert.eq(firstStage.$search.view.name, viewName);
             } else if (firstStage.hasOwnProperty("$vectorSearch")) {
-                assert.eq(firstStage.$vectorSearch.view.nss, viewNss);
+                assert.eq(firstStage.$vectorSearch.view.name, viewName);
             } else {
                 assert.fail(
                     "Expected first stage to have either $search or $vectorSearch, but found neither: " +
                     tojson(firstStage));
             }
-            assert.eq(unionWithStage.$unionWith.coll, viewNss.getName());
+            assert.eq(unionWithStage.$unionWith.coll, viewName);
         } else {
             assert.eq(unionWithStage.$unionWith.coll, collNss.getName());
         }

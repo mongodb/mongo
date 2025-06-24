@@ -242,7 +242,7 @@ const unionWithNestedDeepTestCases = (isStoredSource) => {
         bestActressView, pipeline, isStoredSource, bestActressViewPipeline, (explain) => {
             assertUnionWithSearchSubPipelineAppliedViews(explain,
                                                          bestPictureColl,
-                                                         bestPictureView,
+                                                         bestPictureView.getName(),
                                                          bestPicturesViewPipeline,
                                                          isStoredSource);
         });

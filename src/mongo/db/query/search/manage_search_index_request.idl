@@ -30,31 +30,8 @@ global:
     cpp_namespace: mongo
 imports:
     - mongo/db/basic_types.idl
+    - "mongo/db/query/search/search_query_view_spec.idl"
 structs:
-    MongotQueryViewSpec:
-        description: >-
-            If the search query is on a view, this struct defines the view information
-            required to be serialized into the RemoteCommandRequest before sending it
-            to mongot. 
-            NOTE: this struct is similar to SearchQueryViewSpec except for
-            that it holds only the view's *name*, not the *NSS*. When working with
-            commands on views, mongot requires just the name of the view while  the
-            server-side code needs the NSS in order to add the corresponding view
-            pipeline to the resolvedNamespaces dict on the expression context.
-        strict: true
-        fields:
-            name:
-                description: Mongot requires just the name of the view.
-                type: string
-                optional: false
-            effectivePipeline:
-                description: >-
-                    An array of agg stages gathered from the current and associated views.
-                    This field is only required for  createSearchIndexes commands, though
-                    it is being added to all search index command requests for easier
-                    debugability.
-                type: array<object>
-                optional: false
     ManageSearchIndexRequest:
         description: Command request for search index management host
         strict: false
@@ -74,6 +51,6 @@ structs:
             view:
                 description: >-
                     If the command is being run on a view namespace, this field must be
-                    set to MongotQueryViewSpec
-                type: MongotQueryViewSpec
+                    set to SearchQueryViewSpec
+                type: SearchQueryViewSpec
                 optional: true

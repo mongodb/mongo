@@ -55,7 +55,7 @@ let pipeline = [
 validateSearchExplain(
     moviesWithEnrichedTitle, pipeline, false, enrichedTitleViewPipeline, (explain) => {
         assertUnionWithSearchSubPipelineAppliedViews(
-            explain, moviesColl, actionMovies, actionMoviesViewPipeline);
+            explain, moviesColl, actionMovies.getName(), actionMoviesViewPipeline);
     });
 
 let outerExpected = buildExpectedResults([6, 4, 8, 9, 10], datasets.MOVIES_WITH_ENRICHED_TITLE);
@@ -92,7 +92,7 @@ pipeline = [
 
 validateSearchExplain(moviesColl, pipeline, false, null, (explain) => {
     assertUnionWithSearchSubPipelineAppliedViews(
-        explain, moviesColl, moviesWithEnrichedTitle, enrichedTitleViewPipeline);
+        explain, moviesColl, moviesWithEnrichedTitle.getName(), enrichedTitleViewPipeline);
 });
 
 outerExpected = buildExpectedResults([11, 14, 5], datasets.MOVIES);

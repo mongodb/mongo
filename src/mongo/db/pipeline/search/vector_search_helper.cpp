@@ -53,7 +53,7 @@ executor::RemoteCommandRequest getRemoteCommandRequestForVectorSearchQuery(
     if (view) {
         // mongot only expects the view's name but request currently holds the entire view object.
         // Set the view name and remove the view object from the request.
-        cmdBob.append(mongot_cursor::kViewNameField, view->getNss().coll());
+        cmdBob.append(mongot_cursor::kViewNameField, view->getName());
         request.removeField(search_helpers::kViewFieldName);
     }
 

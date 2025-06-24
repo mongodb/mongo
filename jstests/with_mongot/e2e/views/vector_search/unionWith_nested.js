@@ -60,7 +60,7 @@ const pipeline = [
 validateSearchExplain(
     moviesWithEnrichedTitle, pipeline, false, enrichedTitleViewPipeline, (explain) => {
         assertUnionWithSearchSubPipelineAppliedViews(
-            explain, moviesColl, actionMovies, actionMoviesViewPipeline);
+            explain, moviesColl, actionMovies.getName(), actionMoviesViewPipeline);
     });
 
 // Gather the expected results for all parts of the pipeline.

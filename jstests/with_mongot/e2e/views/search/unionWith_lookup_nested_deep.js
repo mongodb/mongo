@@ -592,7 +592,7 @@ const unionWithLookupNestedDeepTestCases = (isStoredSource) => {
                               // infrastructure to check for inner $unionWith view definitions.
                               assertUnionWithSearchSubPipelineAppliedViews(unionWithFirstExplain,
                                                                            categories,
-                                                                           categoriesView,
+                                                                           categoriesView.getName(),
                                                                            categoriesViewPipeline,
                                                                            isStoredSource);
                           });

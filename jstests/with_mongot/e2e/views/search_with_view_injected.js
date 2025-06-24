@@ -35,8 +35,9 @@ assert.commandWorked(testDb.createView(matchViewName, teamColl.getName(), matchV
 const injectingViewTest = function(coll) {
     assert.commandFailedWithCode(testDb.runCommand({
         aggregate: coll,
-        pipeline:
-            [{$search: {view: {nss: addFieldsViewName, effectivePipeline: addFieldsViewPipeline}}}],
+        pipeline: [
+            {$search: {view: {name: addFieldsViewName, effectivePipeline: addFieldsViewPipeline}}}
+        ],
         cursor: {}
     }),
                                  [injectionNotAllowedErrorCode]);
@@ -44,7 +45,7 @@ const injectingViewTest = function(coll) {
         aggregate: coll,
         pipeline: [{
             $vectorSearch:
-                {view: {nss: addFieldsViewName, effectivePipeline: addFieldsViewPipeline}}
+                {view: {name: addFieldsViewName, effectivePipeline: addFieldsViewPipeline}}
         }],
         cursor: {}
     }),
@@ -52,7 +53,7 @@ const injectingViewTest = function(coll) {
     assert.commandFailedWithCode(testDb.runCommand({
         aggregate: coll,
         pipeline: [{
-            $searchMeta: {view: {nss: addFieldsViewName, effectivePipeline: addFieldsViewPipeline}}
+            $searchMeta: {view: {name: addFieldsViewName, effectivePipeline: addFieldsViewPipeline}}
         }],
         cursor: {}
     }),

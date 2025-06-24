@@ -44,6 +44,7 @@ idl_generator(
     src = "manage_search_index_request.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query/search:search_query_view_spec_gen",
     ],
 )
 

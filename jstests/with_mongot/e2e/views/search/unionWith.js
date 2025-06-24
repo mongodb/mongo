@@ -126,7 +126,7 @@ const unionWithTestCases = (isStoredSource) => {
         bestActressView, pipeline, isStoredSource, bestActressViewPipeline, (explain) => {
             assertUnionWithSearchSubPipelineAppliedViews(explain,
                                                          bestPictureColl,
-                                                         bestPictureView,
+                                                         bestPictureView.getName(),
                                                          bestPicturesViewPipeline,
                                                          isStoredSource);
         });
@@ -222,11 +222,12 @@ const unionWithTestCases = (isStoredSource) => {
                           null,  // No view pipeline to verify application of since we are running
                                  // on a collection.
                           (explain) => {
-                              assertUnionWithSearchSubPipelineAppliedViews(explain,
-                                                                           bestPictureColl,
-                                                                           bestPictureView,
-                                                                           bestPicturesViewPipeline,
-                                                                           isStoredSource);
+                              assertUnionWithSearchSubPipelineAppliedViews(
+                                  explain,
+                                  bestPictureColl,
+                                  bestPictureView.getName(),
+                                  bestPicturesViewPipeline,
+                                  isStoredSource);
                           });
 
     results = bestActressColl.aggregate(pipeline).toArray();
