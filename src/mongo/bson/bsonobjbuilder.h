@@ -257,10 +257,10 @@ public:
     }
 
     /** Append a boolean element */
-    Derived& appendBool(StringData fieldName, int val) {
+    Derived& appendBool(StringData fieldName, bool val) {
         _b.appendNum((char)BSONType::boolean);
         _b.appendCStr(fieldName);
-        _b.appendNum((char)(val ? 1 : 0));
+        _b.appendNum(char(val));
         return asDerived();
     }
 
