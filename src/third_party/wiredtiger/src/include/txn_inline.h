@@ -211,8 +211,10 @@ __txn_apply_prepare_state_update(WT_SESSION_IMPL *session, WT_UPDATE *upd, bool 
         upd->durable_ts = txn->durable_timestamp;
         WT_RELEASE_WRITE_WITH_BARRIER(upd->prepare_state, WT_PREPARE_RESOLVED);
     } else {
-        /* Set prepare timestamp. */
+        /* Set prepare timestamp and id. */
         upd->start_ts = txn->prepare_timestamp;
+        upd->prepare_ts = txn->prepare_timestamp;
+        upd->prepared_id = txn->prepared_id;
 
         /*
          * By default durable timestamp is assigned with 0 which is same as WT_TS_NONE. Assign it
@@ -246,7 +248,8 @@ __txn_apply_prepare_state_page_del(WT_SESSION_IMPL *session, WT_PAGE_DELETED *pa
     } else {
         /* Set prepare timestamp. */
         page_del->timestamp = txn->prepare_timestamp;
-
+        page_del->prepare_ts = txn->prepare_timestamp;
+        page_del->prepared_id = txn->prepared_id;
         /*
          * By default durable timestamp is assigned with 0 which is same as WT_TS_NONE. Assign it
          * with WT_TS_NONE to make sure in case if we change the macro value it shouldn't be a
