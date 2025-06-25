@@ -147,7 +147,7 @@ StatusWith<RefreshState> getPersistedRefreshFlags(OperationContext* opCtx,
 
 StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
-
+    BSONObj document;
     try {
         DBDirectClient client(opCtx);
         FindCommandRequest findRequest{NamespaceString::kShardConfigCollectionsNamespace};
@@ -167,11 +167,13 @@ StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCt
                           str::stream() << "collection " << nss.ns() << " not found");
         }
 
-        BSONObj document = cursor->nextSafe();
+        document = cursor->nextSafe();
         return ShardCollectionType(document);
     } catch (const DBException& ex) {
-        return ex.toStatus(str::stream() << "Failed to read the '" << nss.ns()
-                                         << "' entry locally from config.collections");
+        const auto docDetails = document.isEmpty() ? "" : ": " + document.toString();
+        return ex.toStatus(str::stream()
+                           << "Failed to read the '" << nss.toString()
+                           << "' entry locally from config.collections" << docDetails);
     }
 }
 

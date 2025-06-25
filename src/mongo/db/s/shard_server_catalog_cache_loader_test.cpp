@@ -31,8 +31,10 @@
 
 #include <boost/optional/optional_io.hpp>
 
+#include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/db/s/type_shard_collection.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
@@ -437,6 +439,51 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindMixedChun
                           chunksWithNewEpoch[i].getMax());
         ASSERT_EQUALS(collAndChunksRes.changedChunks[i].getVersion(),
                       chunksWithNewEpoch[i].getVersion());
+    }
+}
+
+TEST_F(ShardServerCatalogCacheLoaderTest, PersistedCachedDataIsDroppedWhenCorrupted) {
+    //  Required fields for documents in config.cache.collections
+    std::vector<StringData> requiredFieldNames = {ShardCollectionType::kEpochFieldName,
+                                                  ShardCollectionType::kTimestampFieldName,
+                                                  ShardCollectionType::kUuidFieldName,
+                                                  ShardCollectionType::kKeyPatternFieldName,
+                                                  ShardCollectionType::kUniqueFieldName};
+
+    const auto collAndChunks = setUpChunkLoaderWithFiveChunks();
+    _shardLoader->waitForCollectionFlush(operationContext(), kNss);
+    const auto persistedCollection =
+        uassertStatusOK(shardmetadatautil::readShardCollectionsEntry(operationContext(), kNss));
+
+    for (const auto& fieldName : requiredFieldNames) {
+        // Simulate config.cache.collections getting corrupted by missing a required field
+        ASSERT_OK(shardmetadatautil::updateShardCollectionsEntry(
+            operationContext(),
+            BSON(ShardCollectionType::kNssFieldName << kNss.ns()),
+            BSON("$unset" << BSON(fieldName << 1)),
+            false /*upsert*/));
+
+        // Assert that data in config.cache.collections is corrupted
+        const auto status =
+            shardmetadatautil::readShardCollectionsEntry(operationContext(), kNss).getStatus();
+        ASSERT_FALSE(status.isOK());
+        ASSERT_EQUALS(status.code(), ErrorCodes::IDLFailedToParse);
+
+        // Ensure that the corrupted cache gets dropped and the persisted metadata
+        // is intact after a refresh.
+        _remoteLoaderMock->setCollectionRefreshReturnValue(collAndChunks.first);
+        _remoteLoaderMock->setChunkRefreshReturnValue(collAndChunks.second);
+        const auto newChunks =
+            _shardLoader->getChunksSince(kNss, collAndChunks.second.back().getVersion()).get();
+        _shardLoader->waitForCollectionFlush(operationContext(), kNss);
+        // Assert that refreshing from the latest version returned a single document
+        // matching that version.
+        ASSERT_EQUALS(newChunks.changedChunks.size(), 1UL);
+        ASSERT_EQUALS(newChunks.epoch, collAndChunks.second.back().getVersion().epoch());
+        // Assert that the persisted metadata is intact
+        const auto newPersistedCollection =
+            uassertStatusOK(shardmetadatautil::readShardCollectionsEntry(operationContext(), kNss));
+        ASSERT_BSONOBJ_EQ(persistedCollection.toBSON(), newPersistedCollection.toBSON());
     }
 }
 
