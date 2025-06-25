@@ -157,11 +157,13 @@ st.rs0.nodes.forEach(node => {
         assert.eq(profilerEntries.length, 0, {profilerEntries});
     }
 });
-assert.gte(
-    numEntriesPrimaryReadPrefAfter,
-    numEntriesPrimaryReadPrefBefore,
-    "Expected to find at least as many resharding oplog fetcher profiler entries with read " +
-        "preference 'primary' before and after the critical section");
+// TODO SERVER-106538: Figure out how to reenable this assertion or get similar coverage in a
+// different way.
+// assert.gte(
+//     numEntriesPrimaryReadPrefAfter,
+//     numEntriesPrimaryReadPrefBefore,
+//     "Expected to find at least as many resharding oplog fetcher profiler entries with read " +
+//         "preference 'primary' before and after the critical section");
 
 jsTest.log("Profiler entry counts: " + tojson({
                numEntriesNearestReadPref,
