@@ -15,7 +15,8 @@ import sys
 from typing import Any, Dict, List, Optional, Set
 
 import structlog
-import yaml
+
+from buildscripts.ciconfig.yaml_load import yaml_load
 
 ENTERPRISE_MODULE_NAME = "enterprise"
 ASAN_SIGNATURE = "detect_leaks=1"
@@ -80,10 +81,11 @@ def parse_evergreen_file(path, evergreen_binary="evergreen"):
                     path, result.stdout, result.stderr
                 )
             )
-        config = yaml.safe_load(result.stdout)
+        config: dict = yaml_load(result.stdout)
     else:
         with open(path, "r", encoding="utf8") as fstream:
-            config = yaml.safe_load(fstream)
+            data = fstream.read()
+            config: dict = yaml_load(data)
 
     return EvergreenProjectConfig(config)
 

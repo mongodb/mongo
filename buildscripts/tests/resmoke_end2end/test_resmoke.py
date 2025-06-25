@@ -808,7 +808,7 @@ class TestEvergreenYML(unittest.TestCase):
             generate_func = task.find_func_command("generate resmoke tasks")
             if (
                 generate_func is None
-                or get_dict_value(generate_func, ["vars", "is_jstestfuzz"]) != "true"
+                or get_dict_value(generate_func, ["vars", "is_jstestfuzz"]) is not True
             ):
                 continue
 

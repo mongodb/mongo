@@ -73,6 +73,7 @@ requests = "^2.32.3"
 typing-extensions = "^4.12.2"
 typer = "^0.12.3"
 tenacity = "^9.0.0"
+rapidyaml = {git = "https://github.com/biojppm/rapidyaml@v0.9.0", markers = "platform_system != 'Windows'"}
 
 [tool.poetry.group.export.dependencies]
 pipx = "1.6.0"

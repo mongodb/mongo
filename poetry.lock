@@ -696,6 +696,22 @@ wrapt = ">=1.10,<2"
 dev = ["PyTest", "PyTest-Cov", "bump2version (<1)", "setuptools", "tox"]
 
 [[package]]
+name = "deprecation"
+version = "2.1.0"
+description = "A library to handle automated deprecations"
+optional = false
+python-versions = "*"
+groups = ["core"]
+markers = "(platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and platform_system != \"Windows\""
+files = [
+    {file = "deprecation-2.1.0-py2.py3-none-any.whl", hash = "sha256:a10811591210e1fb0e768a8c25517cabeabcba6f0bf96564f8ff45189f90b14a"},
+    {file = "deprecation-2.1.0.tar.gz", hash = "sha256:72b3bde64e5d778694b0cf68178aed03d15e15477116add3fb773e581f9518ff"},
+]
+
+[package.dependencies]
+packaging = "*"
+
+[[package]]
 name = "distlib"
 version = "0.3.9"
 description = "Distribution utilities"
@@ -2459,7 +2475,7 @@ version = "24.2"
 description = "Core utilities for Python packages"
 optional = false
 python-versions = ">=3.8"
-groups = ["compile", "export", "idl", "testing"]
+groups = ["compile", "core", "export", "idl", "testing"]
 markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\""
 files = [
     {file = "packaging-24.2-py3-none-any.whl", hash = "sha256:09abb1bccd265c01f4a3aa3f7a7db064b36514d2cba19a2f694fe6150451a759"},
@@ -3496,6 +3512,26 @@ files = [
 
 [package.extras]
 all = ["numpy"]
+
+[[package]]
+name = "rapidyaml"
+version = "0.9.0.post2"
+description = "Rapid YAML - a library to parse and emit YAML, and do it fast"
+optional = false
+python-versions = ">=3.6"
+groups = ["core"]
+markers = "(platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and platform_system != \"Windows\""
+files = []
+develop = false
+
+[package.dependencies]
+deprecation = "*"
+
+[package.source]
+type = "git"
+url = "https://github.com/biojppm/rapidyaml"
+reference = "HEAD"
+resolved_reference = "338385b46a312bd8e05016033dd452dccc67e372"
 
 [[package]]
 name = "referencing"
@@ -5411,4 +5447,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "4adbaf602d1abb198a2f0339c0882e862e61490616ee5002559e8a324bcf7548"
+content-hash = "0f66bc1087116663ea12e384ed3266d07d495738b0e57eaddcc0b6b029a4b66e"
