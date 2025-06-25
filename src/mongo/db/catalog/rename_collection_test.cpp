@@ -1199,10 +1199,7 @@ TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsCommonRandom
     auto cmd =
         BSON("renameCollection" << _sourceNssTid.toString() << "to" << targetNssTid.toString());
 
-    // Because the tenantId doesn't belong to the source, we should see a collection not found
-    // error.
-    ASSERT_EQUALS(
-        ErrorCodes::NamespaceNotFound,
+    ASSERT_OK(
         renameCollectionForApplyOps(_opCtx.get(), boost::none, TenantId(OID::gen()), cmd, {}));
     ASSERT_TRUE(_collectionExists(_opCtx.get(), _sourceNssTid));
 }

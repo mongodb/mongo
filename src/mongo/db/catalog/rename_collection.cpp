@@ -985,10 +985,18 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
             "moving a collection between tenants is not allowed",
             sourceNss.tenantId() == targetNss.tenantId());
 
+    // For idempotency reasons, update the `sourceNss` with the namespace found in the collection
+    // catalog for the UUID if it's provided. It's possible this rename was already applied and the
+    // `sourceNss` no longer exists.
     if (uuidToRename) {
         auto nss = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuidToRename.value());
         if (nss)
             sourceNss = *nss;
+    }
+
+    // The rename has already been performed.
+    if (sourceNss == targetNss) {
+        return Status::OK();
     }
 
     RenameCollectionOptions options;
