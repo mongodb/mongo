@@ -7,32 +7,50 @@
  *
  * Example usage:
  *
- * describe("My Test Suite", function() {
- *     it("should do something", function() {
- *         // Test code here
- *     }
- * });
+ *    describe("My Test Suite", function() {
+ *        it("should do something", function() {
+ *            // Test code here
+ *        });
+ *    });
  *
  *
  * Leverage the before/beforeEach/afterEach/after hooks to set up and tear down test environments.
  *
  * Example:
- * before(function() {
- *     this.fixtureDB = startupNewDB();
- * });
- * beforeEach(function() {
- *     this.fixtureDB.seed();
- * });
- * afterEach(function() {
- *     this.fixtureDB.clear();
- * });
- * after(function() {
- *     this.fixtureDB.shutdown();
- * });
- * it("should do something", function() {
- *     this.fixtureDB.insert({ name: "test" });
- *     assert.eq(this.fixtureDB.find({ name: "test" }).count(), 1);
- * });
+ *
+ *    before(function() {
+ *        this.fixtureDB = startupNewDB();
+ *    });
+ *    beforeEach(function() {
+ *        this.fixtureDB.seed();
+ *    });
+ *    afterEach(function() {
+ *        this.fixtureDB.clear();
+ *    });
+ *    after(function() {
+ *        this.fixtureDB.shutdown();
+ *    });
+ *    it("should do something", function() {
+ *        this.fixtureDB.insert({ name: "test" });
+ *        assert.eq(this.fixtureDB.find({ name: "test" }).count(), 1);
+ *    });
+ *
+ * Content in any of the above (excluding `describe`) can be an async function (or otherwise return
+ * a Promise) and the framework will await its resolution.
+ *
+ * Example:
+ *
+ *    before(async function() {
+ *        this.fixtureDB = await startupNewDBAsync();
+ *    });
+ *    it("should do something", async function() {
+ *        await this.fixtureDB.insertAsync({ name: "test" });
+ *        await res = this.fixtureDB.find({ name: "test" }).count();
+ *        assert.eq(res, 1);
+ *    });
+ *    after(function() {
+ *        return this.fixtureDB.shutdownAsync(); // returns a promise
+ *    });
  */
 
 // Context to be passed into each test and hook
@@ -56,9 +74,10 @@ class Test {
     /**
      * Invoke the test function with the given context.
      * @param {Context} ctx
+     * @async
      */
-    run(ctx) {
-        this.#fn.call(ctx);
+    async run(ctx) {
+        return this.#fn.call(ctx);
     }
 
     printPass() {
@@ -97,47 +116,48 @@ class Scope {
     }
 
     addHook(hookname, fn) {
+        assertNoFunctionArgs(fn);
         this[hookname].push(fn);
     }
 
-    runHook(hookname) {
+    async runHook(hookname) {
         const ctx = this.ctx;
-        this[hookname].forEach(function(fn) {
-            fn.call(ctx);
-        });
+        for (const fn of this[hookname]) {
+            await fn.call(ctx);
+        }
     }
 
     /**
      * Run the before-content-after workflow
      */
-    run() {
-        this.runHook("before");
+    async run() {
+        await this.runHook("before");
         for (const node of this.content) {
             if (node instanceof Test) {
-                this.runTest(node);
+                await this.runTest(node);
             } else {
                 // a nested scope (describe block)
-                node.run();
+                await node.run();
             }
         }
-        this.runHook("after");
+        await this.runHook("after");
     }
 
     /**
      * Run the beforeEach-test-afterEach workflow for a given test.
      * @param {Test} test
      */
-    runTest(test) {
+    async runTest(test) {
         try {
-            this.runHook("beforeEach");
-            test.run(this.ctx);
+            await this.runHook("beforeEach");
+            await test.run(this.ctx);
             test.printPass();
         } catch (error) {
             test.printFailure(error);
             // Re-throw the error to ensure the test suite fails
             throw error;
         } finally {
-            this.runHook("afterEach");
+            await this.runHook("afterEach");
         }
     }
 }
@@ -145,6 +165,8 @@ class Scope {
 let currScope = new Scope();
 
 function addTest(title, fn) {
+    assertNoFunctionArgs(fn);
+
     const test = new Test(
         [...currScope.title, title],
         fn,
@@ -268,14 +290,22 @@ function after(fn) {
 
 /**
  * Run all defined tests.
+ * Returns a Promise.
  */
 function runTests() {
-    currScope.run();
+    return currScope.run();
 }
 
 function markUsage() {
     // sentinel for shell to close
     globalThis.__mochalite_closer = runTests;
+}
+
+function assertNoFunctionArgs(fn) {
+    if (fn.length > 0) {
+        throw new Error(
+            "Test content should not take parameters. If you intended to write callback-based content, use async functions instead.");
+    }
 }
 
 export {describe, it, before, beforeEach, afterEach, after};

@@ -965,7 +965,72 @@ class TestMochaRunner(unittest.TestCase):
             self.assertIn(output, result.stdout)
 
         # verify ordering
-        # TODO
+        pattern = r".*".join(arr) + r".*"
+        pattern = re.compile(pattern, re.DOTALL)
+        self.assertRegex(result.stdout, pattern)
+
+    def test_mocha_runner_async(self):
+        resmoke_args = [
+            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_mocha_runner.yml",
+            "buildscripts/tests/resmoke_end2end/testfiles/mocha/async.js",
+        ]
+
+        result = execute_resmoke(resmoke_args)
+
+        self.assertEqual(result.returncode, 0)
+
+        arr = [
+            "before1",
+            "before2",
+            "--beforeEach1",
+            "--beforeEach2",
+            "----test1",
+            "--afterEach1",
+            "--afterEach2",
+            "--beforeEach1",
+            "--beforeEach2",
+            "----test2",
+            "--afterEach1",
+            "--afterEach2",
+            "----describe before1",
+            "----describe before2",
+            "--beforeEach1",
+            "--beforeEach2",
+            "------describe beforeEach1",
+            "------describe beforeEach2",
+            "--------test3",
+            "------describe afterEach1",
+            "------describe afterEach2",
+            "--afterEach1",
+            "--afterEach2",
+            "--beforeEach1",
+            "--beforeEach2",
+            "------describe beforeEach1",
+            "------describe beforeEach2",
+            "--------test4",
+            "------describe afterEach1",
+            "------describe afterEach2",
+            "--afterEach1",
+            "--afterEach2",
+            "----describe after1",
+            "----describe after2",
+            "--beforeEach1",
+            "--beforeEach2",
+            "----test5",
+            "--afterEach1",
+            "--afterEach2",
+            "--beforeEach1",
+            "--beforeEach2",
+            "----test6",
+            "--afterEach1",
+            "--afterEach2",
+            "after1",
+            "after2",
+        ]
+        for output in arr:
+            self.assertIn(output, result.stdout)
+
+        # verify ordering
         pattern = r".*".join(arr) + r".*"
         pattern = re.compile(pattern, re.DOTALL)
         self.assertRegex(result.stdout, pattern)

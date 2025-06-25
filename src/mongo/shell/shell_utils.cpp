@@ -717,8 +717,13 @@ BSONObj _closeGoldenData(const BSONObj& input, void*) {
 
 void closeMochaStyleTestContext(Scope& scope) {
     const StringData code =
-        "function() { if (typeof globalThis.__mochalite_closer === 'function') __mochalite_closer(); }"_sd;
-    scope.invokeSafe(code.data(), nullptr, nullptr);
+        "if (typeof globalThis.__mochalite_closer === 'function') { await __mochalite_closer(); }"_sd;
+    scope.exec(code.data(),
+               "" /* name */,
+               true /* printResult */,
+               true /* reportError*/,
+               true /* assertOnError*/,
+               0 /*timeoutMs*/);
 }
 
 /**
