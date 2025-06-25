@@ -84,7 +84,7 @@ TEST_F(DocumentSourceScoreTest, CheckNoOptionalArgsIncluded) {
     const auto desugaredList =
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
     // Default normalization is none.
-    ASSERT_EQ(desugaredList.size(), 1);
+    ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> ds = *desugaredList.begin();
     auto stage = exec::agg::buildStage(ds);
     ASSERT_DOES_NOT_THROW(stage->setSource(mock.get()));
@@ -127,7 +127,7 @@ TEST_F(DocumentSourceScoreTest, CheckOnlyWeightSpecified) {
     const auto desugaredList =
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
     // Default normalization is none.
-    ASSERT_EQ(desugaredList.size(), 1);
+    ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> ds = *desugaredList.begin();
     auto stage = exec::agg::buildStage(ds);
     ASSERT_DOES_NOT_THROW(stage->setSource(mock.get()));
@@ -171,7 +171,7 @@ TEST_F(DocumentSourceScoreTest, CheckIntScoreMetadataUpdated) {
 
     const auto desugaredList =
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
-    ASSERT_EQ(desugaredList.size(), 1);
+    ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
     auto stage = exec::agg::buildStage(docSourceScore);
     auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
@@ -196,7 +196,7 @@ TEST_F(DocumentSourceScoreTest, CheckDoubleScoreMetadataUpdated) {
 
     const auto desugaredList =
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
-    ASSERT_EQ(desugaredList.size(), 1);
+    ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
     auto stage = exec::agg::buildStage(docSourceScore);
     auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
@@ -221,7 +221,7 @@ TEST_F(DocumentSourceScoreTest, CheckLengthyDocScoreMetadataUpdated) {
 
     const auto desugaredList =
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
-    ASSERT_EQ(desugaredList.size(), 1);
+    ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
     auto stage = exec::agg::buildStage(docSourceScore);
     auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
@@ -246,7 +246,7 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfScoreNotDouble) {
 
     const auto desugaredList =
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
-    ASSERT_EQ(desugaredList.size(), 1);
+    ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
     auto stage = exec::agg::buildStage(docSourceScore);
     auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
@@ -267,7 +267,7 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfExpressionFieldPathDoesNotExist) {
 
     const auto desugaredList =
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
-    ASSERT_EQ(desugaredList.size(), 1);
+    ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
     auto stage = exec::agg::buildStage(docSourceScore);
     auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
@@ -305,17 +305,7 @@ TEST_F(DocumentSourceScoreTest, ChecksScoreMetadatUpdatedValidExpression) {
 
     const auto desugaredList =
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
-    ASSERT_EQ(desugaredList.size(), 1);
-    boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
-    auto stage = exec::agg::buildStage(docSourceScore);
-    auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
-    stage->setSource(mock.get());
-
-    auto next = stage->getNext();
-    ASSERT(next.isAdvanced());
-
-    // Assert inputDoc's metadata equals 15.3
-    ASSERT_EQ(next.releaseDocument().metadata().getScore(), 15.3);
+    ASSERT_EQ(desugaredList.size(), 4);
 }
 
 TEST_F(DocumentSourceScoreTest, ErrorsNormFuncSigmoidInvalidWeight) {
@@ -389,6 +379,25 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeExpressionNoNormalizatio
                     ]
                 }
             }
+        },
+        {
+            "$replaceRoot": {
+                "newRoot": {
+                    "docs": "$$ROOT"
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "internal_raw_score": {
+                    "$meta": "score"
+                }
+            }
+        },
+        {
+            "$replaceRoot": {
+                "newRoot": "$docs"
+            }
         }
     ]})";
 
@@ -408,6 +417,25 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeNoNormalizationUnweighte
         {
             "$setMetadata": {
                 "score": "$myScore"
+            }
+        },
+        {
+            "$replaceRoot": {
+                "newRoot": {
+                    "docs": "$$ROOT"
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "internal_raw_score": {
+                    "$meta": "score"
+                }
+            }
+        },
+        {
+            "$replaceRoot": {
+                "newRoot": "$docs"
             }
         }
     ]})";
@@ -432,6 +460,20 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeNoNormalizationWeighted)
             }
         },
         {
+            "$replaceRoot": {
+                "newRoot": {
+                    "docs": "$$ROOT"
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "internal_raw_score": {
+                    "$meta": "score"
+                }
+            }
+        },
+        {
             "$setMetadata": {
                 "score": {
                     "$multiply": [
@@ -439,6 +481,11 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeNoNormalizationWeighted)
                         {"$const": 0.5}
                     ]
                 }
+            }
+        },
+        {
+            "$replaceRoot": {
+                "newRoot": "$docs"
             }
         }
     ]})";
@@ -459,6 +506,20 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeSigmoidNormalization) {
         {
             "$setMetadata": {
                 "score": "$myScore"
+            }
+        },
+        {
+            "$replaceRoot": {
+                "newRoot": {
+                    "docs": "$$ROOT"
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "internal_raw_score": {
+                    "$meta": "score"
+                }
             }
         },
         {
@@ -483,6 +544,11 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeSigmoidNormalization) {
                         }
                     ]
                 }
+            }
+        },
+        {
+            "$replaceRoot": {
+                "newRoot": "$docs"
             }
         }
     ]})";
@@ -507,6 +573,20 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeSigmoidNormalizationWeig
             }
         },
         {
+            "$replaceRoot": {
+                "newRoot": {
+                    "docs": "$$ROOT"
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "internal_raw_score": {
+                    "$meta": "score"
+                }
+            }
+        },
+        {
             "$setMetadata": {
                 "score": {
                     "$divide": [
@@ -538,6 +618,11 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeSigmoidNormalizationWeig
                         {"$const": 0.5}
                     ]
                 }
+            }
+        },
+        {
+            "$replaceRoot": {
+                "newRoot": "$docs"
             }
         }
     ]})";
@@ -566,6 +651,20 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeExpressionSigmoidNormali
             }
         },
         {
+            "$replaceRoot": {
+                "newRoot": {
+                    "docs": "$$ROOT"
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "internal_raw_score": {
+                    "$meta": "score"
+                }
+            }
+        },
+        {
             "$setMetadata": {
                 "score": {
                     "$divide": [
@@ -587,6 +686,11 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeExpressionSigmoidNormali
                         }
                     ]
                 }
+            }
+        },
+        {
+            "$replaceRoot": {
+                "newRoot": "$docs"
             }
         }
     ]})";
@@ -613,6 +717,13 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeMinMaxScalerNormalizatio
             "$replaceRoot": {
                 "newRoot": {
                     "docs": "$$ROOT"
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "internal_raw_score": {
+                    "$meta": "score"
                 }
             }
         },
@@ -675,6 +786,13 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeMinMaxScalerNormalizatio
             }
         },
         {
+            "$addFields": {
+                "internal_raw_score": {
+                    "$meta": "score"
+                }
+            }
+        },
+        {
             "$_internalSetWindowFields": {
                 "sortBy": {"internal_min_max_scaler_normalization_score": -1},
                 "output": {
@@ -700,11 +818,6 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeMinMaxScalerNormalizatio
             }
         },
         {
-            "$replaceRoot": {
-                "newRoot": "$docs"
-            }
-        },
-        {
             "$setMetadata": {
                 "score": {
                     "$multiply": [
@@ -712,6 +825,11 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeMinMaxScalerNormalizatio
                         {"$const": 0.5}
                     ]
                 }
+            }
+        },
+        {
+            "$replaceRoot": {
+                "newRoot": "$docs"
             }
         }
     ]})";
@@ -743,6 +861,13 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeExpressionMinMaxScalerNo
             "$replaceRoot": {
                 "newRoot": {
                     "docs": "$$ROOT"
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "internal_raw_score": {
+                    "$meta": "score"
                 }
             }
         },
@@ -809,6 +934,25 @@ TEST_F(DocumentSourceScoreTest, QueryShapeDebugStringNoNormalization) {
                 score: "$HASH<myScore>"
             }
         })",
+        R"({
+            "$replaceRoot": {
+                "newRoot": {
+                    "HASH<docs>": "$$ROOT"
+                }
+            }
+        })",
+        R"({
+            "$addFields": {
+                "HASH<internal_raw_score>": {
+                    "$meta": "score"
+                }
+            }
+        })",
+        R"({
+            "$replaceRoot": {
+                "newRoot": "$HASH<docs>"
+            }
+        })",
     };
 
     runQueryShapeDebugStringTest(getExpCtx(), spec, expectedValues);
@@ -827,6 +971,20 @@ TEST_F(DocumentSourceScoreTest, QueryShapeDebugStringSigmoidNormalizationWeighte
         R"({
             $setMetadata: {
                 score: "$HASH<myScore>"
+            }
+        })",
+        R"({
+            "$replaceRoot": {
+                "newRoot": {
+                    "HASH<docs>": "$$ROOT"
+                }
+            }
+        })",
+        R"({
+            "$addFields": {
+                "HASH<internal_raw_score>": {
+                    "$meta": "score"
+                }
             }
         })",
         R"({
@@ -863,6 +1021,11 @@ TEST_F(DocumentSourceScoreTest, QueryShapeDebugStringSigmoidNormalizationWeighte
                 }
             }
         })",
+        R"({
+            "$replaceRoot": {
+                "newRoot": "$HASH<docs>"
+            }
+        })",
     };
 
     runQueryShapeDebugStringTest(getExpCtx(), spec, expectedValues);
@@ -897,6 +1060,13 @@ TEST_F(DocumentSourceScoreTest, QueryShapeDebugStringExpressionMinMaxScalerNorma
                 }
             })",
         R"({
+                "$addFields": {
+                    "HASH<internal_raw_score>": {
+                        "$meta": "score"
+                    }
+                }
+            })",
+        R"({
                 "$_internalSetWindowFields": {
                     "sortBy": {"HASH<internal_min_max_scaler_normalization_score>": -1},
                     "output": {
@@ -922,11 +1092,6 @@ TEST_F(DocumentSourceScoreTest, QueryShapeDebugStringExpressionMinMaxScalerNorma
                 }
             })",
         R"({
-                "$replaceRoot": {
-                    "newRoot": "$HASH<docs>"
-                }
-            })",
-        R"({
                 "$setMetadata": {
                     "score": {
                         "$multiply": [
@@ -935,7 +1100,13 @@ TEST_F(DocumentSourceScoreTest, QueryShapeDebugStringExpressionMinMaxScalerNorma
                         ]
                     }
                 }
-            })"};
+            })",
+        R"({
+                "$replaceRoot": {
+                    "newRoot": "$HASH<docs>"
+                }
+            })",
+    };
 
     runQueryShapeDebugStringTest(getExpCtx(), spec, expectedValues);
 }
@@ -946,7 +1117,7 @@ TEST_F(DocumentSourceScoreTest, ScoreDetailsDesugaring) {
             "{$score: {score: \"$myScore\", normalization: \"none\", scoreDetails: true}}");
         const auto desugaredList =
             DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
-        ASSERT_EQ(desugaredList.size(), 2);
+        ASSERT_EQ(desugaredList.size(), 5);
         const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
         BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
         ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -958,6 +1129,20 @@ TEST_F(DocumentSourceScoreTest, ScoreDetailsDesugaring) {
                     }
                 },
                 {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
                     "$setMetadata": {
                         "scoreDetails": {
                             "value": {
@@ -966,7 +1151,7 @@ TEST_F(DocumentSourceScoreTest, ScoreDetailsDesugaring) {
                             "description": {
                                 "$const": "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:"
                             },
-                            "rawScore": "$myScore",
+                            "rawScore": "$internal_raw_score",
                             "normalization": {
                                 "$const": "none"
                             },
@@ -978,6 +1163,11 @@ TEST_F(DocumentSourceScoreTest, ScoreDetailsDesugaring) {
                             },
                             "details": []
                         }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
                     }
                 }
             ]
@@ -998,7 +1188,7 @@ TEST_F(DocumentSourceScoreTest, ScoreDetailsDesugaring) {
             })");
         const auto desugaredList =
             DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
-        ASSERT_EQ(desugaredList.size(), 4);
+        ASSERT_EQ(desugaredList.size(), 7);
         const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
         BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
         ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -1011,6 +1201,20 @@ TEST_F(DocumentSourceScoreTest, ScoreDetailsDesugaring) {
                                 "$myScore",
                                 "$otherScore"
                             ]
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
                         }
                     }
                 },
@@ -1069,12 +1273,7 @@ TEST_F(DocumentSourceScoreTest, ScoreDetailsDesugaring) {
                             "description": {
                                 "$const": "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:"
                             },
-                            "rawScore": {
-                                "$add": [
-                                    "$myScore",
-                                    "$otherScore"
-                                ]
-                            },
+                            "rawScore": "$internal_raw_score",
                             "normalization": {
                                 "$const": "sigmoid"
                             },
@@ -1087,6 +1286,11 @@ TEST_F(DocumentSourceScoreTest, ScoreDetailsDesugaring) {
                             "details": []
                         }
                     }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
                 }
             ]
         })",
@@ -1098,7 +1302,7 @@ TEST_F(DocumentSourceScoreTest, ScoreDetailsDesugaring) {
             "scoreDetails: true}}");
         const auto desugaredList =
             DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
-        ASSERT_EQ(desugaredList.size(), 7);
+        ASSERT_EQ(desugaredList.size(), 8);
         const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
         BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
         ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -1113,6 +1317,13 @@ TEST_F(DocumentSourceScoreTest, ScoreDetailsDesugaring) {
                     "$replaceRoot": {
                         "newRoot": {
                             "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
                         }
                     }
                 },
@@ -1146,11 +1357,6 @@ TEST_F(DocumentSourceScoreTest, ScoreDetailsDesugaring) {
                     }
                 },
                 {
-                    "$replaceRoot": {
-                        "newRoot": "$docs"
-                    }
-                },
-                {
                     "$setMetadata": {
                         "score": {
                             "$multiply": [
@@ -1173,7 +1379,7 @@ TEST_F(DocumentSourceScoreTest, ScoreDetailsDesugaring) {
                             "description": {
                                 "$const": "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:"
                             },
-                            "rawScore": "$myScore",
+                            "rawScore": "$internal_raw_score",
                             "normalization": {
                                 "$const": "minMaxScaler"
                             },
@@ -1185,6 +1391,11 @@ TEST_F(DocumentSourceScoreTest, ScoreDetailsDesugaring) {
                             },
                             "details": []
                         }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
                     }
                 }
             ]

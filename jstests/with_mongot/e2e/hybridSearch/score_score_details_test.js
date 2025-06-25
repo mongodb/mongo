@@ -75,7 +75,7 @@ function testScoreDetails(normalization, weight, expectedScoreResults) {
         assert(fieldPresent("details", foundDoc), foundDoc);
         const details = foundDoc["details"];
         assert(fieldPresent("value", details), details);
-        // We don't care about the actual score, just assert that its been calculated.
+        // We don't care about the actual score, just assert that it's been calculated.
         assert.gte(details["value"], 0, details);
         // Assert that the score metadata is the same value as what scoreDetails set.
         assert.eq(details["value"], score);
@@ -148,3 +148,112 @@ expectedScoreResults =
         ])
         .toArray();
 testScoreDetails("minMaxScaler", "unspecified", expectedScoreResults);
+
+// Testcase: multiple (recursive) $score stages results in the correct score details output.
+(function testMultipleScoreStagesWithScoreDetails() {
+    const normalizationMethods = ["none", "minMaxScaler", "sigmoid"];
+    for (var firstScoreNormalization of normalizationMethods) {
+        for (var secondScoreNormalization of normalizationMethods) {
+            let firstScore = {
+                score: "$single",
+                normalization: firstScoreNormalization,
+                scoreDetails: true,
+            };
+
+            let secondScore = {
+                score: {$add: [{$meta: "score"}, 10]},
+                normalization: secondScoreNormalization,
+                scoreDetails: true,
+            };
+
+            let query = [
+                {
+                    $score: firstScore,
+                },
+                {$score: secondScore},
+                {$addFields: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}},
+                {$sort: {_id: 1}}
+            ];
+
+            let results = coll.aggregate(query).toArray();
+
+            // Determine the stage specification for the rawScore in scoreDetails. It is calculated
+            // by the output of the first $score stage (with normalization), and the raw score
+            // calculation of the second $score stage (without normalization).
+            let expectedResultsPipeline = [];
+            if (firstScoreNormalization === "none") {
+                expectedResultsPipeline.push(
+                    {$addFields: {expected_raw_score: {$add: ["$single", 10]}}});
+            } else if (firstScoreNormalization === "minMaxScaler") {
+                expectedResultsPipeline.push({
+                    $setWindowFields: {
+                        sortBy: {_id: 1},
+                        output: {
+                            "normalized_first_score": {
+                                $minMaxScaler: {input: "$single", min: 0, max: 1},
+                                window: {documents: ["unbounded", "unbounded"]}
+                            },
+                        }
+                    }
+                });
+                expectedResultsPipeline.push(
+                    {$addFields: {expected_raw_score: {$add: ["$normalized_first_score", 10]}}});
+            } else if (firstScoreNormalization === "sigmoid") {
+                expectedResultsPipeline.push(
+                    {$addFields: {expected_raw_score: {$add: [{$sigmoid: "$single"}, 10]}}});
+            }
+
+            // Determine the stage specification to calculate the final score in scoreDetails. It is
+            // calculated by taking the raw score output from the second $score and running it
+            // through the normalization function of the second $score.
+            if (secondScoreNormalization === "none") {
+                expectedResultsPipeline.push(
+                    {$addFields: {expected_final_score: "$expected_raw_score"}});
+            } else if (secondScoreNormalization === "minMaxScaler") {
+                expectedResultsPipeline.push({
+                    $setWindowFields: {
+                        sortBy: {_id: 1},
+                        output: {
+                            "expected_final_score": {
+                                $minMaxScaler: {input: "$expected_raw_score", min: 0, max: 1},
+                                window: {documents: ["unbounded", "unbounded"]}
+                            },
+                        }
+                    }
+                });
+            } else if (secondScoreNormalization === "sigmoid") {
+                expectedResultsPipeline.push(
+                    {$addFields: {expected_final_score: {$sigmoid: "$expected_raw_score"}}});
+            }
+
+            // $project the fields we want in the expected results.
+            expectedResultsPipeline.push({
+                $project: {
+                    _id: 1,
+                    rawScore: "$expected_raw_score",
+                    expectedScore: "$expected_final_score"
+                }
+            });
+            expectedResultsPipeline.push({$sort: {_id: 1}});
+
+            let expectedScoreResults = coll.aggregate(expectedResultsPipeline).toArray();
+
+            for (let i = 0; i < results.length; i++) {
+                const foundDoc = results[i];
+                jsTestLog("actual", foundDoc);
+                jsTestLog("expected", expectedScoreResults[i]);
+                // Assert that the score metadata has been set.
+                assert(fieldPresent("score", foundDoc), foundDoc);
+                const score = foundDoc["score"];
+                assert.eq(score, expectedScoreResults[i]["expectedScore"]);
+                assert(fieldPresent("details", foundDoc), foundDoc);
+                const details = foundDoc["details"];
+                assert(fieldPresent("value", details), details);
+                // Assert that the score metadata is the same value as what scoreDetails set.
+                assert.eq(details["value"], score, details);
+                assert(fieldPresent("rawScore", details), details);
+                assert.eq(details["rawScore"], expectedScoreResults[i]["rawScore"]);
+            }
+        }
+    }
+})();

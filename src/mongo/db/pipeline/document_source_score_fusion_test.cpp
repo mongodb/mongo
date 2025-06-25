@@ -582,6 +582,20 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedNormalization
                     }
                 },
                 {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
                     "$setMetadata": {
                         "score": {
                             "$divide": [
@@ -611,6 +625,11 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedNormalization
                                 }
                             ]
                         }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
                     }
                 },
                 {
@@ -666,6 +685,20 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedNormalization
                                 }
                             },
                             {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
                                 "$setMetadata": {
                                     "score": {
                                         "$divide": [
@@ -695,6 +728,11 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedNormalization
                                             }
                                         ]
                                     }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
                                 }
                             },
                             {
@@ -1243,6 +1281,20 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedSigmoid) {
                     }
                 },
                 {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
                     "$setMetadata": {
                         "score": {
                             "$divide": [
@@ -1272,6 +1324,11 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedSigmoid) {
                                 }
                             ]
                         }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
                     }
                 },
                 {
@@ -1330,6 +1387,20 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedSigmoid) {
                                 }
                             },
                             {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
                                 "$setMetadata": {
                                     "score": {
                                         "$divide": [
@@ -1359,6 +1430,11 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedSigmoid) {
                                             }
                                         ]
                                     }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
                                 }
                             },
                             {
@@ -1644,6 +1720,20 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
                     }
                 },
                 {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
                     "$setMetadata": {
                         "score": {
                             "$divide": [
@@ -1673,6 +1763,11 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
                                 }
                             ]
                         }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
                     }
                 },
                 {
@@ -2739,6 +2834,25 @@ TEST_F(DocumentSourceScoreFusionTest, CheckWeightsAppliedMultiplePipelines) {
                             },
                             {
                                 "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
                                     "matchDistance_score": {
                                         "$multiply": [
                                             {
@@ -3596,6 +3710,20 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfScoreWithGeoNearDistanceMetadataPip
                     }
                 },
                 {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
                     "$setMetadata": {
                         "score": {
                             "$divide": [
@@ -3625,6 +3753,11 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfScoreWithGeoNearDistanceMetadataPip
                                 }
                             ]
                         }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
                     }
                 },
                 {
@@ -6137,6 +6270,25 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineScoreInputPipelineScoreDet
                 },
                 {
                     "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
                         "scorePipe1_score": {
                             "$multiply": [
                                 {
@@ -6182,6 +6334,20 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineScoreInputPipelineScoreDet
                                 }
                             },
                             {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
                                 "$setMetadata": {
                                     "score": {
                                         "$divide": [
@@ -6211,6 +6377,11 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineScoreInputPipelineScoreDet
                                             }
                                         ]
                                     }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
                                 }
                             },
                             {
@@ -6443,6 +6614,25 @@ TEST_F(DocumentSourceScoreFusionTest,
                 },
                 {
                     "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
                         "scorePipe1_score": {
                             "$multiply": [
                                 {
@@ -6510,6 +6700,25 @@ TEST_F(DocumentSourceScoreFusionTest,
                                             }
                                         ]
                                     }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
                                 }
                             },
                             {
@@ -6763,6 +6972,20 @@ TEST_F(DocumentSourceScoreFusionTest,
                     }
                 },
                 {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
                     "$setMetadata": {
                         "scoreDetails": {
                             "value": {
@@ -6771,7 +6994,7 @@ TEST_F(DocumentSourceScoreFusionTest,
                             "description": {
                                 "$const": "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:"
                             },
-                            "rawScore": "$age",
+                            "rawScore": "$internal_raw_score",
                             "normalization": {
                                 "$const": "none"
                             },
@@ -6783,6 +7006,11 @@ TEST_F(DocumentSourceScoreFusionTest,
                             },
                             "details": []
                         }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
                     }
                 },
                 {
@@ -6867,6 +7095,20 @@ TEST_F(DocumentSourceScoreFusionTest,
                                 }
                             },
                             {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
                                 "$setMetadata": {
                                     "score": {
                                         "$divide": [
@@ -6921,16 +7163,7 @@ TEST_F(DocumentSourceScoreFusionTest,
                                         "description": {
                                             "$const": "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:"
                                         },
-                                        "rawScore": {
-                                            "$add": [
-                                                {
-                                                    "$const": 10
-                                                },
-                                                {
-                                                    "$const": 2
-                                                }
-                                            ]
-                                        },
+                                        "rawScore": "$internal_raw_score",
                                         "normalization": {
                                             "$const": "sigmoid"
                                         },
@@ -6942,6 +7175,11 @@ TEST_F(DocumentSourceScoreFusionTest,
                                         },
                                         "details": []
                                     }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
                                 }
                             },
                             {
@@ -7203,6 +7441,25 @@ TEST_F(DocumentSourceScoreFusionTest,
                 },
                 {
                     "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
                         "scorePipe1_score": {
                             "$multiply": [
                                 {
@@ -7267,6 +7524,25 @@ TEST_F(DocumentSourceScoreFusionTest,
                                             }
                                         ]
                                     }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
                                 }
                             },
                             {
@@ -7532,6 +7808,25 @@ TEST_F(DocumentSourceScoreFusionTest,
                 },
                 {
                     "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
                         "scorePipe1_score": {
                             "$multiply": [
                                 {
@@ -7596,6 +7891,25 @@ TEST_F(DocumentSourceScoreFusionTest,
                                             }
                                         ]
                                     }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
                                 }
                             },
                             {
@@ -7853,6 +8167,20 @@ TEST_F(DocumentSourceScoreFusionTest,
                             }
                         },
                         {
+                            "$replaceRoot": {
+                                "newRoot": {
+                                    "docs": "$$ROOT"
+                                }
+                            }
+                        },
+                        {
+                            "$addFields": {
+                                "internal_raw_score": {
+                                    "$meta": "score"
+                                }
+                            }
+                        },
+                        {
                             "$setMetadata": {
                                 "scoreDetails": {
                                     "value": {
@@ -7861,9 +8189,7 @@ TEST_F(DocumentSourceScoreFusionTest,
                                     "description": {
                                         "$const": "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:"
                                     },
-                                    "rawScore": {
-                                        "$meta": "geoNearDistance"
-                                    },
+                                    "rawScore": "$internal_raw_score",
                                     "normalization": {
                                         "$const": "none"
                                     },
@@ -7875,6 +8201,11 @@ TEST_F(DocumentSourceScoreFusionTest,
                                     },
                                     "details": []
                                 }
+                            }
+                        },
+                        {
+                            "$replaceRoot": {
+                                "newRoot": "$docs"
                             }
                         },
                         {
@@ -7959,6 +8290,20 @@ TEST_F(DocumentSourceScoreFusionTest,
                                         }
                                     },
                                     {
+                                        "$replaceRoot": {
+                                            "newRoot": {
+                                                "docs": "$$ROOT"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "$addFields": {
+                                            "internal_raw_score": {
+                                                "$meta": "score"
+                                            }
+                                        }
+                                    },
+                                    {
                                         "$setMetadata": {
                                             "scoreDetails": {
                                                 "value": {
@@ -7967,16 +8312,7 @@ TEST_F(DocumentSourceScoreFusionTest,
                                                 "description": {
                                                     "$const": "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:"
                                                 },
-                                                "rawScore": {
-                                                    "$add": [
-                                                        {
-                                                            "$const": 10
-                                                        },
-                                                        {
-                                                            "$const": 2
-                                                        }
-                                                    ]
-                                                },
+                                                "rawScore": "$internal_raw_score",
                                                 "normalization": {
                                                     "$const": "none"
                                                 },
@@ -7988,6 +8324,11 @@ TEST_F(DocumentSourceScoreFusionTest,
                                                 },
                                                 "details": []
                                             }
+                                        }
+                                    },
+                                    {
+                                        "$replaceRoot": {
+                                            "newRoot": "$docs"
                                         }
                                     },
                                     {
@@ -8269,6 +8610,20 @@ TEST_F(DocumentSourceScoreFusionTest,
                     }
                 },
                 {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
                     "$setMetadata": {
                         "scoreDetails": {
                             "value": {
@@ -8277,9 +8632,7 @@ TEST_F(DocumentSourceScoreFusionTest,
                             "description": {
                                 "$const": "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:"
                             },
-                            "rawScore": {
-                                "$meta": "geoNearDistance"
-                            },
+                            "rawScore": "$internal_raw_score",
                             "normalization": {
                                 "$const": "none"
                             },
@@ -8291,6 +8644,11 @@ TEST_F(DocumentSourceScoreFusionTest,
                             },
                             "details": []
                         }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
                     }
                 },
                 {
@@ -8372,6 +8730,20 @@ TEST_F(DocumentSourceScoreFusionTest,
                                 }
                             },
                             {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
                                 "$setMetadata": {
                                     "scoreDetails": {
                                         "value": {
@@ -8380,16 +8752,7 @@ TEST_F(DocumentSourceScoreFusionTest,
                                         "description": {
                                             "$const": "the score calculated from multiplying a weight in the range [0,1] with either a normalized or nonnormalized value:"
                                         },
-                                        "rawScore": {
-                                            "$add": [
-                                                {
-                                                    "$const": 10
-                                                },
-                                                {
-                                                    "$const": 2
-                                                }
-                                            ]
-                                        },
+                                        "rawScore": "$internal_raw_score",
                                         "normalization": {
                                             "$const": "none"
                                         },
@@ -8401,6 +8764,11 @@ TEST_F(DocumentSourceScoreFusionTest,
                                         },
                                         "details": []
                                     }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
                                 }
                             },
                             {
@@ -8664,6 +9032,20 @@ TEST_F(DocumentSourceScoreFusionTest,
                     }
                 },
                 {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
                     "$setMetadata": {
                         "score": {
                             "$divide": [
@@ -8693,6 +9075,11 @@ TEST_F(DocumentSourceScoreFusionTest,
                                 }
                             ]
                         }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
                     }
                 },
                 {
@@ -8752,6 +9139,20 @@ TEST_F(DocumentSourceScoreFusionTest,
                                 }
                             },
                             {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
+                                    }
+                                }
+                            },
+                            {
                                 "$setMetadata": {
                                     "score": {
                                         "$divide": [
@@ -8781,6 +9182,11 @@ TEST_F(DocumentSourceScoreFusionTest,
                                             }
                                         ]
                                     }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": "$docs"
                                 }
                             },
                             {
@@ -8937,6 +9343,13 @@ TEST_F(DocumentSourceScoreFusionTest,
                     }
                 },
                 {
+                    "$addFields": {
+                        "internal_raw_score": {
+                            "$meta": "score"
+                        }
+                    }
+                },
+                {
                     "$_internalSetWindowFields": {
                         "sortBy": {
                             "internal_min_max_scaler_normalization_score": -1
@@ -9027,6 +9440,13 @@ TEST_F(DocumentSourceScoreFusionTest,
                                 "$replaceRoot": {
                                     "newRoot": {
                                         "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "internal_raw_score": {
+                                        "$meta": "score"
                                     }
                                 }
                             },

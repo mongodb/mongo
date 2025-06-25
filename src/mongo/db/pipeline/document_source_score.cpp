@@ -71,6 +71,11 @@ static const std::string scoreScoreDetailsDescription =
     "the score calculated from multiplying a weight in the range [0,1] with either a normalized or "
     "nonnormalized value:";
 
+// Internal, intermediate top-level field name used for the raw score calculated that will be put
+// into scoreDetails. This is required because the 'score' expression in $score can only be
+// calculated once, in case it has a recursive reference to {$meta: score}.
+static constexpr StringData kInternalRawScoreField = "internal_raw_score";
+
 // Internal, intermediate top-level field name used for minMaxScaler normalization. The
 // $minMaxScaler is output into this field during intermediate processing, and then written back to
 // the score metadata variable.
@@ -85,6 +90,29 @@ boost::intrusive_ptr<DocumentSource> buildSetMetadataStageFromExpression(
     boost::intrusive_ptr<Expression>&& expr) {
     return DocumentSourceSetMetadata::create(
         expCtx, std::move(expr), DocumentMetadataFields::MetaType::kScore);
+}
+
+/**
+ * Builds and returns a $replaceRoot stage: {$replaceWith: {docs: "$$ROOT"}}.
+ * This has the effect of storing the unmodified user's document in the path '$docs'.
+ */
+boost::intrusive_ptr<DocumentSource> buildReplaceRootStage(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return DocumentSourceReplaceRoot::createFromBson(
+        BSON("$replaceWith" << BSON("docs" << "$$ROOT")).firstElement(), expCtx);
+}
+
+/**
+ * Builds and returns a $replaceRoot stage: {$replaceRoot: {"newRoot": "$docs"}}.  This restores the
+ * user's document.
+ */
+boost::intrusive_ptr<DocumentSource> buildRestoreRootStage(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return DocumentSourceReplaceRoot::create(expCtx,
+                                             ExpressionFieldPath::createPathFromString(
+                                                 expCtx.get(), "docs", expCtx->variablesParseState),
+                                             "documents",
+                                             SbeCompatibility::noRequirements);
 }
 
 /**
@@ -107,6 +135,44 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildRawScoreCalculationStages(
         expCtx.get(), spec.getScore().getElement(), expCtx->variablesParseState);
     outputStages.emplace_back(
         buildSetMetadataStageFromExpression(expCtx, std::move(scoreExpression)));
+
+    return outputStages;
+}
+
+/**
+ * Builds the set of stages to prep for scoreDetails.  This includes a $replaceRoot stage in order
+ * to hide the customer's doc so that we can do our own processing, and an $addFields to preserve
+ * the raw score such that we do not need to calculate it again later for scoreDetails. Calculating
+ * the raw score twice may not even be possible, in the case where the raw score depends on the
+ * value of {$meta: score}, which is updated throughout the desugared pipeline of $score. Currently,
+ * this helper function builds the following subpipeline:
+ * [
+ *     {
+ *         $replaceRoot: {
+ *             newRoot: {
+ *                 docs: "$$ROOT"
+ *             }
+ *         }
+ *     },
+ *     {
+ *         $addFields: {
+ *             internal_raw_score: {
+ *                 $meta: "score"
+ *             }
+ *         }
+ *     }
+ * ]
+ */
+std::list<boost::intrusive_ptr<DocumentSource>> buildScoreDetailsPreparationStages(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
+
+    outputStages.emplace_back(buildReplaceRootStage(expCtx));
+
+    auto scoreExpression = Expression::parseObject(
+        expCtx.get(), BSON("$meta" << "score"), expCtx->variablesParseState);
+    outputStages.emplace_back(DocumentSourceAddFields::create(
+        FieldPath(kInternalRawScoreField), std::move(scoreExpression), expCtx));
 
     return outputStages;
 }
@@ -140,20 +206,6 @@ buildNormalizationCalculationStagesForSigmoidNormalization(
         buildSetMetadataStageFromExpression(expCtx, std::move(sigmoidExpression)));
 
     return outputStages;
-}
-
-/**
- * Builds and returns a $replaceRoot stage: {$replaceWith: {docs: "$$ROOT"}}.
- * This has the effect of storing the unmodified user's document in the path '$docs'.
- */
-boost::intrusive_ptr<DocumentSource> buildReplaceRootStage(
-    const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    tassert(9460002,
-            "Expected normalization to be minMaxScaler",
-            spec.getNormalization() == ScoreNormalizationEnum::kMinMaxScaler);
-
-    return DocumentSourceReplaceRoot::createFromBson(
-        BSON("$replaceWith" << BSON("docs" << "$$ROOT")).firstElement(), expCtx);
 }
 
 /**
@@ -200,29 +252,10 @@ boost::intrusive_ptr<DocumentSource> buildSetMetadataStageForMinMaxScalerOutput(
 }
 
 /**
- * Builds and returns a $replaceRoot stage: {$replaceWith: {"newRoot": "$docs"}}.  This restores the
- * user's document.
- */
-boost::intrusive_ptr<DocumentSource> buildRestoreRootStage(
-    const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    tassert(9460003,
-            "Expected normalization to be minMaxScaler",
-            spec.getNormalization() == ScoreNormalizationEnum::kMinMaxScaler);
-
-    return DocumentSourceReplaceRoot::create(expCtx,
-                                             ExpressionFieldPath::createPathFromString(
-                                                 expCtx.get(), "docs", expCtx->variablesParseState),
-                                             "documents",
-                                             SbeCompatibility::noRequirements);
-}
-
-/**
  * Builds the set of stages required to calculate the minMaxScaler normalization of the score. Note
- * that the resulting score is normalized, but unweighted. This helper function replaces the user's
- * root document (so that the window function can use an intermediate top level field to operate
- * on), runs the score metadata variable through the $minMaxScaler window function, then restores
- * the user's root document. To see the exact desugared output, look at
- * document_source_score_test.cpp.
+ * that the resulting score is normalized, but unweighted. This helper function runs the score
+ * metadata variable through the $minMaxScaler window function. To see the exact desugared output,
+ * look at document_source_score_test.cpp.
  */
 std::list<boost::intrusive_ptr<DocumentSource>>
 buildNormalizationCalculationStagesForMinMaxScalerNormalization(
@@ -233,10 +266,8 @@ buildNormalizationCalculationStagesForMinMaxScalerNormalization(
 
     std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
 
-    outputStages.emplace_back(buildReplaceRootStage(spec, expCtx));
     outputStages.emplace_back(buildSetWindowFieldsStage(spec, expCtx));
     outputStages.emplace_back(buildSetMetadataStageForMinMaxScalerOutput(spec, expCtx));
-    outputStages.emplace_back(buildRestoreRootStage(spec, expCtx));
 
     return outputStages;
 }
@@ -341,7 +372,7 @@ boost::intrusive_ptr<DocumentSource> setScoreDetailsMetadata(
             pExpCtx.get(),
             BSON("value" << BSON("$meta" << "score") << "description"
                          << scoreScoreDetailsDescription << "rawScore"
-                         << spec.getScore().getElement() << "normalization"
+                         << ("$" + kInternalRawScoreField) << "normalization"
                          << getNormalizationString(spec.getNormalization()) << "weight"
                          << spec.getWeight() << "expression"
                          << hybrid_scoring_util::score_details::stringifyExpression(spec.getScore())
@@ -350,6 +381,7 @@ boost::intrusive_ptr<DocumentSource> setScoreDetailsMetadata(
         DocumentMetadataFields::kScoreDetails);
     return setScoreDetails;
 }
+
 }  // namespace
 
 std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
@@ -359,6 +391,14 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
     // std::list.splice() has a runtime complexity of O(1), because under the hood it just reassigns
     // internal pointers.
     outputStages.splice(outputStages.end(), buildRawScoreCalculationStages(spec, pExpCtx));
+
+    // Note that the scoreDetails preparation stages ($replaceRoot and $addFields) must happen
+    // *after* raw score calculation for two reasons. The first is that the raw score can't be set
+    // until it is calculated. The second is that the raw score calculation may depend on fields
+    // inside the user's document, and running the $replaceRoot before calculation would remove
+    // access to those fields (without modification to references to add the 'docs.' prefix).
+    outputStages.splice(outputStages.end(), buildScoreDetailsPreparationStages(pExpCtx));
+
     outputStages.splice(outputStages.end(), buildNormalizationCalculationStages(spec, pExpCtx));
     outputStages.splice(outputStages.end(), buildWeightCalculationStages(spec, pExpCtx));
 
@@ -366,6 +406,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
     if (includeScoreDetails) {
         outputStages.emplace_back(setScoreDetailsMetadata(spec, pExpCtx));
     }
+    outputStages.emplace_back(buildRestoreRootStage(pExpCtx));
 
     return outputStages;
 }
