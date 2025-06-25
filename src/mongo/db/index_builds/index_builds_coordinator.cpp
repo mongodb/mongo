@@ -2386,12 +2386,12 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
         // If we are in magic restore mode we will return true for canAcceptWritesFor on admin or
         // config databases which we do not want in this case. This will not impact normal primary
         // execution.
-        onInitFn = [&](std::vector<BSONObj>& specs) {
+        onInitFn = [&] {
             if (!(replCoord->getSettings().isReplSet() &&
                   replCoord->canAcceptWritesFor(opCtx, nss)) ||
                 storageGlobalParams.magicRestore) {
                 // Not primary.
-                return Status::OK();
+                return;
             }
 
             // Two phase index builds should have commit quorum set.
@@ -2424,8 +2424,6 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
                 replState->buildUUID,
                 replState->indexSpecs,
                 false /* fromMigrate */);
-
-            return Status::OK();
         };
     } else {
         onInitFn = MultiIndexBlock::makeTimestampedIndexOnInitFn(opCtx, collection.get());

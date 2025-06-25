@@ -192,15 +192,14 @@ TEST_F(MultiIndexBlockTest, InitWriteConflictException) {
 
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_THROWS_CODE(indexer->init(operationContext(),
-                                         coll,
-                                         {spec},
-                                         [](std::vector<BSONObj>& specs) -> Status {
-                                             throwWriteConflictException(
-                                                 "Throw WriteConflictException in 'OnInitFn'.");
-                                         }),
-                           DBException,
-                           ErrorCodes::WriteConflict);
+        ASSERT_THROWS_CODE(
+            indexer->init(
+                operationContext(),
+                coll,
+                {spec},
+                [] { throwWriteConflictException("Throw WriteConflictException in 'OnInitFn'."); }),
+            DBException,
+            ErrorCodes::WriteConflict);
     }
 
     {
@@ -227,12 +226,9 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     // IndexBuildAlreadyInProgress
     {
         WriteUnitOfWork wuow(operationContext());
-        auto status = indexer
-                          ->init(operationContext(),
-                                 coll,
-                                 {spec, spec},
-                                 [](std::vector<BSONObj>& specs) -> Status { return Status::OK(); })
-                          .getStatus();
+        auto status =
+            indexer->init(operationContext(), coll, {spec, spec}, MultiIndexBlock::kNoopOnInitFn)
+                .getStatus();
         ASSERT_NOT_OK(status);
         ASSERT_NE(status, ErrorCodes::IndexBuildAlreadyInProgress);
     }

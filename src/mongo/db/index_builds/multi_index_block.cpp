@@ -240,16 +240,10 @@ void MultiIndexBlock::ignoreUniqueConstraint() {
     _ignoreUnique = true;
 }
 
-MultiIndexBlock::OnInitFn MultiIndexBlock::kNoopOnInitFn =
-    [](std::vector<BSONObj>& specs) -> Status {
-    return Status::OK();
-};
-
 MultiIndexBlock::OnInitFn MultiIndexBlock::makeTimestampedIndexOnInitFn(OperationContext* opCtx,
                                                                         const CollectionPtr& coll) {
-    return [opCtx, ns = coll->ns()](std::vector<BSONObj>& specs) -> Status {
+    return [opCtx, ns = coll->ns()] {
         opCtx->getServiceContext()->getOpObserver()->onStartIndexBuildSinglePhase(opCtx, ns);
-        return Status::OK();
     };
 }
 
@@ -318,17 +312,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
         std::size_t eachIndexBuildMaxMemoryUsageBytes =
             getEachIndexBuildMaxMemoryUsageBytes(maxMemoryUsageBytes, indexSpecs.size());
 
-        // Initializing individual index build blocks below performs un-timestamped writes to the
-        // durable catalog. It's possible for the onInit function to set multiple timestamps
-        // depending on the index build codepath taken. Once to persist the index build entry in the
-        // 'config.system.indexBuilds' collection and another time to log the operation using
-        // onStartIndexBuild(). It's imperative that the durable catalog writes are timestamped at
-        // the same time as onStartIndexBuild() is to avoid rollback issues.
-        Status status = onInit(indexInfoObjs);
-        if (!status.isOK()) {
-            return status;
-        }
-
         // First do a pass over all indexes we have been requested to build to see if there are any
         // conflicts with existing indexes. We do this without adding anything to the index catalog
         // so we can distinguish between conflicts against already existing indexes and the specs
@@ -345,6 +328,16 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                     return status;
                 }
             }
+        }
+
+        // Initializing individual index build blocks below performs un-timestamped writes to the
+        // durable catalog. It's possible for the onInit function to set multiple timestamps
+        // depending on the index build codepath taken. Once to persist the index build entry in the
+        // 'config.system.indexBuilds' collection and another time to log the operation using
+        // onStartIndexBuild(). It's imperative that the durable catalog writes are timestamped at
+        // the same time as onStartIndexBuild() is to avoid rollback issues.
+        if (onInit) {
+            onInit();
         }
 
         // Then proceed to start the index builds. If we encounter conflicts for the index specs at
@@ -404,22 +397,24 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                         stateInfoIt != resumeInfoIndexes.end());
 
                 stateInfo = *stateInfoIt;
-                status = index.block->initForResume(opCtx,
-                                                    collection.getWritableCollection(opCtx),
-                                                    *stateInfo,
-                                                    resumeInfo->getPhase());
+                auto status = index.block->initForResume(opCtx,
+                                                         collection.getWritableCollection(opCtx),
+                                                         *stateInfo,
+                                                         resumeInfo->getPhase());
+                if (!status.isOK())
+                    return status;
             } else {
-                status =
+                auto status =
                     index.block->init(opCtx, collection.getWritableCollection(opCtx), forRecovery);
+                if (!status.isOK())
+                    return status;
             }
-            if (!status.isOK())
-                return status;
 
             auto indexCatalogEntry =
                 index.block->getWritableEntry(opCtx, collection.getWritableCollection(opCtx));
             index.real = indexCatalogEntry->accessMethod();
-            status = index.real->initializeAsEmpty();
-            if (!status.isOK())
+
+            if (auto status = index.real->initializeAsEmpty(); !status.isOK())
                 return status;
 
             index.bulk = index.real->initiateBulk(indexCatalogEntry,

@@ -128,9 +128,8 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
 
     builder->setIndexBuildMethod(options.method);
 
-    std::vector<BSONObj> indexes;
     try {
-        indexes = writeConflictRetry(opCtx, "IndexBuildsManager::setUpIndexBuild", nss, [&]() {
+        writeConflictRetry(opCtx, "IndexBuildsManager::setUpIndexBuild", nss, [&]() {
             MultiIndexBlock::InitMode mode = options.forRecovery
                 ? MultiIndexBlock::InitMode::Recovery
                 : MultiIndexBlock::InitMode::SteadyState;
