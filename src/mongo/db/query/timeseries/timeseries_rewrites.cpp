@@ -115,17 +115,6 @@ bool isEligibleForViewlessTimeseriesRewritesInRouter(OperationContext* const opC
         isViewlessTimeseriesCollection(cri.getChunkManager());
 }
 
-bool isEligibleForViewlessTimeseriesRewritesInRouter(OperationContext* const opCtx,
-                                                     const NamespaceString& nss) {
-    if (const auto& criWithStatus =
-            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
-        criWithStatus.isOK()) {
-        return isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, criWithStatus.getValue());
-    } else {
-        return false;
-    }
-}
-
 std::vector<BSONObj> prependUnpackStageToPipeline(
     const std::vector<BSONObj>& pipeline,
     const StringData timeField,

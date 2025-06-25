@@ -43,6 +43,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/query/exec/cluster_client_cursor_params.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
+#include "mongo/s/router_role.h"
 
 #include <boost/optional/optional.hpp>
 
@@ -89,11 +90,11 @@ public:
      * On success, fills out 'result' with the command response.
      */
     static Status runAggregate(OperationContext* opCtx,
+                               RoutingContext* routingCtx,
                                const Namespaces& namespaces,
                                AggregateCommandRequest& request,
                                const LiteParsedPipeline& liteParsedPipeline,
                                const PrivilegeVector& privileges,
-                               boost::optional<CollectionRoutingInfo> cri,
                                boost::optional<ResolvedView> resolvedView,
                                boost::optional<ExplainOptions::Verbosity> verbosity,
                                BSONObjBuilder* result);

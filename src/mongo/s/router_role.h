@@ -153,7 +153,14 @@ public:
             // CannotRefreshDueToLocksHeld if the entry is not already cached.
             const auto allowLocks = opCtx->inMultiDocumentTransaction() &&
                 shard_role_details::getLocker(opCtx)->isLocked();
-            RoutingContext routingCtx(opCtx, {_targetedNamespaces.front()}, allowLocks);
+
+            // Construct an empty RoutingContext if nss is a collectionless aggregate namespace.
+            std::vector<NamespaceString> nssList;
+            if (!_targetedNamespaces.front().isCollectionlessAggregateNS()) {
+                nssList.push_back(_targetedNamespaces.front());
+            }
+
+            RoutingContext routingCtx(opCtx, nssList, allowLocks);
             return routing_context_utils::runAndValidate(
                 routingCtx, [&](RoutingContext& ctx) { return callbackFn(opCtx, ctx); });
         });

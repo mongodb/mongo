@@ -374,9 +374,7 @@ std::vector<AsyncRequestsSender::Response> gatherResponsesImpl(
         readPref,
         retryPolicy);
 
-    if (routingCtx && !requests.empty()) {
-        // If we reach here, at least one versioned request was scheduled and sent to the shards by
-        // the ARS.
+    if (routingCtx && routingCtx->hasNss(nss)) {
         routingCtx->onRequestSentForNss(nss);
     }
 
@@ -1018,8 +1016,8 @@ StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd_DEPRECATED(
     return catalogCache->getCollectionRoutingInfo(opCtx, nss, allowLocks);
 }
 
-StatusWith<std::unique_ptr<RoutingContext>> getRoutingContextForTxnCmd(OperationContext* opCtx,
-                                                                       const NamespaceString& nss) {
+StatusWith<std::unique_ptr<RoutingContext>> getRoutingContextForTxnCmd(
+    OperationContext* opCtx, const std::vector<NamespaceString>& nssList) {
     // When in a multi-document transaction, allow getting routing info from the
     // CatalogCache even though locks may be held. The CatalogCache will throw
     // CannotRefreshDueToLocksHeld if the entry is not already cached.
@@ -1032,8 +1030,7 @@ StatusWith<std::unique_ptr<RoutingContext>> getRoutingContextForTxnCmd(Operation
         opCtx->inMultiDocumentTransaction() && shard_role_details::getLocker(opCtx)->isLocked();
 
     try {
-        auto routingCtx =
-            std::make_unique<RoutingContext>(opCtx, std::vector<NamespaceString>{nss}, allowLocks);
+        auto routingCtx = std::make_unique<RoutingContext>(opCtx, std::move(nssList), allowLocks);
         return routingCtx;
     } catch (const DBException& ex) {
         return ex.toStatus();

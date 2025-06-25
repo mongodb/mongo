@@ -86,6 +86,11 @@ public:
     const CollectionRoutingInfo& getCollectionRoutingInfo(const NamespaceString& nss) const;
 
     /**
+     * Returns if the RoutingContext contains the specified NamespaceString.
+     */
+    bool hasNss(const NamespaceString& nss) const;
+
+    /**
      * Record that a versioned request for a namespace was sent to a shard. The namespace is
      * considered validated.
      */
@@ -107,7 +112,7 @@ public:
     /**
      * Validate the RoutingContext prior to destruction to ensure that either:
      * 1. All declared namespaces have had their routing tables validated by sending a versioned
-     * request to a shard. Each namespace should have a corresponding Status value recording this.
+     * request to a shard.
      * 2. An exception is thrown (i.e. if the collection generation has changed) and will be
      * propagated up the stack.
      *

@@ -195,7 +195,7 @@ TargetedWriteRequest makeTargetWriteRequest(OperationContext* opCtx,
         nss = nss.makeTimeseriesBucketsNamespace();
     }
 
-    auto swRoutingCtx = getRoutingContextForTxnCmd(opCtx, nss);
+    auto swRoutingCtx = getRoutingContextForTxnCmd(opCtx, {nss});
     uassertStatusOK(swRoutingCtx.getStatus());
     auto& routingCtx = swRoutingCtx.getValue();
     const auto& cri = routingCtx->getCollectionRoutingInfo(nss);

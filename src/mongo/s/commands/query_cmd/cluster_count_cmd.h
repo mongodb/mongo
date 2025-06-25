@@ -75,11 +75,12 @@ inline BSONObj prepareCountForPassthrough(const BSONObj& cmdObj, bool requestQue
 
 inline bool convertAndRunAggregateIfViewlessTimeseries(
     OperationContext* const opCtx,
+    RoutingContext& routingCtx,
     BSONObjBuilder& bodyBuilder,
     const CountCommandRequest& request,
-    const CollectionRoutingInfo& cri,
     const NamespaceString& nss,
     boost::optional<mongo::ExplainOptions::Verbosity> verbosity = boost::none) {
+    const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
     if (!timeseries::isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, cri)) {
         return false;
     } else {
@@ -88,11 +89,15 @@ inline bool convertAndRunAggregateIfViewlessTimeseries(
         const auto hasExplain = verbosity.has_value();
         bodyBuilder.resetToEmpty();
         auto aggRequest = query_request_conversion::asAggregateCommandRequest(request, hasExplain);
+
         uassertStatusOK(ClusterAggregate::runAggregate(
             opCtx,
+            &routingCtx,
             ClusterAggregate::Namespaces{nss, nss},
             aggRequest,
+            {aggRequest},
             {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)},
+            boost::none,
             verbosity,
             &bodyBuilder));
         return true;
@@ -187,10 +192,11 @@ public:
                 auto aggResult = BSONObjBuilder{};
 
                 if (convertAndRunAggregateIfViewlessTimeseries(
-                        opCtx, aggResult, countRequest, cri, nss)) {
+                        opCtx, routingCtx, aggResult, countRequest, nss)) {
                     ViewResponseFormatter{aggResult.obj()}.appendAsCountResponse(
                         &result, boost::none /*tenantId*/);
                     // We've delegated execution to agg.
+                    routingCtx.validateOnContextEnd();
                     return true;
                 }
             }
@@ -397,10 +403,7 @@ public:
                     // a view-less timeseries aggregate request.
                     auto bodyBuilder = result->getBodyBuilder();
                     if (convertAndRunAggregateIfViewlessTimeseries(
-                            opCtx, bodyBuilder, countRequest, cri, nss, verbosity)) {
-                        // TODO SERVER-102925 remove this once the RoutingContext is integrated into
-                        // Cluster::runAggregate()
-                        routingCtx.onRequestSentForNss(nss);
+                            opCtx, routingCtx, bodyBuilder, countRequest, nss, verbosity)) {
                         // We've delegated execution to agg.
                         return Status::OK();
                     }

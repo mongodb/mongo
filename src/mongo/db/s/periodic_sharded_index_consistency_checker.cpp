@@ -54,6 +54,7 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/routing_information_cache.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/util/assert_util.h"
@@ -201,25 +202,35 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                             auto cri = uassertStatusOK(
                                 RoutingInformationCache::get(opCtx)->getCollectionRoutingInfo(opCtx,
                                                                                               nss));
-                            auto status = ClusterAggregate::runAggregate(
-                                opCtx,
-                                ClusterAggregate::Namespaces{nss, nss},
-                                request,
-                                LiteParsedPipeline{request},
-                                PrivilegeVector(),
-                                cri,
-                                boost::none /* ResolvedView */,
-                                boost::none /* verbosity */,
-                                &responseBuilder);
+                            // TODO SERVER-95927 This should be replaced with the
+                            // withValidatedRoutingContext() helper, which accesses the routing
+                            // tables in the Grid's CatalogCache.
+                            auto routingCtxPtr = RoutingContext::createSynthetic({{nss, cri}});
+                            routing_context_utils::runAndValidate(
+                                *routingCtxPtr, [&](RoutingContext& routingCtx) {
+                                    auto status = ClusterAggregate::runAggregate(
+                                        opCtx,
+                                        &routingCtx,
+                                        ClusterAggregate::Namespaces{nss, nss},
+                                        request,
+                                        LiteParsedPipeline{request},
+                                        PrivilegeVector(),
+                                        boost::none /* ResolvedView */,
+                                        boost::none /* verbosity */,
+                                        &responseBuilder);
 
-                            // Stop counting if the agg command failed for one of the collections
-                            // to avoid recording a false count.
-                            uassertStatusOKWithContext(
-                                status, str::stream() << "nss " << nss.toStringForErrorMsg());
+                                    // Stop counting if the agg command failed for one of the
+                                    // collections to avoid recording a false count.
+                                    uassertStatusOKWithContext(
+                                        status,
+                                        str::stream() << "nss " << nss.toStringForErrorMsg());
 
-                            if (!responseBuilder.obj()["cursor"]["firstBatch"].Array().empty()) {
-                                numShardedCollsWithInconsistentIndexes++;
-                            }
+                                    if (!responseBuilder.obj()["cursor"]["firstBatch"]
+                                             .Array()
+                                             .empty()) {
+                                        numShardedCollsWithInconsistentIndexes++;
+                                    }
+                                });
                         });
                 }
 

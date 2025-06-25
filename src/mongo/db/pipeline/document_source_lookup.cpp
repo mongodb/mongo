@@ -1410,6 +1410,7 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceLookUp::dist
     // Note that this decision is inherently racy and subject to become stale. This is okay because
     // either choice will work correctly; we are simply applying a heuristic optimization.
     if (foreignShardedLookupAllowed() && pExpCtx->getSubPipelineDepth() == 0 &&
+        !_fromNs.isCollectionlessAggregateNS() &&
         pExpCtx->getMongoProcessInterface()->isSharded(_fromExpCtx->getOperationContext(),
                                                        _fromNs)) {
         tassert(

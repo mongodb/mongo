@@ -119,6 +119,10 @@ const CollectionRoutingInfo& RoutingContext::getCollectionRoutingInfo(
     return it->second.cri;
 }
 
+bool RoutingContext::hasNss(const NamespaceString& nss) const {
+    return _nssRoutingInfoMap.find(nss) != _nssRoutingInfoMap.end();
+}
+
 StatusWith<CollectionRoutingInfo> RoutingContext::_getCollectionRoutingInfo(
     OperationContext* opCtx, const NamespaceString& nss, bool allowLocks) const {
     if (auto atClusterTime = getEffectiveAtClusterTime(opCtx)) {

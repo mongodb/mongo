@@ -36,6 +36,7 @@
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
+#include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/parsed_find_command.h"
@@ -46,6 +47,7 @@
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/timeseries/timeseries_rewrites.h"
+#include "mongo/db/query/util/cluster_find_util.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
@@ -88,6 +90,10 @@ inline std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(
     uassert(ErrorCodes::InvalidNamespace,
             "Cannot specify UUID to a mongos.",
             !findCommand->getNamespaceOrUUID().isUUID());
+
+    uassert(ErrorCodes::InvalidNamespace,
+            "Cannot specify find without a real namespace",
+            !findCommand->getNamespaceOrUUID().nss().isCollectionlessAggregateNS());
 
     return findCommand;
 }
@@ -249,14 +255,6 @@ public:
                          .build();
 
             try {
-                // Handle requests against a viewless timeseries collection.
-                // TODO SERVER-102925 remove this once the RoutingContext is integrated into
-                // Cluster::runAggregate()
-                if (convertAndRunAggregateIfViewlessTimeseries(
-                        opCtx, result, cq.getFindCommandRequest(), querySettings, verbosity)) {
-                    return;
-                }
-
                 long long millisElapsed;
                 std::vector<AsyncRequestsSender::Response> shardResponses;
 
@@ -266,6 +264,18 @@ public:
 
                 routing_context_utils::withValidatedRoutingContext(
                     opCtx, {nss}, [&](RoutingContext& routingCtx) {
+                        // Handle requests against a viewless timeseries collection.
+                        if (auto cursorId =
+                                cluster_find_util::convertFindAndRunAggregateIfViewlessTimeseries(
+                                    opCtx,
+                                    routingCtx,
+                                    ns(),
+                                    result,
+                                    cq.getFindCommandRequest(),
+                                    querySettings,
+                                    verbosity)) {
+                            return;
+                        }
                         const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
                         // Create an RAII object that prints the collection's shard key in the case
@@ -403,18 +413,24 @@ public:
                 .expCtx = std::move(expCtx), .parsedFind = std::move(parsedFind)});
 
             try {
-                // Handle requests against a viewless timeseries collection.
-                if (convertAndRunAggregateIfViewlessTimeseries(
-                        opCtx, result, cq->getFindCommandRequest(), querySettings)) {
-                    return;
-                }
-
                 // Do the work to generate the first batch of results. This blocks waiting to
                 // get responses from the shard(s).
-                bool partialResultsReturned = false;
+                auto partialResultsReturned = false;
+                auto builtResponse = false;
                 std::vector<BSONObj> batch;
-                auto cursorId = ClusterFind::runQuery(
-                    opCtx, *cq, ReadPreferenceSetting::get(opCtx), &batch, &partialResultsReturned);
+                auto cursorId = ClusterFind::runQuery(opCtx,
+                                                      *cq,
+                                                      ns(),
+                                                      ReadPreferenceSetting::get(opCtx),
+                                                      &batch,
+                                                      &partialResultsReturned,
+                                                      &builtResponse,
+                                                      result,
+                                                      &querySettings);
+
+                if (builtResponse) {
+                    return;
+                }
 
                 // Build the response document.
                 CursorResponseBuilder::Options options;
@@ -442,37 +458,6 @@ public:
 
         const GenericArguments& getGenericArguments() const override {
             return _genericArgs;
-        }
-
-        /**
-         * Helper function to detect when we are running find on a viewless timeseries query,
-         * converting the request to an agg request, and calling runAggregate(). Returns true if the
-         * conversion to and execution as an aggregate pipeline took place.
-         */
-        bool convertAndRunAggregateIfViewlessTimeseries(
-            OperationContext* const opCtx,
-            rpc::ReplyBuilderInterface* const result,
-            const FindCommandRequest& request,
-            const query_settings::QuerySettings& querySettings,
-            boost::optional<mongo::ExplainOptions::Verbosity> verbosity = boost::none) {
-            if (timeseries::isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, ns())) {
-                const auto hasExplain = verbosity.has_value();
-                auto bodyBuilder = result->getBodyBuilder();
-                bodyBuilder.resetToEmpty();
-                auto aggRequest =
-                    query_request_conversion::asAggregateCommandRequest(request, hasExplain);
-                aggRequest.setQuerySettings(querySettings);
-                uassertStatusOK(ClusterAggregate::runAggregate(
-                    opCtx,
-                    ClusterAggregate::Namespaces{ns(), ns()},
-                    aggRequest,
-                    {Privilege(ResourcePattern::forExactNamespace(ns()), ActionType::find)},
-                    verbosity,
-                    &bodyBuilder));
-                return true;
-            } else {
-                return false;
-            }
         }
 
         void retryOnViewError(

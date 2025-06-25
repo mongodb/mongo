@@ -10,6 +10,24 @@ exports_files(
 )
 
 mongo_cc_library(
+    name = "cluster_find_util",
+    hdrs = [
+        "cluster_find_util.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:aggregation_request_helper",
+        "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
+        "//src/mongo/db/query/query_settings",
+        "//src/mongo/s/query/planner:cluster_aggregate",
+    ],
+)
+
+mongo_cc_library(
     name = "jparse_util",
     srcs = [
         "jparse_util.cpp",

@@ -272,6 +272,7 @@ mongo_cc_library(
         "//src/mongo/db/query/query_settings:query_settings_service",
         "//src/mongo/db/query/query_shape",
         "//src/mongo/db/query/search:search_index_process_router",
+        "//src/mongo/db/query/util:cluster_find_util",
         "//src/mongo/db/query/write_ops:parsed_update",
         "//src/mongo/db/repl:repl_server_parameters",
         "//src/mongo/db/repl/hello:hello_auth",

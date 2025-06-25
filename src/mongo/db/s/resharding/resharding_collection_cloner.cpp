@@ -81,6 +81,7 @@
 #include "mongo/util/string_map.h"
 #include "mongo/util/timer.h"
 
+#include <cinttypes>
 #include <mutex>
 #include <string>
 #include <utility>
@@ -470,10 +471,10 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
         routerRelaxCollectionUUIDConsistencyCheckBlock(boost::in_place_init_if, _relaxed, opCtx);
 
     sharding::router::CollectionRouter router(opCtx->getServiceContext(), _sourceNss);
-    auto dispatchResults = router.route(
+    auto dispatchResults = router.routeWithRoutingContext(
         opCtx,
         "resharding collection cloner fetching with natural order (query stage)"_sd,
-        [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+        [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             AsyncRequestsSender::ShardHostMap designatedHostsMap;
             stdx::unordered_map<ShardId, BSONObj> resumeTokenMap;
             std::set<ShardId> shardsToSkip;
@@ -546,19 +547,27 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
             request.setUnwrappedReadPref(readPref.toContainingBSON());
             ReadPreferenceSetting::get(opCtx) = readPref;
 
-            return sharded_agg_helpers::dispatchShardPipeline(
+            auto res = sharded_agg_helpers::dispatchShardPipeline(
+                routingCtx,
                 Document(request.toBSON()),
                 sharded_agg_helpers::PipelineDataSource::kNormal,
                 false /* eligibleForSampling */,
                 std::move(pipeline),
                 boost::none /* explain */,
+                _sourceNss,
                 false /* requestQueryStatsFromRemotes */,
-                cri,
                 ShardTargetingPolicy::kAllowed,
                 readConcern.toBSONInner(),
                 std::move(designatedHostsMap),
                 std::move(resumeTokenMap),
                 std::move(shardsToSkip));
+
+            // It is possible that all shards are included in shardsToSkip, so we safely skip
+            // validation if no cursors were established.
+            if (res.remoteCursors.empty()) {
+                routingCtx.skipValidation();
+            }
+            return res;
         });
 
     bool hasSplitPipeline = !!dispatchResults.splitPipeline;

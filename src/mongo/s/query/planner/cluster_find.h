@@ -68,9 +68,13 @@ public:
      */
     static CursorId runQuery(OperationContext* opCtx,
                              const CanonicalQuery& query,
+                             const NamespaceString& origNss,
                              const ReadPreferenceSetting& readPref,
                              std::vector<BSONObj>* results,
-                             bool* partialResultsReturned = nullptr);
+                             bool* partialResultsReturned = nullptr,
+                             bool* builtResponse = nullptr,
+                             rpc::ReplyBuilderInterface* result = nullptr,
+                             const query_settings::QuerySettings* querySettings = nullptr);
 
     /**
      * Executes the getMore command 'cmd', and on success returns a CursorResponse.

@@ -68,6 +68,7 @@
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/s/query/planner/cluster_aggregation_planner.h"
+#include "mongo/s/router_role.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
@@ -195,63 +196,31 @@ Document serializeToCommand(const MapReduceCommandRequest& parsedMr, Pipeline* p
     return translatedCmd.freeze();
 }
 
-}  // namespace
+bool _runMapReduceInRoutingContext(OperationContext* opCtx,
+                                   RoutingContext& routingCtx,
+                                   const MapReduceCommandRequest& parsedMr,
+                                   const NamespaceString& nss,
+                                   BSONObjBuilder& result,
+                                   boost::optional<ExplainOptions::Verbosity> verbosity) {
+    const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
-bool runAggregationMapReduce(OperationContext* opCtx,
-                             const DatabaseName& dbName,
-                             const BSONObj& cmd,
-                             BSONObjBuilder& result,
-                             boost::optional<ExplainOptions::Verbosity> verbosity) {
-    auto parsedMr =
-        MapReduceCommandRequest::parse(IDLParserContext("mapReduce",
-                                                        auth::ValidatedTenancyScope::get(opCtx),
-                                                        dbName.tenantId(),
-                                                        SerializationContext::stateDefault()),
-                                       cmd);
-    stdx::unordered_set<NamespaceString> involvedNamespaces{parsedMr.getNamespace()};
-    auto resolvedOutNss = parsedMr.getOutOptions().getDatabaseName()
-        ? NamespaceStringUtil::deserialize(boost::none,
-                                           *(parsedMr.getOutOptions().getDatabaseName()),
-                                           parsedMr.getOutOptions().getCollectionName(),
-                                           SerializationContext::stateDefault())
-        : NamespaceStringUtil::deserialize(parsedMr.getNamespace().dbName(),
-                                           parsedMr.getOutOptions().getCollectionName());
-
-    if (_sampler.tick()) {
-        LOGV2_WARNING(5725800,
-                      "The map reduce command is deprecated. For more information, see "
-                      "https://docs.mongodb.com/manual/core/map-reduce/");
-    }
-
-    if (parsedMr.getOutOptions().getOutputType() != OutputType::InMemory) {
-        involvedNamespaces.insert(resolvedOutNss);
-    }
-
-    auto cri = uassertStatusOK(
-        sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, parsedMr.getNamespace()));
-
-    // Create an RAII object that prints the collection's shard key in the case of a tassert
-    // or crash.
+    // Create an RAII object that prints the collection's shard key in the case of a tassert or
+    // crash.
     ScopedDebugInfo shardKeyDiagnostics(
         "ShardKeyDiagnostics",
         diagnostic_printers::ShardKeyDiagnosticPrinter{
             cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON() : BSONObj()});
 
     auto expCtx = makeExpressionContext(opCtx, parsedMr, cri, verbosity);
-
     // Create an RAII object that prints useful information about the ExpressionContext in the case
     // of a tassert or crash.
     ScopedDebugInfo expCtxDiagnostics("ExpCtxDiagnostics",
                                       diagnostic_printers::ExpressionContextPrinter{expCtx});
 
     auto pipeline = map_reduce_common::translateFromMR(parsedMr, expCtx);
-
-    auto namespaces =
-        ClusterAggregate::Namespaces{parsedMr.getNamespace(), parsedMr.getNamespace()};
-
+    auto namespaces = ClusterAggregate::Namespaces{nss, nss};
     // Auth has already been checked for the original mapReduce command, no need to recheck here.
     PrivilegeVector privileges;
-
     // This holds the raw results from the aggregation, which will be reformatted to match the
     // expected mapReduce output.
     BSONObjBuilder tempResults;
@@ -259,6 +228,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     auto targeter =
         cluster_aggregation_planner::AggregationTargeter::make(opCtx,
                                                                std::move(pipeline),
+                                                               namespaces.executionNss,
                                                                cri,
                                                                PipelineDataSource::kNormal,
                                                                false);  // perShardCursor
@@ -280,6 +250,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                 // a pointer to the constructed ExpressionContext.
                 uassertStatusOK(cluster_aggregation_planner::dispatchPipelineAndMerge(
                     opCtx,
+                    routingCtx,
                     std::move(targeter),
                     std::move(serialized),
                     std::numeric_limits<long long>::max(),
@@ -335,6 +306,44 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     }
 
     return true;
+}
+}  // namespace
+
+bool runAggregationMapReduce(OperationContext* opCtx,
+                             const DatabaseName& dbName,
+                             const BSONObj& cmd,
+                             BSONObjBuilder& result,
+                             boost::optional<ExplainOptions::Verbosity> verbosity) {
+    auto parsedMr =
+        MapReduceCommandRequest::parse(IDLParserContext("mapReduce",
+                                                        auth::ValidatedTenancyScope::get(opCtx),
+                                                        dbName.tenantId(),
+                                                        SerializationContext::stateDefault()),
+                                       cmd);
+    const auto& nss = parsedMr.getNamespace();
+    stdx::unordered_set<NamespaceString> involvedNamespaces{nss};
+    auto resolvedOutNss = parsedMr.getOutOptions().getDatabaseName()
+        ? NamespaceStringUtil::deserialize(boost::none,
+                                           *(parsedMr.getOutOptions().getDatabaseName()),
+                                           parsedMr.getOutOptions().getCollectionName(),
+                                           SerializationContext::stateDefault())
+        : NamespaceStringUtil::deserialize(nss.dbName(),
+                                           parsedMr.getOutOptions().getCollectionName());
+
+    if (_sampler.tick()) {
+        LOGV2_WARNING(5725800,
+                      "The map reduce command is deprecated. For more information, see "
+                      "https://docs.mongodb.com/manual/core/map-reduce/");
+    }
+
+    if (parsedMr.getOutOptions().getOutputType() != OutputType::InMemory) {
+        involvedNamespaces.insert(resolvedOutNss);
+    }
+
+    auto routingCtxPtr = uassertStatusOK(sharded_agg_helpers::getExecutionNsRoutingCtx(opCtx, nss));
+    return routing_context_utils::runAndValidate(*routingCtxPtr, [&](RoutingContext& routingCtx) {
+        return _runMapReduceInRoutingContext(opCtx, routingCtx, parsedMr, nss, result, verbosity);
+    });
 }
 
 }  // namespace mongo

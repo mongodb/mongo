@@ -73,6 +73,7 @@
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/util/cluster_find_util.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context.h"
@@ -295,10 +296,10 @@ void updateNumHostsTargetedMetrics(OperationContext* opCtx,
 }
 
 CursorId runQueryWithoutRetrying(OperationContext* opCtx,
+                                 RoutingContext& routingCtx,
                                  const CanonicalQuery& query,
                                  const ReadPreferenceSetting& readPref,
                                  const boost::optional<UUID> sampleId,
-                                 RoutingContext& routingCtx,
                                  std::vector<BSONObj>* results,
                                  bool* partialResultsReturned) {
     const auto& findCommand = query.getFindCommandRequest();
@@ -677,9 +678,13 @@ StatusWith<ClusterCursorManager::PinnedCursor> checkOutCursorWithRetries(
 
 CursorId ClusterFind::runQuery(OperationContext* opCtx,
                                const CanonicalQuery& query,
+                               const NamespaceString& origNss,
                                const ReadPreferenceSetting& readPref,
                                std::vector<BSONObj>* results,
-                               bool* partialResultsReturned) {
+                               bool* partialResultsReturned,
+                               bool* builtResponse,
+                               rpc::ReplyBuilderInterface* const result,
+                               const query_settings::QuerySettings* querySettings) {
     CurOp::get(opCtx)->debug().planCacheShapeHash = canonical_query_encoder::computeHash(
         /* Mongos doesn't know beforehand which execution engine will be used, so we use the classic
            encoding method by default. */
@@ -688,6 +693,11 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
     // If the user supplied a 'partialResultsReturned' out-parameter, default it to false here.
     if (partialResultsReturned) {
         *partialResultsReturned = false;
+    }
+
+    // If the user supplied a 'builtResponse' out-parameter, default it to false here.
+    if (builtResponse) {
+        *builtResponse = false;
     }
 
     // We must always have a BSONObj vector into which to output our results.
@@ -709,6 +719,10 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                 findCommand.getStartAt().isEmpty());
 
     const auto& nss = query.nss();
+    uassert(ErrorCodes::InvalidNamespace,
+            "Cannot specify find without a real namespace",
+            !nss.isCollectionlessAggregateNS());
+
     // Try to generate a sample id for this query here instead of inside 'runQueryWithoutRetrying()'
     // since it is incorrect to generate multiple sample ids for a single query.
     const auto sampleId = analyze_shard_key::tryGenerateSampleId(
@@ -737,6 +751,24 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
     try {
         return router.routeWithRoutingContext(
             opCtx, "find", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+                // If this is a viewless timeseries namespace, run the equivalent aggregation (which
+                // writes its own cursor response into 'result') and short-circuit the normal find
+                // path.
+                if (result && querySettings) {
+                    if (auto cursorId =
+                            cluster_find_util::convertFindAndRunAggregateIfViewlessTimeseries(
+                                opCtx,
+                                routingCtx,
+                                origNss,
+                                result,
+                                query.getFindCommandRequest(),
+                                *querySettings)) {
+                        if (builtResponse) {
+                            *builtResponse = true;
+                        }
+                        return *cursorId;
+                    }
+                }
                 const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
                 // Create an RAII object that prints the collection's shard key in the case of a
@@ -747,7 +779,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                         cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON()
                                         : BSONObj()});
                 return runQueryWithoutRetrying(
-                    opCtx, query, readPref, sampleId, routingCtx, results, partialResultsReturned);
+                    opCtx, routingCtx, query, readPref, sampleId, results, partialResultsReturned);
             });
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // If the database doesn't exist, we successfully return an empty result set without

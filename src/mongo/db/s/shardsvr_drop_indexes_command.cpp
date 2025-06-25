@@ -254,8 +254,8 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
                     CommandHelpers::appendSimpleCommandStatus(
                         output, aggregateResponse.responseOK, errmsg);
 
-                    // TODO SERVER-104795 we can fail to validate routing tables for a nss in the
-                    // event of a concurrent chink migration that moves requested chunks from one
+                    // TODO SERVER-91380 we can fail to validate routing tables for a nss in the
+                    // event of a concurrent chunk migration that moves requested chunks from one
                     // shard to a shard that had previously been marked as returning a successful
                     // response for dropIndexes(). We skip RoutingContext validation here to
                     // avoiding hitting the assertion in validateOnDestroy(), but this should be

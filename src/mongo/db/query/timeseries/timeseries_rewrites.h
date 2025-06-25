@@ -57,7 +57,6 @@ bool isEligibleForViewlessTimeseriesRewrites(OperationContext*, const Collection
 bool isEligibleForViewlessTimeseriesRewrites(OperationContext*, const CollectionOrViewAcquisition&);
 bool isEligibleForViewlessTimeseriesRewritesInRouter(OperationContext*,
                                                      const CollectionRoutingInfo&);
-bool isEligibleForViewlessTimeseriesRewritesInRouter(OperationContext*, const NamespaceString&);
 
 /**
  * Determine whether the catalog data indicates that the collection is a viewless timeseries

@@ -233,7 +233,7 @@ void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
                  retryPolicy,
                  _designatedHostsMap);
 
-    if (_routingCtx) {
+    if (_routingCtx && _routingCtx->hasNss(_nss)) {
         _routingCtx->onRequestSentForNss(_nss);
     }
 }
@@ -579,6 +579,7 @@ std::pair<std::vector<HostAndPort>, StringMap<ShardId>> getHostInfos(
 
 std::vector<RemoteCursor> establishCursorsOnAllHosts(
     OperationContext* opCtx,
+    RoutingContext& routingCtx,
     std::shared_ptr<executor::TaskExecutor> executor,
     const NamespaceString& nss,
     const std::set<ShardId>& shardIds,
@@ -605,6 +606,11 @@ std::vector<RemoteCursor> establishCursorsOnAllHosts(
                                   newCmd.obj(),
                                   opCtx,
                                   Milliseconds(internalQueryAggMulticastTimeoutMS));
+
+    if (routingCtx.hasNss(nss)) {
+        routingCtx.onRequestSentForNss(nss);
+    }
+
     std::vector<RemoteCursor> remoteCursors;
     std::set<HostAndPort> remotesToClean;
 

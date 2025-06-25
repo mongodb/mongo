@@ -512,6 +512,12 @@ StatusWith<CollectionRoutingInfo> CatalogCache::_getCollectionRoutingInfoAt(
     const NamespaceString& nss,
     boost::optional<Timestamp> optAtClusterTime,
     bool allowLocks) {
+    // We should never acquire a routing table for a collectionless aggregate, as the pipeline has
+    // no shards part to target.
+    tassert(10292500,
+            "Incorrectly attempted to acquire a CollectionRoutingInfo for a collectionless "
+            "aggregate, which is not a real namespace.",
+            !nss.isCollectionlessAggregateNS());
 
     auto swDbInfo = _getDatabaseForCollectionRoutingInfo(opCtx, nss, allowLocks);
     if (!swDbInfo.isOK()) {

@@ -213,7 +213,7 @@ std::unique_ptr<RoutingContext> CollectionRoutingInfoTargeter::_init(OperationCo
                     waitForDatabaseToBeDropped.pauseWhileSet(opCtx);
                 }
 
-                return uassertStatusOK(getRoutingContextForTxnCmd(opCtx, nss));
+                return uassertStatusOK(getRoutingContextForTxnCmd(opCtx, {nss}));
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 LOGV2_INFO(8314601,
                            "Failed initialization of routing info because the database has been "

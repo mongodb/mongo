@@ -264,13 +264,16 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
         }
 
         for (const auto& nss : involvedNamespaces) {
-            if (nss == executionNss)
+            if (nss == executionNss || nss.isCollectionlessAggregateNS())
                 continue;
 
-            // TODO SERVER-102925 Remove this once the RoutingContext is incorporated into sharded
-            // agg.
-            const auto resolvedNsCri =
-                uassertStatusOK(getCollectionRoutingInfoForTxnCmd_DEPRECATED(opCtx, nss));
+            // We acquire CRIs for each involved nss through the RoutingContext here, and will rely
+            // on whatever info is in the cached routing tables regardless of staleness. It is okay
+            // that we haven't validated the tables authoritatively against the shards because this
+            // function is only involved in metric tracking, but not query correctness, so it is
+            // permissible to see stale info.
+            auto resolvedNsCtx = uassertStatusOK(getRoutingContextForTxnCmd(opCtx, {nss}));
+            const auto& resolvedNsCri = resolvedNsCtx->getCollectionRoutingInfo(nss);
             if (resolvedNsCri.isSharded()) {
                 std::set<ShardId> shardIdsForNs;
                 // Note: It is fine to use 'getAllShardIds_UNSAFE_NotPointInTime' here because the
@@ -538,25 +541,30 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       boost::optional<ExplainOptions::Verbosity> verbosity,
                                       BSONObjBuilder* result) {
     return runAggregate(opCtx,
+                        nullptr /* RoutingContext */,
                         namespaces,
                         request,
                         liteParsedPipeline,
                         privileges,
-                        boost::none /*CollectionRoutingInfo*/,
                         boost::none /*ResolvedView*/,
                         verbosity,
                         result);
 }
 
 Status ClusterAggregate::runAggregate(OperationContext* opCtx,
+                                      RoutingContext* routingCtx,
                                       const Namespaces& namespaces,
                                       AggregateCommandRequest& request,
                                       const LiteParsedPipeline& liteParsedPipeline,
                                       const PrivilegeVector& privileges,
-                                      boost::optional<CollectionRoutingInfo> cri,
                                       boost::optional<ResolvedView> resolvedView,
                                       boost::optional<ExplainOptions::Verbosity> verbosity,
                                       BSONObjBuilder* result) {
+    // Perform RoutingContext termination validation at the end of this function if the caller
+    // didn't pass a RoutingContext in, i.e. it is created and owned by this function.
+    auto performRoutingCtxValidation = (routingCtx == nullptr);
+    std::unique_ptr<RoutingContext> ownedCtx;
+
     // Given that in single shard/sharded cluster unsharded collection scenarios the query doesn't
     // go through retryOnViewError mongos doesn't know it's running against a view, and then it
     // passes the desugared query to the shard, so the shard knows it is running against a view but
@@ -575,98 +583,113 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     performValidationChecks(opCtx, request, liteParsedPipeline);
 
     const auto isSharded = [](OperationContext* opCtx, const NamespaceString& nss) {
-        // TODO SERVER-102925 Remove this once the RoutingContext is incorporated into sharded agg.
-        auto criSW = getCollectionRoutingInfoForTxnCmd_DEPRECATED(opCtx, nss);
+        // Note that if this decision is stale, and a collection has transitioned from sharded to
+        // unsharded, we may uassert on valid pipelines with $out as it cannot output to sharded
+        // collections.
+        auto swRoutingCtx = getRoutingContextForTxnCmd(opCtx, {nss});
 
         // If the ns is not found we assume its unsharded. It might be implicitly created as
         // unsharded if this query does writes. An existing collection could also be concurrently
         // sharded in between here and lock acquisition elsewhere reguardless so shardedness still
         // needs to be checked after parsing too.
-        if (criSW.getStatus().code() == ErrorCodes::NamespaceNotFound) {
+        if (swRoutingCtx.getStatus() == ErrorCodes::NamespaceNotFound) {
             return false;
         }
-        const auto& cri = uassertStatusOK(criSW);
-        return cri.isSharded();
+        uassertStatusOK(swRoutingCtx.getStatus());
+        auto& routingCtx = swRoutingCtx.getValue();
+        return routingCtx->getCollectionRoutingInfo(nss).isSharded();
     };
-    bool isExplain = request.getExplain().get_value_or(false);
-    liteParsedPipeline.verifyIsSupported(opCtx, isSharded, isExplain);
-    auto hasChangeStream = liteParsedPipeline.hasChangeStream();
-    CurOp::get(opCtx)->debug().isChangeStreamQuery = hasChangeStream;
-    const auto& involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
-    bool shouldDoFLERewrite = request.getEncryptionInformation().has_value();
-    auto generatesOwnDataOnce = liteParsedPipeline.generatesOwnDataOnce();
-    auto requiresCollationForParsingUnshardedAggregate =
+
+    const auto isExplain = request.getExplain().get_value_or(false);
+    const auto hasChangeStream = liteParsedPipeline.hasChangeStream();
+    const auto shouldDoFLERewrite = request.getEncryptionInformation().has_value();
+    const auto generatesOwnDataOnce = liteParsedPipeline.generatesOwnDataOnce();
+    const auto requiresCollationForParsingUnshardedAggregate =
         liteParsedPipeline.requiresCollationForParsingUnshardedAggregate();
-    auto pipelineDataSource = hasChangeStream ? PipelineDataSource::kChangeStream
-        : generatesOwnDataOnce                ? PipelineDataSource::kGeneratesOwnDataOnce
-                                              : PipelineDataSource::kNormal;
+    CurOp::get(opCtx)->debug().isChangeStreamQuery = hasChangeStream;
+
+    liteParsedPipeline.verifyIsSupported(opCtx, isSharded, isExplain);
+
+    const auto& involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
+
+    const auto pipelineDataSource = hasChangeStream ? PipelineDataSource::kChangeStream
+        : generatesOwnDataOnce                      ? PipelineDataSource::kGeneratesOwnDataOnce
+                                                    : PipelineDataSource::kNormal;
 
     // If the routing table is not already taken by the higher level, fill it now.
-    if (!cri && !generatesOwnDataOnce) {
-        // If the routing table is valid, we obtain a reference to it. If the table is not valid,
-        // then either the database does not exist, or there are no shards in the cluster. In the
-        // latter case, we always return an empty cursor. In the former case, if the requested
-        // aggregation is a $changeStream, we allow the operation to continue so that stream cursors
-        // can be established on the given namespace before the database or collection is actually
-        // created. If the database does not exist and this is not a $changeStream, then we return
-        // an empty cursor.
-        auto executionNsRoutingInfoStatus =
-            sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, namespaces.executionNss);
+    auto cri = routingCtx
+        ? boost::make_optional(routingCtx->getCollectionRoutingInfo(namespaces.executionNss))
+        : boost::none;
 
-        if (!executionNsRoutingInfoStatus.isOK()) {
+    auto parseQueryStatsAndReturnEmptyResult = [&](const Status& status) -> Status {
+        try {
+            auto pipeline =
+                parsePipelineAndRegisterQueryStats(opCtx,
+                                                   involvedNamespaces,
+                                                   namespaces,
+                                                   request,
+                                                   cri,
+                                                   hasChangeStream,
+                                                   shouldDoFLERewrite,
+                                                   requiresCollationForParsingUnshardedAggregate,
+                                                   resolvedView,
+                                                   verbosity);
+
+            pipeline->validateCommon(false);
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+            // Ignore redundant NamespaceNotFound errors.
+            LOGV2_DEBUG(8396400,
+                        4,
+                        "Skipping query stats due to NamespaceNotFound",
+                        "status"_attr = ex.toStatus());
+        }
+
+        // If validation is ok, just return empty result
+        appendEmptyResultSetWithStatus(opCtx, namespaces.requestedNss, status, result);
+        return Status::OK();
+    };
+
+    if (!routingCtx) {
+        // If the routing table is valid, we obtain a reference to it. If the table is not
+        // valid, then either the database does not exist, or there are no shards in the
+        // cluster. In the latter case, we always return an empty cursor. In the former case, if
+        // the requested aggregation is a $changeStream, we allow the operation to continue so
+        // that stream cursors can be established on the given namespace before the database or
+        // collection is actually created. If the database does not exist and this is not a
+        // $changeStream, then we return an empty cursor.
+        auto swRoutingCtx =
+            sharded_agg_helpers::getExecutionNsRoutingCtx(opCtx, namespaces.executionNss);
+
+        if (!swRoutingCtx.isOK()) {
             uassert(CollectionUUIDMismatchInfo(request.getDbName(),
                                                *request.getCollectionUUID(),
                                                std::string{request.getNamespace().coll()},
                                                boost::none),
                     "Database does not exist",
-                    executionNsRoutingInfoStatus != ErrorCodes::NamespaceNotFound ||
-                        !request.getCollectionUUID());
+                    swRoutingCtx != ErrorCodes::NamespaceNotFound || !request.getCollectionUUID());
 
             if (liteParsedPipeline.startsWithCollStats()) {
-                uassertStatusOKWithContext(executionNsRoutingInfoStatus,
+                uassertStatusOKWithContext(swRoutingCtx.getStatus(),
                                            "Unable to retrieve information for $collStats stage");
             }
-        }
 
-        if (executionNsRoutingInfoStatus.isOK()) {
-            cri = executionNsRoutingInfoStatus.getValue();
-        } else if (!(hasChangeStream &&
-                     executionNsRoutingInfoStatus == ErrorCodes::NamespaceNotFound)) {
-            // To achieve parity with mongod-style responses, parse and validate the query
-            // even though the namespace is not found.
-            try {
-                auto pipeline = parsePipelineAndRegisterQueryStats(
-                    opCtx,
-                    involvedNamespaces,
-                    namespaces,
-                    request,
-                    cri,
-                    hasChangeStream,
-                    shouldDoFLERewrite,
-                    requiresCollationForParsingUnshardedAggregate,
-                    resolvedView,
-                    verbosity);
-                pipeline->validateCommon(false);
-            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-                LOGV2_DEBUG(8396400,
-                            4,
-                            "Skipping query stats due to NamespaceNotFound",
-                            "status"_attr = ex.toStatus());
-                // ignore redundant NamespaceNotFound errors.
+            if (hasChangeStream && swRoutingCtx == ErrorCodes::NamespaceNotFound) {
+                // Construct an empty RoutingContext for $changeStreams.
+                std::vector<NamespaceString> emptyNssList;
+                ownedCtx =
+                    std::make_unique<RoutingContext>(opCtx, emptyNssList, false /*allowLocks*/);
+                routingCtx = ownedCtx.get();
+            } else {
+                return parseQueryStatsAndReturnEmptyResult(swRoutingCtx.getStatus());
             }
-
-            // if validation is ok, just return empty result
-            appendEmptyResultSetWithStatus(
-                opCtx, namespaces.requestedNss, executionNsRoutingInfoStatus.getStatus(), result);
-            return Status::OK();
+        } else {
+            ownedCtx = std::move(swRoutingCtx.getValue());
+            routingCtx = ownedCtx.get();
+            if (routingCtx->hasNss(namespaces.executionNss)) {
+                cri = routingCtx->getCollectionRoutingInfo(namespaces.executionNss);
+            }
         }
     }
-
-    // We should never acquire a routing table for a collectionless aggregate, as the first stage
-    // generates its own data and has the pipeline has no shards part to target.
-    tassert(10337900,
-            "Cannot acquire a routing table for collectionless aggregate",
-            !(cri && generatesOwnDataOnce));
 
     // This is used later on as well.
     const auto routingTableIsAvailable = cri && cri->hasRoutingTable();
@@ -761,6 +784,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     auto targeter = cluster_aggregation_planner::AggregationTargeter::make(
         opCtx,
         std::move(pipeline),
+        namespaces.executionNss,
         cri,
         pipelineDataSource,
         request.getPassthroughToShard().has_value());
@@ -800,6 +824,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             switch (targeter.policy) {
                 case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::
                     kMongosRequired: {
+                    routingCtx->skipValidation();
                     // If this is an explain write the explain output and return.
                     auto expCtx = targeter.pipeline->getContext();
                     if (expCtx->getExplain()) {
@@ -829,6 +854,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                     const bool eligibleForSampling = !request.getExplain();
                     return cluster_aggregation_planner::dispatchPipelineAndMerge(
                         opCtx,
+                        *routingCtx,
                         std::move(targeter),
                         serializeForPassthrough(expCtx, request, namespaces.executionNss),
                         request.getCursor().getBatchSize().value_or(
@@ -854,6 +880,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
                     return cluster_aggregation_planner::runPipelineOnSpecificShardOnly(
                         expCtx,
+                        *routingCtx,
                         namespaces,
                         expCtx->getExplain(),
                         serializeForPassthrough(expCtx, request, namespaces.executionNss),
@@ -908,6 +935,13 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             }
             collectQueryStatsMongos(opCtx,
                                     std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
+        }
+
+        // Validate the RoutingContext in the current function if it was created and owned by this
+        // function, and not instantiated higher up the call stack by a parent function. In the
+        // latter case, the parent function will handle cleanup and terminiation validation.
+        if (performRoutingCtxValidation) {
+            routingCtx->validateOnContextEnd();
         }
     }
 
@@ -965,17 +999,18 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     //
     // In addition, we should be sure to remove the 'usesExtendedRange' value from the unpack stage,
     // since the value on the target shard may be different.
-    boost::optional<CollectionRoutingInfo> snapshotCri;
+    std::unique_ptr<RoutingContext> snapshotRoutingCtx;
     if (nsStruct.executionNss.isTimeseriesBucketsCollection()) {
         const TypeCollectionTimeseriesFields* timeseriesFields =
             [&]() -> const TypeCollectionTimeseriesFields* {
-            StatusWith<CollectionRoutingInfo> criSt =
-                sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, nsStruct.executionNss);
+            auto swRoutingCtx =
+                sharded_agg_helpers::getExecutionNsRoutingCtx(opCtx, nsStruct.executionNss);
 
-            if (criSt.isOK()) {
-                const CollectionRoutingInfo& cri = criSt.getValue();
+            if (swRoutingCtx.isOK()) {
+                const auto& cri =
+                    swRoutingCtx.getValue()->getCollectionRoutingInfo(nsStruct.executionNss);
                 if (cri.isSharded()) {
-                    snapshotCri = cri;
+                    snapshotRoutingCtx = std::move(swRoutingCtx.getValue());
                     return cri.getChunkManager().getTimeseriesFields().get_ptr();
                 }
             }
@@ -988,11 +1023,11 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     }
 
     auto status = ClusterAggregate::runAggregate(opCtx,
+                                                 snapshotRoutingCtx.get(),
                                                  nsStruct,
                                                  resolvedAggRequest,
                                                  LiteParsedPipeline(resolvedAggRequest, true),
                                                  privileges,
-                                                 snapshotCri,
                                                  boost::make_optional(resolvedView),
                                                  verbosity,
                                                  result);
@@ -1008,6 +1043,10 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
                                                   verbosity,
                                                   result,
                                                   numberRetries + 1);
+    }
+
+    if (snapshotRoutingCtx && status.isOK()) {
+        snapshotRoutingCtx->validateOnContextEnd();
     }
 
     return status;

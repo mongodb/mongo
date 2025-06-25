@@ -302,12 +302,8 @@ public:
                                         : BSONObj()});
 
                 if (timeseries::isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, cri)) {
-                    // TODO SERVER-102925 remove this once the RoutingContext is integrated into
-                    // Cluster::runAggregate() isEligibleForViewlessTimeseriesRewritesInRouter,
-                    // runDistinctAsAgg
-                    routingCtx.onRequestSentForNss(nss);
-
                     runDistinctAsAgg(opCtx,
+                                     routingCtx,
                                      std::move(canonicalQuery),
                                      boost::none /* resolvedView */,
                                      verbosity,
@@ -333,8 +329,12 @@ public:
                         const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>&
                             ex) {
                         const auto& resolvedView = *ex.extraInfo<ResolvedView>();
-                        runDistinctAsAgg(
-                            opCtx, std::move(canonicalQuery), resolvedView, verbosity, bodyBuilder);
+                        runDistinctAsAgg(opCtx,
+                                         routingCtx,
+                                         std::move(canonicalQuery),
+                                         resolvedView,
+                                         verbosity,
+                                         bodyBuilder);
                         return Status::OK();
                     }
                 }
@@ -415,10 +415,8 @@ public:
 
                 std::vector<AsyncRequestsSender::Response> shardResponses;
                 if (timeseries::isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, cri)) {
-                    // TODO SERVER-102925 remove this once the RoutingContext is integrated into
-                    // Cluster::runAggregate()
-                    routingCtx.onRequestSentForNss(nss);
                     runDistinctAsAgg(opCtx,
+                                     routingCtx,
                                      std::move(canonicalQuery),
                                      boost::none /* resolvedView */,
                                      boost::none /* verbosity */,
@@ -443,6 +441,7 @@ public:
                             ex) {
                         const auto& resolvedView = *ex.extraInfo<ResolvedView>();
                         runDistinctAsAgg(opCtx,
+                                         routingCtx,
                                          std::move(canonicalQuery),
                                          resolvedView,
                                          boost::none /* verbosity */,
@@ -527,6 +526,7 @@ public:
     }
 
     void runDistinctAsAgg(OperationContext* opCtx,
+                          RoutingContext& routingCtx,
                           std::unique_ptr<CanonicalQuery> canonicalQuery,
                           boost::optional<const ResolvedView&> resolvedView,
                           boost::optional<ExplainOptions::Verbosity> verbosity,
@@ -551,6 +551,7 @@ public:
         auto ownedQueryStatsKey = std::move(curOp->debug().queryStatsInfo.key);
         curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
 
+        // Skip privilege checking if we are in an explain.
         if (verbosity) {
             if (resolvedView.has_value()) {
                 // If running explain distinct on view, then aggregate is executed without privilege
@@ -562,13 +563,19 @@ public:
                                                                    PrivilegeVector(),
                                                                    verbosity,
                                                                    &bob));
+                // Skip routingCtx validation here as a new context and routing table will be
+                // acquired for the resolved view.
+                routingCtx.skipValidation();
             } else {
                 // Viewless timeseries, similar idea.
                 uassertStatusOK(
                     ClusterAggregate::runAggregate(opCtx,
+                                                   &routingCtx,
                                                    ClusterAggregate::Namespaces{nss, nss},
                                                    distinctAggRequest,
+                                                   {distinctAggRequest},
                                                    PrivilegeVector{},
+                                                   boost::none,
                                                    verbosity,
                                                    &bob));
             }
@@ -584,12 +591,18 @@ public:
             // Query against a view.
             uassertStatusOK(ClusterAggregate::retryOnViewError(
                 opCtx, distinctAggRequest, *resolvedView, nss, privileges, verbosity, &bob));
+            // Skip routingCtx validation here as new contexts and routing tables will be acquired
+            // for the resolved view.
+            routingCtx.skipValidation();
         } else {
             // Query against viewless timeseries.
             uassertStatusOK(ClusterAggregate::runAggregate(opCtx,
+                                                           &routingCtx,
                                                            ClusterAggregate::Namespaces{nss, nss},
                                                            distinctAggRequest,
+                                                           {distinctAggRequest},
                                                            privileges,
+                                                           boost::none,
                                                            verbosity,
                                                            &bob));
         }

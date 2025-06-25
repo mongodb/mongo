@@ -172,6 +172,7 @@ AsyncRequestsSender::Response establishMergingShardCursor(OperationContext* opCt
         {{mergingShardId, mergeCmdObj}},
         ReadPreferenceSetting::get(opCtx),
         sharded_agg_helpers::getDesiredRetryPolicy(opCtx));
+
     auto response = ars.next(true /* forMergeCursors*/);
     tassert(6273807,
             "requested and received data from just one shard, but results are still pending",
@@ -244,7 +245,7 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
                                      const ShardId& shardId,
                                      const std::vector<ShardId>& targetedShards,
                                      bool hasSpecificMergeShard,
-                                     const CollectionRoutingInfo& cri,
+                                     const boost::optional<CollectionRoutingInfo>& cri,
                                      bool mergingShardContributesData,
                                      const Pipeline* pipelineForMerging,
                                      bool requestQueryStatsFromRemotes) {
@@ -272,7 +273,7 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
             if (!mergeCtx->getIgnoreCollator()) {
                 return Value(mergeCtx->getCollator() ? mergeCtx->getCollator()->getSpec().toBSON()
                                                      : CollationSpec::kSimpleSpec);
-            } else if (!cri.hasRoutingTable() && !nss.isCollectionlessAggregateNS()) {
+            } else if (cri && !cri->hasRoutingTable()) {
                 // If we are dispatching a merging pipeline to a specific shard, and the main
                 // namespace is untracked, we must contact the primary shard to determine whether or
                 // not there exists a collection default collation. This is unfortunate, but
@@ -294,11 +295,11 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
                 tassert(8596500,
                         "Contacting primary shard for collation in unexpected case",
                         targetedShards.size() == 1 &&
-                            targetedShards[0] == cri.getDbPrimaryShardId() &&
+                            targetedShards[0] == cri->getDbPrimaryShardId() &&
                             hasSpecificMergeShard);
 
                 if (auto untrackedDefaultCollation =
-                        getUntrackedCollectionCollation(mergeCtx->getOperationContext(), cri, nss);
+                        getUntrackedCollectionCollation(mergeCtx->getOperationContext(), *cri, nss);
                     !untrackedDefaultCollation.isEmpty()) {
                     return Value(untrackedDefaultCollation);
                 }
@@ -362,10 +363,10 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
 }
 
 Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                               RoutingContext& routingCtx,
                                const ClusterAggregate::Namespaces& namespaces,
                                Document serializedCommand,
                                long long batchSize,
-                               const boost::optional<CollectionRoutingInfo>& cri,
                                DispatchShardPipelineResults shardDispatchResults,
                                BSONObjBuilder* result,
                                const PrivilegeVector& privileges,
@@ -407,23 +408,23 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
                                    requestQueryStatsFromRemotes);
     }
 
-    // If we are not merging on router, then this is not a $changeStream aggregation, and we
-    // therefore must have a valid routing table.
-    invariant(cri);
-
     const ShardId mergingShardId =
         pickMergingShard(opCtx, shardDispatchResults.mergeShardId, targetedShards);
     const bool mergingShardContributesData =
         std::find(targetedShards.begin(), targetedShards.end(), mergingShardId) !=
         targetedShards.end();
 
+    const auto cri = routingCtx.hasNss(namespaces.executionNss)
+        ? boost::optional<CollectionRoutingInfo>(
+              routingCtx.getCollectionRoutingInfo(namespaces.executionNss))
+        : boost::none;
     auto mergeCmdObj = createCommandForMergingShard(serializedCommand,
                                                     expCtx,
                                                     namespaces.requestedNss,
                                                     mergingShardId,
                                                     targetedShards,
                                                     shardDispatchResults.mergeShardId.has_value(),
-                                                    *cri,
+                                                    cri,
                                                     mergingShardContributesData,
                                                     mergePipeline,
                                                     requestQueryStatsFromRemotes);
@@ -607,6 +608,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
 
 DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    RoutingContext& routingCtx,
     const NamespaceString& executionNss,
     Document serializedCommand,
     DispatchShardPipelineResults* shardDispatchResults,
@@ -667,7 +669,8 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
                                     executionNss,
                                     ReadPreferenceSetting::get(opCtx),
                                     requests,
-                                    false /* do not allow partial results */);
+                                    false /* do not allow partial results */,
+                                    &routingCtx);
 
     // Convert remote cursors into a vector of "owned" cursors.
     std::vector<OwnedRemoteCursor> ownedCursors;
@@ -764,15 +767,16 @@ ClusterClientCursorGuard buildClusterCursor(OperationContext* opCtx,
 
 AggregationTargeter AggregationTargeter::make(OperationContext* opCtx,
                                               std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+                                              const NamespaceString& execNss,
                                               boost::optional<CollectionRoutingInfo> cri,
                                               PipelineDataSource pipelineDataSource,
                                               bool perShardCursor) {
     // TODO SERVER-97620 get this info from pipeline instead of passing in a separate field for it.
     tassert(7972401,
             "Aggregation did not have a routing table and does not feature either a $changeStream "
-            "or a stage marked as `kGeneratesOwnDataOnce`",
+            " or a collectionless aggregate.",
             cri || pipelineDataSource == PipelineDataSource::kChangeStream ||
-                pipelineDataSource == PipelineDataSource::kGeneratesOwnDataOnce);
+                execNss.isCollectionlessAggregateNS());
 
     auto policy = pipeline->requiredToRunOnRouter() ? TargetingPolicy::kMongosRequired
                                                     : TargetingPolicy::kAnyShard;
@@ -786,7 +790,8 @@ AggregationTargeter AggregationTargeter::make(OperationContext* opCtx,
     if (perShardCursor) {
         policy = TargetingPolicy::kSpecificShardOnly;
     }
-    return AggregationTargeter{policy, std::move(pipeline), cri};
+
+    return AggregationTargeter{policy, std::move(pipeline)};
 }
 
 Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
@@ -826,6 +831,7 @@ Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
 }
 
 Status dispatchPipelineAndMerge(OperationContext* opCtx,
+                                RoutingContext& routingCtx,
                                 AggregationTargeter targeter,
                                 Document serializedCommand,
                                 long long batchSize,
@@ -839,13 +845,14 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
 
     // If not, split the pipeline as necessary and dispatch to the relevant shards.
     auto shardDispatchResults =
-        sharded_agg_helpers::dispatchShardPipeline(serializedCommand,
+        sharded_agg_helpers::dispatchShardPipeline(routingCtx,
+                                                   serializedCommand,
                                                    pipelineDataSource,
                                                    eligibleForSampling,
                                                    std::move(targeter.pipeline),
                                                    expCtx->getExplain(),
-                                                   requestQueryStatsFromRemotes,
-                                                   targeter.cri);
+                                                   namespaces.executionNss,
+                                                   requestQueryStatsFromRemotes);
 
     // Check for valid usage of SEARCH_META. We wait until after we've dispatched pipelines to the
     // shards in the event that we need to resolve any views.
@@ -895,6 +902,7 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
     // If we have the exchange spec then dispatch all consumers.
     if (shardDispatchResults.exchangeSpec) {
         shardDispatchResults = dispatchExchangeConsumerPipeline(expCtx,
+                                                                routingCtx,
                                                                 namespaces.executionNss,
                                                                 serializedCommand,
                                                                 &shardDispatchResults,
@@ -905,10 +913,10 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
 
     // If we reach here, we have a merge pipeline to dispatch.
     return dispatchMergingPipeline(expCtx,
+                                   routingCtx,
                                    namespaces,
                                    serializedCommand,
                                    batchSize,
-                                   targeter.cri,
                                    std::move(shardDispatchResults),
                                    result,
                                    privileges,
@@ -946,6 +954,7 @@ BSONObj getCollation(OperationContext* opCtx,
 }
 
 Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                      RoutingContext& routingCtx,
                                       const ClusterAggregate::Namespaces& namespaces,
                                       boost::optional<ExplainOptions::Verbosity> explain,
                                       Document serializedCommand,
@@ -980,6 +989,11 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
         {{shardId, cmdObj}},
         ReadPreferenceSetting::get(opCtx),
         Shard::RetryPolicy::kIdempotent);
+
+    if (routingCtx.hasNss(namespaces.executionNss)) {
+        routingCtx.onRequestSentForNss(namespaces.executionNss);
+    }
+
     auto response = ars.next();
     tassert(6273806,
             "requested and received data from just one shard, but results are still pending",

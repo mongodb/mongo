@@ -240,8 +240,11 @@ boost::optional<ShardId> DocumentSourceGraphLookUp::computeMergeShardId() const 
     // Note that we can only check sharding state when we're on router as we may be holding
     // locks on mongod (which would inhibit looking up sharding state in the catalog cache).
     if (pExpCtx->getInRouter()) {
-        // Only nominate a merging shard if the outer collection is unsharded.
-        if (!pExpCtx->getMongoProcessInterface()->isSharded(pExpCtx->getOperationContext(),
+        // Only nominate a merging shard if the outer collection is unsharded, or if the pipeline is
+        // running as a collectionless aggregate (e.g. $documents is substituted for the "from"
+        // field).
+        if (pExpCtx->getNamespaceString().isCollectionlessAggregateNS() ||
+            !pExpCtx->getMongoProcessInterface()->isSharded(pExpCtx->getOperationContext(),
                                                             pExpCtx->getNamespaceString())) {
             return pExpCtx->getMongoProcessInterface()->determineSpecificMergeShard(
                 pExpCtx->getOperationContext(), _from);

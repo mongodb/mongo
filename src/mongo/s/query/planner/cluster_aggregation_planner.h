@@ -48,6 +48,7 @@
 #include "mongo/s/query/exec/cluster_client_cursor_impl.h"
 #include "mongo/s/query/exec/cluster_client_cursor_params.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
+#include "mongo/s/router_role.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/uuid.h"
 
@@ -102,6 +103,7 @@ struct AggregationTargeter {
      */
     static AggregationTargeter make(OperationContext* opCtx,
                                     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+                                    const NamespaceString& execNss,
                                     boost::optional<CollectionRoutingInfo> cri,
                                     sharded_agg_helpers::PipelineDataSource pipelineDataSource,
                                     bool perShardCursor);
@@ -113,7 +115,6 @@ struct AggregationTargeter {
     } policy;
 
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
-    boost::optional<CollectionRoutingInfo> cri;
 };
 
 /**
@@ -134,6 +135,7 @@ Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
  * query sampling enabled and the rate-limited sampler successfully generates a sample id for it.
  */
 Status dispatchPipelineAndMerge(OperationContext* opCtx,
+                                RoutingContext& routingCtx,
                                 AggregationTargeter targeter,
                                 Document serializedCommand,
                                 long long batchSize,
@@ -150,6 +152,7 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
  * mongod.
  */
 Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                      RoutingContext& routingCtx,
                                       const ClusterAggregate::Namespaces& namespaces,
                                       boost::optional<ExplainOptions::Verbosity> explain,
                                       Document serializedCommand,

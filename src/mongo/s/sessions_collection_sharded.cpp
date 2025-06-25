@@ -223,9 +223,9 @@ LogicalSessionIdSet SessionsCollectionSharded::findRemovedSessions(
         // Do the work to generate the first batch of results. This blocks waiting to get responses
         // from the shard(s).
         std::vector<BSONObj> batch;
-        CursorId cursorId;
-        cursorId = ClusterFind::runQuery(opCtx, *cq, ReadPreferenceSetting::get(opCtx), &batch);
 
+        auto cursorId =
+            ClusterFind::runQuery(opCtx, *cq, cq->nss(), ReadPreferenceSetting::get(opCtx), &batch);
         rpc::OpMsgReplyBuilder replyBuilder;
         CursorResponseBuilder::Options options;
         options.isInitialResponse = true;

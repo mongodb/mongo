@@ -48,6 +48,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/query/exec/owned_remote_cursor.h"
+#include "mongo/s/router_role.h"
 
 #include <cstddef>
 #include <memory>
@@ -142,13 +143,14 @@ enum class PipelineDataSource {
  * `dispatchShardPipeline`.
  */
 DispatchShardPipelineResults dispatchShardPipeline(
+    RoutingContext& routingCtx,
     Document serializedCommand,
     PipelineDataSource pipelineDataSource,
     bool eligibleForSampling,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     boost::optional<ExplainOptions::Verbosity> explain,
+    const NamespaceString& targetedNss,
     bool requestQueryStatsFromRemotes = false,
-    boost::optional<CollectionRoutingInfo> cri = boost::none,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
     boost::optional<BSONObj> readConcern = boost::none,
     AsyncRequestsSender::ShardHostMap designatedHostsMap = {},
@@ -206,8 +208,8 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
  * Returns 'ShardNotFound' or 'NamespaceNotFound' if there are no shards in the cluster or if
  * collection 'execNss' does not exist, respectively.
  */
-StatusWith<CollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* opCtx,
-                                                            const NamespaceString& execNss);
+StatusWith<std::unique_ptr<RoutingContext>> getExecutionNsRoutingCtx(
+    OperationContext* opCtx, const NamespaceString& execNss);
 
 /**
  * Returns true if an aggregation over 'nss' must run on all shards.

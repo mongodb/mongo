@@ -102,6 +102,7 @@ std::vector<RemoteCursor> establishCursors(
  */
 std::vector<RemoteCursor> establishCursorsOnAllHosts(
     OperationContext* opCtx,
+    RoutingContext& routingCtx,
     std::shared_ptr<executor::TaskExecutor> executor,
     const NamespaceString& nss,
     const std::set<ShardId>& shardIds,
