@@ -187,6 +187,22 @@ function mapListCatalogToListCollectionsEntry(listCatalogEntry, listCatalogMap, 
     }
 }
 
+/**
+ * Some `createIndexes` fields are of type `safeBool`, which accepts either a boolean or a number,
+ * and persist the value in the catalog. When retrieving it, `$listCatalog` returns the raw value,
+ * while `listIndexes` converts it to a boolean. This function replicates this logic.
+ */
+function safeBoolToBool(value) {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+    if (typeof value === 'number' || value instanceof NumberInt || value instanceof NumberLong ||
+        value instanceof NumberDecimal) {
+        return bsonWoCompare(value, 0) !== 0;  // 0 is false, any other value is true
+    }
+    assert(false, `Unexpected value for boolean-or-numeric field: ${tojsononeline(value)}`);
+}
+
 function mapListCatalogToListIndexesEntry(listCatalogEntry) {
     const indexes = listCatalogEntry.md.indexes.map(mdIndex => {
         const {
@@ -253,7 +269,7 @@ function mapListCatalogToListIndexesEntry(listCatalogEntry) {
             // TODO (SERVER-97749) Add the background field once it's properly handled.
             // Handle various mapping quirks of `listIndexes` vs the raw catalog. See also:
             // https://github.com/mongodb/mongo/blob/96893c43d288b84fccb4242b51c8d7c57df5887d/src/mongo/db/catalog/README.md#examples-of-differences-between-listindexes-and-listcatalog-results
-            ...(typeof mdIndexSpec.sparse === "number" && {sparse: mdIndexSpec.sparse !== 0}),
+            ...(mdIndexSpec.sparse !== undefined && {sparse: safeBoolToBool(mdIndexSpec.sparse)}),
             ...(typeof mdIndexSpec.bits === "number" && {bits: Math.floor(mdIndexSpec.bits)}),
             // For more details on the history and handling of NaN on TTL indexes, see:
             // https://www.mongodb.com/docs/v8.0/tutorial/expire-data/#indexes-configured-using-nan

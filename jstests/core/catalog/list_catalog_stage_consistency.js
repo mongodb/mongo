@@ -111,6 +111,8 @@ createIndexAndCheckConsistency(db.collection_simple, {fCompound1: -1, fCompound2
 createIndexAndCheckConsistency(db.collection_simple, {fUnique: 1}, {unique: true});
 createIndexAndCheckConsistency(db.collection_simple, {fSparse: 1}, {sparse: true});
 createIndexAndCheckConsistency(db.collection_simple, {fSparseNonBool: 1}, {sparse: 123.45});
+createIndexAndCheckConsistency(
+    db.collection_simple, {fSparseNumberLong: 1}, {sparse: NumberLong('1234567891011')});
 createIndexAndCheckConsistency(db.collection_simple, {fUnique: 1}, {unique: true});
 createIndexAndCheckConsistency(db.collection_simple, {fTtl: 1}, {expireAfterSeconds: 123});
 createIndexAndCheckConsistency(db.collection_simple, {fTtlNumber: 1}, {expireAfterSeconds: 123.45});
