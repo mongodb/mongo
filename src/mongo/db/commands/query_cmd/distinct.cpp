@@ -757,17 +757,13 @@ public:
         const auto& nss = canonicalQuery->nss();
         const auto& dbName = nss.dbName();
         const auto& vts = auth::ValidatedTenancyScope::get(opCtx);
-        const auto distinctAggCmd =
-            OpMsgRequestBuilder::create(
-                vts,
-                dbName,
-                uassertStatusOK(parsed_distinct_command::asAggregation(*canonicalQuery)))
-                .body;
         const auto serializationContext = vts != boost::none
             ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
             : SerializationContext::stateCommandRequest();
-        auto distinctAggRequest = aggregation_request_helper::parseFromBSON(
-            distinctAggCmd, vts, verbosity, serializationContext);
+
+        auto distinctAggRequest = parsed_distinct_command::asAggregation(
+            *canonicalQuery, verbosity, serializationContext);
+
         distinctAggRequest.setQuerySettings(canonicalQuery->getExpCtx()->getQuerySettings());
 
         auto curOp = CurOp::get(opCtx);
@@ -783,7 +779,7 @@ public:
             uassertStatusOK(runAggregate(opCtx,
                                          distinctAggRequest,
                                          {distinctAggRequest},
-                                         distinctAggCmd,
+                                         distinctAggRequest.toBSON(),
                                          PrivilegeVector(),
                                          verbosity,
                                          replyBuilder));
@@ -798,7 +794,7 @@ public:
         uassertStatusOK(runAggregate(opCtx,
                                      distinctAggRequest,
                                      {distinctAggRequest},
-                                     distinctAggCmd,
+                                     distinctAggRequest.toBSON(),
                                      privileges,
                                      verbosity,
                                      replyBuilder));

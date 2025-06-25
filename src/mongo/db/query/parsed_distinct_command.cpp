@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/parsed_distinct_command.h"
 
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -80,20 +81,23 @@ std::string getProjectedDottedField(const std::string& field, bool* isIDOut) {
  * Add the stages that pull all values along a path and puts them into an array. Includes the
  * necessary unwind stage that can turn those into individual documents.
  */
-void addReplaceRootForDistinct(BSONArrayBuilder* pipelineBuilder, const FieldPath& path) {
-    BSONObjBuilder reshapeStageBuilder(pipelineBuilder->subobjStart());
+std::vector<BSONObj> addReplaceRootForDistinct(const FieldPath& path) {
+    std::vector<BSONObj> pipeline;
+    BSONObjBuilder reshapeStageBuilder;
     reshapeStageBuilder.append(
         DocumentSourceReplaceRoot::kStageName,
         BSON("newRoot" << BSON(CanonicalDistinct::kUnwoundArrayFieldForViewUnwind
                                << BSON("$_internalFindAllValuesAtPath" << path.fullPath()))));
-    reshapeStageBuilder.doneFast();
-    BSONObjBuilder unwindStageBuilder(pipelineBuilder->subobjStart());
+    pipeline.push_back(reshapeStageBuilder.obj());
+    BSONObjBuilder unwindStageBuilder;
     {
         BSONObjBuilder unwindBuilder(unwindStageBuilder.subobjStart("$unwind"));
         unwindBuilder.append(
             "path", str::stream() << "$" << CanonicalDistinct::kUnwoundArrayFieldForViewUnwind);
         unwindBuilder.append("preserveNullAndEmptyArrays", true);
     }
+    pipeline.push_back(unwindStageBuilder.obj());
+    return pipeline;
 }
 
 std::unique_ptr<CollatorInterface> resolveCollator(OperationContext* opCtx,
@@ -157,16 +161,15 @@ std::unique_ptr<ParsedDistinctCommand> parse(
     return parsedDistinct;
 }
 
-StatusWith<BSONObj> asAggregation(const CanonicalQuery& query) {
+AggregateCommandRequest asAggregation(const CanonicalQuery& query,
+                                      boost::optional<ExplainOptions::Verbosity> verbosity,
+                                      const SerializationContext& serializationContext) {
     tassert(9245502, "Expected distinct property on CanonicalQuery", query.getDistinct());
-
-    BSONObjBuilder aggregationBuilder;
 
     const FindCommandRequest& findCommand = query.getFindCommandRequest();
     tassert(ErrorCodes::BadValue,
             "Unsupported type UUID for namespace",
             findCommand.getNamespaceOrUUID().isNamespaceString());
-    aggregationBuilder.append("aggregate", findCommand.getNamespaceOrUUID().nss().coll());
 
     // Build a pipeline that accomplishes the distinct request. The building code constructs a
     // pipeline that looks like this, assuming the distinct is on the key "a.b.c"
@@ -182,17 +185,19 @@ StatusWith<BSONObj> asAggregation(const CanonicalQuery& query) {
     // where there is an array along the distinct path. For example, if we're distincting on "a.b"
     // and have a document like {a: [{b: 1}, {b: 2}]}, distinct() should produce two values: 1
     // and 2.
-    BSONArrayBuilder pipelineBuilder(aggregationBuilder.subarrayStart("pipeline"));
+    std::vector<BSONObj> pipeline;
+
     if (!findCommand.getFilter().isEmpty()) {
-        BSONObjBuilder matchStageBuilder(pipelineBuilder.subobjStart());
+        BSONObjBuilder matchStageBuilder;
         matchStageBuilder.append("$match", findCommand.getFilter());
-        matchStageBuilder.doneFast();
+        pipeline.push_back(matchStageBuilder.obj());
     }
 
     FieldPath path(query.getDistinct()->getKey());
-    addReplaceRootForDistinct(&pipelineBuilder, path);
+    const auto next_pipeline = addReplaceRootForDistinct(path);
+    pipeline.insert(pipeline.end(), next_pipeline.begin(), next_pipeline.end());
 
-    BSONObjBuilder groupStageBuilder(pipelineBuilder.subobjStart());
+    BSONObjBuilder groupStageBuilder;
     {
         BSONObjBuilder groupBuilder(groupStageBuilder.subobjStart("$group"));
         groupBuilder.appendNull("_id");
@@ -205,30 +210,38 @@ StatusWith<BSONObj> asAggregation(const CanonicalQuery& query) {
         }
         groupBuilder.doneFast();
     }
-    groupStageBuilder.doneFast();
-    pipelineBuilder.doneFast();
+    pipeline.push_back(groupStageBuilder.obj());
 
-    aggregationBuilder.append(CanonicalDistinct::kCollationField, findCommand.getCollation());
-    aggregationBuilder.append(CanonicalDistinct::kHintField, findCommand.getHint());
+    AggregateCommandRequest aggregateRequest(
+        query.nss(), std::move(pipeline), serializationContext);
+
+    aggregateRequest.setCollation(findCommand.getCollation());
+    aggregateRequest.setHint(findCommand.getHint());
+
 
     int maxTimeMS = findCommand.getMaxTimeMS() ? static_cast<int>(*findCommand.getMaxTimeMS()) : 0;
     if (maxTimeMS > 0) {
-        aggregationBuilder.append(query_request_helper::cmdOptionMaxTimeMS, maxTimeMS);
+        aggregateRequest.setMaxTimeMS(maxTimeMS);
     }
 
     if (const auto& rc = findCommand.getReadConcern(); rc && !rc->isEmpty()) {
-        aggregationBuilder.append(repl::ReadConcernArgs::kReadConcernFieldName, rc->toBSONInner());
+        aggregateRequest.setReadConcern(rc);
     }
 
     if (findCommand.getUnwrappedReadPref() && !findCommand.getUnwrappedReadPref()->isEmpty()) {
-        aggregationBuilder.append(query_request_helper::kUnwrappedReadPrefField,
-                                  *findCommand.getUnwrappedReadPref());
+        aggregateRequest.setUnwrappedReadPref(findCommand.getUnwrappedReadPref());
     }
 
     // Specify the 'cursor' option so that aggregation uses the cursor interface.
-    aggregationBuilder.append("cursor", BSONObj());
+    aggregateRequest.setCursor(mongo::SimpleCursorOptions(serializationContext));
 
-    return aggregationBuilder.obj();
+    aggregateRequest.setDbName(query.nss().dbName());
+
+    if (verbosity) {
+        aggregateRequest.setExplain(true);
+    }
+
+    return aggregateRequest;
 }
 
 std::unique_ptr<CanonicalQuery> parseCanonicalQuery(

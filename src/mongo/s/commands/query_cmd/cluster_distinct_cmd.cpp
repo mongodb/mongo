@@ -533,16 +533,8 @@ public:
                           BSONObjBuilder& bob) const {
         const auto& nss = canonicalQuery->nss();
         const auto& dbName = nss.dbName();
-        const auto& vts = auth::ValidatedTenancyScope::get(opCtx);
-        const auto distinctAggCmd =
-            OpMsgRequestBuilder::create(
-                vts,
-                dbName,
-                uassertStatusOK(parsed_distinct_command::asAggregation(*canonicalQuery)))
-                .body;
-        auto distinctAggRequest = aggregation_request_helper::parseFromBSON(
-            distinctAggCmd,
-            vts,
+        auto distinctAggRequest = parsed_distinct_command::asAggregation(
+            *canonicalQuery,
             verbosity,
             canonicalQuery->getFindCommandRequest().getSerializationContext());
 
