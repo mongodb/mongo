@@ -323,6 +323,39 @@ void populateCollectionUUIDMismatch(OperationContext* opCtx,
                                     boost::optional<std::string>* actualCollection,
                                     bool* hasContactedPrimaryShard);
 
+class BatchCommandSizeEstimatorBase {
+public:
+    BatchCommandSizeEstimatorBase() = default;
+    virtual ~BatchCommandSizeEstimatorBase() = default;
+
+    virtual int getBaseSizeEstimate() const = 0;
+    virtual int getOpSizeEstimate(int opIdx, const ShardId& shard) const = 0;
+    virtual void addOpToBatch(int opIdx, const ShardId& shard) = 0;
+
+protected:
+    // Copy/move constructors and assignment operators are declared protected to prevent slicing.
+    // Derived classes can supply public copy/move constructors and assignment operators if desired.
+    BatchCommandSizeEstimatorBase(const BatchCommandSizeEstimatorBase&) = default;
+    BatchCommandSizeEstimatorBase(BatchCommandSizeEstimatorBase&&) = default;
+    BatchCommandSizeEstimatorBase& operator=(const BatchCommandSizeEstimatorBase&) = default;
+    BatchCommandSizeEstimatorBase& operator=(BatchCommandSizeEstimatorBase&&) = default;
+};
+
+class BatchedCommandSizeEstimator final : public BatchCommandSizeEstimatorBase {
+public:
+    explicit BatchedCommandSizeEstimator(OperationContext* opCtx,
+                                         const BatchedCommandRequest& clientRequest);
+
+    int getBaseSizeEstimate() const final;
+    int getOpSizeEstimate(int opIdx, const ShardId& shardId) const final;
+    void addOpToBatch(int opIdx, const ShardId& shardId) final {}
+
+private:
+    const BatchedCommandRequest& _clientRequest;
+    const bool _isRetryableWriteOrInTransaction;
+    const int _baseSizeEstimate;
+};
+
 // Helper function to target ready writeOps. See BatchWriteOp::targetBatch for details.
 StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
                                      std::vector<WriteOp>& writeOps,
@@ -330,7 +363,6 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
                                      bool recordTargetErrors,
                                      PauseMigrationsDuringMultiUpdatesEnablement& pauseMigrations,
                                      GetTargeterFn getTargeterFn,
-                                     GetWriteSizeFn getWriteSizeFn,
-                                     int baseCommandSizeBytes,
+                                     BatchCommandSizeEstimatorBase& sizeEstimator,
                                      TargetedBatchMap& batchMap);
 }  // namespace mongo

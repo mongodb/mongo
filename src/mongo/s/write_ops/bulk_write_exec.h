@@ -140,6 +140,27 @@ BulkWriteCommandReply createEmulatedErrorReply(const Status& error,
                                                int errorCount,
                                                const boost::optional<TenantId>& tenantId);
 
+class BulkCommandSizeEstimator final : public BatchCommandSizeEstimatorBase {
+public:
+    explicit BulkCommandSizeEstimator(OperationContext* opCtx,
+                                      const BulkWriteCommandRequest& clientRequest);
+
+    int getBaseSizeEstimate() const final;
+    int getOpSizeEstimate(int opIdx, const ShardId& shardId) const final;
+    void addOpToBatch(int opIdx, const ShardId& shardId) final;
+
+private:
+    const BulkWriteCommandRequest& _clientRequest;
+    const bool _isRetryableWriteOrInTransaction;
+    const int _baseSizeEstimate;
+
+    // targetWriteOps() can target writes to different shards which will end up being executed
+    // inside different child batches. We need to keep a map of shardId to a set of all of the
+    // nsInfo indexes we have account for the size of. We only want to count each nsInfoIdx once
+    // per child batch.
+    absl::flat_hash_map<ShardId, absl::flat_hash_set<int>> _accountedForNsInfos;
+};
+
 /**
  * The BulkWriteOp class manages the lifecycle of a bulkWrite request received by mongos. Each op in
  * the ops array is tracked via a WriteOp, and the function of the BulkWriteOp is to aggregate the
@@ -335,13 +356,6 @@ public:
      * from all shards. If no write concern errors exist, returns boost::none.
      */
     boost::optional<BulkWriteWriteConcernError> generateWriteConcernError() const;
-
-    /**
-     * Calculates an estimate of the size, in bytes, required to store the common fields that will
-     * go into each child batch command sent to a shard, i.e. all fields besides the actual write
-     * ops.
-     */
-    int getBaseChildBatchCommandSizeEstimate() const;
 
     const BulkWriteCommandRequest& getClientRequest() const {
         return _clientRequest;

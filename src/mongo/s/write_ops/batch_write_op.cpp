@@ -121,65 +121,82 @@ bool wasShardAlreadyTargetedWithDifferentShardVersion(
 }
 
 /**
- * Helper to determine whether a number of targeted writes require a new targeted batch.
+ * Helper to determine whether 'twResult' can be included in the current batch or whether
+ * 'twResult' requires a new batch.
+ *
+ * Returns true if 'twResult' requires a new batch, otherwise returns false.
  */
-bool isNewBatchRequiredOrdered(
+bool isCompatibleWithBatch(
+    bool ordered,
     const NamespaceString& nss,
-    const std::vector<std::unique_ptr<TargetedWrite>>& writes,
+    const WriteOp::TargetWritesResult& twResult,
+    boost::optional<WriteType> batchType,
     const TargetedBatchMap& batchMap,
     const std::map<NamespaceString, std::set<ShardId>>& nsShardIdMap,
     const std::map<NamespaceString, std::set<const ShardEndpoint*, EndpointComp>>& nsEndpointMap) {
-    // If this write targets a different shard, it needs to go in a different batch.
-    for (auto&& write : writes) {
-        if (batchMap.find(write->endpoint.shardName) == batchMap.end()) {
-            LOGV2_DEBUG(9986803,
-                        5,
-                        "New batch required as this write targets a different shard",
-                        "shard"_attr = write->endpoint.shardName);
-            return true;
+    // If 'twResult.writeType' is different than the current batch's WriteType, then 'twResult'
+    // cannot be added to the current batch. Also, if 'twResult.writeType' doesn't support grouping,
+    // then 'twResult' cannot be added to the current batch because it must be in a batch by itself.
+    if (batchType &&
+        (twResult.writeType != *batchType || !writeTypeSupportsGrouping(twResult.writeType))) {
+        return false;
+    }
+
+    // If writes are ordered and we have a targeted endpoint, then check if 'twResult.writes'
+    // contains targeted writes to any other endpoints. If so, then we need a new batch.
+    if (ordered && !batchMap.empty()) {
+        dassert(batchMap.size() == 1u);
+
+        for (auto&& write : twResult.writes) {
+            if (batchMap.find(write->endpoint.shardName) == batchMap.end()) {
+                LOGV2_DEBUG(9986803,
+                            5,
+                            "New batch required as this write targets a different shard",
+                            "shard"_attr = write->endpoint.shardName);
+                return false;
+            }
         }
     }
 
-    // If we already targeted this shard with a different shard version, then we also need a new
-    // batch.
-    return wasShardAlreadyTargetedWithDifferentShardVersion(
-        nss, writes, nsShardIdMap, nsEndpointMap);
-}
-
-bool isNewBatchRequiredUnordered(
-    const NamespaceString& nss,
-    const std::vector<std::unique_ptr<TargetedWrite>>& writes,
-    const std::map<NamespaceString, std::set<ShardId>>& nsShardIdMap,
-    const std::map<NamespaceString, std::set<const ShardEndpoint*, EndpointComp>>& nsEndpointMap) {
-    return wasShardAlreadyTargetedWithDifferentShardVersion(
-        nss, writes, nsShardIdMap, nsEndpointMap);
+    // If we already targeted any shard with a different shard version, then we need a new batch.
+    return !wasShardAlreadyTargetedWithDifferentShardVersion(
+        nss, twResult.writes, nsShardIdMap, nsEndpointMap);
 }
 
 /**
- * Helper to determine whether a number of targeted writes require a new targeted batch.
+ * Helper to determine whether there is room to add a given op to the current btach.
  */
-bool wouldMakeBatchesTooBig(const std::vector<std::unique_ptr<TargetedWrite>>& writes,
-                            const TargetedBatchMap& batchMap) {
+bool wouldFitInBatch(OperationContext* opCtx,
+                     std::vector<std::unique_ptr<TargetedWrite>>& writes,
+                     const TargetedBatchMap& batchMap,
+                     int opIdx,
+                     BatchCommandSizeEstimatorBase& sizeEstimator,
+                     std::vector<int>& estSizesForOpsOut) {
+    estSizesForOpsOut.clear();
+
     for (auto&& write : writes) {
-        TargetedBatchMap::const_iterator it = batchMap.find(write->endpoint.shardName);
+        const ShardId& shardId = write->endpoint.shardName;
+
+        int estSizeBytesForWrite = sizeEstimator.getOpSizeEstimate(opIdx, shardId);
+        estSizesForOpsOut.push_back(estSizeBytesForWrite);
+
+        TargetedBatchMap::const_iterator it = batchMap.find(shardId);
         if (it == batchMap.end()) {
             // If this is the first item in the batch, it can't be too big
             continue;
         }
 
-        if (it->second->getNumOps() >= write_ops::kMaxWriteBatchSize) {
-            // Too many items in batch
-            return true;
-        }
+        invariant(estSizeBytesForWrite > 0);
 
-        invariant(write->estimatedSizeBytes > 0);
-        if (it->second->getEstimatedSizeBytes() + write->estimatedSizeBytes > BSONObjMaxUserSize) {
-            // Batch would be too big
-            return true;
+        if (it->second->getNumOps() >= write_ops::kMaxWriteBatchSize ||
+            it->second->getEstimatedSizeBytes() + estSizeBytesForWrite > BSONObjMaxUserSize) {
+            // Too many items in batch, or batch would be too big
+            LOGV2_DEBUG(9986804, 5, "Write is too large to include in the current batch");
+            return false;
         }
     }
 
-    return false;
+    return true;
 }
 
 /**
@@ -309,8 +326,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
                                      bool recordTargetErrors,
                                      PauseMigrationsDuringMultiUpdatesEnablement& pauseMigrations,
                                      GetTargeterFn getTargeterFn,
-                                     GetWriteSizeFn getWriteSizeFn,
-                                     int baseCommandSizeBytes,
+                                     BatchCommandSizeEstimatorBase& sizeEstimator,
                                      TargetedBatchMap& batchMap) {
     //
     // Targeting of unordered batches is fairly simple - each remaining write op is targeted,
@@ -353,16 +369,23 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
     // Returns WriteType::WriteWithoutShardKeyWithId if there is any write of that type in the
     // batch. We send WriteType::WriteWithoutShardKeyWithId in batches of only such writes.
 
-    boost::optional<WriteType> writeType;
-
+    boost::optional<WriteType> batchType;
     std::map<NamespaceString, std::set<const ShardEndpoint*, EndpointComp>> nsEndpointMap;
     std::map<NamespaceString, std::set<ShardId>> nsShardIdMap;
+    std::vector<int> estSizesForOps;
 
     for (auto& writeOp : writeOps) {
-        // If the previous iteration encountered a write that doesn't support grouping (such as
-        // WithoutShardKeyOrId or TimeseriesRetryableUpdate), then that write should be sent in
-        // its own batch.
-        if (writeType && !writeTypeSupportsGrouping(*writeType)) {
+        // If 'ordered' is true and a previous iteration targeted more than one endpoint, then it's
+        // not possible to add more WriteOps to the batch, because we wouldn't be able to ensure
+        // that all the WriteOps executed in order (because order can't be enforced across shards).
+        //
+        // Likewise, if the previous iteration encountered a write that doesn't support grouping
+        // (such as WithoutShardKeyOrId or TimeseriesRetryableUpdate), then it's not possible to
+        // add more WriteOps to the batch.
+        //
+        // If either of these conditions is true, then we must end the batch here.
+        if ((ordered && batchMap.size() > 1u) ||
+            (batchType && !writeTypeSupportsGrouping(*batchType))) {
             break;
         }
 
@@ -427,7 +450,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
                 writeOp.setOpError(targetError);
 
                 if (ordered) {
-                    return writeType ? *writeType : WriteType::Ordinary;
+                    return batchType ? *batchType : WriteType::Ordinary;
                 }
 
                 continue;
@@ -441,40 +464,24 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             }
         }
 
-        // Set up a guard so that 'writeOp' will be reset to "ready" if we exit this block
-        // before 'finishedProcessingWriteOp' gets set to true.
-        bool finishedProcessingWriteOp = false;
-        ON_BLOCK_EXIT([&] {
-            if (!finishedProcessingWriteOp) {
-                writeOp.resetWriteToReady(opCtx);
-            }
-        });
+        const NamespaceString& nss = targeter.getNS();
+        const int opIdx = writeOp.getWriteItem().getItemIndex();
+        estSizesForOps.clear();
 
-        // If writes are ordered and we have a targeted endpoint, make sure we don't need to send
-        // these targeted writes to any other endpoints.
-        if (ordered && !batchMap.empty()) {
-            dassert(batchMap.size() == 1u);
-            if (isNewBatchRequiredOrdered(
-                    targeter.getNS(), result.writes, batchMap, nsShardIdMap, nsEndpointMap)) {
-                break;
-            }
-        }
+        // Check if 'writeOp' is compatible with the other WriteOps in this batch and check if
+        // it can fit in this batch.
+        const bool canBeAddedToBatch =
+            isCompatibleWithBatch(
+                ordered, nss, result, batchType, batchMap, nsShardIdMap, nsEndpointMap) &&
+            wouldFitInBatch(opCtx, result.writes, batchMap, opIdx, sizeEstimator, estSizesForOps);
 
-        // If writes are unordered and we already have targeted endpoints, make sure we don't target
-        // the same shard with a different shardVersion. We can continue to look for the next writes
-        // that can still be included in the same batch.
-        if (!ordered &&
-            isNewBatchRequiredUnordered(
-                targeter.getNS(), result.writes, nsShardIdMap, nsEndpointMap)) {
-            continue;
-        }
-
-        // If the WriteType of 'writeOp' is different than the current batch's WriteType, then
-        // 'writeOp' cannot be added to the current batch. Also, if 'writeOp' doesn't support
-        // grouping, then 'writeOp' cannot be added to the current batch because it must be in
-        // a batch by itself.
-        if (writeType &&
-            (result.writeType != *writeType || !writeTypeSupportsGrouping(result.writeType))) {
+        // Handle the case where 'writeOp' cannot be added to the current batch.
+        if (!canBeAddedToBatch) {
+            // We're not including 'writeOp' in this batch, so reset its state to "ready".
+            writeOp.resetWriteToReady(opCtx);
+            // If 'ordered' is true, then we must end the batch here to ensure that all of
+            // the WriteOps executed in order. If 'ordered' is false, we can continue to look
+            // for other WriteOps to include in this batch.
             if (ordered) {
                 break;
             } else {
@@ -482,51 +489,72 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             }
         }
 
-        // Call the getWriteSizeFn() callback to get the estimated size for each TargetedWrite.
-        // The getWriteSizeFn() callback may be stateful, so once it is called we are committed
-        // to either adding the WriteOp in the batch or stopping the batch here and breaking
-        // (i.e. "continue" is not allowed after this point).
-        for (auto&& write : result.writes) {
-            write->estimatedSizeBytes = getWriteSizeFn(writeOp, write->endpoint.shardName);
-        }
-
-        if (wouldMakeBatchesTooBig(result.writes, batchMap)) {
-            invariant(!batchMap.empty());
-            LOGV2_DEBUG(9986804, 5, "Making a new batch to avoid making batch size too large");
-            break;
-        }
-
-        // Targeting succeeded.
-        writeType = result.writeType;
+        // Targeting succeeded and 'writeOp' can be added to the current batch.
+        batchType = result.writeType;
         writeOp.setWriteType(result.writeType);
-        finishedProcessingWriteOp = true;
 
         // Add each TargetedWrite to the appropriate TargetedBatch.
-        for (auto&& write : result.writes) {
+        size_t sz = result.writes.size();
+        for (size_t i = 0; i < sz; ++i) {
+            auto& write = result.writes[i];
+
             const auto& shardId = write->endpoint.shardName;
             TargetedBatchMap::iterator batchIt = batchMap.find(shardId);
             if (batchIt == batchMap.end()) {
-                auto newBatch = std::make_unique<TargetedWriteBatch>(shardId, baseCommandSizeBytes);
+                auto newBatch = std::make_unique<TargetedWriteBatch>(
+                    shardId, sizeEstimator.getBaseSizeEstimate());
                 batchIt = batchMap.emplace(shardId, std::move(newBatch)).first;
             }
 
-            nsEndpointMap[targeter.getNS()].insert(&write->endpoint);
-            nsShardIdMap[targeter.getNS()].insert(shardId);
+            nsEndpointMap[nss].insert(&write->endpoint);
+            nsShardIdMap[nss].insert(shardId);
 
-            auto estWriteSizeBytes = write->estimatedSizeBytes;
+            // Add this op to the appropriate targeted batch.
+            batchIt->second->addWrite(std::move(write), estSizesForOps[i]);
 
-            batchIt->second->addWrite(std::move(write), estWriteSizeBytes);
+            // Inform 'sizeEstimator' that this op has been included.
+            sizeEstimator.addOpToBatch(opIdx, shardId);
         }
         LOGV2_DEBUG(9986807, 5, "Targeting complete for child batch to shard");
-
-        // Break if we're ordered and we have more than one endpoint - later writes cannot be
-        // enforced as ordered across multiple shard endpoints.
-        if (ordered && batchMap.size() > 1u) {
-            break;
-        }
     }
 
-    return writeType ? *writeType : WriteType::Ordinary;
+    return batchType ? *batchType : WriteType::Ordinary;
+}
+
+BatchedCommandSizeEstimator::BatchedCommandSizeEstimator(OperationContext* opCtx,
+                                                         const BatchedCommandRequest& clientRequest)
+    : _clientRequest(clientRequest),
+      _isRetryableWriteOrInTransaction(opCtx->getTxnNumber().has_value()),
+      _baseSizeEstimate(clientRequest.getBaseCommandSizeEstimate(opCtx)) {}
+
+int BatchedCommandSizeEstimator::getBaseSizeEstimate() const {
+    return _baseSizeEstimate;
+}
+
+int BatchedCommandSizeEstimator::getOpSizeEstimate(int opIdx, const ShardId& shardId) const {
+    // If retryable writes are used, MongoS needs to send an additional array of stmtId(s)
+    // corresponding to the statements that got routed to each individual shard, so they
+    // need to be accounted in the potential request size so it does not exceed the max BSON
+    // size.
+    const int writeSizeBytes = BatchItemRef(&_clientRequest, opIdx).getSizeForBatchWriteBytes() +
+        getEncryptionInformationSize(_clientRequest) +
+        write_ops::kWriteCommandBSONArrayPerElementOverheadBytes +
+        (_isRetryableWriteOrInTransaction
+             ? write_ops::kStmtIdSize + write_ops::kWriteCommandBSONArrayPerElementOverheadBytes
+             : 0);
+
+    // For unordered writes, the router must return an entry for each failed write. This
+    // constant is a pessimistic attempt to ensure that if a request to a shard hits
+    // "retargeting needed" error and has to return number of errors equivalent to the
+    // number of writes in the batch, the response size will not exceed the max BSON size.
+    //
+    // The constant of 272 is chosen as an approximation of the size of the BSON
+    // representation of the StaleConfigInfo (which contains the shard id) and the adjacent
+    // error message.
+    const bool ordered = _clientRequest.getWriteCommandRequestBase().getOrdered();
+    const int errorResponsePotentialSizeBytes =
+        ordered ? 0 : write_ops::kWriteCommandBSONArrayPerElementOverheadBytes + 272;
+    return std::max(writeSizeBytes, errorResponsePotentialSizeBytes);
 }
 
 BatchWriteOp::BatchWriteOp(OperationContext* opCtx, const BatchedCommandRequest& clientRequest)
@@ -547,40 +575,16 @@ StatusWith<WriteType> BatchWriteOp::targetBatch(const NSTargeter& targeter,
                                                 TargetedBatchMap* targetedBatches) {
     const bool ordered = _clientRequest.getWriteCommandRequestBase().getOrdered();
 
+    BatchedCommandSizeEstimator sizeEstimator(_opCtx, _clientRequest);
+
     auto targetStatus = targetWriteOps(
         _opCtx,
         _writeOps,
         ordered,
         recordTargetErrors,
         _pauseMigrationsDuringMultiUpdatesParameter,
-        // getTargeterFn:
         [&](const WriteOp& writeOp) -> const NSTargeter& { return targeter; },
-        // assignWriteSizeFn:
-        [&](const WriteOp& writeOp, ShardId& shard) {
-            // If retryable writes are used, MongoS needs to send an additional array of stmtId(s)
-            // corresponding to the statements that got routed to each individual shard, so they
-            // need to be accounted in the potential request size so it does not exceed the max BSON
-            // size.
-            const int writeSizeBytes = writeOp.getWriteItem().getSizeForBatchWriteBytes() +
-                getEncryptionInformationSize(_clientRequest) +
-                write_ops::kWriteCommandBSONArrayPerElementOverheadBytes +
-                (_batchTxnNum ? write_ops::kStmtIdSize +
-                         write_ops::kWriteCommandBSONArrayPerElementOverheadBytes
-                              : 0);
-
-            // For unordered writes, the router must return an entry for each failed write. This
-            // constant is a pessimistic attempt to ensure that if a request to a shard hits
-            // "retargeting needed" error and has to return number of errors equivalent to the
-            // number of writes in the batch, the response size will not exceed the max BSON size.
-            //
-            // The constant of 272 is chosen as an approximation of the size of the BSON
-            // representation of the StaleConfigInfo (which contains the shard id) and the adjacent
-            // error message.
-            const int errorResponsePotentialSizeBytes =
-                ordered ? 0 : write_ops::kWriteCommandBSONArrayPerElementOverheadBytes + 272;
-            return std::max(writeSizeBytes, errorResponsePotentialSizeBytes);
-        },
-        _clientRequest.getBaseCommandSizeEstimate(_opCtx),
+        sizeEstimator,
         *targetedBatches);
 
     if (!targetStatus.isOK()) {

@@ -355,7 +355,7 @@ struct TargetedWrite {
     TargetedWrite(const ShardEndpoint& endpoint,
                   WriteOpRef writeOpRef,
                   boost::optional<UUID> sampleId)
-        : endpoint(endpoint), writeOpRef(writeOpRef), estimatedSizeBytes(0), sampleId(sampleId) {}
+        : endpoint(endpoint), writeOpRef(writeOpRef), sampleId(sampleId) {}
 
     // Where to send the write
     ShardEndpoint endpoint;
@@ -364,10 +364,6 @@ struct TargetedWrite {
     // TODO: Could be a more complex handle, shared between write state and networking code if
     // we need to be able to cancel ops.
     WriteOpRef writeOpRef;
-
-    // An approximation of how large the write is in bytes. Initially 0 but will be set by calling
-    // AssignWriteSizeFn on a write during targetWriteOps.
-    int estimatedSizeBytes;
 
     // The unique sample id for the write if it has been chosen for sampling.
     boost::optional<UUID> sampleId;
