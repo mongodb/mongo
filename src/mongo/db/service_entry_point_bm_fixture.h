@@ -62,16 +62,18 @@ public:
 
         ReadWriteConcernDefaults::create(service, _lookupMock.getFetchDefaultsFn());
         _lookupMock.setLookupCallReturnValue({});
-        doConfigureServiceContext(sc);
+        setUpServiceContext(sc);
     }
 
     void tearDownSharedResources(benchmark::State& state) override {
+        tearDownServiceContext(getGlobalServiceContext());
         setGlobalServiceContext({});
         BenchmarkWithProfiler::tearDownSharedResources(state);
     }
 
-    /** Any custom service context setup, including attaching a ServiceEntryPoint. */
-    virtual void doConfigureServiceContext(ServiceContext* sc) = 0;
+    /** Any custom service context setup and teardown, such as attaching a ServiceEntryPoint. */
+    virtual void setUpServiceContext(ServiceContext*) {}
+    virtual void tearDownServiceContext(ServiceContext*) {}
 
     virtual ClusterRole getClusterRole() const = 0;
 
@@ -111,10 +113,10 @@ private:
  * With sanitizers, run this in a diminished "correctness check" mode.
  */
 #if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
-const auto kSEPBMMaxThreads = 1;
+const auto kCommandBMMaxThreads = 1;
 #else
 /** 2x to benchmark the case of more threads than cores for curiosity's sake. */
-const auto kSEPBMMaxThreads = 2 * ProcessInfo::getNumLogicalCores();
+const auto kCommandBMMaxThreads = 2 * ProcessInfo::getNumLogicalCores();
 #endif
 
 

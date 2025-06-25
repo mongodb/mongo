@@ -4367,6 +4367,38 @@ mongo_cc_benchmark(
 )
 
 mongo_cc_benchmark(
+    name = "find_one_bm",
+    srcs = [
+        "find_one_bm.cpp",
+        "service_entry_point_bm_fixture.h",
+    ],
+    tags = ["sep_bm"],
+    deps = [
+        ":mongod_options_init",
+        ":read_write_concern_defaults_mock",
+        ":server_base",
+        ":service_context_d",
+        ":shard_role_api",
+        ":vector_clock_mongod",
+        "//src/mongo/db/auth:authserver",
+        "//src/mongo/db/catalog:catalog_impl",
+        "//src/mongo/db/catalog:database_holder",
+        "//src/mongo/db/commands:standalone",
+        "//src/mongo/db/index_builds:index_builds_coordinator_mongod",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/repl:repl_coordinator_impl",
+        "//src/mongo/db/repl:serveronly_repl",
+        "//src/mongo/db/repl:storage_interface_impl",
+        "//src/mongo/db/s:sharding_runtime_d",
+        "//src/mongo/db/storage:storage_control",
+        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/unittest:benchmark_util",
+        "//src/mongo/util:periodic_runner_factory",
+    ],
+)
+
+mongo_cc_benchmark(
     name = "collection_acquisition_bm",
     srcs = [
         "collection_acquisition_bm.cpp",

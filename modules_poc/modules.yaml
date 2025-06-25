@@ -31,6 +31,7 @@ core:
     - src/mongo/util/
     - src/mongo/db/catalog/util/partitioned*
     - src/mongo/db/field_parser[._]*
+    - src/mongo/db/find_one_bm.cpp
     - src/mongo/db/generic_argument_util.*
     - src/mongo/db/nesting_depth_test.cpp
     - src/mongo/db/operation_killer.*

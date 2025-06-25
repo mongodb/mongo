@@ -37,7 +37,7 @@ namespace mongo {
 
 class ServiceEntryPointShardRoleBenchmarkFixture : public ServiceEntryPointBenchmarkFixture {
 public:
-    void doConfigureServiceContext(ServiceContext* sc) override {
+    void setUpServiceContext(ServiceContext* sc) override {
         auto replCoordMock = std::make_unique<repl::ReplicationCoordinatorMock>(sc);
         // Transition to primary so that the server can accept writes.
         invariant(replCoordMock->setFollowerMode(repl::MemberState::RS_PRIMARY));
@@ -57,6 +57,6 @@ BENCHMARK_DEFINE_F(ServiceEntryPointShardRoleBenchmarkFixture, BM_SEP_PING)
 }
 
 BENCHMARK_REGISTER_F(ServiceEntryPointShardRoleBenchmarkFixture, BM_SEP_PING)
-    ->ThreadRange(1, kSEPBMMaxThreads);
+    ->ThreadRange(1, kCommandBMMaxThreads);
 
 }  // namespace mongo

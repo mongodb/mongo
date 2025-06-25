@@ -326,3 +326,6 @@ filters:
   - "cursor_in_use_info*":
     approvers:
       - 10gen/query-execution
+  - "find_one_bm*":
+    approvers:
+      - 10gen/performance
