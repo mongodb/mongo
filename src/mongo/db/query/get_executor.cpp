@@ -58,6 +58,7 @@
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/eof.h"
 #include "mongo/db/exec/express/plan_executor_express.h"
+#include "mongo/db/exec/multi_plan_rate_limiter.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/record_store_fast_count.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
@@ -1483,6 +1484,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
             } catch (const ExceptionFor<ErrorCodes::RetryMultiPlanning>&) {
                 // Propagate the params to the next iteration.
                 paramsForSingleCollectionQuery = makeQueryPlannerParams(plannerOptions);
+                canonicalQuery->getExpCtx()->setWasRateLimited(true);
             }
         }
         tasserted(8712800, "Exceeded retry iterations for making a planner");

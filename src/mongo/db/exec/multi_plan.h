@@ -31,6 +31,7 @@
 
 
 #include "mongo/base/status.h"
+#include "mongo/db/exec/multi_plan_rate_limiter.h"
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -197,6 +198,12 @@ private:
      * Throws an exception if yield recovery fails.
      */
     void tryYield(PlanYieldPolicy* yieldPolicy);
+
+    /**
+     * Controls the number of threads concurrently multiplanning for the same shape. More details
+     * can be found in multi_plan_rate_limiter.h.
+     */
+    MultiPlanTicket rateLimit(PlanYieldPolicy* yieldPolicy, size_t candidatesSize);
 
     /**
      * Deletes all children, except for best and backup plans.

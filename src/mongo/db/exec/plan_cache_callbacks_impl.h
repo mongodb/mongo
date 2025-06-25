@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/exec/multi_plan_bucket.h"
+#include "mongo/db/exec/multi_plan_rate_limiter.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/plan_cache/plan_cache_callbacks.h"
 #include "mongo/db/query/plan_cache/plan_cache_log_utils.h"
@@ -116,8 +116,16 @@ public:
         tassert(1003137, "oldEntry is expected to have non zero works", oldEntry->readsOrWorks);
         auto&& [planCacheShapeHash, planCacheKey] = hashes(key, oldEntry);
 
-        if (_collection) {
-            MultiPlanBucket::release(key.toString(), _collection);
+        auto* serviceContext = getCurrentServiceContext();
+        if (serviceContext) {
+            /*
+             * Since the plan cache entry is now active, multiplanning will be skipped the next time
+             * the query shape is encountered  and the cached plan will be immediately trialed. For
+             * this reason, the query shape can be removed from the data structure maintaining the
+             * rate limited query shapes.
+             */
+            MultiPlanRateLimiter::get(serviceContext)
+                .removeQueryShapeFromMultiPlanRateLimiter(_collection, key.toString());
         }
 
         if (oldEntry->cachedPlan->solutionHash != newPlan.solutionHash) {

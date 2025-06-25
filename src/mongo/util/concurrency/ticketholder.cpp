@@ -73,6 +73,9 @@ bool TicketHolder::resize(OperationContext* opCtx, int32_t newSize, Date_t deadl
                     _outof.fetchAndAdd(1);
                 }
             } else {
+                tassert(10330200,
+                        "TicketHolder: OperationContext must be provided for gradual resize",
+                        opCtx);
                 // Make sure the operation isn't interrupted before waiting for tickets.
                 opCtx->checkForInterrupt();
                 // Take tickets one-by-one without releasing.

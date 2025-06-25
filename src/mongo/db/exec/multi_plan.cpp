@@ -34,7 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/exec/histogram_server_status_metric.h"
-#include "mongo/db/exec/multi_plan_bucket.h"
+#include "mongo/db/exec/multi_plan_rate_limiter.h"
 #include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collection_query_info.h"
@@ -69,7 +69,6 @@
 
 
 namespace mongo {
-
 using std::unique_ptr;
 
 // static
@@ -243,39 +242,53 @@ void MultiPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
     }
 }
 
+MultiPlanTicket MultiPlanStage::rateLimit(PlanYieldPolicy* yieldPolicy,
+                                          const size_t candidatesSize) {
+    auto& rateLimiter = MultiPlanRateLimiter::get(opCtx()->getServiceContext());
+
+    auto ticketManager =
+        rateLimiter.getTicketManager(opCtx(), collectionPtr(), *_query, candidatesSize);
+    // Attempt to acquire tickets immediately without waiting.
+    auto ticket = ticketManager.tryAcquire();
+    if (!ticket) {
+        // Tickets were not immediately required. We will yield all resources/relinquish all locks
+        // and then wait for tickets. When tickets are available, the locks will be reacquired
+        // and then multiplanning will resume.
+        auto whileYieldingFn = [&ticketManager, &ticket] {
+            ticket = ticketManager.waitForTicket();
+        };
+        uassertStatusOK(yieldPolicy->yieldOrInterrupt(
+            expCtx()->getOperationContext(), whileYieldingFn, RestoreContext::RestoreType::kYield));
+    }
+    tassert(10330201, "A multi-plan ticket must be obtained to proceed", ticket.has_value());
+    return std::move(ticket.value());
+}
+
 Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
-    static AtomicWord<long> concurrentMultiPlansCounter = 0;
     if (bestPlanChosen()) {
         return Status::OK();
     }
 
-    boost::optional<MultiPlanTokens> tokens{};
-
     const size_t candidatesSize = _candidates.size();
 
-    const auto concurrentMultiPlanJobs = concurrentMultiPlansCounter.addAndFetch(candidatesSize);
-    ON_BLOCK_EXIT(
-        [candidatesSize]() { concurrentMultiPlansCounter.subtractAndFetch(candidatesSize); });
+    const auto concurrentMultiPlanJobs =
+        MultiPlanRateLimiter::concurrentMultiPlansCounter.addAndFetch(candidatesSize);
+    ON_BLOCK_EXIT([candidatesSize]() {
+        MultiPlanRateLimiter::concurrentMultiPlansCounter.subtractAndFetch(candidatesSize);
+    });
 
+    boost::optional<MultiPlanTicket> multiPlanTicket{};
     if (feature_flags::gfeatureFlagMultiPlanLimiter.isEnabled() &&
-        concurrentMultiPlanJobs > internalQueryConcurrentMultiPlanningThreshold.load()) {
-        auto planCacheKey = plan_cache_key_factory::make<PlanCacheKey>(*_query, collectionPtr());
-        auto bucket = MultiPlanBucket::get(planCacheKey, collectionPtr());
-
-        // If no token is available, the thread can wait here for some time.
-        LOGV2_DEBUG(8712801, 5, "Obtaining multiplanning rate limiter tokens");
-        tokens = bucket->getTokens(_candidates.size(), yieldPolicy, opCtx());
-        if (!tokens) {
-            LOGV2_DEBUG(8712802,
-                        1,
-                        "Not enough multiplanning rate limiter tokens were available, retrying");
-            return Status(ErrorCodes::RetryMultiPlanning,
-                          "Too many multi plans running for the same shape");
+        concurrentMultiPlanJobs > internalQueryConcurrentMultiPlanningThreshold.load() &&
+        yieldPolicy->canAutoYield()) {
+        multiPlanTicket = rateLimit(yieldPolicy, candidatesSize);
+        if (!expCtx()->wasRateLimited() && multiPlanTicket->isTicketHolderReleased()) {
+            // A ticket holder is usually released when the corresponing plan cache entry has been
+            // created.
+            // If the query has already been rate-limited it means that the plan cache entry was
+            // created and invalidated so we just continue with multi-planning.
+            return Status(ErrorCodes::RetryMultiPlanning, "Retry planning");
         }
-
-        LOGV2_DEBUG(8712803,
-                    1,
-                    "Multiplanning rate limiter tokens are available, continue multiplanning...");
     }
 
     if (MONGO_unlikely(sleepWhileMultiplanning.shouldFail())) {

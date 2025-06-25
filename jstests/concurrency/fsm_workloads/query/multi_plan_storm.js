@@ -28,6 +28,7 @@ export const $config = (function() {
             const count = db[collName]
                               .aggregate([{$match: {a: {$gt: x}, b: {$gt: y}, c: {$lt: z}}}])
                               .itcount();
+            const docs = db[collName].find({a: {$gt: x}, b: {$gt: y}, c: {$lt: z}}).toArray();
         }
     };
 
@@ -77,13 +78,13 @@ export const $config = (function() {
     function teardown(db, collName, cluster) {
         let rateLimiterAllowedCount = 0;
         let rateLimiterDelayedCount = 0;
-        let rateLimiterRefusedCount = 0;
+        let rateLimiterReleasedCount = 0;
 
         cluster.executeOnMongodNodes(db => {
             const rateLimiterMetrics = db.serverStatus().metrics.query.multiPlanner.rateLimiter;
             rateLimiterAllowedCount += rateLimiterMetrics.allowed;
             rateLimiterDelayedCount += rateLimiterMetrics.delayed;
-            rateLimiterRefusedCount += rateLimiterMetrics.refused;
+            rateLimiterReleasedCount += rateLimiterMetrics.released;
 
             assert.commandWorked(db.adminCommand({
                 setParameter: 1,
@@ -99,15 +100,18 @@ export const $config = (function() {
         });
 
         jsTest.log(`Rate Limiter metrics: allowed=${rateLimiterAllowedCount}, delayed=${
-            rateLimiterDelayedCount}, refused=${rateLimiterRefusedCount}`);
+            rateLimiterDelayedCount}, released=${rateLimiterReleasedCount}`);
 
-        assert.gt(rateLimiterAllowedCount, 0);
-        assert.gte(rateLimiterDelayedCount, 0);
-        assert.gte(rateLimiterRefusedCount, 0);
+        // In case of multi-document transaction all metrics rate-limiting metrics will be 0.
+        if (rateLimiterAllowedCount + rateLimiterDelayedCount + rateLimiterReleasedCount > 0) {
+            assert.gt(rateLimiterAllowedCount, 0);
+            assert.gte(rateLimiterDelayedCount, 0);
+            assert.gte(rateLimiterReleasedCount, 0);
+        }
     }
 
     return {
-        threadCount: 20,
+        threadCount: 50,
         iterations: 2,
         states: states,
         startState: 'query',

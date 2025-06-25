@@ -1017,6 +1017,14 @@ public:
         return _params.requiresTimeseriesExtendedRangeSupport;
     }
 
+    void setWasRateLimited(bool v) {
+        _params.wasRateLimited = v;
+    }
+
+    bool wasRateLimited() const {
+        return _params.wasRateLimited;
+    }
+
 protected:
     struct ExpressionContextParams {
         OperationContext* opCtx = nullptr;
@@ -1144,6 +1152,9 @@ protected:
         bool isRankFusion = false;
 
         bool requiresTimeseriesExtendedRangeSupport = false;
+
+        // Indicates that the query is replanned after being rate-limited.
+        bool wasRateLimited = false;
     };
 
     ExpressionContextParams _params;
