@@ -251,6 +251,9 @@ TEST_F(DatabaseTest, CreateCollectionReportsCatalogIdentifier) {
 }
 
 TEST_F(DatabaseTest, CreateCollectionDoesNotReportCatalogIdentifierForVirtualCollection) {
+    RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
+        "featureFlagReplicateLocalCatalogIdentifiers", true);
+
     // Register an OpObserver to validate the collection isn't persisted in the local catalog and
     // thus does not generate a 'CreateCollCatalogIdentifier'.
     auto createOpObserver =
@@ -266,6 +269,7 @@ TEST_F(DatabaseTest, CreateCollectionDoesNotReportCatalogIdentifierForVirtualCol
     collectionOptions.setNoIdIndex();
 
     auto opCtx = _opCtx.get();
+    repl::UnreplicatedWritesBlock uwb(opCtx);  // virtual collections are standalone-only
     writeConflictRetry(opCtx, "testNoCatalogIdentifierForVirtualColl", _nss, [&] {
         WriteUnitOfWork wuow(opCtx);
         AutoGetDb autoDb(opCtx, _nss.dbName(), MODE_X);
