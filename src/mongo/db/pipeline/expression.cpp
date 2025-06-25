@@ -2767,12 +2767,14 @@ intrusive_ptr<Expression> ExpressionFilter::optimize() {
 
 Value ExpressionFilter::serialize(const SerializationOptions& options) const {
     if (_limit) {
-        return Value(DOC("$filter" << DOC("input" << _input->serialize(options) << "as" << _varName
-                                                  << "cond" << _cond->serialize(options) << "limit"
+        return Value(DOC("$filter" << DOC("input" << _input->serialize(options) << "as"
+                                                  << options.serializeIdentifier(_varName) << "cond"
+                                                  << _cond->serialize(options) << "limit"
                                                   << (*_limit)->serialize(options))));
     }
-    return Value(DOC("$filter" << DOC("input" << _input->serialize(options) << "as" << _varName
-                                              << "cond" << _cond->serialize(options))));
+    return Value(DOC("$filter" << DOC("input" << _input->serialize(options) << "as"
+                                              << options.serializeIdentifier(_varName) << "cond"
+                                              << _cond->serialize(options))));
 }
 
 Value ExpressionFilter::evaluate(const Document& root, Variables* variables) const {
@@ -3071,7 +3073,8 @@ intrusive_ptr<Expression> ExpressionMap::optimize() {
 }
 
 Value ExpressionMap::serialize(const SerializationOptions& options) const {
-    return Value(DOC("$map" << DOC("input" << _input->serialize(options) << "as" << _varName << "in"
+    return Value(DOC("$map" << DOC("input" << _input->serialize(options) << "as"
+                                           << options.serializeIdentifier(_varName) << "in"
                                            << _each->serialize(options))));
 }
 
