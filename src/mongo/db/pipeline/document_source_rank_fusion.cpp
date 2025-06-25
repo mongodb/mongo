@@ -107,6 +107,10 @@ static void rankFusionBsonPipelineValidator(const std::vector<BSONObj>& pipeline
             rankPipelineMsg,
         !hybrid_scoring_util::isHybridSearchPipeline(pipeline));
 
+    uassert(10614800,
+            "$rankFusion input pipelines must not contain a $score stage.",
+            !hybrid_scoring_util::pipelineContainsScoreStage(pipeline));
+
     auto rankedPipelineStatus = hybrid_scoring_util::isRankedPipeline(pipeline);
     if (!rankedPipelineStatus.isOK()) {
         uasserted(9191100, rankedPipelineStatus.reason() + " " + rankPipelineMsg);

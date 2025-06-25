@@ -104,6 +104,11 @@ Status isScoredPipeline(const std::vector<BSONObj>& bsonPipeline,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 /**
+ * Returns true if the BSON pipeline contains a $score stage.
+ */
+bool pipelineContainsScoreStage(const std::vector<BSONObj>& bsonPipeline);
+
+/**
  * Returns true if the BSON contains a $scoreFusion or $rankFusion and false otherwise.
  */
 bool isHybridSearchPipeline(const std::vector<BSONObj>& bsonPipeline);

@@ -330,6 +330,15 @@ Status isRankedPipeline(const std::vector<BSONObj>& bsonPipeline) {
                  "stage.");
 }
 
+bool pipelineContainsScoreStage(const std::vector<BSONObj>& bsonPipeline) {
+    // Check if the pipeline has an explicit $score stage.
+    bool hasScoreStage = std::any_of(bsonPipeline.begin(), bsonPipeline.end(), [](auto&& stage) {
+        return stage.hasField(DocumentSourceScore::kStageName);
+    });
+
+    return hasScoreStage;
+}
+
 Status isScoredPipeline(const std::vector<BSONObj>& bsonPipeline,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     if (bsonPipeline.empty()) {
@@ -361,12 +370,7 @@ Status isScoredPipeline(const std::vector<BSONObj>& bsonPipeline,
     bool firstStageIsImplicitlyScored = !firstStage.isEmpty() &&
         implicitlyScoredStages.contains(*firstStage.getFieldNames<std::set<std::string>>().begin());
 
-    // Check if the pipeline has an explicit $score stage.
-    bool hasScoreStage = std::any_of(bsonPipeline.begin(), bsonPipeline.end(), [](auto&& stage) {
-        return stage.hasField(DocumentSourceScore::kStageName);
-    });
-
-    return firstStageIsImplicitlyScored || hasScoreStage
+    return firstStageIsImplicitlyScored || pipelineContainsScoreStage(bsonPipeline)
         ? Status::OK()
         : Status(
               ErrorCodes::Error::BadValue,

@@ -74,3 +74,43 @@ assert.commandFailedWithCode(
         }
     }]),
     10170100);
+
+// Check that $score is not an allowed stage in $rankFusion.
+assert.commandFailedWithCode(
+    runPipeline([{
+        $rankFusion: {
+            input: {pipelines: {scoreInputPipeline: [{$score: {score: "$_id"}}, {$sort: {_id: 1}}]}}
+        }
+    }]),
+    10614800);
+assert.commandFailedWithCode(
+    runPipeline([{
+        $rankFusion: {
+            input: {pipelines: {scoreInputPipeline: [{$sort: {_id: 1}}, {$score: {score: "$_id"}}]}}
+        }
+    }]),
+    10614800);
+assert.commandFailedWithCode(
+    runPipeline([{
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    scoreInputPipeline1: [{$score: {score: "$_id"}}, {$sort: {_id: 1}}],
+                    scoreInputPipeline2: [{$sort: {_id: 1}}]
+                }
+            }
+        }
+    }]),
+    10614800);
+assert.commandFailedWithCode(
+    runPipeline([{
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    scoreInputPipeline1: [{$sort: {_id: 1}}],
+                    scoreInputPipeline2: [{$score: {score: "$_id"}}, {$sort: {_id: 1}}]
+                }
+            }
+        }
+    }]),
+    10614800);

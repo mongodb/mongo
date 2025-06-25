@@ -539,5 +539,44 @@ TEST(BsonPipelineIsHybridSearchPipeline, NonHybridSearchStages) {
     })")};
     ASSERT_FALSE(hybrid_scoring_util::isHybridSearchPipeline(otherStagesPipeline));
 }
+
+TEST(BsonPipelineContainsScoreStage, PipelineContainsScoreStage) {
+    std::vector<BSONObj> noScoreStagePipeline = {fromjson(R"(
+        {
+            $match: {a: {gte: 5}}
+        })"),
+                                                 fromjson(R"({
+            $limit: 10
+        })"),
+                                                 fromjson(R"({
+            $sort: {a: -1}
+    })")};
+    ASSERT_FALSE(hybrid_scoring_util::pipelineContainsScoreStage(noScoreStagePipeline));
+
+    std::vector<BSONObj> scoreStagePipeline = {fromjson(R"(
+        {
+            $match: {a: {gte: 5}}
+        })"),
+                                               fromjson(R"({
+            $score: {score: 10}
+        })"),
+                                               fromjson(R"({
+            $sort: {a: -1}
+    })")};
+    ASSERT_TRUE(hybrid_scoring_util::pipelineContainsScoreStage(scoreStagePipeline));
+
+    std::vector<BSONObj> scoreStageFirstPipeline = {fromjson(R"({
+            $score: {score: 10}
+        })"),
+                                                    fromjson(R"(
+        {
+            $match: {a: {gte: 5}}
+        })"),
+                                                    fromjson(R"({
+            $sort: {a: -1}
+    })")};
+    ASSERT_TRUE(hybrid_scoring_util::pipelineContainsScoreStage(scoreStageFirstPipeline));
+}
+
 }  // namespace
 }  // namespace mongo

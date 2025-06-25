@@ -331,6 +331,26 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedRankFusionPipeline) {
                        10473002);
 }
 
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfScoreStageInInputPipeline) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    agatha: [
+                        { $score: {
+                            score: 10
+                        } }
+                    ]
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       10614800);
+}
+
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedScoreFusionPipeline) {
     auto spec = fromjson(R"({
         $rankFusion: {
