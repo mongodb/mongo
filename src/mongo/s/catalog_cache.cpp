@@ -65,10 +65,6 @@ MONGO_FAIL_POINT_DEFINE(blockDatabaseCacheLookup);
 // information loaded from the config server is found to be inconsistent.
 const int kMaxInconsistentCollectionRefreshAttempts = 3;
 
-const int kDatabaseCacheSize = 10000;
-const int kCollectionCacheSize = 10000;
-const int kIndexCacheSize = 10000;
-
 const OperationContext::Decoration<bool> operationShouldBlockBehindCatalogCacheRefresh =
     OperationContext::declareDecoration<bool>();
 
@@ -851,7 +847,7 @@ CatalogCache::DatabaseCache::DatabaseCache(ServiceContext* service,
                  const ComparableDatabaseVersion& previousDbVersion) {
               return _lookupDatabase(opCtx, dbName, db, previousDbVersion);
           },
-          kDatabaseCacheSize),
+          gCatalogCacheDatabaseMaxEntries),
       _catalogCacheLoader(catalogCacheLoader) {}
 
 CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDatabase(
@@ -914,7 +910,7 @@ CatalogCache::CollectionCache::CollectionCache(ServiceContext* service,
                  const ComparableChunkVersion& previousChunkVersion) {
               return _lookupCollection(opCtx, nss, collectionHistory, previousChunkVersion);
           },
-          kCollectionCacheSize),
+          gCatalogCacheCollectionMaxEntries),
       _catalogCacheLoader(catalogCacheLoader) {}
 
 void CatalogCache::CollectionCache::reportStats(BSONObjBuilder* builder) const {
@@ -1050,7 +1046,7 @@ CatalogCache::IndexCache::IndexCache(ServiceContext* service, ThreadPoolInterfac
                  const ComparableIndexVersion& previousIndexVersion) {
               return _lookupIndexes(opCtx, nss, indexes, previousIndexVersion);
           },
-          kIndexCacheSize) {}
+          gCatalogCacheIndexMaxEntries) {}
 
 CatalogCache::IndexCache::LookupResult CatalogCache::IndexCache::_lookupIndexes(
     OperationContext* opCtx,
