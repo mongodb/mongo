@@ -1,3 +1,4 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_library", "symlink")
 load("//bazel/config:generate_config_header.bzl", "generate_config_header")
 load(
@@ -14,6 +15,14 @@ load(
 )
 
 package(default_visibility = ["//visibility:public"])
+
+selects.config_setting_group(
+    name = "windows_tcmalloc_gperf_enabled",
+    match_all = [
+        "@platforms//os:windows",
+        "//bazel/config:tcmalloc_gperf_enabled",
+    ],
+)
 
 WT_DEFINES = [
     "HAVE_VERBOSE",
@@ -34,6 +43,9 @@ WT_DEFINES = [
     "//conditions:default": ["HAVE_LIBTCMALLOC"],
 }) + select({
     "@platforms//os:linux": ["_GNU_SOURCE"],
+    "//conditions:default": [],
+}) + select({
+    ":windows_tcmalloc_gperf_enabled": ["ENABLE_WINDOWS_TCMALLOC_COMMUNITY_SUPPORT"],
     "//conditions:default": [],
 })
 
