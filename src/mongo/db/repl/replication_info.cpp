@@ -462,8 +462,10 @@ public:
         const auto internalClient = cmd.getInternalClient();
         const bool isInternalClient = internalClient.has_value();
 
+        bool isInitialHandshake = false;
         if (ClientMetadata::tryFinalize(client)) {
             // This is the first hello for this client.
+            isInitialHandshake = true;
             audit::logClientMetadata(client);
             if (!isInternalClient) {
                 DirectShardClientTracker::trackClient(client);
@@ -628,7 +630,7 @@ public:
             }
         }
 
-        handleHelloAuth(opCtx, dbName, cmd, &result);
+        handleHelloAuth(opCtx, dbName, cmd, isInitialHandshake, &result);
 
         if (getTestCommandsEnabled()) {
             validateResult(&result);

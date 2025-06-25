@@ -39,6 +39,7 @@
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/commands/authentication_commands.h"
+#include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -46,11 +47,14 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
+
 namespace mongo {
 
 void handleHelloAuth(OperationContext* opCtx,
                      const DatabaseName& dbName,
                      const HelloCommand& cmd,
+                     const bool isInitialHandshake,
                      BSONObjBuilder* result) {
     // saslSupportedMechs: UserName -> List[String]
     if (auto userNameVariant = cmd.getSaslSupportedMechs()) {
@@ -62,6 +66,13 @@ void handleHelloAuth(OperationContext* opCtx,
                 auto& saslMechanismRegistry = SASLServerMechanismRegistry::get(opCtx->getService());
                 saslMechanismRegistry.advertiseMechanismNamesForUser(opCtx, userName, result);
             });
+    } else if (isInitialHandshake && gEnableDetailedConnectionHealthMetricLogLines.load()) {
+        auto client = opCtx->getClient();
+        auto metadata = ClientMetadata::get(client);
+        LOGV2(10483900,
+              "Connection not authenticating",
+              "client"_attr = client->getRemote(),
+              "doc"_attr = metadata ? metadata->getDocument() : BSONObj());
     }
 
     // speculativeAuthenticate: SaslStart -> SaslReply or Authenticate -> AuthenticateReply

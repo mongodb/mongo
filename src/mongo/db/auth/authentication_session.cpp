@@ -367,6 +367,7 @@ void AuthenticationSession::markSuccessful() {
             _mech->appendExtraInfo(&extraInfoBob);
         }
 
+        auto metadata = ClientMetadata::get(_client);
         LOGV2(5286306,
               "Successfully authenticated",
               "client"_attr = _client->getRemote(),
@@ -377,6 +378,7 @@ void AuthenticationSession::markSuccessful() {
               "db"_attr = _userName.getDB(),
               "result"_attr = Status::OK().code(),
               "metrics"_attr = metrics,
+              "doc"_attr = metadata ? metadata->getDocument() : BSONObj(),
               "extraInfo"_attr = extraInfoBob.obj());
     }
 }
@@ -401,6 +403,7 @@ void AuthenticationSession::markFailed(const Status& status) {
             _mech->appendExtraInfo(&extraInfoBob);
         }
 
+        auto metadata = ClientMetadata::get(_client);
         LOGV2(5286307,
               "Failed to authenticate",
               "client"_attr = _client->getRemote(),
@@ -412,6 +415,7 @@ void AuthenticationSession::markFailed(const Status& status) {
               "error"_attr = redact(status),
               "result"_attr = status.code(),
               "metrics"_attr = metrics,
+              "doc"_attr = metadata ? metadata->getDocument() : BSONObj(),
               "extraInfo"_attr = extraInfoBob.obj());
     }
 }
