@@ -49,7 +49,9 @@ buildvariants:
   - name: &upload_source_graph_index upload_source_graph_index
     display_name: "~ Upload Source Graph Index"
     tags: ["source_graph_indexing"]
-    cron: "30 * * * *" # Every hour, 30 min offset
+    # This is currently disabled since our demo license expired
+    activate: false
+    # cron: "30 * * * *" # Every hour, 30 min offset
     # SourceGraph's indexer requires a lot of CPU to execute in a reasonable amount of time
     run_on:
       - rhel93-xxlarge
