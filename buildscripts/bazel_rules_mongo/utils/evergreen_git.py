@@ -14,7 +14,7 @@ def get_expansions(expansions_file: str) -> Dict[str, any]:
     if not os.path.exists(expansions_file):
         raise RuntimeError(f"Expansions file not found at {expansions_file}")
 
-    with open(expansions_file, "r") as file:
+    with open(expansions_file, "r", encoding="utf8") as file:
         return yaml.safe_load(file)
 
 

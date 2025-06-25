@@ -63,7 +63,7 @@ def process_owners_file(output_lines: list[str], node: FileNode) -> None:
     print(f"parsing: {owners_file_path}")
     output_lines.append(f"# The following patterns are parsed from {owners_file_path}")
 
-    with open(owners_file_path, "r") as file:
+    with open(owners_file_path, "r", encoding="utf8") as file:
         contents = yaml.safe_load(file)
         assert "version" in contents, f"Version not found in {owners_file_path}"
         assert contents["version"] in parsers, f"Unsupported version in {owners_file_path}"
@@ -279,7 +279,7 @@ def get_allowed_unowned_files() -> Set[str]:
 
     unowned_files = set()
 
-    with open(allowed_unowned_file_path, "r") as file:
+    with open(allowed_unowned_file_path, "r", encoding="utf8") as file:
         contents = yaml.safe_load(file)
 
         try:

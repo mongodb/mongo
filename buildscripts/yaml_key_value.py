@@ -8,7 +8,7 @@ import yaml
 
 def get_yaml_value(yaml_file, yaml_key):
     """Return string value for 'yaml_key' from 'yaml_file'."""
-    with open(yaml_file, "r") as ystream:
+    with open(yaml_file, "r", encoding="utf8") as ystream:
         yaml_dict = yaml.safe_load(ystream)
     return str(yaml_dict.get(yaml_key, ""))
 

@@ -56,7 +56,7 @@ def is_string_list(lst):
 def load_yaml_file(filename):
     """Attempt to read 'filename' as YAML."""
     try:
-        with open(filename, "r") as fp:
+        with open(filename, "r", encoding="utf8") as fp:
             return yaml.safe_load(fp)
     except yaml.YAMLError as err:
         raise ValueError("File '%s' contained invalid YAML: %s" % (filename, err))

@@ -403,7 +403,7 @@ class TestSetParameters(_ResmokeSelftest):
     def generate_suite(self, suite_output_path, template_file):
         """Read the template file, substitute the `outputLocation` and rewrite to the file `suite_output_path`."""
 
-        with open(os.path.normpath(template_file), "r") as template_suite_fd:
+        with open(os.path.normpath(template_file), "r", encoding="utf8") as template_suite_fd:
             suite = yaml.safe_load(template_suite_fd)
 
         try:
@@ -568,7 +568,7 @@ class TestDiscovery(_ResmokeSelftest):
         )
 
         with open(
-            "buildscripts/resmokeconfig/fully_disabled_feature_flags.yml"
+            "buildscripts/resmokeconfig/fully_disabled_feature_flags.yml", encoding="utf8"
         ) as fully_disabled_ffs:
             self.assertIn(
                 "featureFlagFryer",
@@ -832,7 +832,7 @@ class TestMultiversionConfig(unittest.TestCase):
             ],
             check=True,
         )
-        with open(file_name, "r") as file:
+        with open(file_name, "r", encoding="utf8") as file:
             file_contents = file.read()
 
         try:

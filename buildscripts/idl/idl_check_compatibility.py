@@ -62,7 +62,7 @@ def load_rules_file() -> dict:
     if not os.path.exists(abs_filename):
         raise ValueError(f"Rules file {abs_filename} not found")
 
-    with open(abs_filename) as file:
+    with open(abs_filename, encoding="utf8") as file:
         return yaml.safe_load(file)
 
 

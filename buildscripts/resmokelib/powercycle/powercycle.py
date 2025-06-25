@@ -1317,10 +1317,10 @@ def new_resmoke_config(config_file, new_config_file, test_data, eval_str=""):
             "config": {"shell_options": {"eval": eval_str, "global_vars": {"TestData": test_data}}}
         }
     }
-    with open(config_file, "r") as yaml_stream:
+    with open(config_file, "r", encoding="utf8") as yaml_stream:
         config = yaml.safe_load(yaml_stream)
     config.update(new_config)
-    with open(new_config_file, "w") as yaml_stream:
+    with open(new_config_file, "w", encoding="utf8") as yaml_stream:
         yaml.safe_dump(config, yaml_stream)
 
 

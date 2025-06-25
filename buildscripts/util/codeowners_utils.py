@@ -16,7 +16,7 @@ def process_owners(cur_dir: str) -> Tuple[Dict[re.Pattern, List[str]], bool]:
     if not os.path.exists(owners_file_path):
         return process_owners(os.path.dirname(cur_dir))
 
-    with open(owners_file_path, "r") as f:
+    with open(owners_file_path, "r", encoding="utf8") as f:
         contents = yaml.safe_load(f)
 
         assert "version" in contents, f"Version not found in {owners_file_path}"
@@ -50,7 +50,9 @@ def process_owners(cur_dir: str) -> Tuple[Dict[re.Pattern, List[str]], bool]:
 
 class Owners:
     def __init__(self):
-        self.co_jira_map = yaml.safe_load(open("buildscripts/util/co_jira_map.yml", "r"))
+        self.co_jira_map = yaml.safe_load(
+            open("buildscripts/util/co_jira_map.yml", "r", encoding="utf8")
+        )
 
     def get_codeowners(self, file_path: str) -> List[str]:
         cur_dir = os.path.dirname(file_path)

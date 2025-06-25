@@ -124,7 +124,7 @@ class SetupMultiversion(Subcommand):
         self.github_oauth_token = (
             github_oauth_token.replace("token ", "") if github_oauth_token else None
         )
-        with open(config.SETUP_MULTIVERSION_CONFIG) as file_handle:
+        with open(config.SETUP_MULTIVERSION_CONFIG, encoding="utf8") as file_handle:
             raw_yaml = yaml.safe_load(file_handle)
         self.config = config.SetupMultiversionConfig(raw_yaml)
 

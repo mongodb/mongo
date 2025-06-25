@@ -8,12 +8,12 @@ parser.add_argument("--variant_name")
 parser.add_argument("--task_name")
 args = parser.parse_args()
 
-with open("etc/evergreen_yml_components/configuration.yml") as f:
+with open("etc/evergreen_yml_components/configuration.yml", encoding="utf8") as f:
     yml = yaml.safe_load(f)
     default_timeout = yml["exec_timeout_secs"]
 
 override_timeout = None
-with open("etc/evergreen_timeouts.yml") as f:
+with open("etc/evergreen_timeouts.yml", encoding="utf8") as f:
     yml = yaml.safe_load(f)
     if args.variant_name in yml["overrides"]:
         for task in yml["overrides"][args.variant_name]:
@@ -21,7 +21,7 @@ with open("etc/evergreen_timeouts.yml") as f:
                 override_timeout = task["exec_timeout"] * 60
                 break
 
-with open("override_task_timeout.yml", "w") as f:
+with open("override_task_timeout.yml", "w", encoding="utf8") as f:
     if override_timeout:
         print(
             f"Overriding timeout for {args.variant_name}:{args.task_name} of {override_timeout} seconds."

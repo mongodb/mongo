@@ -42,7 +42,7 @@ class TagsConfig(object):
         See TagsConfig.__init__() for the keyword arguments that can be specified.
         """
 
-        with open(filename, "r") as fstream:
+        with open(filename, "r", encoding="utf8") as fstream:
             raw = yaml.safe_load(fstream)
 
         return cls(raw, **kwargs)

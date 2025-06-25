@@ -53,7 +53,7 @@ class CodeLockdownConfig(BaseModel):
         :param file_path: Path to file.
         :return: Config object.
         """
-        with open(file_path) as file_handler:
+        with open(file_path, encoding="utf8") as file_handler:
             return cls(**yaml.safe_load(file_handler))
 
     def get_all_group_names(self) -> List[str]:

@@ -87,7 +87,9 @@ def get_all_feature_flags_turned_off_by_default(idl_dirs: List[str] = None):
         if not binder.is_feature_flag_enabled_by_default(flag)
     ]
 
-    with open("buildscripts/resmokeconfig/fully_disabled_feature_flags.yml") as fully_disabled_ffs:
+    with open(
+        "buildscripts/resmokeconfig/fully_disabled_feature_flags.yml", encoding="utf8"
+    ) as fully_disabled_ffs:
         force_disabled_flags = yaml.safe_load(fully_disabled_ffs)
 
     return list(set(all_default_false_flags) - set(force_disabled_flags))

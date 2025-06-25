@@ -75,7 +75,7 @@ def read_variable_from_yml(filename, variable_name):
     :param variable_name: Variable to read from file.
     :return: Value of variable or None.
     """
-    with open(filename, "r") as fh:
+    with open(filename, "r", encoding="utf8") as fh:
         nodes = yaml.safe_load(fh)
 
     variables = nodes["variables"]

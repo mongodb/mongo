@@ -42,7 +42,7 @@ class TestSuiteGeneration(unittest.TestCase):
         tested_suite = "test_matrix_suite"
         generated_suite_path = self.matrix_suite_config.get_generated_suite_path(tested_suite)
         self.matrix_suite_config.generate_matrix_suite_file(tested_suite)
-        with open(generated_suite_path, "r+") as file:
+        with open(generated_suite_path, "r+", encoding="utf8") as file:
             gen_yaml = yaml.safe_load(file)
             gen_yaml["abc"] = "def"
             file.seek(0)

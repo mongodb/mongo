@@ -73,7 +73,7 @@ def parse_evergreen_file(path, evergreen_binary="evergreen"):
     if evergreen_binary:
         # Call 'evergreen evaluate path' to pre-process the project configuration file.
         cmd = [evergreen_binary, "evaluate", path]
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, encoding="utf8", text=True)
         if result.returncode:
             raise RuntimeError(
                 "Unable to evaluate {}.\nSTDOUT:{}\nSTDERR:{}".format(
@@ -82,7 +82,7 @@ def parse_evergreen_file(path, evergreen_binary="evergreen"):
             )
         config = yaml.safe_load(result.stdout)
     else:
-        with open(path, "r") as fstream:
+        with open(path, "r", encoding="utf8") as fstream:
             config = yaml.safe_load(fstream)
 
     return EvergreenProjectConfig(config)

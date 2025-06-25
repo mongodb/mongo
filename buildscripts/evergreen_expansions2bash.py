@@ -20,7 +20,7 @@ except ModuleNotFoundError:
 
 
 def _load_defaults(defaults_file: str) -> dict:
-    with open(defaults_file) as fh:
+    with open(defaults_file, encoding="utf8") as fh:
         defaults = yaml.safe_load(fh)
         if not isinstance(defaults, dict):
             _error(
@@ -67,7 +67,7 @@ def _load_defaults(defaults_file: str) -> dict:
 
 
 def _load_expansions(expansions_file) -> dict:
-    with open(expansions_file) as fh:
+    with open(expansions_file, encoding="utf8") as fh:
         expansions = yaml.safe_load(fh)
 
         if not isinstance(expansions, dict):

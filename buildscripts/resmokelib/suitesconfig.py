@@ -329,7 +329,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         new_text = cls.generate_matrix_suite_text(suite_name)
         new_yaml = yaml.safe_load(new_text)
 
-        with open(generated_path, "r") as file:
+        with open(generated_path, "r", encoding="utf8") as file:
             old_text = file.read()
             old_yaml = yaml.safe_load(old_text)
             if new_yaml != old_yaml:

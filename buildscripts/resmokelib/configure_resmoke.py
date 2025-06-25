@@ -438,7 +438,7 @@ flags in common: {common_set}
     )
     if not _config.INCLUDE_FULLY_DISABLED_FEATURE_TESTS:
         with open(
-            "buildscripts/resmokeconfig/fully_disabled_feature_flags.yml"
+            "buildscripts/resmokeconfig/fully_disabled_feature_flags.yml", encoding="utf8"
         ) as fully_disabled_ffs:
             # the ENABLED_FEATURE_FLAGS list already excludes the fully disabled features flags
             # This keeps any feature flags enabled that were manually turned on from being excluded

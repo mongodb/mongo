@@ -164,7 +164,7 @@ class GenerateAndCheckPerfResults(interface.Hook):
         self.create_time = datetime.datetime.now()
 
         try:
-            with open(THRESHOLD_LOCATION) as fh:
+            with open(THRESHOLD_LOCATION, encoding="utf8") as fh:
                 self.performance_thresholds = yaml.safe_load(fh)["tests"]
         except Exception:
             self.logger.exception(

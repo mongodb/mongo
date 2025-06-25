@@ -83,7 +83,7 @@ class OwnersParserV1:
         if not os.path.exists(parsed_path):
             raise RuntimeError(f"Could not find alias file {path}")
 
-        with open(parsed_path, "r") as file:
+        with open(parsed_path, "r", encoding="utf8") as file:
             contents = yaml.safe_load(file)
             assert "version" in contents, f"Version not found in {path}"
             assert "aliases" in contents, f"Alias not found in {path}"

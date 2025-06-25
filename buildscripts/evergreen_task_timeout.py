@@ -99,7 +99,7 @@ class TimeoutOverrides(BaseModel):
     @classmethod
     def from_yaml_file(cls, file_path: Path) -> "TimeoutOverrides":
         """Read the timeout overrides from the given file."""
-        with open(file_path) as file_handler:
+        with open(file_path, encoding="utf8") as file_handler:
             return cls(**yaml.safe_load(file_handler))
 
     def _lookup_override(self, build_variant: str, task_name: str) -> Optional[TimeoutOverride]:
@@ -173,7 +173,7 @@ def output_timeout(
         output["timeout_secs"] = math.ceil(idle_timeout.total_seconds())
 
     if output_file:
-        with open(output_file, "w") as outfile:
+        with open(output_file, "w", encoding="utf8") as outfile:
             yaml.dump(output, stream=outfile, default_flow_style=False)
 
     yaml.dump(output, stream=sys.stdout, default_flow_style=False)

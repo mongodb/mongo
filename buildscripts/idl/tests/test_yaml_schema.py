@@ -79,7 +79,7 @@ class TestJSONSchema(testcase.IDLTestcase):
         return os.path.join(self._base_dir, "buildscripts", "idl")
 
     def load_yaml_file(self, file_path):
-        with open(file_path, "r") as f:
+        with open(file_path, "r", encoding="utf8") as f:
             return yaml.safe_load(f)
 
     def validate_yaml_file(self, file_path, schema):

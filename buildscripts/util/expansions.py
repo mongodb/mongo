@@ -16,7 +16,7 @@ def get_expansions() -> dict:
     if not os.path.exists(expansions_file):
         return None
 
-    with open(expansions_file, "r") as file:
+    with open(expansions_file, "r", encoding="utf8") as file:
         return yaml.safe_load(file)
 
 

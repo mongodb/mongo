@@ -43,7 +43,7 @@ def get_task_config(task_name, is_remote):
     else:
         config_location = powercycle.abs_path(POWERCYCLE_TASKS_CONFIG)
 
-    with open(config_location) as file_handle:
+    with open(config_location, encoding="utf8") as file_handle:
         raw_yaml = yaml.safe_load(file_handle)
     tasks_raw_yaml = raw_yaml.get("tasks", [])
 
