@@ -148,6 +148,7 @@
         - jstests/core/timeseries/write/timeseries_metadata.js
         - jstests/core/timeseries/write/timeseries_min_max.js
         - jstests/core/timeseries/write/timeseries_out_of_order.js
+        - jstests/core/timeseries/write/timeseries_reopened_bucket_insert.js
         - jstests/core/timeseries/write/timeseries_simple.js
         - jstests/core/timeseries/write/timeseries_sparse.js
 - name: all_sharding_timeseries_tests_selector
@@ -182,12 +183,14 @@
         - jstests/noPassthrough/catalog/server_status_catalog_stats.js
         - jstests/noPassthrough/query/timeseries/bucket_unpacking_with_sort_granularity_change.js
         - jstests/noPassthrough/query/timeseries/timeseries_validate_mixed_schema_bucket.js
+        - jstests/noPassthrough/timeseries/bucket_reopening/timeseries_reopen_uncompressed_bucket_for_compression.js
         - jstests/noPassthrough/timeseries/create/initial_sync_recreate_timeseries_collection.js
         - jstests/noPassthrough/timeseries/create/timeseries_block_compressor_options.js
         - jstests/noPassthrough/timeseries/create/timeseries_server_parameters.js
         - jstests/noPassthrough/timeseries/create/timeseries_startup.js
         - jstests/noPassthrough/timeseries/create/timeseries_writes_check_buckets_coll_is_valid.js
         - jstests/noPassthrough/timeseries/data_integrity/intermediate_data_consistency_checks_skips.js
+        - jstests/noPassthrough/timeseries/data_integrity/timeseries_insert_compression_failure.js
         - jstests/noPassthrough/timeseries/data_integrity/timeseries_insert_decompression_failure.js
         - jstests/noPassthrough/timeseries/extended_range/timeseries_bucket_spanning_epoch.js
         - jstests/noPassthrough/timeseries/index_builds/timeseries_create_index_option_defaults.js
@@ -210,6 +213,7 @@
         - jstests/noPassthrough/timeseries/updates_deletes/timeseries_updates_create_compressed_buckets.js
         - jstests/noPassthrough/timeseries/validate/validate_compressed_bucket_with_time_out_of_order.js
         - jstests/noPassthrough/timeseries/validate/validate_timeseries_bucket_max_span.js
+        - jstests/noPassthrough/timeseries/validate/validate_timeseries_bucket_reopening.js
         - jstests/noPassthrough/timeseries/validate/validate_timeseries_bucketing_parameters_change.js
         - jstests/noPassthrough/timeseries/validate/validate_timeseries_count.js
         - jstests/noPassthrough/timeseries/validate/validate_timeseries_data_indexes.js
@@ -219,6 +223,7 @@
         - jstests/noPassthrough/timeseries/validate/validate_v3_buckets_are_unsorted.js
         - jstests/noPassthrough/timeseries/write/promoting_compressed_sorted_bucket_to_compressed_unsorted_bucket.js
         - jstests/noPassthrough/timeseries/write/timeseries_bucket_limit_size.js
+        - jstests/noPassthrough/timeseries/write/timeseries_bucket_max_size_min_limit.js
         - jstests/noPassthrough/timeseries/write/timeseries_bucket_oids.js
         - jstests/noPassthrough/timeseries/write/timeseries_closed_due_to_schema_changes.js
         - jstests/noPassthrough/timeseries/write/timeseries_compressed_bucket_size.js
@@ -226,8 +231,11 @@
         - jstests/noPassthrough/timeseries/write/timeseries_dynamic_bucket_sizing_large.js
         - jstests/noPassthrough/timeseries/write/timeseries_find_and_modify_without_shard_key_raw_data.js
         - jstests/noPassthrough/timeseries/write/timeseries_idle_buckets.js
+        - jstests/noPassthrough/timeseries/write/timeseries_insert_after_cycle_primary.js
         - jstests/noPassthrough/timeseries/write/timeseries_insert_after_failed_insert.js
         - jstests/noPassthrough/timeseries/write/timeseries_insert_invalid_timefield.js
+        - jstests/noPassthrough/timeseries/write/timeseries_insert_ordered_false.js
+        - jstests/noPassthrough/timeseries/write/timeseries_insert_ordered_true.js
         - jstests/noPassthrough/timeseries/write/timeseries_large_measurements.js
         - jstests/noPassthrough/timeseries/write/timeseries_large_measurements_max_size.js
         - jstests/noPassthrough/timeseries/write/timeseries_retry_writes.js

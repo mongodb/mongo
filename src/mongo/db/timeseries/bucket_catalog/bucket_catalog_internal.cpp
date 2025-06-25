@@ -282,8 +282,13 @@ BSONObj reopenFetchedBucket(OperationContext* opCtx,
                             const Collection* bucketsColl,
                             const OID& bucketId,
                             ExecutionStatsController& stats) {
-    const auto& reopenedBucketDoc =
-        DBDirectClient{opCtx}.findOne(bucketsColl->ns(), BSON("_id" << bucketId));
+
+    const auto reopenedBucketDoc = [&] {
+        FindCommandRequest findReq{bucketsColl->ns()};
+        findReq.setFilter(BSON("_id" << bucketId));
+        findReq.setRawData(true);
+        return DBDirectClient{opCtx}.findOne(std::move(findReq));
+    }();
 
     if (!reopenedBucketDoc.isEmpty()) {
         stats.incNumBucketsFetched();
@@ -308,6 +313,7 @@ BSONObj reopenQueriedBucket(OperationContext* opCtx,
         // Run an aggregation to find a suitable bucket to reopen.
         AggregateCommandRequest aggRequest(bucketsColl->ns(), pipeline);
         aggRequest.setHint(index);
+        aggRequest.setRawData(true);
 
         // TODO SERVER-86094: remove after fixing perf regression.
         query_settings::QuerySettings querySettings;
