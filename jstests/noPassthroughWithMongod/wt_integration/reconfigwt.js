@@ -46,7 +46,7 @@ if (ss.storageEngine.name !== "wiredTiger") {
     }
 
     runTestForParam("wiredTigerEngineRuntimeConfig");
-    // TODO SERVER-76014: Remove this once FeatureFlagCreateSpillKVEngine is enabled by default.
+    // TODO (SERVER-106716): Remove the feature flag check.
     if (FeatureFlagUtil.isPresentAndEnabled(db, "FeatureFlagCreateSpillKVEngine")) {
         runTestForParam("spillWiredTigerEngineRuntimeConfig");
     }
