@@ -92,6 +92,7 @@ selector:
     - jstests/core/timeseries/ddl/timeseries_nondefault_collation.js
     - jstests/core/timeseries/ddl/timeseries_sparse_index.js
     - jstests/core/timeseries/ddl/timeseries_special_indexes_metadata.js
+    - jstests/core/timeseries/geo/partialFilterExpression_with_internalBucketGeoWithin.js
     - jstests/core/timeseries/geo/timeseries_geonear.js
     - jstests/core/timeseries/geo/timeseries_geonear_edge_case_measurements.js
     - jstests/core/timeseries/geo/timeseries_geonear_mindistance_and_maxdistance.js

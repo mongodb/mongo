@@ -11,15 +11,18 @@
  * ]
  */
 
+import {
+    createRawTimeseriesIndex,
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec
+} from "jstests/core/libs/raw_operation_utils.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getWinningPlanFromExplain, isCollscan, isIxscan} from "jstests/libs/query/analyze_plan.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const timeFieldName = "timestamp";
 
 const coll = db[jsTestName()];
-const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 coll.drop();
 
 assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
@@ -103,7 +106,7 @@ var texasPolygon = {
     ]],
 };
 // Create index to cover Texas and Southern California.
-assert.commandWorked(bucketsColl.createIndex({a: 1}, {
+assert.commandWorked(createRawTimeseriesIndex(coll, {a: 1}, {
     partialFilterExpression: {
         $_internalBucketGeoWithin: {
             withinRegion: {
@@ -115,9 +118,13 @@ assert.commandWorked(bucketsColl.createIndex({a: 1}, {
     }
 }));
 
-IndexBuildTest.assertIndexes(bucketsColl, 1 + shardKeyIndexCount, ["a_1"]);
+IndexBuildTest.assertIndexes(getTimeseriesCollForRawOps(coll),
+                             1 + shardKeyIndexCount,
+                             ["a_1"],
+                             [] /* notReadyIndexes */,
+                             kRawOperationSpec);
 
-var findAndExplain = assert.commandWorked(bucketsColl
+var findAndExplain = assert.commandWorked(getTimeseriesCollForRawOps(coll)
                                               .find({
                                                   a: 1,
                                                   $_internalBucketGeoWithin: {
@@ -128,6 +135,7 @@ var findAndExplain = assert.commandWorked(bucketsColl
                                                       field: "loc"
                                                   }
                                               })
+                                              .rawData()
                                               .explain());
 
 assert(isIxscan(db, getWinningPlanFromExplain(findAndExplain)));
@@ -135,7 +143,7 @@ assert(isIxscan(db, getWinningPlanFromExplain(findAndExplain)));
 // Unlike the example above, this query provides a different argument for "field" than what we
 // indexed the collection on. In this case, we cannot use our index and expect to have to do a
 // collection scan.
-findAndExplain = assert.commandWorked(bucketsColl
+findAndExplain = assert.commandWorked(getTimeseriesCollForRawOps(coll)
                                           .find({
                                               a: 1,
                                               $_internalBucketGeoWithin: {
@@ -146,13 +154,14 @@ findAndExplain = assert.commandWorked(bucketsColl
                                                   field: "geoloc"
                                               }
                                           })
+                                          .rawData()
                                           .explain());
 
 assert(isCollscan(db, getWinningPlanFromExplain(findAndExplain)));
-assert.commandWorked(bucketsColl.dropIndexes());
+assert.commandWorked(getTimeseriesCollForRawOps(coll).dropIndexes("*", kRawOperationSpec));
 
 // Create a smaller index and query for a larger region, resulting in a collection scan.
-assert.commandWorked(bucketsColl.createIndex({a: 1}, {
+assert.commandWorked(createRawTimeseriesIndex(coll, {a: 1}, {
     partialFilterExpression: {
         $_internalBucketGeoWithin: {
             withinRegion: {
@@ -163,9 +172,13 @@ assert.commandWorked(bucketsColl.createIndex({a: 1}, {
         }
     }
 }));
-IndexBuildTest.assertIndexes(bucketsColl, 1 + shardKeyIndexCount, ["a_1"]);
+IndexBuildTest.assertIndexes(getTimeseriesCollForRawOps(coll),
+                             1 + shardKeyIndexCount,
+                             ["a_1"],
+                             [] /* notReadyIndexes */,
+                             kRawOperationSpec);
 
-findAndExplain = assert.commandWorked(bucketsColl
+findAndExplain = assert.commandWorked(getTimeseriesCollForRawOps(coll)
                                           .find({
                                               a: 1,
                                               $_internalBucketGeoWithin: {
@@ -176,5 +189,6 @@ findAndExplain = assert.commandWorked(bucketsColl
                                                   field: "loc"
                                               }
                                           })
+                                          .rawData()
                                           .explain());
 assert(isCollscan(db, getWinningPlanFromExplain(findAndExplain)));

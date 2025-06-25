@@ -82,6 +82,12 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
             return;
         }
 
+        if (innerCmd.hasOwnProperty("rawData")) {
+            // TODO(SERVER-106438): Review interaction of setQuerySettings with rawData
+            // Query settings can't be applied on rawData queries
+            return;
+        }
+
         const ns = {db: dbName, coll: collectionName};
         const qsutils = new QuerySettingsUtils(db, collectionName);
         qsutils.onSetQuerySettings(computeAndStoreResult);

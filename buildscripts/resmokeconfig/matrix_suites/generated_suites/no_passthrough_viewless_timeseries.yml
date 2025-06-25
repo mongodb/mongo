@@ -54,6 +54,8 @@ selector:
     - jstests/noPassthrough/timeseries/data_integrity/timeseries_insert_compression_failure.js
     - jstests/noPassthrough/timeseries/data_integrity/timeseries_insert_decompression_failure.js
     - jstests/noPassthrough/timeseries/extended_range/timeseries_bucket_spanning_epoch.js
+    - jstests/noPassthrough/timeseries/index_builds/hybrid_index_timeseries.js
+    - jstests/noPassthrough/timeseries/index_builds/resumable_timeseries_index_build_collection_scan_phase.js
     - jstests/noPassthrough/timeseries/index_builds/timeseries_create_index_option_defaults.js
     - jstests/noPassthrough/timeseries/query/timeseries_group_block_metrics.js
     - jstests/noPassthrough/timeseries/query/timeseries_group_bson_types.js

@@ -1,9 +1,12 @@
 // Helper functions for testing index builds.
 
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {reconnect} from "jstests/replsets/rslib.js";
 
 export var IndexBuildTest = class {
     /**
@@ -95,6 +98,11 @@ export var IndexBuildTest = class {
      * client connection thread and the IndexBuildsCoordinator thread actively building the index.
      */
     static waitForIndexBuildToStart(database, collectionName, indexName, filter) {
+        if (collectionName) {
+            collectionName =
+                getTargetCollForIndexBuilds(database.getCollection(collectionName)).getName();
+        }
+
         let opId;
         assert.soon(function() {
             return (opId = IndexBuildTest.getIndexBuildOpId(
@@ -170,6 +178,14 @@ export var IndexBuildTest = class {
     static assertIndexes(coll, numIndexes, readyIndexes, notReadyIndexes, options) {
         notReadyIndexes = notReadyIndexes || [];
         options = options || {};
+
+        // The translation logic for indexes on timeseries collections removes in-progress builds
+        // with includeBuildUUIDs: true. Work around it by using rawData mode.
+        // TODO(SERVER-106407): Remove this workaround
+        if (coll.getMetadata().type === 'timeseries' && options.includeBuildUUIDs === true) {
+            coll = getTimeseriesCollForRawOps(coll.getDB(), coll);
+            options = {...options, ...getRawOperationSpec(coll.getDB())};
+        }
 
         let res = assert.commandWorked(coll.runCommand("listIndexes", options));
         assert.eq(numIndexes,
@@ -498,7 +514,7 @@ export const ResumableIndexBuildTest = class {
                 buildUUID: function(uuid) {
                     return uuid && uuid["uuid"]["$uuid"] === buildUUID;
                 },
-                namespace: coll.getFullName()
+                namespace: getTargetCollForIndexBuilds(coll).getFullName()
             });
         }
         IndexBuildTest.assertIndexesIdHelper(coll, indexNames.length, indexNames);
@@ -583,6 +599,7 @@ export const ResumableIndexBuildTest = class {
         }
         const defaultOptions = {noCleanData: true, setParameter: setParameter};
         upg.start(conn, Object.assign(defaultOptions, options || {}));
+        reconnect(conn);
 
         if (shouldComplete) {
             // Ensure that the index builds were completed upon the node starting back up.
@@ -839,6 +856,7 @@ export const ResumableIndexBuildTest = class {
         assert(RegExp("4841502.*" + buildUUID).test(rawMongoProgramOutput(".*")));
 
         rst.start(resumeNode, {noCleanData: true});
+        reconnect(resumeNode);
         otherNodeFp.off();
 
         // Ensure that the index build was completed upon the node starting back up.
@@ -1095,3 +1113,16 @@ export const ResumableIndexBuildTest = class {
             rst, dbName, collName, [indexName], postIndexBuildInserts);
     }
 };
+
+/**
+ * Given a collection, returns the collection where index builds started over `coll` runs.
+ * For legacy timeseries collections, the index builds run on the `system.buckets.<coll>` namespace.
+ * TODO(SERVER-101609): Remove this function and use `coll` directly
+ */
+function getTargetCollForIndexBuilds(coll) {
+    if (coll.getMetadata()?.type === 'timeseries') {
+        return getTimeseriesCollForDDLOps(coll.getDB(), coll);
+    }
+
+    return coll;
+}

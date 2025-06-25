@@ -26,7 +26,7 @@ const metaFieldName = 'meta';
 assert.commandWorked(db.createCollection(
     coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 
-// The {meta: 1, time: 1} index gets built by default on the time-series bucket collection. This
+// The {meta: 1, time: 1} index gets built by default on the time-series collection. This
 // test assumes that all of the indexes in the collection are not finished to ensure they are
 // resumed when the node is restarted. Drop this index.
 assert.commandWorked(coll.dropIndex({[metaFieldName]: 1, [timeFieldName]: 1}));
@@ -42,12 +42,11 @@ for (let i = 0; i < 3; i++) {
     }));
 }
 
-const bucketColl = db.getCollection("system.buckets." + coll.getName());
 ResumableIndexBuildTest.run(
     rst,
     dbName,
-    bucketColl.getName(),
-    [[{"control.min.time": 1}, {"control.max.time": 1}]],
+    coll.getName(),
+    [[{[timeFieldName]: 1}]],
     [{name: "hangIndexBuildDuringCollectionScanPhaseAfterInsertion", logIdWithBuildUUID: 20386}],
     /*iteration=*/ 0,
     ["collection scan"],

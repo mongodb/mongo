@@ -1,7 +1,9 @@
 /**
- * Tests that hybrid index builds on timeseries buckets collections behave correctly when they
+ * Tests that hybrid index builds on timeseries collections behave correctly when they
  * receive concurrent writes.
  */
+import {assertCommandWorkedInParallelShell} from "jstests/libs/parallel_shell_helpers.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const conn = MongoRunner.runMongod();
@@ -10,7 +12,6 @@ const dbName = jsTestName();
 const collName = 'ts';
 const testDB = conn.getDB(dbName);
 const tsColl = testDB[collName];
-const bucketsColl = testDB.getCollection('system.buckets.' + collName);
 
 const timeField = 'time';
 const metaField = 'meta';
@@ -35,13 +36,16 @@ const runTest = (config) => {
     // Prevent the index build from completing.
     IndexBuildTest.pauseIndexBuilds(conn);
 
-    // Build an index on the buckets collection, not the time-series view, and wait for it to start.
+    // Build a raw index over the buckets of the time-series collection, and wait for it to start.
     const indexName = "test_index";
     let indexOptions = config.indexOptions || {};
     indexOptions.name = indexName;
-    const awaitIndex = IndexBuildTest.startIndexBuild(
-        conn, bucketsColl.getFullName(), config.indexSpec, indexOptions);
-    IndexBuildTest.waitForIndexBuildToStart(testDB, bucketsColl.getName(), indexName);
+    const awaitIndex = assertCommandWorkedInParallelShell(conn, testDB, {
+        createIndexes: getTimeseriesCollForRawOps(testDB, tsColl).getName(),
+        indexes: [{key: config.indexSpec, ...indexOptions}],
+        ...getRawOperationSpec(testDB)
+    });
+    IndexBuildTest.waitForIndexBuildToStart(testDB, tsColl.getName(), indexName);
 
     // Perform writes while the index build is in progress.
     assert.commandWorked(tsColl.insert({
@@ -60,9 +64,9 @@ const runTest = (config) => {
     IndexBuildTest.resumeIndexBuilds(conn);
     awaitIndex();
 
-    // Due to the nature of bucketing, we can't reliably make assertions about the contents of the
-    // buckets collection, so we rely on validate to ensure the index is built correctly.
-    const validateRes = assert.commandWorked(bucketsColl.validate());
+    // Due to the nature of bucketing, we can't reliably make assertions about them,
+    // so we rely on validate to ensure the index is built correctly.
+    const validateRes = assert.commandWorked(tsColl.validate());
     assert(validateRes.valid, validateRes);
 };
 

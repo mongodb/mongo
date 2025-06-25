@@ -8,7 +8,6 @@
  *     requires_replication,
  * ]
  */
-import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 import {waitForState} from "jstests/replsets/rslib.js";
@@ -74,8 +73,7 @@ awaitIndexTimeseries =
 
 jsTest.log("Waiting for index build to start on secondary");
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName, 'i_1');
-IndexBuildTest.waitForIndexBuildToStart(
-    secondaryDB, TimeseriesTest.getBucketsCollName(timeseriesCollName), 'x_1');
+IndexBuildTest.waitForIndexBuildToStart(secondaryDB, timeseriesCollName, 'x_1');
 
 jsTest.log("Adding a new node to the replica set");
 let newNode = replSet.add({
