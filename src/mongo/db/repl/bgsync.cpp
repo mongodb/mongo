@@ -619,6 +619,14 @@ void BackgroundSync::_produce() {
                 "denylistDuration"_attr = denylistDuration);
             _replCoord->denylistSyncSource(source, Date_t::now() + denylistDuration);
         }
+    } else if (fetcherReturnStatus.code() == ErrorCodes::BSONObjectTooLarge) {
+        // TODO: SERVER-99952 discovered that a large document near max size will exceed the limit
+        // when fetched with oplog metadata. Re-evaluate the handling of this error code after this
+        // ticket is resolved.
+        LOGV2_WARNING(10033600,
+                      "BSON document and metadata fetched by oplog fetcher exceeds the BSON limit"
+                      "sync source",
+                      "syncSource"_attr = source);
     } else if (!fetcherReturnStatus.isOK()) {
         LOGV2_WARNING(21122,
                       "Oplog fetcher stopped querying remote oplog with error: {error}",

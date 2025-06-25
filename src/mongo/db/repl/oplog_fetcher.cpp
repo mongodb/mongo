@@ -756,7 +756,13 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     if (_isShuttingDown()) {
         return Status(ErrorCodes::CallbackCanceled, "oplog fetcher shutting down");
     }
-
+    // We call fetchSuccessful after any batch succeeds and it will reset _numRestarts to 0. Note
+    // that if the first batch is succesful and the second batch due to an error that is not handled
+    // in shouldContinue(), it will create an indefinite loop. The loop occurs because the restart
+    // after the second batch will recreate the cursor and repeat the successful first batch and
+    // reset _numRestarts, never letting it increment enough to exceed maxRestarts. This can be
+    // resolved by adding the error to shouldContinue() and returning false in that case so that it
+    // doesn't infinitely loop.
     _oplogFetcherRestartDecision->fetchSuccessful(this);
 
     // Stop fetching and return on fail point.
@@ -1109,6 +1115,13 @@ bool OplogFetcher::OplogFetcherRestartDecisionDefault::shouldContinue(OplogFetch
     if (status.code() == ErrorCodes::ShutdownInProgress) {
         LOGV2(4696202,
               "Not recreating cursor for oplog fetcher because sync source is shutting down",
+              "error"_attr = redact(status));
+        return false;
+    }
+    // If the oplog batch fetched exceeds the size limit, do not attempt to restart.
+    else if (status.code() == ErrorCodes::BSONObjectTooLarge) {
+        LOGV2(10033601,
+              "BSON document and metadata fetched by oplog fetcher exceeds the BSON limit",
               "error"_attr = redact(status));
         return false;
     }
