@@ -366,7 +366,7 @@ server_parameters:
         set_at: startup
         cpp_vartype: int32_t
         cpp_varname: gSpillWiredTigerZstdCompressionLevel
-        default: 3
+        default: -7
         validator:
             gte: -7
             lte: 22
