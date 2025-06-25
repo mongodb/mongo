@@ -57,7 +57,7 @@ public:
     ~TimeSeriesOpObserver() override = default;
 
     NamespaceFilters getNamespaceFilters() const final {
-        return {NamespaceFilter::kSystem, NamespaceFilter::kSystem};
+        return {NamespaceFilter::kSystem, NamespaceFilter::kAll};
     }
 
     void onInserts(OperationContext* opCtx,
