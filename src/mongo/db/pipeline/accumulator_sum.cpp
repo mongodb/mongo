@@ -102,14 +102,11 @@ void AccumulatorSum::processInternal(const Value& input, bool merging) {
             return;
         }
 
-        if (input.getType() == BSONType::Array) {
-            // The merge-side must be ready to process the full state of a partial sum from a
-            // shard-side.
-            applyPartialSum(
-                input.getArray(), nonDecimalTotalType, totalType, nonDecimalTotal, decimalTotal);
-        } else {
-            MONGO_UNREACHABLE_TASSERT(6422702);
-        }
+        assertMergingInputType(input, BSONType::Array);
+        // The merge-side must be ready to process the full state of a partial sum from a
+        // shard-side.
+        applyPartialSum(
+            input.getArray(), nonDecimalTotalType, totalType, nonDecimalTotal, decimalTotal);
         return;
     }
 
