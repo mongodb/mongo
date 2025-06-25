@@ -95,6 +95,9 @@ function killopIndexBuildOnSecondaryOnFailpoint(rst, failpointName, shouldSuccee
         // Expect the index build to succeed.
         createIdx();
 
+        // Wait for secondary to be ready.
+        rst.awaitSecondaryNodes();
+
         // Wait for the index build commit to replicate.
         rst.awaitReplication();
         IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
