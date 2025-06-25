@@ -104,6 +104,13 @@ TEST(Metadata, UpconvertDuplicateReadPreference) {
                        ErrorCodes::InvalidOptions);
 }
 
+TEST(Metadata, UpconvertOnlyExtractsReadPreference) {
+    auto legacyCmdObj = fromjson(
+        "{aggregate: 'someCollection', $queryOptions: {someRandomField: 'Hello, world!'}}");
+    auto expectedCmdObj = fromjson("{aggregate: 'someCollection'}");
+    checkUpconvert(legacyCmdObj, /* queryFlags */ 0, expectedCmdObj);
+}
+
 TEST(Metadata, UpconvertUsesDocumentSequecesCorrectly) {
     // These are cases where it is valid to use document sequences.
     const auto valid = {
