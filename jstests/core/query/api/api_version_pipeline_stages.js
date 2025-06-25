@@ -48,6 +48,66 @@ if (FeatureFlagUtil.isPresentAndEnabled(testDb.getMongo(), 'RankFusionFull')) {
     unstablePipelines.push([{$rankFusion: {input: {pipelines: {field1: [{$sort: {foo: 1}}]}}}}]);
 }
 
+// TODO SERVER-82020: $scoreFusion/$score/$minMaxScaler can always be included when the feature flag
+// is enabled by default.
+if (FeatureFlagUtil.isPresentAndEnabled(testDb.getMongo(), 'SearchHybridScoringFull')) {
+    let hybridSearchPipelines = [
+        // $score is not included in the strict api.
+        [{$score: {score: 10}}],
+        // $minMaxScaler is not included in the strict api.
+        [{
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {
+                    "relativeXValue": {
+                        $minMaxScaler: {
+                            input: "$x",
+                        },
+                        window: {range: ["unbounded", "unbounded"]}
+                    },
+                }
+            }
+        }],
+        // $scoreFusion is not included in the strict api.
+        [{
+            $scoreFusion: {
+                input: {
+                    pipelines: {
+                        score2: [
+                            {
+                                $search: {
+                                    index: "search_index",
+                                    text: {query: "mystery", path: "genres"}
+                                }
+                            },
+                            {$match: {author: "dave"}}
+                        ]
+                    },
+                    normalization: "none"
+                },
+                combination: {weights: {score2: 5}}
+            }
+        }]
+    ];
+
+    for (var hybridSearchPipeline of hybridSearchPipelines) {
+        // Hybrid search stages require a minimum FCV of 8.1. In some tests, namely
+        // fcv_upgrade_downgrade_replica_sets_jscore_passthrough and its burn-in tests, the FCV is
+        // changed in the background as the test is running. This results in a flaky test, unless we
+        // accept both the strict API error code and the queryFeatureNotAllowed error code for
+        // hybrid search pipelines.
+        assert.commandFailedWithCode(
+            testDb.runCommand({
+                aggregate: collName,
+                pipeline: hybridSearchPipeline,
+                cursor: {},
+                apiStrict: true,
+                apiVersion: "1"
+            }),
+            [ErrorCodes.APIStrictError, ErrorCodes.QueryFeatureNotAllowed]);
+    }
+}
+
 function assertAggregateFailsWithAPIStrict(pipeline) {
     assert.commandFailedWithCode(testDb.runCommand({
         aggregate: collName,
