@@ -31,42 +31,42 @@ export const $config = (function() {
                 switch (index) {
                     case 0:
                         return [{
-                        $lookup: {
-                            from: lookupViewNs1,
-                            localField: 'a',
-                            foreignField: 'b',
-                            as: 'result1'
-                        }
-                    }];
+                            $lookup: {
+                                from: lookupViewNs1,
+                                localField: 'a',
+                                foreignField: 'b',
+                                as: 'result1'
+                            }
+                        }];
                     case 1:
                         return [{
-                        $lookup: {
-                            from: lookupViewNs1,
-                            let : {a1: '$a'},
-                            pipeline: [
-                                {$match: {$expr: {$eq: ["$$a1", "$b"]}}},
-                                {
-                                  $lookup: {
-                                      from: lookupViewNs2,
-                                      let : {b1: '$b'},
-                                      pipeline: [{$match: {$expr: {$eq: ["$$b1", "$b"]}}}],
-                                      as: "result2Inner"
-                                  }
-                                }
-                            ],
-                            as: 'result2'
-                        }
-                    }];
+                            $lookup: {
+                                from: lookupViewNs1,
+                                let: { a1: '$a' },
+                                pipeline: [
+                                    { $match: { $expr: { $eq: ["$$a1", "$b"] } } },
+                                    {
+                                        $lookup: {
+                                            from: lookupViewNs2,
+                                            let: { b1: '$b' },
+                                            pipeline: [{ $match: { $expr: { $eq: ["$$b1", "$b"] } } }],
+                                            as: "result2Inner"
+                                        }
+                                    }
+                                ],
+                                as: 'result2'
+                            }
+                        }];
                     case 2:
                         return [{
-                        $graphLookup: {
-                            from: lookupViewNs1,
-                            startWith: '$a',
-                            connectFromField: 'a',
-                            connectToField: 'b',
-                            as: 'result3'
-                        }
-                    }];
+                            $graphLookup: {
+                                from: lookupViewNs1,
+                                startWith: '$a',
+                                connectFromField: 'a',
+                                connectToField: 'b',
+                                as: 'result3'
+                            }
+                        }];
                     case 3:
                         return [];
                     default:
@@ -173,6 +173,19 @@ export const $config = (function() {
             return;
         }
 
+        // TODO SERVER-89663: As part of the design for additional transaction participants we were
+        // willing to accept leaving open some transactions in case of abort/commit. These read-only
+        // transactions are expected to be reaped by the transaction reaper to avoid deadlocking the
+        // server since they will hold locks. We lower the value to the default 60 seconds since
+        // otherwise it will be 24 hours during testing. This is needed since this workload is run
+        // in suites that run multi-document transactions.
+        this.originalTransactionLifetimeLimitSeconds = {};
+        cluster.executeOnMongodNodes((db) => {
+            const res = assert.commandWorked(
+                db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 60}));
+            this.originalTransactionLifetimeLimitSeconds[db.getMongo().host] = res.was;
+        });
+
         const coll = db[collName];
 
         assert.commandWorked(coll.insert({a: 1, b: 2}));
@@ -211,6 +224,16 @@ export const $config = (function() {
                 }));
             });
         }
+
+        // TODO SERVER-89663: We restore the original transaction lifetime limit since there may be
+        // concurrent executions that relied on the old value.
+        cluster.executeOnMongodNodes((db) => {
+            assert.commandWorked(db.adminCommand({
+                setParameter: 1,
+                transactionLifetimeLimitSeconds:
+                    this.originalTransactionLifetimeLimitSeconds[db.getMongo().host]
+            }));
+        });
     }
 
     return {

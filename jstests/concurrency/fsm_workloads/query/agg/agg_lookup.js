@@ -22,16 +22,16 @@ export const $config = (function() {
                 let arr = null;
                 try {
                     const cursor = db[collName]
-                          .aggregate([
-                              {
-                                  $lookup: {
-                                      from: collName,
-                                      localField: "_id",
-                                      foreignField: "to",
-                                      as: "out",
-                                  }
-                              },
-                          ], aggOptions);
+                        .aggregate([
+                            {
+                                $lookup: {
+                                    from: collName,
+                                    localField: "_id",
+                                    foreignField: "to",
+                                    as: "out",
+                                }
+                            },
+                        ], aggOptions);
 
                     arr = cursor.toArray();
                 } catch (e) {
@@ -78,6 +78,19 @@ export const $config = (function() {
             return;
         }
 
+        // TODO SERVER-89663: As part of the design for additional transaction participants we were
+        // willing to accept leaving open some transactions in case of abort/commit. These read-only
+        // transactions are expected to be reaped by the transaction reaper to avoid deadlocking the
+        // server since they will hold locks. We lower the value to the default 60 seconds since
+        // otherwise it will be 24 hours during testing. This is needed since this workload is run
+        // in suites that run multi-document transactions.
+        this.originalTransactionLifetimeLimitSeconds = {};
+        cluster.executeOnMongodNodes((db) => {
+            const res = assert.commandWorked(
+                db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 60}));
+            this.originalTransactionLifetimeLimitSeconds[db.getMongo().host] = res.was;
+        });
+
         // Load example data.
         const bulk = db[collName].initializeUnorderedBulkOp();
         for (let i = 0; i < this.numDocs; ++i) {
@@ -113,9 +126,19 @@ export const $config = (function() {
         }
     }
 
-    function teardown(db, collName) {
+    function teardown(db, collName, cluster) {
         // Drop indexes, if any were created.
         assert.commandWorked(db[collName].dropIndexes());
+
+        // TODO SERVER-89663: We restore the original transaction lifetime limit since there may be
+        // concurrent executions that relied on the old value.
+        cluster.executeOnMongodNodes((db) => {
+            assert.commandWorked(db.adminCommand({
+                setParameter: 1,
+                transactionLifetimeLimitSeconds:
+                    this.originalTransactionLifetimeLimitSeconds[db.getMongo().host]
+            }));
+        });
     }
 
     return {
