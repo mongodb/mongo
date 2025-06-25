@@ -26,6 +26,15 @@ record identity is fixed, but other storage engines may change it when updating 
 that changing record ids can be very expensive, as indexes map to the RecordId. A single document
 with a large array may have thousands of index entries, resulting in very expensive updates.
 
+### Spill Tables
+
+Some operations may wish to relieve memory pressure by temporarily spilling some of their state to
+disk. The [SpillTable](spill_table.h) API provides an interface to do so which, in order to support
+isolation from non-spilling reads/writes, can use an entirely separate storage engine instance. It
+also will automatically drop the underlying table upon its destruction. Further, writes to a spill
+table will fail if the available disk space falls below a provided threshold. Note that reading
+from/writing to a spill table does not support transactionality or timestamping.
+
 ## Locking and Concurrency
 
 MongoDB uses multi-granular intent locking; see the [Concurrency FAQ][]. In all cases, this will
