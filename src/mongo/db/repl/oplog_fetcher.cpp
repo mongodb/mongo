@@ -306,10 +306,6 @@ OplogFetcher::StartingPoint OplogFetcher::getStartingPoint_forTest() const {
     return _config.startingPoint;
 }
 
-OpTime OplogFetcher::getLastOpTimeFetched_forTest() const {
-    return _getLastOpTimeFetched();
-}
-
 FindCommandRequest OplogFetcher::makeFindCmdRequest_forTest(long long findTimeout) const {
     return _makeFindCmdRequest(findTimeout);
 }
@@ -345,7 +341,7 @@ void OplogFetcher::_setSocketTimeout(long long timeout) {
     _conn->setSoTimeout(timeout / 1000.0 + oplogNetworkTimeoutBufferSeconds.load());
 }
 
-OpTime OplogFetcher::_getLastOpTimeFetched() const {
+OpTime OplogFetcher::getLastOpTimeFetched() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _lastFetched;
 }
@@ -440,7 +436,7 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
             // to change sync sources anyway, do it immediately rather than checking if we can
             // retry the error.
             const bool stopFetching = _dataReplicatorExternalState->shouldStopFetchingOnError(
-                                          _config.source, _getLastOpTimeFetched()) !=
+                                          _config.source, getLastOpTimeFetched()) !=
                 ChangeSyncSourceAction::kContinueSyncing;
 
             // Recreate a cursor if we have enough retries left.
@@ -531,7 +527,7 @@ Status OplogFetcher::_connect() {
         }();
     } while (!connectStatus.isOK() &&
              _dataReplicatorExternalState->shouldStopFetchingOnError(_config.source,
-                                                                     _getLastOpTimeFetched()) ==
+                                                                     getLastOpTimeFetched()) ==
                  ChangeSyncSourceAction::kContinueSyncing &&
              _oplogFetcherRestartDecision->shouldContinue(this, connectStatus));
 
@@ -571,7 +567,7 @@ FindCommandRequest OplogFetcher::_makeFindCmdRequest(long long findTimeout) cons
     {
         BSONObjBuilder queryBob;
 
-        auto lastOpTimeFetched = _getLastOpTimeFetched();
+        auto lastOpTimeFetched = getLastOpTimeFetched();
         BSONObjBuilder filterBob;
         filterBob.append("ts", BSON("$gte" << lastOpTimeFetched.getTimestamp()));
         // Handle caller-provided filter.
@@ -851,7 +847,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     }
 
     // This lastFetched value is the last OpTime from the previous batch.
-    auto previousOpTimeFetched = _getLastOpTimeFetched();
+    auto previousOpTimeFetched = getLastOpTimeFetched();
 
     auto validateResult = OplogFetcher::validateDocuments(
         documents, _firstBatch, previousOpTimeFetched.getTimestamp(), _config.startingPoint);
@@ -961,7 +957,7 @@ Status OplogFetcher::_checkRemoteOplogStart(const OplogFetcher::Documents& docum
         }
     }
 
-    auto lastFetched = _getLastOpTimeFetched();
+    auto lastFetched = getLastOpTimeFetched();
 
     // The sync source could be behind us if it rolled back after we selected it. We could have
     // failed to detect the rollback if it occurred between sync source selection (when we check the
@@ -1109,7 +1105,7 @@ bool OplogFetcher::OplogFetcherRestartDecisionDefault::shouldContinue(OplogFetch
     }
     LOGV2(21275,
           "Recreating cursor for oplog fetcher due to error",
-          "lastOpTimeFetched"_attr = fetcher->_getLastOpTimeFetched(),
+          "lastOpTimeFetched"_attr = fetcher->getLastOpTimeFetched(),
           "attemptsRemaining"_attr = (_maxRestarts - _numRestarts),
           "error"_attr = redact(status));
     // Exponential delay between retry attempts, starting at 5ms and increasing exponentially by a

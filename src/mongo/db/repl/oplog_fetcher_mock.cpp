@@ -95,7 +95,7 @@ void OplogFetcherMock::receiveBatch(CursorId cursorId,
     }
 
     auto validateResult = OplogFetcher::validateDocuments(
-        documents, _first, _getLastOpTimeFetched().getTimestamp(), _startingPoint);
+        documents, _first, getLastOpTimeFetched().getTimestamp(), _startingPoint);
 
     // Set _first to false after receiving the first batch.
     _first = false;
@@ -215,7 +215,7 @@ stdx::mutex* OplogFetcherMock::_getMutex() noexcept {
     return &_mutex;
 }
 
-OpTime OplogFetcherMock::_getLastOpTimeFetched() const {
+OpTime OplogFetcherMock::getLastOpTimeFetched() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _lastFetched;
 }

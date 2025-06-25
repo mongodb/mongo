@@ -533,7 +533,7 @@ void BackgroundSync::_produce() {
                 logLevel,
                 "Scheduling fetcher to read remote oplog",
                 "syncSource"_attr = source,
-                "lastOpTimeFetched"_attr = oplogFetcher->getLastOpTimeFetched_forTest());
+                "lastOpTimeFetched"_attr = oplogFetcher->getLastOpTimeFetched());
     auto scheduleStatus = oplogFetcher->startup();
     if (!scheduleStatus.isOK()) {
         LOGV2_WARNING(21119,

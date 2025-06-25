@@ -276,11 +276,6 @@ public:
     FindCommandRequest makeFindCmdRequest_forTest(long long findTimeout) const;
 
     /**
-     * Returns the OpTime of the last oplog entry fetched and processed.
-     */
-    OpTime getLastOpTimeFetched_forTest() const;
-
-    /**
      * Returns the await data timeout used for the "maxTimeMS" field in getMore command requests.
      */
     Milliseconds getAwaitDataTimeout_forTest() const;
@@ -312,11 +307,10 @@ public:
      */
     Milliseconds getRetriedFindMaxTime_forTest() const;
 
-protected:
     /**
      * Returns the OpTime of the last oplog entry fetched and processed.
      */
-    virtual OpTime _getLastOpTimeFetched() const;
+    virtual OpTime getLastOpTimeFetched() const;
 
 private:
     // =============== AbstractAsyncComponent overrides ================

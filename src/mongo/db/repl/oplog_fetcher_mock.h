@@ -118,7 +118,7 @@ private:
         OplogFetcherMock* _mock;
     };
 
-    OpTime _getLastOpTimeFetched() const override;
+    OpTime getLastOpTimeFetched() const override;
 
     void _finishCallback(Status status);
 

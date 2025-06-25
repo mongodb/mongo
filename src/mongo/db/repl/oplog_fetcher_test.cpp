@@ -540,7 +540,7 @@ std::unique_ptr<ShutdownState> OplogFetcherTest::processSingleBatch(const Messag
                                               OplogFetcher::StartingPoint::kSkipFirstDoc);
 
     // Update lastFetched before it is updated by getting the next batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // We should only be blocked on the network after the response if we need to shut down the oplog
     // fetcher after this test.
@@ -556,7 +556,7 @@ std::unique_ptr<ShutdownState> OplogFetcherTest::processSingleBatch(const Messag
     oplogFetcher->join();
 
     if (!lastFetchedShouldAdvance) {
-        ASSERT_EQUALS(lastFetched, oplogFetcher->getLastOpTimeFetched_forTest());
+        ASSERT_EQUALS(lastFetched, oplogFetcher->getLastOpTimeFetched());
     }
 
     return shutdownState;
@@ -608,14 +608,14 @@ TEST_F(OplogFetcherTest, ShuttingExecutorDownShouldPreventOplogFetcherFromStarti
     auto oplogFetcher = makeOplogFetcher();
 
     // Last optime fetched should match values passed to constructor.
-    ASSERT_EQUALS(lastFetched, oplogFetcher->getLastOpTimeFetched_forTest());
+    ASSERT_EQUALS(lastFetched, oplogFetcher->getLastOpTimeFetched());
 
     ASSERT_FALSE(oplogFetcher->isActive());
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, oplogFetcher->startup());
     ASSERT_FALSE(oplogFetcher->isActive());
 
     // Last optime fetched should not change.
-    ASSERT_EQUALS(lastFetched, oplogFetcher->getLastOpTimeFetched_forTest());
+    ASSERT_EQUALS(lastFetched, oplogFetcher->getLastOpTimeFetched());
 }
 
 TEST_F(OplogFetcherTest, OplogFetcherReturnsOperationFailedIfExecutorFailsToScheduleRunQuery) {
@@ -630,14 +630,14 @@ TEST_F(OplogFetcherTest, OplogFetcherReturnsOperationFailedIfExecutorFailsToSche
         makeOplogFetcherWithDifferentExecutor(&taskExecutorMock, [](Status) { MONGO_UNREACHABLE; });
 
     // Last optime fetched should match values passed to constructor.
-    ASSERT_EQUALS(lastFetched, oplogFetcher->getLastOpTimeFetched_forTest());
+    ASSERT_EQUALS(lastFetched, oplogFetcher->getLastOpTimeFetched());
 
     ASSERT_FALSE(oplogFetcher->isActive());
     ASSERT_EQUALS(ErrorCodes::OperationFailed, oplogFetcher->startup());
     ASSERT_FALSE(oplogFetcher->isActive());
 
     // Last optime fetched should not change.
-    ASSERT_EQUALS(lastFetched, oplogFetcher->getLastOpTimeFetched_forTest());
+    ASSERT_EQUALS(lastFetched, oplogFetcher->getLastOpTimeFetched());
 }
 
 TEST_F(OplogFetcherTest, ShuttingExecutorDownAfterStartupButBeforeRunQueryScheduled) {
@@ -755,7 +755,7 @@ TEST_F(OplogFetcherTest,
     auto metadataObj = makeOplogBatchMetadata(boost::none, oqMetadata);
 
     // Update lastFetched before it is updated by getting the next batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Creating the cursor will succeed.
     auto m = processSingleRequestResponse(
@@ -1241,7 +1241,7 @@ TEST_F(OplogFetcherTest, DontRecreateNewCursorAfterFailedBatchNoRetries) {
     auto firstBatch = {firstEntry, secondEntry};
 
     // Update lastFetched before it is updated by getting the next batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Creating the cursor will succeed.
     auto m = processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(),
@@ -1252,8 +1252,7 @@ TEST_F(OplogFetcherTest, DontRecreateNewCursorAfterFailedBatchNoRetries) {
         m, lastFetched, durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()));
 
     // Check that the first batch was successfully processed.
-    validateLastBatch(
-        true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched_forTest());
+    validateLastBatch(true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched());
 
     // This will cause the oplog fetcher to fail while getting the next batch. Since it doesn't have
     // any retries, the oplog fetcher will shut down.
@@ -1279,7 +1278,7 @@ TEST_F(OplogFetcherTest, DontRecreateNewCursorAfterFailedBatchWhenSyncSourceChan
     auto firstBatch = {firstEntry, secondEntry};
 
     // Update lastFetched before it is updated by getting the next batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Creating the cursor will succeed.
     auto m = processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(),
@@ -1290,8 +1289,7 @@ TEST_F(OplogFetcherTest, DontRecreateNewCursorAfterFailedBatchWhenSyncSourceChan
         m, lastFetched, durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()));
 
     // Check that the first batch was successfully processed.
-    validateLastBatch(
-        true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched_forTest());
+    validateLastBatch(true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched());
 
     // Mock a result that tells us to stop syncing.
     dataReplicatorExternalState->setShouldStopFetchingResult(
@@ -1321,7 +1319,7 @@ TEST_F(OplogFetcherTest, FailCreateNewCursorAfterFailedBatchRetriesShutsDownOplo
     auto firstBatch = {firstEntry, secondEntry};
 
     // Update lastFetched before it is updated by getting the next batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Creating the cursor will succeed.
     auto m = processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(),
@@ -1332,8 +1330,7 @@ TEST_F(OplogFetcherTest, FailCreateNewCursorAfterFailedBatchRetriesShutsDownOplo
         m, lastFetched, durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()));
 
     // Check that the first batch was successfully processed.
-    validateLastBatch(
-        true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched_forTest());
+    validateLastBatch(true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched());
 
     // This will cause us to fail getting the next batch, meaning a new cursor needs to be created.
     processSingleRequestResponse(
@@ -1391,7 +1388,7 @@ TEST_F(OplogFetcherTest, SuccessfullyRecreateCursorAfterFailedBatch) {
     auto firstBatch = {firstEntry, secondEntry};
 
     // Update lastFetched before it is updated by getting the next batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // -- Step 2 --
     // Creating the cursor will succeed. After this, the cursor will be blocked on call() for the
@@ -1408,7 +1405,7 @@ TEST_F(OplogFetcherTest, SuccessfullyRecreateCursorAfterFailedBatch) {
                   conn->getSoTimeout());
 
     // Update lastFetched since it should have been updated after getting the last batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Check that the first batch was successfully processed.
     validateLastBatch(true /* skipFirstDoc */, firstBatch, lastFetched);
@@ -1449,7 +1446,7 @@ TEST_F(OplogFetcherTest, SuccessfullyRecreateCursorAfterFailedBatch) {
                   conn->getSoTimeout());
 
     // Update lastFetched since it should have been updated after getting the last batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Check that the first batch with the new cursor was successfully processed.
     validateLastBatch(true /* skipFirstDoc */, secondBatch, lastFetched);
@@ -1472,7 +1469,7 @@ TEST_F(OplogFetcherTest, SuccessfullyRecreateCursorAfterFailedBatch) {
                            dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime());
 
     // Update lastFetched since it should have been updated after getting the last batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Check that the next batch was successfully processed.
     validateLastBatch(false /* skipFirstDoc */, thirdBatch, lastFetched);
@@ -1492,7 +1489,7 @@ TEST_F(OplogFetcherTest, SuccessfullyRecreateCursorAfterFailedBatch) {
         true);
 
     // Update lastFetched since it should have been updated after getting the last batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Check that the next batch was successfully processed.
     validateLastBatch(false /* skipFirstDoc */, fourthBatch, lastFetched);
@@ -1535,7 +1532,7 @@ TEST_F(OplogFetcherTest, SuccessfulBatchResetsNumRestarts) {
     auto firstBatch = {firstEntry, secondEntry};
 
     // Update lastFetched before it is updated by getting the next batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // -- Step 3 --
     // Creating the cursor will succeed. After this, the cursor will be blocked on call() for the
@@ -1548,7 +1545,7 @@ TEST_F(OplogFetcherTest, SuccessfulBatchResetsNumRestarts) {
         m, lastFetched, durationCount<Milliseconds>(oplogFetcher->getRetriedFindMaxTime_forTest()));
 
     // Update lastFetched since it should have been updated after getting the last batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Check that the first batch was successfully processed.
     validateLastBatch(true /* skipFirstDoc */, firstBatch, lastFetched);
@@ -1567,7 +1564,7 @@ TEST_F(OplogFetcherTest, SuccessfulBatchResetsNumRestarts) {
     auto secondBatch = {secondEntry, thirdEntry};
 
     // Update lastFetched before it is updated by getting the next batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // -- Step 5 --
     // Make sure that we can finish recreating the cursor successfully.
@@ -1579,7 +1576,7 @@ TEST_F(OplogFetcherTest, SuccessfulBatchResetsNumRestarts) {
         m, lastFetched, durationCount<Milliseconds>(oplogFetcher->getRetriedFindMaxTime_forTest()));
 
     // Update lastFetched since it should have been updated after getting the last batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Check that the first batch from the new cursor was successfully processed.
     validateLastBatch(true /* skipFirstDoc */, secondBatch, lastFetched);
@@ -1608,7 +1605,7 @@ TEST_F(OplogFetcherTest, OplogFetcherWorksWithoutExhaust) {
     auto firstBatch = {firstEntry, secondEntry};
 
     // Update lastFetched before it is updated by getting the next batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Set a null lastCommittedOpTime to test that non-exhaust cursors don't attach a null
     // lastKnownCommittedOpTime. This must be done before we issue the response to the find request
@@ -1628,7 +1625,7 @@ TEST_F(OplogFetcherTest, OplogFetcherWorksWithoutExhaust) {
         m, lastFetched, durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()));
 
     // Update lastFetched since it should have been updated after getting the last batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Check that the first batch was successfully processed.
     validateLastBatch(true /* skipFirstDoc */, firstBatch, lastFetched);
@@ -1660,7 +1657,7 @@ TEST_F(OplogFetcherTest, OplogFetcherWorksWithoutExhaust) {
                            false /* exhaustSupported */);
 
     // Update lastFetched since it should have been updated after getting the last batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Check that the next batch was successfully processed.
     validateLastBatch(false /* skipFirstDoc */, secondBatch, lastFetched);
@@ -1680,7 +1677,7 @@ TEST_F(OplogFetcherTest, OplogFetcherWorksWithoutExhaust) {
                            false /* exhaustSupported */);
 
     // Update lastFetched since it should have been updated after getting the last batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Check that the next batch was successfully processed.
     validateLastBatch(false /* skipFirstDoc */, thirdBatch, lastFetched);
@@ -1716,8 +1713,7 @@ TEST_F(OplogFetcherTest, CursorIsDeadShutsDownOplogFetcherWithSuccessfulStatus) 
     oplogFetcher->join();
 
     // Check that the next batch was successfully processed.
-    validateLastBatch(
-        true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched_forTest());
+    validateLastBatch(true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched());
 
     ASSERT_OK(shutdownState.getStatus());
 }
@@ -1756,8 +1752,7 @@ TEST_F(OplogFetcherTest, SkipFirstDocumentIfDoesntMatchFilter) {
     // Check that the next batch was successfully processed.
     // Note that though we told the oplog fetcher not to skip the first doc, we should skip it
     // anyway because it won't match the filter.
-    validateLastBatch(
-        true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched_forTest());
+    validateLastBatch(true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched());
 
     ASSERT_OK(shutdownState.getStatus());
 }
@@ -1794,8 +1789,7 @@ TEST_F(OplogFetcherTest, DontSkipFirstDocumentIfDoesMatchFilter) {
     oplogFetcher->join();
 
     // Check that the next batch was successfully processed.
-    validateLastBatch(
-        false /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched_forTest());
+    validateLastBatch(false /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched());
 
     ASSERT_OK(shutdownState.getStatus());
 }
@@ -1928,7 +1922,7 @@ TEST_F(OplogFetcherTest,
     auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
 
     // Update lastFetched before it is updated by getting the next batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Creating the cursor will succeed. Only send over the first entry. Save the second for the
     // getMore request.
@@ -1946,7 +1940,7 @@ TEST_F(OplogFetcherTest,
         Status{ErrorCodes::QueryPlanKilled, "Simulating failure for test."},
         true);
 
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Resend all data for the retry. The enqueueDocumentsFn will check to make sure that
     // the first entry was not enqueued twice.
@@ -2003,7 +1997,7 @@ TEST_F(OplogFetcherTest,
     auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
 
     // Update lastFetched before it is updated by getting the next batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Creating the cursor will succeed.
     auto m = processSingleRequestResponse(
@@ -2021,7 +2015,7 @@ TEST_F(OplogFetcherTest,
         Status{ErrorCodes::QueryPlanKilled, "Simulating failure for test."},
         true);
 
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Resend the second entry for the retry. The enqueueDocumentsFn will check to make sure that
     // the second entry was not enqueued twice.
@@ -2612,7 +2606,7 @@ TEST_F(OplogFetcherTest, CheckFindCommandIncludesFilter) {
     auto firstBatch = {firstEntry, secondEntry};
 
     // Update lastFetched before it is updated by getting the next batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Creating the cursor will succeed.
     auto m = processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(),
@@ -2648,7 +2642,7 @@ TEST_F(OplogFetcherTest, CheckFindCommandIncludesCustomReadConcern) {
     auto firstBatch = {firstEntry, secondEntry};
 
     // Update lastFetched before it is updated by getting the next batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Creating the cursor will succeed.
     auto m = processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(),
@@ -2686,7 +2680,7 @@ TEST_F(OplogFetcherTest, CheckFindCommandIncludesRequestResumeTokenWhenRequested
     auto firstBatch = {firstEntry, secondEntry};
 
     // Update lastFetched before it is updated by getting the next batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     auto cursorRes = CursorResponse(
         NamespaceString::kRsOplogNamespace, cursorId, firstBatch, boost::none, resumeTokenObj);
@@ -2731,7 +2725,7 @@ TEST_F(OplogFetcherTest, BSONObjectTooLargeShutsDownOplogFetcher) {
     auto firstBatch = {firstEntry, secondEntry};
 
     // Update lastFetched before it is updated by getting the next batch.
-    lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
 
     // Creating the cursor will succeed.
     auto m = processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(),
@@ -2742,8 +2736,7 @@ TEST_F(OplogFetcherTest, BSONObjectTooLargeShutsDownOplogFetcher) {
         m, lastFetched, durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()));
 
     // Check that the first batch was successfully processed.
-    validateLastBatch(
-        true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched_forTest());
+    validateLastBatch(true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched());
 
     // Process second batch that throws BSONObjectTooLarge.
     processSingleRequestResponse(
