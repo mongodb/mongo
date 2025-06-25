@@ -418,6 +418,10 @@ acquireLocksForRenameCollectionWithinDBForApplyOps(OperationContext* opCtx,
     dassert(!shard_role_details::getRecoveryUnit(opCtx)->isActive());
 
     auto sourceColl = catalog->lookupCollectionByNamespace(opCtx, source);
+    // This method is only invoked when the source collection exists and rename ops are applied
+    // exclusively (with no concurrent writers), which guarantees the stability of this condition.
+    tassert(10562400, "Expected source collection to exist", sourceColl);
+
     auto targetCollBasedOnNs = catalog->lookupCollectionByNamespace(opCtx, target);
     auto nsToDropBasedOnUUID =
         uuidToDrop ? catalog->lookupNSSByUUID(opCtx, *uuidToDrop) : boost::none;
