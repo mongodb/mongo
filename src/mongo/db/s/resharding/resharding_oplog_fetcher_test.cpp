@@ -62,6 +62,7 @@
 #include "mongo/db/query/client_cursor/kill_cursors_gen.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -2408,7 +2409,14 @@ protected:
         auto lastOplogEntry = uassertStatusOK(repl::OplogEntry::parse(lastOplogEntryBson));
 
         ASSERT_EQ(lastOplogEntry.getWallClockTime(), expected.lastFetchedOplogWallClockTime);
-        ASSERT_BSONOBJ_EQ(lastOplogEntryBson, expected.lastFetchedOplogEntry->toBSON());
+
+        // Exclude the 'wallClockTime' field from the BSON comparison, as it is expected to be set
+        // to the current time by the fetcher.
+        auto actualLastOplogEntryBson =
+            lastOplogEntryBson.removeField(repl::OplogEntry::kWallClockTimeFieldName);
+        auto expectedLastOplogEntryBson = expected.lastFetchedOplogEntry->toBSON().removeField(
+            repl::OplogEntry::kWallClockTimeFieldName);
+        ASSERT_BSONOBJ_EQ(actualLastOplogEntryBson, expectedLastOplogEntryBson);
     }
 };
 
@@ -2497,9 +2505,9 @@ TEST_F(
                                     oplogId);
         auto oplogEntries = BSON_ARRAY(oplogEntry.toBSON());
         auto mockCursorResponse = makeMockAggregateResponse(postBatchResumeToken, oplogEntries);
-        // Advance the clock to verify that the fetcher doesn't modify the wall clock time of the
-        // oplog entry it fetched. It should not insert a 'reshardProgressMark' oplog entry since
-        // the batch is not empty.
+        // Advance the clock to verify that the fetcher sets the wall clock time of every oplog
+        // entry it fetches to the current time. It should not insert a 'reshardProgressMark' oplog
+        // entry since the batch is not empty.
         advanceTime(Milliseconds(1500));
         runFetcher(testCtx.fetcher.get(), mockCursorResponse);
 
@@ -2508,7 +2516,7 @@ TEST_F(
         expected.storedProgress = testOptions.storeProgress;
         expected.lastFetchedCount = 1;
         expected.lastFetchedOplogId = oplogId;
-        expected.lastFetchedOplogWallClockTime = oplogWallClockTime;
+        expected.lastFetchedOplogWallClockTime = now();
         expected.lastFetchedOplogEntry = oplogEntry;
 
         assertOplogEntriesCount(testCtx.outputCollectionNss, expected);
@@ -2545,9 +2553,9 @@ TEST_F(
                                     oplogId);
         auto oplogEntries = BSON_ARRAY(oplogEntry.toBSON());
         auto mockCursorResponse = makeMockAggregateResponse(postBatchResumeToken, oplogEntries);
-        // Advance the clock to verify that the fetcher doesn't modify the wall clock time of the
-        // oplog entry it fetched. It should not insert a 'reshardProgressMark' oplog entry since
-        // the batch is not empty.
+        // Advance the clock to verify that the fetcher sets the wall clock time of every oplog
+        // entry it fetches to the current time. It should not insert a 'reshardProgressMark' oplog
+        // entry since the batch is not empty.
         advanceTime(Milliseconds(1500));
         runFetcher(testCtx.fetcher.get(), mockCursorResponse);
 
@@ -2556,7 +2564,7 @@ TEST_F(
         expected.storedProgress = testOptions.storeProgress;
         expected.lastFetchedCount = 1;
         expected.lastFetchedOplogId = oplogId;
-        expected.lastFetchedOplogWallClockTime = oplogWallClockTime;
+        expected.lastFetchedOplogWallClockTime = now();
         expected.lastFetchedOplogEntry = oplogEntry;
 
         assertOplogEntriesCount(testCtx.outputCollectionNss, expected);
@@ -2592,8 +2600,9 @@ TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
                                      oplogId0);
         auto oplogEntries0 = BSON_ARRAY(oplogEntry0.toBSON());
         auto mockCursorResponse0 = makeMockAggregateResponse(postBatchResumeToken0, oplogEntries0);
-        // Advance the clock to verify that the fetcher doesn't modify the wall clock time of the
-        // oplog entry it fetched.
+        // Advance the clock to verify that the fetcher sets the wall clock time of every oplog
+        // entry it fetches to the current time. It should not insert a 'reshardProgressMark' oplog
+        // entry since the batch is not empty.
         advanceTime(Milliseconds(1500));
         runFetcher(testCtx.fetcher.get(), mockCursorResponse0);
 
@@ -2602,7 +2611,7 @@ TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
         expected.storedProgress = testOptions.storeProgress;
         expected.lastFetchedCount = 1;
         expected.lastFetchedOplogId = oplogId0;
-        expected.lastFetchedOplogWallClockTime = oplogWallClockTime0;
+        expected.lastFetchedOplogWallClockTime = now();
         expected.lastFetchedOplogEntry = oplogEntry0;
 
         assertOplogEntriesCount(testCtx.outputCollectionNss, expected);
@@ -2647,8 +2656,9 @@ TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
                                      oplogId0);
         auto oplogEntries0 = BSON_ARRAY(oplogEntry0.toBSON());
         auto mockCursorResponse0 = makeMockAggregateResponse(postBatchResumeToken0, oplogEntries0);
-        // Advance the clock to verify that the fetcher doesn't modify the wall clock time of the
-        // oplog entry it fetched.
+        // Advance the clock to verify that the fetcher sets the wall clock time of every oplog
+        // entry it fetches to the current time. It should not insert a 'reshardProgressMark' oplog
+        // entry since the batch is not empty.
         advanceTime(Milliseconds(1500));
         runFetcher(testCtx.fetcher.get(), mockCursorResponse0);
 
@@ -2657,7 +2667,7 @@ TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
         expected.storedProgress = testOptions.storeProgress;
         expected.lastFetchedCount = 1;
         expected.lastFetchedOplogId = oplogId0;
-        expected.lastFetchedOplogWallClockTime = oplogWallClockTime0;
+        expected.lastFetchedOplogWallClockTime = now();
         expected.lastFetchedOplogEntry = oplogEntry0;
 
         assertOplogEntriesCount(testCtx.outputCollectionNss, expected);
@@ -2697,9 +2707,8 @@ TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
         auto postBatchResumeToken = testCtx.startAt.getTs();
         auto oplogEntries = BSONArrayBuilder().arr();
         auto mockCursorResponse = makeMockAggregateResponse(postBatchResumeToken, oplogEntries);
-        // Advance the clock to verify that the fetcher doesn't modify the wall clock time of the
-        // oplog entry it fetched and that it sets the wall clock time of the 'reshardProgressMark'
-        // to the current time.
+        // Advance the clock to verify that the fetcher it sets the wall clock time of the
+        // 'reshardProgressMark' to the current time.
         advanceTime(Milliseconds(1500));
         runFetcher(testCtx.fetcher.get(), mockCursorResponse);
 
@@ -2793,9 +2802,9 @@ TEST_F(
                                     oplogId);
         auto oplogEntries = BSON_ARRAY(oplogEntry.toBSON());
         auto mockCursorResponse = makeMockAggregateResponse(postBatchResumeToken, oplogEntries);
-        // Advance the clock to verify that the fetcher doesn't modify the wall clock time of the
-        // oplog entry it fetched. It should not insert a 'reshardProgressMark' oplog entry since
-        // the batch is not empty.
+        // Advance the clock to verify that the fetcher sets the wall clock time of every oplog
+        // entry it fetches to the current time. It should not insert a 'reshardProgressMark' oplog
+        // entry since the batch is not empty.
         advanceTime(Milliseconds(1500));
         runFetcher(testCtx.fetcher.get(), mockCursorResponse);
 
@@ -2805,7 +2814,7 @@ TEST_F(
 
         expected.lastFetchedCount = 1;
         expected.lastFetchedOplogId = oplogId;
-        expected.lastFetchedOplogWallClockTime = oplogWallClockTime;
+        expected.lastFetchedOplogWallClockTime = now();
         expected.lastFetchedOplogEntry = oplogEntry;
 
         assertLastOplogNotProgressMark(testCtx.outputCollectionNss, expected);
@@ -2843,9 +2852,9 @@ TEST_F(
                                     oplogId);
         auto oplogEntries = BSON_ARRAY(oplogEntry.toBSON());
         auto mockCursorResponse = makeMockAggregateResponse(postBatchResumeToken, oplogEntries);
-        // Advance the clock to verify that the fetcher doesn't modify the wall clock time of the
-        // oplog entry it fetched. It should not insert a 'reshardProgressMark' oplog entry since
-        // the batch is not empty.
+        // Advance the clock to verify that the fetcher sets the wall clock time of every oplog
+        // entry it fetches to the current time. It should not insert a 'reshardProgressMark' oplog
+        // entry since the batch is not empty.
         advanceTime(Milliseconds(1500));
         runFetcher(testCtx.fetcher.get(), mockCursorResponse);
 
@@ -2854,7 +2863,7 @@ TEST_F(
         expected.storedProgress = testOptions.storeProgress;
         expected.lastFetchedCount = 1;
         expected.lastFetchedOplogId = oplogId;
-        expected.lastFetchedOplogWallClockTime = oplogWallClockTime;
+        expected.lastFetchedOplogWallClockTime = now();
         expected.lastFetchedOplogEntry = oplogEntry;
 
         assertLastOplogNotProgressMark(testCtx.outputCollectionNss, expected);
@@ -2896,9 +2905,9 @@ TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
                                      oplogId0);
         auto oplogEntries0 = BSON_ARRAY(oplogEntry0.toBSON());
         auto mockCursorResponse0 = makeMockAggregateResponse(postBatchResumeToken0, oplogEntries0);
-        // Advance the clock to verify that the fetcher doesn't modify the wall clock time of the
-        // oplog entry it fetched. It should not insert a 'reshardProgressMark' oplog entry since
-        // the batch is not empty.
+        // Advance the clock to verify that the fetcher sets the wall clock time of every oplog
+        // entry it fetches to the current time. It should not insert a 'reshardProgressMark' oplog
+        // entry since the batch is not empty.
         advanceTime(Milliseconds(1500));
         runFetcher(testCtx.fetcher.get(), mockCursorResponse0);
 
@@ -2907,7 +2916,7 @@ TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
         expected.storedProgress = testOptions.storeProgress;
         expected.lastFetchedOplogId = oplogId0;
         expected.lastFetchedCount = 1;
-        expected.lastFetchedOplogWallClockTime = oplogWallClockTime0;
+        expected.lastFetchedOplogWallClockTime = now();
         expected.lastFetchedOplogEntry = oplogEntry0;
 
         assertLastOplogNotProgressMark(testCtx.outputCollectionNss, expected);

@@ -46,6 +46,7 @@
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -76,7 +77,19 @@ namespace mongo {
 
 namespace {
 MONGO_FAIL_POINT_DEFINE(reshardingApplyOplogBatchTwice);
+
+/*
+ * Returns the amount of time that has elapsed since the oplog entry was created.
+ */
+Milliseconds calculateTimeElapsedSinceOplogWallClockTime(OperationContext* opCtx,
+                                                         const repl::OplogEntry& oplogEntry) {
+    auto oplogWallTime = oplogEntry.getWallClockTime();
+    auto currentWallTime = opCtx->getServiceContext()->getFastClockSource()->now();
+    // If there are clock skews, then the difference below may be negative so cap it at zero.
+    return std::max(Milliseconds(0), currentWallTime - oplogWallTime);
 }
+
+}  // namespace
 
 ReshardingOplogApplier::ReshardingOplogApplier(
     std::unique_ptr<Env> env,
@@ -102,7 +115,7 @@ ReshardingOplogApplier::ReshardingOplogApplier(
                        _env->applierMetrics(),
                        isCapped},
       _sessionApplication{std::move(oplogBufferNss)},
-      _batchApplier{_crudApplication, _sessionApplication, _env->applierMetrics()},
+      _batchApplier{_crudApplication, _sessionApplication},
       _oplogIter(std::move(oplogIterator)) {}
 
 SemiFuture<void> ReshardingOplogApplier::_applyBatch(
@@ -298,9 +311,39 @@ void ReshardingOplogApplier::_clearAppliedOpsAndStoreProgress(OperationContext* 
 
     _env->applierMetrics()->onOplogEntriesApplied(_currentBatchToApply.size());
 
+    if (_needToEstimateRemainingTimeBasedOnMovingAverage(opCtx)) {
+        _updateAverageTimeToApplyOplogEntries(opCtx);
+    }
+
     _currentBatchToApply.clear();
     _currentDerivedOpsForCrudWriters.clear();
     _currentDerivedOpsForSessionWriters.clear();
+}
+
+bool ReshardingOplogApplier::_needToEstimateRemainingTimeBasedOnMovingAverage(
+    OperationContext* opCtx) {
+    if (!_supportEstimatingRemainingTimeBasedOnMovingAverage.has_value()) {
+        // Only check the feature flag once since the setFCV command aborts any in-progress
+        // resharding operation so no resharding operations can span multiple FCV versions.
+        _supportEstimatingRemainingTimeBasedOnMovingAverage =
+            resharding::gFeatureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    }
+
+    return *_supportEstimatingRemainingTimeBasedOnMovingAverage &&
+        resharding::gReshardingRemainingTimeEstimateBasedOnMovingAverage.load();
+}
+
+void ReshardingOplogApplier::_updateAverageTimeToApplyOplogEntries(OperationContext* opCtx) {
+    if (_currentBatchToApply.empty()) {
+        return;
+    }
+
+    // Update the average based on the last oplog in the batch.
+    auto timeToApply =
+        calculateTimeElapsedSinceOplogWallClockTime(opCtx, _currentBatchToApply.back());
+    _env->applierMetrics()->updateAverageTimeToApplyOplogEntries(timeToApply);
 }
 
 NamespaceString ReshardingOplogApplier::ensureStashCollectionExists(

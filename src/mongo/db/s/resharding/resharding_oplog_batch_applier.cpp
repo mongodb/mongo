@@ -32,6 +32,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
@@ -63,28 +65,10 @@
 
 namespace mongo {
 
-namespace {
-
-/*
- * Returns the amount of time that has elapsed since the oplog entry was created.
- */
-Milliseconds calculateTimeElapsedSinceOplogWallClockTime(OperationContext* opCtx,
-                                                         const repl::OplogEntry& oplogEntry) {
-    auto oplogWallTime = oplogEntry.getWallClockTime();
-    auto currentWallTime = opCtx->getServiceContext()->getFastClockSource()->now();
-    // If there are clock skews, then the difference below may be negative so cap it at zero.
-    return std::max(Milliseconds(0), currentWallTime - oplogWallTime);
-}
-
-}  // namespace
-
 ReshardingOplogBatchApplier::ReshardingOplogBatchApplier(
     const ReshardingOplogApplicationRules& crudApplication,
-    const ReshardingOplogSessionApplication& sessionApplication,
-    ReshardingOplogApplierMetrics* applierMetrics)
-    : _crudApplication(crudApplication),
-      _sessionApplication(sessionApplication),
-      _applierMetrics(applierMetrics) {}
+    const ReshardingOplogSessionApplication& sessionApplication)
+    : _crudApplication(crudApplication), _sessionApplication(sessionApplication) {}
 
 template <bool IsForSessionApplication>
 SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
@@ -119,9 +103,6 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                        } else {
                            if (resharding::isProgressMarkOplogAfterOplogApplicationStarted(
                                    oplogEntry)) {
-                               auto timeToApply = calculateTimeElapsedSinceOplogWallClockTime(
-                                   opCtx.get(), oplogEntry);
-                               _applierMetrics->updateAverageTimeToApplyOplogEntries(timeToApply);
                                continue;
                            }
 

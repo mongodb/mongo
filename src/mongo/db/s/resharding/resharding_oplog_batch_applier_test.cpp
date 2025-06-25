@@ -212,8 +212,8 @@ public:
             _sessionApplication =
                 std::make_unique<ReshardingOplogSessionApplication>(_myOplogBufferNss);
 
-            _batchApplier = std::make_unique<ReshardingOplogBatchApplier>(
-                *_crudApplication, *_sessionApplication, _applierMetrics.get());
+            _batchApplier = std::make_unique<ReshardingOplogBatchApplier>(*_crudApplication,
+                                                                          *_sessionApplication);
         }
     }
 
@@ -641,139 +641,17 @@ TEST_F(ReshardingOplogBatchApplierTest, CancelableWhileWaitingOnPreparedTxn) {
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::CallbackCanceled);
 }
 
-TEST_F(ReshardingOplogBatchApplierTest, NotUpdateAvgTimeToApplyUponSeeingCrudOplog) {
-    auto executor = makeTaskExecutorForApplier();
-    auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
-
-    auto oplogEntry0 = makeInsertOplogEntry();
-    auto oplogEntry1 = makeUpdateOplogEntry();
-    auto oplogEntry2 = makeDeleteOplogEntry();
-
-    auto future = applier()->applyBatch<false>({&oplogEntry0, &oplogEntry1, &oplogEntry2},
-                                               executor,
-                                               CancellationToken::uncancelable(),
-                                               factory);
-    future.get();
-
-    ASSERT_FALSE(metrics()->getAverageTimeToApplyOplogEntries(getMyDonorShardId()));
-}
-
 TEST_F(ReshardingOplogBatchApplierTest,
-       UpdateAvgTimeToApplyUponSeeingProgressMarkOplogCreatedAfterOplogApplicationStartedBasic) {
-    auto smoothingFactor = 0.6;
-    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
-        "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
-
+       NotThrowUponSeeingProgressMarkOplogCreatedAfterOplogApplicationStarted) {
     auto executor = makeTaskExecutorForApplier();
     auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
 
-    // Verify that the average started out uninitialized.
-    ASSERT_FALSE(metrics()->getAverageTimeToApplyOplogEntries(getMyDonorShardId()));
-
-    // Test a batch with only one 'reshardProgressMark' oplog entry.
-    auto oplogWallTime0 = now();
-    auto oplogEntry0 = makeProgressMarkNoopOplogEntry(
-        oplogWallTime0, true /* createdAfterOplogApplicationStarted */);
-
-    // Advance the clock before applying the oplog entry above.
-    auto timeToApply0 = Milliseconds(1200);
-    advanceTime(timeToApply0);
-    auto future0 = applier()->applyBatch<false>(
-        {&oplogEntry0}, executor, CancellationToken::uncancelable(), factory);
-    future0.get();
-
-    // Verify that the average got initialized based on the difference between the current timestamp
-    // and oplogEntry0 wall time.
-    auto avgTimeToApply0 = timeToApply0;
-    ASSERT_EQ(metrics()->getAverageTimeToApplyOplogEntries(getMyDonorShardId()), avgTimeToApply0);
-
-    // Test a batch with multiple 'reshardProgressMark' oplog entries with different wall clock
-    // times.
-    advanceTime(Milliseconds(1000));
-    auto oplogWallTime1 = now();
-    auto oplogEntry1 = makeProgressMarkNoopOplogEntry(
-        oplogWallTime1, true /* createdAfterOplogApplicationStarted */);
-
-    advanceTime(Milliseconds(5));
-    auto oplogWallTime2 = now();
-    auto oplogEntry2 =
+    auto oplogEntry =
         makeProgressMarkNoopOplogEntry(now(), true /* createdAfterOplogApplicationStarted */);
-
-    // Advance the clock before applying the oplog entries above.
-    advanceTime(Milliseconds(800));
-    auto future2 = applier()->applyBatch<false>(
-        {&oplogEntry1, &oplogEntry2}, executor, CancellationToken::uncancelable(), factory);
-    future2.get();
-
-    // Verify that the average got based on the difference between the current timestamp and
-    // oplogEntry1 wall time, and then again based on the difference between the current timestamp
-    // and oplogEntry2 wall time.
-    auto timeToApply1 = now() - oplogWallTime1;
-    auto avgTimeToApply1 = Milliseconds((int)resharding::calculateExponentialMovingAverage(
-        avgTimeToApply0.count(), timeToApply1.count(), smoothingFactor));
-
-    auto timeToApply2 = now() - oplogWallTime2;
-    auto avgTimeToApply2 = Milliseconds((int)resharding::calculateExponentialMovingAverage(
-        avgTimeToApply1.count(), timeToApply2.count(), smoothingFactor));
-
-    ASSERT_EQ(metrics()->getAverageTimeToApplyOplogEntries(getMyDonorShardId()), avgTimeToApply2);
-
-    // Test a batch with one 'reshardProgressMark' oplog entry and one crud oplog entry.
-    advanceTime(Milliseconds(600));
-    auto oplogWallTime3 = now();
-    auto oplogEntry3 = makeProgressMarkNoopOplogEntry(
-        oplogWallTime3, true /* createdAfterOplogApplicationStarted */);
-
-    auto oplogEntry4 = makeInsertOplogEntry();
-
-    // Advance the clock before applying the oplog entry above.
-    advanceTime(Milliseconds(400));
-    auto future4 = applier()->applyBatch<false>(
-        {&oplogEntry3, &oplogEntry4}, executor, CancellationToken::uncancelable(), factory);
-    future4.get();
-
-    // Verify that the average got based on the difference between the current timestamp and
-    // oplogEntry3 wall time.
-    auto timeToApply3 = now() - oplogWallTime3;
-    auto avgTimeToApply3 = Milliseconds((int)resharding::calculateExponentialMovingAverage(
-        avgTimeToApply2.count(), timeToApply3.count(), smoothingFactor));
-
-    ASSERT_EQ(metrics()->getAverageTimeToApplyOplogEntries(getMyDonorShardId()), avgTimeToApply3);
-
-    // Test a batch with no 'reshardProgressMark' oplog entries but one crud oplog entry.
-    auto oplogEntry5 = makeInsertOplogEntry();
-
-    // Advance the clock before applying the oplog entry above.
-    advanceTime(Milliseconds(200));
-    auto future3 = applier()->applyBatch<false>(
-        {&oplogEntry5}, executor, CancellationToken::uncancelable(), factory);
-    future3.get();
-
-    // Verify that the average does not get updated or cleared upon applying a crud oplog entry.
-    ASSERT_EQ(metrics()->getAverageTimeToApplyOplogEntries(getMyDonorShardId()), avgTimeToApply3);
-}
-
-TEST_F(
-    ReshardingOplogBatchApplierTest,
-    UpdateAvgTimeToApplyUponSeeingProgressMarkOplogCreatedAfterOplogApplicationStartedClockSkew) {
-    auto smoothingFactor = 0.5;
-    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
-        "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
-
-    auto executor = makeTaskExecutorForApplier();
-    auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
-
-    ASSERT_FALSE(metrics()->getAverageTimeToApplyOplogEntries(getMyDonorShardId()));
-
-    // Make the oplog wall time greater than the current time on the recipient.
-    auto oplogWallTime = now() + Milliseconds(100);
-    auto oplogEntry = makeProgressMarkNoopOplogEntry(
-        oplogWallTime, true /* createdAfterOplogApplicationStarted */);
 
     auto future = applier()->applyBatch<false>(
         {&oplogEntry}, executor, CancellationToken::uncancelable(), factory);
     future.get();
-    ASSERT_EQ(metrics()->getAverageTimeToApplyOplogEntries(getMyDonorShardId()), Milliseconds(0));
 }
 
 DEATH_TEST_F(ReshardingOplogBatchApplierTest,

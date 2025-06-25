@@ -369,7 +369,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<double>
         cpp_varname: gReshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor
-        default: 0.9
+        default: 0.4
         validator:
             gt: 0
             lt: 1

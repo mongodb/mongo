@@ -829,7 +829,7 @@ void ReshardingMetrics::OplogLatencyMetrics::updateAverageTimeToFetch(Millisecon
         if (!_avgTimeToFetch) {
             return timeToFetch;
         }
-        return Milliseconds{(int)resharding::calculateExponentialMovingAverage(
+        return Milliseconds{(long long)resharding::calculateExponentialMovingAverage(
             _avgTimeToFetch->count(),
             timeToFetch.count(),
             resharding::gReshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor
@@ -844,7 +844,7 @@ void ReshardingMetrics::OplogLatencyMetrics::updateAverageTimeToApply(Millisecon
         if (!_avgTimeToApply) {
             return timeToApply;
         }
-        return Milliseconds{(int)resharding::calculateExponentialMovingAverage(
+        return Milliseconds{(long long)resharding::calculateExponentialMovingAverage(
             _avgTimeToApply->count(),
             timeToApply.count(),
             resharding::gReshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor

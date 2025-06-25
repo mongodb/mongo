@@ -56,6 +56,7 @@
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_noop_o2_field_gen.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
@@ -164,6 +165,10 @@ public:
     const std::string kOriginalShardKey = "sk";
     const BSONObj kOriginalShardKeyPattern{BSON(kOriginalShardKey << 1)};
 
+    ReshardingOplogApplierTest()
+        : ShardingMongoDTestFixture(
+              Options{}.useMockClock(true).useMockTickSource<Milliseconds>(true)) {}
+
     void setUp() override {
         ShardingMongoDTestFixture::setUp();
 
@@ -215,6 +220,8 @@ public:
             ReshardingMetrics::Role::kRecipient,
             getServiceContext()->getFastClockSource()->now(),
             getServiceContext());
+        _metrics->registerDonors({_sourceId.getShardId()});
+
         _applierMetrics = std::make_unique<ReshardingOplogApplierMetrics>(
             _sourceId.getShardId(), _metrics.get(), boost::none);
 
@@ -338,8 +345,9 @@ public:
     repl::OplogEntry makeOplog(const repl::OpTime& opTime,
                                repl::OpTypeEnum opType,
                                const BSONObj& obj1,
-                               const boost::optional<BSONObj> obj2) {
-        return makeOplog(opTime, opType, obj1, obj2, {}, {});
+                               const boost::optional<BSONObj> obj2,
+                               Date_t wallClockTime = {}) {
+        return makeOplog(opTime, opType, obj1, obj2, {}, {}, wallClockTime);
     }
 
     repl::OplogEntry makeOplog(const repl::OpTime& opTime,
@@ -347,7 +355,8 @@ public:
                                const BSONObj& obj1,
                                const boost::optional<BSONObj> obj2,
                                const OperationSessionInfo& sessionInfo,
-                               const std::vector<StmtId>& statementIds) {
+                               const std::vector<StmtId>& statementIds,
+                               Date_t wallClockTime = {}) {
         ReshardingDonorOplogId id(opTime.getTimestamp(), opTime.getTimestamp());
         return {repl::DurableOplogEntry(opTime,
                                         opType,
@@ -361,7 +370,7 @@ public:
                                         obj2,
                                         sessionInfo,
                                         boost::none /* upsert */,
-                                        {} /* date */,
+                                        wallClockTime,
                                         statementIds,
                                         boost::none /* prevWrite */,
                                         boost::none /* preImage */,
@@ -369,6 +378,30 @@ public:
                                         kMyShardId,
                                         Value(id.toBSON()),
                                         boost::none /* needsRetryImage) */)};
+    }
+
+    repl::OplogEntry makeProgressMarkNoopOplog(repl::OpTime opTime,
+                                               Date_t wallClockTime,
+                                               bool createdAfterOplogApplicationStarted) {
+        ReshardingDonorOplogId id(opTime.getTimestamp(), opTime.getTimestamp());
+
+        repl::MutableOplogEntry op;
+        op.setOpType(repl::OpTypeEnum::kNoop);
+        op.set_id(Value(id.toBSON()));
+        op.setObject({});
+
+        ReshardProgressMarkO2Field o2Field;
+        o2Field.setType(resharding::kReshardProgressMarkOpLogType);
+        if (createdAfterOplogApplicationStarted) {
+            o2Field.setCreatedAfterOplogApplicationStarted(true);
+        }
+        op.setObject2(o2Field.toBSON());
+
+        op.setNss({});
+        op.setOpTime(opTime);
+        op.setWallClockTime(wallClockTime);
+
+        return {op.toBSON()};
     }
 
     const NamespaceString& oplogBufferNs() {
@@ -411,6 +444,27 @@ public:
 
     std::shared_ptr<ThreadPool> getCancelableOpCtxExecutor() {
         return _cancelableOpCtxExecutor;
+    }
+
+    ReshardingMetrics* metrics() {
+        return _metrics.get();
+    }
+
+    ClockSourceMock* clockSource() {
+        return dynamic_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());
+    }
+
+    TickSourceMock<Milliseconds>* tickSource() {
+        return dynamic_cast<TickSourceMock<Milliseconds>*>(getServiceContext()->getTickSource());
+    }
+
+    Date_t now() {
+        return clockSource()->now();
+    }
+
+    void advanceTime(Milliseconds millis) {
+        clockSource()->advance(millis);
+        tickSource()->advance(millis);
     }
 
 protected:
@@ -1016,6 +1070,206 @@ TEST_F(ReshardingOplogApplierTest, MetricsAreReported) {
     auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
     ASSERT_TRUE(progressDoc);
     ASSERT_EQ(5, progressDoc->getNumEntriesApplied());
+}
+
+TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApplyBasic) {
+    auto batchSize = 2;
+    auto smoothingFactor = 0.3;
+
+    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
+        "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
+
+    loadCatalogCacheValues();
+    for (bool movingAvgFeatureFlag : {false, true}) {
+        for (bool movingAvgServerParameter : {false, true}) {
+            LOGV2(10655503,
+                  "Running case",
+                  "test"_attr = _agent.getTestName(),
+                  "movingAvgFeatureFlag"_attr = movingAvgFeatureFlag,
+                  "movingAvgServerParameter"_attr = movingAvgServerParameter);
+
+            const RAIIServerParameterControllerForTest movingAvgFeatureFlagRAII{
+                "featureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage",
+                movingAvgFeatureFlag};
+            const RAIIServerParameterControllerForTest movingAvgServerParameterRAII{
+                "reshardingRemainingTimeEstimateBasedOnMovingAverage", movingAvgServerParameter};
+
+            // Verify that the average started out uninitialized.
+            ASSERT_FALSE(metrics()->getAverageTimeToApplyOplogEntries(sourceId().getShardId()));
+
+            // Advance the clock before making each oplog entry to make them have distinct wall
+            // clock times.
+            std::deque<repl::OplogEntry> ops;
+
+            // The oplog batch has size greater than 1. The last oplog entry is a CRUD oplog entry.
+            advanceTime(Milliseconds(1250));
+            ops.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                    repl::OpTypeEnum::kInsert,
+                                    BSON("_id" << 1),
+                                    boost::none,
+                                    now()));
+            advanceTime(Milliseconds(150));
+            auto oplogWallTime1 = now();
+            ops.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                    repl::OpTypeEnum::kInsert,
+                                    BSON("_id" << 2),
+                                    boost::none,
+                                    oplogWallTime1));
+
+            // The oplog batch has batch greater than 1. The last oplog entry is a session oplog
+            // entry.
+            advanceTime(Milliseconds(750));
+            ops.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                    repl::OpTypeEnum::kUpdate,
+                                    update_oplog_entry::makeDeltaOplogEntry(
+                                        BSON(doc_diff::kUpdateSectionFieldName << BSON("x" << 1))),
+                                    BSON("_id" << 2),
+                                    now()));
+            advanceTime(Milliseconds(50));
+            OperationSessionInfo sessionInfo3;
+            sessionInfo3.setSessionId(makeLogicalSessionIdForTest());
+            sessionInfo3.setTxnNumber(1);
+            auto statementIds3 = std::vector<int>{0};
+            auto oplogWallTime3 = now();
+            ops.push_back(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
+                                    repl::OpTypeEnum::kDelete,
+                                    BSON("_id" << 1),
+                                    boost::none,
+                                    sessionInfo3,
+                                    statementIds3,
+                                    oplogWallTime3));
+
+            // The oplog batch has equal to 1. The last oplog entry is a 'reshardProgressMark' oplog
+            // entry.
+            advanceTime(Milliseconds(500));
+            auto oplogWallTime4 = now();
+            ops.push_back(
+                makeProgressMarkNoopOplog(repl::OpTime(Timestamp(9, 3), 1),
+                                          oplogWallTime4,
+                                          true /* createdAfterOplogApplicationStarted */));
+
+            advanceTime(Milliseconds(100));
+            auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops), batchSize);
+            boost::optional<ReshardingOplogApplier> applier;
+            applier.emplace(makeApplierEnv(),
+                            kApplierBatchTaskCount,
+                            sourceId(),
+                            oplogBufferNs(),
+                            appliedToNs(),
+                            stashCollections(),
+                            0U /* myStashIdx */,
+                            chunkManager(),
+                            std::move(iterator));
+
+            auto cancelToken = operationContext()->getCancellationToken();
+            CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+            auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
+            ASSERT_OK(future.getNoThrow());
+
+            auto avgTimeToApplyAfter =
+                metrics()->getAverageTimeToApplyOplogEntries(sourceId().getShardId());
+
+            if (movingAvgFeatureFlag && movingAvgServerParameter) {
+                // Upon applying the first batch, the average should get based on the difference
+                // between the current timestamp and oplogEntry1 wall time.
+                auto timeToApply1 = now() - oplogWallTime1;
+                auto avgTimeToApply1 = timeToApply1;
+
+                // Upon applying the second batch, the average should get based on the difference
+                // between the current timestamp and oplogEntry3 wall time.
+                auto timeToApply3 = now() - oplogWallTime3;
+                auto avgTimeToApply3 =
+                    Milliseconds((int)resharding::calculateExponentialMovingAverage(
+                        avgTimeToApply1.count(), timeToApply3.count(), smoothingFactor));
+
+                // Upon applying the third batch, the average should get based on the difference
+                // between the current timestamp and oplogEntry4 wall time.
+                auto timeToApply4 = now() - oplogWallTime4;
+                auto avgTimeToApply4 =
+                    Milliseconds((int)resharding::calculateExponentialMovingAverage(
+                        avgTimeToApply3.count(), timeToApply4.count(), smoothingFactor));
+
+                ASSERT_EQ(avgTimeToApplyAfter, avgTimeToApply4);
+            } else {
+                // Verify that the average did not get initialized.
+                ASSERT_FALSE(avgTimeToApplyAfter);
+            }
+        }
+    }
+}
+
+TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApply_EmptyBatch) {
+    auto batchSize = 2;
+
+    // Not set the 'reshardingRemainingTimeEstimateBasedOnMovingAverage' server parameter to verify
+    // that it defaults to true.
+    const RAIIServerParameterControllerForTest movingAvgFeatureFlagRAII{
+        "featureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage", true};
+
+    // Verify that the average started out uninitialized.
+    ASSERT_FALSE(metrics()->getAverageTimeToApplyOplogEntries(sourceId().getShardId()));
+
+    std::deque<repl::OplogEntry> ops;
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops), batchSize);
+    boost::optional<ReshardingOplogApplier> applier;
+    applier.emplace(makeApplierEnv(),
+                    kApplierBatchTaskCount,
+                    sourceId(),
+                    oplogBufferNs(),
+                    appliedToNs(),
+                    stashCollections(),
+                    0U /* myStashIdx */,
+                    chunkManager(),
+                    std::move(iterator));
+
+    auto cancelToken = operationContext()->getCancellationToken();
+    CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+    auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
+    ASSERT_OK(future.getNoThrow());
+
+    // Verify that the average is still uninitialized.
+    ASSERT_FALSE(metrics()->getAverageTimeToApplyOplogEntries(sourceId().getShardId()));
+}
+
+TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApply_ClockSkew) {
+    auto batchSize = 2;
+
+    // Not set the 'reshardingRemainingTimeEstimateBasedOnMovingAverage' server parameter to verify
+    // that it defaults to true.
+    const RAIIServerParameterControllerForTest movingAvgFeatureFlagRAII{
+        "featureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage", true};
+
+    // Verify that the average started out uninitialized.
+    ASSERT_FALSE(metrics()->getAverageTimeToApplyOplogEntries(sourceId().getShardId()));
+
+    std::deque<repl::OplogEntry> ops;
+    // Make the oplog wall time greater than the current time on the recipient.
+    ops.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                            repl::OpTypeEnum::kInsert,
+                            BSON("_id" << 1),
+                            boost::none,
+                            now() + Milliseconds(100)));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops), batchSize);
+    boost::optional<ReshardingOplogApplier> applier;
+    applier.emplace(makeApplierEnv(),
+                    kApplierBatchTaskCount,
+                    sourceId(),
+                    oplogBufferNs(),
+                    appliedToNs(),
+                    stashCollections(),
+                    0U /* myStashIdx */,
+                    chunkManager(),
+                    std::move(iterator));
+
+    auto cancelToken = operationContext()->getCancellationToken();
+    CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+    auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
+    ASSERT_OK(future.getNoThrow());
+
+    ASSERT_EQ(metrics()->getAverageTimeToApplyOplogEntries(sourceId().getShardId()),
+              Milliseconds(0));
 }
 
 }  // unnamed namespace

@@ -136,8 +136,10 @@ struct OplogInsertBatch {
  * Packs the oplog entries in 'aggregateBatch' into insert batches based on the configured maximum
  * insert batch count and bytes while preserving the original oplog order. If there is an oplog
  * entry whose size exceeds the max batch bytes, packs it into its own batch instead of throwing.
+ * Sets the wall clock time of each oplog entry to the current wall clock time.
  */
-std::vector<OplogInsertBatch> getOplogInsertBatches(const std::vector<BSONObj>& aggregateBatch) {
+std::vector<OplogInsertBatch> getOplogInsertBatches(OperationContext* opCtx,
+                                                    const std::vector<BSONObj>& aggregateBatch) {
     size_t maxOperations = resharding::gReshardingOplogFetcherInsertBatchLimitOperations.load();
     auto maxBytes = resharding::gReshardingOplogFetcherInsertBatchLimitBytes.load();
 
@@ -163,15 +165,21 @@ std::vector<OplogInsertBatch> getOplogInsertBatches(const std::vector<BSONObj>& 
             } else if (totalBytes + currentBytes > maxBytes) {
                 break;
             }
-            insertBatch.statements.emplace_back(currentDoc);
+
+            auto currentMutableOplogEntry =
+                uassertStatusOK(repl::MutableOplogEntry::parse(currentDoc));
+            currentMutableOplogEntry.setWallClockTime(
+                opCtx->getServiceContext()->getFastClockSource()->now());
+            auto currentMutableOplogBson = currentMutableOplogEntry.toBSON();
+
+            insertBatch.statements.emplace_back(currentMutableOplogBson);
             totalBytes += currentBytes;
             ++currentIndex;
 
-            const auto currentOplogEntry = uassertStatusOK(repl::OplogEntry::parse(currentDoc));
-            insertBatch.lastOplogId =
-                ReshardingDonorOplogId::parse(IDLParserContext{"OplogFetcherParsing"},
-                                              currentOplogEntry.get_id()->getDocument().toBson());
-            if (resharding::isFinalOplog(currentOplogEntry)) {
+            insertBatch.lastOplogId = ReshardingDonorOplogId::parse(
+                IDLParserContext{"OplogFetcherParsing"},
+                currentMutableOplogEntry.get_id()->getDocument().toBson());
+            if (resharding::isFinalOplog({currentMutableOplogBson})) {
                 insertBatch.moreToCome = false;
                 break;
             }
@@ -659,7 +667,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
                                       AcquisitionPrerequisites::kWrite),
                                   MODE_IX);
 
-            const auto insertBatches = getOplogInsertBatches(aggregateBatch);
+            const auto insertBatches = getOplogInsertBatches(opCtx, aggregateBatch);
             for (const auto& insertBatch : insertBatches) {
                 Timer insertTimer;
 

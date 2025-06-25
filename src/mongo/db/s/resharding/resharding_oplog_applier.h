@@ -142,6 +142,18 @@ private:
      */
     void _clearAppliedOpsAndStoreProgress(OperationContext* opCtx);
 
+    /**
+     * Returns true if the recipient has been configured to estimate the remaining time based on
+     * the exponential moving average of the time it takes to fetch and apply oplog entries.
+     */
+    bool _needToEstimateRemainingTimeBasedOnMovingAverage(OperationContext* opCtx);
+
+    /**
+     * Updates the average time to apply oplog entries based on the last oplog entry in the current
+     * batch if it is not empty.
+     */
+    void _updateAverageTimeToApplyOplogEntries(OperationContext* opCtx);
+
     std::unique_ptr<Env> _env;
 
     // Identifier for the oplog source.
@@ -162,6 +174,8 @@ private:
 
     // The source of the oplog entries to be applied.
     std::unique_ptr<ReshardingDonorOplogIteratorInterface> _oplogIter;
+
+    boost::optional<bool> _supportEstimatingRemainingTimeBasedOnMovingAverage;
 };
 
 }  // namespace mongo
