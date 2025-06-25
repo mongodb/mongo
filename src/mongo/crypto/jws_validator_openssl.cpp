@@ -135,8 +135,21 @@ public:
         uassert(7095403, str::stream() << "Unknown hashing algorithm: '" << algorithm << "'", alg);
 
         UniqueEVPMDCtx ctx(EVP_MD_CTX_new());
+
+        EVP_PKEY_CTX* pctx = nullptr;
+
         uassertOpenSSL("DigestVerifyInit failed",
-                       EVP_DigestVerifyInit(ctx.get(), nullptr, alg, nullptr, _key.get()) == 1);
+                       EVP_DigestVerifyInit(ctx.get(), &pctx, alg, nullptr, _key.get()) == 1);
+
+        if (algorithm == kPS256) {
+            uassertOpenSSL("EVP_PKEY_CTX_set_rsa_padding failed",
+                           EVP_PKEY_CTX_set_rsa_padding(pctx, RSA_PKCS1_PSS_PADDING) == 1);
+            uassertOpenSSL("EVP_PKEY_CTX_set_rsa_mgf1_md failed",
+                           EVP_PKEY_CTX_set_rsa_mgf1_md(pctx, alg) == 1);
+            uassertOpenSSL("EVP_PKEY_CTX_set_rsa_pss_saltlen",
+                           EVP_PKEY_CTX_set_rsa_pss_saltlen(pctx, RSA_PSS_SALTLEN_DIGEST) == 1);
+        }
+
         uassertOpenSSL(
             "DigestVerifyUpdate failed",
             EVP_DigestVerifyUpdate(ctx.get(),
@@ -160,8 +173,10 @@ private:
     static constexpr auto kRS256 = "RS256"_sd;
     static constexpr auto kRS384 = "RS384"_sd;
     static constexpr auto kRS512 = "RS512"_sd;
+    static constexpr auto kPS256 = "PS256"_sd;
+
     static const EVP_MD* getHashingAlg(StringData alg) {
-        if (alg == kRS256) {
+        if (alg == kRS256 || alg == kPS256) {
             return EVP_sha256();
         }
         if (alg == kRS384) {

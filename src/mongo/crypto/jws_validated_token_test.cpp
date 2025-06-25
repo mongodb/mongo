@@ -48,7 +48,7 @@ namespace mongo::crypto::test {
     (defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER >= 0x2070000fL)
 
 // Serialization Header: { typ: 'JWT', alg: 'RS256', kid: 'custom-key-1' }
-constexpr auto modifiedTokenHeader =
+constexpr auto modifiedTokenHeaderRS =
     "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImN1c3RvbS1rZXktMSJ9";
 
 // Serialization Header: { typ: 'JWT', alg: 'RS256', kid: 'custom-key-2' }
@@ -57,35 +57,77 @@ constexpr auto modifiedTokenHeader =
 //                       aud: ["jwt@kernel.mongodb.com"],
 //                       nonce: "gdfhjj324ehj23k4", auth_time: 1661374077 }
 // Expires 01/18/2038
-constexpr auto validTokenHeader =
+constexpr auto validTokenHeaderRS =
     "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImN1c3RvbS1rZXktMiJ9";
-constexpr auto validTokenBody =
+constexpr auto validTokenBodyRS =
     "eyJpc3MiOiJKV1NDb21wYWN0UGFyc2VyVGVzdCIsInN1YiI6Imp3c1BhcnNlclRlc3QxIiwiaWF0IjoxNjYxMzc0MDc3LC"
     "JleHAiOjIxNDc0ODM2NDcsImF1ZCI6WyJqd3RAa2VybmVsLm1vbmdvZGIuY29tIl0sIm5vbmNlIjoiZ2RmaGpqMzI0ZWhq"
     "MjNrNCIsImF1dGhfdGltZSI6MTY2MTM3NDA3N30";
-constexpr auto validTokenSignature =
-    "E6wxDxFrxpzt-zxjhTbtslT_T5UlMMZDfqxnoIyeDBb1d7VD9ced_"
-    "yH192qfldjuR8Q4Wv5YLkjMTQ8KNXIjN313EAomd2jBxHo9zHgXd9jenVIWxF7WLI4hqWZYaO630bhoRFeQYIF4J-"
-    "7fgJ9xQEJTWWi8peqXpYaCUcw2rEP-vA0oPfJhTIY67DLaTwPUExQ37kNn58Ei0ey4VWokGeY16aeyLVI-aLbh_xzwt_"
-    "DEPq4Ifjj1mab4hg1m7QYfKFpezoldmC-"
-    "0WJqqae9IhucUYK4T1nrAR4PBQreunIutajv0j8kMu3Mb7fBdFrfxhAzm7oeCrwPEIHRk-rDsiw";
+constexpr auto validTokenSignatureRS =
+    "YdpHAKFpBwljmgtsLa-KNwZBmTwnycB-rr5lmGotiO_cb8DgzqSuBpBPBh4innWLOkwnEWU_"
+    "SbKLfpNqFrxDhlZL7eKVmnyrE5Rp7hdIsSg8HL0RJHdAXFgOKHsBBP9w_UNNrQ1VXOIGiUPnB0x_W6h_"
+    "LHuIxhEmzYiktzNG_lYvqpYRj7FlbQN89jYXYcJ6ztV2WvGeYCmx4rscBp5FCdndmEMjJWdY_"
+    "TTu1s7ZQKYRW9kL8Zt1gF8-OCvZEFjGp75qxHI9OGLwqGUx6NxVrc9pRX8wCBWSa8_IlUfeTHf2DiglY0yN-U7-"
+    "waFfnweMsyLG2mrounqQX8CuMG1Xjg";
 
 // Serialization Header: { typ: 'JWT', alg: 'RS256', kid: 'custom-key-2' }
 // Serialization Body: { iss: "JWSCompactParserTest", sub: "jwsParserTest1",
 //                       iat: 1661374077, exp: 1661374677,
 //                       aud: ["jwt@kernel.mongodb.com"],
 //                       nonce: "gdfhjj324ehj23k4", auth_time: 1661374077 }
-constexpr auto expiredTokenHeader =
+constexpr auto expiredTokenHeaderRS =
     "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImN1c3RvbS1rZXktMiJ9";
-constexpr auto expiredTokenBody =
+constexpr auto expiredTokenBodyRS =
     "eyJpc3MiOiJKV1NDb21wYWN0UGFyc2VyVGVzdCIsInN1YiI6Imp3c1BhcnNlclRlc3QxIiwiaWF0IjoxNjYxMzc0MDc3LC"
     "JleHAiOjE2NjEzNzQ2NzcsImF1ZCI6WyJqd3RAa2VybmVsLm1vbmdvZGIuY29tIl0sIm5vbmNlIjoiZ2RmaGpqMzI0ZWhq"
     "MjNrNCIsImF1dGhfdGltZSI6MTY2MTM3NDA3N30";
-constexpr auto expiredTokenSignature =
+constexpr auto expiredTokenSignatureRS =
     "xNcutFSVjDdHQ2U1xZMb6eghjNXrozJrtWl58dk-bJhatqMotbF1OecurgqQPru2KOhY_IT4rba0F1m403Pp10WiC5-"
     "zpyhElKiBktB7U3XamVZYKDFPpr6iFGxlfBEwzbA39Y6akjEqFExhQ0wr3kR4oqVGiCoG8prPWV39-"
     "MUpgtWg8XaJK65wK3jmEHWfr2QE5mLNpLQBzifBKqhXCqR69VWyFm9FSKyYXLMgk-yH3mIFNBdZxutvWg_PZFECwdcjl-"
     "rtZX-VvzXUtNZl7Dcnn7PbtOEmSISpCdd797we4iwfAHduf5tUykiYn7_NwHD_fxCyfI8HgtRJ9VmVEQ";
+
+// // Serialization Header: { typ: 'JWT', alg: 'PS256', kid: 'custom-key-1' }
+constexpr auto modifiedTokenHeaderPS =
+    "eyJ0eXAiOiJKV1QiLCJhbGciOiJQUzI1NiIsImtpZCI6ImN1c3RvbS1rZXktMSJ9";
+
+// Serialization Header: { "typ": "JWT", "alg": "PS256", "kid": "custom-key-2" }
+// Serialization Body: { "iss": "JWSCompactParserTest", "sub": "jwsParserTest1",
+//                          "iat": 1661374077, "exp": 2147483647,
+//                          "aud": ["jwt@kernel.mongodb.com"],
+//                          "nonce": "gdfhjj324ehj23k4", "auth_time": 1661374077 }
+//  Expires 01/18/2038
+constexpr auto validTokenHeaderPS =
+    "eyJ0eXAiOiJKV1QiLCJhbGciOiJQUzI1NiIsImtpZCI6ImN1c3RvbS1rZXktMiJ9";
+constexpr auto validTokenBodyPS =
+    "eyJpc3MiOiJKV1NDb21wYWN0UGFyc2VyVGVzdCIsInN1YiI6Imp3c1BhcnNlclRlc3QxIiwiaWF0IjoxNjYxMzc0MDc3LC"
+    "JleHAiOjIxNDc0ODM2NDcsImF1ZCI6WyJqd3RAa2VybmVsLm1vbmdvZGIuY29tIl0sIm5vbmNlIjoiZ2RmaGpqMzI0ZWhq"
+    "MjNrNCIsImF1dGhfdGltZSI6MTY2MTM3NDA3N30";
+constexpr auto validTokenSignaturePS =
+    "hyI8UvyTlXGNb0CtUa03d1BZD6eFbFWtPwt3_gcwiCG6e_RzSPb65dyPUrgXDXy5zPBd6qW7t0aeL5UsCODF4x1Fs4H_"
+    "5yaRVptH0B-Qd5_c3LdFCHynAcW1pnRyFzhfeoO6B2b1InhsfFvVM3j59C_X2xv1MuplhSbtcU1ESTGwYvQbG-"
+    "Fu2CpcCiz8h9r4zCkLMKUUdokNBQ5t3oL42xDuovWSM4ijHlu1EktJ_"
+    "iBGHdmpbobHrAnjsCePl83N6JOwBycFMjz0VBalAYiOoaZ_ceVV71-HcI2j5in5LcNKwjknfJ9yimYwukRVnBH2i9ne_"
+    "yWXRxDqEKu9uo0c4w";
+
+// Serialization Header: { typ: 'JWT', alg: 'PS256', kid: 'custom-key-2' }
+// Serialization Body: { iss: "JWSCompactParserTest", sub: "jwsParserTest1",
+//                       iat: 1661374077, exp: 1661374677,
+//                       aud: ["jwt@kernel.mongodb.com"],
+//                       nonce: "gdfhjj324ehj23k4", auth_time: 1661374077 }
+constexpr auto expiredTokenHeaderPS =
+    "eyJ0eXAiOiJKV1QiLCJhbGciOiJQUzI1NiIsImtpZCI6ImN1c3RvbS1rZXktMiJ9";
+constexpr auto expiredTokenBodyPS =
+    "eyJpc3MiOiJKV1NDb21wYWN0UGFyc2VyVGVzdCIsInN1YiI6Imp3c1BhcnNlclRlc3QxIiwiaWF0IjoxNjYxMzc0MDc3LC"
+    "JleHAiOjE2NjEzNzQ2NzcsImF1ZCI6WyJqd3RAa2VybmVsLm1vbmdvZGIuY29tIl0sIm5vbmNlIjoiZ2RmaGpqMzI0ZWhq"
+    "MjNrNCIsImF1dGhfdGltZSI6MTY2MTM3NDA3N30";
+constexpr auto expiredTokenSignaturePS =
+    "TKejemt0wwfrn2vPZmEkh_Sz8eMTZQzp-hbna7-JtmAx5HWyErc21TBh_i7C70VBoIs7o-PFvgd-"
+    "A43F2fHnYIkHzGQcYnM3ndci1y26BRfh4y0DmCp6oMEv8krJGIxaPx8uQJdmYjaddGL8weItFRQOcW_jbOOYiyr0kZq_"
+    "UtRH2wVIoSjIDGhDRmeKuOsf9dgJHlAOx_72POuMSEY2wH_"
+    "MApaRRdvKTkz2YzvsCyPTgJdGAMQkZOYWxQYZnC0JMnfUuLeQnsOGNwrNbI6AfpG30eRS0wksi_1PJjArXO_"
+    "PHukBow6OiGoFe2IeZ8bE5SRITwkQT6PdU4tvKUTz2w";
+
 
 BSONObj getTestJWKSet() {
     BSONObjBuilder set;
@@ -110,28 +152,37 @@ BSONObj getTestJWKSet() {
         key.append("kty", "RSA");
         key.append("kid", "custom-key-2");
         key.append("e", "AQAB");
-        key.append(
-            "n",
-            "4Amo26gLJITvt62AXI7z224KfvfQjwpyREjtpA2DU2mN7pnlz-"
-            "ZDu0sygwkhGcAkRPVbzpEiliXtVo2dYN4vMKLSd5BVBXhtB41bZ6OUxni48uP5txm7w8BUWv8MxzPkzyW_"
-            "3dd8rOfzECdLCF5G3aA4u_XRu2ODUSAMcrxXngnNtAuC-"
-            "OdqgYmvZfgFwqbU0VKNR4bbkhSrw6p9Tct6CUW04Ml4HMacZUovJKXRvNqnHcx3sy4PtVe3CyKlbb4KhBtkj1U"
-            "U_"
-            "cwiosz8uboBbchp7wsATieGVF8x3BUtf0ry94BGYXKbCGY_Mq-TSxcM_3afZiJA1COVZWN7d4GTEw");
+        key.append("n",
+                   "ANBv7-YFoyL8EQVhig7yF8YJogUTW-qEkE81s_bs2CTsI1oepDFNAeMJ-Krfx1B7yllYAYtScZGo_"
+                   "l60R9Ou4X89LA66bnVRWVFCp1YV1r0UWtn5hJLlAbqKseSmjdwZlL_"
+                   "e420GlUAiyYsiIr6wltC1dFNYyykq62RhfYhM0xpnt0HiN-k71y9A0GO8H-"
+                   "dFU1WgOvEYMvHmDAZtAP6RTkALE3AXlIHNb4mkOc9gwwn-"
+                   "7cGBc08rufYcniKtS0ZHOtD1aE2CTi1MMQMKkqtVxWIdTI3wLJl1t966f9rBHR6qVtTV8Qpq1bquUc2"
+                   "oaHjR4lPTf0Z_hTaELJa5-BBbvJU");
         key.doneFast();
     }
-
     keys.doneFast();
     return set.obj();
 }
 
-TEST_F(JWKManagerTest, validateTokenFromKeys) {
+
+void validateJWKManagerWithToken(JWKManagerTest* instance, StringData token) {
+    RAIIServerParameterControllerForTest quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
+    instance->jwksFetcher()->setKeys(getTestJWKSet());
+    ASSERT_OK(instance->jwkManager()->loadKeys());
+    ASSERT_THROWS(JWSValidatedToken(instance->jwkManager(), token), DBException);
+}
+
+void validateTokenFromKeys(JWKManagerTest* instance,
+                           const auto validTokenHeader,
+                           const auto validTokenBody,
+                           const auto validTokenSignature) {
     RAIIServerParameterControllerForTest quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
 
     auto validToken = validTokenHeader + "."_sd + validTokenBody + "."_sd + validTokenSignature;
 
-    jwksFetcher()->setKeys(getTestJWKSet());
-    JWSValidatedToken validatedToken(jwkManager(), validToken);
+    instance->jwksFetcher()->setKeys(getTestJWKSet());
+    JWSValidatedToken validatedToken(instance->jwkManager(), validToken);
 
     auto headerString = base64url::decode(validTokenHeader);
     BSONObj headerBSON = fromjson(headerString);
@@ -150,38 +201,48 @@ TEST_F(JWKManagerTest, validateTokenFromKeys) {
     ASSERT_FALSE(body.getExpectPrefix());
 }
 
-TEST_F(JWKManagerTest, failsWithExpiredToken) {
-    RAIIServerParameterControllerForTest quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
+TEST_F(JWKManagerTest, validateTokenFromKeysRS) {
+    validateTokenFromKeys(this, validTokenHeaderRS, validTokenBodyRS, validTokenSignatureRS);
+}
 
+TEST_F(JWKManagerTest, failsWithExpiredTokenRS) {
     auto expiredToken =
-        expiredTokenHeader + "."_sd + expiredTokenBody + "."_sd + expiredTokenSignature;
-    BSONObj keys = getTestJWKSet();
-
-    jwksFetcher()->setKeys(getTestJWKSet());
-    ASSERT_OK(jwkManager()->loadKeys());
-    ASSERT_THROWS(JWSValidatedToken(jwkManager(), expiredToken), DBException);
+        expiredTokenHeaderRS + "."_sd + expiredTokenBodyRS + "."_sd + expiredTokenSignatureRS;
+    validateJWKManagerWithToken(this, expiredToken);
 }
 
-TEST_F(JWKManagerTest, failsWithModifiedToken) {
-    RAIIServerParameterControllerForTest quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
-
+TEST_F(JWKManagerTest, failsWithModifiedTokenRS) {
     auto modifiedToken =
-        validTokenHeader + "."_sd + validTokenBody + "."_sd + validTokenSignature + "a"_sd;
-
-    jwksFetcher()->setKeys(getTestJWKSet());
-    ASSERT_OK(jwkManager()->loadKeys());
-    ASSERT_THROWS(JWSValidatedToken(jwkManager(), modifiedToken), DBException);
+        validTokenHeaderRS + "."_sd + validTokenBodyRS + "."_sd + validTokenSignatureRS + "a"_sd;
+    validateJWKManagerWithToken(this, modifiedToken);
 }
 
-TEST_F(JWKManagerTest, failsWithModifiedHeaderForADifferentKey) {
-    RAIIServerParameterControllerForTest quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
-
+TEST_F(JWKManagerTest, failsWithModifiedHeaderForADifferentKeyRS) {
     auto modifiedToken =
-        modifiedTokenHeader + "."_sd + validTokenBody + "."_sd + validTokenSignature;
+        modifiedTokenHeaderRS + "."_sd + validTokenBodyRS + "."_sd + validTokenSignatureRS;
+    validateJWKManagerWithToken(this, modifiedToken);
+}
 
-    jwksFetcher()->setKeys(getTestJWKSet());
-    ASSERT_OK(jwkManager()->loadKeys());
-    ASSERT_THROWS(JWSValidatedToken(jwkManager(), modifiedToken), DBException);
+TEST_F(JWKManagerTest, validateTokenFromKeysPS) {
+    validateTokenFromKeys(this, validTokenHeaderPS, validTokenBodyPS, validTokenSignaturePS);
+}
+
+TEST_F(JWKManagerTest, failsWithExpiredTokenPS) {
+    auto expiredToken =
+        expiredTokenHeaderPS + "."_sd + expiredTokenBodyPS + "."_sd + expiredTokenSignaturePS;
+    validateJWKManagerWithToken(this, expiredToken);
+}
+
+TEST_F(JWKManagerTest, failsWithModifiedTokenPS) {
+    auto modifiedToken =
+        validTokenHeaderPS + "."_sd + validTokenBodyPS + "."_sd + validTokenSignaturePS + "a"_sd;
+    validateJWKManagerWithToken(this, modifiedToken);
+}
+
+TEST_F(JWKManagerTest, failsWithModifiedHeaderForADifferentKeyPS) {
+    auto modifiedToken =
+        modifiedTokenHeaderPS + "."_sd + validTokenBodyPS + "."_sd + validTokenSignaturePS;
+    validateJWKManagerWithToken(this, modifiedToken);
 }
 
 // Serialization Header: { "typ": 'JWT', "alg": 'RS256', "kid": 'custom-key-2' }
@@ -226,17 +287,17 @@ TEST_F(JWKManagerTest, parsingErrors) {
     // invalid base64url
     ASSERT_THROWS_CODE(
         JWSValidatedToken(jwkManager(),
-                          fmt::format("foo+.{}.{}", validTokenBody, validTokenSignature)),
+                          fmt::format("foo+.{}.{}", validTokenBodyRS, validTokenSignatureRS)),
         DBException,
         40537);
     ASSERT_THROWS_CODE(
         JWSValidatedToken(jwkManager(),
-                          fmt::format("{}.foo+.{}", validTokenHeader, validTokenSignature)),
+                          fmt::format("{}.foo+.{}", validTokenHeaderRS, validTokenSignatureRS)),
         DBException,
         40537);
     ASSERT_THROWS_CODE(
         JWSValidatedToken(jwkManager(),
-                          fmt::format("{}.{}.foo+", validTokenHeader, validTokenBody)),
+                          fmt::format("{}.{}.foo+", validTokenHeaderRS, validTokenBodyRS)),
         DBException,
         40537);
 
@@ -245,29 +306,30 @@ TEST_F(JWKManagerTest, parsingErrors) {
     ASSERT_THROWS_CODE(
         JWSValidatedToken(
             jwkManager(),
-            fmt::format("{}.{}.{}", invalidJsonBase64, validTokenBody, validTokenSignature)),
+            fmt::format("{}.{}.{}", invalidJsonBase64, validTokenBodyRS, validTokenSignatureRS)),
         DBException,
         16619);
     ASSERT_THROWS_CODE(
         JWSValidatedToken(
             jwkManager(),
-            fmt::format("{}.{}.{}", validTokenHeader, invalidJsonBase64, validTokenSignature)),
+            fmt::format("{}.{}.{}", validTokenHeaderRS, invalidJsonBase64, validTokenSignatureRS)),
         DBException,
         16619);
 
     // invalid JWS Header post-decode
     auto badJWSHeaderNoRequired = base64url::encode(R"({"typ":"JWT"})");
     auto badJWSHeaderBadType = base64url::encode(R"({"typ":"JWK","alg":"RS256","kid":"foo"})");
+    ASSERT_THROWS_CODE(JWSValidatedToken(jwkManager(),
+                                         fmt::format("{}.{}.{}",
+                                                     badJWSHeaderNoRequired,
+                                                     validTokenBodyRS,
+                                                     validTokenSignatureRS)),
+                       DBException,
+                       ErrorCodes::IDLFailedToParse);
     ASSERT_THROWS_CODE(
         JWSValidatedToken(
             jwkManager(),
-            fmt::format("{}.{}.{}", badJWSHeaderNoRequired, validTokenBody, validTokenSignature)),
-        DBException,
-        ErrorCodes::IDLFailedToParse);
-    ASSERT_THROWS_CODE(
-        JWSValidatedToken(
-            jwkManager(),
-            fmt::format("{}.{}.{}", badJWSHeaderBadType, validTokenBody, validTokenSignature)),
+            fmt::format("{}.{}.{}", badJWSHeaderBadType, validTokenBodyRS, validTokenSignatureRS)),
         DBException,
         7095401);
 
@@ -277,13 +339,13 @@ TEST_F(JWKManagerTest, parsingErrors) {
     ASSERT_THROWS_CODE(
         JWSValidatedToken(
             jwkManager(),
-            fmt::format("{}.{}.{}", validTokenHeader, badJWTFieldType, validTokenSignature)),
+            fmt::format("{}.{}.{}", validTokenHeaderRS, badJWTFieldType, validTokenSignatureRS)),
         DBException,
         ErrorCodes::TypeMismatch);
     ASSERT_THROWS_CODE(
         JWSValidatedToken(
             jwkManager(),
-            fmt::format("{}.{}.{}", validTokenHeader, badJWTNoRequired, validTokenSignature)),
+            fmt::format("{}.{}.{}", validTokenHeaderRS, badJWTNoRequired, validTokenSignatureRS)),
         DBException,
         ErrorCodes::IDLFailedToParse);
 }
