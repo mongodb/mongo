@@ -281,7 +281,7 @@ void ExecCommandClient::_epilogue() {
         failCommand.executeIf(
             [&](const BSONObj& data) {
                 rpc::RewriteStateChangeErrors::onActiveFailCommand(opCtx, data);
-                result->getBodyBuilder().append(data["writeConcernError"]);
+                result->getBodyBuilder().append(data["writeConcernError"_sd]);
                 if (data.hasField(kErrorLabelsFieldName) &&
                     data[kErrorLabelsFieldName].type() == BSONType::array) {
                     auto labels = data.getObjectField(kErrorLabelsFieldName).getOwned();
@@ -293,7 +293,8 @@ void ExecCommandClient::_epilogue() {
             [&](const BSONObj& data) {
                 return CommandHelpers::shouldActivateFailCommandFailPoint(
                            data, _invocation, opCtx->getClient()) &&
-                    data.hasField("writeConcernError");
+                    data.hasField("writeConcernError"_sd) &&
+                    !result->getBodyBuilder().hasField("writeConcernError"_sd);
             });
     }
 

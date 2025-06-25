@@ -1290,11 +1290,11 @@ void RunCommandAndWaitForWriteConcern::_waitForWriteConcern(BSONObjBuilder& bb) 
     if (auto scoped = failCommand.scopedIf([&](const BSONObj& obj) {
             return CommandHelpers::shouldActivateFailCommandFailPoint(
                        obj, invocation, opCtx->getClient()) &&
-                obj.hasField("writeConcernError");
+                obj.hasField("writeConcernError"_sd) && !bb.hasField("writeConcernError"_sd);
         });
         MONGO_unlikely(scoped.isActive())) {
         const BSONObj& data = scoped.getData();
-        bb.append(data["writeConcernError"]);
+        bb.append(data["writeConcernError"_sd]);
         if (data.hasField(kErrorLabelsFieldName) &&
             data[kErrorLabelsFieldName].type() == BSONType::array) {
             // Propagate error labels specified in the failCommand failpoint to the
