@@ -356,6 +356,11 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
     // Record the plan summary stats after $unionWith operation is done.
     _execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
 
+    // stats update (previously done in usedDisk())
+    if (_pipeline) {
+        _stats.planSummaryStats.usedDisk = _pipeline->usedDisk();
+    }
+
     _executionState = ExecutionProgress::kFinished;
     return GetNextResult::makeEOF();
 }
@@ -403,12 +408,8 @@ DocumentSourceContainer::iterator DocumentSourceUnionWith::doOptimizeAt(
     return std::next(itr);
 };
 
-bool DocumentSourceUnionWith::usedDisk() {
-    if (_pipeline) {
-        _stats.planSummaryStats.usedDisk =
-            _stats.planSummaryStats.usedDisk || _pipeline->usedDisk();
-    }
-    return _stats.planSummaryStats.usedDisk;
+bool DocumentSourceUnionWith::usedDisk() const {
+    return _pipeline && _pipeline->usedDisk();
 }
 
 void DocumentSourceUnionWith::doDispose() {

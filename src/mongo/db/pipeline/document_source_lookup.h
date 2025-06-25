@@ -183,7 +183,7 @@ public:
 
     bool validateOperationContext(const OperationContext* opCtx) const final;
 
-    bool usedDisk() final;
+    bool usedDisk() const final;
 
     const SpecificStats* getSpecificStats() const final {
         return &_stats;

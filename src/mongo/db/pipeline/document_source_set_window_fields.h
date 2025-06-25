@@ -199,7 +199,7 @@ public:
         _iterator.setSource(source);
     }
 
-    bool usedDisk() final {
+    bool usedDisk() const final {
         return _iterator.usedDisk();
     };
 

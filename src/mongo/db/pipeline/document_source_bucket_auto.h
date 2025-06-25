@@ -142,7 +142,7 @@ public:
         return &_stats;
     }
 
-    bool usedDisk() final {
+    bool usedDisk() const final {
         return _sorter ? _sorter->stats().spilledRanges() > 0
                        : _stats.spillingStats.getSpills() > 0;
     }

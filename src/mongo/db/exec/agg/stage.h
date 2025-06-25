@@ -242,7 +242,7 @@ public:
         return getContext()->getOperationContext() == opCtx;
     }
 
-    virtual bool usedDisk() {
+    virtual bool usedDisk() const {
         return false;
     }
 

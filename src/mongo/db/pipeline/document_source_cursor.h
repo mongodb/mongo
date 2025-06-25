@@ -166,7 +166,7 @@ public:
         return _stats.planSummaryStats;
     }
 
-    bool usedDisk() final {
+    bool usedDisk() const final {
         return _stats.planSummaryStats.usedDisk;
     }
 

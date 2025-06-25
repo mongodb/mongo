@@ -193,7 +193,7 @@ public:
     void reattachToOperationContext(OperationContext* opCtx) final;
     bool validateOperationContext(const OperationContext* opCtx) const final;
     StageConstraints constraints(PipelineSplitState pipeState) const final;
-    bool usedDisk() final;
+    bool usedDisk() const final;
     const SpecificStats* getSpecificStats() const final {
         return &_stats;
     }

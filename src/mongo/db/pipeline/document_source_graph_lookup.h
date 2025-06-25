@@ -221,7 +221,7 @@ public:
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final;
 
-    bool usedDisk() override {
+    bool usedDisk() const override {
         return _visitedDocuments.usedDisk() || _visitedFromValues.usedDisk() || _queue.usedDisk();
     }
 

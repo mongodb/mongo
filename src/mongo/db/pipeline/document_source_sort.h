@@ -255,7 +255,7 @@ public:
     /**
      * Returns true if the sorter used disk while satisfying the query and false otherwise.
      */
-    bool usedDisk() final;
+    bool usedDisk() const final;
 
     bool isPopulated() {
         return _populated;

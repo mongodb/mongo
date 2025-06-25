@@ -1093,12 +1093,8 @@ DocumentSourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
     return itr;
 }  // doOptimizeAt
 
-bool DocumentSourceLookUp::usedDisk() {
-    if (_pipeline)
-        _stats.planSummaryStats.usedDisk =
-            _stats.planSummaryStats.usedDisk || _pipeline->usedDisk();
-
-    return _stats.planSummaryStats.usedDisk;
+bool DocumentSourceLookUp::usedDisk() const {
+    return _pipeline && _pipeline->usedDisk();
 }
 
 void DocumentSourceLookUp::doDispose() {

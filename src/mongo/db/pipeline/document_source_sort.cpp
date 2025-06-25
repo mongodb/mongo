@@ -692,7 +692,7 @@ void DocumentSourceSort::loadingDone() {
     _populated = true;
 }
 
-bool DocumentSourceSort::usedDisk() {
+bool DocumentSourceSort::usedDisk() const {
     return isBoundedSortStage() ? _timeSorter->stats().spilledRanges() > 0
                                 : _sortExecutor->wasDiskUsed();
 }

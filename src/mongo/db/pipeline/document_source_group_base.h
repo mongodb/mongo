@@ -152,7 +152,7 @@ public:
     /**
      * Returns true if this $group stage used disk during execution and false otherwise.
      */
-    bool usedDisk() final {
+    bool usedDisk() const final {
         return _groupProcessor.usedDisk();
     }
 
