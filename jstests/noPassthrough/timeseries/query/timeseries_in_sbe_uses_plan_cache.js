@@ -1,6 +1,7 @@
 /**
  * Ensures that SBE-eligible time series queries use the classic plan cache.
  */
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {assertCacheUsage} from "jstests/libs/query/plan_cache_utils.js";
 import {checkSbeStatus, kSbeRestricted} from "jstests/libs/query/sbe_util.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
@@ -24,7 +25,6 @@ coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {
     timeseries: {timeField: 'time', metaField: 'meta'},
 }));
-const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
 // Just after midnight on Saturday, April 8, 2023 in GMT, expressed as milliseconds since the epoch.
 const datePrefix = 1680912440;
@@ -47,7 +47,7 @@ function checkPipelineUsesCacheEntry({pipeline, expectedId, cacheEntry}) {
     assert.eq(results[0]._id, expectedId);
 
     const newEntry = assertCacheUsage({
-        planCacheColl: bucketsColl,
+        planCacheColl: getTimeseriesCollForDDLOps(db, coll),
         queryColl: coll,
         pipeline: pipeline,
         fromMultiPlanning: false,
@@ -126,8 +126,12 @@ const originalPipeline = [
     {$project: {_id: 1, x: 1}}
 ];
 
-const cacheEntry = testLoweredPipeline(
-    {queryColl: coll, planCacheColl: bucketsColl, pipeline: originalPipeline, expectedId: 20});
+const cacheEntry = testLoweredPipeline({
+    queryColl: coll,
+    planCacheColl: getTimeseriesCollForDDLOps(db, coll),
+    pipeline: originalPipeline,
+    expectedId: 20
+});
 
 // Now run pipelines with the same shape but different parameters on 'time' and 'x'. These
 // should re-use the cache entry and not require replanning.
@@ -163,7 +167,7 @@ const cacheEntry = testLoweredPipeline(
 }
 
 {
-    bucketsColl.getPlanCache().clear();
+    getTimeseriesCollForDDLOps(db, coll).getPlanCache().clear();
 
     // Now run a pipeline with a different shape, by adding a predicate on 'y'. This
     // should result in a cache entry with a different planCacheKey.
@@ -180,7 +184,7 @@ const cacheEntry = testLoweredPipeline(
     ];
     const newCacheEntry = testLoweredPipeline({
         queryColl: coll,
-        planCacheColl: bucketsColl,
+        planCacheColl: getTimeseriesCollForDDLOps(db, coll),
         pipeline: pipelineWithDifferentShape,
         expectedId: 20
     });

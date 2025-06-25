@@ -4,6 +4,7 @@
  * @tags: [requires_fcv_80, featureFlagTimeseriesUpdatesSupport]
  */
 
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {BulkWriteMetricChecker} from "jstests/libs/bulk_write_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -21,6 +22,8 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
     const namespace2 = `${dbName}.${collName2}`;
     const session = isMongos ? cluster.s.startSession() : cluster.getPrimary().startSession();
     const testDB = session.getDatabase(dbName);
+    const coll = testDB[collName1];
+    const coll2 = testDB[collName2];
 
     // The chunks below are [$minKey, key1) on shard0, [key1, key2) on shard1 and [key2, $maxKey) on
     // shard2.
@@ -41,7 +44,9 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
         assert.commandWorked(
             testDB.adminCommand({shardCollection: namespace2, key: {timestamp: 1}}));
 
-        const splitNs = timeseries ? `${dbName}.system.buckets.${collName1}` : namespace1;
+        // TODO(SERVER-101609): Remove `splitNs` and replace with `namespace1`
+        const splitNs =
+            (timeseries ? getTimeseriesCollForDDLOps(testDB, coll) : coll).getFullName();
         const splitKey = timeseries ? "control.min.timestamp" : "timestamp";
 
         assert.commandWorked(testDB.adminCommand({split: splitNs, middle: {[splitKey]: key1}}));
@@ -67,9 +72,6 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
             _waitForDelete: true
         }));
     }
-
-    const coll = testDB[collName1];
-    const coll2 = testDB[collName2];
 
     const defaultTimestamp = ISODate("2021-05-18T00:00:00.000Z");
 

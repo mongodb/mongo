@@ -6,6 +6,7 @@
  *   requires_sharding,
  * ]
  */
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -17,12 +18,10 @@ const collName = jsTestName();
 const timeField = 't';
 const metaField = 'm';
 
-const bucketsCollName = `system.buckets.${collName}`;
-const fullBucketsCollName = `${dbName}.system.buckets.${collName}`;
-
 const st = new ShardingTest({shards: 2});
 const sDB = st.s.getDB(dbName);
 assert.commandWorked(sDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+const coll = sDB.getCollection(collName);
 
 // Shard time-series collection.
 const shardKey = {
@@ -38,15 +37,18 @@ assert.commandWorked(sDB.adminCommand({
 const splitPoint = {
     [`control.min.${timeField}`]: new Date(50 * 1000)
 };
-assert.commandWorked(sDB.adminCommand({split: fullBucketsCollName, middle: splitPoint}));
+assert.commandWorked(sDB.adminCommand(
+    {split: getTimeseriesCollForDDLOps(sDB, coll).getFullName(), middle: splitPoint}));
 
 // // Move one of the chunks into the second shard.
 const primaryShard = st.getPrimaryShard(dbName);
 const otherShard = st.getOther(primaryShard);
-assert.commandWorked(sDB.adminCommand(
-    {movechunk: fullBucketsCollName, find: splitPoint, to: otherShard.name, _waitForDelete: true}));
-
-const coll = sDB.getCollection(collName);
+assert.commandWorked(sDB.adminCommand({
+    movechunk: getTimeseriesCollForDDLOps(sDB, coll).getFullName(),
+    find: splitPoint,
+    to: otherShard.name,
+    _waitForDelete: true
+}));
 
 const hasInternalBoundedSort = (explain) => {
     for (const shardName in explain.shards) {
@@ -81,14 +83,14 @@ for (let i = 0; i < 100; i++) {
 }
 
 // Ensure that each shard owns one chunk.
-const counts = st.chunkCounts(bucketsCollName, dbName);
+const counts = st.chunkCounts(getTimeseriesCollForDDLOps(sDB, coll).getName(), dbName);
 assert.eq(1, counts[primaryShard.shardName], counts);
 assert.eq(1, counts[otherShard.shardName], counts);
 
 assert.eq(coll.count(), 100);
 assert.eq(getTimeseriesCollForRawOps(sDB, coll).count({}, getRawOperationSpec(sDB)), 4);
 
-// The {meta: 1, time: 1} index gets built by default on the time-series bucket collection.
+// The {meta: 1, time: 1} index gets built by default on the time-series collection.
 assert.eq(coll.getIndexes().length, 2);
 
 const indexName = "t_1";

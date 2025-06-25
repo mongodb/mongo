@@ -8,6 +8,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const kIdleBucketExpiryMemoryUsageThreshold = 1024 * 1024 * 10;
 const conn = MongoRunner.runMongod({
@@ -23,13 +24,12 @@ const testDB = conn.getDB(dbName);
 assert.commandWorked(testDB.dropDatabase());
 
 const coll = testDB.getCollection('t');
-const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 
 const timeFieldName = 'time';
 const metaFieldName = 'meta';
 
 const expectedStats = {
-    bucketsNs: bucketsColl.getFullName()
+    bucketsNs: getTimeseriesCollForDDLOps(testDB, coll).getFullName()
 };
 let initialized = false;
 

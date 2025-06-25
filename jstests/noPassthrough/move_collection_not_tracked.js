@@ -2,8 +2,10 @@
  * Verifies that namespaces which can't be moved/tracked do not get registered in the sharding
  * catalog when moveCollection is invoked on them.
  */
+import {
+    areViewlessTimeseriesEnabled
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const testCases = [
@@ -105,21 +107,56 @@ const testCases = [
             const testDB = st.s.getDB(dbName);
             assert.commandWorked(
                 st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
-            // Creaty dummy instances of temporary reshrd collections
+            // Create a dummy instance of a reshard collection
             assert.commandWorked(testDB.createCollection("system.resharding.testColl"));
-            assert.commandWorked(
-                testDB.createCollection("system.buckets.resharding.testTimeseriesColl",
-                                        {timeseries: {timeField: "x", metaField: "y"}}));
         },
-        tasks: [
-            {nsToMove: "testDbWithSystemResharding.system.resharding.testColl"},
-            {nsToMove: "testDbWithSystemResharding.system.buckets.resharding.testTimeseriesColl"}
-        ],
+        tasks: [{nsToMove: "testDbWithSystemResharding.system.resharding.testColl"}],
         teardown: (st) => {
             // The temporary reshard collection must be dropped before checking metadata integrity.
             const testDB = st.s.getDB("testDbWithSystemResharding");
             testDB["system.resharding.testColl"].drop();
-            testDB["system.buckets.resharding.testTimeseriesColl"].drop();
+        }
+    },
+    {
+        name: "systemReshardingTimeseries",
+        shouldSkip: (conn) =>
+            !areViewlessTimeseriesEnabled(conn.getDB("testDbWithSystemReshardingTimeseries")),
+        setup: (st) => {
+            const dbName = "testDbWithSystemReshardingTimeseries";
+            const testDB = st.s.getDB(dbName);
+            assert.commandWorked(
+                st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+            // Create a dummy instance of a temporary timeseries reshard collection
+            assert.commandWorked(testDB.createCollection(
+                "system.resharding.testColl", {timeseries: {timeField: "x", metaField: "y"}}));
+        },
+        tasks: [{nsToMove: "testDbWithSystemReshardingTimeseries.system.resharding.testColl"}],
+        teardown: (st) => {
+            // The temporary reshard collection must be dropped before checking metadata integrity.
+            const testDB = st.s.getDB("testDbWithSystemReshardingTimeseries");
+            testDB["system.resharding.testColl"].drop();
+        }
+    },
+    {
+        // TODO(SERVER-101595): Completely remove this test case
+        name: "systemBucketsResharding",
+        shouldSkip: (conn) =>
+            areViewlessTimeseriesEnabled(conn.getDB("testDbWithSystemBucketsResharding")),
+        setup: (st) => {
+            const dbName = "testDbWithSystemBucketsResharding";
+            const testDB = st.s.getDB(dbName);
+            assert.commandWorked(
+                st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+            // Create a dummy instance of a temporary legacy timeseries buckets reshard collection
+            assert.commandWorked(
+                testDB.createCollection("system.buckets.resharding.testColl",
+                                        {timeseries: {timeField: "x", metaField: "y"}}));
+        },
+        tasks: [{nsToMove: "testDbWithSystemBucketsResharding.system.buckets.resharding.testColl"}],
+        teardown: (st) => {
+            // The temporary reshard collection must be dropped before checking metadata integrity.
+            const testDB = st.s.getDB("testDbWithSystemBucketsResharding");
+            testDB["system.buckets.resharding.testColl"].drop();
         }
     },
     {

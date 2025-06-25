@@ -1,6 +1,6 @@
 /**
  * Tests that the validate command checks data consistencies of the version field in time-series
- * bucket collections and return warnings properly.
+ * collections and return warnings properly.
  *
  * Version 1 indicates the bucket is uncompressed, and version 2 indicates the bucket is compressed.
  *

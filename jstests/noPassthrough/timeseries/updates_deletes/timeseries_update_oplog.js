@@ -8,6 +8,7 @@
  *   featureFlagTimeseriesUpdatesSupport,
  * ]
  */
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 1});
@@ -90,7 +91,7 @@ function fullBucketValidateFn(testDB, coll, retryableWrite, startTime) {
         testDB.getSiblingDB("local")
             .oplog.rs
             .find({
-                "o.applyOps.ns": testDB.getName() + '.system.buckets.' + coll.getName(),
+                "o.applyOps.ns": getTimeseriesCollForDDLOps(testDB, coll).getFullName(),
                 ts: {$gt: startTime}
             })
             .toArray();
@@ -106,7 +107,7 @@ function partialBucketValidateFn(testDB, coll, retryableWrite, startTime) {
         testDB.getSiblingDB("local")
             .oplog.rs
             .find({
-                "o.applyOps.ns": testDB.getName() + '.system.buckets.' + coll.getName(),
+                "o.applyOps.ns": getTimeseriesCollForDDLOps(testDB, coll).getFullName(),
                 ts: {$gt: startTime}
             })
             .toArray();
@@ -123,7 +124,7 @@ function upsertValidateFn(testDB, coll, retryableWrite, startTime) {
         testDB.getSiblingDB("local")
             .oplog.rs
             .find({
-                "o.applyOps.ns": testDB.getName() + '.system.buckets.' + coll.getName(),
+                "o.applyOps.ns": getTimeseriesCollForDDLOps(testDB, coll).getFullName(),
                 ts: {$gt: startTime}
             })
             .toArray();

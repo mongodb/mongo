@@ -112,14 +112,14 @@ const runTest = function(docsInsert, docsUpdateA, docsUpdateB) {
 
     const docs = docsInsert.concat(docsUpdateA, docsUpdateB);
 
-    // Check view.
-    const viewDocs = coll.find({}).sort({_id: 1}).toArray();
-    assert.eq(docs.length, viewDocs.length, viewDocs);
+    // Check measurements.
+    const userDocs = coll.find({}).sort({_id: 1}).toArray();
+    assert.eq(docs.length, userDocs.length, userDocs);
     for (let i = 0; i < docs.length; i++) {
-        assert.docEq(docs[i], viewDocs[i], 'unexpected doc from view: ' + i);
+        assert.docEq(docs[i], userDocs[i], 'unexpected measurement doc: ' + i);
     }
 
-    // Check bucket collection.
+    // Check buckets.
     const bucketDocs =
         getTimeseriesCollForRawOps(testDB, coll).find().rawData().sort({_id: 1}).toArray();
     assert.eq(1, bucketDocs.length, bucketDocs);

@@ -42,6 +42,10 @@ selector:
     - does_not_support_viewless_timeseries_yet
   roots:
     - jstests/noPassthrough/catalog/server_status_catalog_stats.js
+    - jstests/noPassthrough/crud/vectored_insert_no_oplog_hole.js
+    - jstests/noPassthrough/global_catalog/shareded_data_distribution_orphan_docs.js
+    - jstests/noPassthrough/move_collection_not_tracked.js
+    - jstests/noPassthrough/query/change_streams/change_streams_timeseries_shard_collection_event.js
     - jstests/noPassthrough/query/timeseries/bucket_unpacking_with_sort_granularity_change.js
     - jstests/noPassthrough/query/timeseries/timeseries_validate_mixed_schema_bucket.js
     - jstests/noPassthrough/timeseries/bucket_reopening/timeseries_reopen_uncompressed_bucket_for_compression.js
@@ -57,6 +61,7 @@ selector:
     - jstests/noPassthrough/timeseries/index_builds/hybrid_index_timeseries.js
     - jstests/noPassthrough/timeseries/index_builds/resumable_timeseries_index_build_collection_scan_phase.js
     - jstests/noPassthrough/timeseries/index_builds/timeseries_create_index_option_defaults.js
+    - jstests/noPassthrough/timeseries/query/timeseries_concurrent.js
     - jstests/noPassthrough/timeseries/query/timeseries_group_block_metrics.js
     - jstests/noPassthrough/timeseries/query/timeseries_group_bson_types.js
     - jstests/noPassthrough/timeseries/query/timeseries_group_spill_metrics.js
@@ -64,7 +69,8 @@ selector:
     - jstests/noPassthrough/timeseries/query/timeseries_id_filtered_explicit_upack_bucket.js
     - jstests/noPassthrough/timeseries/query/timeseries_internal_bounded_sort_spilling.js
     - jstests/noPassthrough/timeseries/query/timeseries_query_knob_sbe.js
-    - jstests/noPassthrough/timeseries/query/timeseries_sample_on_system_buckets.js
+    - jstests/noPassthrough/timeseries/query/timeseries_sample_on_buckets.js
+    - jstests/noPassthrough/timeseries/stats/timeseries_collStats.js
     - jstests/noPassthrough/timeseries/stats/timeseries_latency_stats.js
     - jstests/noPassthrough/timeseries/stats/timeseries_serverStatus.js
     - jstests/noPassthrough/timeseries/timeseries_buckets_oplog_update.js
@@ -105,4 +111,5 @@ selector:
     - jstests/noPassthrough/timeseries/write/timeseries_retryable_writes_restart.js
     - jstests/noPassthrough/timeseries/write/timeseries_time_backward.js
     - jstests/noPassthrough/timeseries/write/timeseries_write_concern.js
+    - jstests/noPassthrough/versioning_protocol/stale_shard_version_with_timeseries.js
 test_kind: js_test

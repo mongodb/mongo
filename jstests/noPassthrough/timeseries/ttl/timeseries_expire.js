@@ -42,7 +42,7 @@ TimeseriesTest.run((insert) => {
     });
     jsTestLog('Removal took ' + ((new Date()).getTime() - start.getTime()) + ' ms.');
 
-    // Check bucket collection.
+    // Check buckets.
     const bucketDocs = getTimeseriesCollForRawOps(testDB, coll)
                            .find()
                            .rawData()

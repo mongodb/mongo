@@ -3,6 +3,7 @@
  * given different varitions of creating and sharding commands.
  */
 
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     assertChangeStreamEventEq,
@@ -15,11 +16,6 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const dbName = jsTestName();
 const collName = "test_timeseries_coll";
 const collNS = dbName + "." + collName;
-const systemCollNS = "system.buckets." + collName;
-const ns = {
-    db: dbName,
-    coll: systemCollNS
-};
 
 // Runs and end-to-end test that spins up a sharded testing cluster,
 // creates a timeseries collection, shards it, and then asserts that the format of the associated
@@ -78,7 +74,7 @@ function createAndShardTimeseriesCollectionThenAssertShardCollectionFormat(st, p
     // Setup complete for this variation; assert 'shardCollection' event structure.
     findAndAssertShardCollectionEvent({
         "operationType": "shardCollection",
-        ns,
+        "ns": {db: dbName, coll: getTimeseriesCollForDDLOps(db, collName)},
         "operationDescription": params.expectedShardCollectionEventOperationDescription
     });
 

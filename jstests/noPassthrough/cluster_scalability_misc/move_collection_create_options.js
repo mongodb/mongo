@@ -1,6 +1,7 @@
 /*
  * Tests moveCollection and reshardCollection commands with all non-internal collection options.
  */
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -78,8 +79,9 @@ function validateCollection(conn,
     }
 
     // Validate config.collections doc.
-    const ns = listCollectionsDoc.type == "timeseries" ? (dbName + ".system.buckets." + collName)
-                                                       : (dbName + "." + collName);
+    const ns = dbName + "." +
+        (listCollectionsDoc.type == "timeseries" ? getTimeseriesCollForDDLOps(db, collName)
+                                                 : collName);
     const collDoc = conn.getCollection("config.collections").findOne({_id: ns});
     if (expectNoShardingMetadata) {
         assert.eq(collDoc, null);

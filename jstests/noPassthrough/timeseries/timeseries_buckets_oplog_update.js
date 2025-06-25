@@ -1,6 +1,6 @@
 /**
- * Tests that updates with "_$internalApplyOplogUpdate" are correctly applied on a time-series
- * buckets collection.
+ * Tests that updates with "_$internalApplyOplogUpdate" are correctly applied on time-series
+ * buckets using raw operations.
  *
  * @tags: [
  *   requires_replication,
@@ -102,7 +102,7 @@ const updateDoc2 = {
 getTimeseriesCollForRawOps(testDB, coll).insertOne(insertDocFull, getRawOperationSpec(testDB));
 
 function runTest(runInTxn) {
-    // Inserts measurement 0 and 1 again through update oplog entries on the buckets collection.
+    // Inserts measurement 0 and 1 again through update oplog entries on buckets.
     // Only two measurements are expected to exist.
     const updCmd = {
         update: getTimeseriesCollForRawOps(testDB, coll).getName(),

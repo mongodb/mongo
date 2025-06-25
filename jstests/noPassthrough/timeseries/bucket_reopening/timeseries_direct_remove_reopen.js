@@ -1,5 +1,5 @@
 /**
- * Tests that direct removal in a timeseries bucket collection synchronizes with bucket reopening.
+ * Tests that direct removal of a timeseries bucket synchronizes with bucket reopening.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";

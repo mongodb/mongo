@@ -44,10 +44,9 @@ assert.commandWorked(db.createCollection(
     collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}));
 coll = db.getCollection(collName);
 // Using insertMany means that these inserts will be performed in the same WriteBatch because the
-// number of documents inserted is less than maxWriteBatchSize.  As a result, they are treated as
-// a single insert into the 'systems.buckets' collection. If we are always using compressed buckets
-// to write to time-series collections, this test will still work because this insert will be
-// compressed (i.e. land in a version-2 bucket).
+// number of documents inserted is less than maxWriteBatchSize. This will insert two buckets due to
+// the default timeseriesBucketMaxCount=1000 limit. We are always using compressed buckets to write
+// to time-series collections, so this insert will be compressed (i.e. land in a version-2 bucket).
 coll.insertMany([...Array(1002).keys()].map(i => ({
                                                 "metadata": {"sensorId": 2, "type": "temperature"},
                                                 "timestamp": ISODate(),

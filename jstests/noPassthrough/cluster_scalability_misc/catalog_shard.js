@@ -6,6 +6,7 @@
  *   requires_fcv_70,
  * ]
  */
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -28,8 +29,6 @@ const timeseriesDbName = "timeseriesDB";
 const timeseriesUnshardedCollName = "unsharded_timeseries_coll";
 const timeseriesShardedCollName = "sharded_timeseries_coll";
 const timeseriesShardedNs = timeseriesDbName + "." + timeseriesShardedCollName;
-const timeseriesShardedBucketsNs =
-    `${timeseriesDbName}.system.buckets.${timeseriesShardedCollName}`;
 
 function basicCRUD(conn) {
     assert.commandWorked(st.s.getCollection(unshardedNs).insert([{x: 1}, {x: -1}]));
@@ -206,7 +205,8 @@ const newShardName =
     assert.commandWorked(timeseriesDB[timeseriesShardedCollName].insert({time: ISODate()}));
     st.printShardingStatus();
     assert.commandWorked(st.s.adminCommand({
-        moveChunk: timeseriesShardedBucketsNs,
+        moveChunk: getTimeseriesCollForDDLOps(timeseriesDB, timeseriesDB[timeseriesShardedCollName])
+                       .getFullName(),
         find: {"control.min.time": 0},
         to: configShardName,
         _waitForDelete: true
@@ -228,7 +228,8 @@ const newShardName =
     assert.commandWorked(st.s.adminCommand(
         {moveChunk: indexedNs, find: {_id: 0}, to: newShardName, _waitForDelete: true}));
     assert.commandWorked(st.s.adminCommand({
-        moveChunk: timeseriesShardedBucketsNs,
+        moveChunk: getTimeseriesCollForDDLOps(timeseriesDB, timeseriesDB[timeseriesShardedCollName])
+                       .getFullName(),
         find: {"control.min.time": 0},
         to: newShardName,
         _waitForDelete: true

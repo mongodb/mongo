@@ -3,7 +3,12 @@
  * @tags: []
  */
 
+import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesBucketsColl
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {findMatchingLogLine} from "jstests/libs/log.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 (function() {
 
@@ -43,7 +48,7 @@ ns = "test.viewOnColl";
 db.viewOnColl.aggregate(pipeline);
 checkLogForCollectionType(ns, "view");
 
-// Check for timeseries and timeseriesBuckets collectionType.
+// Check for timeseries collectionType.
 assert.commandWorked(db.createCollection(
     "timeseries_coll", {timeseries: {timeField: "timestamp", metaField: "metadata"}}));
 assert.commandWorked(db.timeseries_coll.insert({
@@ -52,8 +57,22 @@ assert.commandWorked(db.timeseries_coll.insert({
 }));
 db.timeseries_coll.aggregate(pipeline);
 checkLogForCollectionType("test.timeseries_coll", "timeseries");
-db.test.system.buckets.timeseries_coll.aggregate(pipeline);
-checkLogForCollectionType("test.system.buckets.timeseries_coll", "timeseriesBuckets");
+
+// Check for timeseries collectionType with raw operations over buckets.
+assert.commandWorked(db.createCollection(
+    "timeseries_coll_rawops", {timeseries: {timeField: "timestamp", metaField: "metadata"}}));
+assert.commandWorked(db.timeseries_coll_rawops.insert({
+    "metadata": {"type": "measurement"},
+    "timestamp": ISODate("2021-05-18T00:00:00.000Z"),
+}));
+getTimeseriesCollForRawOps(db, db.test.timeseries_coll_rawops)
+    .aggregate(pipeline, getRawOperationSpec(db));
+if (areViewlessTimeseriesEnabled(db)) {
+    checkLogForCollectionType("test.timeseries_coll", "timeseries");
+} else {
+    checkLogForCollectionType("test." + getTimeseriesBucketsColl("timeseries_coll"),
+                              "timeseriesBuckets");
+}
 
 // Check for system collectionType.
 db.system.profile.aggregate(pipeline);

@@ -4,13 +4,13 @@
  * read documents from the re-created time-series collection.
  */
 
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, mongos: 2});
 const dbName = "test";
 const collName = "coll";
 const ns = dbName + "." + collName;
-const bucketNs = dbName + ".system.buckets." + collName;
 
 const dbStaleRouter = st.s0.getDB(dbName);
 const dbOtherRouter = st.s1.getDB(dbName);
@@ -35,7 +35,7 @@ dbOtherRouter[collName].drop();
 assert.commandWorked(dbOtherRouter.adminCommand(
     {shardCollection: ns, key: {time: 1}, timeseries: {timeField: "time"}}));
 assert.commandWorked(dbOtherRouter.adminCommand({
-    moveRange: bucketNs,
+    moveRange: dbName + "." + getTimeseriesCollForDDLOps(dbOtherRouter, collName),
     toShard: st.shard1.shardName,
     min: {"control.min.time": MinKey},
     max: {"control.min.time": MaxKey}

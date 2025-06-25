@@ -1,6 +1,6 @@
 /**
- * Tests inserting sample data into the time-series buckets collection. This test is for the
- * exercising the optimized $sample implementation for $_internalUnpackBucket.
+ * This test is for the exercising the optimized $sample implementation for $_internalUnpackBucket
+ * in time-series collections.
  */
 import {aggPlanHasStage, getAggPlanStage, getPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
@@ -82,10 +82,10 @@ let runSampleTests = (measurementsPerBucket, backupPlanSelected) => {
 
     let numDocs = fillBuckets(coll, measurementsPerBucket);
 
-    // Check the time-series view to make sure we have the correct number of docs and that there are
-    // no duplicates after sampling.
-    const viewDocs = coll.find({}, {x: 1}).toArray();
-    assert.eq(numDocs, viewDocs.length, viewDocs);
+    // Check the time-series measurements to make sure we have the correct number of docs and that
+    // there are no duplicates after sampling.
+    const userDocs = coll.find({}, {x: 1}).toArray();
+    assert.eq(numDocs, userDocs.length, userDocs);
 
     let sampleSize = 20;
     let result = coll.aggregate([{$sample: {size: sampleSize}}]).toArray();

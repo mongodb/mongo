@@ -3,6 +3,7 @@
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const conn = MongoRunner.runMongod();
 
@@ -11,7 +12,6 @@ const testDB = conn.getDB(dbName);
 assert.commandWorked(testDB.dropDatabase());
 
 const coll = testDB.getCollection('ts');
-const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 
 const timeFieldName = 'time';
 const metaFieldName = 'tag';
@@ -70,7 +70,8 @@ if (!FeatureFlagUtil.isEnabled(testDB, "TimeseriesUpdatesSupport")) {
 
 // Direct bucket update.
 ++expectedMetrics.directUpdated;
-assert.commandWorked(bucketsColl.updateOne({meta: 1}, {$set: {meta: 3}}));
+assert.commandWorked(getTimeseriesCollForRawOps(testDB, coll)
+                         .updateOne({meta: 1}, {$set: {meta: 3}}, getRawOperationSpec(testDB)));
 checkServerStatus();
 
 // User delete that updates the original bucket.
@@ -93,7 +94,8 @@ checkServerStatus();
 
 // Direct bucket delete.
 ++expectedMetrics.directDeleted;
-assert.commandWorked(bucketsColl.deleteOne({meta: 1}));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(testDB, coll).deleteOne({meta: 1}, getRawOperationSpec(testDB)));
 checkServerStatus();
 
 MongoRunner.stopMongod(conn);

@@ -1,5 +1,5 @@
 /**
- * Tests maximum size of measurements held in each bucket in a time-series buckets collection.
+ * Tests maximum size of measurements held in each bucket of a time-series collection.
  * @tags: [
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
@@ -47,17 +47,17 @@ TimeseriesTest.run((insert) => {
             }
         }
 
-        // Check view.
-        const viewDocs = coll.find({}, {x: 1}).sort({_id: 1}).toArray();
-        assert.eq(numDocs, viewDocs.length, viewDocs);
+        // Check measurements.
+        const userDocs = coll.find({}, {x: 1}).sort({_id: 1}).toArray();
+        assert.eq(numDocs, userDocs.length, userDocs);
         for (let i = 0; i < numDocs; i++) {
-            const viewDoc = viewDocs[i];
-            assert.eq(i, viewDoc._id, 'unexpected _id in doc: ' + i + ': ' + tojson(viewDoc));
+            const userDoc = userDocs[i];
+            assert.eq(i, userDoc._id, 'unexpected _id in doc: ' + i + ': ' + tojson(userDoc));
 
             const value = (i % 2 == 0 ? "a" : "b");
             assert.eq(value.repeat(largeValueSize),
-                      viewDoc.x,
-                      'unexpected field x in doc: ' + i + ': ' + tojson(viewDoc));
+                      userDoc.x,
+                      'unexpected field x in doc: ' + i + ': ' + tojson(userDoc));
         }
 
         const bucketDocs = getTimeseriesCollForRawOps(db, coll)

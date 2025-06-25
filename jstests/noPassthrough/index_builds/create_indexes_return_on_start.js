@@ -212,13 +212,19 @@ runTest(shardingDb, [shardingTest.rs0, shardingTest.rs1], false, (coll) => {
         {moveChunk: coll.getFullName(), find: {m: 10}, to: shardingTest.shard1.shardName}));
 });
 runTest(shardingDb, [shardingTest.rs0, shardingTest.rs1], true, (coll) => {
-    const bucketsNs = shardingDb.getName() + ".system.buckets." + coll.getName();
     assert.commandWorked(
         shardingDb.adminCommand({shardCollection: coll.getFullName(), key: {m: 1}}));
-    assert.commandWorked(shardingDb.adminCommand({split: bucketsNs, middle: {meta: 5}}));
     assert.commandWorked(shardingDb.adminCommand(
-        {moveChunk: bucketsNs, find: {meta: 0}, to: shardingTest.shard0.shardName}));
-    assert.commandWorked(shardingDb.adminCommand(
-        {moveChunk: bucketsNs, find: {meta: 10}, to: shardingTest.shard1.shardName}));
+        {split: getTimeseriesCollForDDLOps(shardingDb, coll).getFullName(), middle: {meta: 5}}));
+    assert.commandWorked(shardingDb.adminCommand({
+        moveChunk: getTimeseriesCollForDDLOps(shardingDb, coll).getFullName(),
+        find: {meta: 0},
+        to: shardingTest.shard0.shardName
+    }));
+    assert.commandWorked(shardingDb.adminCommand({
+        moveChunk: getTimeseriesCollForDDLOps(shardingDb, coll).getFullName(),
+        find: {meta: 10},
+        to: shardingTest.shard1.shardName
+    }));
 });
 shardingTest.stop();

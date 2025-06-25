@@ -1,6 +1,5 @@
 /**
- * Tests inserting sample data into the time-series buckets collection.
- * This test is for the simple case of only one measurement per bucket.
+ * Tests that inserting data into a time-series collection records latencyStats in $collStats.
  * @tags: [
  *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,

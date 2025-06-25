@@ -4,6 +4,7 @@
  *
  * @tags: [requires_fcv_80, requires_timeseries]
  */
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -80,13 +81,13 @@ primaryColl2.drop();
 jsTestLog("Creating timeseries collection");
 const collNameTS = "tstestcoll";
 const primaryCollTS = primaryDB[collNameTS];
-const primaryBucketsCollTS = primaryDB["system.buckets." + collNameTS];
 assert.commandWorked(primaryDB.createCollection(
     primaryCollTS.getName(), {timeseries: {timeField: "time", metaField: "measurement"}}));
 
 jsTestLog("Starting blocked vectored time series insert in parallel thread");
-failPoint = configureFailPoint(
-    primaryDB, "hangAfterCollectionInserts", {collectionNS: primaryBucketsCollTS.getFullName()});
+failPoint = configureFailPoint(primaryDB, "hangAfterCollectionInserts", {
+    collectionNS: getTimeseriesCollForDDLOps(primaryDB, primaryCollTS).getFullName()
+});
 insertThread = new Thread((host, dbName, collName) => {
     const db = new Mongo(host).getDB(dbName);
     const objA = {"time": ISODate("2021-01-01T01:00:00Z"), "measurement": "A"};

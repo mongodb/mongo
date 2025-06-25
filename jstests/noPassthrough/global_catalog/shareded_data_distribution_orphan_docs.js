@@ -3,6 +3,7 @@
  * owning chunks or orphan ranges.
  */
 
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ShardingTest} from 'jstests/libs/shardingtest.js';
 
 // Skip orphans check because this test disables the range deleter in order to test the
@@ -20,14 +21,17 @@ const numDocs = 6;
 
 const emptyTimeseriesNss = 'test.emptyTimeseriesNss';
 const timeseriesNssWithDocs = 'test.collTimeseries2';
-const emptyBucketTimeseriesNss = 'test.system.buckets.emptyTimeseriesNss';
-const bucketTimeseriesNssWithDocs = 'test.system.buckets.collTimeseries2';
 
 const primaryShard = st.shard0.shardName;
 const temporaryDataShard = st.shard1.shardName;
 const finalDataShard = st.shard2.shardName;
 
 function verifyShardedDataDistributionFor(nss, expectedDistribution) {
+    // TODO(SERVER-101609): This `if` statement does timeseries translation and can be removed
+    if (st.s.getCollection(nss).getMetadata().type === 'timeseries') {
+        nss = getTimeseriesCollForDDLOps(st.s.getDB(dbName), st.s.getCollection(nss)).getFullName();
+    }
+
     const aggregationResponse =
         adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: nss}}]).toArray();
     assert.eq(1, aggregationResponse.length);
@@ -70,9 +74,13 @@ for (let destinationShardId of [temporaryDataShard, finalDataShard]) {
         assert.commandWorked(
             st.s.adminCommand({moveChunk: nss, find: {skey: 1}, to: destinationShardId}));
     }
-    for (let nss of [bucketTimeseriesNssWithDocs, emptyBucketTimeseriesNss]) {
-        assert.commandWorked(st.s.adminCommand(
-            {moveChunk: nss, find: {"control.min.time": 1}, to: destinationShardId}));
+    for (let nss of [timeseriesNssWithDocs, emptyTimeseriesNss]) {
+        assert.commandWorked(st.s.adminCommand({
+            moveChunk: getTimeseriesCollForDDLOps(st.s.getDB(dbName), st.s.getCollection(nss))
+                           .getFullName(),
+            find: {"control.min.time": 1},
+            to: destinationShardId
+        }));
     }
 }
 
@@ -91,9 +99,8 @@ verifyShardedDataDistributionFor(nssWithDocs, [
 ]);
 
 verifyShardedDataDistributionFor(
-    emptyBucketTimeseriesNss,
-    [{shardName: finalDataShard, numOwnedDocuments: 0, numOrphanedDocs: 0}]);
-verifyShardedDataDistributionFor(bucketTimeseriesNssWithDocs, [
+    emptyTimeseriesNss, [{shardName: finalDataShard, numOwnedDocuments: 0, numOrphanedDocs: 0}]);
+verifyShardedDataDistributionFor(timeseriesNssWithDocs, [
     {shardName: primaryShard, numOwnedDocuments: 0, numOrphanedDocs: 1},
     {shardName: temporaryDataShard, numOwnedDocuments: 0, numOrphanedDocs: 1},
     {shardName: finalDataShard, numOwnedDocuments: 1, numOrphanedDocs: 0}

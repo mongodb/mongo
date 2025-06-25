@@ -1,5 +1,5 @@
 /**
- * Tests that direct updates to a timeseries bucket collection close the bucket, preventing further
+ * Tests that direct updates to a timeseries bucket close the bucket, preventing further
  * inserts to land in that bucket or deletes and updates to be applied to it.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
