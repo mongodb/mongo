@@ -1810,7 +1810,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildTextMatch(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     auto textNode = static_cast<const TextMatchNode*>(root);
-    const auto& coll = getCurrentCollection(reqs);
+    auto coll = getCurrentCollection(reqs);
     tassert(5432212, "no collection object", coll);
     tassert(5432213, "index keys requested for text match node", !reqs.getIndexKeyBitset());
     tassert(5432215,
@@ -3019,8 +3019,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         std::move(outputs)};
 }
 
-const CollectionPtr& SlotBasedStageBuilder::getCurrentCollection(const PlanStageReqs& reqs) const {
-    return _collections.lookupCollection(reqs.getTargetNamespace());
+CollectionPtr SlotBasedStageBuilder::getCurrentCollection(const PlanStageReqs& reqs) const {
+    auto nss = reqs.getTargetNamespace();
+    const auto coll = _collections.lookupCollection(nss);
+    tassert(7922500,
+            str::stream() << "No collection found that matches namespace '" << nss.toString()
+                          << "'",
+            coll != CollectionPtr::null);
+    return CollectionPtr(coll.get(), CollectionPtr::NoYieldTag{});
 }
 
 // Returns a non-null pointer to the root of a plan tree, or a non-OK status if the PlanStage tree

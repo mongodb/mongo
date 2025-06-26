@@ -35,10 +35,12 @@
 namespace mongo {
 
 /**
- * Class which holds a set of pointers to multiple collections. This class distinguishes between
- * a 'main collection' and 'secondary collections'. While the former represents the collection a
- * given command is run against, the latter represents other collections that the query execution
- * engine may need to access.
+ * Class which is used to access pointers to multiple collections referenced in a query. This class
+ * distinguishes between a 'main collection' and 'secondary collections'. While the former
+ * represents the collection a given command is run against, the latter represents other collections
+ * that the query execution engine may need to access. In case of secondary collections, we only
+ * store the namespace strings and fetch 'collectionPtr' on demand, since they can become invalid
+ * during query yields. The main collectionPtr is restored through yield so it can be stored.
  */
 class MultipleCollectionAccessor final {
 public:
@@ -50,18 +52,16 @@ public:
                                bool isAnySecondaryNamespaceAViewOrSharded,
                                const std::vector<NamespaceStringOrUUID>& secondaryExecNssList)
         : _mainColl(mainColl),
-          _isAnySecondaryNamespaceAViewOrSharded(isAnySecondaryNamespaceAViewOrSharded) {
+          _isAnySecondaryNamespaceAViewOrSharded(isAnySecondaryNamespaceAViewOrSharded),
+          _opCtx(opCtx) {
         auto catalog = CollectionCatalog::get(opCtx);
         for (const auto& secondaryNssOrUuid : secondaryExecNssList) {
             auto secondaryNss = catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUuid);
 
-            // Don't store a CollectionPtr if the main nss is also a secondary one.
+            // Don't store secondaryNss if it is also the main nss.
             if (secondaryNss != mainCollNss) {
-                // Even if the collection corresponding to 'secondaryNss' doesn't exist, we
-                // still want to include it. It is the responsibility of consumers of this class
-                // to verify that a collection exists before accessing it.
-                _secondaryColls.emplace(std::move(secondaryNss),
-                                        catalog->lookupCollectionByNamespace(opCtx, secondaryNss));
+                _secondaryColls.emplace(secondaryNss,
+                                        catalog->lookupUUIDByNSS(opCtx, secondaryNss));
             }
         }
     }
@@ -79,21 +79,30 @@ public:
         return *_mainColl;
     }
 
-    const std::map<NamespaceString, CollectionPtr>& getSecondaryCollections() const {
-        return _secondaryColls;
+    std::map<NamespaceString, CollectionPtr> getSecondaryCollections() const {
+        std::map<NamespaceString, CollectionPtr> collMap;
+        for (const auto& [nss, uuid] : _secondaryColls) {
+            collMap.emplace(
+                nss,
+                uuid ? CollectionCatalog::get(_opCtx)->lookupCollectionByUUID(_opCtx, *uuid)
+                     : nullptr);
+        }
+        return collMap;
     }
 
     bool isAnySecondaryNamespaceAViewOrSharded() const {
         return _isAnySecondaryNamespaceAViewOrSharded;
     }
 
-    const CollectionPtr& lookupCollection(const NamespaceString& nss) const {
+    CollectionPtr lookupCollection(const NamespaceString& nss) const {
         if (_mainColl && _mainColl->get() && nss == _mainColl->get()->ns()) {
-            return *_mainColl;
-        } else if (auto itr = _secondaryColls.find(nss); itr != _secondaryColls.end()) {
-            return itr->second;
+            return CollectionPtr(_mainColl->get(), CollectionPtr::NoYieldTag{});
+        } else if (auto itr = _secondaryColls.find(nss);
+                   itr != _secondaryColls.end() && itr->second) {
+            return CollectionPtr{
+                CollectionCatalog::get(_opCtx)->lookupCollectionByUUID(_opCtx, *itr->second)};
         }
-        return CollectionPtr::null;
+        return CollectionPtr{nullptr};
     }
 
     void clear() {
@@ -121,7 +130,9 @@ private:
     // sharded collection is not currently supported by the execution subsystem.
     bool _isAnySecondaryNamespaceAViewOrSharded = false;
 
-    // Map from namespace to a corresponding CollectionPtr.
-    std::map<NamespaceString, CollectionPtr> _secondaryColls{};
+    // Map from namespace to corresponding UUID
+    stdx::unordered_map<NamespaceString, boost::optional<UUID>> _secondaryColls{};
+
+    OperationContext* _opCtx = nullptr;
 };
 }  // namespace mongo
