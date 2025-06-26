@@ -516,7 +516,7 @@ def symbolize_frames(
             )
             symbolizer_path = DEFAULT_SYMBOLIZER_PATH
 
-    symbolizer_args = [symbolizer_path]
+    symbolizer_args = [symbolizer_path, "--relativenames"]
     for dh in dsym_hint:
         symbolizer_args.append("-dsym-hint={}".format(dh))
     symbolizer_process = subprocess.Popen(
