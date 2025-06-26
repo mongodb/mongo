@@ -94,6 +94,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -1200,12 +1201,12 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollbackImpl::_findComm
     }
 
     // Rollback common point should be >= the replication commit point.
-    invariant(commonPointOpTime.getTimestamp() >= lastCommittedOpTime.getTimestamp());
-    invariant(commonPointOpTime >= lastCommittedOpTime);
+    fassert(5007100, commonPointOpTime.getTimestamp() >= lastCommittedOpTime.getTimestamp());
+    fassert(5007101, commonPointOpTime >= lastCommittedOpTime);
 
     // Rollback common point should be >= the committed snapshot optime.
-    invariant(commonPointOpTime.getTimestamp() >= committedSnapshot.getTimestamp());
-    invariant(commonPointOpTime >= committedSnapshot);
+    fassert(5007102, commonPointOpTime.getTimestamp() >= committedSnapshot.getTimestamp());
+    fassert(5007103, commonPointOpTime >= committedSnapshot);
 
     // Rollback common point should be >= the stable timestamp.
     invariant(stableTimestamp);
