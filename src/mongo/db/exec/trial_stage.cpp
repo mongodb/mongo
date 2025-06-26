@@ -77,7 +77,8 @@ Status TrialStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             if (mustYield && !yieldPolicy->canAutoYield()) {
                 throw WriteConflictException();
             }
-            auto yieldStatus = yieldPolicy->yieldOrInterrupt(expCtx()->opCtx);
+            auto yieldStatus = yieldPolicy->yieldOrInterrupt(
+                expCtx()->opCtx, nullptr, RestoreContext::RestoreType::kYield);
             if (!yieldStatus.isOK()) {
                 return yieldStatus;
             }

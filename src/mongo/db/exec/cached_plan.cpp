@@ -190,7 +190,8 @@ Status CachedPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
     // In all cases, the actual yielding happens here.
     if (yieldPolicy->shouldYieldOrInterrupt(expCtx()->opCtx)) {
         // Here's where we yield.
-        return yieldPolicy->yieldOrInterrupt(expCtx()->opCtx);
+        return yieldPolicy->yieldOrInterrupt(
+            expCtx()->opCtx, nullptr, RestoreContext::RestoreType::kYield);
     }
 
     return Status::OK();

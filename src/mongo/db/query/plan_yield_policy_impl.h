@@ -45,7 +45,9 @@ public:
 private:
     void saveState(OperationContext* opCtx) override;
 
-    void restoreState(OperationContext* opCtx, const Yieldable* yieldable) override;
+    void restoreState(OperationContext* opCtx,
+                      const Yieldable* yieldable,
+                      RestoreContext::RestoreType restoreType) override;
 
     // The plan executor which this yield policy is responsible for yielding. Must not outlive the
     // plan executor.

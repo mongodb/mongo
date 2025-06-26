@@ -47,12 +47,14 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(throwWriteConflictExceptionInBatchedDeleteStage);
 MONGO_FAIL_POINT_DEFINE(batchedDeleteStageSleepAfterNDocuments);
+MONGO_FAIL_POINT_DEFINE(batchedDeleteStageThrowWriteConflictException);
 
 namespace {
 
@@ -347,6 +349,11 @@ PlanStage::StageState BatchedDeleteStage::doWork(WorkingSetID* out) {
 
 PlanStage::StageState BatchedDeleteStage::_tryRestoreState(WorkingSetID* out) {
     try {
+        if (MONGO_unlikely(batchedDeleteStageThrowWriteConflictException.shouldFail())) {
+            throw WriteConflictException(
+                str::stream() << "Hit failpoint '"
+                              << batchedDeleteStageThrowWriteConflictException.getName() << "'.");
+        }
         child()->restoreState(&collection());
     } catch (const WriteConflictException&) {
         *out = WorkingSet::INVALID_ID;

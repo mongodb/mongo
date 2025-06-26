@@ -104,16 +104,20 @@ void waitForInserts(OperationContext* opCtx,
     ON_BLOCK_EXIT([curOp] { curOp->resumeTimer(); });
 
     uint64_t currentNotifierVersion = notifierData->notifier->getVersion();
-    auto yieldResult = yieldPolicy->yieldOrInterrupt(opCtx, [opCtx, notifierData] {
-        const auto deadline = awaitDataState(opCtx).waitForInsertsDeadline;
-        notifierData->notifier->waitUntil(notifierData->lastEOFVersion, deadline);
-        if (MONGO_unlikely(planExecutorHangWhileYieldedInWaitForInserts.shouldFail())) {
-            LOGV2(4452903,
-                  "PlanExecutor - planExecutorHangWhileYieldedInWaitForInserts fail point enabled. "
-                  "Blocking until fail point is disabled");
-            planExecutorHangWhileYieldedInWaitForInserts.pauseWhileSet();
-        }
-    });
+    auto yieldResult = yieldPolicy->yieldOrInterrupt(
+        opCtx,
+        [opCtx, notifierData] {
+            const auto deadline = awaitDataState(opCtx).waitForInsertsDeadline;
+            notifierData->notifier->waitUntil(notifierData->lastEOFVersion, deadline);
+            if (MONGO_unlikely(planExecutorHangWhileYieldedInWaitForInserts.shouldFail())) {
+                LOGV2(4452903,
+                      "PlanExecutor - planExecutorHangWhileYieldedInWaitForInserts fail point "
+                      "enabled. "
+                      "Blocking until fail point is disabled");
+                planExecutorHangWhileYieldedInWaitForInserts.pauseWhileSet();
+            }
+        },
+        RestoreContext::RestoreType::kYield);
     notifierData->lastEOFVersion = currentNotifierVersion;
 
     uassertStatusOK(yieldResult);

@@ -42,6 +42,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/util/assert_util.h"
 
 namespace {
 
@@ -55,6 +56,8 @@ int sgn(int i) {
 }  // namespace
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(throwDuringIndexScanRestore);
 
 // static
 const char* IndexScan::kStageType = "IXSCAN";
@@ -260,8 +263,14 @@ void IndexScan::doSaveStateRequiresIndex() {
 }
 
 void IndexScan::doRestoreStateRequiresIndex() {
-    if (_indexCursor)
+    if (_indexCursor) {
+        if (MONGO_unlikely(throwDuringIndexScanRestore.shouldFail())) {
+            throw WriteConflictException(str::stream()
+                                         << "Hit failpoint '"
+                                         << throwDuringIndexScanRestore.getName() << "'.");
+        }
         _indexCursor->restore();
+    }
 }
 
 void IndexScan::doDetachFromOperationContext() {
