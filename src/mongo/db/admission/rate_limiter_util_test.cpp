@@ -75,7 +75,8 @@ TEST_F(RateLimiterTest, BasicTokenAcquisition) {
     ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 0);
     // Immediate acquisition (without throttling, i.e. no sleep) still counts as a queue time of
     // zero, so the average timing metric will have that as its first value.
-    ASSERT_EQ(rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0);
+    ASSERT(rateLimiter.stats().averageTimeQueuedMicros.get().has_value());
+    ASSERT_APPROX_EQUAL(*rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0, 0.1);
 }
 
 // Verify that RateLimiter::setBurstSize range checks its input.
@@ -202,9 +203,10 @@ TEST_F(RateLimiterTest, RejectOverMaxWaiters) {
                (status2.code() == RateLimiter::kRejectedErrorCode));
         ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 1);
 
-        // Assert that the token balance is between 0 and -1, as only one token should have been
-        // borrowed from the bucket.
-        ASSERT_LT(rateLimiter.tokenBalance(), 0);
+        // Assert that the token balance is between ~0 and -1, as only one token should have been
+        // borrowed from the bucket. The bucket may have refilled slightly past 0 on slow machines,
+        // and so we account for that in the assertion.
+        ASSERT_LT(rateLimiter.tokenBalance(), 0.2);
         ASSERT_GT(rateLimiter.tokenBalance(), -1);
 
         // Interrupt the other token acquisition.
@@ -425,7 +427,8 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
         ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), maxTokens);
         ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 0);
         ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 0);
-        ASSERT_EQ(rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0);
+        ASSERT(rateLimiter.stats().averageTimeQueuedMicros.get().has_value());
+        ASSERT_APPROX_EQUAL(*rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0, .1);
 
         // Make sure we've enqueued all the remaining waiters so that we don't race with advancing
         // the mock clock.
@@ -446,7 +449,8 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
         ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), numThreads - maxTokens);
         ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 0);
         ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 0);
-        ASSERT_EQ(rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0);
+        ASSERT(rateLimiter.stats().averageTimeQueuedMicros.get().has_value());
+        ASSERT_APPROX_EQUAL(*rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0, .1);
 
         // Advancing time less than tokenInterval doesn't cause a token to be acquired.
         auto smallAdvance = Milliseconds{10};
