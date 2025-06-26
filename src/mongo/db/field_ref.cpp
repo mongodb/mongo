@@ -115,8 +115,8 @@ void FieldRef::parse(StringData path) {
         // instead reach the break statement.
 
         if (cur != beg) {
-            size_t offset = beg - _dotted.get().begin();
-            size_t len = cur - beg;
+            std::uint32_t offset = beg - _dotted.get().begin();
+            std::uint32_t len = cur - beg;
             appendParsedPart(StringView{offset, len});
         } else {
             appendParsedPart(StringView{});
@@ -210,7 +210,7 @@ void FieldRef::reserialize() const {
     const std::string::const_iterator end = _dotted.get().end();
     for (size_t i = 0; i != parts; ++i) {
         boost::optional<StringView>& part = _parts[i];
-        const size_t size = part ? part->len : _replacements[i].get().size();
+        const std::uint32_t size = part ? part->len : _replacements[i].get().size();
 
         // There is one case where we expect to see the "where" iterator to be at "end" here: we
         // are at the last part of the FieldRef and that part is the empty string. In that case, we
@@ -221,7 +221,7 @@ void FieldRef::reserialize() const {
         if (!size) {
             part = StringView{};
         } else {
-            std::size_t offset = where - _dotted.get().begin();
+            std::uint32_t offset = where - _dotted.get().begin();
             part = StringView{offset, size};
         }
         where += size;

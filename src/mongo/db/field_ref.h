@@ -34,6 +34,7 @@
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/container_size_helper.h"
 
@@ -48,6 +49,14 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+
+
+/**
+ * For performance reasons, we need to reduce the size of FieldRef::StringView. Since we have a cap
+ * on the size of FieldRef that is lower than the uint32 max value, we'll never run into overflow.
+ * However we should static assert that this is true in case of future changes.
+ */
+MONGO_STATIC_ASSERT(BSONObjMaxInternalSize < std::numeric_limits<std::uint32_t>::max());
 
 /**
  * A FieldPath represents a path in a document, starting from the root. The path
@@ -293,14 +302,16 @@ private:
         // Constructs an empty StringView.
         StringView() = default;
 
-        StringView(std::size_t offset, std::size_t len) : offset(offset), len(len) {};
+        StringView(std::uint32_t offset, std::uint32_t len) : offset(offset), len(len) {};
 
         StringData toStringData(const std::string& viewInto) const {
             return {viewInto.c_str() + offset, len};
         };
 
-        std::size_t offset = 0;
-        std::size_t len = 0;
+        // uint32 is large enough for FieldRef since we have a limit on it's size. At the top of
+        // this file we statically assert that this is true.
+        std::uint32_t offset = 0;
+        std::uint32_t len = 0;
     };
 
     /**

@@ -11,6 +11,7 @@
  *   # size.
  *   does_not_support_multiplanning_single_solutions,
  *   incompatible_aubsan,
+ *   requires_profiling
  * ]
  */
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
@@ -21,6 +22,11 @@ if (isSlowBuild(db)) {
     jsTestLog("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
     quit();
 }
+
+// This test can cause lots of spam in the slow query logs due to the size of the queries. If an
+// error happens, we'll have a backtrace and know which query is the issue, so slow query logs are
+// not necessary.
+db.setProfilingLevel(0, {slowms: 10000});
 
 const coll = db.query_limits_test;
 coll.drop();
@@ -151,6 +157,27 @@ function testLargeAndOrPredicates() {
     }
 }
 
+function testLongFieldNames() {
+    jsTestLog("Testing $match with long field name");
+    // Test with a long field name that's accepted by the server.
+    {
+        const longFieldName = 'a'.repeat(10_000_000);
+        const predicate = {[longFieldName]: 1};
+        runAgg([{$match: predicate}]);
+        runAgg([{$match: {$and: [predicate]}}]);
+        runAgg([{$match: {$or: [predicate]}}]);
+    }
+
+    // Test with a field name that's too long, where the server rejects it.
+    {
+        const extraLongFieldName = 'a'.repeat(17_000_000);
+        const predicate = {[extraLongFieldName]: 1};
+        assert.throwsWithCode(() => runAgg([{$match: predicate}]), 17260);
+        assert.throwsWithCode(() => runAgg([{$match: {$and: [predicate]}}]), 17260);
+        assert.throwsWithCode(() => runAgg([{$match: {$or: [predicate]}}]), 17260);
+    }
+}
+
 // Test deeply nested queries.
 function testDeeplyNestedPath() {
     jsTestLog("Testing deeply nested $match");
@@ -270,6 +297,7 @@ const tests = [
     testLargeBucket,
     testLargeProject,
     testLargeAndOrPredicates,
+    testLongFieldNames,
     testDeeplyNestedPath,
     testNestedAndOr,
     testPipelineLimits,
