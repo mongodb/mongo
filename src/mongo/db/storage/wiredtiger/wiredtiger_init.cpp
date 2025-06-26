@@ -172,17 +172,7 @@ public:
             }
 
             WiredTigerKVEngineBase::WiredTigerConfig wtConfig =
-                getWiredTigerConfigFromStartupOptions(true /* usingSpillWiredTigerKVEngine */);
-            wtConfig.cacheSizeMB = gSpillWiredTigerCacheSizeMB;
-            wtConfig.evictionThreadsMin = gSpillWiredTigerEvictionThreadsMin;
-            wtConfig.evictionThreadsMax = gSpillWiredTigerEvictionThreadsMax;
-            wtConfig.evictionDirtyTriggerMB =
-                gSpillWiredTigerEvictionDirtyTriggerPercentage * wtConfig.cacheSizeMB / 100;
-            wtConfig.inMemory = false;
-            wtConfig.logEnabled = false;
-            wtConfig.prefetchEnabled = false;
-            wtConfig.restoreEnabled = false;
-            wtConfig.zstdCompressorLevel = gSpillWiredTigerZstdCompressionLevel;
+                getSpillWiredTigerConfigFromStartupOptions();
             spillWiredTigerKVEngine = std::make_unique<SpillWiredTigerKVEngine>(
                 std::string{getCanonicalName()},
                 params.getSpillDbPath(),

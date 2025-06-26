@@ -900,7 +900,6 @@ std::string generateWTOpenConfigString(const WiredTigerKVEngineBase::WiredTigerC
  * Returns a WiredTigerKVEngineBase::WiredTigerConfig populated with config values provided at
  * startup.
  */
-WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
-    bool usingSpillWiredTigerKVEngine = false);
+WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions();
 
 }  // namespace mongo

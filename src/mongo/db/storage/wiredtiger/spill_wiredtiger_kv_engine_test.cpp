@@ -35,6 +35,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -51,10 +52,12 @@ class SpillWiredTigerKVEngineTest : public ServiceContextTest {
 protected:
     SpillWiredTigerKVEngineTest() : _dbpath("wt_test"), _opCtx(makeOperationContext()) {
         WiredTigerKVEngineBase::WiredTigerConfig wtConfig =
-            getWiredTigerConfigFromStartupOptions(true /* usingSpillWiredTigerKVEngine */);
+            getSpillWiredTigerConfigFromStartupOptions();
         wtConfig.cacheSizeMB = kWtCacheSizeBytes / (1 * 1024 * 1024);
-        wtConfig.inMemory = false;
-        wtConfig.logEnabled = false;
+        wtConfig.evictionDirtyTriggerMB =
+            gSpillWiredTigerEvictionDirtyTriggerPercentage * wtConfig.cacheSizeMB / 100;
+        wtConfig.evictionUpdatesTriggerMB =
+            gSpillWiredTigerEvictionDirtyTriggerPercentage * wtConfig.cacheSizeMB / 100;
 
         _kvEngine = std::make_unique<SpillWiredTigerKVEngine>(
             std::string{kWiredTigerEngineName},

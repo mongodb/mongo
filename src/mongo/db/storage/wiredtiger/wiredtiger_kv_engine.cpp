@@ -3206,10 +3206,9 @@ Status WiredTigerKVEngine::_drop(WiredTigerSession& session, const char* uri, co
     return wtRCToStatus(ret, session);
 }
 
-WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
-    bool usingSpillWiredTigerKVEngine) {
-    // TODO(SERVER-103279): Optimally configure SpillWiredTigerKVEngine.
+WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions() {
     WiredTigerKVEngineBase::WiredTigerConfig wtConfig;
+
     wtConfig.sessionMax = wiredTigerGlobalOptions.sessionMax;
     wtConfig.evictionDirtyTargetMB = wiredTigerGlobalOptions.evictionDirtyTargetGB * 1024;
     wtConfig.evictionDirtyTriggerMB = wiredTigerGlobalOptions.evictionDirtyTriggerGB * 1024;
@@ -3220,20 +3219,12 @@ WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
     wtConfig.liveRestoreReadSizeMB = wiredTigerGlobalOptions.liveRestoreReadSizeMB;
     wtConfig.statisticsLogWaitSecs = wiredTigerGlobalOptions.statisticsLogDelaySecs;
 
-    if (!usingSpillWiredTigerKVEngine) {
-        // Config fuzzer tests fail for SpillWiredTigerKVEngine due to eviction thresholds being
-        // higher than the cache size.
-        // TODO(SERVER-103279): Fix this issue by appropriately configuring these thresholds for
-        // SpillWiredTigerKVEngine.
-        wtConfig.extraOpenOptions = wiredTigerGlobalOptions.engineConfig;
-
-        if (wtConfig.extraOpenOptions.find("session_max=") != std::string::npos) {
-            LOGV2_WARNING(
-                9086701,
-                "The session cache max is derived from the session_max value "
-                "provided as a server parameter. Please use the wiredTigerSessionMax server "
-                "parameter to set this value.");
-        }
+    wtConfig.extraOpenOptions = wiredTigerGlobalOptions.engineConfig;
+    if (wtConfig.extraOpenOptions.find("session_max=") != std::string::npos) {
+        LOGV2_WARNING(9086701,
+                      "The session cache max is derived from the session_max value "
+                      "provided as a server parameter. Please use the wiredTigerSessionMax server "
+                      "parameter to set this value.");
     }
 
     return wtConfig;

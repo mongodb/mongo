@@ -142,7 +142,7 @@ std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::makeTemporaryRecordStore(
     std::string uri = WiredTigerUtil::buildTableUri(ident);
     LOGV2_DEBUG(10158008,
                 2,
-                "WiredTigerKVEngine::makeTemporaryRecordStore",
+                "SpillWiredTigerKVEngine::makeTemporaryRecordStore",
                 "uri"_attr = uri,
                 "config"_attr = config);
     uassertStatusOK(wtRCToStatus(session.create(uri.c_str(), config.c_str()), session));
@@ -220,6 +220,28 @@ void SpillWiredTigerKVEngine::cleanShutdown(bool memLeakAllowed) {
     invariantWTOK(_conn->close(_conn, closeConfig.c_str()), nullptr);
     LOGV2(10158007, "Closed spill WiredTiger ", "duration"_attr = Date_t::now() - startTime);
     _conn = nullptr;
+}
+
+WiredTigerKVEngineBase::WiredTigerConfig getSpillWiredTigerConfigFromStartupOptions() {
+    WiredTigerKVEngineBase::WiredTigerConfig wtConfig;
+
+    wtConfig.cacheSizeMB = gSpillWiredTigerCacheSizeMB;
+    wtConfig.sessionMax = wiredTigerGlobalOptions.sessionMax;
+    wtConfig.evictionThreadsMin = gSpillWiredTigerEvictionThreadsMin;
+    wtConfig.evictionThreadsMax = gSpillWiredTigerEvictionThreadsMax;
+    wtConfig.evictionDirtyTargetMB = wiredTigerGlobalOptions.evictionDirtyTargetGB * 1024;
+    wtConfig.evictionDirtyTriggerMB =
+        gSpillWiredTigerEvictionDirtyTriggerPercentage * wtConfig.cacheSizeMB / 100;
+    wtConfig.evictionUpdatesTriggerMB =
+        gSpillWiredTigerEvictionDirtyTriggerPercentage * wtConfig.cacheSizeMB / 100;
+    wtConfig.statisticsLogWaitSecs = wiredTigerGlobalOptions.statisticsLogDelaySecs;
+    wtConfig.inMemory = false;
+    wtConfig.logEnabled = false;
+    wtConfig.prefetchEnabled = false;
+    wtConfig.restoreEnabled = false;
+    wtConfig.zstdCompressorLevel = gSpillWiredTigerZstdCompressionLevel;
+
+    return wtConfig;
 }
 
 }  // namespace mongo

@@ -188,4 +188,10 @@ private:
     void _openWiredTiger(const std::string& path, const std::string& wtOpenConfig);
 };
 
+/**
+ * Returns a WiredTigerKVEngineBase::WiredTigerConfig populated with config values provided at
+ * startup for the Spill WiredTiger Engine.
+ */
+WiredTigerKVEngineBase::WiredTigerConfig getSpillWiredTigerConfigFromStartupOptions();
+
 }  // namespace mongo
