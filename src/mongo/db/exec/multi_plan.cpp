@@ -278,7 +278,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     });
 
     boost::optional<MultiPlanTicket> multiPlanTicket{};
-    if (feature_flags::gfeatureFlagMultiPlanLimiter.isEnabled() &&
+    if (expCtx()->getIfrContext().getSavedFlagValue(feature_flags::gfeatureFlagMultiPlanLimiter) &&
         concurrentMultiPlanJobs > internalQueryConcurrentMultiPlanningThreshold.load() &&
         yieldPolicy->canAutoYield()) {
         multiPlanTicket = rateLimit(yieldPolicy, candidatesSize);

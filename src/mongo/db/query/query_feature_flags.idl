@@ -229,6 +229,7 @@ feature_flags:
         cpp_varname: gfeatureFlagMultiPlanLimiter
         default: false
         fcv_gated: false
+        incremental_rollout_phase: in_development
 
     featureFlagSbeUpgradeBinaryTrees:
         description: "Feature flag to enable N-ary ABT nodes"
