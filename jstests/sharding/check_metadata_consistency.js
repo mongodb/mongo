@@ -164,6 +164,56 @@ function assertNoInconsistencies() {
     assertNoInconsistencies();
 })();
 
+function assertCollectionOptionsMismatch(inconsistencies, expectedOptions) {
+    assert(inconsistencies.some(object => {
+        return (object.type === "CollectionOptionsMismatch" &&
+                expectedOptions.every(expectedO => object.details.options.some(
+                                          o => tojson(o.options) === tojson(expectedO))));
+    }),
+           "Expected CollectionOptionsMismatch options: " + tojson(expectedOptions) + ", but got " +
+               tojson(inconsistencies));
+}
+
+(function testCappedCollectionCantBeSharded() {
+    const db = getNewDb();
+    const dbName = db.getName();
+    const kCappedCollName = "capped_collection";
+    const kCappedCollNss = dbName + "." + kCappedCollName;
+    const kShardedCollName = "sharded_collection";
+    const kShardedCollNss = dbName + "." + kShardedCollName;
+
+    // Enforce dbPrimary to be shard1 (first chunk is on shard1 is granted)
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+
+    // Create a sharded collection on shard1 and insert a document in it.
+    assert.commandWorked(st.s.adminCommand(
+        {shardCollection: db.getCollection(kShardedCollName).getFullName(), key: {_id: 1}}));
+
+    // Create a capped collection on shard1 through a direct connection.
+    assert.commandWorked(
+        st.shard1.getDB(dbName).createCollection(kCappedCollName, {capped: true, size: 1000}));
+
+    // Get the UUID of the unsharded capped collection.
+    const uuid = st.shard1.getDB(dbName).getCollectionInfos({name: kCappedCollName})[0].info.uuid;
+
+    // Update config.collections such that the sharded collection has the same nss and uuid of the
+    // unsharded capped collection previously created.
+    let collEntry = configDB.collections.findOne({_id: kShardedCollNss});
+    collEntry._id = kCappedCollNss;
+    collEntry.uuid = uuid;
+    configDB.collections.insert(collEntry);
+
+    // Catch the inconsistency.
+    const inconsistencies = db.checkMetadataConsistency().toArray();
+    assert.neq(0, inconsistencies.length);
+    assertCollectionOptionsMismatch(inconsistencies, [{capped: true}, {capped: false}]);
+
+    // Clean up the database to pass the hooks that detect inconsistencies.
+    db.dropDatabase();
+    assertNoInconsistencies();
+})();
+
 (function testMissingShardKeyInconsistency() {
     const db = getNewDb();
     const kSourceCollName = "coll";

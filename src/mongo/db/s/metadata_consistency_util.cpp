@@ -43,6 +43,7 @@
 #include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/grid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -78,6 +79,31 @@ void logMetadataInconsistency(const MetadataInconsistencyItem& inconsistencyItem
     LOGV2_WARNING(7514800,
                   "Detected sharding metadata inconsistency",
                   "inconsistency"_attr = inconsistencyItem);
+}
+
+void _checkCappedAndShardedCollectionInconsistency(
+    OperationContext* opCtx,
+    const ShardId& shardId,
+    const CollectionPtr& localColl,
+    std::vector<MetadataInconsistencyItem>& inconsistencies) {
+    const NamespaceString& nss = localColl->ns();
+    const BSONObj& shardOptions = BSON("capped" << true);
+    // The collection on the global catalog do not have capped options, therefore it is assumed to
+    // be false by default.
+    const BSONObj& configOptions = BSON("capped" << false);
+    constexpr StringData kShardsFieldName = "shards"_sd;
+    constexpr StringData kOptionsFieldName = "options"_sd;
+    const auto configShardId = Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId();
+
+    if (localColl->isCapped()) {
+        inconsistencies.emplace_back(metadata_consistency_util::makeInconsistency(
+            MetadataInconsistencyTypeEnum::kCollectionOptionsMismatch,
+            CollectionOptionsMismatchDetails{
+                nss,
+                {BSON(kOptionsFieldName << shardOptions << kShardsFieldName << BSON_ARRAY(shardId)),
+                 BSON(kOptionsFieldName << configOptions << kShardsFieldName
+                                        << BSON_ARRAY(configShardId))}}));
+    }
 }
 
 void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
@@ -296,6 +322,8 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
                     CollectionUUIDMismatchDetails{
                         localNss, shardId, localUUID, UUID, getNumDocs(opCtx, localColl.get())}));
             } else {
+                _checkCappedAndShardedCollectionInconsistency(
+                    opCtx, shardId, localColl, inconsistencies);
                 _checkShardKeyIndexInconsistencies(opCtx,
                                                    nss,
                                                    shardId,
