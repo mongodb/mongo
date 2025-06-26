@@ -1,5 +1,8 @@
 version: 1.0.0
 filters:
+  - "*":
+    approvers:
+      - 10gen/mongo-default-approvers
   - "OWNERS.yml":
     approvers:
       - 10gen/server-root-ownership

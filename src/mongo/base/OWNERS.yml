@@ -5,7 +5,7 @@ filters:
       - 10gen/server-programmability
   - "error_codes.yml":
     approvers:
-      - NOOWNERS
+      - 10gen/mongo-default-approvers
   - "secure_allocator*":
     approvers:
       - 10gen/server-security

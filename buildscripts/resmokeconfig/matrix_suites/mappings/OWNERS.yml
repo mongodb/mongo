@@ -1,7 +1,8 @@
 version: 1.0.0
-options:
-  no_parent_owners: true
 filters:
+  - "*":
+    approvers:
+      - 10gen/mongo-default-approvers
   - "aggregation_expression_multiversion_fuzzer*":
     approvers:
       - 10gen/query-optimization

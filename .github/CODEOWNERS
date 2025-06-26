@@ -5,6 +5,7 @@
 # https://github.com/10gen/mongo/blob/master/docs/owners/owners_format.md
 
 # The following patterns are parsed from ./OWNERS.yml
+* @10gen/mongo-default-approvers @svc-auto-approve-bot
 OWNERS.yml @10gen/server-root-ownership @svc-auto-approve-bot
 .bazel* @10gen/devprod-build @svc-auto-approve-bot
 .clang-format @10gen/server-programmability @svc-auto-approve-bot
@@ -86,13 +87,13 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/ @10gen/devprod-correctness @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokeconfig/matrix_suites/OWNERS.yml
-/buildscripts/resmokeconfig/matrix_suites/**/*
+/buildscripts/resmokeconfig/matrix_suites/**/* @10gen/mongo-default-approvers @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/*viewless_timeseries.yml @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/sharding_task_executor_pool_size* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/change_streams_* @10gen/query-execution-change-streams @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokeconfig/matrix_suites/mappings/OWNERS.yml
-/buildscripts/resmokeconfig/matrix_suites/mappings/**/*
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/* @10gen/mongo-default-approvers @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_expression_multiversion_fuzzer* @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_mongos_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_multiversion_fuzzer* @10gen/query-optimization @svc-auto-approve-bot
@@ -113,7 +114,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/update_fuzzer* @10gen/query-execution-write-exec @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokeconfig/matrix_suites/overrides/OWNERS.yml
-/buildscripts/resmokeconfig/matrix_suites/overrides/**/*
+/buildscripts/resmokeconfig/matrix_suites/overrides/**/* @10gen/mongo-default-approvers @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/bulk_write.yml @10gen/query-execution-write-exec @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/change_streams* @10gen/query-execution-change-streams @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/multiplan_single_solutions.yml @10gen/query-optimization @svc-auto-approve-bot
@@ -125,7 +126,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/stepdown_primary_change_streams.yml @10gen/query-execution-change-streams @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokeconfig/suites/OWNERS.yml
-/buildscripts/resmokeconfig/suites/**/*
+/buildscripts/resmokeconfig/suites/**/* @10gen/mongo-default-approvers @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/aggregation* @10gen/query @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/aggregation_disabled_optimization.yml @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/aggregation_repeat_queries_multiplan_single_solutions.yml @10gen/query-optimization @svc-auto-approve-bot
@@ -182,7 +183,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/**/queryable_server.py @10gen/server-backup-restore @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokelib/testing/hooks/OWNERS.yml
-/buildscripts/resmokelib/testing/hooks/**/*
+/buildscripts/resmokelib/testing/hooks/**/* @10gen/mongo-default-approvers @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/analyze_shard_key.py @10gen/server-cluster-scalability @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/queryable_server_hook.py @10gen/server-backup-restore @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/change_streams.py @10gen/query-execution-change-streams @svc-auto-approve-bot
@@ -1469,7 +1470,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/base/OWNERS.yml
 /src/mongo/base/**/* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/base/**/error_codes.yml
+/src/mongo/base/**/error_codes.yml @10gen/mongo-default-approvers @svc-auto-approve-bot
 /src/mongo/base/**/secure_allocator* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/bson/OWNERS.yml
@@ -2968,7 +2969,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/transport/OWNERS.yml
 /src/mongo/transport/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
-/src/mongo/transport/**/ssl_connection_context.h
+/src/mongo/transport/**/ssl_connection_context.h @10gen/mongo-default-approvers @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/transport/named_pipe/OWNERS.yml
 /src/mongo/transport/named_pipe/**/* @10gen/query-integration-extensions @svc-auto-approve-bot
