@@ -55,6 +55,10 @@ auto makeClientsWithOpCtxs(ServiceContext* svcCtx, size_t numOps) {
     return clientsWithOps;
 }
 
+auto constexpr convertBurstSizeToBurstCapacitySecs(double refreshRate, double burstSize) {
+    return burstSize / refreshRate;
+}
+
 class RateLimiterTest : public ServiceContextTest {
 private:
     unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kDefault,
@@ -93,12 +97,14 @@ TEST_F(RateLimiterTest, RateLimitIsValidAfterQueueing) {
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
         constexpr double burstSize = 1.0;
         constexpr double refreshRate = 2.0;
+        constexpr double burstCapacitySecs =
+            convertBurstSizeToBurstCapacitySecs(refreshRate, burstSize);
         constexpr int maxQueueDepth = 4;
         constexpr int numThreads = 10;
         auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), numThreads + 1);
 
         RateLimiter rateLimiter(
-            refreshRate, burstSize, maxQueueDepth, "RateLimitIsValidAfterQueueing");
+            refreshRate, burstCapacitySecs, maxQueueDepth, "RateLimitIsValidAfterQueueing");
         auto tickSource = getServiceContext()->getTickSource();
 
         auto startTicks = tickSource->getTicks();
@@ -159,7 +165,12 @@ TEST_F(RateLimiterTest, RateLimitIsValidAfterQueueing) {
 // - but there are already the maximum number of threads enqueued.
 TEST_F(RateLimiterTest, RejectOverMaxWaiters) {
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-        RateLimiter rateLimiter(.01, 1.0, 1, "RejectOverMaxWaiters");
+        constexpr double burstSize = 1.0;
+        constexpr double refreshRate = 0.1;
+        constexpr double burstCapacitySecs =
+            convertBurstSizeToBurstCapacitySecs(refreshRate, burstSize);
+
+        RateLimiter rateLimiter(refreshRate, burstCapacitySecs, 1, "RejectOverMaxWaiters");
         auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), 3);
         Notification<void> firstTokenAcquired;
         Notification<void> hasFailed;
@@ -218,7 +229,12 @@ TEST_F(RateLimiterTest, RejectOverMaxWaiters) {
 // otherwise queue are instead rejected.
 TEST_F(RateLimiterTest, QueueingDisabled) {
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-        RateLimiter rateLimiter(.01, 1.0, 0, "QueueingDisabled");
+        constexpr double burstSize = 1.0;
+        constexpr double refreshRate = .01;
+        constexpr double burstCapacitySecs =
+            convertBurstSizeToBurstCapacitySecs(refreshRate, burstSize);
+
+        RateLimiter rateLimiter(refreshRate, burstCapacitySecs, 0, "QueueingDisabled");
         auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), 2);
         Notification<void> firstTokenAcquired;
 
@@ -254,7 +270,14 @@ TEST_F(RateLimiterTest, QueueingDisabled) {
 // the rate limiter wakes up the thread and returns the appropriate error status.
 TEST_F(RateLimiterTest, InterruptedDueToOperationKilled) {
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-        RateLimiter rateLimiter(.01, 1.0, INT_MAX, "InterruptedDueToOperationKilled");
+        constexpr double burstSize = 1.0;
+        constexpr double refreshRate = .01;
+        constexpr double burstCapacitySecs =
+            convertBurstSizeToBurstCapacitySecs(refreshRate, burstSize);
+
+
+        RateLimiter rateLimiter(
+            refreshRate, burstCapacitySecs, INT_MAX, "InterruptedDueToOperationKilled");
         auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), 2);
         Notification<void> firstTokenAcquired;
         std::vector<unittest::JoinThread> threads;
@@ -297,7 +320,13 @@ TEST_F(RateLimiterTest, InterruptedDueToOperationKilled) {
 // service shutdown.
 TEST_F(RateLimiterTest, InterruptedDueToKillAllOperations) {
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-        RateLimiter rateLimiter(.01, 1.0, INT_MAX, "InterruptedDueToKillAllOperations");
+        constexpr double burstSize = 1.0;
+        constexpr double refreshRate = .01;
+        constexpr double burstCapacitySecs =
+            convertBurstSizeToBurstCapacitySecs(refreshRate, burstSize);
+
+        RateLimiter rateLimiter(
+            refreshRate, burstCapacitySecs, INT_MAX, "InterruptedDueToKillAllOperations");
         auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), 2);
         Notification<void> firstTokenAcquired;
         Notification<void> secondTokenInterrupted;
@@ -383,11 +412,13 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
         const int maxTokens = 2;
         const int refreshRate = 4;
+        const double burstCapacitySecs =
+            convertBurstSizeToBurstCapacitySecs(refreshRate, maxTokens);
         const int64_t numThreads = 10;
         const Milliseconds tokenInterval = Milliseconds(1000) / refreshRate;
 
         RateLimiter rateLimiter(
-            refreshRate, maxTokens, INT_MAX, "ConcurrentTokenAcquisitionWithQueueing");
+            refreshRate, burstCapacitySecs, INT_MAX, "ConcurrentTokenAcquisitionWithQueueing");
 
         auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), numThreads);
 
@@ -508,7 +539,13 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
 // returns the error status corresponding to the reason for the interruption.
 TEST_F(RateLimiterWithMockClockTest, InterruptedDueToOperationDeadline) {
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-        RateLimiter rateLimiter(.01, 1.0, INT_MAX, "InterruptedDueToOperationDeadline");
+        constexpr double burstSize = 1.0;
+        constexpr double refreshRate = .01;
+        constexpr double burstCapacitySecs =
+            convertBurstSizeToBurstCapacitySecs(refreshRate, burstSize);
+
+        RateLimiter rateLimiter(
+            refreshRate, burstCapacitySecs, INT_MAX, "InterruptedDueToOperationDeadline");
         auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), 2);
         Notification<void> firstTokenAcquired;
         std::vector<unittest::JoinThread> threads;

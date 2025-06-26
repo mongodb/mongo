@@ -95,8 +95,8 @@ public:
 
     // Configuration Options
 
-    void updateRateParameters(double refreshRatePerSec, double burstSize) {
-        _rateLimiter.updateRateParameters(refreshRatePerSec, burstSize);
+    void updateRateParameters(double refreshRatePerSec, double burstCapacitySecs) {
+        _rateLimiter.updateRateParameters(refreshRatePerSec, burstCapacitySecs);
     }
 
     void setMaxQueueDepth(int64_t maxQueueDepth) {

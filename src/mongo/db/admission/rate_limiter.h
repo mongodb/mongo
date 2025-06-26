@@ -93,7 +93,7 @@ public:
     constexpr static ErrorCodes::Error kRejectedErrorCode = ErrorCodes::RateLimitExceeded;
 
     RateLimiter(double refreshRatePerSec,
-                double burstSize,
+                double burstCapacitySecs,
                 int64_t maxQueueDepth,
                 std::string name);
 
@@ -120,11 +120,11 @@ public:
 
     /**
      * refreshRate is the number of tokens issued per second when rate-limiting has kicked in.
-     * Tokens will be issued smoothly, rather than all at once every 1 second. The burstSize is the
-     * maximum number of tokens that will be issued before rate-limiting kicks in (ie, the maximum
-     * number of tokens that can accumulate in the bucket).
+     * Tokens will be issued smoothly, rather than all at once every 1 second. The
+     * burstCapacitySecs is the number of seconds worth of unutilized rate limit that can be
+     * stored away before rate-limiting kicks in.
      */
-    void updateRateParameters(double refreshRatePerSec, double burstSize);
+    void updateRateParameters(double refreshRatePerSec, double burstCapacitySecs);
 
     /**
      * The maximum number of requests enqueued waiting for a token. Token requests that come in and

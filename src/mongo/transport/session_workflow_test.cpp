@@ -735,6 +735,16 @@ public:
             registry.registerImplementation(std::make_unique<SnappyMessageCompressor>());
             uassertStatusOK(registry.finalizeSupportedCompressors());
         }
+
+        _requestLimiterEnabled.emplace("ingressRequestRateLimiterEnabled", true);
+    }
+
+    auto enableRateOverrideBehaviorWithSpecifiedBurstSize(double burstSize) -> void {
+        _overrideFailpoint.emplace("ingressRequestRateLimiterFractionalRateOverride",
+                                   BSON("rate" << kVerySlowRate));
+        _requestLimiterBurstCapacitySecs.emplace(
+            "ingressRequestAdmissionBurstCapacitySecs",
+            _convertBurstSizeToBurstCapacitySecs(kVerySlowRate, burstSize));
     }
 
     auto getRateLimiterStats() -> IngressRequestRateLimiterStats {
@@ -759,22 +769,27 @@ public:
     }
 
 private:
-    RAIIServerParameterControllerForTest featureEnabled{"featureFlagIngressRateLimiting", true};
-    unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kDefault,
-                                                          logv2::LogSeverity::Debug(4)};
+    double _convertBurstSizeToBurstCapacitySecs(double refreshRate, double burstSize) {
+        // Rounding needed to ensure that the conversion back to burstSize won't be incorrect due
+        // to imprecisions in floating point division.
+        return std::round(burstSize / refreshRate);
+    }
+
+    static constexpr double kVerySlowRate = 5e-6;
+
+    RAIIServerParameterControllerForTest _featureEnabled{"featureFlagIngressRateLimiting", true};
+
+    unittest::MinimumLoggedSeverityGuard _logSeverityGuard{logv2::LogComponent::kDefault,
+                                                           logv2::LogSeverity::Debug(4)};
+
+    boost::optional<FailPointEnableBlock> _overrideFailpoint;
+    boost::optional<RAIIServerParameterControllerForTest> _requestLimiterEnabled;
+    boost::optional<RAIIServerParameterControllerForTest> _requestLimiterBurstCapacitySecs;
+    boost::optional<RAIIServerParameterControllerForTest> _requestAdmissionRatePerSec;
 };
 
 TEST_F(IngressRequestRateLimiterTest, FireAndForgetResponse) {
-    auto fp = globalFailPointRegistry().find("ingressRateLimiterVerySlowRate");
-    fp->setMode(FailPoint::alwaysOn);
-    RAIIServerParameterControllerForTest requestLimiterEnabled{"ingressRequestRateLimiterEnabled",
-                                                               true};
-    RAIIServerParameterControllerForTest requestLimiterBurstSize{"ingressRequestAdmissionBurstSize",
-                                                                 1};
-
-    // Actually sets the very slow rate since the ingressRateLimiterVerySlowRate is set
-    RAIIServerParameterControllerForTest requestAdmissionRatePerSec{
-        "ingressRequestAdmissionRatePerSec", 1};
+    enableRateOverrideBehaviorWithSpecifiedBurstSize(1.0);
 
     startSession();
     auto msg = makeOpMsg();
@@ -802,16 +817,7 @@ TEST_F(IngressRequestRateLimiterTest, FireAndForgetResponse) {
 }
 
 TEST_F(IngressRequestRateLimiterTest, FireAndForgetResponseCompressed) {
-    auto fp = globalFailPointRegistry().find("ingressRateLimiterVerySlowRate");
-    fp->setMode(FailPoint::alwaysOn);
-    RAIIServerParameterControllerForTest requestLimiterEnabled{"ingressRequestRateLimiterEnabled",
-                                                               true};
-    RAIIServerParameterControllerForTest requestLimiterBurstSize{"ingressRequestAdmissionBurstSize",
-                                                                 1};
-
-    // Actually sets the very slow rate since the ingressRateLimiterVerySlowRate is set
-    RAIIServerParameterControllerForTest requestAdmissionRatePerSec{
-        "ingressRequestAdmissionRatePerSec", 1};
+    enableRateOverrideBehaviorWithSpecifiedBurstSize(1.0);
 
     startSession();
     auto msg = makeOpMsg();

@@ -44,13 +44,9 @@ namespace mongo {
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(ingressRateLimiterVerySlowRate);
+MONGO_FAIL_POINT_DEFINE(ingressRequestRateLimiterFractionalRateOverride);
 
 VersionedValue<CIDRList> ingressRequestRateLimiterExemptions;
-
-// This is very slow since it would allow one operation every 200,000 seconds, so roughly one
-// every 55 hours
-constexpr auto kSlowest = 5e-6;
 
 const auto getIngressRequestRateLimiter =
     ServiceContext::declareDecoration<boost::optional<IngressRequestRateLimiter>>();
@@ -82,11 +78,13 @@ Status IngressRequestRateLimiterExemptions::setFromString(StringData str,
 
 IngressRequestRateLimiter::IngressRequestRateLimiter()
     : _rateLimiter{static_cast<double>(gIngressRequestRateLimiterRatePerSec.load()),
-                   static_cast<double>(gIngressRequestRateLimiterBurstSize.load()),
+                   gIngressRequestRateLimiterBurstCapacitySecs.load(),
                    0,
                    "ingressRequestRateLimiter"} {
-    if (MONGO_unlikely(ingressRateLimiterVerySlowRate.shouldFail())) {
-        _rateLimiter.updateRateParameters(kSlowest, gIngressRequestRateLimiterBurstSize.load());
+    if (const auto scopedFp = ingressRequestRateLimiterFractionalRateOverride.scoped();
+        MONGO_unlikely(scopedFp.isActive())) {
+        const auto rate = scopedFp.getData().getField("rate").numberDouble();
+        _rateLimiter.updateRateParameters(rate, gIngressRequestRateLimiterBurstCapacitySecs.load());
     }
 }
 
@@ -118,39 +116,32 @@ Status IngressRequestRateLimiter::admitRequest(Client* client) {
     return _rateLimiter.tryAcquireToken();
 }
 
-void IngressRequestRateLimiter::setAdmissionRatePerSec(std::int32_t refreshRatePerSec) {
-    if (MONGO_unlikely(ingressRateLimiterVerySlowRate.shouldFail())) {
-        _rateLimiter.updateRateParameters(kSlowest, gIngressRequestRateLimiterBurstSize.load());
+void IngressRequestRateLimiter::updateRateParameters(double refreshRatePerSec,
+                                                     double burstCapacitySecs) {
+    if (const auto scopedFp = ingressRequestRateLimiterFractionalRateOverride.scoped();
+        MONGO_unlikely(scopedFp.isActive())) {
+        const auto rate = scopedFp.getData().getField("rate").numberDouble();
+        _rateLimiter.updateRateParameters(rate, gIngressRequestRateLimiterBurstCapacitySecs.load());
         return;
     }
     _rateLimiter.updateRateParameters(refreshRatePerSec,
-                                      gIngressRequestRateLimiterBurstSize.load());
-}
-
-void IngressRequestRateLimiter::setAdmissionBurstSize(std::int32_t burstSize) {
-    _rateLimiter.updateRateParameters(gIngressRequestRateLimiterRatePerSec.load(), burstSize);
+                                      gIngressRequestRateLimiterBurstCapacitySecs.load());
 }
 
 Status IngressRequestRateLimiter::onUpdateAdmissionRatePerSec(std::int32_t refreshRatePerSec) {
     if (auto client = Client::getCurrent()) {
         auto& instance = getIngressRequestRateLimiter(client->getServiceContext());
-
-        if (MONGO_unlikely(ingressRateLimiterVerySlowRate.shouldFail())) {
-            instance->_rateLimiter.updateRateParameters(kSlowest,
-                                                        gIngressRequestRateLimiterBurstSize.load());
-            return Status::OK();
-        }
-
-        instance->setAdmissionRatePerSec(refreshRatePerSec);
+        instance->updateRateParameters(refreshRatePerSec,
+                                       gIngressRequestRateLimiterBurstCapacitySecs.load());
     }
 
     return Status::OK();
 }
 
-Status IngressRequestRateLimiter::onUpdateAdmissionBurstSize(std::int32_t burstSize) {
+Status IngressRequestRateLimiter::onUpdateAdmissionBurstCapacitySecs(double burstCapacitySecs) {
     if (auto client = Client::getCurrent()) {
         getIngressRequestRateLimiter(client->getServiceContext())
-            ->setAdmissionBurstSize(static_cast<double>(burstSize));
+            ->updateRateParameters(gIngressRequestRateLimiterRatePerSec.load(), burstCapacitySecs);
     }
 
     return Status::OK();

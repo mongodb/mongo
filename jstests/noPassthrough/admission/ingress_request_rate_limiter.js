@@ -14,6 +14,7 @@ import {
     getRateLimiterStats,
     kConfigLogsAndFailPointsForRateLimiterTests,
     kRateLimiterExemptAppName,
+    kSlowestRefreshRateSecs,
     runTestReplSet,
     runTestSharded,
     runTestStandalone,
@@ -24,22 +25,18 @@ import {
  */
 function testServerParameter(conn) {
     const db = conn.getDB("admin");
-    // Test setting burst size
+    // Test setting burst capacity.
     assert.commandFailedWithCode(db.adminCommand({
         setParameter: 1,
-        ingressRequestAdmissionBurstSize: 0,
+        ingressRequestAdmissionBurstCapacitySecs: -1,
     }),
                                  ErrorCodes.BadValue);
 
-    assert.commandFailedWithCode(db.adminCommand({
-        setParameter: 1,
-        ingressRequestAdmissionBurstSize: -1,
-    }),
-                                 ErrorCodes.BadValue);
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, ingressRequestAdmissionBurstCapacitySecs: 1}));
 
-    assert.commandWorked(db.adminCommand({setParameter: 1, ingressRequestAdmissionBurstSize: 1}));
-
-    assert.commandWorked(db.adminCommand({setParameter: 1, ingressRequestAdmissionBurstSize: 2}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, ingressRequestAdmissionBurstCapacitySecs: 2}));
 
     // Test setting admission rate
 
@@ -55,9 +52,9 @@ function testServerParameter(conn) {
     }));
 }
 
-// Arbitrary but low burst size in the amount of commands allowed to pass through.
-const amountOfInserts = 3;
-const maxBurstSize = amountOfInserts;
+// Arbitrary but low burst capacity in the amount of commands allowed to pass through.
+const maxBurstRequests = 3;
+const maxBurstCapacitySecs = maxBurstRequests / kSlowestRefreshRateSecs;
 
 // Since the rate limiter is set to a very low rate and a burst of 3,
 // the 3 additional extra will be rejected and will result in an error.
@@ -103,7 +100,7 @@ function testRateLimiterMetrics(conn, exemptConn) {
 
     // Here we calculate the amount of requests that are expected to be successful using the
     // available amount of token in the rate limiter
-    const requestAmount = amountOfInserts + extraRequests;
+    const requestAmount = maxBurstRequests + extraRequests;
     const expectedAmountOfSuccess =
         Math.floor(initialStatus.network.ingressRequestRateLimiter.totalAvailableTokens);
     const expectedAmountOfFailures = requestAmount - expectedAmountOfSuccess;
@@ -144,7 +141,7 @@ function testRateLimiterMetrics(conn, exemptConn) {
 function testRateLimiterUnauthenticated(noAuthClient, exemptConn) {
     // We run more pings than the available burst size. As all pings are exempts, they should
     // all succeed.
-    const amountOfPing = maxBurstSize + extraRequests;
+    const amountOfPing = maxBurstRequests + extraRequests;
     const initialRateLimiterStats = getRateLimiterStats(exemptConn);
     const initialExempt = initialRateLimiterStats.exemptedAdmissions;
     const initialAvailableTokens = initialRateLimiterStats.totalAvailableTokens;
@@ -152,7 +149,7 @@ function testRateLimiterUnauthenticated(noAuthClient, exemptConn) {
     // Run ping on unauthenticated client. As the client is unauthenticated, all command
     // should work as there is no rate limiting applied.
     const noAuthDB = noAuthClient.getDB("admin");
-    for (let i = 0; i < maxBurstSize + extraRequests; ++i) {
+    for (let i = 0; i < maxBurstRequests + extraRequests; ++i) {
         assert.commandWorked(noAuthDB.runCommand({ping: 1}));
     }
 
@@ -171,7 +168,7 @@ function testRateLimiterUnauthenticated(noAuthClient, exemptConn) {
 // Parameters for ingress admission rate limiting enabled.
 const kParams = {
     ingressRequestAdmissionRatePerSec: 1,
-    ingressRequestAdmissionBurstSize: maxBurstSize,
+    ingressRequestAdmissionBurstCapacitySecs: maxBurstCapacitySecs,
     ingressRequestRateLimiterEnabled: true,
 };
 
@@ -275,7 +272,7 @@ function runTestCompressed() {
     const initialAvailableTokens =
         initialStatus.network.ingressRequestRateLimiter.totalAvailableTokens;
 
-    const requestAmount = amountOfInserts + extraRequests;
+    const requestAmount = maxBurstRequests + extraRequests;
     const expectedAmountOfSuccess =
         Math.floor(initialStatus.network.ingressRequestRateLimiter.totalAvailableTokens);
     const expectedAmountOfFailures = requestAmount - expectedAmountOfSuccess;

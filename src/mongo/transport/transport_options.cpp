@@ -84,9 +84,9 @@ Status onUpdateEstablishmentRefreshRate(int32_t newValue) {
 
 Status onUpdateEstablishmentBurstCapacitySecs(double newValue) {
     auto refreshRate = gIngressConnectionEstablishmentRatePerSec.load();
-    return forEachSessionManager([refreshRate, burstSize = newValue](SessionManager* sm) {
+    return forEachSessionManager([refreshRate, burstCapacitySecs = newValue](SessionManager* sm) {
         sm->getSessionEstablishmentRateLimiter().updateRateParameters(refreshRate,
-                                                                      refreshRate * burstSize);
+                                                                      burstCapacitySecs);
     });
 }
 

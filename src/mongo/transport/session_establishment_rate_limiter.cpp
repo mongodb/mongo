@@ -65,8 +65,7 @@ Status MaxEstablishingConnectionsOverrideServerParameter::setFromString(
 
 SessionEstablishmentRateLimiter::SessionEstablishmentRateLimiter()
     : _rateLimiter(gIngressConnectionEstablishmentRatePerSec.load(),
-                   gIngressConnectionEstablishmentRatePerSec.load() *
-                       gIngressConnectionEstablishmentBurstCapacitySecs.load(),
+                   gIngressConnectionEstablishmentBurstCapacitySecs.load(),
                    gIngressConnectionEstablishmentMaxQueueDepth.load(),
                    "SessionEstablishmentRateLimiter") {}
 

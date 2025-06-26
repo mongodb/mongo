@@ -54,26 +54,21 @@ public:
     Status admitRequest(Client* client);
 
     /**
-     * Adjusts the refresh rate of the rate limiter to 'refreshRatePerSec'.
+     * Adjusts the refresh rate and burst capacity of the rate limiter.
      */
-    void setAdmissionRatePerSec(std::int32_t refreshRatePerSec);
+    void updateRateParameters(double refreshRatePerSec, double burstCapacitySecs);
 
     /**
-     * Adjusts the rate limiter's burst rate to 'burstSize'.
-     */
-    void setAdmissionBurstSize(std::int32_t burstSize);
-
-    /**
-     * Called automatically when the value of the server parameter ingressRequestAdmissionRatePerSec
-     * changes value.
+     * Called automatically when the value of the server parameter
+     * ingressRequestAdmissionRatePerSec changes value.
      */
     static Status onUpdateAdmissionRatePerSec(std::int32_t refreshRatePerSec);
 
     /**
-     * Called automatically when the value of the server parameter ingressRequestAdmissionBurstSize
-     * changes value.
+     * Called automatically when the value of the server parameter
+     * ingressRequestAdmissionBurstCapacitySecs changes value.
      */
-    static Status onUpdateAdmissionBurstSize(std::int32_t burstSize);
+    static Status onUpdateAdmissionBurstCapacitySecs(double burstCapacitySecs);
 
     /**
      * Reports the ingress admission rate limiter metrics.

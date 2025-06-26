@@ -7,6 +7,7 @@ import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
 import {
     authenticateConnection,
     getRateLimiterStats,
+    kSlowestRefreshRateSecs,
     runTestReplSet,
     runTestSharded,
     runTestStandalone,
@@ -54,7 +55,7 @@ const exemptIP = "127.0.0.1";
 
 const kParams = {
     ingressRequestAdmissionRatePerSec: 1,
-    ingressRequestAdmissionBurstSize: 1,
+    ingressRequestAdmissionBurstCapacitySecs: Math.round(1.0 / kSlowestRefreshRateSecs),
     ingressRequestRateLimiterEnabled: true,
     ingressRequestRateLimiterExemptions: {ranges: [exemptIP]},
 };

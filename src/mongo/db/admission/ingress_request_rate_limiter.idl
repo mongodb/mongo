@@ -52,19 +52,18 @@ server_parameters:
         validator: {gte: 1}
         redact: false
 
-    ingressRequestAdmissionBurstSize:
+    ingressRequestAdmissionBurstCapacitySecs:
         description: >-
-            The maximum number of requests above what the configured rate limit would allow that
-            will be admitted before excess admissions begin to be rejected. This will allow the
-            server to handle temporary bursts of requests or periods of time where the configured
-            rate limit is exceeded slightly.
+            Describes how many seconds worth of unutilized rate limit can be stored away to admit
+            additional ingress requests during periods where the rate limit is temporarily
+            exceeded.
         set_at: [startup, runtime]
-        cpp_varname: gIngressRequestRateLimiterBurstSize
-        cpp_vartype: Atomic<int32_t>
-        on_update: IngressRequestRateLimiter::onUpdateAdmissionBurstSize
+        cpp_varname: gIngressRequestRateLimiterBurstCapacitySecs
+        cpp_vartype: Atomic<double>
+        on_update: IngressRequestRateLimiter::onUpdateAdmissionBurstCapacitySecs
         default:
-            expr: std::numeric_limits<int32_t>::max()
-        validator: {gte: 1}
+            expr: std::numeric_limits<double>::max()
+        validator: {gt: 0}
         redact: false
 
     ingressRequestRateLimiterExemptions:

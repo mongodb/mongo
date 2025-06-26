@@ -7,9 +7,15 @@ const maxInt32 = Math.pow(2, 31) - 1;
 // rate limiting is disabled during shutdown.
 const kParamsRestore = {
     ingressRequestAdmissionRatePerSec: maxInt32,
-    ingressRequestAdmissionBurstSize: maxInt32,
+    ingressRequestAdmissionBurstCapacitySecs: Number.MAX_VALUE,
     ingressRequestRateLimiterEnabled: 0,
 };
+
+/**
+ * An abnormally slow refresh rate to assure that a refresh doesn't trigger during a particular
+ * test.
+ */
+export const kSlowestRefreshRateSecs = 5e-6;
 
 /**
  * Value for app name based exemption in the ingress request rate limiter.
@@ -23,9 +29,8 @@ export const kRateLimiterExemptAppName = "testRateLimiter";
 export const kConfigLogsAndFailPointsForRateLimiterTests = {
     logComponentVerbosity: tojson({command: 2}),
     featureFlagIngressRateLimiting: 1,
-    "failpoint.ingressRateLimiterVerySlowRate": tojson({
-        mode: "alwaysOn",
-    }),
+    "failpoint.ingressRequestRateLimiterFractionalRateOverride":
+        tojson({mode: "alwaysOn", data: {rate: kSlowestRefreshRateSecs}}),
     "failpoint.skipRateLimiterForTestClient":
         tojson({mode: "alwaysOn", data: {exemptAppName: kRateLimiterExemptAppName}}),
 };
