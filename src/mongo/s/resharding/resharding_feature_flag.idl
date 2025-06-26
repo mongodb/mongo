@@ -105,4 +105,3 @@ feature_flags:
         cpp_varname: gFeatureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage
         default: false
         fcv_gated: true
-        fcv_context_unaware: true
