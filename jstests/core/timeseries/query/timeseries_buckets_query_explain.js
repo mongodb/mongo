@@ -1,5 +1,5 @@
 /**
- * Tests explaining read operations on a time-series buckets collection.
+ * Tests explaining read operations over the buckets of a time-series collection (with rawData).
  *
  * @tags: [
  *   # Refusing to run a test that issues an aggregation command with explain because it may return
@@ -9,10 +9,7 @@
  *   requires_timeseries,
  * ]
  */
-import {
-    getTimeseriesCollForRawOps,
-    getTimeseriesExecutionNamespace
-} from "jstests/core/libs/raw_operation_utils.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
@@ -34,27 +31,25 @@ assert.commandWorked(coll.insert([
 const assertQueryPlannerNamespace = function(explain) {
     if (explain.shards) {
         for (const shardExplain of Object.values(explain.shards)) {
-            assert.eq(
-                shardExplain.queryPlanner.namespace,
-                getTimeseriesExecutionNamespace(getTimeseriesCollForRawOps(coll)).getFullName(),
-                `Expected shard plan query planner namespace to be ${
-                    tojson(getTimeseriesExecutionNamespace(getTimeseriesCollForRawOps(coll))
-                               .getFullName())} but got ${tojson(shardExplain)}`);
+            assert.eq(shardExplain.queryPlanner.namespace,
+                      getTimeseriesCollForDDLOps(db, coll).getFullName(),
+                      `Expected shard plan query planner namespace to be ${
+                          tojson(getTimeseriesCollForDDLOps(db, coll).getFullName())} but got ${
+                          tojson(shardExplain)}`);
         }
     } else if (explain.queryPlanner.namespace) {
         assert.eq(explain.queryPlanner.namespace,
-                  getTimeseriesExecutionNamespace(getTimeseriesCollForRawOps(coll)).getFullName(),
+                  getTimeseriesCollForDDLOps(db, coll).getFullName(),
                   `Expected query planner namespace to be ${
-                      tojson(getTimeseriesExecutionNamespace(getTimeseriesCollForRawOps(coll))
-                                 .getFullName())} but got ${tojson(explain)}`);
+                      tojson(getTimeseriesCollForDDLOps(db, coll).getFullName())} but got ${
+                      tojson(explain)}`);
     } else {
         for (const shardPlan of explain.queryPlanner.winningPlan.shards) {
             assert.eq(
                 shardPlan.namespace,
-                getTimeseriesExecutionNamespace(getTimeseriesCollForRawOps(coll)).getFullName(),
+                getTimeseriesCollForDDLOps(db, coll).getFullName(),
                 `Expected winning shard plan query planner namespace to be ${
-                    tojson(getTimeseriesExecutionNamespace(
-                        getTimeseriesCollForRawOps(coll)))} but got ${tojson(shardPlan)}`);
+                    tojson(getTimeseriesCollForDDLOps(db, coll))} but got ${tojson(shardPlan)}`);
         }
     }
 };

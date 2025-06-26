@@ -1,6 +1,6 @@
 /**
- * Test that time-series bucket collections support $_requestResumeToken with both
- * $_resumeAfter and $_startAt tokens.
+ * Test that time-series collections support $_requestResumeToken with both
+ * $_resumeAfter and $_startAt tokens over the raw bucket data.
  *
  * @tags: [
  *   # The test runs commands that are not allowed with security token: killCursors.
@@ -99,7 +99,7 @@ TimeseriesTest.run((insert) => {
         resumeCmd[tokenType] = {'$recordId': NumberLong(10)};
         assert.commandFailedWithCode(db.runCommand(resumeCmd), 7738600);
 
-        // Test that resuming fails if querying the time-series view.
+        // Test that resuming fails if querying the time-series collection without rawData.
         let viewCmd =
             {find: coll.getName(), filter: {}, $_requestResumeToken: true, hint: {$natural: 1}};
         viewCmd[tokenType] = {'$recordId': BinData(5, '1234')};

@@ -1,6 +1,6 @@
 /**
  * Test the behavior of $group on time-series collections. Specifically, we are targeting rewrites
- * that replace bucket unpacking with $group over the buckets collection, where the group key
+ * that replace bucket unpacking with $group over the raw buckets, where the group key
  * expressions are non-trivial, i.e., more than just a field path or a constant.
  *
  * @tags: [

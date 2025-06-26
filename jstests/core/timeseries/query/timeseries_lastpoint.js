@@ -9,7 +9,7 @@
  * on time. Note, that the actual sort pattern might include a prefix for the key that is used to
  * group by.
  *
- * The additional stages against the buckets collection rely on the control values for the time
+ * The additional stages against the raw buckets rely on the control values for the time
  * field. The min/max control values for time have _different semantics_. Max is a true max accross
  * the events in the bucket but min is a _rounded down_ value per the collection settings. This
  * means that we can find the event with max t ({$top: {sortBy: {t: -1}, ...}
@@ -404,7 +404,7 @@ const casesLastpointWithDistinctScan = [
         const explainFull = assert.commandWorked(coll.explain().aggregate(pipeline));
         const explain = getSingleNodeExplain(explainFull);
 
-        // There must be a group at the buckets collection level (that is, before unpack).
+        // There must be a group over the raw buckets (that is, before unpack).
         if (getEngine(explain) === "classic") {
             for (const stage of explain.stages) {
                 if (stage.hasOwnProperty("$group")) {
@@ -443,7 +443,7 @@ const casesLastpointWithDistinctScan = [
         const explainFull = assert.commandWorked(coll.explain().aggregate(pipeline));
         const explain = getSingleNodeExplain(explainFull);
 
-        // There must be a group at the buckets collection level (that is, before unpack).
+        // There must be a group over the raw buckets (that is, before unpack).
         if (getEngine(explain) === "classic") {
             for (const stage of explain.stages) {
                 if (stage.hasOwnProperty("$groupByDistinctScan")) {

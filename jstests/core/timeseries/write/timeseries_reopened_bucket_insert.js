@@ -134,14 +134,14 @@ const checkIfBucketReopened = function(
         "data": {"_id": BinData(7, "BwBnAAErFWHgv3LTiA8A"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
     };
 
-    // Insert closed bucket into the system.buckets collection.
+    // Insert closed bucket into the collection using raw ops.
     assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(bucketDoc, kRawOperationSpec));
 
     checkIfBucketReopened(measurement1, /* willCreateBucket */ false, /* willReopenBucket */ true);
     // Now that we reopened 'bucketDoc' we shouldn't have to open a new bucket.
     checkIfBucketReopened(measurement2, /* willCreateBucket */ false, /* willReopenBucket */ false);
 
-    // Insert closed bucket into the system.buckets collection.
+    // Insert closed bucket into the collection using raw ops.
     assert.commandWorked(
         getTimeseriesCollForRawOps(coll).insert(missingClosedFlagBucketDoc, kRawOperationSpec));
     // We expect to reopen buckets with missing 'closed' flags (this means the buckets are open for
@@ -180,7 +180,7 @@ const checkIfBucketReopened = function(
         "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
     };
 
-    // Insert closed bucket into the system.buckets collection.
+    // Insert closed bucket into the collection using raw ops.
     assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(bucketDoc, kRawOperationSpec));
 
     // Can reopen bucket with complex metadata, even if field order in measurement is different.

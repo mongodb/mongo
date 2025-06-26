@@ -294,18 +294,17 @@ export var TimeseriesTest = class {
 
     static ensureDataIsDistributedIfSharded(coll, splitPointDate) {
         const db = coll.getDB();
-        const buckets = getTimeseriesCollForDDLOps(db, coll);
         if (isShardedTimeseries(coll)) {
             const timeFieldName =
                 db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.timeField;
 
             const splitPoint = {[`control.min.${timeFieldName}`]: splitPointDate};
             assert.commandWorked(db.adminCommand(
-                {split: `${db.getName()}.${buckets.getName()}`, middle: splitPoint}));
+                {split: getTimeseriesCollForDDLOps(db, coll).getFullName(), middle: splitPoint}));
 
             const allShards = db.getSiblingDB("config").shards.find().sort({_id: 1}).toArray().map(
                 doc => doc._id);
-            const currentShards = buckets
+            const currentShards = getTimeseriesCollForDDLOps(db, coll)
                                       .aggregate([
                                           {"$collStats": {storageStats: {}}},
                                           {$project: {shard: 1}},
@@ -325,13 +324,13 @@ export var TimeseriesTest = class {
                 assert(otherShard);
 
                 assert.commandWorked(db.adminCommand({
-                    movechunk: `${db.getName()}.${buckets.getName()}`,
+                    movechunk: getTimeseriesCollForDDLOps(db, coll).getFullName(),
                     find: splitPoint,
                     to: otherShard,
                     _waitForDelete: true
                 }));
 
-                const updatedShards = buckets
+                const updatedShards = getTimeseriesCollForDDLOps(db, coll)
                                           .aggregate([
                                               {"$collStats": {storageStats: {}}},
                                               {$project: {shard: 1}},

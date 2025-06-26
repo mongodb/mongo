@@ -1,5 +1,5 @@
 /**
- * Tests findAndModify on a timeseries buckets collection.
+ * Tests findAndModify on the raw buckets of a timeseries collection.
  *
  * @tags: [
  *   # We need a timeseries collection.

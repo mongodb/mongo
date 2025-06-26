@@ -79,16 +79,6 @@ export function getTimeseriesCollForRawOps(db, coll) {
 }
 
 /**
- * Given a timeseries collection, returns the expected execution namespace.
- *
- * When rawData is supported, this will return the timeseries buckets collection. Otherwise returns
- * the collection itself.
- */
-export function getTimeseriesExecutionNamespace(db, coll) {
-    return isRawOperationSupported(db) ? getTimeseriesBucketsColl(coll) : coll;
-}
-
-/**
  * Override the rawData function on the DBQuery object so that it becomes a no-op on versions where
  * rawData parameter is not supported (< 9.0)
  *

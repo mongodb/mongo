@@ -58,7 +58,7 @@ TimeseriesTest.run((insert) => {
         assert.eq(bucketDocs.length, 1);
 
         const bucketDoc = bucketDocs[0];
-        jsTestLog('Bucket collection document: ' + tojson(bucketDoc));
+        jsTestLog('Bucket document: ' + tojson(bucketDoc));
 
         assert.docEq(
             expectedMin, bucketDoc.control.min, 'invalid min in bucket: ' + tojson(bucketDoc));

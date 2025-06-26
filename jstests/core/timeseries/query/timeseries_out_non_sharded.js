@@ -21,6 +21,9 @@
  * ]
  */
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
+import {
+    areViewlessTimeseriesEnabled
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const numHosts = 10;
@@ -74,16 +77,18 @@ function runOutAndCompareResults({
         const actualOptions = collections[0]["options"]["timeseries"];
         validateCollectionOptions({expected: expectedTSOptions, actual: actualOptions});
 
-        // Make sure we have both the buckets collection and the view on the timeseries collection.
-        const bucketsColl = assert.commandWorked(testDB.runCommand(
-            {listCollections: 1, filter: {name: "system.buckets." + outColl.getName()}}));
-        assert.eq(1, bucketsColl.cursor.firstBatch.length);
+        if (!areViewlessTimeseriesEnabled(testDB)) {
+            // Make sure we have both the buckets collection and the timeseries view.
+            const bucketsColl = assert.commandWorked(testDB.runCommand(
+                {listCollections: 1, filter: {name: "system.buckets." + outColl.getName()}}));
+            assert.eq(1, bucketsColl.cursor.firstBatch.length);
 
-        assert.eq(1,
-                  testDB.getCollection("system.views")
-                      .find({viewOn: "system.buckets." + outColl.getName()})
-                      .toArray()
-                      .length);
+            assert.eq(1,
+                      testDB.getCollection("system.views")
+                          .find({viewOn: "system.buckets." + outColl.getName()})
+                          .toArray()
+                          .length);
+        }
     } else {
         // Make sure the output collection is not a timeseries collection.
         assert(

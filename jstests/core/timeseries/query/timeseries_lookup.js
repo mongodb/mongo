@@ -1,5 +1,5 @@
 /**
- * Test that time-series bucket collections work as expected with $lookup.
+ * Test that time-series collections work as expected with $lookup.
  *
  * @tags: [
  *   # This test depends on certain writes ending up in the same bucket. Stepdowns and tenant

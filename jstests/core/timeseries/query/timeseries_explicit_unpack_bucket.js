@@ -1,6 +1,6 @@
 /**
- * Test that internal systems can run an explicit $_unpackBucket operation directly against a
- * time-series bucket collection. This stage is only used for special known use cases by other
+ * Test that internal systems can run an explicit $_unpackBucket operation directly against the
+ * buckets of a time-series collection. This stage is only used for special known use cases by other
  * MongoDB products rather than user applications.
  *
  * @tags: [
@@ -185,7 +185,7 @@ assert.commandFailedWithCode(
     assert.throws(() => getTimeseriesCollForRawOps(tsCollWithMeta)
                             .aggregate([{$_unpackBucket: {metaField: "tags"}}], kRawOperationSpec)),
                  5612405);
-// $_unpackBucket fails if the time-series bucket collection has a metaField but it was not
+// $_unpackBucket fails if the time-series collection has a metaField but it was not
 // included as a parameter.
 assert.commandFailedWithCode(
     assert.throws(() =>

@@ -1,6 +1,5 @@
 /**
- * Performs basic write operations on a time-series buckets collection through its time-series view
- * namespace using rawData.
+ * Performs basic write operations on the buckets of a time-series collection using rawData.
  * @tags: [
  *   requires_timeseries,
  *   does_not_support_transactions,

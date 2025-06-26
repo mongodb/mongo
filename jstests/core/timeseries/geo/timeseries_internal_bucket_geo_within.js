@@ -25,7 +25,6 @@ coll.drop();
 
 assert.commandWorked(
     db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
-const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
 let pipeline = [{
     $match: {

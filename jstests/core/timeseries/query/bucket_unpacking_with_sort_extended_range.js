@@ -21,7 +21,7 @@ import {
     kRawOperationSpec
 } from "jstests/core/libs/raw_operation_utils.js";
 import {
-    getTimeseriesBucketsColl,
+    getTimeseriesCollForDDLOps,
     isShardedTimeseries
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -50,20 +50,18 @@ if (FixtureHelpers.isMongos(db)) {
 
 // Create unindexed collection
 const coll = testDB.timeseries_internal_bounded_sort_extended_range;
-const buckets = testDB['system.buckets.' + coll.getName()];
 coll.drop();
 assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: 't'}}));
 
 // Create collection indexed on time
 const collIndexed = testDB.timeseries_internal_bounded_sort_extended_range_with_index;
-const bucketsIndexed = testDB['system.buckets.' + collIndexed.getName()];
 collIndexed.drop();
 assert.commandWorked(
     testDB.createCollection(collIndexed.getName(), {timeseries: {timeField: 't'}}));
 assert.commandWorked(collIndexed.createIndex({'t': 1}));
 
 jsTestLog(collIndexed.getIndexes());
-jsTestLog(bucketsIndexed.getIndexes());
+jsTestLog(getTimeseriesCollForRawOps(collIndexed).getIndexes(kRawOperationSpec));
 
 for (const collection of [coll, collIndexed]) {
     let shardList = getShards();
@@ -75,17 +73,26 @@ for (const collection of [coll, collIndexed]) {
         const shardName0 = shardList[0];
         const shardName1 = shardList[1];
 
-        const collName = getTimeseriesBucketsColl(collection).getFullName();
         // Our example data has documents between 2000-2003, and these dates are non-wrapping.
         // So this goes on the primary shard, and everything else goes on the non-primary.
-        assert.commandWorked(sh.splitAt(collName, {'control.min.t': ISODate('2000-01-01')}));
-        assert.commandWorked(sh.splitAt(collName, {'control.min.t': ISODate('2003-01-01')}));
         assert.commandWorked(
-            sh.moveChunk(collName, {'control.min.t': ISODate('1969-01-01')}, shardName1));
+            sh.splitAt(getTimeseriesCollForDDLOps(testDB, collection).getFullName(),
+                       {'control.min.t': ISODate('2000-01-01')}));
         assert.commandWorked(
-            sh.moveChunk(collName, {'control.min.t': ISODate('2000-01-01')}, shardName0));
+            sh.splitAt(getTimeseriesCollForDDLOps(testDB, collection).getFullName(),
+                       {'control.min.t': ISODate('2003-01-01')}));
         assert.commandWorked(
-            sh.moveChunk(collName, {'control.min.t': ISODate('2003-01-01')}, shardName1));
+            sh.moveChunk(getTimeseriesCollForDDLOps(testDB, collection).getFullName(),
+                         {'control.min.t': ISODate('1969-01-01')},
+                         shardName1));
+        assert.commandWorked(
+            sh.moveChunk(getTimeseriesCollForDDLOps(testDB, collection).getFullName(),
+                         {'control.min.t': ISODate('2000-01-01')},
+                         shardName0));
+        assert.commandWorked(
+            sh.moveChunk(getTimeseriesCollForDDLOps(testDB, collection).getFullName(),
+                         {'control.min.t': ISODate('2003-01-01')},
+                         shardName1));
     }
 }
 
@@ -163,7 +170,8 @@ function checkAgainstReferenceBoundedSortUnexpected(
         assert.gt(blocking.length, 0, {bounded, blocking, plan});
         if (!TestData.hasRandomShardsAddedRemoved)
             assert.lt(bounded.length,
-                      FixtureHelpers.numberOfShardsForCollection(buckets),
+                      FixtureHelpers.numberOfShardsForCollection(
+                          getTimeseriesCollForDDLOps(testDB, coll)),
                       {bounded, blocking, plan});
     } else {
         const stages = getAggPlanStages(plan, "$_internalBoundedSort");

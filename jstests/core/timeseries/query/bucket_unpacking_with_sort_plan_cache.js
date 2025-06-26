@@ -23,6 +23,7 @@
  *     examines_sbe_cache
  * ]
  */
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {
     getAggPlanStage,
@@ -56,9 +57,7 @@ const setupCollection = (coll, collName, numDocs) => {
 
 const collName = jsTestName();
 const coll = db[collName];
-const bucketsName = "system.buckets." + collName;
 const stageName = "$_internalBoundedSort";
-const bucketsColl = db[bucketsName];
 
 const testBoundedSorterPlanCache = (sortDirection, indexDirection) => {
     // Setup with a few documents.
@@ -79,7 +78,7 @@ const testBoundedSorterPlanCache = (sortDirection, indexDirection) => {
     assert.eq(getAggPlanStage(explain, "IXSCAN").direction, traversalDirection, explain);
 
     // Check the cache is empty.
-    assert.eq(db[bucketsName].getPlanCache().list().length, 0);
+    assert.eq(getTimeseriesCollForDDLOps(db, coll).getPlanCache().list().length, 0);
 
     // Run the query twice in order to cache and activate the plan.
     for (let i = 0; i < 2; ++i) {
@@ -88,7 +87,7 @@ const testBoundedSorterPlanCache = (sortDirection, indexDirection) => {
     }
 
     // Check the answer was cached.
-    assert.eq(db[bucketsName].getPlanCache().list().length, 1);
+    assert.eq(getTimeseriesCollForDDLOps(db, coll).getPlanCache().list().length, 1);
 
     // Check that the solution still uses internal bounded sort with the correct order.
     explain = coll.explain().aggregate(pipeline);
@@ -100,7 +99,8 @@ const testBoundedSorterPlanCache = (sortDirection, indexDirection) => {
     const planCacheKey =
         getPlanCacheKeyFromExplain(getAggPlanStage(explain, cursorStageName)[cursorStageName]);
     const planCacheEntry = (() => {
-        const planCache = bucketsColl.getPlanCache().list([{$match: {planCacheKey}}]);
+        const planCache =
+            getTimeseriesCollForDDLOps(db, coll).getPlanCache().list([{$match: {planCacheKey}}]);
         assert.eq(planCache.length, 1, planCache);
         return planCache[0];
     })();

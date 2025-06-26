@@ -1,6 +1,5 @@
 /**
- * Performs basic read operations on a time-series buckets collection through its time-series view
- * namespace using rawData.
+ * Performs basic read operations on the buckets of a time-series collection using rawData.
  * @tags: [
  *   requires_timeseries,
  *   requires_fcv_82,

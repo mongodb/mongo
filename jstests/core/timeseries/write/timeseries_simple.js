@@ -1,5 +1,5 @@
 /**
- * Tests inserting sample data into the time-series buckets collection.
+ * Tests inserting sample data into a time-series collection.
  * This test is for the simple case of only one measurement per bucket.
  * @tags: [
  *   # This test depends on certain writes ending up in the same bucket. Stepdowns
@@ -78,14 +78,14 @@ TimeseriesTest.run((insert) => {
         let start = new Date();
         assert.commandWorked(insert(coll, doc));
         jsTestLog('Insertion took ' + ((new Date()).getTime() - start.getTime()) +
-                  ' ms. Retrieving doc from view: ' + i);
+                  ' ms. Retrieving doc: ' + i);
         start = new Date();
         const docFromView = coll.findOne({_id: doc._id});
         assert(docFromView,
-               'inserted doc missing from time-series view: ' + i + ': ' + tojson(doc));
+               'inserted doc missing from time-series collection: ' + i + ': ' + tojson(doc));
         jsTestLog('Doc retrieval took ' + ((new Date()).getTime() - start.getTime()) +
-                  ' ms. Doc fetched from view: ' + i + ': ' + tojson(docFromView));
-        assert.docEq(doc, docFromView, 'Invalid document retrieved from view: ' + i);
+                  ' ms. Fetched doc: ' + i + ': ' + tojson(docFromView));
+        assert.docEq(doc, docFromView, 'Invalid doc retrieved: ' + i);
 
         // Update expected control min/max and data in bucket.
         Object.keys(doc).forEach((key) => {
@@ -99,17 +99,17 @@ TimeseriesTest.run((insert) => {
         });
     }
 
-    // Check view.
-    const viewDocs = coll.find().toArray();
-    assert.eq(numDocs, viewDocs.length, viewDocs);
+    // Check measurements.
+    const userDocs = coll.find().toArray();
+    assert.eq(numDocs, userDocs.length, userDocs);
 
-    // Check bucket collection.
+    // Check buckets.
     const bucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     assert.eq(1, bucketDocs.length, bucketDocs);
     const bucketDoc = bucketDocs[0];
     TimeseriesTest.decompressBucket(bucketDoc);
 
-    jsTestLog('Bucket collection document: ' + tojson(bucketDoc));
+    jsTestLog('Bucket document: ' + tojson(bucketDoc));
     assert.docEq(expectedBucketDoc.control.min,
                  bucketDoc.control.min,
                  'invalid min in bucket: ' + tojson(bucketDoc));

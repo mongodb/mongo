@@ -1,5 +1,5 @@
 /**
- * Tests that schema validation is enabled on the bucket collection.
+ * Tests that schema validation is enabled on the buckets of a time-series collection.
  *
  * @tags: [
  *   requires_timeseries,

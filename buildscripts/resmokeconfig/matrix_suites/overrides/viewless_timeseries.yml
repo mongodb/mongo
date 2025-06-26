@@ -96,6 +96,7 @@
         - jstests/core/timeseries/geo/partialFilterExpression_with_internalBucketGeoWithin.js
         - jstests/core/timeseries/geo/timeseries_geonear.js
         - jstests/core/timeseries/geo/timeseries_geonear_edge_case_measurements.js
+        - jstests/core/timeseries/geo/timeseries_geonear_measurements.js
         - jstests/core/timeseries/geo/timeseries_geonear_mindistance_and_maxdistance.js
         - jstests/core/timeseries/geo/timeseries_geonear_random_measurements.js
         - jstests/core/timeseries/geo/timeseries_internal_bucket_geo_within.js
@@ -111,6 +112,7 @@
         - jstests/core/timeseries/query/bucket_unpacking_with_sort_with_geo.js
         - jstests/core/timeseries/query/timeseries_block_explain.js
         - jstests/core/timeseries/query/timeseries_bucket_level_filter.js
+        - jstests/core/timeseries/query/timeseries_buckets_query_explain.js
         - jstests/core/timeseries/query/timeseries_cursor_batches.js
         - jstests/core/timeseries/query/timeseries_explicit_unpack_bucket.js
         - jstests/core/timeseries/query/timeseries_find.js

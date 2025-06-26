@@ -1,5 +1,5 @@
 /**
- * Tests maximum time-range of measurements held in each bucket in a time-series buckets collection.
+ * Tests maximum time-range of measurements held in each bucket of a time-series collection.
  * @tags: [
  *   # This test depends on certain writes ending up in the same bucket. Stepdowns
  *   # may result in writes splitting between two primaries, and thus different buckets.
@@ -46,11 +46,11 @@ TimeseriesTest.run((insert) => {
             }
         }
 
-        // Check view.
-        const viewDocs = coll.find().sort({_id: 1}).toArray();
-        assert.eq(numDocs, viewDocs.length, viewDocs);
+        // Check measurements.
+        const userDocs = coll.find().sort({_id: 1}).toArray();
+        assert.eq(numDocs, userDocs.length, userDocs);
         for (let i = 0; i < numDocs; i++) {
-            const viewDoc = viewDocs[i];
+            const viewDoc = userDocs[i];
             assert.eq(i, viewDoc._id, 'unexpected _id in doc: ' + i + ': ' + tojson(viewDoc));
             assert.eq(i, viewDoc.x, 'unexpected field x in doc: ' + i + ': ' + tojson(viewDoc));
             assert.eq(docTimes[i],
@@ -58,7 +58,7 @@ TimeseriesTest.run((insert) => {
                       'unexpected time in doc: ' + i + ': ' + tojson(viewDoc));
         }
 
-        // Check bucket collection.
+        // Check buckets.
         const bucketDocs = getTimeseriesCollForRawOps(coll)
                                .find()
                                .rawData()

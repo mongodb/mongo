@@ -41,14 +41,14 @@ TimeseriesTest.run((insert) => {
         let docs = docsBucketA.concat(docsBucketB);
         assert.commandWorked(insert(coll, docs), 'failed to insert docs: ' + tojson(docs));
 
-        // Check view.
-        const viewDocs = coll.find({}).sort({_id: 1}).toArray();
-        assert.eq(docs.length, viewDocs.length, viewDocs);
+        // Check measurements.
+        const userDocs = coll.find({}).sort({_id: 1}).toArray();
+        assert.eq(docs.length, userDocs.length, userDocs);
         for (let i = 0; i < docs.length; i++) {
-            assert.docEq(docs[i], viewDocs[i], 'unexpected doc from view: ' + i);
+            assert.docEq(docs[i], userDocs[i], 'unexpected measurement doc: ' + i);
         }
 
-        // Check bucket collection.
+        // Check buckets.
         const bucketDocs = getTimeseriesCollForRawOps(coll)
                                .find()
                                .rawData()
@@ -85,7 +85,7 @@ TimeseriesTest.run((insert) => {
         }
     };
 
-    // Ensure _id order of docs in the bucket collection by using constant times.
+    // Ensure _id order of raw buckets documents by using constant times.
     const t = [
         ISODate("2020-11-26T00:00:00.000Z"),
         ISODate("2020-11-26T00:10:00.000Z"),

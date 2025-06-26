@@ -247,7 +247,7 @@ assert.commandFailedWithCode(
     ErrorCodes.InvalidIndexSpecificationOption);
 
 // Clustered index legacy format { clusteredIndex: <bool> } is only supported on certain internal
-// namespaces (e.g time-series buckets collections).
+// namespaces and for time-series collections.
 assert.commandFailedWithCode(
     replicatedDB.createCollection(replicatedColl.getName(), {clusteredIndex: true}), 5979703);
 
@@ -351,7 +351,7 @@ assert.commandFailedWithCode(
 nonReplicatedDB.runCommand({drop: nonReplicatedColl.getName()});
 
 // Clustered index legacy format { clusteredIndex: <bool> } is only supported on certain internal
-// namespaces (e.g time-series buckets collections). Additionally, collections that support the
+// namespaces and for time-series collections. Additionally, collections that support the
 // legacy format are prohibited from using the other format.
 assert.commandFailedWithCode(
     nonReplicatedDB.createCollection(nonReplicatedColl.getName(),

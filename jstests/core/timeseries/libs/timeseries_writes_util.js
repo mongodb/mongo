@@ -2,6 +2,7 @@
  * Helpers for testing timeseries arbitrary writes.
  */
 
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {
     getExecutionStages,
     getPlanStage,
@@ -136,7 +137,6 @@ export function prepareShardedCollection(
     }
 
     const coll = dbToUse.getCollection(collName);
-    const sysCollName = sysCollNamePrefix + coll.getName();
     coll.drop();
 
     const tsOptions = includeMeta
@@ -156,11 +156,11 @@ export function prepareShardedCollection(
         splitPoint = includeMeta ? splitMetaPointBetweenTwoShards : splitTimePointBetweenTwoShards;
     }
     // [MinKey, splitPoint) and [splitPoint, MaxKey) are the two chunks after the split.
-    assert.commandWorked(
-        dbToUse.adminCommand({split: dbToUse[sysCollName].getFullName(), middle: splitPoint}));
+    assert.commandWorked(dbToUse.adminCommand(
+        {split: getTimeseriesCollForDDLOps(dbToUse, coll).getFullName(), middle: splitPoint}));
 
     assert.commandWorked(dbToUse.adminCommand({
-        moveChunk: dbToUse[sysCollName].getFullName(),
+        moveChunk: getTimeseriesCollForDDLOps(dbToUse, coll).getFullName(),
         find: splitPoint,
         to: otherShard.shardName,
         _waitForDelete: true
@@ -329,10 +329,6 @@ export function testDeleteOne({initialDocList, filter, expectedResultDocs, nDele
     assert.eq(nDeleted, res.deletedCount);
 
     verifyResultDocs(coll, initialDocList, expectedResultDocs, nDeleted);
-}
-
-export function getBucketCollection(coll) {
-    return coll.getDB()[sysCollNamePrefix + coll.getName()];
 }
 
 /**
@@ -639,14 +635,13 @@ export function testFindOneAndUpdate({
 
 export function getRelevantProfilerEntries(db, coll, requestType) {
     const collName = coll.getName();
-    const sysCollName = sysCollNamePrefix + coll.getName();
     const profilerFilter = {
         $or: [
             // Potential two-phase protocol cluster query.
             {
                 "op": "command",
-                "ns": `${db.getName()}.${sysCollName}`,
-                "command.aggregate": `${sysCollName}`,
+                "ns": `${db.getName()}.${getTimeseriesCollForDDLOps(db, coll).getName()}`,
+                "command.aggregate": `${getTimeseriesCollForDDLOps(db, coll).getName()}`,
                 "command.$_isClusterQueryWithoutShardKeyCmd": true,
                 // Filters out events recorded because of StaleConfig error.
                 "ok": {$ne: 0},

@@ -1,6 +1,6 @@
 /**
  * Test the behavior of $group on time-series collections. Specifically, we are targeting rewrites
- * that replace bucket unpacking with $group over the buckets collection. Currently, only $min/$max
+ * that replace bucket unpacking with $group over the raw buckets. Currently, only $min/$max
  * are supported for the rewrites.
  *
  * @tags: [

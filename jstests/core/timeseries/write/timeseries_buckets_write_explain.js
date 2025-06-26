@@ -1,5 +1,5 @@
 /**
- * Tests explaining write operations on a time-series buckets collection.
+ * Tests explaining write operations on the raw buckets of a timeseries collection.
  *
  * @tags: [
  *   requires_fcv_82,

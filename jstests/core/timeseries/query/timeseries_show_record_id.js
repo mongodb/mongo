@@ -47,8 +47,8 @@ TimeseriesTest.run((insert) => {
         }
     }
 
-    // The time-series user view uses aggregation to build a representation of the data.
-    // showRecordId() is not support in aggregation.
+    // The time-series measurements are generated on-the-fly by unpacking the underlying buckets,
+    // so they do not have a record id.
     const error = assert.throws(() => {
         coll.find().showRecordId().toArray();
     });

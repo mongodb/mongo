@@ -57,7 +57,7 @@ function prepareCompressedBucket() {
     }
     assert.commandWorked(coll.insert(docs));
 
-    // Check the bucket collection to make sure that it generated the buckets we expect.
+    // Check the buckets to make sure it generated what we expect.
     const bucketDocs =
         getTimeseriesCollForRawOps(coll).find().rawData().sort({'control.min._id': 1}).toArray();
     assert.eq(2, bucketDocs.length, tojson(bucketDocs));

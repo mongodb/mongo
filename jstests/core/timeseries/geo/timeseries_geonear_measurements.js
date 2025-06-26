@@ -23,9 +23,11 @@
  * ]
  */
 
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec
+} from "jstests/core/libs/raw_operation_utils.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {aggPlanHasStage, getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 Random.setRandomSeed();
@@ -641,13 +643,12 @@ function runExamples(coll, isTimeseries, has2dsphereIndex) {
 
     // Make sure the 2dsphere index exists. (If the collection is implicitly sharded then we will
     // also see an implicitly created index.)
-    const buckets = db.getCollection('system.buckets.' + coll.getName());
     let extraIndexesForSharding = {'control.min.time': 1, 'control.max.time': 1};
 
-    assert.sameMembers(buckets.getIndexKeys(),
-                       isShardedTimeseries(coll)
-                           ? [{'data.loc': '2dsphere_bucket'}, extraIndexesForSharding]
-                           : [{'data.loc': '2dsphere_bucket'}]);
+    assert.sameMembers(
+        getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec).map(i => i.key),
+        isShardedTimeseries(coll) ? [{'data.loc': '2dsphere_bucket'}, extraIndexesForSharding]
+                                  : [{'data.loc': '2dsphere_bucket'}]);
 
     insertTestData(coll);
     runExamples(coll, true /* isTimeseries */, true /* has2dsphereIndex */);

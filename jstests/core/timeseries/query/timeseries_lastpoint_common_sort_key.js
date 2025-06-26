@@ -122,7 +122,7 @@ const casesLastpointOptimization = [
         const explainFull = assert.commandWorked(coll.explain().aggregate(pipeline));
         const explain = getSingleNodeExplain(explainFull);
 
-        // There must be a group at the buckets collection level (that is, before unpack).
+        // There must be a group over the raw buckets (that is, before unpack).
         if (getEngine(explain) === "classic") {
             for (const stage of explain.stages) {
                 if (stage.hasOwnProperty("$group")) {
