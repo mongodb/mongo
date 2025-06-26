@@ -291,6 +291,8 @@ public:
         return DocumentSourceMatch::serialize(opts);
     }
 
+    StageConstraints constraints(PipelineSplitState pipeState) const override;
+
 protected:
     DocumentSourceInternalChangeStreamMatch(const BSONObj& query,
                                             const boost::intrusive_ptr<ExpressionContext>& expCtx)

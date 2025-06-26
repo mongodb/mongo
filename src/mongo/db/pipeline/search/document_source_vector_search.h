@@ -109,8 +109,8 @@ public:
                                      UnionRequirement::kNotAllowed,
                                      ChangeStreamRequirement::kDenylist);
         constraints.unionRequirement = UnionRequirement::kAllowed;
-        constraints.requiresInputDocSource = false;
         constraints.noFieldModifications = true;
+        constraints.setConstraintsForNoInputSources();
         return constraints;
     }
 

@@ -108,7 +108,7 @@ public:
         StageConstraints constraints = DocumentSourceMock::constraints(pipeState);
         constraints.requiredPosition = PositionRequirement::kFirst;
         constraints.isIndependentOfAnyCollection = true;
-        constraints.requiresInputDocSource = false;
+        constraints.setConstraintsForNoInputSources();
         return constraints;
     }
 

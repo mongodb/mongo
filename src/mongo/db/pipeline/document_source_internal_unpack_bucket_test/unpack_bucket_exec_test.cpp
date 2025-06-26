@@ -1096,6 +1096,7 @@ TEST_F(InternalUnpackBucketExecTest, AssertConstraints) {
     ASSERT_TRUE(constraints.isAllowedInUnionPipeline());
     ASSERT_TRUE(constraints.isAllowedInsideFacetStage());
     ASSERT_FALSE(constraints.writesPersistentData());
+    ASSERT_FALSE(constraints.consumesLogicalCollectionData);
 }
 
 }  // namespace

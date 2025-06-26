@@ -131,14 +131,17 @@ public:
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     StageConstraints constraints(PipelineSplitState pipeState) const final {
-        return {StreamType::kStreaming,
-                PositionRequirement::kFirst,
-                HostTypeRequirement::kNone,
-                DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kNotAllowed,
-                TransactionRequirement::kNotAllowed,
-                LookupRequirement::kAllowed,
-                UnionRequirement::kAllowed};
+        StageConstraints constraints(StreamType::kStreaming,
+                                     PositionRequirement::kFirst,
+                                     HostTypeRequirement::kNone,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kNotAllowed,
+                                     TransactionRequirement::kNotAllowed,
+                                     LookupRequirement::kAllowed,
+                                     UnionRequirement::kAllowed);
+
+        constraints.consumesLogicalCollectionData = false;
+        return constraints;
     }
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(

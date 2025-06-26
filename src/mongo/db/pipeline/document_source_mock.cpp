@@ -59,7 +59,7 @@ DocumentSourceMock::DocumentSourceMock(std::deque<GetNextResult> results,
     for (auto& res : results) {
         _queue.push_back(QueueItem{std::move(res), /*count*/ 1});
     }
-    mockConstraints.requiresInputDocSource = false;
+    mockConstraints.setConstraintsForNoInputSources();
 }
 
 const char* DocumentSourceMock::getSourceName() const {

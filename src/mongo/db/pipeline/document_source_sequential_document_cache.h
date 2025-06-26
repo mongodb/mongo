@@ -83,7 +83,11 @@ public:
                                      LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed);
 
-        constraints.requiresInputDocSource = (_cache->isBuilding());
+        if (_cache->isBuilding()) {
+            constraints.requiresInputDocSource = true;
+        } else {
+            constraints.setConstraintsForNoInputSources();
+        }
         return constraints;
     }
 

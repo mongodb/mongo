@@ -51,15 +51,17 @@ ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamCheckTopologyChange,
 
 StageConstraints DocumentSourceChangeStreamCheckTopologyChange::constraints(
     PipelineSplitState pipeState) const {
-    return {StreamType::kStreaming,
-            PositionRequirement::kNone,
-            HostTypeRequirement::kAnyShard,
-            DiskUseRequirement::kNoDiskUse,
-            FacetRequirement::kNotAllowed,
-            TransactionRequirement::kNotAllowed,
-            LookupRequirement::kNotAllowed,
-            UnionRequirement::kNotAllowed,
-            ChangeStreamRequirement::kChangeStreamStage};
+    StageConstraints constraints(StreamType::kStreaming,
+                                 PositionRequirement::kNone,
+                                 HostTypeRequirement::kAnyShard,
+                                 DiskUseRequirement::kNoDiskUse,
+                                 FacetRequirement::kNotAllowed,
+                                 TransactionRequirement::kNotAllowed,
+                                 LookupRequirement::kNotAllowed,
+                                 UnionRequirement::kNotAllowed,
+                                 ChangeStreamRequirement::kChangeStreamStage);
+    constraints.consumesLogicalCollectionData = false;
+    return constraints;
 }
 
 

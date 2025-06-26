@@ -167,15 +167,17 @@ void DocumentSourceChangeStreamUnwindTransaction::rebuild(BSONObj filter) {
 
 StageConstraints DocumentSourceChangeStreamUnwindTransaction::constraints(
     PipelineSplitState pipeState) const {
-    return StageConstraints(StreamType::kStreaming,
-                            PositionRequirement::kNone,
-                            HostTypeRequirement::kNone,
-                            DiskUseRequirement::kNoDiskUse,
-                            FacetRequirement::kNotAllowed,
-                            TransactionRequirement::kNotAllowed,
-                            LookupRequirement::kNotAllowed,
-                            UnionRequirement::kNotAllowed,
-                            ChangeStreamRequirement::kChangeStreamStage);
+    StageConstraints constraints(StreamType::kStreaming,
+                                 PositionRequirement::kNone,
+                                 HostTypeRequirement::kNone,
+                                 DiskUseRequirement::kNoDiskUse,
+                                 FacetRequirement::kNotAllowed,
+                                 TransactionRequirement::kNotAllowed,
+                                 LookupRequirement::kNotAllowed,
+                                 UnionRequirement::kNotAllowed,
+                                 ChangeStreamRequirement::kChangeStreamStage);
+    constraints.consumesLogicalCollectionData = false;
+    return constraints;
 }
 
 Value DocumentSourceChangeStreamUnwindTransaction::doSerialize(

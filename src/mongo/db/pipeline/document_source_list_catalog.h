@@ -116,7 +116,7 @@ public:
 
         constraints.isIndependentOfAnyCollection =
             pExpCtx->getNamespaceString().isCollectionlessAggregateNS();
-        constraints.requiresInputDocSource = false;
+        constraints.setConstraintsForNoInputSources();
         return constraints;
     }
 

@@ -138,6 +138,8 @@ public:
         constraints.canSwapWithMatch = true;
         // The user cannot specify multiple $unpackBucket stages in the pipeline.
         constraints.canAppearOnlyOnceInPipeline = true;
+        // This stage only reads raw timeseries bucket documents.
+        constraints.consumesLogicalCollectionData = false;
         return constraints;
     }
 

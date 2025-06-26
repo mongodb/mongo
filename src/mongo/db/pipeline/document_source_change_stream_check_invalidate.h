@@ -71,15 +71,17 @@ public:
     }
 
     StageConstraints constraints(PipelineSplitState pipeState) const final {
-        return {StreamType::kStreaming,
-                PositionRequirement::kNone,
-                HostTypeRequirement::kNone,
-                DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kNotAllowed,
-                TransactionRequirement::kNotAllowed,
-                LookupRequirement::kNotAllowed,
-                UnionRequirement::kNotAllowed,
-                ChangeStreamRequirement::kChangeStreamStage};
+        StageConstraints constraints(StreamType::kStreaming,
+                                     PositionRequirement::kNone,
+                                     HostTypeRequirement::kNone,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kNotAllowed,
+                                     TransactionRequirement::kNotAllowed,
+                                     LookupRequirement::kNotAllowed,
+                                     UnionRequirement::kNotAllowed,
+                                     ChangeStreamRequirement::kChangeStreamStage);
+        constraints.consumesLogicalCollectionData = false;
+        return constraints;
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {

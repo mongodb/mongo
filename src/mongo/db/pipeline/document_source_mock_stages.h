@@ -137,7 +137,7 @@ public:
                                      LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed);
         constraints.isIndependentOfAnyCollection = true;
-        constraints.requiresInputDocSource = false;
+        constraints.setConstraintsForNoInputSources();
         return constraints;
     }
 

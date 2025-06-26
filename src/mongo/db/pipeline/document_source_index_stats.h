@@ -115,7 +115,7 @@ public:
                                      DocumentSource::TransactionRequirement::kNotAllowed,
                                      DocumentSource::LookupRequirement::kAllowed,
                                      DocumentSource::UnionRequirement::kAllowed);
-        constraints.requiresInputDocSource = false;
+        constraints.setConstraintsForNoInputSources();
         return constraints;
     }
 

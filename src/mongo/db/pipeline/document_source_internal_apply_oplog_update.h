@@ -91,6 +91,7 @@ public:
         constraints.isAllowedWithinUpdatePipeline = true;
         constraints.checkExistenceForDiffInsertOperations = true;
         constraints.isIndependentOfAnyCollection = false;
+        constraints.consumesLogicalCollectionData = false;
         return constraints;
     }
 

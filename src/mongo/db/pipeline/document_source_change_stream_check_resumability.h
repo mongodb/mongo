@@ -91,15 +91,17 @@ public:
     const char* getSourceName() const override;
 
     StageConstraints constraints(PipelineSplitState pipeState) const override {
-        return {StreamType::kStreaming,
-                PositionRequirement::kNone,
-                HostTypeRequirement::kAnyShard,
-                DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kNotAllowed,
-                TransactionRequirement::kNotAllowed,
-                LookupRequirement::kNotAllowed,
-                UnionRequirement::kNotAllowed,
-                ChangeStreamRequirement::kChangeStreamStage};
+        StageConstraints constraints(StreamType::kStreaming,
+                                     PositionRequirement::kNone,
+                                     HostTypeRequirement::kAnyShard,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kNotAllowed,
+                                     TransactionRequirement::kNotAllowed,
+                                     LookupRequirement::kNotAllowed,
+                                     UnionRequirement::kNotAllowed,
+                                     ChangeStreamRequirement::kChangeStreamStage);
+        constraints.consumesLogicalCollectionData = false;
+        return constraints;
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {

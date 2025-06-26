@@ -114,6 +114,7 @@ public:
                                      UnionRequirement::kNotAllowed,
                                      ChangeStreamRequirement::kChangeStreamStage);
         constraints.canSwapWithMatch = true;
+        constraints.consumesLogicalCollectionData = false;
         return constraints;
     }
 

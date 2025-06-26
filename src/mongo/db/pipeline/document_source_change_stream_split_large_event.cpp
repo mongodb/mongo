@@ -122,6 +122,7 @@ StageConstraints DocumentSourceChangeStreamSplitLargeEvent::constraints(
 
     // The user cannot specify multiple split stages in the pipeline.
     constraints.canAppearOnlyOnceInPipeline = true;
+    constraints.consumesLogicalCollectionData = false;
     return constraints;
 }
 

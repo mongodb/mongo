@@ -167,6 +167,7 @@ StageConstraints DocumentSourceChangeStreamOplogMatch::constraints(
                                  ChangeStreamRequirement::kChangeStreamStage);
     constraints.isIndependentOfAnyCollection =
         pExpCtx->getNamespaceString().isCollectionlessAggregateNS() ? true : false;
+    constraints.consumesLogicalCollectionData = false;
     return constraints;
 }
 

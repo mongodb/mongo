@@ -304,6 +304,15 @@ struct StageConstraints {
         return diskRequirement == DiskUseRequirement::kWritesPersistentData;
     }
 
+    /**
+     * Helper method that sets both 'requiresInputDocSource' and 'consumesLogicalCollectionData', if
+     * the document source generates results itself and does not expect inputs.
+     */
+    void setConstraintsForNoInputSources() {
+        requiresInputDocSource = false;
+        consumesLogicalCollectionData = false;
+    }
+
     // Indicates whether this stage needs to be at a particular position in the pipeline.
     PositionRequirement requiredPosition;
 
@@ -336,11 +345,18 @@ struct StageConstraints {
     StreamType streamType;
 
     // True if this stage does not generate results itself, and instead pulls inputs from an
-    // input DocumentSource (via 'pSource').
+    // input DocumentSource (via 'pSource'). Must be set using the 'setConstraintsForNoInputSources'
+    // helper method.
     bool requiresInputDocSource = true;
 
     // True if this stage operates on a global or database level, like $currentOp.
     bool isIndependentOfAnyCollection = false;
+
+    // True if this stage's input can be standard user-inserted documents. False if the stage
+    // processes collection metadata, or internally created data, such as oplog entries or
+    // timeseries bucket documents. This stage must be also be false if 'requiresInputDocSource' is
+    // false, since this indicates the stage has no input.
+    bool consumesLogicalCollectionData = true;
 
     // True if this stage can ever be safely swapped with a subsequent $match stage, provided
     // that the match does not depend on the paths returned by getModifiedPaths().
@@ -407,7 +423,8 @@ struct StageConstraints {
             unionRequirement == other.unionRequirement &&
             preservesOrderAndMetadata == other.preservesOrderAndMetadata &&
             mergeShardId == other.mergeShardId &&
-            noFieldModifications == other.noFieldModifications;
+            noFieldModifications == other.noFieldModifications &&
+            consumesLogicalCollectionData == other.consumesLogicalCollectionData;
     }
 };
 }  // namespace mongo

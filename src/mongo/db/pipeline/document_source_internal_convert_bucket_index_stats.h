@@ -89,15 +89,17 @@ public:
     }
 
     StageConstraints constraints(PipelineSplitState pipeState) const final {
-        return {StreamType::kStreaming,
-                PositionRequirement::kNone,
-                HostTypeRequirement::kNone,
-                DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kNotAllowed,
-                TransactionRequirement::kAllowed,
-                LookupRequirement::kAllowed,
-                UnionRequirement::kAllowed,
-                ChangeStreamRequirement::kDenylist};
+        StageConstraints constraints(StreamType::kStreaming,
+                                     PositionRequirement::kNone,
+                                     HostTypeRequirement::kNone,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kNotAllowed,
+                                     TransactionRequirement::kAllowed,
+                                     LookupRequirement::kAllowed,
+                                     UnionRequirement::kAllowed,
+                                     ChangeStreamRequirement::kDenylist);
+        constraints.consumesLogicalCollectionData = false;
+        return constraints;
     }
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;

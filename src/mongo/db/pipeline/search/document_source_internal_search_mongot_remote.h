@@ -63,7 +63,7 @@ public:
                                      LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed,
                                      ChangeStreamRequirement::kDenylist);
-        constraints.requiresInputDocSource = false;
+        constraints.setConstraintsForNoInputSources();
         return constraints;
     }
 

@@ -150,7 +150,7 @@ public:
                                      UnionRequirement::kNotAllowed);
 
         constraints.isIndependentOfAnyCollection = true;
-        constraints.requiresInputDocSource = false;
+        constraints.setConstraintsForNoInputSources();
         return constraints;
     }
 

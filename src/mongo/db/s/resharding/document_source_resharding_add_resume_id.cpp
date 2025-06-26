@@ -100,15 +100,17 @@ DocumentSourceReshardingAddResumeId::DocumentSourceReshardingAddResumeId(
 
 StageConstraints DocumentSourceReshardingAddResumeId::constraints(
     PipelineSplitState pipeState) const {
-    return StageConstraints(StreamType::kStreaming,
-                            PositionRequirement::kNone,
-                            HostTypeRequirement::kAnyShard,
-                            DiskUseRequirement::kNoDiskUse,
-                            FacetRequirement::kNotAllowed,
-                            TransactionRequirement::kNotAllowed,
-                            LookupRequirement::kNotAllowed,
-                            UnionRequirement::kNotAllowed,
-                            ChangeStreamRequirement::kDenylist);
+    StageConstraints constraints(StreamType::kStreaming,
+                                 PositionRequirement::kNone,
+                                 HostTypeRequirement::kAnyShard,
+                                 DiskUseRequirement::kNoDiskUse,
+                                 FacetRequirement::kNotAllowed,
+                                 TransactionRequirement::kNotAllowed,
+                                 LookupRequirement::kNotAllowed,
+                                 UnionRequirement::kNotAllowed,
+                                 ChangeStreamRequirement::kDenylist);
+    constraints.consumesLogicalCollectionData = false;
+    return constraints;
 }
 
 Value DocumentSourceReshardingAddResumeId::serialize(const SerializationOptions& opts) const {

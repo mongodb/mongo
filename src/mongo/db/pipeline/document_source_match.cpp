@@ -645,6 +645,22 @@ Value DocumentSourceInternalChangeStreamMatch::serialize(const SerializationOpti
     return doSerialize(opts);
 }
 
+StageConstraints DocumentSourceInternalChangeStreamMatch::constraints(
+    PipelineSplitState pipeState) const {
+    StageConstraints constraints{StreamType::kStreaming,
+                                 PositionRequirement::kNone,
+                                 HostTypeRequirement::kNone,
+                                 DiskUseRequirement::kNoDiskUse,
+                                 FacetRequirement::kAllowed,
+                                 TransactionRequirement::kAllowed,
+                                 LookupRequirement::kAllowed,
+                                 UnionRequirement::kAllowed,
+                                 ChangeStreamRequirement::kAllowlist};
+    constraints.noFieldModifications = true;
+    constraints.consumesLogicalCollectionData = false;
+    return constraints;
+}
+
 intrusive_ptr<DocumentSourceInternalChangeStreamMatch>
 DocumentSourceInternalChangeStreamMatch::create(BSONObj filter,
                                                 const intrusive_ptr<ExpressionContext>& expCtx) {

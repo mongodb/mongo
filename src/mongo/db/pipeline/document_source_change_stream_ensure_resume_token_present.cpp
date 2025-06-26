@@ -90,6 +90,7 @@ StageConstraints DocumentSourceChangeStreamEnsureResumeTokenPresent::constraints
     // the mongoS.
     constraints.canSwapWithMatch = true;
     constraints.canSwapWithSingleDocTransformOrRedact = true;
+    constraints.consumesLogicalCollectionData = false;
 
     return constraints;
 }

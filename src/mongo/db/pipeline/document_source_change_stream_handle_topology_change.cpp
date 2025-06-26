@@ -175,6 +175,7 @@ StageConstraints DocumentSourceChangeStreamHandleTopologyChange::constraints(
     // streams pipeline.
     constraints.canSwapWithMatch = true;
     constraints.canSwapWithSingleDocTransformOrRedact = true;
+    constraints.consumesLogicalCollectionData = false;
 
     return constraints;
 }
