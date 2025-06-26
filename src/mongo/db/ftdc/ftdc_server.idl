@@ -150,3 +150,19 @@ server_parameters:
         cpp_vartype: "AtomicWord<bool>"
         cpp_varname: gDiagnosticDataCollectionVerboseTCMalloc
         redact: false
+
+    spillWiredTigerServerStatusVerbosity:
+        description: >-
+            The verbosity level of WiredTiger stats included in server status for the spill engine. The 3 
+            levels are:
+            - Level 0: No WiredTiger stats included
+            - Level 1: Select WiredTiger stats included
+            - Level 2: All WiredTiger stats included
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<int32_t>
+        cpp_varname: gSpillWiredTigerServerStatusVerbosity
+        default: 1
+        validator:
+            gte: 0
+            lte: 2
+        redact: false

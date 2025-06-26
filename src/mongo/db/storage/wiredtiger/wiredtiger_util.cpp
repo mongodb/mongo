@@ -975,7 +975,9 @@ static int mdb_handle_error_for_statistics(WT_EVENT_HANDLER* handler,
     return mdb_handle_error(handler, session, errorCode, message);
 }
 
-bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngine* engine, BSONObjBuilder& bob) {
+bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngineBase* engine,
+                                                 BSONObjBuilder& bob,
+                                                 const std::vector<std::string>& fieldsToInclude) {
     boost::optional<StatsCollectionPermit> permit = engine->tryGetStatsCollectionPermit();
     if (!permit) {
         return false;
@@ -991,10 +993,16 @@ bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngine* engine, BSO
     WiredTigerSession session(&engine->getConnection(), handler, *permit);
 
     // Filter out irrelevant statistic fields.
-    std::vector<std::string> fieldsToIgnore = {"LSM"};
+    std::vector<std::string> categoriesToIgnore = {"LSM"};
 
     Status status = WiredTigerUtil::exportTableToBSON(
-        session, "statistics:", "statistics=(fast)", bob, fieldsToIgnore);
+        session,
+        "statistics:",
+        "statistics=(fast)",
+        bob,
+        fieldsToInclude.empty() ? categoriesToIgnore : fieldsToInclude,
+        fieldsToInclude.empty() ? FilterBehavior::kExcludeCategories
+                                : FilterBehavior::kIncludeStats);
     if (!status.isOK()) {
         bob.append("error", "unable to retrieve statistics");
         bob.append("code", static_cast<int>(status.code()));
@@ -1039,14 +1047,15 @@ Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
                                          const std::string& uri,
                                          const std::string& config,
                                          BSONObjBuilder& bob) {
-    return exportTableToBSON(session, uri, config, bob, {});
+    return exportTableToBSON(session, uri, config, bob, {}, FilterBehavior::kExcludeCategories);
 }
 
 Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
                                          const std::string& uri,
                                          const std::string& config,
                                          BSONObjBuilder& bob,
-                                         const std::vector<std::string>& filter) {
+                                         const std::vector<std::string>& filter,
+                                         FilterBehavior filterBehavior) {
     WT_CURSOR* cursor = nullptr;
     const char* cursorConfig = config.empty() ? nullptr : config.c_str();
 
@@ -1094,20 +1103,38 @@ Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
 
         long long value = castStatisticsValue<long long>(statisticValue);
 
-        if (category.size() == 0) {
-            bob.appendNumber(statisticDescription, value);
-        } else {
-            bool shouldSkipField =
-                std::find(filter.begin(), filter.end(), category) != filter.end();
-            if (shouldSkipField) {
-                continue;
-            }
+        switch (filterBehavior) {
+            case FilterBehavior::kExcludeCategories: {
+                if (category.size() == 0) {
+                    bob.appendNumber(statisticDescription, value);
+                    break;
+                }
 
-            BSONObjBuilder*& measurementsSubObj =
-                measurementsMappedByCategory[std::string{category}];
-            if (!measurementsSubObj)
-                measurementsSubObj = new BSONObjBuilder();
-            measurementsSubObj->appendNumber(str::ltrim(std::string{measurement}), value);
+                bool shouldSkipField =
+                    std::find(filter.begin(), filter.end(), category) != filter.end();
+                if (shouldSkipField) {
+                    continue;
+                }
+
+                BSONObjBuilder*& measurementsSubObj =
+                    measurementsMappedByCategory[std::string{category}];
+                if (!measurementsSubObj)
+                    measurementsSubObj = new BSONObjBuilder();
+                measurementsSubObj->appendNumber(str::ltrim(std::string{measurement}), value);
+                break;
+            }
+            case FilterBehavior::kIncludeStats: {
+                bool shouldIncludeField =
+                    std::find(filter.begin(), filter.end(), statisticDescription) != filter.end();
+                if (shouldIncludeField) {
+                    BSONObjBuilder*& measurementsSubObj =
+                        measurementsMappedByCategory[std::string{category}];
+                    if (!measurementsSubObj)
+                        measurementsSubObj = new BSONObjBuilder();
+                    measurementsSubObj->appendNumber(str::ltrim(std::string{measurement}), value);
+                }
+                break;
+            }
         }
     }
 

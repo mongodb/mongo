@@ -31,19 +31,85 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/wiredtiger/spill_wiredtiger_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
 namespace mongo {
+
+namespace {
+const std::vector<std::string>& fieldsToInclude = {
+    "block-manager: blocks read",
+    "block-manager: blocks written",
+    "block-manager: bytes read",
+    "block-manager: bytes written",
+    "cache: application thread time evicting (usecs)",
+    "cache: application threads eviction requested with cache fill ratio < 25%",
+    "cache: application threads eviction requested with cache fill ratio >= 75%",
+    "cache: application threads page write from cache to disk count",
+    "cache: application threads page write from cache to disk time (usecs)",
+    "cache: bytes allocated for updates",
+    "cache: bytes currently in the cache",
+    "cache: bytes read into cache",
+    "cache: bytes written from cache",
+    "cache: eviction currently operating in aggressive mode",
+    "cache: eviction empty score",
+    "cache: eviction state",
+    "cache: eviction walk target strategy clean pages",
+    "cache: eviction walk target strategy dirty pages",
+    "cache: eviction walk target strategy pages with updates",
+    "cache: forced eviction - pages evicted that were clean count",
+    "cache: forced eviction - pages evicted that were dirty count",
+    "cache: forced eviction - pages selected count",
+    "cache: forced eviction - pages selected unable to be evicted count",
+    "cache: hazard pointer blocked page eviction",
+    "cache: maximum bytes configured",
+    "cache: maximum page size seen at eviction",
+    "cache: number of times dirty trigger was reached",
+    "cache: number of times eviction trigger was reached",
+    "cache: number of times updates trigger was reached",
+    "cache: page evict attempts by application threads",
+    "cache: page evict failures by application threads",
+    "cache: pages queued for eviction",
+    "cache: pages queued for urgent eviction",
+    "cache: tracked dirty bytes in the cache",
+};
+}
 
 bool SpillWiredTigerServerStatusSection::includeByDefault() const {
     return true;
 }
 
+/**
+ * Verbosity levels of WiredTiger stats included in serverStatus is set through serverStatus
+ * calls as db.serverStatus({spillWiredTiger: <verbosity>}). We can configure FTDC verbosity
+ * levels using the spillWiredTigerServerStatusVerbosity server parameter.
+ *
+ * The 3 verbosity levels are:
+ *    - Level 0: No WiredTiger stats included
+ *    - Level 1: Select WiredTiger stats included (default)
+ *    - Level 2: All WiredTiger stats included
+ */
 BSONObj SpillWiredTigerServerStatusSection::generateSection(
     OperationContext* opCtx, const BSONElement& configElement) const {
+    int verbosity = configElement.isNumber() ? configElement.safeNumberInt() : 1;
+    if (verbosity == 0) {
+        return BSONObj{};
+    }
 
-    // TODO SERVER-104355: Fill in this section.
-
-    return BSONObj{};
+    SpillWiredTigerKVEngine* engine = checked_cast<SpillWiredTigerKVEngine*>(
+        opCtx->getServiceContext()->getStorageEngine()->getSpillEngine());
+    BSONObjBuilder bob;
+    if (verbosity == 1) {
+        if (!WiredTigerUtil::collectConnectionStatistics(engine, bob, fieldsToInclude)) {
+            LOGV2_DEBUG(10641700, 2, "WiredTiger is not ready to collect statistics.");
+        }
+    } else {
+        if (!WiredTigerUtil::collectConnectionStatistics(engine, bob)) {
+            LOGV2_DEBUG(10641701, 2, "WiredTiger is not ready to collect statistics.");
+        }
+    }
+    return bob.obj();
 }
-
 }  // namespace mongo

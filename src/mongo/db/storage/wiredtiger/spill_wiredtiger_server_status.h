@@ -36,8 +36,6 @@
 
 namespace mongo {
 
-class SpillWiredTigerKVEngine;
-
 /**
  * Adds "spillWiredTiger" to the results of db.serverStatus().
  */

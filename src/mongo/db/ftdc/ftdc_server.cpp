@@ -304,6 +304,8 @@ public:
         // Exclude apiVersions.
         commandBuilder.append("metrics", BSON("apiVersions" << false));
 
+        commandBuilder.append("spillWiredTiger", gSpillWiredTigerServerStatusVerbosity.load());
+
         if (gDiagnosticDataCollectionEnableLatencyHistograms.load()) {
             BSONObjBuilder subObjBuilder(commandBuilder.subobjStart("opLatencies"));
             subObjBuilder.append("histograms", true);

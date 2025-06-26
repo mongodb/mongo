@@ -372,21 +372,6 @@ server_parameters:
             lte: 22
         redact: false
 
-    spillWiredTigerServerStatusLevel:
-        description: >-
-            The level of WiredTiger stats included in server status for the spill engine. The 3 levels are:
-            - Level 0: No WiredTiger stats included
-            - Level 1: Select WiredTiger stats included
-            - Level 2: All WiredTiger stats included
-        set_at: [startup, runtime]
-        cpp_vartype: Atomic<int32_t>
-        cpp_varname: gSpillWiredTigerServerStatusLevel
-        default: 1
-        validator:
-            gte: 0
-            lte: 2
-        redact: false
-
     enableTemporarilyUnavailableExceptions:
         description:
             "Enables the use of TemporarilyUnavailableExceptions. When disabled, reverts to
