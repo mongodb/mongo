@@ -78,7 +78,8 @@ feature_flags:
             in a progress document and use this count instead of the fast count to recover
             metrics upon recovery."
         cpp_varname: gFeatureFlagReshardingStoreOplogFetcherProgress
-        default: false
+        default: true
+        version: 8.2
         fcv_gated: true
     featureFlagReshardingNumSamplesPerChunk:
         description: "Feature flag for adding numSamplesPerChunk as a field in reshardCollection."

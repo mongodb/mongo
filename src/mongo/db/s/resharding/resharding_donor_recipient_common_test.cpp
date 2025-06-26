@@ -392,7 +392,8 @@ struct RecipientFieldsValidator {
     }
 
     bool skipCloningAndApplying;
-    bool storeOplogFetcherProgress;
+    // featureFlagReshardingStoreOplogFetcherProgress defaults to true.
+    bool storeOplogFetcherProgress = true;
     boost::optional<bool> performVerification;
 };
 
@@ -914,8 +915,7 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsWhenShardOwnsChunks_StoreOplogFetcherProgress) {
-    RAIIServerParameterControllerForTest storeOplogFetcherProgressFeatureFlagController(
-        "featureFlagReshardingStoreOplogFetcherProgress", true);
+    // Not set featureFlagReshardingStoreOplogFetcherProgress to verify that it defaults to true.
 
     testProcessRecipientFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
                                kThisShard.getShardId() /* primaryShard */,
