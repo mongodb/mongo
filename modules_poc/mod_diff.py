@@ -5,7 +5,7 @@ import subprocess
 import sys
 from typing import Iterable, NoReturn
 
-from browse import Decl, is_submodule_usage, load_decls
+from .browse import Decl, is_submodule_usage, load_decls
 
 
 def perr_exit(message: str) -> NoReturn:
@@ -96,9 +96,12 @@ def get_changed_files_git() -> list[str]:
 
 
 def main() -> None:
-    changed_files = get_changed_files_git()
+    if len(sys.argv) > 1:
+        files_to_show = sys.argv[1:]
+    else:
+        files_to_show = get_changed_files_git()
 
-    if not changed_files:
+    if not files_to_show:
         perr_exit(
             "No changed files found compared to origin/master, or an error occurred.",
         )
@@ -111,14 +114,14 @@ def main() -> None:
 
     missing_files = []
     files = {}
-    for file in load_decls().items():
+    for file in load_decls():
         # Normalize to put generated files in the same place as sources
         filepath = file.name
         filepath = filepath[filepath.index("src/mongo/") :]
         assert filepath not in files, f"Duplicate file entry: {filepath}"
         files[filepath] = file
 
-    for filepath in changed_files:
+    for filepath in files_to_show:
         human_filepath = filepath
         if filepath.endswith(".idl"):
             # Convert .idl files to generated .h files

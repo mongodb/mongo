@@ -643,8 +643,6 @@ class ModularityApp(App):
 
 
 input_path = "merged_decls.json"
-if len(sys.argv) > 1:
-    input_path = sys.argv[1]
 
 
 def load_decls() -> list[File]:
@@ -709,6 +707,8 @@ def load_decls() -> list[File]:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        input_path = sys.argv[1]
     if "--parse-only" in sys.argv:
         load_decls()
     else:
