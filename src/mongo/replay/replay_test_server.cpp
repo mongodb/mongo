@@ -52,13 +52,13 @@ ReplayTestServer::~ReplayTestServer() {
 }
 
 void ReplayTestServer::setupServerResponse(const std::string& name, const std::string& response) {
-    tassert(ErrorCodes::InternalError, "mock server is null", _mockServer);
+    tassert(ErrorCodes::ReplayClientInternalError, "mock server is null", _mockServer);
     _fakeResponseMap.insert({name, response});
     _mockServer->setCommandReply(name, fromjson(response));
 }
 
 const std::string& ReplayTestServer::getFakeResponse(const std::string& name) const {
-    tassert(ErrorCodes::InternalError,
+    tassert(ErrorCodes::ReplayClientInternalError,
             "fake response was not set correctly",
             _fakeResponseMap.contains(name));
     auto it = _fakeResponseMap.find(name);
@@ -66,12 +66,12 @@ const std::string& ReplayTestServer::getFakeResponse(const std::string& name) co
 }
 
 std::string ReplayTestServer::getConnectionString() const {
-    tassert(ErrorCodes::InternalError, "mock server is null", _mockServer);
+    tassert(ErrorCodes::ReplayClientInternalError, "mock server is null", _mockServer);
     return _mockServer->getServerHostAndPort().toString();
 }
 
 void ReplayTestServer::setUp() {
-    tassert(ErrorCodes::InternalError, "mock server is not null", !_mockServer);
+    tassert(ErrorCodes::ReplayClientInternalError, "mock server is not null", !_mockServer);
     auto& settings = logv2::LogManager::global().getGlobalSettings();
     _originalSeverity = settings.getMinimumLogSeverity(logv2::LogComponent::kNetwork).toInt();
     settings.setMinimumLoggedSeverity(logv2::LogComponent::kNetwork, logv2::LogSeverity::Debug(1));
@@ -90,7 +90,7 @@ void ReplayTestServer::tearDown() {
 
 bool ReplayTestServer::checkResponse(const std::string& name, const BSONObj& response) const {
 
-    tassert(ErrorCodes::InternalError,
+    tassert(ErrorCodes::ReplayClientInternalError,
             "fake response was not set correctly",
             _fakeResponseMap.contains(name));
     auto it = _fakeResponseMap.find(name);

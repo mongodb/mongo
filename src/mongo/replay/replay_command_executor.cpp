@@ -84,15 +84,16 @@ bool ReplayCommandExecutor::isConnected() const {
 
 BSONObj ReplayCommandExecutor::runCommand(const ReplayCommand& command) const {
     OpMsgRequest request;
-    uassert(ErrorCodes::InternalError, "MongoR is not connected", isConnected());
-    uassert(
-        ErrorCodes::InternalError, "Failed to process bson command", command.toRequest(request));
+    uassert(ErrorCodes::ReplayClientNotConnected, "MongoR is not connected", isConnected());
+    uassert(ErrorCodes::ReplayClientFailedToProcessBSON,
+            "Failed to process bson command",
+            command.toRequest(request));
     try {
         const auto reply = _dbConnection->runCommand(std::move(request));
         return reply->getCommandReply().getOwned();
     } catch (const DBException& e) {
         auto lastError = e.toStatus();
-        tassert(ErrorCodes::InternalError, lastError.reason(), false);
+        tassert(ErrorCodes::ReplayClientInternalError, lastError.reason(), false);
     }
     return {};
 }

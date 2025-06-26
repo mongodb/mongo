@@ -60,10 +60,10 @@ bool ReplayCommand::toRequest(OpMsgRequest& request) const {
         request = parse(_bsonCommand);
     } catch (const DBException& e) {
         auto lastError = e.toStatus();
-        tassert(ErrorCodes::InternalError, lastError.reason(), false);
+        tassert(ErrorCodes::ReplayClientInternalError, lastError.reason(), false);
         return false;
     } catch (const std::exception& e) {
-        tassert(ErrorCodes::InternalError, e.what(), false);
+        tassert(ErrorCodes::ReplayClientInternalError, e.what(), false);
         return false;
     }
     return true;
@@ -74,7 +74,7 @@ std::string ReplayCommand::toString() const {
         const auto request = parse(_bsonCommand);
         return request.body.toString();
     } catch (const DBException& e) {
-        tassert(ErrorCodes::InternalError, e.what(), false);
+        tassert(ErrorCodes::ReplayClientInternalError, e.what(), false);
     }
     return {};
 }

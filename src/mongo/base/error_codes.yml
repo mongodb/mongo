@@ -887,6 +887,11 @@ error_codes:
       name: StreamProcessorS3TokenExpired,
       categories: [StreamProcessorRetryableError],
     }
+  #Replay client errors.
+  - {code: 900, name: ReplayClientConfigurationError}
+  - {code: 901, name: ReplayClientNotConnected}
+  - {code: 902, name: ReplayClientFailedToProcessBSON}
+  - {code: 903, name: ReplayClientInternalError}
 
   # Error codes 4000-8999 are reserved.
 
