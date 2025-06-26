@@ -511,6 +511,39 @@ TEST(AsioTransportLayer, SourceSyncTimeoutTimesOut) {
     ASSERT_EQ(received.get().getStatus(), ErrorCodes::NetworkTimeout);
 }
 
+/**
+ * Check that a ShutdownInProgress error returns when the ASIOReactorTimer is set after reactor
+ * shutdown.
+ */
+TEST(AsioTransportLayer, UseTimerAfterReactorShutdown) {
+    TestFixture tf;
+    Notification<void> shutdown;
+    auto reactor = tf.tla().getReactor(TransportLayer::kNewReactor);
+    auto timer = reactor->makeTimer();
+    auto reactorThread = stdx::thread([reactor, &shutdown] {
+        LOGV2(9701500, "running reactor");
+        reactor->run();
+        LOGV2(9701501, "reactor stopped, draining");
+        reactor->drain();
+        LOGV2(9701502, "reactor drain complete");
+        shutdown.set();
+    });
+
+    auto timer1 = timer->waitUntil(Date_t::now() + Seconds(5));
+    std::move(timer1).get();
+    LOGV2(9701503, "first timer fired");
+
+    LOGV2(9701504, "shutting down reactor");
+    reactor->stop();
+    shutdown.get();
+
+    LOGV2(9701505, "setting second timer");
+    auto timer2 = timer->waitUntil(Date_t::now() + Seconds(5));
+    ASSERT_EQ(std::move(timer2).getNoThrow().code(), ErrorCodes::ShutdownInProgress);
+    LOGV2(9701506, "second timer fired");
+    reactorThread.join();
+}
+
 /* check that timeouts don't time out unless there's an actual timeout */
 TEST(AsioTransportLayer, SourceSyncTimeoutSucceeds) {
     TestFixture tf;

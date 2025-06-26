@@ -154,6 +154,11 @@ public:
 
 
     Future<void> waitUntil(Date_t expiration, const BatonHandle& baton = nullptr) override {
+        if ((**_timer)->get_executor().context().stopped()) {
+            return Future<void>::makeReady(
+                Status(ErrorCodes::ShutdownInProgress,
+                       "The reactor associated with this timer has been shutdown"));
+        }
         if (baton && baton->networking()) {
             return _asyncWait([&] { return baton->networking()->waitUntil(*this, expiration); },
                               baton);
