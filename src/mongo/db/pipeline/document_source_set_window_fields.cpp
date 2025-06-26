@@ -375,6 +375,7 @@ Value DocumentSourceInternalSetWindowFields::serialize(const SerializationOption
         }
 
         out["maxFunctionMemoryUsageBytes"] = Value(md.freezeToValue());
+        // TODO SERVER-106308 Investigate if we can delete maxTotalMemoryUsageBytes.
         out["maxTotalMemoryUsageBytes"] =
             opts.serializeLiteral(static_cast<long long>(_memoryTracker.maxMemoryBytes()));
         out["usedDisk"] = opts.serializeLiteral(_iterator.usedDisk());

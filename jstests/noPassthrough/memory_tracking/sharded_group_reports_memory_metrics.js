@@ -35,8 +35,13 @@ assert.commandWorked(coll.insertMany([
 runShardedMemoryStatsTest({
     db: testDB,
     collName: collName,
-    pipeline: [{$group: {_id: "$groupKey", values: {$push: "$val"}}}],
-    pipelineComment: "sharded memory stats group test",
+    commandObj: {
+        aggregate: collName,
+        pipeline: [{$group: {_id: "$groupKey", values: {$push: "$val"}}}],
+        comment: "sharded memory stats group test",
+        cursor: {batchSize: 1},
+        allowDiskUse: false
+    },
     stageName: "group",
     expectedNumGetMores: 2,
     numShards: 2

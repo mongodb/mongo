@@ -35,12 +35,19 @@ assert.commandWorked(coll.insertMany([
     {groupKey: 2, val: "d"},
 ]));
 
-runMemoryStatsTest(db,
-                   collName,
-                   [{$group: {_id: "$groupKey", values: {$push: "$val"}}}] /*pipeline*/,
-                   "memory stats group test" /*pipelineComment*/,
-                   "group" /*stageName*/,
-                   2 /*expectedNumGetMores*/);
+runMemoryStatsTest({
+    db: db,
+    collName: collName,
+    commandObj: {
+        aggregate: collName,
+        pipeline: [{$group: {_id: "$groupKey", values: {$push: "$val"}}}],
+        comment: "memory stats group test",
+        cursor: {batchSize: 1},
+        allowDiskUse: false
+    },
+    stageName: "group",
+    expectedNumGetMores: 2
+});
 
 // Clean up.
 db[collName].drop();

@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator_for_bucket_auto.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
@@ -108,6 +109,7 @@ DocumentSource::GetNextResult DocumentSourceBucketAuto::doGetNext() {
 
     if (!_sortedInput) {
         // We have been disposed. Return EOF.
+        _memoryTracker.resetCurrent();
         return GetNextResult::makeEOF();
     }
 
@@ -177,6 +179,7 @@ DocumentSource::GetNextResult DocumentSourceBucketAuto::populateSorter() {
     }
 
     auto next = pSource->getNext();
+    auto prevMemUsage = _sorter->stats().memUsage();
     for (; next.isAdvanced(); next = pSource->getNext()) {
         auto nextDoc = next.releaseDocument();
         auto key = extractKey(nextDoc);
@@ -184,8 +187,16 @@ DocumentSource::GetNextResult DocumentSourceBucketAuto::populateSorter() {
         auto doc = Document{{AccumulatorN::kFieldNameOutput, Value(std::move(nextDoc))},
                             {AccumulatorN::kFieldNameGeneratedSortKey, Value(_nDocPositions++)}};
         _sorter->add(std::move(key), std::move(doc));
+
+        // To provide as accurate memory accounting as possible, we update the memory tracker after
+        // we add each document to the sorter.
+        auto currMemUsage = _sorter->stats().memUsage();
+        _memoryTracker.add(currMemUsage - prevMemUsage);
+        prevMemUsage = currMemUsage;
+
         ++_nDocuments;
     }
+
     return next;
 }
 
@@ -227,21 +238,25 @@ void DocumentSourceBucketAuto::addDocumentToBucket(const pair<Value, Document>& 
 
     const size_t numAccumulators = _accumulatedFields.size();
     for (size_t k = 0; k < numAccumulators; k++) {
-        if (bucket._accums[k]->needsInput()) {
-            bool isPositionalAccum = isPositionalAccumulator(bucket._accums[k]->getOpName());
+        AccumulatorState& accumulator = *bucket._accums[k];
+        if (accumulator.needsInput()) {
+            bool isPositionalAccum = isPositionalAccumulator(accumulator.getOpName());
             auto value = entry.second.getField(AccumulatorN::kFieldNameOutput);
             auto evaluated = _accumulatedFields[k].expr.argument->evaluate(value.getDocument(),
                                                                            &pExpCtx->variables);
+
+            auto prevMemUsage = accumulator.getMemUsage();
             if (isPositionalAccum) {
                 auto wrapped = Value(Document{
                     {AccumulatorN::kFieldNameGeneratedSortKey,
                      entry.second.getField(AccumulatorN::kFieldNameGeneratedSortKey)},
                     {AccumulatorN::kFieldNameOutput, std::move(evaluated)},
                 });
-                bucket._accums[k]->process(Value(std::move(wrapped)), false);
+                accumulator.process(Value(std::move(wrapped)), false);
             } else {
-                bucket._accums[k]->process(std::move(evaluated), false);
+                accumulator.process(std::move(evaluated), false);
             }
+            _accumulatedFieldMemoryTrackers[k]->add(accumulator.getMemUsage() - prevMemUsage);
         }
     }
 }
@@ -356,9 +371,10 @@ boost::optional<DocumentSourceBucketAuto::Bucket> DocumentSourceBucketAuto::popu
     for (size_t k = 0; k < _accumulatedFields.size(); ++k) {
         Value initializerValue =
             _accumulatedFields[k].expr.initializer->evaluate(emptyDoc, &pExpCtx->variables);
-        currentBucket._accums[k]->startNewGroup(initializerValue);
+        AccumulatorState& accumulator = *currentBucket._accums[k];
+        accumulator.startNewGroup(initializerValue);
+        _accumulatedFieldMemoryTrackers[k]->add(accumulator.getMemUsage());
     }
-
 
     // Add 'approxBucketSize' number of documents to the current bucket. If this is the last bucket,
     // add all the remaining documents.
@@ -373,6 +389,17 @@ boost::optional<DocumentSourceBucketAuto::Bucket> DocumentSourceBucketAuto::popu
     // Modify the bucket details for next bucket.
     _currentBucketDetails.currentMin = adjustBoundariesAndGetMinForNextBucket(&currentBucket);
     _currentBucketDetails.previousMax = currentBucket._max;
+
+    // Free the accumulators' memory usage that we've tallied from this past bucket.
+    for (size_t i = 0; i < currentBucket._accums.size(); i++) {
+        // Subtract the current usage.
+        _accumulatedFieldMemoryTrackers[i]->add(-1 * currentBucket._accums[i]->getMemUsage());
+
+        currentBucket._accums[i]->reduceMemoryConsumptionIfAble();
+
+        // Update the memory usage for this AccumulationStatement.
+        _accumulatedFieldMemoryTrackers[i]->add(currentBucket._accums[i]->getMemUsage());
+    }
     return currentBucket;
 }
 
@@ -408,11 +435,20 @@ Document DocumentSourceBucketAuto::makeDocument(const Bucket& bucket) {
 
 void DocumentSourceBucketAuto::doDispose() {
     _sortedInput.reset();
+
+    _memoryTracker.resetCurrent();
 }
+
 
 void DocumentSourceBucketAuto::doForceSpill() {
     if (_sorter) {
+        auto prevSorterSize = _sorter->stats().memUsage();
         _sorter->spill();
+
+        // The sorter's size has decreased after spilling. Subtract this freed memory from the
+        // memory tracker.
+        auto currSorterSize = _sorter->stats().memUsage();
+        _memoryTracker.add(-1 * (prevSorterSize - currSorterSize));
     } else if (_sortedInput && _sortedInput->spillable()) {
         SortOptions opts = makeSortOptions();
         SorterTracker tracker;
@@ -432,6 +468,9 @@ void DocumentSourceBucketAuto::doForceSpill() {
                                                     previousSpilledBytes,
                                                 tracker.spilledKeyValuePairs.loadRelaxed(),
                                                 spilledDataStorageIncrease);
+        // The sorter iterator has spilled everything. Set the memory tracker and the
+        // accumulators' trackers back to 0.
+        _memoryTracker.resetCurrent();
     }
 }
 
@@ -463,7 +502,6 @@ Value DocumentSourceBucketAuto::serialize(const SerializationOptions& opts) cons
 
     if (opts.isSerializingForExplain() &&
         *opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
-
         out["usedDisk"] = opts.serializeLiteral(_stats.spillingStats.getSpills() > 0);
         out["spills"] =
             opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpills()));
@@ -473,6 +511,10 @@ Value DocumentSourceBucketAuto::serialize(const SerializationOptions& opts) cons
             opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledBytes()));
         out["spilledRecords"] =
             opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledRecords()));
+        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+            out["maxUsedMemBytes"] =
+                opts.serializeLiteral(static_cast<long long>(_memoryTracker.maxMemoryBytes()));
+        }
     }
 
     return out.freezeToValue();
@@ -521,10 +563,13 @@ DocumentSourceBucketAuto::DocumentSourceBucketAuto(
       _groupByExpression(groupByExpression),
       _granularityRounder(granularityRounder),
       _nBuckets(numBuckets),
-      _currentBucketDetails{0} {
+      _currentBucketDetails{0},
+      _memoryTracker{OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(
+          *pExpCtx, pExpCtx->getAllowDiskUse() && !pExpCtx->getInRouter(), maxMemoryUsageBytes)} {
     invariant(!accumulationStatements.empty());
     for (auto&& accumulationStatement : accumulationStatements) {
         _accumulatedFields.push_back(accumulationStatement);
+        _accumulatedFieldMemoryTrackers.push_back(&_memoryTracker[accumulationStatement.fieldName]);
     }
 }
 

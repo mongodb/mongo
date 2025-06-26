@@ -61,13 +61,20 @@ assert.commandWorked(coll.insertMany(docs));
     ];
     jsTestLog("Running pipeline " + tojson(pipeline));
 
-    runMemoryStatsTest(db,
-                       collName,
-                       pipeline,
-                       "memory stats setWindowFields test" /*pipelineComment*/,
-                       "_internalSetWindowFields" /*stageName*/,
-                       10 /*expectedNumGetMores*/,
-                       false /*checkInUseMemBytesResets*/);
+    runMemoryStatsTest({
+        db: db,
+        collName: collName,
+        commandObj: {
+            aggregate: collName,
+            pipeline: pipeline,
+            comment: "memory stats setWindowFields test",
+            cursor: {batchSize: 1},
+            allowDiskUse: false
+        },
+        stageName: "_internalSetWindowFields",
+        expectedNumGetMores: 10,
+        checkInUseMemBytesResets: false
+    });
 }
 
 // Clean up.

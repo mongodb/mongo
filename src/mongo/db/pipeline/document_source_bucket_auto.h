@@ -147,6 +147,10 @@ public:
                        : _stats.spillingStats.getSpills() > 0;
     }
 
+    const MemoryUsageTracker* getMemoryTracker_forTest() const {
+        return &_memoryTracker;
+    }
+
 protected:
     GetNextResult doGetNext() final;
     void doDispose() final;
@@ -218,6 +222,9 @@ private:
     std::unique_ptr<Sorter<Value, Document>::Iterator> _sortedInput;
 
     std::vector<AccumulationStatement> _accumulatedFields;
+    // Per-field memory trackers corresponding to each AccumulationStatement in _accumulatedFields.
+    // Caching these helps avoid lookups in the map in MemoryUsageTracker for every input document.
+    std::vector<SimpleMemoryUsageTracker*> _accumulatedFieldMemoryTrackers;
 
     uint64_t _maxMemoryUsageBytes;
     bool _populated = false;
@@ -229,6 +236,8 @@ private:
     BucketDetails _currentBucketDetails;
 
     DocumentSourceBucketAutoStats _stats;
+
+    MemoryUsageTracker _memoryTracker;
 };
 
 }  // namespace mongo

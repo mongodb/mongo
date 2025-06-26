@@ -78,9 +78,11 @@ public:
         return exec::agg::buildStage(createBucketAuto(bucketAutoSpec));
     }
 
-    vector<Document> getResults(BSONObj bucketAutoSpec, deque<Document> inputs) {
+    vector<Document> getResults(BSONObj bucketAutoSpec,
+                                deque<Document> inputs,
+                                bool expectedMemUse = true) {
         auto bucketAutoStage = createBucketAutoStage(bucketAutoSpec);
-        assertBucketAutoType(bucketAutoStage);
+        const DocumentSourceBucketAuto* bucketAutoPtr = getBucketAutoPtr(bucketAutoStage);
 
         // Convert Documents to GetNextResults.
         deque<DocumentSource::GetNextResult> mockInputs;
@@ -95,6 +97,10 @@ public:
         for (auto next = bucketAutoStage->getNext(); next.isAdvanced();
              next = bucketAutoStage->getNext()) {
             results.push_back(next.releaseDocument());
+        }
+
+        if (expectedMemUse) {
+            ASSERT_GT(bucketAutoPtr->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
         }
 
         return results;
@@ -122,15 +128,18 @@ private:
         const auto* bucketAutoStage = dynamic_cast<DocumentSourceBucketAuto*>(documentSource.get());
         ASSERT(bucketAutoStage);
     }
-    void assertBucketAutoType(intrusive_ptr<exec::agg::Stage> documentSource) {
+    const DocumentSourceBucketAuto* getBucketAutoPtr(
+        intrusive_ptr<exec::agg::Stage> documentSource) {
         const auto* bucketAutoStage = dynamic_cast<DocumentSourceBucketAuto*>(documentSource.get());
         ASSERT(bucketAutoStage);
+        return bucketAutoStage;
     }
 };
 
 TEST_F(BucketAutoTests, ReturnsNoBucketsWhenSourceIsEmpty) {
     auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : '$x', buckets: 1}}");
-    auto results = getResults(bucketAutoSpec, {});
+    auto results =
+        getResults(bucketAutoSpec /*bucketAutoSpec*/, {} /*inputs*/, false /*expectedMemUse*/);
     ASSERT_EQUALS(results.size(), 0UL);
 }
 
@@ -424,6 +433,9 @@ TEST_F(BucketAutoTests, ShouldBeAbleToCorrectlySpillToDisk) {
     ASSERT_TRUE(bucketAutoStage->getNext().isEOF());
     ASSERT_TRUE(bucketAutoStage->usedDisk());
 
+    ASSERT_EQ(bucketAutoStage->getMemoryTracker_forTest()->currentMemoryBytes(), 0);
+    ASSERT_GT(bucketAutoStage->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
+
     auto stats =
         dynamic_cast<const DocumentSourceBucketAutoStats*>(bucketAutoStage->getSpecificStats());
     ASSERT_NE(stats, nullptr);
@@ -525,6 +537,9 @@ TEST_F(BucketAutoTests, ShouldBeAbleToForceSpillWhileLoadingDocuments) {
     ASSERT_TRUE(bucketAutoStage->getNext().isEOF());
     ASSERT_TRUE(bucketAutoStage->usedDisk());
 
+    ASSERT_EQ(bucketAutoStage->getMemoryTracker_forTest()->currentMemoryBytes(), 0);
+    ASSERT_GT(bucketAutoStage->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
+
     auto stats =
         dynamic_cast<const DocumentSourceBucketAutoStats*>(bucketAutoStage->getSpecificStats());
     ASSERT_NE(stats, nullptr);
@@ -575,6 +590,9 @@ TEST_F(BucketAutoTests, ShouldBeAbleToForceSpillWhileReturningDocuments) {
 
     ASSERT_TRUE(bucketAutoStage->getNext().isEOF());
     ASSERT_TRUE(bucketAutoStage->usedDisk());
+
+    ASSERT_EQ(bucketAutoStage->getMemoryTracker_forTest()->currentMemoryBytes(), 0);
+    ASSERT_GT(bucketAutoStage->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
 
     auto stats =
         dynamic_cast<const DocumentSourceBucketAutoStats*>(bucketAutoStage->getSpecificStats());
