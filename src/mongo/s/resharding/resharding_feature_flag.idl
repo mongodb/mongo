@@ -69,7 +69,8 @@ feature_flags:
             collection (i.e. skip cloning the documents and fetch/apply the oplog entries
             for it). Currently, only the primary shard can be such a recipient shard."
         cpp_varname: gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable
-        default: false
+        default: true
+        version: 8.2
         fcv_gated: true
     featureFlagReshardingStoreOplogFetcherProgress:
         description:
