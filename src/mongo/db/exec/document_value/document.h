@@ -259,6 +259,13 @@ public:
                        const Document& rhs,
                        const StringDataComparator* stringComparator);
 
+    /**
+     * Merge two documents.
+     *
+     * @returns a new document resulting after the merge.
+     */
+    static Document merge(const Document& lhs, const Document& rhs);
+
     std::string toString() const;
 
     friend std::ostream& operator<<(std::ostream& out, const Document& doc) {

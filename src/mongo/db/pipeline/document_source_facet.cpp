@@ -38,6 +38,7 @@
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source_tee_consumer.h"
+#include "mongo/db/pipeline/explain_util.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -234,10 +235,15 @@ DocumentSource::GetNextResult DocumentSourceFacet::doGetNext() {
 
 Value DocumentSourceFacet::serialize(const SerializationOptions& opts) const {
     MutableDocument serialized;
+
     for (auto&& facet : _facets) {
-        serialized[opts.serializeFieldPathFromString(facet.name)] =
-            Value(opts.isSerializingForExplain() ? facet.pipeline->writeExplainOps(opts)
-                                                 : facet.pipeline->serialize(opts));
+        if (opts.isSerializingForExplain()) {
+            auto explain = mergeExplains(*facet.pipeline, facet.getExecPipeline(), opts);
+            serialized[opts.serializeFieldPathFromString(facet.name)] = Value(explain);
+        } else {
+            serialized[opts.serializeFieldPathFromString(facet.name)] =
+                Value(facet.pipeline->serialize(opts));
+        }
     }
     return Value(Document{{"$facet", serialized.freezeToValue()}});
 }

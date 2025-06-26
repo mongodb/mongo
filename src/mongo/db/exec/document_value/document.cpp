@@ -867,6 +867,15 @@ int Document::compare(const Document& rL,
     }
 }
 
+Document Document::merge(const Document& lhs, const Document& rhs) {
+    MutableDocument result(lhs);
+    for (auto it = rhs.fieldIterator(); it.more();) {
+        auto p = it.next();
+        result.addField(p.first, p.second);
+    }
+    return result.freeze();
+}
+
 string Document::toString() const {
     if (empty())
         return "{}";

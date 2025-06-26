@@ -90,6 +90,13 @@ public:
         return expCtx;
     }
 
+    /**
+     * Write the pipeline's operators to a std::vector<Value>, providing the level of detail
+     * specified by 'verbosity'.
+     */
+    std::vector<Value> writeExplainOps(
+        const SerializationOptions& opts = SerializationOptions{}) const;
+
     void forceSpill();
 
 private:

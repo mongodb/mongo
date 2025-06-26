@@ -33,6 +33,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <boost/range/combine.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
@@ -82,28 +83,6 @@
 namespace mongo {
 
 namespace {
-
-// Given a serialized document source, appends execution stats 'nReturned' and
-// 'executionTimeMillisEstimate' to it.
-Value appendCommonExecStats(Value docSource, const CommonStats& stats) {
-    invariant(docSource.getType() == BSONType::object);
-    MutableDocument doc(docSource.getDocument());
-    auto nReturned = static_cast<long long>(stats.advanced);
-    doc.addField("nReturned", Value(nReturned));
-
-    if (stats.executionTime.precision == QueryExecTimerPrecision::kMillis) {
-        doc.addField("executionTimeMillisEstimate",
-                     Value(durationCount<Milliseconds>(stats.executionTime.executionTimeEstimate)));
-    } else if (stats.executionTime.precision == QueryExecTimerPrecision::kNanos) {
-        doc.addField("executionTimeMillisEstimate",
-                     Value(durationCount<Milliseconds>(stats.executionTime.executionTimeEstimate)));
-        doc.addField("executionTimeMicros",
-                     Value(durationCount<Microseconds>(stats.executionTime.executionTimeEstimate)));
-        doc.addField("executionTimeNanos",
-                     Value(durationCount<Nanoseconds>(stats.executionTime.executionTimeEstimate)));
-    }
-    return Value(doc.freeze());
-}
 
 /**
  * Performs validation checking specific to top-level pipelines. Throws an assertion if the
@@ -628,16 +607,7 @@ std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) c
         auto beforeSize = array.size();
         stage->serializeToArray(array, opts);
         auto afterSize = array.size();
-        // Append execution stats to the serialized stage if the specified verbosity is
-        // 'executionStats' or 'allPlansExecution'.
         invariant(afterSize - beforeSize == 1u);
-        if (*opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            auto serializedStage = array.back();
-            // TODO SERVER-104226: Temporary cast to Stage until explain is handled by
-            // agg::Pipeline.
-            array.back() = appendCommonExecStats(
-                serializedStage, dynamic_cast<exec::agg::Stage&>(*stage).getCommonStats());
-        }
     }
     return array;
 }

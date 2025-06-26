@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,43 +29,22 @@
 
 #pragma once
 
+#include "mongo/db/exec/agg/exec_pipeline.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 
-#include <cstddef>
-#include <string>
 #include <vector>
 
 namespace mongo {
+
 /**
- * A PlanExplainer implementation for aggregation pipelines.
+ * Given a QO and a QE pipeline, merge the pipelines' explain output providing the level of detail
+ * specified by 'verbosity'.
+ * Note: It's expected that the pipelines have the same number of stages.
  */
-class PlanExplainerPipeline final : public PlanExplainer {
-public:
-    PlanExplainerPipeline(const Pipeline* pipeline, const exec::agg::Pipeline* execPipeline)
-        : _pipeline{pipeline}, _execPipeline(execPipeline) {}
+std::vector<Value> mergeExplains(const Pipeline& p1,
+                                 const exec::agg::Pipeline& p2,
+                                 const SerializationOptions& opts);
 
-    bool isMultiPlan() const final {
-        return false;
-    }
-
-    const ExplainVersion& getVersion() const final;
-    std::string getPlanSummary() const final;
-    void getSummaryStats(PlanSummaryStats* statsOut) const final;
-    PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const final;
-    PlanStatsDetails getWinningPlanTrialStats() const final;
-    std::vector<PlanStatsDetails> getRejectedPlansStats(
-        ExplainOptions::Verbosity verbosity) const final;
-
-    void incrementNReturned() {
-        ++_nReturned;
-    }
-
-private:
-    const Pipeline* const _pipeline;
-    const exec::agg::Pipeline* const _execPipeline;
-    size_t _nReturned{0};
-};
 }  // namespace mongo

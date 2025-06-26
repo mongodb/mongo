@@ -52,6 +52,7 @@
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
+#include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/write_ops/single_write_result_gen.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_exec.h"
@@ -360,7 +361,9 @@ BSONObj NonShardServerProcessInterface::preparePipelineAndExplain(
         // extracted the necessary information and won't need it again.
         std::unique_ptr<Pipeline, PipelineDeleter> managedPipeline(
             ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->getOperationContext()));
-        pipelineVec = managedPipeline->writeExplainOps(opts);
+        auto managedExecPipeline =
+            exec::agg::buildPipeline(managedPipeline->getSources(), managedPipeline->getContext());
+        pipelineVec = mergeExplains(*managedPipeline, *managedExecPipeline, opts);
         ownedPipeline = nullptr;
     } else {
         auto pipelineWithCursor = attachCursorSourceToPipelineForLocalRead(ownedPipeline);
@@ -371,7 +374,9 @@ BSONObj NonShardServerProcessInterface::preparePipelineAndExplain(
             while (execPipelineWithCursor->getNext()) {
             }
         }
-        pipelineVec = pipelineWithCursor->writeExplainOps(opts);
+        auto execPipelineWithCursor = exec::agg::buildPipeline(pipelineWithCursor->getSources(),
+                                                               pipelineWithCursor->getContext());
+        pipelineVec = mergeExplains(*pipelineWithCursor, *execPipelineWithCursor, opts);
     }
     BSONArrayBuilder bab;
     for (auto&& stage : pipelineVec) {

@@ -39,6 +39,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/explain_util.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/plan_explainer_pipeline.h"
 #include "mongo/db/query/canonical_query.h"
@@ -189,7 +190,7 @@ public:
      */
     std::vector<Value> writeExplainOps(ExplainOptions::Verbosity verbosity) const {
         auto opts = SerializationOptions{.verbosity = verbosity};
-        return _pipeline->writeExplainOps(opts);
+        return mergeExplains(*_pipeline, *_execPipeline, opts);
     }
 
     boost::optional<StringData> getExecutorType() const override {

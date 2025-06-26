@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,45 +27,32 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/pipeline/explain_util.h"
 
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/plan_summary_stats.h"
-
-#include <cstddef>
-#include <string>
-#include <vector>
+#include "mongo/db/exec/document_value/document.h"
 
 namespace mongo {
-/**
- * A PlanExplainer implementation for aggregation pipelines.
- */
-class PlanExplainerPipeline final : public PlanExplainer {
-public:
-    PlanExplainerPipeline(const Pipeline* pipeline, const exec::agg::Pipeline* execPipeline)
-        : _pipeline{pipeline}, _execPipeline(execPipeline) {}
 
-    bool isMultiPlan() const final {
-        return false;
+std::vector<Value> mergeExplains(const Pipeline& p1,
+                                 const exec::agg::Pipeline& p2,
+                                 const SerializationOptions& opts) {
+    std::vector<Value> result;
+    auto e1 = p1.writeExplainOps(opts);
+    auto e2 = p2.writeExplainOps(opts);
+    tassert(10422601, "Pipelines are not equal", e1.size() == e2.size());
+    result.reserve(e1.size());
+
+    for (size_t i = 0; i < e1.size(); i++) {
+        tassert(
+            10422602, "Expected explain input of type object", e1[i].getType() == BSONType::object);
+        tassert(
+            10422603, "Expected explain input of type object", e2[i].getType() == BSONType::object);
+        Document d1 = e1[i].getDocument();
+        Document d2 = e2[i].getDocument();
+        result.emplace_back(Document::merge(d1, d2));
     }
 
-    const ExplainVersion& getVersion() const final;
-    std::string getPlanSummary() const final;
-    void getSummaryStats(PlanSummaryStats* statsOut) const final;
-    PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const final;
-    PlanStatsDetails getWinningPlanTrialStats() const final;
-    std::vector<PlanStatsDetails> getRejectedPlansStats(
-        ExplainOptions::Verbosity verbosity) const final;
+    return result;
+}
 
-    void incrementNReturned() {
-        ++_nReturned;
-    }
-
-private:
-    const Pipeline* const _pipeline;
-    const exec::agg::Pipeline* const _execPipeline;
-    size_t _nReturned{0};
-};
 }  // namespace mongo

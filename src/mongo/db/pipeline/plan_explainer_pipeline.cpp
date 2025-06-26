@@ -61,17 +61,21 @@ void PlanExplainerPipeline::getSummaryStats(PlanSummaryStats* statsOut) const {
     tassert(9378603, "Encountered unexpected nullptr for PlanSummaryStats", statsOut);
 
     auto source_it = _pipeline->getSources().cbegin();
+    auto stage_it = _execPipeline->getStages().cbegin();
+    tassert(10422600,
+            "Pipelines are not equal",
+            _pipeline->size() == _execPipeline->getStages().size());
+
     if (auto docSourceCursor = dynamic_cast<DocumentSourceCursor*>(source_it->get())) {
         *statsOut = docSourceCursor->getPlanSummaryStats();
         ++source_it;
+        ++stage_it;
     };
 
     PlanSummaryStatsVisitor visitor(*statsOut);
-    std::for_each(source_it, _pipeline->getSources().cend(), [&](const auto& source) {
-        // TODO SERVER-104226: Temporary cast to Stage until explain is handled by agg::Pipeline.
-        auto& stage = dynamic_cast<exec::agg::Stage&>(*source);
-        statsOut->usedDisk = statsOut->usedDisk || stage.usedDisk();
-        if (auto specificStats = stage.getSpecificStats()) {
+    std::for_each(stage_it, _execPipeline->getStages().cend(), [&](const auto& stage) {
+        statsOut->usedDisk = statsOut->usedDisk || stage->usedDisk();
+        if (auto specificStats = stage->getSpecificStats()) {
             specificStats->acceptVisitor(&visitor);
         }
     });

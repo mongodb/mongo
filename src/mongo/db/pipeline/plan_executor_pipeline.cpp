@@ -75,7 +75,8 @@ PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContex
                                            ResumableScanType resumableScanType)
     : _expCtx(std::move(expCtx)),
       _pipeline(std::move(pipeline)),
-      _planExplainer{_pipeline.get()},
+      _execPipeline(exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext())),
+      _planExplainer{_pipeline.get(), _execPipeline.get()},
       _resumableScanType{resumableScanType} {
     // Pipeline plan executors must always have an ExpressionContext.
     invariant(_expCtx);
@@ -89,7 +90,6 @@ PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContex
         // For a resumable scan, set the initial _latestOplogTimestamp and _postBatchResumeToken.
         _initializeResumableScanState();
     }
-    _execPipeline = exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
 }
 
 PlanExecutor::ExecState PlanExecutorPipeline::getNext(BSONObj* objOut, RecordId* recordIdOut) {
