@@ -399,7 +399,7 @@ public:
                             "featureFlagQETextSearchPreview is enabled",
                             !cmd.getEncryptedFields()->getStrEncodeVersion());
                 }
-                EncryptionInformationHelpers::checkPerFieldTagLimitNotExceeded(
+                EncryptionInformationHelpers::checkTagLimitsAndStorageNotExceeded(
                     cmd.getEncryptedFields().get());
             }
 

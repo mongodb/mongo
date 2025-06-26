@@ -75,6 +75,18 @@ structs:
                     gte: 0.0
                     lte: 1.0
 
+    FLEOverrideTagOverheadData:
+        description: "Container for the fleAllowTotalTagOverheadToExceedBSONLimit CSP"
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            shouldOverride:
+                description: "Flag indicating whether or not the tag storage limit should be overridden"
+                type: bool
+                default: false
+
 server_parameters:
     unsupportedDangerousTestingFLEDiagnosticsEnabled:
         description: "Start with test-only FLE statistics behavior enabled"
@@ -91,5 +103,17 @@ server_parameters:
         set_at: cluster
         cpp_varname: "fleCompactionOptions"
         cpp_vartype: FLECompactionOptions
+        redact: false
+        omit_in_ftdc: false
+
+    fleAllowTotalTagOverheadToExceedBSONLimit:
+        description:
+            "If set to true, allows QE collection creation to succeed even if the total
+            worst-case tag count for all encrypted fields exceeds the 16MiB BSON limit"
+        set_at: cluster
+        cpp_varname: "fleOverrideTagOverheadParameter"
+        cpp_vartype: FLEOverrideTagOverheadData
+        condition:
+            min_fcv: 8.2
         redact: false
         omit_in_ftdc: false

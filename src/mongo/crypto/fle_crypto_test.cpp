@@ -47,6 +47,7 @@
 #include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_numeric.h"
+#include "mongo/crypto/fle_options_gen.h"
 #include "mongo/crypto/fle_testing_util.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/basic_types.h"
@@ -2647,36 +2648,28 @@ TEST_F(ServiceContextTest, EncryptionInformation_TestTagLimitsForTextSearch) {
         }
         ASSERT_EQ(actual, expected);
     };
-    auto doOneTest = [](const std::vector<QueryTypeConfig>& qtc, boost::optional<int> error) {
+    auto doOneFieldTest = [](const std::vector<QueryTypeConfig>& qtc, boost::optional<int> error) {
         EncryptedFieldConfig efc;
         EncryptedField field{UUID::gen(), "field"};
         field.setBsonType("string"_sd);
         field.setQueries(std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>{qtc});
         efc.setFields({field});
         if (error) {
-            ASSERT_THROWS_CODE(EncryptionInformationHelpers::checkPerFieldTagLimitNotExceeded(efc),
-                               DBException,
-                               *error);
+            ASSERT_THROWS_CODE(
+                EncryptionInformationHelpers::checkTagLimitsAndStorageNotExceeded(efc),
+                DBException,
+                *error);
         } else {
             ASSERT_DOES_NOT_THROW(
-                EncryptionInformationHelpers::checkPerFieldTagLimitNotExceeded(efc));
+                EncryptionInformationHelpers::checkTagLimitsAndStorageNotExceeded(efc));
         }
     };
-
-    // unindexed fields are not checked
-    doOneTest({}, {});
-
-    // equality fields are not checked
-    doOneTest({QueryTypeConfig(QueryTypeEnum::Equality)}, {});
-
-    // range fields are not checked
-    doOneTest({QueryTypeConfig(QueryTypeEnum::Range)}, {});
 
     // substring field under limit
     std::vector<QueryTypeConfig> qtc = {
         makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 2, 10, 200)};
     assertExpectedMaxTags(qtc, 1756);
-    doOneTest(qtc, {});
+    doOneFieldTest(qtc, {});
 
     // substring tag limit tests require a failpoint to circumvent parameter limits
     {
@@ -2684,63 +2677,241 @@ TEST_F(ServiceContextTest, EncryptionInformation_TestTagLimitsForTextSearch) {
         // substring field at limit
         qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 1, 1, 83'999);
         assertExpectedMaxTags(qtc, 84'000);
-        doOneTest(qtc, {});
+        doOneFieldTest(qtc, {});
 
         qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 1, 2, 42'000);
         assertExpectedMaxTags(qtc, 84'000);
-        doOneTest(qtc, {});
+        doOneFieldTest(qtc, {});
 
         // substring field over limit
         qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 10, 100, 1000);
         assertExpectedMaxTags(qtc, 86'087);
-        doOneTest(qtc, 10384602);
+        doOneFieldTest(qtc, 10384602);
 
         // overflow uint32_t
         qtc.front() =
             makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 1, INT32_MAX, INT32_MAX);
-        doOneTest(qtc, 10384601);
+        doOneFieldTest(qtc, 10384601);
     }
 
     // substring field should still be under tag limit even with min allowed lb and max allowed ub
     // and mlen
     qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 2, 10, 400);
     assertExpectedMaxTags(qtc, 3556);
-    doOneTest(qtc, {});
+    doOneFieldTest(qtc, {});
 
     for (auto qtype : {QueryTypeEnum::SuffixPreview, QueryTypeEnum::PrefixPreview}) {
         // suffix/prefix field under limit
         qtc.front() = makeTextQueryTypeConfig(qtype, 9, 109, {});
         assertExpectedMaxTags(qtc, 102);
-        doOneTest(qtc, {});
+        doOneFieldTest(qtc, {});
 
         // suffix/prefix field at limit
         qtc.front() = makeTextQueryTypeConfig(qtype, 21, 84'019, {});
         assertExpectedMaxTags(qtc, 84'000);
-        doOneTest(qtc, {});
+        doOneFieldTest(qtc, {});
 
         // suffix/prefix field over limit
         qtc.front() = makeTextQueryTypeConfig(qtype, 1, 84'001, {});
         assertExpectedMaxTags(qtc, 84'002);
-        doOneTest(qtc, 10384602);
+        doOneFieldTest(qtc, 10384602);
     }
 
     // suffix+prefix field under limit
     qtc = {makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 9, 109, {}),
            makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 90, 900, {})};
     assertExpectedMaxTags(qtc, 101 + 811 + 1);
-    doOneTest(qtc, {});
+    doOneFieldTest(qtc, {});
 
     // suffix+prefix field at limit
     qtc = {makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 101, 42100, {}),
            makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 1001, 42999, {})};
     assertExpectedMaxTags(qtc, 84'000);
-    doOneTest(qtc, {});
+    doOneFieldTest(qtc, {});
 
     // suffix+prefix field over limit
     qtc = {makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 101, 42100, {}),
            makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 1001, 43000, {})};
     assertExpectedMaxTags(qtc, 84'001);
-    doOneTest(qtc, 10384602);
+    doOneFieldTest(qtc, 10384602);
+}
+
+TEST_F(ServiceContextTest, EncryptionInformation_TestTagStorageLimits) {
+    auto makeEqualityQueryTypeConfig = []() {
+        QueryTypeConfig config;
+        config.setQueryType(QueryTypeEnum::Equality);
+
+        return config;
+    };
+    auto makeRangeQueryTypeConfigInt32 =
+        [](int32_t lb, int32_t ub, const boost::optional<uint32_t>& precision, int sparsity) {
+            QueryTypeConfig config;
+            config.setQueryType(QueryTypeEnum::Range);
+            config.setMin(Value(lb));
+            config.setMax(Value(ub));
+            config.setSparsity(sparsity);
+            if (precision) {
+                config.setPrecision(*precision);
+            }
+            config.setTrimFactor(0);
+            return config;
+        };
+    auto makeTextQueryTypeConfig =
+        [](QueryTypeEnum qtype, int32_t lb, int32_t ub, boost::optional<int32_t> mlen) {
+            QueryTypeConfig qtc{qtype};
+            qtc.setStrMinQueryLength(lb);
+            qtc.setStrMaxQueryLength(ub);
+            qtc.setStrMaxLength(std::move(mlen));
+            return qtc;
+        };
+    auto makeEncryptedFields =
+        [](int numFields, StringData bsonType, const std::vector<QueryTypeConfig>& qtc) {
+            std::vector<EncryptedField> fields;
+            for (int i = 0; i < numFields; i++) {
+                EncryptedField field{UUID::gen(), fmt::format("field_{}", i)};
+                field.setBsonType(bsonType);
+                field.setQueries(std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>{qtc});
+                fields.emplace_back(field);
+            }
+
+            return fields;
+        };
+    auto doMultipleFieldsTest = [](const EncryptedFieldConfig& efc, boost::optional<int> error) {
+        // Regardless of "error", we always expect success when the override cluster param is set.
+        {
+            FLEOverrideTagOverheadData tagOverheadOverride;
+            tagOverheadOverride.setShouldOverride(true);
+
+            RAIIServerParameterControllerForTest overrideTagOverheadLimit(
+                "fleAllowTotalTagOverheadToExceedBSONLimit", tagOverheadOverride);
+            ASSERT_DOES_NOT_THROW(
+                EncryptionInformationHelpers::checkTagLimitsAndStorageNotExceeded(efc));
+        }
+
+        if (error) {
+            ASSERT_THROWS_CODE(
+                EncryptionInformationHelpers::checkTagLimitsAndStorageNotExceeded(efc),
+                DBException,
+                *error);
+        } else {
+            ASSERT_DOES_NOT_THROW(
+                EncryptionInformationHelpers::checkTagLimitsAndStorageNotExceeded(efc));
+        }
+    };
+
+    // Fields should fail if total tag storage exceeds BSON limit even while each field is
+    // within tag limit
+
+    // equality above total tag storage limit
+    EncryptedFieldConfig efc;
+    efc.setFields(makeEncryptedFields(131073, "string"_sd, {makeEqualityQueryTypeConfig()}));
+    doMultipleFieldsTest(efc, 10431800);
+
+    // equality within total tag storage limit
+    efc.setFields(makeEncryptedFields(131072, "string"_sd, {makeEqualityQueryTypeConfig()}));
+    doMultipleFieldsTest(efc, {});
+
+    // range above total tag storage limit
+    efc.setFields(makeEncryptedFields(
+        11916, "int"_sd, {makeRangeQueryTypeConfigInt32(1, 1000, boost::none, 1)}));
+    doMultipleFieldsTest(efc, 10431800);
+
+    // range within total tag storage limit
+    efc.setFields(makeEncryptedFields(
+        11915, "int"_sd, {makeRangeQueryTypeConfigInt32(1, 1000, boost::none, 1)}));
+    doMultipleFieldsTest(efc, {});
+
+    // substring above total tag storage limit
+    efc.setFields(makeEncryptedFields(
+        37, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 2, 10, 400)}));
+    doMultipleFieldsTest(efc, 10431800);
+
+    // substring within total tag storage limit
+    efc.setFields(makeEncryptedFields(
+        36, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 2, 10, 400)}));
+    doMultipleFieldsTest(efc, {});
+
+    // prefix above total tag storage limit
+    efc.setFields(makeEncryptedFields(
+        1286, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 9, 109, {})}));
+    doMultipleFieldsTest(efc, 10431800);
+
+    // prefix within total tag storage limit
+    efc.setFields(makeEncryptedFields(
+        1285, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 9, 109, {})}));
+    doMultipleFieldsTest(efc, {});
+
+    // suffix above total tag storage limit
+    efc.setFields(makeEncryptedFields(
+        1286, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 9, 109, {})}));
+    doMultipleFieldsTest(efc, 10431800);
+
+    // suffix within total tag storage limit
+    efc.setFields(makeEncryptedFields(
+        1285, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 9, 109, {})}));
+    doMultipleFieldsTest(efc, {});
+
+    // suffix+prefix above total tag storage limit
+    efc.setFields(
+        makeEncryptedFields(144,
+                            "string"_sd,
+                            {makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 9, 109, {}),
+                             makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 90, 900, {})}));
+    doMultipleFieldsTest(efc, 10431800);
+
+    // suffix+prefix within total tag storage limit
+    efc.setFields(
+        makeEncryptedFields(143,
+                            "string"_sd,
+                            {makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 9, 109, {}),
+                             makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 90, 900, {})}));
+    doMultipleFieldsTest(efc, {});
+
+    // mixture of substring, suffix, and prefix above total tag storage limit
+    std::vector<EncryptedField> fields;
+    auto substringFields = makeEncryptedFields(
+        36, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 2, 10, 400)});
+    auto prefixFields = makeEncryptedFields(
+        15, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 9, 109, {})});
+    auto suffixFields = makeEncryptedFields(
+        15, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 9, 109, {})});
+    fields.insert(fields.end(), substringFields.begin(), substringFields.end());
+    fields.insert(fields.end(), prefixFields.begin(), prefixFields.end());
+    fields.insert(fields.end(), suffixFields.begin(), suffixFields.end());
+    efc.setFields(fields);
+    doMultipleFieldsTest(efc, 10431800);
+
+    // mixture of substring, suffix, and prefix within total tag storage limit
+    suffixFields = makeEncryptedFields(
+        14, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 9, 109, {})});
+    fields.clear();
+    fields.insert(fields.end(), substringFields.begin(), substringFields.end());
+    fields.insert(fields.end(), prefixFields.begin(), prefixFields.end());
+    fields.insert(fields.end(), suffixFields.begin(), suffixFields.end());
+    efc.setFields(fields);
+    doMultipleFieldsTest(efc, {});
+
+    // mixture of substring, equality, and range above total tag storage limit
+    substringFields = makeEncryptedFields(
+        14, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 2, 10, 400)});
+    auto equalityFields = makeEncryptedFields(6785, "string"_sd, {makeEqualityQueryTypeConfig()});
+    auto rangeFields = makeEncryptedFields(
+        6800, "int"_sd, {makeRangeQueryTypeConfigInt32(1, 1000, boost::none, 1)});
+    fields.clear();
+    fields.insert(fields.end(), substringFields.begin(), substringFields.end());
+    fields.insert(fields.end(), equalityFields.begin(), equalityFields.end());
+    fields.insert(fields.end(), rangeFields.begin(), rangeFields.end());
+    efc.setFields(fields);
+    doMultipleFieldsTest(efc, 10431800);
+
+    // mixture of substring, equality, and range within total tag storage limit
+    equalityFields = makeEncryptedFields(5000, "string"_sd, {makeEqualityQueryTypeConfig()});
+    fields.clear();
+    fields.insert(fields.end(), substringFields.begin(), substringFields.end());
+    fields.insert(fields.end(), equalityFields.begin(), equalityFields.end());
+    fields.insert(fields.end(), rangeFields.begin(), rangeFields.end());
+    efc.setFields(fields);
+    doMultipleFieldsTest(efc, {});
 }
 
 TEST_F(ServiceContextTest, IndexedFields_FetchTwoLevels) {

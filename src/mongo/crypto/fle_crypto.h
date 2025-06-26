@@ -1112,11 +1112,20 @@ public:
                                                      const EncryptionInformation& ei);
 
     /**
-     * Throws if there exists an indexed-encrypted field in the EncryptedFieldConfig, whose
-     * worst case tag count exceeds the per-field tag limit.
+     * checkTagLimitsAndStorageNotExceeded throws if either of the following conditions are met:
+     *    1. There exists an indexed-encrypted field in the EncryptedFieldConfig, whose
+     *       worst case tag count exceeds the per-field tag limit of 84k tags.
+     *    2. The total worst case tag storage for all indexed-encrypted fields in the
+     *       EncryptedFieldConfig exceeds the 16MiB BSON limit.
+     *
+     * kFLE2PerTagStorageBytes represents the expected amount of space needed per tag. Each tag has
+     * at least 128 bytes of overhead, consisting of the encrypted metadata block (96) and the
+     * __safeContent__ tag (32).
      */
     static constexpr uint32_t kFLE2PerFieldTagLimit = 84000;
-    static void checkPerFieldTagLimitNotExceeded(const EncryptedFieldConfig& ef);
+    static constexpr uint32_t kFLE2PerTagStorageBytes =
+        sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob) + sizeof(PrfBlock);
+    static void checkTagLimitsAndStorageNotExceeded(const EncryptedFieldConfig& ef);
 };
 
 /**

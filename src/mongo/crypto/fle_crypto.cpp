@@ -98,6 +98,7 @@ extern "C" {
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_fields_util.h"
 #include "mongo/crypto/fle_numeric.h"
+#include "mongo/crypto/fle_options_gen.h"
 #include "mongo/crypto/fle_tokens_gen.h"
 #include "mongo/crypto/fle_util.h"
 #include "mongo/crypto/mongocryptbuffer.h"
@@ -3958,36 +3959,52 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
     return efc;
 }
 
-void EncryptionInformationHelpers::checkPerFieldTagLimitNotExceeded(
+void EncryptionInformationHelpers::checkTagLimitsAndStorageNotExceeded(
     const EncryptedFieldConfig& ef) {
 
-    auto calculateMaxTags = [](const QueryTypeConfig qtc) -> uint32_t {
-        if (!isFLE2TextQueryType(qtc.getQueryType())) {
-            return 0;
+    auto calculateMaxTags = [](const boost::optional<StringData>& type,
+                               StringData path,
+                               const QueryTypeConfig& qtc) -> uint64_t {
+        auto qtype = qtc.getQueryType();
+        if (qtype == QueryTypeEnum::Equality) {
+            return 1;
+        } else if (qtype == QueryTypeEnum::Range) {
+            uassert(10431801,
+                    fmt::format("Missing bsonType for range field '{}'", path),
+                    type.has_value());
+            return getEdgesLength(typeFromName(type.value()), path, qtc);
+        } else if (isFLE2TextQueryType(qtype)) {
+            int32_t ub = qtc.getStrMaxQueryLength().get();
+            int32_t lb = qtc.getStrMinQueryLength().get();
+            if (qtype == QueryTypeEnum::SubstringPreview) {
+                return maxTagsForSubstring(
+                    lb, ub, static_cast<uint32_t>(qtc.getStrMaxLength().get()));
+            }
+            return maxTagsForSuffixOrPrefix(lb, ub);
+        } else {
+            uasserted(10431802, "Unknown or deprecated query type encountered");
         }
-        int32_t ub = qtc.getStrMaxQueryLength().get();
-        int32_t lb = qtc.getStrMinQueryLength().get();
-        if (qtc.getQueryType() == QueryTypeEnum::SubstringPreview) {
-            int32_t mlen = static_cast<uint32_t>(qtc.getStrMaxLength().get());
-            return maxTagsForSubstring(lb, ub, mlen);
-        }
-        return maxTagsForSuffixOrPrefix(lb, ub);
     };
 
+    uint64_t totalTagCount = 0;
     for (const auto& field : ef.getFields()) {
         if (!field.getQueries()) {
             continue;
         }
 
         auto tagCount =
-            visit(OverloadedVisitor{[&](QueryTypeConfig qtc) { return calculateMaxTags(qtc); },
-                                    [&](std::vector<QueryTypeConfig> queries) {
-                                        uint32_t maxTags = 0;
-                                        for (auto& qtc : queries) {
-                                            maxTags += calculateMaxTags(qtc);
-                                        }
-                                        return maxTags;
-                                    }},
+            visit(OverloadedVisitor{
+                      [&](QueryTypeConfig qtc) {
+                          return calculateMaxTags(field.getBsonType(), field.getPath(), qtc);
+                      },
+                      [&](std::vector<QueryTypeConfig> queries) {
+                          uint64_t maxTags = 0;
+                          for (auto& qtc : queries) {
+                              maxTags +=
+                                  calculateMaxTags(field.getBsonType(), field.getPath(), qtc);
+                          }
+                          return maxTags;
+                      }},
                   field.getQueries().get());
         if (hasQueryTypeMatching(field, isFLE2TextQueryType)) {
             tagCount++;  // substring/suffix/prefix types get an extra tag for exact string match
@@ -3999,7 +4016,23 @@ void EncryptionInformationHelpers::checkPerFieldTagLimitNotExceeded(
                             tagCount),
                 tagCount <= kFLE2PerFieldTagLimit);
         }
+        totalTagCount += tagCount;
     }
+
+    auto totalTagStorage = (totalTagCount * kFLE2PerTagStorageBytes);
+    auto shouldOverrideTotalTagOverheadLimit =
+        ServerParameterSet::getClusterParameterSet()
+            ->get<ClusterParameterWithStorage<FLEOverrideTagOverheadData>>(
+                "fleAllowTotalTagOverheadToExceedBSONLimit")
+            ->getValue(boost::none)
+            .getShouldOverride();
+    uassert(
+        10431800,
+        fmt::format("Cannot create a collection where the worst case total Queryable Encryption "
+                    "tag storage size ({}) exceeds the max BSON size ({})",
+                    totalTagStorage,
+                    BSONObjMaxUserSize),
+        shouldOverrideTotalTagOverheadLimit || totalTagStorage <= BSONObjMaxUserSize);
 }
 
 std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(ConstDataRange cdr) {
