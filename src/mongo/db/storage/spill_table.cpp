@@ -36,6 +36,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -150,17 +151,48 @@ Status SpillTable::insertRecords(OperationContext* opCtx, std::vector<Record>* r
     _ru->setOperationContext(opCtx);
     ON_BLOCK_EXIT([this] { _ru->setOperationContext(nullptr); });
 
-    for (auto&& record : *records) {
+    // This function inserts records starting at the provided index until the threshold of data is
+    // reached, returning the last index that was inserted.
+    auto insert = [this, opCtx, &records](size_t index,
+                                          int64_t batchSizeThreshold) -> StatusWith<size_t> {
+        StorageWriteTransaction txn{*_ru};
+        int64_t bytesInserted = 0;
+
+        for (; index < records->size(); ++index) {
+            auto& record = (*records)[index];
+
+            auto rid = _rs->insertRecord(
+                opCtx, *_ru, record.id, record.data.data(), record.data.size(), {});
+            if (!rid.isOK()) {
+                return rid.getStatus();
+            }
+            record.id = rid.getValue();
+
+            bytesInserted += record.data.size();
+            if (bytesInserted >= batchSizeThreshold) {
+                break;
+            }
+        }
+
+        txn.commit();
+        return index;
+    };
+
+    int64_t batchSizeThreshold = gSpillTableInsertBatchSizeBytes.load();
+    for (size_t index = 0; index < records->size(); ++index) {
         auto status = writeConflictRetry(
             opCtx, *_ru, "SpillTable::insertRecords", NamespaceString::kEmpty, [&] {
-                StorageWriteTransaction txn{*_ru};
-                auto status = _rs->insertRecord(
-                    opCtx, *_ru, record.id, record.data.data(), record.data.size(), {});
-                if (!status.isOK()) {
-                    return status.getStatus();
+                try {
+                    auto result = insert(index, batchSizeThreshold);
+                    if (!result.isOK()) {
+                        return result.getStatus();
+                    }
+                    index = result.getValue();
+                } catch (const StorageUnavailableException&) {
+                    // Insert the rest of the records one at a time without any batching.
+                    batchSizeThreshold = 0;
+                    throw;
                 }
-                record.id = status.getValue();
-                txn.commit();
                 return Status::OK();
             });
         if (!status.isOK()) {

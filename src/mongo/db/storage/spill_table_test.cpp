@@ -39,17 +39,86 @@
 #include "mongo/util/fail_point.h"
 
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace mongo {
 namespace {
 
+constexpr int32_t kCacheSizeMB = 50;
+
 class SpillTableTest : public StorageEngineTest {
 protected:
     SpillTableTest()
-        : StorageEngineTest(
-              StorageEngineTest::Options{}.setParameter("featureFlagCreateSpillKVEngine", true)) {}
+        : StorageEngineTest(StorageEngineTest::Options{}
+                                .setParameter("featureFlagCreateSpillKVEngine", true)
+                                .setParameter("spillWiredTigerCacheSizeMB", kCacheSizeMB)) {}
 };
+
+TEST_F(SpillTableTest, InsertRecords) {
+    auto opCtx = makeOperationContext();
+    auto spillTable = makeSpillTable(opCtx.get(), KeyFormat::Long, 1024);
+
+    std::string data(1024 * 1024, 'a');
+    std::vector<Record> records(kCacheSizeMB,
+                                {.id = {}, .data = {data.data(), static_cast<int>(data.size())}});
+
+    ASSERT_OK(spillTable->insertRecords(opCtx.get(), &records));
+
+    auto cursor = spillTable->getCursor(opCtx.get());
+    for (auto&& record : records) {
+        auto next = cursor->next();
+        ASSERT_TRUE(next);
+        ASSERT_EQ(next->data.size(), record.data.size());
+    }
+    ASSERT_FALSE(cursor->next());
+}
+
+TEST_F(SpillTableTest, InsertRecordsWriteConflict) {
+    auto opCtx = makeOperationContext();
+    auto spillTable = makeSpillTable(opCtx.get(), KeyFormat::Long, 1024);
+
+    std::string data(1024 * 1024, 'a');
+    std::vector<Record> records(kCacheSizeMB,
+                                {.id = {}, .data = {data.data(), static_cast<int>(data.size())}});
+
+    FailPointEnableBlock writeConflict{
+        "WTWriteConflictException",
+        FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1}};
+    ASSERT_OK(spillTable->insertRecords(opCtx.get(), &records));
+
+    auto cursor = spillTable->getCursor(opCtx.get());
+    for (auto&& record : records) {
+        auto next = cursor->next();
+        ASSERT_TRUE(next);
+        ASSERT_EQ(next->data.size(), record.data.size());
+    }
+    ASSERT_FALSE(cursor->next());
+}
+
+TEST_F(SpillTableTest, InsertRecordsRandomWriteConflicts) {
+    auto opCtx = makeOperationContext();
+    auto spillTable = makeSpillTable(opCtx.get(), KeyFormat::Long, 1024);
+
+    std::string data(1024 * 1024, 'a');
+    std::vector<Record> records(kCacheSizeMB,
+                                {.id = {}, .data = {data.data(), static_cast<int>(data.size())}});
+
+    FailPointEnableBlock writeConflict{
+        "WTWriteConflictException",
+        FailPoint::ModeOptions{
+            .mode = FailPoint::Mode::random,
+            .val = static_cast<int32_t>(std::numeric_limits<int32_t>::max() * 0.1)}};
+    ASSERT_OK(spillTable->insertRecords(opCtx.get(), &records));
+
+    auto cursor = spillTable->getCursor(opCtx.get());
+    for (auto&& record : records) {
+        auto next = cursor->next();
+        ASSERT_TRUE(next);
+        ASSERT_EQ(next->data.size(), record.data.size());
+    }
+    ASSERT_FALSE(cursor->next());
+}
 
 TEST_F(SpillTableTest, ImmediatelyBelowDiskSpaceThreshold) {
     auto thresholdBytes = 1024;

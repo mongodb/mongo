@@ -233,6 +233,18 @@ server_parameters:
         validator: {gte: 0, lte: 1}
         redact: false
 
+    spillTableInsertBatchSizeBytes:
+        description: >-
+            The amount of data that a call to SpillTable::insertRecords will batch together into a
+            single storage transaction.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<long long>
+        cpp_varname: gSpillTableInsertBatchSizeBytes
+        default: 16777216 # 16 MB
+        validator:
+            gte: 0
+        redact: false
+
 feature_flags:
     featureFlagLargeBatchedOperations:
         description: >-
