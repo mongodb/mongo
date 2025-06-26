@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
@@ -179,7 +180,7 @@ private:
 
     DeferredFn<boost::intrusive_ptr<exec::agg::Stage>> _queryShapeRepresentativeQueriesCursor{
         [this]() {
-            return boost::dynamic_pointer_cast<exec::agg::Stage>(
+            return exec::agg::buildStage(
                 createQueryShapeRepresentativeQueriesCursor(getContext()->getOperationContext()));
         }};
 
