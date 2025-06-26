@@ -31,6 +31,13 @@ function getProfilerEntries(conn) {
         });
 }
 
+function resetProfilerCollection(db) {
+    db.setProfilingLevel(0);
+    assert(db.system.profile.drop());
+    db.createCollection("system.profile", {capped: true, size: 100 * 1024 * 1024});
+    db.setProfilingLevel(2);
+}
+
 /**
  * Returns the read preference used by the command with the given profiler entry.
  */
@@ -72,7 +79,7 @@ function runMoveCollection(host, ns, toShard) {
 }
 
 // Turn on profiling on all nodes on the donor shard.
-st.rs0.nodes.forEach(node => node.getDB("local").setProfilingLevel(2));
+st.rs0.nodes.forEach(node => resetProfilerCollection(node.getDB("local")));
 
 const beforeQueryingRemainingTimeFp =
     configureFailPoint(configPrimary, "hangBeforeQueryingRecipients");
@@ -124,9 +131,7 @@ assert.soon(() => {
             // Drop the profiler entries on the secondaries so that we can verify later that the
             // resharding oplog fetcher was still fetching from the primary after the critical
             // section had started.
-            node.getDB("local").setProfilingLevel(0);
-            assert(node.getDB("local").system.profile.drop());
-            node.getDB("local").setProfilingLevel(2);
+            resetProfilerCollection(node.getDB("local"));
         }
     });
     return numEntriesPrimaryReadPrefBefore > 0;
@@ -157,13 +162,11 @@ st.rs0.nodes.forEach(node => {
         assert.eq(profilerEntries.length, 0, {profilerEntries});
     }
 });
-// TODO SERVER-106538: Figure out how to reenable this assertion or get similar coverage in a
-// different way.
-// assert.gte(
-//     numEntriesPrimaryReadPrefAfter,
-//     numEntriesPrimaryReadPrefBefore,
-//     "Expected to find at least as many resharding oplog fetcher profiler entries with read " +
-//         "preference 'primary' before and after the critical section");
+assert.gte(
+    numEntriesPrimaryReadPrefAfter,
+    numEntriesPrimaryReadPrefBefore,
+    "Expected to find at least as many resharding oplog fetcher profiler entries with read " +
+        "preference 'primary' before and after the critical section");
 
 jsTest.log("Profiler entry counts: " + tojson({
                numEntriesNearestReadPref,
