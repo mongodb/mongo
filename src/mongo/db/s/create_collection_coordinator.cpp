@@ -79,6 +79,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
@@ -1108,13 +1109,13 @@ void exitCriticalSectionsOnCoordinator(OperationContext* opCtx,
  * bucket collection.
  */
 BSONObj validateAndTranslateShardKey(OperationContext* opCtx,
-                                     const boost::optional<TimeseriesOptions>& timeseriesOpts,
+                                     const TypeCollectionTimeseriesFields& timeseriesFields,
                                      const BSONObj& shardKey) {
     shardkeyutil::validateTimeseriesShardKey(
-        timeseriesOpts->getTimeField(), timeseriesOpts->getMetaField(), shardKey);
+        timeseriesFields.getTimeField(), timeseriesFields.getMetaField(), shardKey);
 
-    return uassertStatusOK(
-        timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(*timeseriesOpts, shardKey));
+    return uassertStatusOK(timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(
+        timeseriesFields.getTimeseriesOptions(), shardKey));
 }
 
 /**
@@ -1261,7 +1262,10 @@ boost::optional<UUID> createCollectionAndIndexes(
 
     auto translatedRequest = request;
     translatedRequest.setCollation(translatedRequestParams.getCollation());
-    translatedRequest.setTimeseries(translatedRequestParams.getTimeseries());
+
+    if (const auto& timeseriesFields = translatedRequestParams.getTimeseries()) {
+        translatedRequest.setTimeseries(timeseriesFields->getTimeseriesOptions());
+    }
 
     // The creation is on the original nss in order to support timeseries creation using the
     // directly the bucket nss. In that case, we do not want to create the view. This feature is
@@ -1290,7 +1294,10 @@ boost::optional<UUID> createCollectionAndIndexes(
             request.getUnique().value_or(false),
             request.getEnforceUniquenessCheck().value_or(true),
             shardkeyutil::ValidationBehaviorsShardCollection(opCtx, dataShard),
-            translatedRequestParams.getTimeseries());
+            (translatedRequestParams.getTimeseries()
+                 ? boost::make_optional(
+                       translatedRequestParams.getTimeseries()->getTimeseriesOptions())
+                 : boost::none));
     } else {
         uassert(6373200,
                 "Must have an index compatible with the proposed shard key",
@@ -1382,11 +1389,8 @@ void commit(OperationContext* opCtx,
 
     const auto& placementVersion = initialChunks->chunks.back().getVersion();
 
-    if (translatedRequestParams.getTimeseries()) {
-        TypeCollectionTimeseriesFields timeseriesFields;
-        auto tsOptions = *translatedRequestParams.getTimeseries();
-        timeseriesFields.setTimeseriesOptions(std::move(tsOptions));
-        coll.setTimeseriesFields(std::move(timeseriesFields));
+    if (const auto& timeseriesFields = translatedRequestParams.getTimeseries()) {
+        coll.setTimeseriesFields(timeseriesFields);
     }
 
     if (auto collationBSON = translatedRequestParams.getCollation(); !collationBSON.isEmpty()) {
@@ -1699,14 +1703,61 @@ void CreateCollectionCoordinator::_translateRequestParameters(OperationContext* 
     // checkPrecoditions phase we have the guarantee for the request's timeseries options to be
     // either empty or identical to the local catalog's ones.
     NamespaceString targetNs;
-    boost::optional<TimeseriesOptions> timeseriesOpts;
+    boost::optional<TypeCollectionTimeseriesFields> optExtendedTimeseriesFields;
     {
         auto coll = acquireTargetCollection(opCtx, originalNss(), _request);
         targetNs = coll.nss();
-        if (coll.exists()) {
-            timeseriesOpts = coll.getCollectionPtr()->getTimeseriesOptions();
-        } else {
-            timeseriesOpts = _request.getTimeseries();
+        if (coll.exists() && coll.getCollectionPtr()->isTimeseriesCollection()) {
+            // Set core timeseries options
+            tassert(
+                10636500,
+                fmt::format(
+                    "Collection '{}' is a timeseries collection but is missing timeseries options",
+                    targetNs.toStringForErrorMsg()),
+                coll.getCollectionPtr()->getTimeseriesOptions());
+            auto extendedTimeseriesFields = TypeCollectionTimeseriesFields();
+            extendedTimeseriesFields.setTimeseriesOptions(
+                *(coll.getCollectionPtr()->getTimeseriesOptions()));
+
+            if (coll.getCollectionPtr()->isNewTimeseriesWithoutView()) {
+                // For viewless timeseries we project all timeseries fields to the global catalog.
+
+                // Set mixedSchema property
+                const auto& mixedSchemaBucketsState =
+                    coll.getCollectionPtr()->getTimeseriesMixedSchemaBucketsState();
+                tassert(
+                    10636501,
+                    fmt::format("Found invalid 'mixedSchemaBuckets' property for collection '{}'",
+                                targetNs.toStringForErrorMsg()),
+                    mixedSchemaBucketsState.isValid());
+                if (!mixedSchemaBucketsState.mustConsiderMixedSchemaBucketsInReads()) {
+                    extendedTimeseriesFields.setTimeseriesBucketsMayHaveMixedSchemaData(false);
+                }
+
+                if (feature_flags::gTSBucketingParametersUnchanged.isEnabled(
+                        VersionContext::getDecoration(opCtx),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                    // Set bucketingParametersChanged property
+                    extendedTimeseriesFields.setTimeseriesBucketingParametersHaveChanged(
+                        coll.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
+                }
+            }
+
+            optExtendedTimeseriesFields = std::move(extendedTimeseriesFields);
+        } else if (_request.getTimeseries()) {
+            // The collection does not exists so we are creating a new timeseries collection.
+            auto extendedTimeseriesFields = TypeCollectionTimeseriesFields();
+            extendedTimeseriesFields.setTimeseriesOptions(*_request.getTimeseries());
+            if (viewlessTimeseriesEnabled(opCtx)) {
+                extendedTimeseriesFields.setTimeseriesBucketsMayHaveMixedSchemaData(false);
+                if (feature_flags::gTSBucketingParametersUnchanged.isEnabled(
+                        VersionContext::getDecoration(opCtx),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                    extendedTimeseriesFields.setTimeseriesBucketingParametersHaveChanged(false);
+                }
+            }
+
+            optExtendedTimeseriesFields = std::move(extendedTimeseriesFields);
         }
     }
 
@@ -1721,13 +1772,14 @@ void CreateCollectionCoordinator::_translateRequestParameters(OperationContext* 
 
     // Assign the correct shard key: in case of timeseries, the shard key must be converted.
     KeyPattern keyPattern;
-    if (timeseriesOpts && isSharded(_request)) {
-        keyPattern = validateAndTranslateShardKey(opCtx, timeseriesOpts, *_request.getShardKey());
+    if (optExtendedTimeseriesFields && isSharded(_request)) {
+        keyPattern = validateAndTranslateShardKey(
+            opCtx, *optExtendedTimeseriesFields, *_request.getShardKey());
     } else {
         keyPattern = *_request.getShardKey();
     }
     auto translatedRequestParams = TranslatedRequestParams(targetNs, keyPattern, resolvedCollator);
-    translatedRequestParams.setTimeseries(timeseriesOpts);
+    translatedRequestParams.setTimeseries(optExtendedTimeseriesFields);
     _doc.setTranslatedRequestParams(std::move(translatedRequestParams));
 
     const auto& originalDataShard = [&] {

@@ -112,6 +112,7 @@ selector:
     - jstests/core/timeseries/query/timeseries_bucket_level_filter.js
     - jstests/core/timeseries/query/timeseries_cursor_batches.js
     - jstests/core/timeseries/query/timeseries_explicit_unpack_bucket.js
+    - jstests/core/timeseries/query/timeseries_find.js
     - jstests/core/timeseries/query/timeseries_groupby_reorder.js
     - jstests/core/timeseries/query/timeseries_groupby_reorder_expr.js
     - jstests/core/timeseries/query/timeseries_hint.js

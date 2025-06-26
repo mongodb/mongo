@@ -14,10 +14,6 @@
  *   requires_fcv_70,
  * ]
  */
-import {
-    areViewlessTimeseriesEnabled,
-} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
@@ -25,13 +21,6 @@ const coll = db[jsTestName()];
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "tag"}}));
-
-// TODO SERVER-106313 enable this test once hinting on partial indexes for tracked viewless
-// tiemseries collections works.
-if (areViewlessTimeseriesEnabled(db) && FixtureHelpers.isTracked(coll)) {
-    jsTest.log("Skipping test because not supported with viewless tracked timeseries");
-    quit();
-}
 
 assert.commandWorked(coll.insertMany([
     {_id: 0, time: new Date("2021-07-29T07:46:38.746Z"), tag: 2, a: 5},

@@ -36,6 +36,7 @@ imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/s/sharding_ddl_coordinator.idl"
     - "mongo/s/request_types/sharded_ddl_commands.idl"
+    - "mongo/s/type_collection_common_types.idl"
 
 enums:
     CreateCollectionCoordinatorPhase:
@@ -73,7 +74,7 @@ structs:
                 description: "Collation value from the targeted unsharded collection if this exists; otherwise, simple-collation"
                 optional: false
             timeseries:
-                type: TimeseriesOptions
+                type: TypeCollectionTimeseriesFields
                 description: "The options to create the time-series collection with."
                 optional: true
 
