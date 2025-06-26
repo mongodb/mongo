@@ -631,6 +631,14 @@ subsequent `getMores` will fetch entries as they become visible without any hole
 Backward cursor oplog readers bypass the oplog visibility rules to see the latest oplog entries,
 disregarding any oplog holes.
 
+# DiskSpaceMonitor
+
+The `DiskSpaceMonitor` is a `ServiceContext` decoration that monitors available disk space every second in the database path and executes registered actions when disk space falls below specified thresholds. The `DiskSpaceMonitor` is started during MongoDB initialization.
+
+Actions are registered with a threshold function which should return the number of threshold bytes and a action function. When the available disk space <= the number of threshold bytes, we perform the action function. Each action receives a unique ID for deregistration or to run specific actions as needed. Actions can be run by its unique ID (`runAction`) or collectively (`runAllActions`).
+
+An example of a use of the `DiskSpaceMonitor` is the `IndexBuildsCoordinator` registers actions to kill index builds when disk space is low when neither `directoryPerDb` nor `directoryForIndexes` is enabled.
+
 # Glossary
 
 **oplog hole**: An uncommitted oplog write that can exist with out-of-order writes when a later
