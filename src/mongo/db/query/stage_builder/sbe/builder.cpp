@@ -830,7 +830,7 @@ void PlanStageSlots::mergeResultInfos(
         }
 
         if (!keptFieldsMissing.empty()) {
-            SbExprOptSbSlotVector projects;
+            SbExprOptSlotVector projects;
             for (const auto& fieldName : keptFieldsMissing) {
                 auto getFieldExpr = b.makeFunction(
                     "getField"_sd, outputs.getResultInfoBaseObj(), b.makeStrConstant(fieldName));
@@ -1043,7 +1043,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildVirtualScan(
     // produced by the scan.
     auto [scanStage, arraySlot] = b.makeVirtualScan(inputTag, inputVal);
 
-    SbExprOptSbSlotVector projects;
+    SbExprOptSlotVector projects;
 
     int32_t resultIdx = vsn->hasRecordId ? 1 : 0;
     auto getResultExpr = b.makeFunction("getElement"_sd, arraySlot, b.makeInt32Constant(resultIdx));
@@ -1334,7 +1334,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildFetch(const Query
 
     auto collatorSlot = _state.getCollatorSlot();
 
-    SbExprOptSbSlotVector projects;
+    SbExprOptSlotVector projects;
     std::vector<std::string> sortKeyNames;
 
     for (size_t i = 0; i < fieldsAndSortKeys.size(); ++i) {
@@ -1563,7 +1563,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSort(const QueryS
         // prefixes.
         orderBy.reserve(sortPattern.size());
 
-        SbExprOptSbSlotVector projects;
+        SbExprOptSlotVector projects;
         for (size_t i = 0; i < sortPattern.size(); ++i) {
             projects.emplace_back(std::move(sortKeys.keyExprs[i]), boost::none);
             direction.push_back(sortPattern[i].isAscending ? sbe::value::SortDirection::Ascending
@@ -1610,7 +1610,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSort(const QueryS
             // sort [s1, s2] [asc, dsc] ...
             // project s1=getElement(fullSortKey,0), s2=getElement(fullSortKey,1)
             // project fullSortKey=generateSortKeyCheap(bson)
-            SbExprOptSbSlotVector projects;
+            SbExprOptSlotVector projects;
 
             int i = 0;
             for (const auto& part : sortPattern) {
@@ -1725,7 +1725,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSortCovered(
                                              : sbe::value::SortDirection::Descending);
     }
 
-    SbExprOptSbSlotVector projects;
+    SbExprOptSlotVector projects;
     auto makeSortKey = [&](SbSlot inputSlot) {
         SbExpr sortKeyExpr = b.makeFillEmptyNull(inputSlot);
         if (collatorSlot) {
@@ -2874,7 +2874,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildProjectionImpl(
         // Call the generateExpression() lambda to evaluate each MQL expression, and then use a
         // ProjectStage to project the output values to slots.
         auto resultObjSlot = outputs.getResultObjIfExists();
-        SbExprOptSbSlotVector projects;
+        SbExprOptSlotVector projects;
         std::vector<std::string> processedPaths;
 
         // Visit all the paths in 'exprPaths' that are not in 'exprPathSlotMap' yet.
@@ -2982,7 +2982,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildProjectionImpl(
 
     // Generate any single-field projections that are needed for 'resultFields'.
     if (!resultFields.empty() && !plan->reqResultObj) {
-        SbExprOptSbSlotVector projects;
+        SbExprOptSlotVector projects;
 
         for (const auto& field : resultFields) {
             auto expr = preimageAllowedFields.count(field)
@@ -4527,7 +4527,7 @@ private:
 
     // We project window function input arguments in order to avoid repeated evaluation
     // for both add and remove expressions.
-    SbExprOptSbSlotVector windowArgProjects;
+    SbExprOptSlotVector windowArgProjects;
 
     SbExpr::Vector windowFinalExprs;
 };
@@ -4613,7 +4613,7 @@ WindowStageBuilder::BuildOutput WindowStageBuilder::build(SbStage stage) {
                          std::move(windows),
                          state.getCollatorSlot());
 
-    SbExprOptSbSlotVector windowFinalProjects;
+    SbExprOptSlotVector windowFinalProjects;
     for (auto& expr : windowFinalExprs) {
         windowFinalProjects.emplace_back(std::move(expr), boost::none);
     }

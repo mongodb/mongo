@@ -346,6 +346,8 @@ inline SbVar SbLocalVar::toVar() const {
     return SbVar{*this};
 }
 
+using SbExprPair = std::pair<SbExpr, SbExpr>;
+
 /**
  * The SbExpr class is used to represent expressions in the SBE stage builder. "SbExpr" is short
  * for "stage builder expression".
@@ -353,7 +355,7 @@ inline SbVar SbLocalVar::toVar() const {
 class SbExpr {
 public:
     using Vector = std::vector<SbExpr>;
-    using CaseValuePair = std::pair<SbExpr, SbExpr>;
+    using CaseValuePair = SbExprPair;
 
     using SlotId = sbe::value::SlotId;
     using FrameId = sbe::FrameId;
@@ -389,6 +391,39 @@ public:
         SbSlotVector sv;
         (sv.emplace_back(std::forward<Args>(args)), ...);
         return sv;
+    }
+
+    template <typename... Args>
+    static std::vector<SbExprPair> makeExprPairVector(Args&&... args) {
+        std::vector<SbExprPair> vec;
+        (vec.emplace_back(std::forward<Args>(args)), ...);
+        return vec;
+    }
+
+private:
+    template <typename Builder>
+    static SbExpr makeBalancedTreeImpl(Builder builder,
+                                       SbExpr::Vector& leaves,
+                                       size_t from,
+                                       size_t until) {
+        tassert(10668300, "Expected at least one expression in range", from < until);
+
+        if (from + 1 == until) {
+            return std::move(leaves[from]);
+        }
+
+        size_t mid = from + (until - from) / 2;
+        auto lhs = makeBalancedTreeImpl(builder, leaves, from, mid);
+        auto rhs = makeBalancedTreeImpl(builder, leaves, mid, until);
+        return builder(std::move(lhs), std::move(rhs));
+    }
+
+public:
+    template <typename Builder>
+    static SbExpr makeBalancedTree(Builder builder, SbExpr::Vector leaves) {
+        tassert(10668301, "Expected at least one expression", !leaves.empty());
+
+        return makeBalancedTreeImpl(builder, leaves, 0, leaves.size());
     }
 
     SbExpr() noexcept = default;
@@ -598,15 +633,15 @@ using SbStage = std::unique_ptr<sbe::PlanStage>;
  * For a number of EExpression-related structures, we have corresponding "SbExpr" versions
  * of these structures. Here is a list:
  *    EExpression::Vector -> SbExpr::Vector
- *    SlotExprPairVector  -> SbExprSbSlotVector or SbExprOptSbSlotVector
+ *    SlotExprPairVector  -> SbExprSlotVector or SbExprOptSlotVector
  *    AggExprPair         -> SbAggExpr
  *    AggExprVector       -> SbAggExprVector
  */
-using SbExprSbSlotPair = std::pair<SbExpr, SbSlot>;
-using SbExprSbSlotVector = std::vector<SbExprSbSlotPair>;
+using SbExprSlotPair = std::pair<SbExpr, SbSlot>;
+using SbExprSlotVector = std::vector<SbExprSlotPair>;
 
-using SbExprOptSbSlotPair = std::pair<SbExpr, boost::optional<SbSlot>>;
-using SbExprOptSbSlotVector = std::vector<SbExprOptSbSlotPair>;
+using SbExprOptSlotPair = std::pair<SbExpr, boost::optional<SbSlot>>;
+using SbExprOptSlotVector = std::vector<SbExprOptSlotPair>;
 
 struct SbAggExpr {
     SbExpr init;

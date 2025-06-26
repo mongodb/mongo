@@ -72,6 +72,19 @@ inline abt::ABTVector extractABT(SbExpr::Vector& exprs) {
     return abtExprs;
 }
 
+inline std::vector<std::pair<abt::ABT, abt::ABT>> extractABT(std::vector<SbExprPair>& exprPairs) {
+    // Convert the SbExprPair vector to a pair<ABT,ABT> vector.
+    std::vector<std::pair<abt::ABT, abt::ABT>> abtExprPairs;
+
+    abtExprPairs.reserve(exprPairs.size());
+
+    for (auto& p : exprPairs) {
+        abtExprPairs.emplace_back(extractABT(p.first), extractABT(p.second));
+    }
+
+    return abtExprPairs;
+}
+
 inline abt::Operations getOptimizerOp(sbe::EPrimUnary::Op op) {
     switch (op) {
         case sbe::EPrimUnary::negate:
@@ -155,7 +168,7 @@ std::vector<sbe::value::SlotVector> SbExprBuilder::lower(
     return slotVectors;
 }
 
-sbe::SlotExprPairVector SbExprBuilder::lower(SbExprSbSlotVector& sbSlotSbExprVec,
+sbe::SlotExprPairVector SbExprBuilder::lower(SbExprSlotVector& sbSlotSbExprVec,
                                              const VariableTypes* varTypes) {
     sbe::SlotExprPairVector slotExprVec;
     slotExprVec.reserve(sbSlotSbExprVec.size());
@@ -385,6 +398,47 @@ SbExpr SbExprBuilder::generateInvalidRoundPlaceArgCheck(SbVar var) {
     return wrap(stage_builder::generateInvalidRoundPlaceArgCheck(var.getABTName()));
 }
 
+SbExpr SbExprBuilder::buildMultiBranchConditionalFromCaseValuePairs(
+    std::vector<SbExprPair> caseValPairs, SbExpr defaultVal) {
+    if (!feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
+        return std::accumulate(
+            std::make_reverse_iterator(std::make_move_iterator(caseValPairs.end())),
+            std::make_reverse_iterator(std::make_move_iterator(caseValPairs.begin())),
+            std::move(defaultVal),
+            [&](auto&& expression, auto&& caseValuePair) {
+                return buildMultiBranchConditional(std::move(caseValuePair), std::move(expression));
+            });
+    } else {
+        return wrap(abt::make<abt::Switch>(extractABT(caseValPairs), extractABT(defaultVal)));
+    }
+}
+
+SbExpr SbExprBuilder::makeBooleanOpTree(abt::Operations logicOp, SbExpr::Vector leaves) {
+    tassert(10668302, "Expected at least one expression", !leaves.empty());
+
+    if (leaves.size() == 1) {
+        return std::move(leaves[0]);
+    }
+
+    if ((logicOp == abt::Operations::And || logicOp == abt::Operations::Or) &&
+        feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
+        return makeNaryOp(logicOp, std::move(leaves));
+    }
+
+    auto builder = [&](SbExpr lhs, SbExpr rhs) {
+        return makeBinaryOp(logicOp, std::move(lhs), std::move(rhs));
+    };
+
+    return SbExpr::makeBalancedTree(builder, std::move(leaves));
+}
+
+SbExpr SbExprBuilder::makeBooleanOpTree(abt::Operations logicOp, SbExpr lhs, SbExpr rhs) {
+    SbExpr::Vector leaves;
+    leaves.emplace_back(std::move(lhs));
+    leaves.emplace_back(std::move(rhs));
+    return makeBooleanOpTree(logicOp, std::move(leaves));
+}
+
 std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> SbBuilder::makeScan(
     UUID collectionUuid,
     DatabaseName dbName,
@@ -557,7 +611,7 @@ SbStage SbBuilder::makeConstFilter(const VariableTypes& varTypes, SbStage stage,
 
 std::pair<SbStage, SbSlotVector> SbBuilder::makeProject(const VariableTypes& varTypes,
                                                         SbStage stage,
-                                                        SbExprOptSbSlotVector projects) {
+                                                        SbExprOptSlotVector projects) {
     sbe::SlotExprPairVector slotExprPairs;
     SbSlotVector outSlots;
 
@@ -626,7 +680,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
     const SbSlotVector& gbs,
     SbAggExprVector sbAggExprs,
     boost::optional<sbe::value::SlotId> collatorSlot,
-    SbExprSbSlotVector mergingExprs) {
+    SbExprSlotVector mergingExprs) {
     // In debug builds or when we explicitly set the query knob, we artificially force frequent
     // spilling. This makes sure that our tests exercise the spilling algorithm and the associated
     // logic for merging partial aggregates which otherwise would require large data sizes to
@@ -692,7 +746,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
     const SbSlotVector& blockAccArgSbSlots,
     SbSlot bitmapInternalSlot,
     const SbSlotVector& accumulatorDataSbSlots,
-    SbExprSbSlotVector mergingExprs) {
+    SbExprSlotVector mergingExprs) {
     tassert(8448607, "Expected at least one group by slot to be provided", gbs.size() > 0);
 
     const auto selectivityBitmapSlotId = selectivityBitmapSlot.getId();

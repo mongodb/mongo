@@ -461,7 +461,7 @@ std::pair<SbSlot /* keyValuesSetSlot */, SbStage> buildKeySetForForeign(
         SbAggExpr{SbExpr{} /* init */, SbExpr{} /* blockAgg */, std::move(addToSetExpr)},
         boost::none);
 
-    SbExprSbSlotVector mergingExprs;
+    SbExprSlotVector mergingExprs;
     mergingExprs.emplace_back(std::move(aggSetUnionExpr), spillSlot);
 
     auto [packedKeyValuesStage, _, aggOutSlots] =
@@ -506,7 +506,7 @@ std::pair<SbSlot /* resultSlot */, SbStage> buildForeignMatchedArray(SbStage inn
         SbAggExpr{SbExpr{} /* init */, SbExpr{} /* blockAgg */, std::move(addToArrayExpr)},
         boost::none);
 
-    SbExprSbSlotVector mergingExprs;
+    SbExprSlotVector mergingExprs;
     mergingExprs.emplace_back(
         b.makeFunction("aggConcatArraysCapped", spillSlot, b.makeInt32Constant(sizeCap)),
         spillSlot);

@@ -5,22 +5,22 @@ ExpressionAnd
 ExpressionAnyElementTrue
 
     let [
-        l5.0 = newArray(true, (getField(s1, "field2") ?: null)) 
+        l4.0 = newArray(true, (getField(s1, "field2") ?: null)) 
     ] 
     in 
-        if (isArray(l5.0) ?: false) 
-        then traverseF(move(l5.0), lambda(l6.0) { (coerceToBool(move(l6.0)) ?: false) }, false) 
+        if (isArray(l4.0) ?: false) 
+        then traverseF(move(l4.0), lambda(l5.0) { (coerceToBool(move(l5.0)) ?: false) }, false) 
         else fail(7158300, "$anyElementTrue's argument must be an array") 
 
 # Golden test output of GoldenGenExpressionTest/TestSimpleExpr
 ExpressionObjectToArray
 
     let [
-        l9.0 = objectToArray(s1) 
+        l7.0 = objectToArray(s1) 
     ] 
     in 
-        if exists(l9.0) 
-        then makeOwn(move(l9.0)) 
+        if exists(l7.0) 
+        then makeOwn(move(l7.0)) 
         elif (typeMatch(s1, 1088) ?: true) 
         then null 
         elif isObject(s1) 
@@ -43,20 +43,20 @@ ExpressionBsonSize
 ExpressionIfNull
 
     let [
-        l16.0 = getField(s1, "null") 
+        l13.0 = getField(s1, "null") 
     ] 
     in 
-        if (typeMatch(l16.0, 1088) ?: true) 
+        if (typeMatch(l13.0, 1088) ?: true) 
         then 
             let [
-                l17.0 = getField(s1, "field1") 
+                l14.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l17.0, 1088) ?: true) 
+                if (typeMatch(l14.0, 1088) ?: true) 
                 then getField(s1, "null") 
-                else move(l17.0) 
+                else move(l14.0) 
         
-        else move(l16.0) 
+        else move(l13.0) 
 
 # Golden test output of GoldenGenExpressionTest/TestSimpleExpr
 ExpressionIn
@@ -65,43 +65,43 @@ isMember(getField(s1, "field1"), [1, 2, 3, 4, 5])
 ExpressionIsNumber
 
     let [
-        l21.0 = getField(s1, "field1") 
+        l18.0 = getField(s1, "field1") 
     ] 
     in 
-        if exists(l21.0) 
-        then isNumber(move(l21.0)) 
+        if exists(l18.0) 
+        then isNumber(move(l18.0)) 
         else false 
 
 # Golden test output of GoldenGenExpressionTest/TestSimpleExpr
 ExpressionLet
 
     let [
-        l27.0 = 
+        l23.0 = 
             let [
-                l28.0 = getField(s1, "field1") 
+                l24.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l28.0, 1088) ?: true) 
+                if (typeMatch(l24.0, 1088) ?: true) 
                 then null 
                 elif ((
-                    if isNumber(l28.0) 
+                    if isNumber(l24.0) 
                     then 0 
-                    elif isDate(l28.0) 
+                    elif isDate(l24.0) 
                     then 1 
                     else fail(7157723, "only numbers and dates are allowed in an $add expression") 
                 + 0) > 1) 
                 then fail(7157722, "only one date allowed in an $add expression") 
-                else (move(l28.0) + 1) 
+                else (move(l24.0) + 1) 
     ] 
     in 
         let [
-            l29.0 = getField(s1, "field1") 
+            l25.0 = getField(s1, "field1") 
         ] 
         in 
-            if ((typeMatch(l27.0, 1088) ?: true) || (typeMatch(l29.0, 1088) ?: true)) 
+            if ((typeMatch(l23.0, 1088) ?: true) || (typeMatch(l25.0, 1088) ?: true)) 
             then null 
-            elif (isNumber(l27.0) && isNumber(l29.0)) 
-            then (move(l27.0) * move(l29.0)) 
+            elif (isNumber(l23.0) && isNumber(l25.0)) 
+            then (move(l23.0) * move(l25.0)) 
             else fail(7157721, "only numbers are allowed in an $multiply expression") 
 
 # Golden test output of GoldenGenExpressionTest/TestSimpleExpr
@@ -117,17 +117,17 @@ ExpressionOr
 ExpressionRange
 
     let [
-        l36.0 = getField(s1, "field1") 
+        l32.0 = getField(s1, "field1") 
     ] 
     in 
-        if isNumber(l36.0) 
+        if isNumber(l32.0) 
         then 
             let [
-                l37.0 = convert ( move(l36.0), int32) 
+                l33.0 = convert ( move(l32.0), int32) 
             ] 
             in 
-                if exists(l37.0) 
-                then newArrayFromRange(0, move(l37.0), 2) 
+                if exists(l33.0) 
+                then newArrayFromRange(0, move(l33.0), 2) 
                 else fail(7157715, "$range end argument cannot be represented as a 32-bit integer") 
         
         else fail(7157712, "$range only supports numeric types for end") 

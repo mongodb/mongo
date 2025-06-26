@@ -1002,7 +1002,7 @@ std::pair<SbStage, SbSlotVector> projectFieldsToSlots(SbStage stage,
         fields.begin(), fields.end(), [](auto&& s) { return s.find('.') == std::string::npos; });
 
     if (topLevelFieldsOnly) {
-        SbExprOptSbSlotVector projects;
+        SbExprOptSlotVector projects;
 
         for (size_t i = 0; i < fields.size(); ++i) {
             auto name = std::make_pair(PlanStageSlots::kField, StringData(fields[i]));
@@ -1070,7 +1070,7 @@ std::pair<SbStage, SbSlotVector> projectFieldsToSlots(SbStage stage,
         visitPathTreeNodes(treeRoot.get(), preVisit, postVisit);
     }
 
-    std::vector<SbExprOptSbSlotVector> stackOfProjects;
+    std::vector<SbExprOptSlotVector> stackOfProjects;
     using DfsState = std::vector<std::pair<Node*, size_t>>;
     size_t depth = 0;
 

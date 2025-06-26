@@ -226,7 +226,7 @@ SbStage projectFieldPathsToPathExprSlots(
     const StringDataMap<const ExpressionFieldPath*>& groupFieldMap) {
     SbBuilder b(state, groupNode.nodeId());
 
-    SbExprOptSbSlotVector projects;
+    SbExprOptSlotVector projects;
     for (auto& fp : groupFieldMap) {
         projects.emplace_back(stage_builder::generateExpression(
                                   state, fp.second, outputs.getResultObjIfExists(), outputs),
@@ -776,9 +776,9 @@ boost::optional<std::vector<SbAggExprVector>> generateAllAccumAggs(
  * statement is implemented by calculating two separate aggregates in the SBE plan, which are
  * finalized by custom glue code in the VM to produce the ultimate value.
  */
-SbExprSbSlotVector generateMergingExpressionsForOneAcc(StageBuilderState& state,
-                                                       const AccumulationStatement& accStmt,
-                                                       int numInputSlots) {
+SbExprSlotVector generateMergingExpressionsForOneAcc(StageBuilderState& state,
+                                                     const AccumulationStatement& accStmt,
+                                                     int numInputSlots) {
     auto slotIdGenerator = state.slotIdGenerator;
     auto frameIdGenerator = state.frameIdGenerator;
 
@@ -808,7 +808,7 @@ SbExprSbSlotVector generateMergingExpressionsForOneAcc(StageBuilderState& state,
     tassert(7039550,
             "expected same number of slots and input exprs",
             spillSlots.size() == mergingExprs.size());
-    SbExprSbSlotVector result;
+    SbExprSlotVector result;
     result.reserve(spillSlots.size());
     for (size_t i = 0; i < spillSlots.size(); ++i) {
         result.emplace_back(std::pair(std::move(mergingExprs[i]), spillSlots[i]));
@@ -820,12 +820,12 @@ SbExprSbSlotVector generateMergingExpressionsForOneAcc(StageBuilderState& state,
  * This function generates all of the merging expressions needed by the accumulators from the
  * specified GroupNode ('groupNode'). These always use scalar mode.
  */
-std::vector<SbExprSbSlotVector> generateAllMergingExprs(StageBuilderState& state,
-                                                        const GroupNode& groupNode) {
+std::vector<SbExprSlotVector> generateAllMergingExprs(StageBuilderState& state,
+                                                      const GroupNode& groupNode) {
     // Since partial accumulator state may be spilled to disk and then merged, we must construct not
     // only the basic agg expressions for each accumulator, but also agg expressions that are used
     // to combine partial aggregates that have been spilled to disk.
-    std::vector<SbExprSbSlotVector> mergingExprs;
+    std::vector<SbExprSlotVector> mergingExprs;
 
     for (const auto& accStmt : groupNode.accumulators) {
         auto accOp = AccumOp{accStmt};
@@ -916,7 +916,7 @@ std::tuple<SbStage, std::vector<std::string>, SbSlotVector, PlanStageSlots> buil
     }
 
     // Prepare to project 'idFinalExpr' to a slot.
-    SbExprOptSbSlotVector projects;
+    SbExprOptSlotVector projects;
     projects.emplace_back(std::move(idFinalExpr), boost::none);
 
     // Generate all the finalize expressions and prepare to project all these expressions
@@ -977,7 +977,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregationBlock(
     SbStage stage,
     SbExpr::Vector groupByKeyExprs,
     std::vector<SbAggExprVector> sbAggExprs,
-    std::vector<SbExprSbSlotVector> mergingExprs,
+    std::vector<SbExprSlotVector> mergingExprs,
     std::vector<SbExpr::Vector> blockAccInputExprs,
     boost::optional<SbSlot> bitmapInternalSlot,
     const std::vector<SbSlotVector>& blockAccDataSlots,
@@ -987,7 +987,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregationBlock(
     SbBuilder b(state, nodeId);
 
     // Project the group by key expressions and any block accumulator input expressions to slots.
-    SbExprOptSbSlotVector projects;
+    SbExprOptSlotVector projects;
     for (auto& expr : groupByKeyExprs) {
         projects.emplace_back(std::move(expr), boost::none);
     }
@@ -1027,7 +1027,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregationBlock(
             std::move(vec.begin(), vec.end(), std::back_inserter(flattenedSbAggExprs));
         }
 
-        SbExprSbSlotVector flattenedMergingExprs;
+        SbExprSlotVector flattenedMergingExprs;
         for (auto& vec : mergingExprs) {
             std::move(vec.begin(), vec.end(), std::back_inserter(flattenedMergingExprs));
         }
@@ -1064,13 +1064,13 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregationScalar(
     SbStage stage,
     SbExpr::Vector groupByKeyExprs,
     std::vector<SbAggExprVector> sbAggExprs,
-    std::vector<SbExprSbSlotVector> mergingExprs,
+    std::vector<SbExprSlotVector> mergingExprs,
     const GroupNode* groupNode) {
     const PlanNodeId nodeId = groupNode->nodeId();
     SbBuilder b(state, nodeId);
 
     // Project the group by key expressions to slots.
-    SbExprOptSbSlotVector projects;
+    SbExprOptSlotVector projects;
     for (auto& expr : groupByKeyExprs) {
         projects.emplace_back(std::move(expr), boost::none);
     }
@@ -1093,7 +1093,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregationScalar(
             std::move(vec.begin(), vec.end(), std::back_inserter(flattenedSbAggExprs));
         }
 
-        SbExprSbSlotVector flattenedMergingExprs;
+        SbExprSlotVector flattenedMergingExprs;
         for (auto& vec : mergingExprs) {
             std::move(vec.begin(), vec.end(), std::back_inserter(flattenedMergingExprs));
         }
@@ -1217,7 +1217,7 @@ std::pair<SbStage, SbExpr::Vector> generateInitRootSlot(SbStage stage,
         auto [outStage, outSlots] =
             b.makeProject(buildVariableTypes(childOutputs, individualSlots),
                           std::move(stage),
-                          SbExprOptSbSlotPair{std::move(idOrEmptyObjExpr), slotIdForInitRoot});
+                          SbExprOptSlotPair{std::move(idOrEmptyObjExpr), slotIdForInitRoot});
         stage = std::move(outStage);
 
         outSlots[0].setTypeSignature(TypeSignature::kObjectType);
@@ -1519,7 +1519,7 @@ SlotBasedStageBuilder::buildGroupImplBlock(SbStage stage,  // moved in
     bool idIsSingleKey = idExprObj == nullptr;
 
     // Generate merging expressions for all the accumulators. These always use scalar mode.
-    std::vector<SbExprSbSlotVector> mergingExprs = generateAllMergingExprs(_state, *groupNode);
+    std::vector<SbExprSlotVector> mergingExprs = generateAllMergingExprs(_state, *groupNode);
 
     // Expression for the group ID if the key is a single constant and no accs had variable inits.
     SbExpr idConstantValue;
@@ -1660,7 +1660,7 @@ SlotBasedStageBuilder::buildGroupImplScalar(SbStage stage,  // moved in
     }
 
     // Generate merging expressions for all the accumulators. These always use scalar mode.
-    std::vector<SbExprSbSlotVector> mergingExprs = generateAllMergingExprs(_state, *groupNode);
+    std::vector<SbExprSlotVector> mergingExprs = generateAllMergingExprs(_state, *groupNode);
 
     // Expression for the group ID if the key is a single constant and no accs had variable inits.
     SbExpr idConstantValue;
