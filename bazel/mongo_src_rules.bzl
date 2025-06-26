@@ -250,6 +250,12 @@ MONGO_GLOBAL_SRC_DEPS = [
 
 MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES
 
+def hex32(val):
+    """Returns zero-padded 8-character lowercase hex string of 32-bit hash."""
+    v = val & 0xFFFFFFFF  # wrap to 32-bit unsigned
+    s = "%x" % v
+    return ("0" * (8 - len(s))) + s
+
 def force_includes_hdr(package_name, name):
     if package_name.startswith("src/mongo"):
         return select({
@@ -754,7 +760,10 @@ def _mongo_cc_binary_and_test(
             "//bazel/config:bolt_enabled": ["-Wl,--threads=" + str(NUM_CPUS)],
             "//conditions:default": [],
         }) + select({
-            "//bazel/config:simple_build_id_enabled": ["-Wl,--build-id=0x%x%x%x" % (hash(name), hash(name), hash(str(UNSAFE_VERSION_ID) + str(UNSAFE_COMPILE_VARIANT)))],
+            "//bazel/config:simple_build_id_enabled": ["-Wl,--build-id=0x" +
+                                                       hex32(hash(name)) +
+                                                       hex32(hash(name)) +
+                                                       hex32(hash(str(UNSAFE_VERSION_ID) + str(UNSAFE_COMPILE_VARIANT)))],
             "//conditions:default": [],
         }),
         "linkstatic": LINKSTATIC_ENABLED,
