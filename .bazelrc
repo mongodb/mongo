@@ -375,8 +375,8 @@ coverage --fission=no
 common --define codeowners_add_auto_approve_user=True
 common --define codeowners_have_allowed_unowned_files=True
 common --define codeowners_allowed_unowned_files_path=.github/ALLOWED_UNOWNED_FILES.yml
-#common --define codeowners_have_default_owner=True
-#common --define codeowners_default_owner=@10gen/mongo-default-approvers
+common --define codeowners_have_default_owner=True
+common --define codeowners_default_owner=@10gen/mongo-default-approvers
 
 # Don't detect the native toolchain on linux, only use the hermetic toolchains.
 # Opt out of this by passing --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=0 on the command line.
