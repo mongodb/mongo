@@ -69,9 +69,6 @@ def get_releases_file_locally_or_fallback_to_remote():
     """Get the latest releases.yml locally or fallback to getting it from github."""
     if os.path.exists(RELEASES_LOCAL_FILE):
         LOGGER.info(f"Found releases.yml file locally: {RELEASES_LOCAL_FILE}")
-        with open(RELEASES_LOCAL_FILE, "rb") as file:
-            print(file.read())
-            print("copyfile here")
         shutil.copyfile(RELEASES_LOCAL_FILE, _config.RELEASES_FILE)
 
     else:
