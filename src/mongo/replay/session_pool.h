@@ -67,8 +67,7 @@ public:
     auto submit(F&& f, Args&&... args)
         -> mongo::stdx::future<typename std::result_of_t<F(Args...)>> {
         using namespace mongo;
-        using ReturnType = typename std::result_of_t<F(Args...)>;
-
+        using ReturnType = typename std::invoke_result_t<F, Args...>;
         stdx::packaged_task<void()> task(
             [f = std::forward<F>(f), ... args = std::forward<Args>(args)]() mutable {
                 std::invoke(f, args...);
