@@ -1491,6 +1491,15 @@ struct DistinctNode : public QuerySolutionNodeWithSortSet {
 
     void computeProperties() override;
 
+    void hash(absl::HashState h) const override {
+        h = absl::HashState::combine(
+            std::move(h), index.identifier.catalogName, index.identifier.disambiguator);
+        // NOTE: We ignore the actual index bounds here. This is fine because this function is only
+        // used to implement the 'isCached' field in explain, so it needs to only distinguish plans
+        // that share the same plan cache key.
+        QuerySolutionNode::hash(std::move(h));
+    }
+
     IndexEntry index;
     IndexBounds bounds;
 

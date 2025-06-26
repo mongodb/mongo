@@ -14,6 +14,7 @@
  */
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {
     getPlanCache,
     testProperty
@@ -52,13 +53,16 @@ function isCachedIsTrueForOnePlan(getQuery, testHelpers) {
     return {passed: true};
 }
 
-// TODO SERVER-102075 re-enable isCached property testing once issue is fixed.
-// // Run the property with a regular collection.
-// testProperty(isCachedIsTrueForOnePlan,
-//              {experimentColl},
-//              {
-//                  collModel: getCollectionModel({isTS: false}),
-//                  // A deterministic set of results isn't needed to check the `isCached` property.
-//                  aggModel: getAggPipelineModel({deterministicBag: false})
-//              },
-//              {numRuns: 200, numQueriesPerRun: 20});
+const numRuns = 50;
+const numQueriesPerRun = 50;
+
+// Run the property with a regular collection.
+testProperty(isCachedIsTrueForOnePlan,
+             {experimentColl},
+             makeWorkloadModel({
+                 collModel: getCollectionModel(),
+                 // A deterministic set of results isn't needed to check the `isCached` property.
+                 aggModel: getAggPipelineModel({deterministicBag: false}),
+                 numQueriesPerRun
+             }),
+             numRuns);

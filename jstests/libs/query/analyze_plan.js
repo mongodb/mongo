@@ -457,6 +457,10 @@ export function getRejectedPlans(root) {
             return rejectedPlans;
         }
         return root.queryPlanner.rejectedPlans;
+    } else if ("shards" in root) {
+        for (const shardName in root.shards) {
+            return getRejectedPlans(root.shards[shardName]);
+        }
     } else {
         return root.stages[0]['$cursor'].queryPlanner.rejectedPlans;
     }

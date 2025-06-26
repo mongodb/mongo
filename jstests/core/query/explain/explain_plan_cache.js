@@ -9,8 +9,8 @@
  *   does_not_support_stepdowns,
  *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,
- *   # The "isCached" field which was introduced in 8.0.
- *   requires_fcv_80,
+ *   # Exercises a bug in distinct scan hashing that was fixed in 8.2.
+ *   requires_fcv_82,
  *   # Does not support multiplanning, because it caches more plans
  *   does_not_support_multiplanning_single_solutions,
  *   # The test examines the SBE plan cache, which initial sync may change the contents of.
@@ -207,9 +207,30 @@ function dataChangeTest(explainMode) {
     assertWinningPlanCacheStatus(coll.find({a: 1, b: 1}).explain(explainMode), true);
 }
 
+function distinctScanTest(explainMode) {
+    coll.drop();
+    assert.commandWorked(coll.insert({a: 1}));
+    assert.commandWorked(coll.createIndex({a: 1}));
+    assert.commandWorked(coll.createIndex({a: 1, b: 1}));
+
+    const pipeline = [{$sort: {a: 1}}, {$group: {_id: "$a"}}];
+
+    // Nothing should be cached at first.
+    assertWinningPlanCacheStatus(coll.explain(explainMode).aggregate(pipeline), false);
+
+    // Run the query to get it cached.
+    for (let i = 0; i < 5; i++) {
+        coll.aggregate(pipeline).toArray();
+    }
+
+    // Only the winning plan should have 'isCached' set to true.
+    assertWinningPlanCacheStatus(coll.explain(explainMode).aggregate(pipeline), true);
+}
+
 for (const explainMode of ["queryPlanner", "executionStats", "allPlansExecution"]) {
     collScanTest(explainMode);
     predicateTest(explainMode);
     dataChangeTest(explainMode);
     sortOnlyTest(explainMode);
+    distinctScanTest(explainMode);
 }
