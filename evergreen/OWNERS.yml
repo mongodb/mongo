@@ -1,26 +1,26 @@
-version: 1.0.0
+version: 2.0.0
 filters:
-  - "get_all_resmoke_suite_configs.sh":
+  - "*":
     approvers:
       - 10gen/devprod-correctness
-  - "get_resmoke_suite_config.sh":
+  - "/bazel*":
     approvers:
-      - 10gen/devprod-correctness
-  - "multiversion_selection.sh":
+      - 10gen/devprod-build
+  - "/compile*":
     approvers:
-      - 10gen/devprod-correctness
-  - "multiversion_setup.sh":
+      - 10gen/devprod-build
+  - "/failed_unittests_gather.sh":
     approvers:
-      - 10gen/devprod-correctness
-  - "resmoke_tests_execute_bazel.sh":
+      - 10gen/devprod-build
+  - "/generate_clang_tidy_report.py":
     approvers:
-      - 10gen/devprod-correctness
-  - "restore_git_history_and_tags.sh":
+      - 10gen/devprod-build
+  - "/generate_evergreen_bazelrc.sh":
     approvers:
-      - 10gen/devprod-correctness
-  - "retry_git.sh":
+      - 10gen/devprod-build
+  - "/package*":
     approvers:
-      - 10gen/devprod-correctness
+      - 10gen/devprod-build
   - "validate_compile_commands.py":
     approvers:
       - 10gen/devprod-build
