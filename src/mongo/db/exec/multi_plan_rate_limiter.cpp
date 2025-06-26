@@ -60,43 +60,43 @@ public:
     TicketTable(TicketTable&&) = delete;
     TicketTable& operator=(TicketTable&&) = delete;
 
-    std::shared_ptr<MultiPlanTicketHolder> get(const std::string& key) {
+    std::shared_ptr<MultiPlanTicketHolder> get(ServiceContext* serviceContext,
+                                               const std::string& key,
+                                               size_t numCandidatePlans) {
         stdx::lock_guard guard{_mutex};
-        auto pos = _table.find(key);
-        if (pos != _table.end()) {
-            return pos->second;
+        auto [pos, _] = _table.try_emplace(key);
+        if (auto holder = pos->second.lock()) {
+            return holder;
         }
-        return std::shared_ptr<MultiPlanTicketHolder>{};
-    }
 
-    std::shared_ptr<MultiPlanTicketHolder> registerQueryShape(ServiceContext* serviceContext,
-                                                              const std::string& key,
-                                                              size_t numCandidatePlans) {
-        stdx::lock_guard guard{_mutex};
-        auto [pos, inserted] = _table.try_emplace(key);
-        if (inserted) {
-            // Make sure that we have at least one ticket to be able to always proceed with
-            // multi-planning.
-            const int numTickets =
-                std::max(internalQueryMaxConcurrentMultiPlanJobsPerCacheKey.load() /
-                             static_cast<int>(numCandidatePlans),
-                         1);
-            pos->second = std::make_shared<MultiPlanTicketHolder>(serviceContext, numTickets);
-        }
-        return pos->second;
+        // Make sure that we have at least one ticket to be able to always proceed with
+        // multi-planning.
+        const int numTickets = std::max(internalQueryMaxConcurrentMultiPlanJobsPerCacheKey.load() /
+                                            static_cast<int>(numCandidatePlans),
+                                        1);
+        auto holder = std::make_shared<MultiPlanTicketHolder>(serviceContext, numTickets);
+        pos->second = holder;
+        return holder;
     }
 
     void removeQueryShape(const std::string& key) {
         stdx::lock_guard guard{_mutex};
         auto pos = _table.find(key);
         if (pos != _table.end()) {
-            pos->second->release();
+            if (auto holder = pos->second.lock()) {
+                holder->release();
+            }
             _table.erase(pos);
         }
     }
 
 private:
-    stdx::unordered_map<std::string, std::shared_ptr<MultiPlanTicketHolder>> _table;
+    // The MultiPlanTicket class, which is always allocated on stack and lives during
+    // multi-planning, stores shared pointers to MultiPlanTicketHolder. Storing weak pointers here
+    // ensures that TicketHolder object is immediately freed once all tickets are destroyed. It
+    // is particular useful in situations when a single query of a particular shape is sent just
+    // once, and an active cache entry for it is never created.
+    stdx::unordered_map<std::string, std::weak_ptr<MultiPlanTicketHolder>> _table;
     stdx::mutex _mutex;
 };
 
@@ -180,14 +180,8 @@ MultiPlanTicketManager MultiPlanRateLimiter::getTicketManager(OperationContext* 
                                                               const CanonicalQuery& cq,
                                                               size_t numCandidatePlans) {
     auto key = plan_cache_key_factory::make<PlanCacheKey>(cq, coll).toString();
-    auto ticketHolder = ticketTableDecoration(coll.get())->get(key);
-
-    // This is the first time the server has received this query shape.
-    if (!ticketHolder) {
-        ticketHolder = ticketTableDecoration(coll.get())
-                           ->registerQueryShape(opCtx->getServiceContext(), key, numCandidatePlans);
-    }
-
+    auto ticketHolder =
+        ticketTableDecoration(coll.get())->get(opCtx->getServiceContext(), key, numCandidatePlans);
     return MultiPlanTicketManager{std::move(ticketHolder), opCtx};
 }
 
