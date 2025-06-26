@@ -65,7 +65,7 @@ public:
      */
     template <typename F, typename... Args>
     auto submit(F&& f, Args&&... args)
-        -> mongo::stdx::future<typename std::result_of_t<F(Args...)>> {
+        -> mongo::stdx::future<typename std::invoke_result_t<F, Args...>> {
         using namespace mongo;
         using ReturnType = typename std::invoke_result_t<F, Args...>;
         stdx::packaged_task<void()> task(
