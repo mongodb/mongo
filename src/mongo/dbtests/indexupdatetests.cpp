@@ -125,7 +125,7 @@ protected:
             });
 
             uassertStatusOK(
-                indexer.init(_opCtx, collection(), key, MultiIndexBlock::kNoopOnInitFn));
+                indexer.init(_opCtx, collection(), {key}, MultiIndexBlock::kNoopOnInitFn));
             uassertStatusOK(indexer.insertAllDocumentsInCollection(_opCtx, collection().get()));
             WriteUnitOfWork wunit(_opCtx);
             ASSERT_OK(indexer.commit(_opCtx,
@@ -192,7 +192,7 @@ public:
             indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
         });
 
-        ASSERT_OK(indexer.init(_opCtx, coll, spec, MultiIndexBlock::kNoopOnInitFn).getStatus());
+        ASSERT_OK(indexer.init(_opCtx, coll, {spec}, MultiIndexBlock::kNoopOnInitFn).getStatus());
         ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, coll.get()));
         ASSERT_OK(indexer.checkConstraints(_opCtx, coll.get()));
 
@@ -248,7 +248,7 @@ public:
                 indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
             });
 
-            ASSERT_OK(indexer.init(_opCtx, collection(), spec, MultiIndexBlock::kNoopOnInitFn)
+            ASSERT_OK(indexer.init(_opCtx, collection(), {spec}, MultiIndexBlock::kNoopOnInitFn)
                           .getStatus());
 
             auto& coll = collection();
@@ -372,7 +372,7 @@ Status IndexBuildBase::createIndex(const BSONObj& indexSpec) {
     ScopeGuard abortOnExit(
         [&] { indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn); });
     Status status =
-        indexer.init(_opCtx, collection(), indexSpec, MultiIndexBlock::kNoopOnInitFn).getStatus();
+        indexer.init(_opCtx, collection(), {indexSpec}, MultiIndexBlock::kNoopOnInitFn).getStatus();
     if (status == ErrorCodes::IndexAlreadyExists) {
         return Status::OK();
     }

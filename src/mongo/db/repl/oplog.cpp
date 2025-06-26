@@ -320,32 +320,7 @@ void createIndexForApplyOps(OperationContext* opCtx,
     auto collUUID = indexCollection->uuid();
     auto fromMigrate = false;
     auto indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
-    if (indexCollection->isEmpty(opCtx)) {
-        WriteUnitOfWork wuow(opCtx);
-        CollectionWriter coll(opCtx, indexNss);
-
-        try {
-            indexBuildsCoordinator->createIndexesOnEmptyCollection(
-                opCtx, coll, {indexSpec}, fromMigrate);
-        } catch (DBException& ex) {
-            // Some indexing errors can be ignored during oplog application.
-            const auto& status = ex.toStatus();
-            if (IndexBuildsCoordinator::isCreateIndexesErrorSafeToIgnore(status, constraints)) {
-                LOGV2_DEBUG(7261800,
-                            1,
-                            "Ignoring indexing error",
-                            "error"_attr = redact(status),
-                            logAttrs(indexCollection->ns()),
-                            logAttrs(indexCollection->uuid()),
-                            "spec"_attr = indexSpec);
-                return;
-            }
-            throw;
-        }
-        wuow.commit();
-    } else {
-        indexBuildsCoordinator->createIndex(opCtx, collUUID, indexSpec, constraints, fromMigrate);
-    }
+    indexBuildsCoordinator->createIndex(opCtx, collUUID, indexSpec, constraints, fromMigrate);
 }
 
 /**

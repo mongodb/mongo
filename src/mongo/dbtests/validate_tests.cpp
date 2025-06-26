@@ -340,8 +340,8 @@ protected:
             Lock::CollectionLock collLock(&_opCtx, _nss, MODE_X);
             CollectionWriter collection(&_opCtx, _nss);
             beginTransaction();
-            status =
-                indexer.init(&_opCtx, collection, spec, MultiIndexBlock::kNoopOnInitFn).getStatus();
+            status = indexer.init(&_opCtx, collection, {spec}, MultiIndexBlock::kNoopOnInitFn)
+                         .getStatus();
             commitTransaction();
             if (status == ErrorCodes::IndexAlreadyExists) {
                 return Status::OK();

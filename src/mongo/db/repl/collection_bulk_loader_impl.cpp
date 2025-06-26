@@ -134,8 +134,10 @@ Status CollectionBulkLoaderImpl::init(const BSONObj& idIndexSpec,
                     auto status = _idIndexBlock
                                       ->init(_opCtx.get(),
                                              collWriter,
-                                             idIndexSpec,
+                                             {idIndexSpec},
                                              MultiIndexBlock::kNoopOnInitFn,
+                                             MultiIndexBlock::InitMode::InitialSync,
+                                             boost::none,
                                              maxIdIndexMemoryUsageBytes)
                                       .getStatus();
                     if (!status.isOK()) {

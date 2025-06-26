@@ -264,7 +264,7 @@ protected:
 
         // Initialize the index builder and add all documents currently in the collection.
         ASSERT_OK(
-            indexer.init(opCtx(), coll, indexSpec, MultiIndexBlock::kNoopOnInitFn).getStatus());
+            indexer.init(opCtx(), coll, {indexSpec}, MultiIndexBlock::kNoopOnInitFn).getStatus());
         ASSERT_OK(indexer.insertAllDocumentsInCollection(opCtx(), coll.get()));
         ASSERT_OK(indexer.checkConstraints(opCtx(), coll.get()));
 

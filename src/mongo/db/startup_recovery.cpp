@@ -231,7 +231,11 @@ Status buildMissingIdIndex(OperationContext* opCtx, const NamespaceString nss) {
     const auto indexCatalog = collWriter->getIndexCatalog();
     const auto idIndexSpec = indexCatalog->getDefaultIdIndexSpec(collWriter.get());
 
-    auto swSpecs = indexer.init(opCtx, collWriter, idIndexSpec, MultiIndexBlock::kNoopOnInitFn);
+    auto swSpecs = indexer.init(opCtx,
+                                collWriter,
+                                {idIndexSpec},
+                                MultiIndexBlock::kNoopOnInitFn,
+                                MultiIndexBlock::InitMode::SteadyState);
     if (!swSpecs.isOK()) {
         return swSpecs.getStatus();
     }

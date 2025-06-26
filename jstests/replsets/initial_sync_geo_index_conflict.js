@@ -62,24 +62,34 @@ function runTest(numDocs) {
     // Wait for initial sync to finish.
     rst.awaitSecondaryNodes();
 
-    // We handle single phase indexing errors in different parts of the oplog application logic
-    // depending on whether the collection is empty at the time. Hence, the different log message
-    // IDs.
-    const expectedLogMsgId = (numDocs === 0 ? 7261800 : 4718200);
-    checkLog.containsJson(secondary, expectedLogMsgId, {
+    const attr = {
         namespace: primaryColl.getFullName(),
         spec: (spec) => {
             jsTestLog('Checking index spec in oplog application log message: ' + tojson(spec));
             return spec.name === 'a_2d';
         }
-    });
+    };
+    const timeoutMillis = 5 * 60 * 1000;
+
+    // Older versions logged 7261800 for empty collections and 4718200 for non-empty. We now always
+    // log 4718200 but multiversion tests can still produce the old id.
+    assert.soon(
+        function() {
+            return checkLog.checkContainsOnceJson(secondary, 4718200, attr) ||
+                checkLog.checkContainsOnceJson(secondary, 7261800, attr);
+        },
+        'Could not find log entries containing the id: 4718200 or 7261800, and attrs: ' +
+            tojson(attr),
+        timeoutMillis,
+        300,
+        {runHangAnalyzer: false});
 
     // We rely on the replica set test fixture shutdown to compare the collection contents
     // (including index specs) between the two nodes in the cluster.
     rst.stopSet();
 }
 
-// We test both empty and non-empty collections because these are handled slightly differently
-// in the oplog application code.
+// We test both empty and non-empty collections because these used to be handled slightly
+// differently in the oplog application code.
 runTest(0);
 runTest(1);

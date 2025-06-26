@@ -157,7 +157,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
         status = indexer
                      .init(opCtx,
                            collection,
-                           spec,
+                           {spec},
                            [opCtx] {
                                if (shard_role_details::getRecoveryUnit(opCtx)
                                        ->getCommitTimestamp()

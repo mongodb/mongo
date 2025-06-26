@@ -2083,8 +2083,7 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
     invariant(collection,
               str::stream() << "IndexBuildsCoordinator::createIndexes: " << collectionUUID);
     auto nss = collection->ns();
-    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_X),
-              str::stream() << "IndexBuildsCoordinator::createIndexes: " << collectionUUID);
+    CollectionCatalog::get(opCtx)->invariantHasExclusiveAccessToCollection(opCtx, nss);
 
     auto buildUUID = UUID::gen();
 
@@ -2095,7 +2094,7 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
         auto onInitFn = MultiIndexBlock::makeTimestampedIndexOnInitFn(opCtx, collection.get());
         IndexBuildsManager::SetupOptions options;
         options.indexConstraints = indexConstraints;
-        // As the caller has a MODE_X lock on the collection, we can safely assume they want to
+        // As the caller has exclusive access to the collection, we can safely assume they want to
         // build the index in the foreground instead of yielding during element insertion.
         options.method = IndexBuildMethod::kForeground;
         uassertStatusOK(_indexBuildsManager.setUpIndexBuild(

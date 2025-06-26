@@ -196,7 +196,7 @@ protected:
         {
             WriteUnitOfWork wunit(&_opCtx);
             uassertStatusOK(
-                indexer.init(&_opCtx, collection, specObj, MultiIndexBlock::kNoopOnInitFn));
+                indexer.init(&_opCtx, collection, {specObj}, MultiIndexBlock::kNoopOnInitFn));
             wunit.commit();
         }
         uassertStatusOK(indexer.insertAllDocumentsInCollection(&_opCtx, collection.get()));

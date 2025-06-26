@@ -478,6 +478,24 @@ public:
         }
     }
 
+    void createCreateIndexBatch(int size) {
+        const long long term1 = 1;
+        const int indexesPerCollection = 62;
+        for (int i = 0; i < size; i += indexesPerCollection) {
+            auto ns = fmt::format("foo.bar{}", i);
+            for (int j = 0; j < indexesPerCollection; ++j) {
+                auto o = BSON("createIndexes" << ns << "v" << 2 << "key"
+                                              << BSON(fmt::format("a_{}", j) << 1) << "name"
+                                              << fmt::format("a_{}_1", j));
+                _oplogEntries.emplace_back(
+                    BSON("op" << "c"
+                              << "ns" << ns << "ui" << _foobarUUID << "o" << o << "ts"
+                              << Timestamp(1, i * indexesPerCollection + j) << "t" << term1 << "v"
+                              << 2 << "wall" << Date_t::now()));
+            }
+        }
+    }
+
     void reset() {
         // Restart with an empty storage.
         _testSvcCtx->resetStorageEngine();
@@ -605,6 +623,13 @@ void BM_TestPrepares(benchmark::State& state) {
     runBMTest(testSvcCtx, fixture, state);
 }
 
+void BM_TestCreateIndex(benchmark::State& state) {
+    TestServiceContext testSvcCtx;
+    Fixture fixture(&testSvcCtx);
+    fixture.createCreateIndexBatch(state.range(0));
+    runBMTest(testSvcCtx, fixture, state);
+}
+
 BENCHMARK(BM_TestInserts)->Arg(100 * 1000)->UseManualTime()->Unit(benchmark::kMillisecond);
 
 BENCHMARK(BM_TestApplyOps)
@@ -646,6 +671,8 @@ BENCHMARK(BM_TestPrepares)
     ->Args({500, 100 * 1000, 500})
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
+
+BENCHMARK(BM_TestCreateIndex)->Arg(100 * 1000)->UseManualTime()->Unit(benchmark::kMillisecond);
 
 }  // namespace
 }  // namespace mongo

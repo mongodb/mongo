@@ -204,7 +204,7 @@ Status createIndexFromSpec(OperationContext* opCtx,
             .init(
                 opCtx,
                 collection,
-                spec,
+                {spec},
                 [opCtx, clock] {
                     if (opCtx->writesAreReplicated() &&
                         shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull()) {

@@ -134,12 +134,6 @@ public:
         InitMode initMode = InitMode::SteadyState,
         const boost::optional<ResumeIndexInfo>& resumeInfo = boost::none,
         boost::optional<size_t> maxMemoryUsageBytes = boost::none);
-    StatusWith<std::vector<BSONObj>> init(
-        OperationContext* opCtx,
-        CollectionWriter& collection,
-        const BSONObj& spec,
-        OnInitFn onInit,
-        boost::optional<size_t> maxMemoryUsageBytes = boost::none);
     /**
      * Not all index initializations need an OnInitFn, in particular index builds that do not need
      * to timestamp catalog writes. This is a no-op.
