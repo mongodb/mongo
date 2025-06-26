@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelementvalue.h"
 #include "mongo/bson/bsonobj.h"
@@ -751,6 +752,8 @@ public:
 
     template <typename T>
     static BSONElement materialize(BSONElementStorage& allocator, BSONElement val) {
+        if (val.eoo())
+            return BSONElement();
         auto allocatedElem = allocator.allocate(val.type(), "", val.valuesize());
         memcpy(allocatedElem.value(), val.value(), val.valuesize());
         return allocatedElem.element();

@@ -741,7 +741,6 @@ bool BSONColumn::contains_forTest(BSONType elementType) const {
     while (byteIter != columnEnd) {
         control = static_cast<uint8_t>(*byteIter);
         if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
-            BSONElement literalElem(byteIter, 1, BSONElement::TrustedInitTag{});
             if (control == stdx::to_underlying(elementType)) {
                 return true;
             } else if (control == stdx::to_underlying(BSONType::eoo)) {
@@ -750,6 +749,7 @@ bool BSONColumn::contains_forTest(BSONType elementType) const {
                 return false;
             }
 
+            BSONElement literalElem(byteIter, 1, BSONElement::TrustedInitTag{});
             byteIter += literalElem.size();
         } else if (bsoncolumn::isInterleavedStartControlByte(*byteIter)) {
 

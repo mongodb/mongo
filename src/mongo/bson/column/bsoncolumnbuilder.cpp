@@ -36,6 +36,7 @@
 #include "mongo/bson/column/simple8b.h"
 #include "mongo/bson/column/simple8b_type_util.h"
 #include "mongo/bson/oid.h"
+#include "mongo/stdx/utility.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/tracking/allocator.h"
@@ -1702,15 +1703,17 @@ int BSONColumnBuilder<Allocator>::numInterleavedStartWritten() const {
 
 template <class Allocator>
 BSONElement BSONColumnBuilder<Allocator>::last() const {
-    return visit(OverloadedVisitor{[](const typename InternalState::Regular& regular) {
-                                       return BSONElement{
-                                           regular._prev.data(),
-                                           /*field name size including null terminator*/ 1,
-                                           BSONElement::TrustedInitTag{}};
-                                   },
-                                   [](const typename InternalState::Interleaved&) {
-                                       return BSONElement{};
-                                   }},
+    return visit(OverloadedVisitor{
+                     [](const typename InternalState::Regular& regular) {
+                         return BSONElement{
+                             regular._prev.data(),
+                             /*field name size including null terminator*/
+                             *regular._prev.data() == stdx::to_underlying(BSONType::eoo) ? 0 : 1,
+                             BSONElement::TrustedInitTag{}};
+                     },
+                     [](const typename InternalState::Interleaved&) {
+                         return BSONElement{};
+                     }},
                  _is.state);
 }
 
