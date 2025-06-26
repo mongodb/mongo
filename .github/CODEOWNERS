@@ -2159,6 +2159,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/**/all_indices_required_checker* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/query/**/allowed_contexts* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/analyze* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/benchmark* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/bson_typemask.h @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/collection_index_usage_tracker* @10gen/query-execution-write-exec @svc-auto-approve-bot
 /src/mongo/db/query/**/collection_query_info* @10gen/query-optimization @svc-auto-approve-bot

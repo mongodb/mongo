@@ -1,0 +1,6 @@
+package(default_visibility = ["//visibility:public"])
+
+py_library(
+    name = "employee",
+    srcs = ["employee.py"],
+)
