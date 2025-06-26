@@ -57,11 +57,13 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceSortByCount::createFromBson(
                                  "expression inside an object",
                 innerObj.firstElementFieldName()[0] == '$');
     } else if (elem.type() == String) {
-        // Make sure that the sortByCount field is a $-prefixed path
+        // Make sure that the sortByCount field is a $-prefixed path.
         uassert(40148,
                 str::stream() << "the sortByCount field must be defined as a $-prefixed path or an "
                                  "expression inside an object",
-                (elem.valueStringData()[0] == '$'));
+                // The string length must be greater than 2 because we need a '$', at least one char
+                // for the field name and the final terminating 0.
+                (elem.valuestrsize() > 2 && elem.valueStringData()[0] == '$'));
     } else {
         uasserted(
             40149,
