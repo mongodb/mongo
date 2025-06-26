@@ -423,6 +423,36 @@ TEST(FailPoint, FailPointEnableBlockByPointer) {
     ASSERT_FALSE(failPoint->shouldFail());
 }
 
+TEST(FailPoint, FailPointEnableBlockWithMode) {
+    auto failPoint = mongo::globalFailPointRegistry().find("dummy");
+
+    ASSERT_FALSE(failPoint->shouldFail());
+
+    {
+        FailPointEnableBlock dummyFp(
+            "dummy", FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+        ASSERT_TRUE(failPoint->shouldFail());
+        ASSERT_FALSE(failPoint->shouldFail());
+    }
+
+    ASSERT_FALSE(failPoint->shouldFail());
+}
+
+TEST(FailPoint, FailPointEnableBlockByPointerWithMode) {
+    auto failPoint = mongo::globalFailPointRegistry().find("dummy");
+
+    ASSERT_FALSE(failPoint->shouldFail());
+
+    {
+        FailPointEnableBlock dummyFp(
+            failPoint, FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+        ASSERT_TRUE(failPoint->shouldFail());
+        ASSERT_FALSE(failPoint->shouldFail());
+    }
+
+    ASSERT_FALSE(failPoint->shouldFail());
+}
+
 TEST(FailPoint, ExecuteIfBasicTest) {
     FailPoint failPoint("testFP");
     failPoint.setMode(FailPoint::nTimes, 1, BSON("skip" << true));

@@ -628,8 +628,10 @@ class FailPointEnableBlock {
 public:
     explicit FailPointEnableBlock(StringData failPointName);
     FailPointEnableBlock(StringData failPointName, BSONObj data);
+    FailPointEnableBlock(StringData failPointName, FailPoint::ModeOptions mode);
     explicit FailPointEnableBlock(FailPoint* failPoint);
     FailPointEnableBlock(FailPoint* failPoint, BSONObj data);
+    FailPointEnableBlock(FailPoint* failPoint, FailPoint::ModeOptions mode);
     ~FailPointEnableBlock();
 
     FailPointEnableBlock(const FailPointEnableBlock&) = delete;

@@ -289,19 +289,27 @@ auto setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj)
 }
 
 FailPointEnableBlock::FailPointEnableBlock(StringData failPointName)
-    : FailPointEnableBlock(failPointName, {}) {}
+    : FailPointEnableBlock(failPointName, BSONObj{}) {}
 
 FailPointEnableBlock::FailPointEnableBlock(StringData failPointName, BSONObj data)
     : FailPointEnableBlock(globalFailPointRegistry().find(failPointName), std::move(data)) {}
 
+FailPointEnableBlock::FailPointEnableBlock(StringData failPointName, FailPoint::ModeOptions mode)
+    : FailPointEnableBlock(globalFailPointRegistry().find(failPointName), std::move(mode)) {}
+
 FailPointEnableBlock::FailPointEnableBlock(FailPoint* failPoint)
-    : FailPointEnableBlock(failPoint, {}) {}
+    : FailPointEnableBlock(failPoint, BSONObj{}) {}
 
 FailPointEnableBlock::FailPointEnableBlock(FailPoint* failPoint, BSONObj data)
+    : FailPointEnableBlock(
+          failPoint,
+          FailPoint::ModeOptions{.mode = FailPoint::Mode::alwaysOn, .extra = std::move(data)}) {}
+
+FailPointEnableBlock::FailPointEnableBlock(FailPoint* failPoint, FailPoint::ModeOptions mode)
     : _failPoint(failPoint) {
     invariant(_failPoint != nullptr);
 
-    _initialTimesEntered = _failPoint->setMode(FailPoint::alwaysOn, 0, std::move(data));
+    _initialTimesEntered = _failPoint->setMode(std::move(mode));
 
     LOGV2_WARNING(23830,
                   "Set failpoint",
