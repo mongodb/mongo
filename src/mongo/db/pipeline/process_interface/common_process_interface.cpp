@@ -53,6 +53,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/router_role.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -215,20 +216,6 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
     return ops;
 }
 
-std::vector<FieldPath> CommonProcessInterface::collectDocumentKeyFieldsActingAsRouter(
-    OperationContext* opCtx, const NamespaceString& nss) const {
-    const auto criSW = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
-    if (criSW.isOK() && criSW.getValue().isSharded()) {
-        return shardKeyToDocumentKeyFields(
-            criSW.getValue().getChunkManager().getShardKeyPattern().getKeyPatternFields());
-    } else if (!criSW.isOK() && criSW.getStatus().code() != ErrorCodes::NamespaceNotFound) {
-        uassertStatusOK(criSW);
-    }
-
-    // We have no evidence this collection is sharded, so the document key is just _id.
-    return {"_id"};
-}
-
 void CommonProcessInterface::updateClientOperationTime(OperationContext* opCtx) const {
     // In order to support causal consistency in a replica set or a sharded cluster when reading
     // with secondary read preference, the secondary must propagate the primary's operation time
@@ -283,21 +270,24 @@ boost::optional<ShardId> CommonProcessInterface::findOwningShard(OperationContex
     if (shard_role_details::getLocker(opCtx)->isLocked()) {
         return boost::none;
     }
-    auto* grid = Grid::get(opCtx);
-    tassert(7958000, "Grid should be initialized", grid && grid->isInitialized());
 
-    return CommonProcessInterface::findOwningShard(opCtx, grid->catalogCache(), nss);
+    auto swRoutingCtx = getRoutingContext(opCtx, {nss});
+    if (swRoutingCtx.getStatus().code() == ErrorCodes::NamespaceNotFound) {
+        return boost::none;
+    }
+
+    // The RoutingContext is acquired and disposed of without validating the routing tables against
+    // a shard here because findOwningShard() is only used for distributed query planning
+    // optimizations; it doesn't affect query correctness.
+    uassertStatusOK(swRoutingCtx.getStatus());
+    auto& routingCtx = swRoutingCtx.getValue();
+    return CommonProcessInterface::findOwningShard(opCtx, *routingCtx, nss);
 }
 
 boost::optional<ShardId> CommonProcessInterface::findOwningShard(OperationContext* opCtx,
-                                                                 CatalogCache* catalogCache,
+                                                                 RoutingContext& routingCtx,
                                                                  const NamespaceString& nss) {
-    tassert(7958001, "CatalogCache should be initialized", catalogCache);
-    auto swCRI = catalogCache->getCollectionRoutingInfo(opCtx, nss);
-    if (swCRI.getStatus().code() == ErrorCodes::NamespaceNotFound) {
-        return boost::none;
-    }
-    const auto cri = uassertStatusOK(swCRI);
+    const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
     if (cri.hasRoutingTable()) {
         const auto& cm = cri.getChunkManager();

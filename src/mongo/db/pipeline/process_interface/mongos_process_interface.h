@@ -118,6 +118,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(OperationContext*,
+                                                                  const NamespaceString&,
+                                                                  RoutingContext*) const final;
+
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
 
     boost::optional<ShardId> determineSpecificMergeShard(OperationContext* opCtx,

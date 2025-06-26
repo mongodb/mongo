@@ -100,7 +100,7 @@ std::list<BSONObj> NonShardServerProcessInterface::getIndexSpecs(OperationContex
 }
 
 std::vector<FieldPath> NonShardServerProcessInterface::collectDocumentKeyFieldsActingAsRouter(
-    OperationContext* opCtx, const NamespaceString& nss) const {
+    OperationContext* opCtx, const NamespaceString& nss, RoutingContext*) const {
     return {"_id"};  // Nothing is sharded.
 }
 

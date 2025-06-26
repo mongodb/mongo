@@ -40,7 +40,7 @@
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
-#include "mongo/s/catalog_cache.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/uuid.h"
 
@@ -159,13 +159,13 @@ public:
      *
      * As written, this function can only be called in a sharded context.
      *
-     * Note that the first overload looks up an instance of 'CatalogCache', while the second takes
+     * Note that the first overload creates an instance of RoutingContext, while the second takes
      * it as a parameter.
      */
     static boost::optional<ShardId> findOwningShard(OperationContext* opCtx,
                                                     const NamespaceString& nss);
     static boost::optional<ShardId> findOwningShard(OperationContext* opCtx,
-                                                    CatalogCache* catalogCache,
+                                                    RoutingContext& routingCtx,
                                                     const NamespaceString& nss);
 
 
@@ -177,7 +177,9 @@ public:
                                        CurrentOpCursorMode cursorMode) const final;
 
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
-        OperationContext*, const NamespaceString&) const override;
+        OperationContext*,
+        const NamespaceString&,
+        RoutingContext* routingCtx = nullptr) const override = 0;
 
     void updateClientOperationTime(OperationContext* opCtx) const final;
 

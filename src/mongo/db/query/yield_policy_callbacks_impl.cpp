@@ -62,6 +62,9 @@ void YieldPolicyCallbacksImpl::duringYield(OperationContext* opCtx) const {
     auto& catalogCacheRefreshRequired =
         planExecutorShardingState(opCtx).catalogCacheRefreshRequired;
     if (catalogCacheRefreshRequired) {
+        // We are simply joining the refresh of the routing tables for the affected namespace here
+        // but not performing a routing operation, so this routing table access is not gated behind
+        // a RoutingContext.
         auto catalogCache = Grid::get(opCtx)->catalogCache();
         uassertStatusOK(
             catalogCache->getCollectionRoutingInfo(opCtx, *catalogCacheRefreshRequired));

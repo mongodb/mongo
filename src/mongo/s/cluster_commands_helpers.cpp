@@ -1016,6 +1016,16 @@ StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd_DEPRECATED(
     return catalogCache->getCollectionRoutingInfo(opCtx, nss, allowLocks);
 }
 
+StatusWith<std::unique_ptr<RoutingContext>> getRoutingContext(
+    OperationContext* opCtx, const std::vector<NamespaceString>& nssList, bool allowLocks) {
+    try {
+        auto routingCtx = std::make_unique<RoutingContext>(opCtx, std::move(nssList), allowLocks);
+        return routingCtx;
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+}
+
 StatusWith<std::unique_ptr<RoutingContext>> getRoutingContextForTxnCmd(
     OperationContext* opCtx, const std::vector<NamespaceString>& nssList) {
     // When in a multi-document transaction, allow getting routing info from the
@@ -1029,12 +1039,7 @@ StatusWith<std::unique_ptr<RoutingContext>> getRoutingContextForTxnCmd(
     const auto allowLocks =
         opCtx->inMultiDocumentTransaction() && shard_role_details::getLocker(opCtx)->isLocked();
 
-    try {
-        auto routingCtx = std::make_unique<RoutingContext>(opCtx, std::move(nssList), allowLocks);
-        return routingCtx;
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
+    return getRoutingContext(opCtx, nssList, allowLocks);
 }
 
 CollectionRoutingInfo getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(
@@ -1078,8 +1083,10 @@ BSONObj forceReadConcernLocal(OperationContext* opCtx, BSONObj& cmd) {
     return bob.obj();
 }
 
-StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(
-    OperationContext* opCtx, const NamespaceString& nss, const CollectionRoutingInfo& cri) {
+StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationContext* opCtx,
+                                                                   RoutingContext& routingCtx,
+                                                                   const NamespaceString& nss) {
+    const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
     auto [indexShard, listIndexesCmd] = [&]() -> std::pair<std::shared_ptr<Shard>, BSONObj> {
         ListIndexes listIndexesCmd(nss);
         setReadWriteConcern(opCtx, listIndexesCmd, true, false);
@@ -1109,6 +1116,7 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(
         }
     }();
 
+    routingCtx.onRequestSentForNss(nss);
     return indexShard->runExhaustiveCursorCommand(
         opCtx,
         ReadPreferenceSetting::get(opCtx),

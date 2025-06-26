@@ -799,26 +799,30 @@ Status runAggregateOnView(ResolvedViewAggExState& resolvedViewAggExState,
         status = _runAggregate(resolvedViewAggExState, result);
     } else {
         // Sharding-aware operation.
+        const auto& resolvedViewNss = resolvedView.getNamespace();
 
         // Stash the shard role for the resolved view nss, in case it was set, as we are about to
         // transition into the router role for it.
-        const ScopedStashShardRole scopedUnsetShardRole{opCtx, resolvedView.getNamespace()};
+        const ScopedStashShardRole scopedUnsetShardRole{opCtx, resolvedViewNss};
 
         sharding::router::CollectionRouter router(opCtx->getServiceContext(),
-                                                  resolvedView.getNamespace(),
+                                                  resolvedViewNss,
                                                   false  // retryOnStaleShard=false
         );
-        status = router.route(
-            opCtx,
-            "runAggregateOnView",
-            [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+        status = router.routeWithRoutingContext(
+            opCtx, "runAggregateOnView", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                 // TODO: SERVER-77402 Use a ShardRoleLoop here and remove this usage of
                 // CollectionRouter's retryOnStaleShard=false.
+                const auto& cri = routingCtx.getCollectionRoutingInfo(resolvedViewNss);
 
                 // Setup the opCtx's OperationShardingState with the expected placement versions for
                 // the underlying collection. Use the same 'placementConflictTime' from the original
                 // request, if present.
                 const auto scopedShardRole = resolvedViewAggExState.setShardRole(cri);
+
+                // Mark routing table as validated as we have entered the shard role for a local
+                // read.
+                routingCtx.onRequestSentForNss(resolvedViewNss);
 
                 // If the underlying collection is unsharded and is located on this shard, then we
                 // can execute the view aggregation locally. Otherwise, we need to kick-back to the

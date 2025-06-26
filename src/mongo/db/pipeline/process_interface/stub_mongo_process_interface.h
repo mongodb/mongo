@@ -292,7 +292,9 @@ public:
     }
 
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
-        OperationContext*, const NamespaceString&) const override {
+        OperationContext*,
+        const NamespaceString&,
+        RoutingContext* routingCtx = nullptr) const override {
         MONGO_UNREACHABLE;
     }
 

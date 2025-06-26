@@ -659,36 +659,40 @@ std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
         request.getUnwrappedReadPref().value_or(BSONObj())));
 
     auto* opCtx = expCtx->getOperationContext();
-    auto* catalogCache = Grid::get(opCtx)->catalogCache();
-    auto cri =
-        uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, request.getNamespace()));
+    const auto& nss = request.getNamespace();
 
-    auto requests =
-        buildVersionedRequests(expCtx, request.getNamespace(), cri, {shardId}, request.toBSON());
-    auto cursors = establishCursors(opCtx,
-                                    expCtx->getMongoProcessInterface()->taskExecutor,
-                                    request.getNamespace(),
-                                    std::move(readPreference),
-                                    requests,
-                                    false /* allowPartialResults */,
-                                    nullptr /* RoutingContext */,
-                                    Shard::RetryPolicy::kIdempotent);
-    invariant(cursors.size() == 1);
+    return routing_context_utils::withValidatedRoutingContext(
+        opCtx, {nss}, [&](RoutingContext& routingCtx) {
+            const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
-    // Convert remote cursors into a vector of "owned" cursors.
-    std::vector<OwnedRemoteCursor> ownedCursors;
-    for (auto&& cursor : cursors) {
-        auto cursorNss = cursor.getCursorResponse().getNSS();
-        ownedCursors.emplace_back(opCtx, std::move(cursor), std::move(cursorNss));
-    }
+            auto requests = buildVersionedRequests(expCtx, nss, cri, {shardId}, request.toBSON());
+            auto cursors = establishCursors(opCtx,
+                                            expCtx->getMongoProcessInterface()->taskExecutor,
+                                            nss,
+                                            std::move(readPreference),
+                                            requests,
+                                            false /* allowPartialResults */,
+                                            &routingCtx,
+                                            Shard::RetryPolicy::kIdempotent);
+            invariant(cursors.size() == 1);
 
-    // We have not split the pipeline, and will execute entirely on the remote shard. Set up an
-    // empty local pipeline which we will attach the merge cursors stage to.
-    auto mergePipeline = Pipeline::parse(std::vector<BSONObj>{}, expCtx);
+            // Convert remote cursors into a vector of "owned" cursors.
+            std::vector<OwnedRemoteCursor> ownedCursors;
+            for (auto&& cursor : cursors) {
+                auto cursorNss = cursor.getCursorResponse().getNSS();
+                ownedCursors.emplace_back(opCtx, std::move(cursor), std::move(cursorNss));
+            }
 
-    partitionAndAddMergeCursorsSource(
-        mergePipeline.get(), std::move(ownedCursors), boost::none, requestQueryStatsFromRemotes);
-    return mergePipeline;
+            // We have not split the pipeline, and will execute entirely on the remote shard. Set up
+            // an empty local pipeline which we will attach the merge cursors stage to.
+            auto mergePipeline = Pipeline::parse(std::vector<BSONObj>{}, expCtx);
+
+            partitionAndAddMergeCursorsSource(mergePipeline.get(),
+                                              std::move(ownedCursors),
+                                              boost::none,
+                                              requestQueryStatsFromRemotes);
+            return mergePipeline;
+        });
 }
 
 boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationContext* opCtx,

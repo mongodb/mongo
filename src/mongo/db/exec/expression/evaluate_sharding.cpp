@@ -110,6 +110,9 @@ Value evaluate(const ExpressionInternalOwningShard& expr,
     // Setting 'allowLocks' to true when evaluating on mongod, as otherwise an invariant is thrown.
     // We can safely set it to true as there is no risk of deadlock, because the code still throws
     // when a refresh would actually need to take place.
+    // We will always refresh the cached routing tables if the ShardVersion is older than the
+    // version the caller believes it has, so it is okay of the cached routing tables are stale
+    // here.
     const auto cri =
         uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, ns, true /* allowLocks */));
 

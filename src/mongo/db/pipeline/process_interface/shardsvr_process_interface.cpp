@@ -120,9 +120,11 @@ void writeToLocalShard(OperationContext* opCtx,
 }  // namespace
 
 bool ShardServerProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
-    const auto cri =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-    return cri.isSharded();
+    // The RoutingContext is acquired and disposed of without validating the routing tables against
+    // a shard here because this isSharded() check is only used for distributed query planning
+    // optimizations; it doesn't affect query correctness.
+    auto routingCtx = uassertStatusOK(getRoutingContext(opCtx, {nss}));
+    return routingCtx->getCollectionRoutingInfo(nss).isSharded();
 }
 
 void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
@@ -141,6 +143,8 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     }();
 
     auto wantedVersion = [&] {
+        // TODO SERVER-95749 Avoid forced collection cache refresh and validate RoutingContext,
+        // throwing if stale.
         auto routingInfo = uassertStatusOK(
             catalogCache->getCollectionRoutingInfo(expCtx->getOperationContext(), nss));
         auto foundVersion = routingInfo.hasRoutingTable()
@@ -363,12 +367,12 @@ std::list<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* 
                                                               const NamespaceString& ns,
                                                               bool includeBuildUUIDs) {
     sharding::router::CollectionRouter router(opCtx->getServiceContext(), ns);
-    return router.route(
+    return router.routeWithRoutingContext(
         opCtx,
         "ShardServerProcessInterface::getIndexSpecs",
-        [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) -> std::list<BSONObj> {
+        [&](OperationContext* opCtx, RoutingContext& routingCtx) -> std::list<BSONObj> {
             StatusWith<Shard::QueryResponse> response =
-                loadIndexesFromAuthoritativeShard(opCtx, ns, cri);
+                loadIndexesFromAuthoritativeShard(opCtx, routingCtx, ns);
             if (response.getStatus().code() == ErrorCodes::NamespaceNotFound) {
                 return {};
             }

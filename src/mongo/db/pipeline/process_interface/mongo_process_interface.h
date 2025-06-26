@@ -100,6 +100,7 @@ class JsExecution;
 
 class Pipeline;
 class PipelineDeleter;
+class RoutingContext;
 class TransactionHistoryIteratorBase;
 
 /**
@@ -201,6 +202,8 @@ public:
      * positive. This method will be fixed in the future once it becomes possible to avoid false
      * negatives. Caller should always attach shardVersion when sending request against nss based
      * on this information.
+     *
+     * DO NOT use this function to make a decision that affects query correctness.
      */
     virtual bool isSharded(OperationContext* opCtx, const NamespaceString& ns) = 0;
 
@@ -534,7 +537,9 @@ public:
      * CatalogCache.
      */
     virtual std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
-        OperationContext* opCtx, const NamespaceString&) const = 0;
+        OperationContext* opCtx,
+        const NamespaceString&,
+        RoutingContext* routingCtx = nullptr) const = 0;
 
     /**
      * Returns zero or one documents with the document key 'documentKey'. 'documentKey' is treated

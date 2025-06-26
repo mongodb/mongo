@@ -95,7 +95,9 @@ public:
     }
 
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
-        OperationContext*, const NamespaceString&) const final {
+        OperationContext*,
+        const NamespaceString&,
+        RoutingContext* routingCtx = nullptr) const final {
         // We don't expect anyone to use this method on the shard itself (yet). This is currently
         // only used for $merge. For $out in a sharded cluster, the mongos is responsible for
         // collecting the document key fields before serializing them and sending them to the

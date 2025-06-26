@@ -448,6 +448,12 @@ StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd_DEPRECATED(
     OperationContext* opCtx, const NamespaceString& nss);
 
 /**
+ * Helper used by getRoutingContextForTxnCmd(). Defaults to allowLocks = false.
+ */
+StatusWith<std::unique_ptr<RoutingContext>> getRoutingContext(
+    OperationContext* opCtx, const std::vector<NamespaceString>& nss, bool allowLocks = false);
+
+/**
  * If the command is running in a transaction, returns the RoutingContext to use for targeting
  * shards. If there is no active transaction or the transaction is not running with snapshot level
  * read concern, the RoutingContext acquires the latest routing table, otherwise it acquires a
@@ -480,8 +486,9 @@ CollectionRoutingInfo getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(
  *
  * Will not retry on StaleConfig or StaleDbVersion errors.
  */
-StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(
-    OperationContext* opCtx, const NamespaceString& nss, const CollectionRoutingInfo& cri);
+StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationContext* opCtx,
+                                                                   RoutingContext& routingCtx,
+                                                                   const NamespaceString& nss);
 
 /**
  * Utility that safely calculates the sum of a limit and skip so it can be forwarded to the shards.

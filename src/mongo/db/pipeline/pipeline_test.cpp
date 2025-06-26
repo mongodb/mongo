@@ -77,6 +77,7 @@
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log_util.h"
+#include "mongo/s/router_role.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
@@ -4717,7 +4718,8 @@ public:
     boost::optional<ShardId> determineSpecificMergeShard(OperationContext* opCtx,
                                                          const NamespaceString& ns) const override {
         if (_catalogCache) {
-            return CommonProcessInterface::findOwningShard(opCtx, _catalogCache, ns);
+            RoutingContext routingCtx(opCtx, {ns});
+            return CommonProcessInterface::findOwningShard(opCtx, routingCtx, ns);
         }
         return boost::none;
     }

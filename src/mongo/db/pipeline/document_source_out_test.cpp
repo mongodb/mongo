@@ -72,7 +72,9 @@ public:
      * of just "_id".
      */
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
-        OperationContext* opCtx, const NamespaceString& nss) const override {
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        RoutingContext* routingCtx = nullptr) const override {
         return {"_id"};
     }
 

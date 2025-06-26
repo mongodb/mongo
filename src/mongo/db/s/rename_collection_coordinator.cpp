@@ -669,18 +669,18 @@ void checkExpectedTargetIndexesMatch(OperationContext* opCtx,
                                      const NamespaceString targetNss,
                                      const std::vector<BSONObj>& expectedIndexes) {
     sharding::router::CollectionRouter router(opCtx->getServiceContext(), targetNss);
-    const auto currentIndexes =
-        router.route(opCtx,
-                     "checking indexes prerequisites within rename collection coordinator",
-                     [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                         const auto response =
-                             loadIndexesFromAuthoritativeShard(opCtx, targetNss, cri);
-                         if (response.getStatus() == ErrorCodes::NamespaceNotFound) {
-                             // Collection does not exist. Consider as no index exist.
-                             return std::vector<BSONObj>();
-                         }
-                         return uassertStatusOK(response).docs;
-                     });
+
+    const auto currentIndexes = router.routeWithRoutingContext(
+        opCtx,
+        "checking indexes prerequisites within rename collection coordinator",
+        [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+            const auto response = loadIndexesFromAuthoritativeShard(opCtx, routingCtx, targetNss);
+            if (response.getStatus() == ErrorCodes::NamespaceNotFound) {
+                // Collection does not exist. Consider as no index exist.
+                return std::vector<BSONObj>();
+            }
+            return uassertStatusOK(response).docs;
+        });
     uassertStatusOK(checkTargetCollectionIndexesMatch(
         targetNss,
         std::list<BSONObj>{expectedIndexes.begin(), expectedIndexes.end()},

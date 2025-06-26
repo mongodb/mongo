@@ -114,7 +114,9 @@ public:
                                             bool addPrimaryShard) final;
 
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
-        OperationContext*, const NamespaceString&) const final;
+        OperationContext*,
+        const NamespaceString&,
+        RoutingContext* routingCtx = nullptr) const final;
 
     boost::optional<Document> lookupSingleDocument(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
