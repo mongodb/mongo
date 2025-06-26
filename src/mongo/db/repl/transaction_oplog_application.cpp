@@ -318,8 +318,8 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
             Lock::GlobalLock globalLock(
                 opCtx,
                 MODE_IX,
-                Lock::GlobalLockSkipOptions{
-                    .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
+                Lock::GlobalLockOptions{.explicitIntent =
+                                            rss::consensus::IntentRegistry::Intent::LocalWrite});
             allocateSnapshotWithConsistentCatalog(opCtx, openSnapshotOptions);
 
             status = _applyOperationsForTransaction(opCtx, ops, mode);

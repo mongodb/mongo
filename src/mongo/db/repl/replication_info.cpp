@@ -257,7 +257,7 @@ public:
             // GlobalUserWriteBlockState and set the userWriteBlockMode field to kUnknown.
             Lock::GlobalLock lk(
                 opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kLeaveUnlocked, [] {
-                    Lock::GlobalLockSkipOptions options;
+                    Lock::GlobalLockOptions options;
                     options.skipRSTLLock = true;
                     return options;
                 }());

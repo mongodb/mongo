@@ -415,7 +415,7 @@ void CurOp::_fetchStorageStatsIfNecessary(Date_t deadline) {
                             MODE_IS,
                             deadline,
                             Lock::InterruptBehavior::kThrow,
-                            Lock::GlobalLockSkipOptions{.skipRSTLLock = true});
+                            Lock::GlobalLockOptions{.skipRSTLLock = true});
         _debug.storageStats =
             shard_role_details::getRecoveryUnit(opCtx)->computeOperationStatisticsSinceLastCall();
     }

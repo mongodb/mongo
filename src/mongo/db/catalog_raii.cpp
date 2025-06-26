@@ -133,7 +133,7 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx,
                      boost::optional<LockMode> tenantLockMode,
                      Date_t deadline)
     : AutoGetDb(opCtx, dbName, mode, tenantLockMode, deadline, [] {
-          Lock::GlobalLockSkipOptions options;
+          Lock::GlobalLockOptions options;
           return options;
       }()) {}
 
@@ -199,8 +199,8 @@ AutoGetDb AutoGetDb::createForAutoGetCollection(
     // Acquire the global/RSTL and all the database locks (may or may not be multiple
     // databases).
     Lock::DBLockSkipOptions dbLockOptions;
-    if (options._globalLockSkipOptions) {
-        dbLockOptions = *options._globalLockSkipOptions;
+    if (options._globalLockOptions) {
+        dbLockOptions = *options._globalLockOptions;
     } else {
         dbLockOptions.skipRSTLLock = canSkipRSTLLock(nsOrUUID);
         // Do not use write intent for non-replicated collections.
@@ -699,8 +699,8 @@ AutoGetOplogFastPath::AutoGetOplogFastPath(OperationContext* opCtx,
         // Invariant that global lock is already held for kLogOp mode.
         invariant(shard_role_details::getLocker(opCtx)->isWriteLocked());
     } else {
-        auto globalLkOptions = Lock::GlobalLockSkipOptions{
-            .skipRSTLLock = options.skipRSTLLock, .explicitIntent = options.explicitIntent};
+        auto globalLkOptions = Lock::GlobalLockOptions{.skipRSTLLock = options.skipRSTLLock,
+                                                       .explicitIntent = options.explicitIntent};
         _globalLock.emplace(
             opCtx, lockMode, deadline, Lock::InterruptBehavior::kThrow, globalLkOptions);
     }
@@ -721,7 +721,7 @@ AutoGetChangeCollection::AutoGetChangeCollection(OperationContext* opCtx,
         AccessMode::kUnreplicatedWrite == mode) {
         auto options = AutoGetCollection::Options{}.deadline(deadline);
         if (AccessMode::kUnreplicatedWrite == mode) {
-            options.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
+            options.globalLockOptions(Lock::GlobalLockOptions{
                 .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
         }
         // Treat this as a regular AutoGetCollection.

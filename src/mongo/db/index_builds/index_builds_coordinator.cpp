@@ -537,8 +537,8 @@ RecoveryUnit::ReadSource getReadSourceForDrainBeforeCommitQuorum(
 AutoGetCollection::Options makeAutoGetCollectionOptions(
     bool skipRSTL,
     boost::optional<rss::consensus::IntentRegistry::Intent> explicitIntent = boost::none) {
-    return AutoGetCollection::Options{}.globalLockSkipOptions(
-        Lock::GlobalLockSkipOptions{.skipRSTLLock = skipRSTL, .explicitIntent = explicitIntent});
+    return AutoGetCollection::Options{}.globalLockOptions(
+        Lock::GlobalLockOptions{.skipRSTLLock = skipRSTL, .explicitIntent = explicitIntent});
 }
 
 }  // namespace
@@ -2242,7 +2242,7 @@ StatusWith<AutoGetCollection> IndexBuildsCoordinator::_autoGetCollectionExclusiv
     while (true) {
         try {
             auto autoGetCollOptions =
-                AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
+                AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
                     .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
             autoGetCollOptions.deadline(Date_t::now() + kStateTransitionBlockedMaxMs);
             return AutoGetCollection(
@@ -3016,7 +3016,7 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
         _awaitLastOpTimeBeforeInterceptorsMajorityCommitted(opCtx, replState);
 
         auto autoGetCollOptions =
-            AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
+            AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
                 .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_IX, autoGetCollOptions);
@@ -3043,7 +3043,7 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     {
         auto autoGetCollOptions =
-            AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
+            AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
                 .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         AutoGetCollection collLock(opCtx, dbAndUUID, MODE_IX, autoGetCollOptions);
@@ -3084,7 +3084,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     {
         auto autoGetCollOptions =
-            AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
+            AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
                 .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
         AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_IX, autoGetCollOptions);
 
@@ -3129,7 +3129,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     auto autoGetCollOptions =
-        AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
+        AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
             .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
     AutoGetCollection indexBuildEntryColl(
         opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX, autoGetCollOptions);

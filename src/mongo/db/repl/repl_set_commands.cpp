@@ -174,7 +174,7 @@ public:
                                     Date_t::now() + Milliseconds(5),
                                     Lock::InterruptBehavior::kLeaveUnlocked,
                                     [] {
-                                        Lock::GlobalLockSkipOptions options;
+                                        Lock::GlobalLockOptions options;
                                         options.skipRSTLLock = true;
                                         return options;
                                     }());

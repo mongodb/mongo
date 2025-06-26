@@ -1757,8 +1757,8 @@ void TransactionParticipant::Participant::unstashTransactionResources(
     Lock::GlobalLock globalLock(
         opCtx,
         MODE_IX,
-        Lock::GlobalLockSkipOptions{.explicitIntent =
-                                        rss::consensus::IntentRegistry::Intent::LocalWrite});
+        Lock::GlobalLockOptions{.explicitIntent =
+                                    rss::consensus::IntentRegistry::Intent::LocalWrite});
 
     // This begins the storage transaction and so we do it after acquiring the global lock.
     _setReadSnapshot(opCtx, repl::ReadConcernArgs::get(opCtx), openSnapshotOptions);

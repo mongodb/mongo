@@ -80,13 +80,13 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
                              LockMode lockMode,
                              Date_t deadline,
                              InterruptBehavior behavior)
-    : GlobalLock(opCtx, lockMode, deadline, behavior, GlobalLockSkipOptions{}) {}
+    : GlobalLock(opCtx, lockMode, deadline, behavior, GlobalLockOptions{}) {}
 
 Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
                              LockMode lockMode,
                              Date_t deadline,
                              InterruptBehavior behavior,
-                             GlobalLockSkipOptions options)
+                             GlobalLockOptions options)
     : _opCtx(opCtx), _interruptBehavior(behavior), _skipRSTLLock(options.skipRSTLLock) {
     if (!options.skipFlowControlTicket) {
         shard_role_details::getLocker(_opCtx)->getFlowControlTicket(_opCtx, lockMode);

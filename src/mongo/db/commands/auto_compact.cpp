@@ -124,7 +124,7 @@ Status autoCompact(OperationContext* opCtx,
         MODE_IS,
         Date_t::max(),
         Lock::InterruptBehavior::kThrow,
-        Lock::GlobalLockSkipOptions{.skipFlowControlTicket = true, .skipRSTLLock = true}};
+        Lock::GlobalLockOptions{.skipFlowControlTicket = true, .skipRSTLLock = true}};
     std::shared_ptr<const CollectionCatalog> catalog = CollectionCatalog::get(opCtx);
     std::vector<StringData> excludedIdents;
 

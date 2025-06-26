@@ -754,8 +754,8 @@ getCollectionForLockFreeRead(OperationContext* opCtx,
     return {std::move(nss), std::move(coll), std::move(viewDefinition)};
 }
 
-static const Lock::GlobalLockSkipOptions kLockFreeReadsGlobalLockOptions{[] {
-    Lock::GlobalLockSkipOptions options;
+static const Lock::GlobalLockOptions kLockFreeReadsGlobalLockOptions{[] {
+    Lock::GlobalLockOptions options;
     options.skipRSTLLock = true;
     return options;
 }()};
@@ -1121,7 +1121,7 @@ bool AutoGetCollectionForReadCommandMaybeLockFree::isAnySecondaryNamespaceAView(
 AutoReadLockFree::AutoReadLockFree(OperationContext* opCtx, Date_t deadline)
     : _lockFreeReadsBlock(opCtx),
       _globalLock(opCtx, MODE_IS, deadline, Lock::InterruptBehavior::kThrow, [] {
-          Lock::GlobalLockSkipOptions options;
+          Lock::GlobalLockOptions options;
           options.skipRSTLLock = true;
           return options;
       }()) {
@@ -1134,7 +1134,7 @@ AutoGetDbForReadLockFree::AutoGetDbForReadLockFree(OperationContext* opCtx,
                                                    Date_t deadline)
     : _lockFreeReadsBlock(opCtx),
       _globalLock(opCtx, MODE_IS, deadline, Lock::InterruptBehavior::kThrow, [] {
-          Lock::GlobalLockSkipOptions options;
+          Lock::GlobalLockOptions options;
           options.skipRSTLLock = true;
           return options;
       }()) {

@@ -518,7 +518,7 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
                                 MODE_IS,
                                 Date_t::max(),
                                 Lock::InterruptBehavior::kThrow,
-                                Lock::GlobalLockSkipOptions{.skipRSTLLock = true});
+                                Lock::GlobalLockOptions{.skipRSTLLock = true});
         auto lastStableRecoveryTimestamp = storageEngine->getLastStableRecoveryTimestamp();
         if (!lastStableRecoveryTimestamp ||
             *lastStableRecoveryTimestamp < atClusterTime->asTimestamp()) {

@@ -87,7 +87,7 @@ const auto serviceDecorator = ServiceContext::declareDecoration<ShardingRecovery
 const auto kViewsPermittedDontSkipRSTL =
     AutoGetCollection::Options{}
         .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
-        .globalLockSkipOptions({{.skipRSTLLock = false}});  // Make sure we don't skip the RSTL
+        .globalLockOptions({{.skipRSTLLock = false}});  // Make sure we don't skip the RSTL
 
 }  // namespace
 
@@ -562,9 +562,8 @@ void ShardingRecoveryService::onConsistentDataAvailable(OperationContext* opCtx,
 void ShardingRecoveryService::_recoverRecoverableCriticalSections(OperationContext* opCtx) {
     LOGV2_DEBUG(5604000, 2, "Recovering all recoverable critical sections");
 
-    auto autoGetCollOptions =
-        AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
-            .explicitIntent = rss::consensus::IntentRegistry::Intent::Read});
+    auto autoGetCollOptions = AutoGetCollection::Options{}.globalLockOptions(
+        Lock::GlobalLockOptions{.explicitIntent = rss::consensus::IntentRegistry::Intent::Read});
     autoGetCollOptions.viewMode(auto_get_collection::ViewMode::kViewsPermitted);
     // Release all in-memory critical sections
     for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {

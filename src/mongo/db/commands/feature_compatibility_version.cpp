@@ -290,8 +290,8 @@ void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersion
 
 StatusWith<BSONObj> FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(
     OperationContext* opCtx) {
-    auto options = AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
-        .explicitIntent = rss::consensus::IntentRegistry::Intent::Read});
+    auto options = AutoGetCollection::Options{}.globalLockOptions(
+        Lock::GlobalLockOptions{.explicitIntent = rss::consensus::IntentRegistry::Intent::Read});
     AutoGetCollection autoColl(
         opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IX, options);
     invariant(autoColl.ensureDbExists(opCtx),

@@ -83,7 +83,7 @@ void appendPreImagesCollectionStats(OperationContext* opCtx, BSONObjBuilder* res
     ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
         opCtx, AdmissionContext::Priority::kExempt);
     Lock::GlobalLock lk(opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kLeaveUnlocked, [] {
-        Lock::GlobalLockSkipOptions options;
+        Lock::GlobalLockOptions options;
         options.skipRSTLLock = true;
         return options;
     }());

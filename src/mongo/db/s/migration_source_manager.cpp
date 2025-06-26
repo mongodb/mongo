@@ -805,7 +805,7 @@ void MigrationSourceManager::_cleanup(bool completeMigration) {
         // Cleanup might be happening because the node is stepping down from primary, we don't want
         // to fail declaring write intent if that is the case.
         auto autoGetCollOptions =
-            AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
+            AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
                 .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
         AutoGetCollection autoColl(_opCtx, nss(), MODE_IX, autoGetCollOptions);
         auto scopedCsr =
@@ -880,7 +880,7 @@ void MigrationSourceManager::_cleanup(bool completeMigration) {
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
         UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
         auto autoGetCollOptions =
-            AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
+            AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
                 .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
         AutoGetCollection autoColl(_opCtx, nss(), MODE_IX, autoGetCollOptions);
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, nss())

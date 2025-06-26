@@ -395,8 +395,8 @@ SnapshotedServices acquireServicesSnapshot(OperationContext* opCtx,
         std::move(collOrView), std::move(collectionDescription), std::move(optOwnershipFilter)};
 }
 
-const Lock::GlobalLockSkipOptions kLockFreeReadsGlobalLockOptions{[] {
-    Lock::GlobalLockSkipOptions options;
+const Lock::GlobalLockOptions kLockFreeReadsGlobalLockOptions{[] {
+    Lock::GlobalLockOptions options;
     options.skipRSTLLock = true;
     return options;
 }()};

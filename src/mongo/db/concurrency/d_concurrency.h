@@ -137,7 +137,7 @@ public:
                         // returns false.
     };
 
-    struct GlobalLockSkipOptions {
+    struct GlobalLockOptions {
         bool skipFlowControlTicket = false;
         bool skipRSTLLock = false;
         bool skipDirectConnectionChecks = false;
@@ -161,7 +161,7 @@ public:
         GlobalLock(OperationContext* opCtx, LockMode lockMode)
             : GlobalLock(opCtx, lockMode, Date_t::max(), InterruptBehavior::kThrow) {}
 
-        GlobalLock(OperationContext* opCtx, LockMode lockMode, GlobalLockSkipOptions skipOptions)
+        GlobalLock(OperationContext* opCtx, LockMode lockMode, GlobalLockOptions skipOptions)
             : GlobalLock(opCtx, lockMode, Date_t::max(), InterruptBehavior::kThrow, skipOptions) {}
 
         /**
@@ -176,7 +176,7 @@ public:
                    LockMode lockMode,
                    Date_t deadline,
                    InterruptBehavior behavior,
-                   GlobalLockSkipOptions skipOptions);
+                   GlobalLockOptions skipOptions);
 
         GlobalLock(GlobalLock&&);
 
@@ -245,7 +245,7 @@ public:
             : GlobalLock(opCtx, MODE_S, deadline, behavior) {}
     };
 
-    using DBLockSkipOptions = GlobalLockSkipOptions;
+    using DBLockSkipOptions = GlobalLockOptions;
 
     /**
      *  Tenant lock.

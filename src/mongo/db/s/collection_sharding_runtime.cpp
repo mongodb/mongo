@@ -673,7 +673,7 @@ CollectionCriticalSection::~CollectionCriticalSection() {
     // TODO (SERVER-71444): Fix to be interruptible or document exception.
     UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
     auto autoGetCollOptions =
-        AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
+        AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
             .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
     AutoGetCollection autoColl(_opCtx, _nss, MODE_IX, autoGetCollOptions);
     auto scopedCsr =

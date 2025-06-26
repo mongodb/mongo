@@ -78,15 +78,15 @@ struct OptionsBase {
         return std::move(*static_cast<T*>(this));
     }
 
-    T globalLockSkipOptions(boost::optional<Lock::GlobalLockSkipOptions> globalLockSkipOptions) {
-        _globalLockSkipOptions = globalLockSkipOptions;
+    T globalLockOptions(boost::optional<Lock::GlobalLockOptions> globalLockOptions) {
+        _globalLockOptions = globalLockOptions;
         return std::move(*static_cast<T*>(this));
     }
 
     ViewMode _viewMode = ViewMode::kViewsForbidden;
     Date_t _deadline = Date_t::max();
     boost::optional<UUID> _expectedUUID;
-    boost::optional<Lock::GlobalLockSkipOptions> _globalLockSkipOptions;
+    boost::optional<Lock::GlobalLockOptions> _globalLockOptions;
 };
 
 struct Options : OptionsBase<Options> {};

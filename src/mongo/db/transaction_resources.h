@@ -138,7 +138,7 @@ struct AcquisitionLocks {
     // TODO SERVER-77213: This should mostly go away once the Locker resides inside
     // TransactionResources and the underlying locks point to it instead of the opCtx.
     LockMode globalLock = MODE_NONE;
-    Lock::GlobalLockSkipOptions globalLockOptions;
+    Lock::GlobalLockOptions globalLockOptions;
     bool hasLockFreeReadsBlock = false;
 
     LockMode dbLock = MODE_NONE;

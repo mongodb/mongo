@@ -143,7 +143,7 @@ Status verifySystemIndexes(OperationContext* opCtx, BSONObjBuilder* startupTimeE
     const NamespaceString& systemUsers = NamespaceString::kAdminUsersNamespace;
     const NamespaceString& systemRoles = NamespaceString::kAdminRolesNamespace;
 
-    auto options = AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
+    auto options = AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
         .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
 
     // Create indexes for the admin.system.users collection.

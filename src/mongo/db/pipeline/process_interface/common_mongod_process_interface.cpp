@@ -259,7 +259,7 @@ bool isQEColl(const CollectionOrViewAcquisition& acquisition) {
         LockMode::MODE_IS,
         Date_t::max(),
         Lock::InterruptBehavior::kThrow,
-        Lock::GlobalLockSkipOptions{.skipFlowControlTicket = true, .skipRSTLLock = true});
+        Lock::GlobalLockOptions{.skipFlowControlTicket = true, .skipRSTLLock = true});
 }
 
 }  // namespace
