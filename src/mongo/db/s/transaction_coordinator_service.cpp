@@ -405,23 +405,22 @@ TransactionCoordinatorService::getCatalogAndScheduler(OperationContext* opCtx) {
 }
 
 void TransactionCoordinatorService::_joinAndCleanup() {
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    std::shared_ptr<CatalogAndScheduler> schedulerToCleanup;
+    {
+        stdx::lock_guard<stdx::mutex> _lock(_mutex);
+        // checking this invariant requires holding _mutex
+        invariant(!_catalogAndScheduler);
+        if (!_catalogAndSchedulerToCleanup)
+            return;
 
-    invariant(!_catalogAndScheduler);
-    if (!_catalogAndSchedulerToCleanup)
-        return;
-
-    auto schedulerToCleanup = _catalogAndSchedulerToCleanup;
-    ul.unlock();
+        schedulerToCleanup = std::move(_catalogAndSchedulerToCleanup);
+    }
 
     LOGV2(22454, "Waiting for coordinator tasks from previous term to complete");
     // Block until all coordinators scheduled the previous time the service was primary to have
     // drained. Because the scheduler was interrupted, it should be extremely rare for there to be
     // any coordinators left, so if this actually causes blocking, it would most likely be a bug.
     schedulerToCleanup->join();
-
-    ul.lock();
-    _catalogAndSchedulerToCleanup.reset();
 }
 
 void TransactionCoordinatorService::CatalogAndScheduler::interrupt() {
