@@ -54,6 +54,7 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_applier.h"
+#include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -522,6 +523,29 @@ OplogEntry makeOplogEntry(OpTime opTime,
 
 OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, boost::optional<UUID> uuid) {
     return makeOplogEntry(opType, nss, uuid, BSON("_id" << 0), boost::none);
+}
+
+OplogEntry makeCreateCollectionOplogEntry(
+    const OpTime& opTime,
+    const NamespaceString& nss,
+    const CollectionOptions& collectionOptions,
+    const BSONObj& idIndex,
+    boost::optional<CreateCollCatalogIdentifier> createCollCatalogIdentifier) {
+    const auto object =
+        MutableOplogEntry::makeCreateCollObject(nss, collectionOptions, collectionOptions.idIndex);
+
+    BSONObj o2;
+    if (createCollCatalogIdentifier.has_value()) {
+        o2 = MutableOplogEntry::makeCreateCollObject2(createCollCatalogIdentifier->catalogId,
+                                                      createCollCatalogIdentifier->ident,
+                                                      createCollCatalogIdentifier->idIndexIdent);
+    }
+    return makeCommandOplogEntry(opTime, nss, object, o2, collectionOptions.uuid);
+}
+OplogEntry makeCreateCollectionOplogEntry(const OpTime& opTime,
+                                          const NamespaceString& nss,
+                                          const UUID& uuid) {
+    return makeCreateCollectionOplogEntry(opTime, nss, CollectionOptions{.uuid = uuid});
 }
 
 CollectionOptions createOplogCollectionOptions() {

@@ -635,7 +635,7 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenant) {
         ASSERT_EQUALS(nss, collNss);
     };
 
-    auto entry = makeCommandOplogEntry(nextOpTime(), nss, op, UUID::gen());
+    const auto entry = makeCreateCollectionOplogEntry(nextOpTime(), nss);
     ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
         _opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kSecondary));
     ASSERT_TRUE(applyCmdCalled);
@@ -690,8 +690,6 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenantAlreadyExists) {
     options.uuid = kUuid;
 
     repl::createCollection(_opCtx.get(), nssTenant1, options);
-    auto op1 = BSON("create" << nssTenant1.coll());
-    auto op2 = BSON("create" << nssTenant2.coll());
 
     bool applyCmdCalled = false;
 
@@ -712,8 +710,8 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenantAlreadyExists) {
     ASSERT_TRUE(collectionExists(_opCtx.get(), nssTenant1));
     ASSERT_FALSE(collectionExists(_opCtx.get(), nssTenant2));
 
-    auto entry1 = makeCommandOplogEntry(nextOpTime(), nssTenant1, op1, kUuid);
-    auto entry2 = makeCommandOplogEntry(nextOpTime(), nssTenant2, op2, UUID::gen());
+    const auto entry1 = makeCreateCollectionOplogEntry(nextOpTime(), nssTenant1, options);
+    const auto entry2 = makeCreateCollectionOplogEntry(nextOpTime(), nssTenant2, UUID::gen());
 
     // This fails silently so we won't see any indication of a collision, but we can also assert
     // that the opObserver event above won't be called in the event of a collision.
@@ -1101,14 +1099,14 @@ TEST_F(IdempotencyTest, CollModCommandMultitenant) {
 
     ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
                   ->setFollowerMode(MemberState::RS_SECONDARY));
-    ASSERT_OK(
-        runOpInitialSync(makeCreateCollectionOplogEntry(nextOpTime(), nss, BSON("uuid" << kUuid))));
+    ASSERT_OK(runOpInitialSync(makeCreateCollectionOplogEntry(nextOpTime(), nss, kUuid)));
     ASSERT_OK(runOpInitialSync(
         buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600), kUuid)));
 
     auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}");
     auto collModCmd = BSON("collMod" << nss.coll() << "index" << indexChange);
-    auto op = makeCommandOplogEntry(nextOpTime(), nss, collModCmd, kUuid);
+    auto op =
+        makeCommandOplogEntry(nextOpTime(), nss, collModCmd, boost::none /* object2 */, kUuid);
 
     ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
         _opCtx.get(), ApplierOperation{&op}, OplogApplication::Mode::kSecondary));
@@ -1142,14 +1140,14 @@ TEST_F(IdempotencyTest, CollModCommandMultitenantWrongTenant) {
 
     ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
                   ->setFollowerMode(MemberState::RS_SECONDARY));
-    ASSERT_OK(runOpInitialSync(
-        makeCreateCollectionOplogEntry(nextOpTime(), nssTenant1, BSON("uuid" << kUuid))));
+    ASSERT_OK(runOpInitialSync(makeCreateCollectionOplogEntry(nextOpTime(), nssTenant1, kUuid)));
     ASSERT_OK(runOpInitialSync(
         buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600), kUuid)));
 
     auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}");
     auto collModCmd = BSON("collMod" << nssTenant2.coll() << "index" << indexChange);
-    auto op = makeCommandOplogEntry(nextOpTime(), nssTenant2, collModCmd, kUuid);
+    auto op = makeCommandOplogEntry(
+        nextOpTime(), nssTenant2, collModCmd, boost::none /* object2 */, kUuid);
 
     // A NamespaceNotFound error is absorbed by the applier, but we can still determine the
     // op_observer callback was never called
@@ -3527,8 +3525,7 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncAddsWorkerMultikeyPathInf
         "test." + _agent.getSuiteName() + "_" + _agent.getTestName());
 
     {
-        auto op = makeCreateCollectionOplogEntry(
-            {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("uuid" << kUuid));
+        auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, kUuid);
         testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
     }
     {
@@ -3553,8 +3550,7 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncAddsMultipleWorkerMultike
         "test." + _agent.getSuiteName() + "_" + _agent.getTestName());
 
     {
-        auto op = makeCreateCollectionOplogEntry(
-            {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("uuid" << kUuid));
+        auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, kUuid);
         testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
     }
 
@@ -3597,8 +3593,7 @@ TEST_F(OplogApplierImplTest,
         "test." + _agent.getSuiteName() + "_" + _agent.getTestName());
 
     {
-        auto op = makeCreateCollectionOplogEntry(
-            {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("uuid" << kUuid));
+        auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, kUuid);
         testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
     }
 
@@ -3627,8 +3622,8 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncFailsWhenCollectionCreati
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(
         "foo." + _agent.getSuiteName() + "_" + _agent.getTestName());
-
-    auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
+    auto op =
+        makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, CollectionOptions{});
 
     TestApplyOplogGroupApplier oplogApplier(
         nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary, false));
@@ -4110,8 +4105,7 @@ TEST_F(OplogApplierImplTest,
     auto doc1 = BSON("_id" << 1);
     auto keyPattern = BSON("a" << 1);
     auto doc3 = BSON("_id" << 3);
-    auto op0 =
-        makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, BSON("uuid" << kUuid));
+    auto op0 = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, kUuid);
     auto op1 = makeInsertDocumentOplogEntry({Timestamp(Seconds(2), 0), 1LL}, nss, doc1);
     auto op2 = makeCreateIndexOplogEntry(
         {Timestamp(Seconds(3), 0), 1LL}, badNss, "a_1", keyPattern, kUuid);
@@ -4335,16 +4329,16 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasUnknownLanguage) {
 TEST_F(IdempotencyTest, CreateCollectionWithValidation) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
-    const BSONObj uuidObj = kUuid.toBSON();
 
-    auto runOpsAndValidate = [this, uuidObj]() {
-        auto options1 = fromjson("{'validator' : {'phone' : {'$type' : 'string' } } }");
-        options1 = options1.addField(uuidObj.firstElement());
+    auto uuid = kUuid;
+    auto runOpsAndValidate = [this, uuid]() {
+        auto options1 = CollectionOptions{
+            .uuid = uuid, .validator = fromjson("{'phone' : {'$type' : 'string' } }")};
         auto createColl1 = makeCreateCollectionOplogEntry(nextOpTime(), _nss, options1);
         auto dropColl = makeCommandOplogEntry(nextOpTime(), _nss, BSON("drop" << _nss.coll()));
 
-        auto options2 = fromjson("{'validator' : {'phone' : {'$type' : 'number' } } }");
-        options2 = options2.addField(uuidObj.firstElement());
+        auto options2 = CollectionOptions{
+            .uuid = uuid, .validator = fromjson("{'phone' : {'$type' : 'number' } }")};
         auto createColl2 = makeCreateCollectionOplogEntry(nextOpTime(), _nss, options2);
 
         auto ops = {createColl1, dropColl, createColl2};
@@ -4375,10 +4369,12 @@ TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
                           << "punct"
                           << "normalization" << false << "backwards" << false << "version"
                           << "57.1");
-        auto options = BSON(
-            "collation" << collationOpts << "uuid" << uuid << "idIndex"
-                        << BSON("collation" << collationOpts << "key" << BSON("_id" << 1) << "name"
-                                            << IndexConstants::kIdIndexName << "v" << 2));
+        CollectionOptions options{
+            .uuid = uuid,
+            .idIndex = BSON("collation" << collationOpts << "key" << BSON("_id" << 1) << "name"
+                                        << IndexConstants::kIdIndexName << "v" << 2),
+
+            .collation = collationOpts};
         auto createColl = makeCreateCollectionOplogEntry(nextOpTime(), _nss, options);
         auto insertOp1 = insert(fromjson("{ _id: 'foo' }"));
         auto updateOp1 = update("foo",
@@ -4415,8 +4411,7 @@ TEST_F(IdempotencyTest, CreateCollectionWithView) {
     ASSERT_OK(runOpInitialSync(createCollection()));
     // Create "system.views" collection
     auto viewNss = NamespaceString::makeSystemDotViewsNamespace(_nss.dbName());
-    ASSERT_OK(
-        runOpInitialSync(makeCreateCollectionOplogEntry(nextOpTime(), viewNss, options.toBSON())));
+    ASSERT_OK(runOpInitialSync(makeCreateCollectionOplogEntry(nextOpTime(), viewNss, options)));
 
     auto viewDoc = BSON(
         "_id"
@@ -4439,8 +4434,10 @@ TEST_F(IdempotencyTest, CollModNamespaceNotFound) {
 
     auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}");
     auto collModCmd = BSON("collMod" << _nss.coll() << "index" << indexChange);
-    auto collModOp = makeCommandOplogEntry(nextOpTime(), _nss, collModCmd, kUuid);
-    auto dropCollOp = makeCommandOplogEntry(nextOpTime(), _nss, BSON("drop" << _nss.coll()), kUuid);
+    auto collModOp =
+        makeCommandOplogEntry(nextOpTime(), _nss, collModCmd, boost::none /* object2 */, kUuid);
+    auto dropCollOp = makeCommandOplogEntry(
+        nextOpTime(), _nss, BSON("drop" << _nss.coll()), boost::none /* object2 */, kUuid);
 
     auto ops = {collModOp, dropCollOp};
     testOpsAreIdempotent(ops);
@@ -4456,7 +4453,8 @@ TEST_F(IdempotencyTest, CollModIndexNotFound) {
 
     auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}");
     auto collModCmd = BSON("collMod" << _nss.coll() << "index" << indexChange);
-    auto collModOp = makeCommandOplogEntry(nextOpTime(), _nss, collModCmd, kUuid);
+    auto collModOp =
+        makeCommandOplogEntry(nextOpTime(), _nss, collModCmd, boost::none /* object2 */, kUuid);
     auto dropIndexOp = dropIndex("createdAt_index", kUuid);
 
     auto ops = {collModOp, dropIndexOp};
@@ -5260,7 +5258,8 @@ TEST_F(IdempotencyTestDisableSteadyStateConstraints, AcceptableErrorsRecordedInS
     auto collModCmd = BSON("collMod" << _nss.coll());
 
     // Create a "collMod" oplog entry.
-    auto collModOp = makeCommandOplogEntry(nextOpTime(), _nss, collModCmd, UUID::gen());
+    auto collModOp = makeCommandOplogEntry(
+        nextOpTime(), _nss, collModCmd, boost::none /* object2 */, UUID::gen());
 
     // Ensure that NamespaceNotFound is "acceptable" but counted.
     int prevAcceptableError = replOpCounters.getAcceptableErrorInCommand()->load();
@@ -5282,7 +5281,8 @@ TEST_F(IdempotencyTestEnableSteadyStateConstraints,
     auto collModCmd = BSON("collMod" << _nss.coll());
 
     // Create a "collMod" oplog entry.
-    auto collModOp = makeCommandOplogEntry(nextOpTime(), _nss, collModCmd, UUID::gen());
+    auto collModOp = makeCommandOplogEntry(
+        nextOpTime(), _nss, collModCmd, boost::none /* object2 */, UUID::gen());
 
     // Ensure that NamespaceNotFound is returned.
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, runOpSteadyState(collModOp));

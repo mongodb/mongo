@@ -90,13 +90,14 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
 
 OplogEntry makeCommandOplogEntry(OpTime opTime,
                                  const NamespaceString& nss,
-                                 const BSONObj& command,
+                                 const BSONObj& object,
+                                 boost::optional<BSONObj> object2,
                                  boost::optional<UUID> uuid) {
     return makeOplogEntry(opTime,
                           OpTypeEnum::kCommand,
                           nss.getCommandNS(),
-                          command,
-                          boost::none /* o2 */,
+                          object,
+                          object2,
                           {} /* sessionInfo */,
                           Date_t() /* wallClockTime*/,
                           {} /* stmtIds */,
@@ -123,20 +124,6 @@ OplogEntry makeCommandOplogEntryWithSessionInfoAndStmtIds(OpTime opTime,
                           stmtIds,
                           boost::none /* uuid */,
                           prevOpTime);
-}
-
-OplogEntry makeCreateCollectionOplogEntry(OpTime opTime,
-                                          const NamespaceString& nss,
-                                          const BSONObj& options) {
-    BSONObjBuilder bob;
-    bob.append("create", nss.coll());
-    boost::optional<UUID> optionalUUID;
-    if (options.hasField("uuid")) {
-        StatusWith<UUID> uuid = UUID::parse(options.getField("uuid"));
-        optionalUUID = uuid.getValue();
-    }
-    bob.appendElements(options);
-    return makeCommandOplogEntry(opTime, nss, bob.obj(), optionalUUID);
 }
 
 OplogEntry makeInsertDocumentOplogEntry(OpTime opTime,
@@ -190,7 +177,7 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
         indexInfo = BSON("createIndexes" << nss.coll() << "v" << 2 << "key" << keyPattern << "name"
                                          << indexName);
     }
-    return makeCommandOplogEntry(opTime, nss, indexInfo, uuid);
+    return makeCommandOplogEntry(opTime, nss, indexInfo, boost::none /* object2 */, uuid);
 }
 
 OplogEntry makeStartIndexBuildOplogEntry(OpTime opTime,
@@ -203,7 +190,8 @@ OplogEntry makeStartIndexBuildOplogEntry(OpTime opTime,
     oplogEntryBuilder.append("startIndexBuild", nss.coll());
     populateTwoPhaseIndexBuildOplogEntry(oplogEntryBuilder, indexBuildUUID, keyPattern, indexName);
 
-    return makeCommandOplogEntry(opTime, nss, oplogEntryBuilder.obj(), uuid);
+    return makeCommandOplogEntry(
+        opTime, nss, oplogEntryBuilder.obj(), boost::none /* object2 */, uuid);
 }
 
 OplogEntry makeCommitIndexBuildOplogEntry(OpTime opTime,
@@ -216,7 +204,8 @@ OplogEntry makeCommitIndexBuildOplogEntry(OpTime opTime,
     oplogEntryBuilder.append("commitIndexBuild", nss.coll());
     populateTwoPhaseIndexBuildOplogEntry(oplogEntryBuilder, indexBuildUUID, keyPattern, indexName);
 
-    return makeCommandOplogEntry(opTime, nss, oplogEntryBuilder.obj(), uuid);
+    return makeCommandOplogEntry(
+        opTime, nss, oplogEntryBuilder.obj(), boost::none /* object2 */, uuid);
 }
 
 OplogEntry makeInsertDocumentOplogEntryWithSessionInfo(OpTime opTime,

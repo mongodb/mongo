@@ -125,18 +125,64 @@ TEST(OplogEntryTest, Create) {
     CollectionOptions opts;
     opts.capped = true;
     opts.cappedSize = 15;
+    opts.uuid = UUID::gen();
 
-    const auto entry = makeCreateCollectionOplogEntry(entryOpTime, nss, opts.toBSON());
+    // The 'object' document shouldn't contain the 'uuid' as it is specified at the top level.
+    const auto oplogEntryObjectDoc =
+        MutableOplogEntry::makeCreateCollObject(nss, opts, BSONObj() /* idIndex */);
+    ASSERT_BSONOBJ_EQ(oplogEntryObjectDoc,
+                      BSON("create" << nss.coll() << "capped" << true << "size" << 15));
+
+    const auto entry = makeCommandOplogEntry(
+        entryOpTime, nss, oplogEntryObjectDoc, boost::none /* object2 */, opts.uuid);
 
     ASSERT(entry.isCommand());
     ASSERT_FALSE(entry.isPartialTransaction());
     ASSERT_FALSE(entry.isCrudOpType());
     ASSERT_FALSE(entry.shouldPrepare());
-    ASSERT_BSONOBJ_EQ(entry.getOperationToApply(),
-                      BSON("create" << nss.coll() << "capped" << true << "size" << 15));
+    ASSERT_BSONOBJ_EQ(oplogEntryObjectDoc, entry.getOperationToApply());
     ASSERT(entry.getCommandType() == OplogEntry::CommandType::kCreate);
     ASSERT_EQ(entry.getOpTime(), entryOpTime);
+    ASSERT_EQ(entry.getUuid(), opts.uuid);
     ASSERT(!entry.getTid());
+    ASSERT(!entry.getObject2());
+}
+
+TEST(OplogEntryTest, CreateWithCatalogIdentifier) {
+    CollectionOptions opts;
+    opts.capped = true;
+    opts.cappedSize = 15;
+    opts.uuid = UUID::gen();
+
+    const auto oplogEntryObjectDoc =
+        MutableOplogEntry::makeCreateCollObject(nss, opts, BSONObj() /* idIndex */);
+    ASSERT_BSONOBJ_EQ(oplogEntryObjectDoc,
+                      BSON("create" << nss.coll() << "capped" << true << "size" << 15));
+
+    // Oplog entries generated with 'featureFlagReplicateLocalCatalogIdentifiers' enabled include
+    // catalog identifier information in the 'o2' field.
+    RecordId catalogId = RecordId(1);
+    std::string ident = "collection_ident";
+    std::string idIndexIdent = "id_index_ident";
+    const auto oplogEntryObject2Doc =
+        MutableOplogEntry::makeCreateCollObject2(catalogId, ident, idIndexIdent);
+    ASSERT_BSONOBJ_EQ(oplogEntryObject2Doc,
+                      BSON("catalogId" << 1 << "ident" << ident << "idIndexIdent" << idIndexIdent));
+
+    const auto entry = makeCommandOplogEntry(
+        entryOpTime, nss, oplogEntryObjectDoc, oplogEntryObject2Doc, opts.uuid);
+
+    ASSERT(entry.isCommand());
+    ASSERT_FALSE(entry.isPartialTransaction());
+    ASSERT_FALSE(entry.isCrudOpType());
+    ASSERT_FALSE(entry.shouldPrepare());
+    ASSERT_BSONOBJ_EQ(oplogEntryObjectDoc, entry.getOperationToApply());
+    ASSERT(entry.getCommandType() == OplogEntry::CommandType::kCreate);
+    ASSERT_EQ(entry.getOpTime(), entryOpTime);
+    ASSERT_EQ(entry.getUuid(), opts.uuid);
+    ASSERT(!entry.getTid());
+    ASSERT(entry.getObject2());
+    ASSERT_BSONOBJ_EQ(*entry.getObject2(), oplogEntryObject2Doc);
 }
 
 TEST(OplogEntryTest, ApplyOpsNotInSession) {

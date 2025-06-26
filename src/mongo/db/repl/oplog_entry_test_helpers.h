@@ -62,13 +62,6 @@ OplogEntry makeOplogEntry(repl::OpTime opTime,
                           boost::optional<OpTime> prevOpTime = boost::none);
 
 /**
- * Creates a create collection oplog entry with given optime.
- */
-OplogEntry makeCreateCollectionOplogEntry(
-    OpTime opTime,
-    const NamespaceString& nss = NamespaceString::createNamespaceString_forTest("test.t"),
-    const BSONObj& options = BSONObj());
-/**
  * Creates an insert oplog entry with given optime and namespace.
  */
 OplogEntry makeInsertDocumentOplogEntry(OpTime opTime,
@@ -122,7 +115,8 @@ OplogEntry makeCommitIndexBuildOplogEntry(OpTime opTime,
  */
 OplogEntry makeCommandOplogEntry(OpTime opTime,
                                  const NamespaceString& nss,
-                                 const BSONObj& command,
+                                 const BSONObj& object,
+                                 boost::optional<BSONObj> object2 = boost::none,
                                  boost::optional<UUID> uuid = boost::none);
 
 /**

@@ -221,7 +221,7 @@ void IdempotencyTest::testOpsAreIdempotent(std::vector<OplogEntry> ops, Sequence
 }
 
 OplogEntry IdempotencyTest::createCollection(UUID uuid) {
-    return makeCreateCollectionOplogEntry(nextOpTime(), _nss, BSON("uuid" << uuid));
+    return makeCreateCollectionOplogEntry(nextOpTime(), _nss, uuid);
 }
 
 OplogEntry IdempotencyTest::dropCollection() {
@@ -256,12 +256,12 @@ OplogEntry IdempotencyTest::buildIndex(const BSONObj& indexSpec,
     } else {
         bob.appendElements(spec.obj());
     }
-    return makeCommandOplogEntry(nextOpTime(), _nss, bob.obj(), uuid);
+    return makeCommandOplogEntry(nextOpTime(), _nss, bob.obj(), boost::none /* object2 */, uuid);
 }
 
 OplogEntry IdempotencyTest::dropIndex(const std::string& indexName, const UUID& uuid) {
     auto cmd = BSON("dropIndexes" << _nss.coll() << "index" << indexName);
-    return makeCommandOplogEntry(nextOpTime(), _nss, cmd, uuid);
+    return makeCommandOplogEntry(nextOpTime(), _nss, cmd, boost::none /* object2 */, uuid);
 }
 
 OplogEntry IdempotencyTest::prepare(LogicalSessionId lsid,

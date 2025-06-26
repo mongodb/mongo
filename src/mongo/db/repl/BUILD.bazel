@@ -1862,6 +1862,7 @@ mongo_cc_library(
     }),
     deps = [
         ":oplog_application",
+        ":oplog_entry_test_helpers",
         ":replmocks",
         ":storage_interface_impl",
         "//src/mongo/db:multitenancy",
