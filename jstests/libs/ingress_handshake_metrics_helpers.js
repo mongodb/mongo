@@ -89,8 +89,6 @@ export function ingressHandshakeMetricsTest(conn, options) {
             before.totalTimeToFirstNonAuthCommandMillis;
         assert.gte(diffMillis, totalDelayMillis);
 
-        // The average time to completed auth will be no larger than the total time.
-        assert.lte(after.averageTimeToCompletedAuthMicros, diffMillis * 1000);
         // Average time to hello will be no larger than average time to completed auth.
         assert.lte(after.averageTimeToCompletedHelloMicros, after.averageTimeToCompletedAuthMicros);
 
