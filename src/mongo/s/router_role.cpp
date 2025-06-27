@@ -83,7 +83,7 @@ CachedDatabaseInfo DBPrimaryRouter::_getRoutingInfo(OperationContext* opCtx) con
     return uassertStatusOK(catalogCache->getDatabase(opCtx, _dbName));
 }
 
-void DBPrimaryRouter::_onException(OperationContext* opCtx, RouteContext* context, Status s) {
+void DBPrimaryRouter::_onException(OperationContext* opCtx, RoutingRetryInfo* retryInfo, Status s) {
     auto catalogCache = Grid::get(_service)->catalogCache();
 
     if (s == ErrorCodes::StaleDbVersion) {
@@ -106,17 +106,17 @@ void DBPrimaryRouter::_onException(OperationContext* opCtx, RouteContext* contex
     }
 
     int maxNumStaleVersionRetries = gMaxNumStaleVersionRetries.load();
-    if (++context->numAttempts > maxNumStaleVersionRetries) {
+    if (++retryInfo->numAttempts > maxNumStaleVersionRetries) {
         uassertStatusOKWithContext(s,
                                    str::stream()
                                        << "Exceeded maximum number of " << maxNumStaleVersionRetries
-                                       << " retries attempting \'" << context->comment << "\'");
+                                       << " retries attempting \'" << retryInfo->comment << "\'");
     } else {
         LOGV2_DEBUG(6375902,
                     3,
                     "Retrying database primary routing operation",
-                    "attempt"_attr = context->numAttempts,
-                    "comment"_attr = context->comment,
+                    "attempt"_attr = retryInfo->numAttempts,
+                    "comment"_attr = retryInfo->comment,
                     "status"_attr = s);
     }
 }
@@ -130,7 +130,7 @@ CollectionRouterCommon::CollectionRouterCommon(
       _retryOnStaleShard(retryOnStaleShard) {}
 
 void CollectionRouterCommon::_onException(OperationContext* opCtx,
-                                          RouteContext* context,
+                                          RoutingRetryInfo* retryInfo,
                                           Status s) {
     auto catalogCache = Grid::get(_service)->catalogCache();
 
@@ -235,17 +235,17 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
     }
 
     int maxNumStaleVersionRetries = gMaxNumStaleVersionRetries.load();
-    if (++context->numAttempts > maxNumStaleVersionRetries) {
+    if (++retryInfo->numAttempts > maxNumStaleVersionRetries) {
         uassertStatusOKWithContext(s,
                                    str::stream()
                                        << "Exceeded maximum number of " << maxNumStaleVersionRetries
-                                       << " retries attempting \'" << context->comment << "\'");
+                                       << " retries attempting \'" << retryInfo->comment << "\'");
     } else {
         LOGV2_DEBUG(6375906,
                     3,
                     "Retrying collection routing operation",
-                    "attempt"_attr = context->numAttempts,
-                    "comment"_attr = context->comment,
+                    "attempt"_attr = retryInfo->numAttempts,
+                    "comment"_attr = retryInfo->comment,
                     "status"_attr = s);
     }
 }

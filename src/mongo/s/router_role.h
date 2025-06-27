@@ -53,7 +53,7 @@ class RouterBase {
 protected:
     RouterBase(ServiceContext* service);
 
-    struct RouteContext {
+    struct RoutingRetryInfo {
         const std::string comment;
         int numAttempts{0};
     };
@@ -75,13 +75,13 @@ public:
 
     template <typename F>
     auto route(OperationContext* opCtx, StringData comment, F&& callbackFn) {
-        RouteContext context{std::string{comment}};
+        RoutingRetryInfo retryInfo{std::string{comment}};
         while (true) {
             auto cdb = _getRoutingInfo(opCtx);
             try {
                 return callbackFn(opCtx, cdb);
             } catch (const DBException& ex) {
-                _onException(opCtx, &context, ex.toStatus());
+                _onException(opCtx, &retryInfo, ex.toStatus());
             }
         }
     }
@@ -94,7 +94,7 @@ public:
 
 private:
     CachedDatabaseInfo _getRoutingInfo(OperationContext* opCtx) const;
-    void _onException(OperationContext* opCtx, RouteContext* context, Status s);
+    void _onException(OperationContext* opCtx, RoutingRetryInfo* retryInfo, Status s);
 
     DatabaseName _dbName;
 };
@@ -112,7 +112,7 @@ protected:
                                                 const CollectionRoutingInfo& cri,
                                                 BSONObjBuilder* builder);
 
-    void _onException(OperationContext* opCtx, RouteContext* context, Status s);
+    void _onException(OperationContext* opCtx, RoutingRetryInfo* retryInfo, Status s);
     CollectionRoutingInfo _getRoutingInfo(OperationContext* opCtx, const NamespaceString& nss);
 
     const std::vector<NamespaceString> _targetedNamespaces;
@@ -169,12 +169,12 @@ public:
 private:
     template <typename F>
     auto _routeImpl(OperationContext* opCtx, StringData comment, F&& work) {
-        RouteContext context{std::string{comment}};
+        RoutingRetryInfo retryInfo{std::string{comment}};
         while (true) {
             try {
                 return std::forward<F>(work)();
             } catch (const DBException& ex) {
-                _onException(opCtx, &context, ex.toStatus());
+                _onException(opCtx, &retryInfo, ex.toStatus());
             }
         }
     }
@@ -197,7 +197,7 @@ public:
 
     template <typename F>
     auto route(OperationContext* opCtx, StringData comment, F&& callbackFn) {
-        RouteContext context{std::string{comment}};
+        RoutingRetryInfo retryInfo{std::string{comment}};
         while (true) {
             stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap;
             for (const auto& nss : _targetedNamespaces) {
@@ -207,7 +207,7 @@ public:
             try {
                 return callbackFn(opCtx, criMap);
             } catch (const DBException& ex) {
-                _onException(opCtx, &context, ex.toStatus());
+                _onException(opCtx, &retryInfo, ex.toStatus());
             }
         }
     }
