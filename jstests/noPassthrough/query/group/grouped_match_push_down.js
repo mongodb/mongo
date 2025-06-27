@@ -177,4 +177,58 @@ assertPipelineOptimizationAndResult({
     expectedResult: [{_id: 2, c: 1, d: 1}]
 });
 
+//
+// Tests scenarios where $match on the $group key cannot be pushed before the $group. This can occur
+// when the $match predicate distinguishes values that are considered equivalent by the $group or
+// when the $group key expression is evaluated differently in the $match and $group stages (e.g.,
+// ExpressionFieldPath vs PathMatchExpression paths).
+//
+
+coll.drop();
+assert.commandWorked(coll.insert([{_id: 1}]));
+assertQueryResult([{$group: {_id: "$a"}}, {$match: {_id: {$exists: false}}}], []);
+assertQueryResult([{$match: {a: {$exists: false}}}, {$group: {_id: "$a"}}], [{_id: null}]);
+
+coll.drop();
+assert.commandWorked(coll.insert([{_id: 1, a: 1}, {_id: 2, a: NumberLong(1)}]));
+assertQueryResult([{$group: {_id: "$a"}}, {$match: {_id: {$type: 'long'}}}], []);
+assertQueryResult([{$match: {a: {$type: 'long'}}}, {$group: {_id: "$a"}}], [{_id: NumberLong(1)}]);
+
+coll.drop();
+assert.commandWorked(coll.insert([{_id: 1, a: [{}]}]));
+assertQueryResult([{$group: {_id: "$a.b"}}, {$match: {_id: {$exists: false}}}], []);
+assertQueryResult([{$match: {'a.b': {$exists: false}}}, {$group: {_id: "$a.b"}}], [{_id: []}]);
+
+coll.drop();
+assert.commandWorked(coll.insert([{_id: 1, a: [{b: [{c: null}]}]}]));
+assertQueryResult([{$group: {_id: "$a.b"}}, {$match: {'_id.c': {$exists: true}}}], []);
+assertQueryResult([{$match: {'a.b.c': {$exists: true}}}, {$group: {_id: "$a.b"}}],
+                  [{_id: [[{c: null}]]}]);
+
+coll.drop();
+assert.commandWorked(coll.insert([{_id: 1, a: {b: 1}}, {_id: 2, a: {b: NumberLong(1)}}]));
+assertQueryResult([{$group: {_id: "$a"}}, {$match: {'_id.b': {$type: 'long'}}}], []);
+assertQueryResult([{$match: {'a.b': {$type: 'long'}}}, {$group: {_id: "$a"}}],
+                  [{_id: {b: NumberLong(1)}}]);
+
+coll.drop();
+assert.commandWorked(
+    coll.insert([{_id: 1, a: [{b: 5, c: 1}]}, {_id: 2, a: [{b: 5, c: NumberLong(1)}]}]));
+assertQueryResult(
+    [{$group: {_id: "$a"}}, {$match: {_id: {$elemMatch: {b: 5, c: {$type: 'long'}}}}}], []);
+assertQueryResult([{$match: {a: {$elemMatch: {b: 5, c: {$type: 'long'}}}}}, {$group: {_id: "$a"}}],
+                  [{_id: [{b: 5, c: NumberLong(1)}]}]);
+
+coll.drop();
+assert.commandWorked(coll.insert([{_id: 1, a: [1]}, {_id: 2, a: [NumberLong(1)]}]));
+assertQueryResult([{$group: {_id: "$a"}}, {$match: {_id: {$elemMatch: {$type: 'long'}}}}], []);
+assertQueryResult([{$match: {a: {$elemMatch: {$type: 'long'}}}}, {$group: {_id: "$a"}}],
+                  [{_id: [NumberLong(1)]}]);
+
+coll.drop();
+assert.commandWorked(coll.insert([{_id: 1, a: {"": 1}}, {_id: 2, a: {"": NumberLong(1)}}]));
+assertQueryResult([{$group: {_id: "$a"}}, {$match: {"_id.": {$type: 'long'}}}], []);
+assertQueryResult([{$match: {'a.': {$type: 'long'}}}, {$group: {_id: "$a"}}],
+                  [{_id: {"": NumberLong(1)}}]);
+
 MongoRunner.stopMongod(conn);

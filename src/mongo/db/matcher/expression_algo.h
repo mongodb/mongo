@@ -51,13 +51,19 @@ namespace expression {
 using NodeTraversalFunc = std::function<void(MatchExpression*, std::string)>;
 
 /**
- * Returns true if 'expr' has a 'searchType' predicated on something in 'paths'. Note that this only
- * returns true for occurrences predicatated on an exact path given: it will not return true if
- * there is searchType on a prefix of the path.
+ * Returns true if 'expr' has a 'searchType' predicated on a path in 'paths' or a descendent of a
+ * path in 'paths'.
+ *
+ * For example, with 'searchType'=EXISTS and 'paths'=["a", "b.c"], then various 'expr's result in:
+ * - {a: {$exists: true}}                     ---> true
+ * - {$and: [{a: {$exists: false}}, {d: 5}]}  ---> true
+ * - {'a.b': {$exists: true}}}                ---> true
+ * - {'b.d': {$exists: true}}                 ---> false
+ * - {'a': {$type: 'long'}}                   ---> false
  */
 bool hasPredicateOnPaths(const MatchExpression& expr,
                          mongo::MatchExpression::MatchType searchType,
-                         const stdx::unordered_set<std::string>& paths);
+                         const OrderedPathSet& paths);
 
 using PathOrExprMatchExpression = std::variant<PathMatchExpression*, ExprMatchExpression*>;
 using Renameables = std::vector<std::pair<PathOrExprMatchExpression, std::string>>;

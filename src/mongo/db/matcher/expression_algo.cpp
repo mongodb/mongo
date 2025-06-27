@@ -677,25 +677,76 @@ std::unique_ptr<MatchExpression> splitMatchExpressionForColumns(
     MONGO_UNREACHABLE;
 }
 
+/**
+ * Return true if any of the paths in 'prefixCandidates' are identical to or an ancestor of any
+ * of the paths in 'testSet'.  The order of the parameters matters -- it's not commutative. It is
+ * important that 'testSet' and 'prefixCandidates' use the same comparator for ordering.
+ */
+template <typename T>
+bool containsDependencyHelper(const std::set<T, PathComparator>& testSet,
+                              const OrderedPathSet& prefixCandidates) {
+    if (testSet.empty()) {
+        return false;
+    }
+
+    PathComparator pathComparator;
+    auto i2 = testSet.begin();
+    for (const auto& p1 : prefixCandidates) {
+        while (pathComparator(*i2, p1)) {
+            ++i2;
+            if (i2 == testSet.end()) {
+                return false;
+            }
+        }
+        // At this point we know that p1 <= *i2, so it may be identical or a path prefix.
+        if (p1 == *i2 || expression::isPathPrefixOf(p1, *i2)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool hasPredicateOnPathsHelper(const MatchExpression& expr,
+                               mongo::MatchExpression::MatchType searchType,
+                               const OrderedPathSet& paths,
+                               boost::optional<StringData> parentPath) {
+    // Accumulate the path components from any ancestors with partial paths (eg. $elemMatch) through
+    // the tree to the leaves. Leaf expressions as children of these partial-path expressions will
+    // sometimes have no path and would otherwise fail to be considered here.
+    std::string ownedPath;
+    boost::optional<StringData> fullPath;
+    if (expr.fieldRef()) {
+        if (parentPath) {
+            ownedPath = std::string{*parentPath} + "." + expr.fieldRef()->dottedField();
+            fullPath = ownedPath;
+        } else {
+            fullPath = expr.fieldRef()->dottedField();
+        }
+    } else {
+        fullPath = parentPath;
+    }
+
+    if (expr.getCategory() == MatchExpression::MatchCategory::kLeaf && fullPath) {
+        return ((expr.matchType() == searchType) &&
+                containsDependencyHelper<StringData>({*fullPath}, paths));
+    }
+    for (size_t i = 0; i < expr.numChildren(); i++) {
+        MatchExpression* child = expr.getChild(i);
+        if (hasPredicateOnPathsHelper(*child, searchType, paths, fullPath)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 }  // namespace
 
 namespace expression {
 
 bool hasPredicateOnPaths(const MatchExpression& expr,
                          mongo::MatchExpression::MatchType searchType,
-                         const stdx::unordered_set<std::string>& paths) {
-    if (expr.getCategory() == MatchExpression::MatchCategory::kLeaf) {
-        const FieldRef* fieldRef = expr.fieldRef();
-        return ((expr.matchType() == searchType) &&
-                paths.contains(toStdStringViewForInterop(fieldRef->dottedField())));
-    }
-    for (size_t i = 0; i < expr.numChildren(); i++) {
-        MatchExpression* child = expr.getChild(i);
-        if (hasPredicateOnPaths(*child, searchType, paths)) {
-            return true;
-        }
-    }
-    return false;
+                         const OrderedPathSet& paths) {
+    return hasPredicateOnPathsHelper(expr, searchType, paths, boost::none /* parentPath */);
 }
 
 bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
@@ -929,25 +980,7 @@ bool hasOnlyRenameableMatchExpressionChildren(const MatchExpression& expr,
 }
 
 bool containsDependency(const OrderedPathSet& testSet, const OrderedPathSet& prefixCandidates) {
-    if (testSet.empty()) {
-        return false;
-    }
-
-    PathComparator pathComparator;
-    auto i2 = testSet.begin();
-    for (const auto& p1 : prefixCandidates) {
-        while (pathComparator(*i2, p1)) {
-            ++i2;
-            if (i2 == testSet.end()) {
-                return false;
-            }
-        }
-        // At this point we know that p1 <= *i2, so it may be identical or a path prefix.
-        if (p1 == *i2 || isPathPrefixOf(p1, *i2)) {
-            return true;
-        }
-    }
-    return false;
+    return containsDependencyHelper(testSet, prefixCandidates);
 }
 
 bool containsOverlappingPaths(const OrderedPathSet& testSet) {

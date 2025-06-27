@@ -2169,15 +2169,102 @@ TEST(hasPredicateOnPaths, ReturnsFalseWhenExistsOnlyOnPrefix) {
         *swMatchExpression.getValue().get(), MatchExpression::MatchType::EXISTS, {"a.b"}));
 }
 
-TEST(hasPredicateOnPaths, ReturnsFalseWhenExistsOnSubpath) {
+TEST(hasPredicateOnPaths, ReturnsTrueWhenExistsOnSubpath) {
     BSONObj matchPredicate = fromjson(
         "{$and: [{q: {$gt: 5000}}, {$and: [{z: {$lte: 50}},"
         "{$or: [{f : {$gte: 4}}, {'a.b' : {$exists : true}}]}]}]}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
     ASSERT_OK(swMatchExpression.getStatus());
-    ASSERT_FALSE(expression::hasPredicateOnPaths(
+    ASSERT_TRUE(expression::hasPredicateOnPaths(
         *swMatchExpression.getValue().get(), MatchExpression::MatchType::EXISTS, {"a"}));
+}
+
+TEST(hasPredicateOnPaths, ReturnsTrueWhenTypeOnSubpath) {
+    BSONObj matchPredicate = fromjson(
+        "{$and: [{q: {$gt: 5000}}, {$and: [{z: {$lte: 50}},"
+        "{$or: [{f : {$gte: 4}}, {'a.b' : {$type : 'long'}}]}]}]}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(swMatchExpression.getStatus());
+    ASSERT_TRUE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {"a"}));
+}
+
+TEST(hasPredicateOnPaths, ReturnsTrueWhenTraversingThroughElemMatchObject) {
+    BSONObj matchPredicate = fromjson("{a: {$elemMatch: {b: 5, c: {$type : 'long'}}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(swMatchExpression.getStatus());
+
+    ASSERT_TRUE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {"a"}));
+    ASSERT_TRUE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {"a.c"}));
+
+    ASSERT_FALSE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {"b"}));
+    ASSERT_FALSE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {"c"}));
+    ASSERT_FALSE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {"a.b"}));
+    ASSERT_FALSE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {"a.d"}));
+}
+
+TEST(hasPredicateOnPaths, ReturnsTrueWhenTraversingThroughElemMatchValue) {
+    BSONObj matchPredicate = fromjson("{a: {$elemMatch: {$type : 'long'}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(swMatchExpression.getStatus());
+
+    ASSERT_TRUE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {"a"}));
+
+    ASSERT_FALSE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {"a.b"}));
+    ASSERT_FALSE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {"a."}));
+}
+
+TEST(hasPredicateOnPaths, EmptyFieldTests) {
+    BSONObj matchPredicate = fromjson("{\"\": {$elemMatch: {a: {$type : 'long'}}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(swMatchExpression.getStatus());
+
+    ASSERT_TRUE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {""}));
+    ASSERT_TRUE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {".a"}));
+
+    ASSERT_FALSE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {"a"}));
+    ASSERT_FALSE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {"."}));
+    ASSERT_FALSE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {".b"}));
+}
+
+TEST(hasPredicateOnPaths, NestedEmptyFieldTests) {
+    BSONObj matchPredicate = fromjson("{a: {$elemMatch: {\"\": {$type : 'long'}}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(swMatchExpression.getStatus());
+
+    ASSERT_TRUE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {"a"}));
+    ASSERT_TRUE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {"a."}));
+
+    ASSERT_FALSE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {""}));
+    ASSERT_FALSE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {".a"}));
+    ASSERT_FALSE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {"."}));
+    ASSERT_FALSE(expression::hasPredicateOnPaths(
+        *swMatchExpression.getValue().get(), MatchExpression::MatchType::TYPE_OPERATOR, {"a.a"}));
 }
 
 TEST(hasPredicateOnPaths, FindsTypeUsage) {
