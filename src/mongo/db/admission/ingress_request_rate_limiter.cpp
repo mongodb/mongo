@@ -121,11 +121,10 @@ void IngressRequestRateLimiter::updateRateParameters(double refreshRatePerSec,
     if (const auto scopedFp = ingressRequestRateLimiterFractionalRateOverride.scoped();
         MONGO_unlikely(scopedFp.isActive())) {
         const auto rate = scopedFp.getData().getField("rate").numberDouble();
-        _rateLimiter.updateRateParameters(rate, gIngressRequestRateLimiterBurstCapacitySecs.load());
+        _rateLimiter.updateRateParameters(rate, burstCapacitySecs);
         return;
     }
-    _rateLimiter.updateRateParameters(refreshRatePerSec,
-                                      gIngressRequestRateLimiterBurstCapacitySecs.load());
+    _rateLimiter.updateRateParameters(refreshRatePerSec, burstCapacitySecs);
 }
 
 Status IngressRequestRateLimiter::onUpdateAdmissionRatePerSec(std::int32_t refreshRatePerSec) {
