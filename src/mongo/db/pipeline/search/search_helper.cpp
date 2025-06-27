@@ -268,7 +268,7 @@ void checkAndSetViewOnExpCtx(boost::intrusive_ptr<ExpressionContext> expCtx,
     // storedSource is disabled, idLookup will retrieve full/unmodified documents during
     // (from the _id values returned by mongot), apply the view's data transforms, and pass
     // said transformed documents through the rest of the user pipeline.
-    if (expCtx->isFeatureFlagMongotIndexedViewsEnabled() && lpp.hasSearchStage()) {
+    if (lpp.hasSearchStage() && !resolvedView.getPipeline().empty()) {
         expCtx->setView(boost::make_optional(std::make_pair(viewName, resolvedView.getPipeline())));
     }
 }
@@ -649,6 +649,15 @@ void validateViewNotSetByUser(boost::intrusive_ptr<ExpressionContext> expCtx, co
         assertAllowedInternalIfRequired(
             expCtx->getOperationContext(), kViewFieldName, AllowedWithClientType::kInternal);
     }
+}
+
+void validateMongotIndexedViewsFF(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                  const std::vector<BSONObj>& effectivePipeline) {
+    // Queries on views with empty effective pipelines (i.e. identity views) are treated as queries
+    // on the underlying collection, therefore allowed on all FCV versions that support search.
+    uassert(ErrorCodes::OptionNotSupportedOnView,
+            "search stages are unsupported on views",
+            effectivePipeline.empty() || expCtx->isFeatureFlagMongotIndexedViewsEnabled());
 }
 
 }  // namespace search_helpers

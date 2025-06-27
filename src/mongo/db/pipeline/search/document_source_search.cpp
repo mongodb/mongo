@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/pipeline/search/lite_parsed_search.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/db/query/search/manage_search_index_request_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
@@ -120,6 +121,10 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
     // return boost::none if there is no view there either.
     if (!spec.getView()) {
         spec.setView(search_helpers::getViewFromExpCtx(expCtx));
+    }
+
+    if (auto view = spec.getView()) {
+        search_helpers::validateMongotIndexedViewsFF(expCtx, view->getEffectivePipeline());
     }
 
     return make_intrusive<DocumentSourceSearch>(expCtx, std::move(spec));

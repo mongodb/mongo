@@ -321,7 +321,6 @@ void DocumentSourceLookUp::resolvedPipelineHelper(
     // we know the view is not mongot indexed because mongot doesn't support indexing a $search view
     // pipeline. and doesn't need the special support inside $_internalSearchIdLookup.
     if (_fromNsIsAView && search_helper_bson_obj::isMongotPipeline(pipeline) &&
-        expCtx->isFeatureFlagMongotIndexedViewsEnabled() &&
         !search_helper_bson_obj::isMongotPipeline(_resolvedPipeline)) {
         // The user pipeline is a mongot pipeline but the view pipeline is not - so we assume it's a
         // mongot-indexed view. As such, we overwrite the view pipeline. This is because in the case

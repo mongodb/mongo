@@ -668,8 +668,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ResolvedViewAggExState::handleViewHel
         // TODO SERVER-101599 remove this code once 9.0 becomes last LTS. By then only viewless
         // timeseries collections will exist.
         return Pipeline::parse(getRequest().getPipeline(), expCtx);
-    } else if (search_helpers::isMongotPipeline(pipeline.get()) &&
-               expCtx->isFeatureFlagMongotIndexedViewsEnabled()) {
+    } else if (search_helpers::isMongotPipeline(pipeline.get())) {
         // For search queries on views don't do any of the pipeline stitching that is done for
         // normal views.
         return pipeline;

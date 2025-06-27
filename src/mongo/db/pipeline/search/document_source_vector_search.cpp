@@ -235,10 +235,15 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::createFromB
 
     // Validate the source of the view if it exists on the spec, otherwise check expCtx for the
     // view.
-    if (search_helpers::getViewFromBSONObj(spec)) {
+    boost::optional<SearchQueryViewSpec> view = search_helpers::getViewFromBSONObj(spec);
+    if (view) {
         search_helpers::validateViewNotSetByUser(expCtx, spec);
-    } else if (auto view = search_helpers::getViewFromExpCtx(expCtx)) {
+    } else if ((view = search_helpers::getViewFromExpCtx(expCtx))) {
         spec = spec.addField(BSON(kViewFieldName << view->toBSON()).firstElement());
+    }
+
+    if (view) {
+        search_helpers::validateMongotIndexedViewsFF(expCtx, view->getEffectivePipeline());
     }
 
     auto serviceContext = expCtx->getOperationContext()->getServiceContext();

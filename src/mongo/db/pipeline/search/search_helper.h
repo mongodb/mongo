@@ -202,5 +202,12 @@ boost::optional<SearchQueryViewSpec> getViewFromBSONObj(const BSONObj& spec);
 
 void validateViewNotSetByUser(boost::intrusive_ptr<ExpressionContext> expCtx, const BSONObj& spec);
 
+/**
+ * Validates that search stages on views are only allowed when the respective feature flag
+ * is enabled.
+ */
+void validateMongotIndexedViewsFF(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                  const std::vector<BSONObj>& effectivePipeline);
+
 }  // namespace search_helpers
 }  // namespace mongo

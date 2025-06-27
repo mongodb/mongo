@@ -239,9 +239,7 @@ AggregateCommandRequest ResolvedView::asExpandedViewAggregation(
     std::vector<BSONObj> resolvedPipeline;
     // Mongot user pipelines are a unique case: $_internalSearchIdLookup applies the view pipeline.
     // For this reason, we do not expand the aggregation request to include the view pipeline.
-    if (search_helper_bson_obj::isMongotPipeline(request.getPipeline()) &&
-        feature_flags::gFeatureFlagMongotIndexedViews.isEnabledUseLatestFCVWhenUninitialized(
-            vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (search_helper_bson_obj::isMongotPipeline(request.getPipeline())) {
         resolvedPipeline.reserve(request.getPipeline().size());
         resolvedPipeline.insert(
             resolvedPipeline.end(), request.getPipeline().begin(), request.getPipeline().end());

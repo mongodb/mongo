@@ -173,6 +173,10 @@ InternalSearchMongotRemoteSpec prepareInternalSearchMetaMongotSpec(
             params.setView(search_helpers::getViewFromExpCtx(expCtx));
         }
 
+        if (auto view = params.getView()) {
+            search_helpers::validateMongotIndexedViewsFF(expCtx, view->getEffectivePipeline());
+        }
+
         return params;
     }
 
