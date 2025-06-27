@@ -28,7 +28,7 @@ pip install -r requirements.txt
 Create some `Employee`s!
 
 ```
-python3 driver.py specs.employee Employee -n 10
+python3 driver.py specs.employee Employee --size 10
 ```
 
 ---
@@ -48,7 +48,7 @@ will generate a single `Employee` object.
 The `-n` flag can be used to generate multiple objects, e.g.
 
 ```
-python3 driver.py specs.employee Employee -n 10
+python3 driver.py specs.employee Employee --size 10
 ```
 
 will generate 10 `Employee` objects.
@@ -57,7 +57,7 @@ The `--indices` switch can be used to create indices from index sets defined in 
 Thus,
 
 ```
-python3 driver.py specs.employee Employee -n 10 --indices index_set_1 --indices index_set_2
+python3 driver.py specs.employee Employee --size 10 --indices index_set_1 --indices index_set_2
 ```
 
 will generate 10 `Employee` objects _and_ create the indices listed in `index_set_1` and
@@ -83,7 +83,7 @@ command to a command list file.
 After setting up a `mongod` at `localhost:27017`, one can run:
 
 ```
-python3 driver.py specs.employee Employee -n 10000 --drop --dump
+python3 driver.py specs.employee Employee --size 10000 --drop --dump
 ```
 
 to drop, generate, and dump the `Employee` dataset.
@@ -91,7 +91,7 @@ to drop, generate, and dump the `Employee` dataset.
 One might also want to restore the original dump first with:
 
 ```
-python3 driver.py specs.employee Employee -n 10000 --drop --dump --restore
+python3 driver.py specs.employee Employee --size 10000 --drop --dump --restore
 ```
 
 By default, `--dump` and `--restore` make user of the `out/` subdirectory as the output directory.
@@ -129,7 +129,7 @@ Commands that are considered to change the dataset are ones that:
 
 - Contains either `--drop` or `--restore`, or
 - Adds an index set with `--indices`, or
-- Generates at least one document with positive `--num`.
+- Generates at least one document with positive `--size`.
 
 In theory, this means that someone else can analyze the dumped `commands.sh` file and the copied
 specifications files to understand how the dataset was generated.

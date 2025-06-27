@@ -25,7 +25,11 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 
-"""Example collection spec to demonstrate various features of this data generator."""
+"""
+Example collection spec to demonstrate various features of this data generator.
+
+Models a potential Employee record document in an HR system.
+"""
 
 import collections
 import dataclasses

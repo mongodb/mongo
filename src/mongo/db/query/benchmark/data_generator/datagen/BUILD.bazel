@@ -1,6 +1,11 @@
 package(default_visibility = ["//visibility:public"])
 
 py_library(
+    name = "config",
+    srcs = ["config.py"],
+)
+
+py_library(
     name = "database_instance",
     srcs = ["database_instance.py"],
 )

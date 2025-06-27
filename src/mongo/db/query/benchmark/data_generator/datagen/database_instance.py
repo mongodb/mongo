@@ -91,7 +91,7 @@ class DatabaseInstance:
         await self.client.drop_database(self.config.database_name)
 
     def restore(self):
-        """Restore the database from the 'self.dump_directory'."""
+        """Restore the database."""
 
         if (mongorestore := shutil.which("mongorestore")) is None:
             raise RuntimeError("Cannot find a mongodump binary along PATH.")
@@ -108,7 +108,7 @@ class DatabaseInstance:
         )
 
     def dump(self, additional_args: list):
-        """Dump the database into 'self.dump_directory'."""
+        """Dump the database."""
 
         if (mongodump := shutil.which("mongodump")) is None:
             raise RuntimeError("Cannot find a mongodump binary along PATH.")

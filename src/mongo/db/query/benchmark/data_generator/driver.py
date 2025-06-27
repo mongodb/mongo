@@ -31,8 +31,9 @@ import pathlib
 import shlex
 import typing
 
-import pymongo
-from datagen.database_instance import DatabaseConfig, DatabaseInstance, RestoreMode
+import datagen.config
+import datagen.database_instance
+import datagen.util
 
 
 class CorrelatedGeneratorFactory:
@@ -119,25 +120,8 @@ def record_metadata(module, out_dir: pathlib.Path, seed: str | None = None, clea
         fout.write(f"{argstring}\n")
 
 
-def restore(client: pymongo.MongoClient, db, coll, path: pathlib.Path):
-    """Invokes mongorestore to restore data from a mongodump."""
-    import shutil
-    import subprocess
-
-    if (mongorestore := shutil.which("mongorestore")) is None:
-        raise RuntimeError("Cannot find a mongodump binary along PATH.")
-
-    if not (coll_file := (path / db.name / coll.name).with_suffix(".bson")).exists():
-        raise FileNotFoundError(f"Missing restore file: {coll_file}")
-
-    host, port = client.address
-    uri = f"mongodb://{host}:{port}"
-
-    subprocess.run([mongorestore, uri, coll_file, "--db", db.name, "--collection", coll.name])
-
-
 async def upstream(
-    database_instance: DatabaseInstance,
+    database_instance: datagen.database_instance.DatabaseInstance,
     collection_name: str,
     source: typing.Generator,
     count: int,
@@ -147,13 +131,25 @@ async def upstream(
 
     import datagen.serialize
 
+    tasks = []
+
     while count:
         num = min(1000, count)  # Batch the inserts.
-        await database_instance.insert_many(
-            collection_name,
-            (datagen.serialize.serialize_doc(dataclasses.asdict(next(source))) for _ in range(num)),
+        tasks.append(
+            asyncio.create_task(
+                database_instance.insert_many(
+                    collection_name,
+                    [
+                        datagen.serialize.serialize_doc(dataclasses.asdict(next(source)))
+                        for _ in range(num)
+                    ],
+                )
+            )
         )
         count -= num
+
+    for task in tasks:
+        await task
 
 
 async def main():
@@ -173,8 +169,8 @@ async def main():
     parser.add_argument("--db", "-d", required=True, help="Name of the database ")
     parser.add_argument(
         "--restore",
-        choices=[mode.name for mode in RestoreMode],
-        default=RestoreMode.NEVER.name,
+        choices=[mode.name for mode in datagen.database_instance.RestoreMode],
+        default=datagen.database_instance.RestoreMode.NEVER.name,
         type=str,
         help="Restore the collection before inserting.",
     )
@@ -200,19 +196,26 @@ async def main():
         "-c",
         help="Name of the collection. Defaults to the name of the schema.",
     )
-    parser.add_argument("--size", type=int, required=True, help="Number of objects to generate.")
+    parser.add_argument(
+        "--size",
+        required=True,
+        type=int,
+        help="Number of objects to generate. Set to 0 to skip data generation.",
+    )
     parser.add_argument("--seed", type=str, help="The seed to use.")
 
     args = parser.parse_args()
     module = importlib.import_module(args.module)
     spec = getattr(module, args.spec)
 
-    restore_mode = RestoreMode[args.restore]
+    restore_mode = datagen.database_instance.RestoreMode[args.restore]
     restore_additional_args = [] if args.restore_args is None else shlex.split(args.restore_args)
     dump_additional_args = ["--out", args.out] + (
         [] if args.dump is None else shlex.split(args.dump)
     )
-    database_config = DatabaseConfig(args.uri, args.db, restore_mode, restore_additional_args)
+    database_config = datagen.database_instance.DatabaseConfig(
+        args.uri, args.db, restore_mode, restore_additional_args
+    )
 
     collection_name = args.spec if args.collection_name is None else args.collection_name
 
@@ -220,31 +223,44 @@ async def main():
 
     # 1. Database Instance provides connectivity to a MongoDB instance, it loads data optionally
     # from the dump on creating and stores data optionally to the dump on closing.
-    with DatabaseInstance(database_config) as database_instance:
+    with datagen.database_instance.DatabaseInstance(database_config) as database_instance:
         if args.drop:
             await database_instance.drop_collection(collection_name)
 
-        # Create and insert the documents.
         seed = None
-        if args.size:
-            # Generate 1024 bits of randomness as the initial seed if one was not already provided.
+
+        # 2-3. Generate data and create indices.
+        if issubclass(spec, datagen.config.DataGeneratorProducer):
+            # 2a. CE data generator spec.
             seed = args.seed if args.seed else f"{random.getrandbits(1024)}"
-            generator_factory = CorrelatedGeneratorFactory(spec, seed)
-            generator = generator_factory.make_generator()
-            await upstream(database_instance, collection_name, generator, args.size)
-            generator_factory.dump_metadata(collection_name, args.size, seed, metadata_path)
+            data_generator = spec.generator_function(seed)
+            generator = datagen.util.DataGenerator(database_instance, data_generator)
+            await generator.populate_collections()
+        else:
+            # 2b. Create and insert the documents.
+            if args.size:
+                # Generate 1024 bits of randomness as the initial seed if one was not already provided.
+                seed = args.seed if args.seed else f"{random.getrandbits(1024)}"
+                generator_factory = CorrelatedGeneratorFactory(spec, seed)
+                generator = generator_factory.make_generator()
+                await upstream(database_instance, collection_name, generator, args.size)
+                generator_factory.dump_metadata(collection_name, args.size, seed, metadata_path)
 
-        # Create indices after documents.
-        indices = args.indices if args.indices else ()
-        for index_set_name in indices:
-            if hasattr(module, index_set_name):
-                index_set = getattr(module, index_set_name)
-                indices = index_set() if callable(index_set) else index_set
-                database_instance.database.get_collection(collection_name).create_indexes(indices)
-            else:
-                raise RuntimeError(f"Module {module} does not define index set {index_set_name}.")
+            # 3b. Create indices after documents.
+            indices = args.indices if args.indices else ()
+            for index_set_name in indices:
+                if hasattr(module, index_set_name):
+                    index_set = getattr(module, index_set_name)
+                    indices = index_set() if callable(index_set) else index_set
+                    database_instance.database.get_collection(collection_name).create_indexes(
+                        indices
+                    )
+                else:
+                    raise RuntimeError(
+                        f"Module {module} does not define index set {index_set_name}."
+                    )
 
-        # Only record things if the dataset is somehow actually changed.
+        # 4. Only record things if the dataset is somehow actually changed.
         if any((args.size, args.indices, args.drop, args.restore)):
             # Only record the seed additionally if it wasn't already passed in.
             record_metadata(
@@ -254,6 +270,7 @@ async def main():
                 clean=args.drop,
             )
 
+        # 5. Dump data if a dump was requested.
         if args.dump is not None:
             database_instance.dump(dump_additional_args)
             dump_commands(args.out)
