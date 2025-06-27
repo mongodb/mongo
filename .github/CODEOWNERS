@@ -2254,6 +2254,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/algebra/**/* @10gen/query-execution-sbe @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/algebra/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/query/benchmark/OWNERS.yml
+/src/mongo/db/query/benchmark/**/README.md @10gen/query-optimization @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/query/boolean_simplification/OWNERS.yml
 /src/mongo/db/query/boolean_simplification/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/boolean_simplification/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot

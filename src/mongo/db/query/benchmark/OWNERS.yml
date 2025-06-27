@@ -1,0 +1,5 @@
+version: 1.0.0
+filters:
+  - "README.md":
+    approvers:
+      - 10gen/query-optimization
