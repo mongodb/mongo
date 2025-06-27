@@ -54,6 +54,8 @@
 namespace {
 // Copies of OpenSSL 1.1.0 and later define new EVP digest routines. We must
 // polyfill used definitions to interact with older OpenSSL versions.
+#define RSA_PSS_SALTLEN_DIGEST -1
+
 EVP_MD_CTX* EVP_MD_CTX_new() {
     return EVP_MD_CTX_create();
 }
