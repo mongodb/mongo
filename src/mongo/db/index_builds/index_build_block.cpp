@@ -192,13 +192,12 @@ void IndexBuildBlock::fail(OperationContext* opCtx, Collection* collection) {
                           "IndexBuildAborted",
                           ErrorCodes::IndexBuildAborted);
 
-    auto indexCatalogEntry = getWritableEntry(opCtx, collection);
-    if (indexCatalogEntry) {
-        invariant(
-            collection->getIndexCatalog()->dropIndexEntry(opCtx, collection, indexCatalogEntry));
+    if (auto indexCatalogEntry = getWritableEntry(opCtx, collection)) {
         if (_indexBuildInterceptor) {
             indexCatalogEntry->setIndexBuildInterceptor(nullptr);
         }
+        invariant(
+            collection->getIndexCatalog()->dropIndexEntry(opCtx, collection, indexCatalogEntry));
     } else {
         collection->getIndexCatalog()->deleteIndexFromDisk(opCtx, collection, _indexName);
     }

@@ -252,12 +252,6 @@ void removeIndex(OperationContext* opCtx,
 
     const bool isTwoPhaseDrop = dataRemoval == DataRemoval::kTwoPhase;
 
-    if (isTwoPhaseDrop) {
-        invariant(entry);
-        CollectionCatalog::get(opCtx)->dropIndex(
-            opCtx, collection->ns(), entry, /*isDropPending=*/true);
-    }
-
     // Schedule the second phase of drop to delete the data when it is no longer in use, if the
     // first phase is successfully committed.
     shard_role_details::getRecoveryUnit(opCtx)->onCommitForTwoPhaseDrop(

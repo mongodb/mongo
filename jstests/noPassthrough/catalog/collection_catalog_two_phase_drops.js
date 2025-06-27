@@ -62,13 +62,6 @@ checkLog.containsJson(primary, 22206, {
     }
 });
 
-// Registering drop pending index entry ident.
-checkLog.containsJson(primary, 6825301, {
-    ident: function(ident) {
-        return ident == xIndexUri;
-    }
-});
-
 // Wait until majority read concern optime has advanced past the given timestamp. Then take a
 // checkpoint and assert that the checkpoint's stable time is past the oplog entry.
 const advanceMajorityThenCheckpoint = function(timestamp) {
@@ -115,13 +108,6 @@ coll.drop();
 
 // Deferring table drop for index.
 checkLog.containsJson(primary, 22206, {
-    ident: function(ident) {
-        return ident == idIndexUri;
-    }
-});
-
-// Registering drop pending index entry ident.
-checkLog.containsJson(primary, 6825301, {
     ident: function(ident) {
         return ident == idIndexUri;
     }

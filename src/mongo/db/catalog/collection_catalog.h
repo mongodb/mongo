@@ -276,11 +276,6 @@ public:
         OperationContext* opCtx, const DatabaseName& dbName) const;
 
     /**
-     * Returns a shared_ptr to a drop pending index if it's found and not expired.
-     */
-    std::shared_ptr<IndexCatalogEntry> findDropPendingIndex(StringData ident) const;
-
-    /**
      * Handles committing a collection to the catalog within a WriteUnitOfWork.
      *
      * Must be called within a WriteUnitOfWork.
@@ -296,20 +291,6 @@ public:
     void onCollectionRename(OperationContext* opCtx,
                             Collection* coll,
                             const NamespaceString& fromCollection) const;
-
-    /**
-     * Marks an index as dropped for this OperationContext. The drop will be committed into the
-     * catalog on commit.
-     *
-     * Maintains the index in a drop pending state in the catalog until the underlying data files
-     * are deleted.
-     *
-     * Must be called within a WriteUnitOfWork.
-     */
-    void dropIndex(OperationContext* opCtx,
-                   const NamespaceString& nss,
-                   std::shared_ptr<IndexCatalogEntry> indexEntry,
-                   bool isDropPending) const;
 
     /**
      * Marks a collection as dropped for this OperationContext. Will cause the collection
@@ -364,13 +345,6 @@ public:
      * Deregister all the collection objects and view namespaces.
      */
     void deregisterAllCollectionsAndViews(ServiceContext* svcCtx);
-
-    /**
-     * Adds the index entry to the drop pending state in the catalog.
-     */
-    void deregisterIndex(OperationContext* opCtx,
-                         std::shared_ptr<IndexCatalogEntry> indexEntry,
-                         bool isDropPending);
 
     /**
      * Clears the in-memory state for the views associated with a particular database.
@@ -915,14 +889,10 @@ private:
     // Map of database names to their corresponding views and other associated state.
     ViewsForDatabaseMap _viewsForDatabase;
 
-    // Map of drop pending idents to their instance of Collection/IndexCatalogEntry. To avoid
-    // affecting the lifetime and delay of the ident drop from the ident reaper, these need to be a
-    // weak_ptr.
+    // Map of drop pending idents to their instance of Collection. To avoid affecting the lifetime
+    // and delay of the ident drop from the ident reaper, these need to be a weak_ptr.
     immutable::unordered_map<std::string, std::weak_ptr<Collection>, StringMapHasher, StringMapEq>
         _dropPendingCollection;
-    immutable::
-        unordered_map<std::string, std::weak_ptr<IndexCatalogEntry>, StringMapHasher, StringMapEq>
-            _dropPendingIndex;
 
     // Set of databases which are currently in the process of being dropped.
     immutable::unordered_set<DatabaseName> _dropPendingDatabases;

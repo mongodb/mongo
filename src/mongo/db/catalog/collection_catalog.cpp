@@ -611,15 +611,6 @@ public:
                     });
                     break;
                 }
-                case UncommittedCatalogUpdates::Entry::Action::kDroppedIndex: {
-                    writeJobs.push_back(
-                        [opCtx,
-                         indexEntry = entry.indexEntry,
-                         isDropPending = *entry.isDropPending](CollectionCatalog& catalog) {
-                            catalog.deregisterIndex(opCtx, std::move(indexEntry), isDropPending);
-                        });
-                    break;
-                }
             };
         }
 
@@ -1492,15 +1483,6 @@ std::shared_ptr<Collection> CollectionCatalog::_createNewPITCollection(
     return collToReturn;
 }
 
-std::shared_ptr<IndexCatalogEntry> CollectionCatalog::findDropPendingIndex(StringData ident) const {
-    const std::weak_ptr<IndexCatalogEntry>* dropPending = _dropPendingIndex.find(ident);
-    if (!dropPending) {
-        return nullptr;
-    }
-
-    return dropPending->lock();
-}
-
 void CollectionCatalog::onCreateCollection(OperationContext* opCtx,
                                            std::shared_ptr<Collection> coll) const {
     invariant(coll);
@@ -1536,15 +1518,6 @@ void CollectionCatalog::onCollectionRename(OperationContext* opCtx,
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
     uncommittedCatalogUpdates.renameCollection(coll, fromCollection);
-}
-
-void CollectionCatalog::dropIndex(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  std::shared_ptr<IndexCatalogEntry> indexEntry,
-                                  bool isDropPending) const {
-    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    uncommittedCatalogUpdates.dropIndex(nss, std::move(indexEntry), isDropPending);
-    PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
 }
 
 void CollectionCatalog::dropCollection(OperationContext* opCtx,
@@ -2450,7 +2423,6 @@ void CollectionCatalog::deregisterAllCollectionsAndViews(ServiceContext* svcCtx)
     _catalog = {};
     _viewsForDatabase = {};
     _dropPendingCollection = {};
-    _dropPendingIndex = {};
     _stats = {};
 
     ResourceCatalog::get().clear();
@@ -2471,18 +2443,6 @@ void CollectionCatalog::clearViews(OperationContext* opCtx, const DatabaseName& 
     });
 }
 
-void CollectionCatalog::deregisterIndex(OperationContext* opCtx,
-                                        std::shared_ptr<IndexCatalogEntry> indexEntry,
-                                        bool isDropPending) {
-    // Unfinished index builds return a nullptr for getSharedIdent(). Use getIdent() instead.
-    std::string ident = indexEntry->getIdent();
-
-    invariant(!_dropPendingIndex.find(ident));
-
-    LOGV2_DEBUG(6825301, 1, "Registering drop pending index entry ident", "ident"_attr = ident);
-    _dropPendingIndex = _dropPendingIndex.set(ident, indexEntry);
-}
-
 void CollectionCatalog::notifyIdentDropped(const std::string& ident) {
     // It's possible that the ident doesn't exist in either map when the collection catalog is
     // re-opened, the _dropPendingIdent map is cleared. During rollback-to-stable we re-open the
@@ -2495,7 +2455,6 @@ void CollectionCatalog::notifyIdentDropped(const std::string& ident) {
     LOGV2_DEBUG(6825302, 1, "Deregistering drop pending ident", "ident"_attr = ident);
 
     _dropPendingCollection = _dropPendingCollection.erase(ident);
-    _dropPendingIndex = _dropPendingIndex.erase(ident);
 }
 
 void CollectionCatalog::invariantHasExclusiveAccessToCollection(OperationContext* opCtx,

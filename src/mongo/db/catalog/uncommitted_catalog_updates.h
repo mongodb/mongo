@@ -74,8 +74,6 @@ public:
             kAddViewResource,
             // Remove a view resource
             kRemoveViewResource,
-            // Dropped index instance
-            kDroppedIndex,
         };
 
         boost::optional<UUID> uuid() const {
@@ -110,12 +108,8 @@ public:
         // Set for action kReplacedViewsForDatabase, boost::none otherwise.
         boost::optional<ViewsForDatabase> viewsForDb;
 
-        // Storage for the actual index entry.
-        // Set for action kDroppedIndex and nullptr otherwise.
-        std::shared_ptr<IndexCatalogEntry> indexEntry;
-
-        // Whether the collection or index entry is drop pending.
-        // Set for actions kDroppedCollection and kDroppedIndex, boost::none otherwise.
+        // Whether the collection entry is drop pending.
+        // Set for actions kDroppedCollection, boost::none otherwise.
         boost::optional<bool> isDropPending;
     };
 
@@ -148,8 +142,7 @@ public:
     /**
      * Determine if an entry uses two-phase commit to write into the CollectionCatalog.
      * kCreatedCollection is also committed using two-phase commit but using a separate system and
-     * is excluded from this list. kDroppedIndex is covered by kWritableCollection as a writable
-     * collection must be used to drop an index.
+     * is excluded from this list.
      */
     static bool isTwoPhaseCommitEntry(const Entry& entry) {
         return (entry.action == Entry::Action::kCreatedCollection ||
@@ -199,13 +192,6 @@ public:
      * list.
      */
     void renameCollection(const Collection* collection, const NamespaceString& from);
-
-    /**
-     * Manages an uncommitted index entry drop.
-     */
-    void dropIndex(const NamespaceString& nss,
-                   std::shared_ptr<IndexCatalogEntry> indexEntry,
-                   bool isDropPending);
 
     /**
      * Manage an uncommitted collection drop.

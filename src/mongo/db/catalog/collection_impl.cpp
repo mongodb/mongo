@@ -252,15 +252,6 @@ StatusWith<std::shared_ptr<Ident>> findSharedIdentForIndex(OperationContext* opC
         return latestEntry->getSharedIdent();
     }
 
-    // Next check the CollectionCatalog for a compatible drop pending index.
-    auto dropPendingEntry = CollectionCatalog::get(opCtx)->findDropPendingIndex(ident);
-
-    // The index entries are incompatible with the read timestamp, but we need to use the same
-    // shared ident to prevent the reaper from dropping idents prematurely.
-    if (dropPendingEntry) {
-        return dropPendingEntry->getSharedIdent();
-    }
-
     // The index ident is expired, but it could still be drop pending. Mark it as in use if
     // possible.
     auto newIdent = storageEngine->markIdentInUse(std::string{ident});
