@@ -1,5 +1,30 @@
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
 
+mongo_cc_library(
+    name = "api",
+    srcs = [
+        "document_source_extension.cpp",
+        "stage_registry.cpp",
+    ],
+    hdrs = [
+        "aggregation_stage.h",
+        "byte_buf.h",
+        "document_source_extension.h",
+        "extension_status.h",
+        "handle.h",
+        "stage_registry.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/mongo/db/extension/public:api",
+        # Note, for the time being we are linking in the C++ SDK here to reduce code duplication.
+        # Eventually, we may decouple the C++ SDK from the server and remove this dependency.
+        "//src/mongo/db/extension/sdk:sdk_cpp",
+        "//src/mongo:base",
+        "//src/mongo/db/pipeline",
+    ],
+)
+
 exports_files(
     glob([
         "*.h",

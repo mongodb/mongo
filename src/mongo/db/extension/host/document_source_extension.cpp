@@ -30,12 +30,70 @@
 #include "mongo/db/extension/host/document_source_extension.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/db/extension/host/byte_buf.h"
+#include "mongo/db/extension/host/extension_status.h"
+#include "mongo/db/extension/sdk/byte_buf_utils.h"
+#include "mongo/util/scopeguard.h"
 
-namespace mongo {
-DocumentSourceExtension::DocumentSourceExtension(StringData name,
-                                                 boost::intrusive_ptr<ExpressionContext> expCtx,
-                                                 Id id)
-    : DocumentSource(name, expCtx), exec::agg::Stage(name, expCtx), _stageName(name), _id(id) {}
+#include <cstdint>
+
+namespace mongo::extension::host {
+
+// static
+void DocumentSourceExtension::registerStage(ExtensionAggregationStageDescriptorHandle descriptor) {
+    auto nameStringData = descriptor.getName();
+    auto id = DocumentSource::allocateId(nameStringData);
+    auto nameAsString = std::string(nameStringData);
+
+    switch (descriptor.getType()) {
+        case MongoExtensionAggregationStageType::kNoOp:
+            registerStage(nameAsString, id, descriptor);
+            break;
+        default:
+            tasserted(10596401,
+                      str::stream()
+                          << "Received unknown stage type while registering extension stage: "
+                          << descriptor.getType());
+    };
+    LiteParsedDocumentSource::registerParser(nameAsString,
+                                             LiteParsedDocumentSourceDefault::parse,
+                                             AllowedWithApiStrict::kAlways,
+                                             AllowedWithClientType::kAny);
+}
+
+// static
+void DocumentSourceExtension::registerStage(
+    const std::string& name,
+    DocumentSource::Id id,
+    extension::host::ExtensionAggregationStageDescriptorHandle descriptor) {
+    DocumentSource::registerParser(
+        name,
+        [id, descriptor](BSONElement specElem,
+                         const boost::intrusive_ptr<ExpressionContext>& expCtx)
+            -> boost::intrusive_ptr<DocumentSource> {
+            return boost::intrusive_ptr(new DocumentSourceExtension(
+                specElem.fieldNameStringData(), expCtx, id, specElem.wrap(), descriptor));
+        },
+        nullptr);
+}
+
+void DocumentSourceExtension::unregisterParser_forTest(const std::string& name) {
+    DocumentSource::unregisterParser_forTest(name);
+}
+
+DocumentSourceExtension::DocumentSourceExtension(
+    StringData name,
+    boost::intrusive_ptr<ExpressionContext> exprCtx,
+    Id id,
+    BSONObj rawStage,
+    extension::host::ExtensionAggregationStageDescriptorHandle staticDescriptor)
+    : DocumentSource(name, exprCtx),
+      exec::agg::Stage(name, exprCtx),
+      _stageName(std::string(name)),
+      _id(id),
+      _raw_stage(rawStage.getOwned()),
+      _staticDescriptor(staticDescriptor),
+      _logicalStage(staticDescriptor.parse(_raw_stage)) {}
 
 const char* DocumentSourceExtension::getSourceName() const {
     return _stageName.c_str();
@@ -46,11 +104,16 @@ DocumentSource::Id DocumentSourceExtension::getId() const {
 }
 
 DocumentSource::GetNextResult DocumentSourceExtension::doGetNext() {
+    if (pSource) {
+        return pSource->getNext();
+    }
     return GetNextResult::makeEOF();
 }
 
 Value DocumentSourceExtension::serialize(const SerializationOptions& opts) const {
-    return Value();
+    // TODO We need to call into the plugin here when we want to serialize for query shape, or
+    // if optimizations change the shape of the stage definition.
+    return Value(_raw_stage);
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic>
@@ -71,4 +134,4 @@ StageConstraints DocumentSourceExtension::constraints(PipelineSplitState pipeSta
     return constraints;
 }
 
-}  // namespace mongo
+}  // namespace mongo::extension::host

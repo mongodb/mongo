@@ -1,0 +1,22 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+mongo_cc_library(
+    name = "sdk_cpp",
+    srcs = [
+        "aggregation_stage.cpp",
+        "byte_buf.cpp",
+        "extension_status.cpp",
+    ],
+    hdrs = [
+        "aggregation_stage.h",
+        "byte_buf.h",
+        "byte_buf_utils.h",
+        "extension_status.h",
+        "handle.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/extension/public:api",
+    ],
+)

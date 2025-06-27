@@ -63,6 +63,10 @@ StringMap<DocumentSource::ParserRegistration> DocumentSource::parserMap;
 DocumentSource::DocumentSource(StringData stageName, const intrusive_ptr<ExpressionContext>& pCtx)
     : _expCtx(pCtx) {}
 
+void DocumentSource::unregisterParser_forTest(const std::string& name) {
+    parserMap.erase(name);
+}
+
 void DocumentSource::registerParser(std::string name, Parser parser, FeatureFlag* featureFlag) {
     auto it = parserMap.find(name);
     massert(28707,

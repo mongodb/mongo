@@ -30,12 +30,18 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/extension/host/aggregation_stage.h"
 #include "mongo/db/pipeline/document_source.h"
 
 namespace mongo {
 
+class DocumentSourceExtensionTest;
+
+namespace extension::host {
+
 /**
- * A DocumentSource wrapper for an extension aggregation stage.
+ * A DocumentSource implementation for an extension aggregation stage. DocumentSourceExtension is a
+ * facade around handles to extension API objects.
  */
 class DocumentSourceExtension : public DocumentSource, public exec::agg::Stage {
 public:
@@ -53,8 +59,30 @@ public:
 
     Value serialize(const SerializationOptions& opts) const override;
 
+    // This method is invoked by extensions to register descriptor.
+    static void registerStage(ExtensionAggregationStageDescriptorHandle descriptor);
+
 private:
-    DocumentSourceExtension(StringData name, boost::intrusive_ptr<ExpressionContext> expCtx, Id id);
+    static void registerStage(
+        const std::string& name,
+        DocumentSource::Id id,
+        extension::host::ExtensionAggregationStageDescriptorHandle descriptor);
+
+    /**
+     * Give access to DocumentSourceExtensionTest to unregister parser.
+     * unregisterParser_forTest is only meant to be used in the context of unit
+     * tests. This is because the parserMap is not thread safe, so modifying it at runtime is
+     * unsafe.
+     */
+    friend class mongo::DocumentSourceExtensionTest;
+    static void unregisterParser_forTest(const std::string& name);
+
+    DocumentSourceExtension(
+        StringData name,
+        boost::intrusive_ptr<ExpressionContext> exprCtx,
+        Id id,
+        BSONObj rawStage,
+        mongo::extension::host::ExtensionAggregationStageDescriptorHandle descriptor);
 
     // Do not support copy or move.
     DocumentSourceExtension(const DocumentSourceExtension&) = delete;
@@ -62,7 +90,18 @@ private:
     DocumentSourceExtension& operator=(const DocumentSourceExtension&) = delete;
     DocumentSourceExtension& operator=(DocumentSourceExtension&&) = delete;
 
-    std::string _stageName;
-    Id _id;
+    /**
+     * NB : Here we keep a copy of the stage name to service getSourceName().
+     * It is tempting to rely on the name which is provided by the _staticDescriptor, however, that
+     * is risky because we need to return a const char* in getSourceName() but a
+     * MongoExtensionByteView coming from the extension is not guaranteed to contain a null
+     * terminator.
+     **/
+    const std::string _stageName;
+    const Id _id;
+    BSONObj _raw_stage;
+    const mongo::extension::host::ExtensionAggregationStageDescriptorHandle _staticDescriptor;
+    mongo::extension::host::ExtensionLogicalAggregationStageHandle _logicalStage;
 };
+}  // namespace extension::host
 }  // namespace mongo
