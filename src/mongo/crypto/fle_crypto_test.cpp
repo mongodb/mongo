@@ -3456,24 +3456,25 @@ TEST_F(ServiceContextTest, CompactionHelpersTest_parseCompactionTokensTestTooLon
         CompactionHelpers::parseCompactionTokens(builder.obj()), DBException, kInvalidPrfLength);
 }
 
-TEST_F(ServiceContextTest, CompactionHelpersTest_validateCompactionTokensTest) {
+TEST_F(ServiceContextTest, CompactionHelpersTest_validateCompactionOrCleanupTokensTest) {
     EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
 
     BSONObjBuilder builder;
     for (auto& field : efc.getFields()) {
         // validate fails until all fields are present
-        ASSERT_THROWS_CODE(CompactionHelpers::validateCompactionTokens(efc, builder.asTempObj()),
+        ASSERT_THROWS_CODE(CompactionHelpers::validateCompactionOrCleanupTokens(
+                               efc, builder.asTempObj(), "Compact"_sd),
                            DBException,
                            7294900);
 
         // validate doesn't care about the value, so this is fine
         builder.append(field.getPath(), "foo");
     }
-    CompactionHelpers::validateCompactionTokens(efc, builder.asTempObj());
+    CompactionHelpers::validateCompactionOrCleanupTokens(efc, builder.asTempObj(), "Compact"_sd);
 
     // validate OK if obj has extra fields
     builder.append("abc.xyz", "foo");
-    CompactionHelpers::validateCompactionTokens(efc, builder.obj());
+    CompactionHelpers::validateCompactionOrCleanupTokens(efc, builder.obj(), "Compact"_sd);
 }
 
 TEST_F(ServiceContextTest, EDCServerCollectionTest_GenerateEDCTokens) {

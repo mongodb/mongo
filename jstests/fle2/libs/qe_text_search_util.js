@@ -38,6 +38,27 @@ export class SuffixField extends TextFieldBase {
         return (Math.min(this._ub, padded_len) - this._lb + 1) +
             1;  // +1 includes tag for exact match string
     }
+
+    calculateExpectedUniqueTagCount(strs) {
+        const affixSet = new Set();
+        const uniqueStrs = new Set(strs);
+        const paddedStrs = new Set();
+        for (const str of strs) {
+            for (let affix_len = this._lb; affix_len <= Math.min(this._ub, str.length);
+                 affix_len++) {
+                affixSet.add(str.slice(-affix_len));
+            }
+            const padded_len = Math.ceil((str.length + 5) / 16) * 16 - 5;
+            if (str.length !== padded_len && str.length < this._ub) {
+                // This string needs padding.
+                paddedStrs.add(str);
+            }
+        }
+        // Number of unique affixes + number of unique strings ( = number of unique exact match
+        // tokens) + number of unique strings that need padding ( = number of unique padding
+        // tokens).
+        return affixSet.size + uniqueStrs.size + paddedStrs.size;
+    }
 }
 
 export class PrefixField extends SuffixField {
@@ -45,6 +66,27 @@ export class PrefixField extends SuffixField {
         let spec = super.createQueryTypeDescriptor();
         spec.queryType = "prefixPreview";
         return spec;
+    }
+
+    calculateExpectedUniqueTagCount(strs) {
+        const affixSet = new Set();
+        const uniqueStrs = new Set(strs);
+        const paddedStrs = new Set();
+        for (const str of strs) {
+            for (let affix_len = this._lb; affix_len <= Math.min(this._ub, str.length);
+                 affix_len++) {
+                affixSet.add(str.slice(0, affix_len));
+            }
+            const padded_len = Math.ceil((str.length + 5) / 16) * 16 - 5;
+            if (str.length !== padded_len && str.length < this._ub) {
+                // This string needs padding.
+                paddedStrs.add(str);
+            }
+        }
+        // Number of unique affixes + number of unique strings ( = number of unique exact match
+        // tokens) + number of unique strings that need padding ( = number of unique padding
+        // tokens).
+        return affixSet.size + uniqueStrs.size + paddedStrs.size;
     }
 }
 
@@ -80,6 +122,34 @@ export class SubstringField extends TextFieldBase {
         const maxkgram2 = (padded_len * range) - (hisum - losum) + range;
         return Math.min(maxkgram1, maxkgram2) + 1;  // +1 includes tag for exact match string
     }
+
+    calculateExpectedUniqueTagCount(strs) {
+        const substringSet = new Set();
+        const uniqueStrs = new Set(strs);
+        const paddedStrs = new Set();
+
+        for (const str of strs) {
+            const strSubstringSet = new Set();
+            for (let substr_len = this._lb; substr_len <= Math.min(this._ub, str.length);
+                 substr_len++) {
+                for (let start = 0; start <= str.length - substr_len; start++) {
+                    const sub = str.slice(start, start + substr_len);
+                    substringSet.add(sub);
+                    strSubstringSet.add(sub);
+                }
+            }
+            // msize = expected tag count - 1 (for exact match string).
+            if (strSubstringSet.size != this.calculateExpectedTagCount(str.length) - 1) {
+                // For substring indexes, we pad when the number of unique substrings is less than
+                // the msize (the max possible number of unique substrings given the padded size).
+                paddedStrs.add(str);
+            }
+        }
+        // Number of unique affixes + number of unique strings ( = number of unique exact match
+        // tokens) + number of unique strings that need padding ( = number of unique padding
+        // tokens).
+        return substringSet.size + uniqueStrs.size + paddedStrs.size;
+    }
 }
 
 export class SuffixAndPrefixField {
@@ -100,6 +170,12 @@ export class SuffixAndPrefixField {
         // to calculateExpectedTagCount.
         return this._suffixField.calculateExpectedTagCount(byte_len) +
             this._prefixField.calculateExpectedTagCount(byte_len) - 1;
+    }
+
+    calculateExpectedUniqueTagCount(strs) {
+        return this._suffixField.calculateExpectedUniqueTagCount(strs) +
+            this._prefixField.calculateExpectedUniqueTagCount(strs) -
+            (new Set(strs)).size;  // Remove double count of exact match tokens.
     }
 }
 

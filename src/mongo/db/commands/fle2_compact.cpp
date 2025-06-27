@@ -216,14 +216,16 @@ void upsertNullAnchor(FLEQueryInterface* queryImpl,
     }
 }
 
-void checkSchemaAndCompactionTokens(const BSONObj& tokens, const Collection& edc) {
+void checkSchemaAndCompactionOrCleanupTokens(const BSONObj& tokens,
+                                             const Collection& edc,
+                                             StringData tokenType) {
     uassert(6346807,
             "Target namespace is not an encrypted collection",
             edc.getCollectionOptions().encryptedFieldConfig);
 
     // Validate the request contains a compaction token for each encrypted field
     const auto& efc = edc.getCollectionOptions().encryptedFieldConfig.value();
-    CompactionHelpers::validateCompactionTokens(efc, tokens);
+    CompactionHelpers::validateCompactionOrCleanupTokens(efc, tokens, tokenType);
 }
 
 std::shared_ptr<stdx::unordered_set<ECOCCompactionDocumentV2>> readUniqueECOCEntriesInTxn(
@@ -964,7 +966,7 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
 
     // Each entry in 'C_f' represents a unique field/value pair. For each field/value pair,
     // compact the ESC entries for that field/value pair in one transaction.
-    auto rangeFieldsToCleanup = std::make_shared<std::map<StringData, AnchorPaddingRootToken>>();
+    auto paddedFieldsToCleanup = std::make_shared<std::map<StringData, AnchorPaddingRootToken>>();
     for (auto& ecocDoc : *uniqueEcocEntries) {
         // start a new transaction
         std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
@@ -976,9 +978,9 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
         auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
         auto service = opCtx->getService();
 
-        if (ecocDoc.isRange() && ecocDoc.anchorPaddingRootToken &&
-            (rangeFieldsToCleanup->find(ecocDoc.fieldName) == rangeFieldsToCleanup->end())) {
-            (*rangeFieldsToCleanup)[ecocDoc.fieldName] = ecocDoc.anchorPaddingRootToken.get();
+        if (!ecocDoc.isEquality() && ecocDoc.anchorPaddingRootToken &&
+            (paddedFieldsToCleanup->find(ecocDoc.fieldName) == paddedFieldsToCleanup->end())) {
+            (*paddedFieldsToCleanup)[ecocDoc.fieldName] = ecocDoc.anchorPaddingRootToken.get();
         }
 
         auto swResult =
@@ -1016,18 +1018,18 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
         }
     }
 
-    // Cleanup padding for field in RangeFields.
-    for (const auto& rangeFieldIt : *rangeFieldsToCleanup) {
+    // Cleanup padding for each padded (range/text search) field.
+    for (const auto& paddedFieldIt : *paddedFieldsToCleanup) {
         std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
         auto argsBlock = std::make_tuple(namespaces.escNss,
                                          pqMaxEntries - pq.size(),
-                                         std::string{rangeFieldIt.first},
-                                         rangeFieldIt.second);
+                                         std::string{paddedFieldIt.first},
+                                         paddedFieldIt.second);
         auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
         auto result = uassertStatusOK(trun->runNoThrow(
             opCtx,
             [service = opCtx->getService(),
-             rangeFieldsToCleanup,
+             paddedFieldsToCleanup,
              innerEscStats,
              sharedBlock,
              anchorsToRemove](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
@@ -1065,11 +1067,11 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
 }
 
 void validateCompactRequest(const CompactStructuredEncryptionData& request, const Collection& edc) {
-    checkSchemaAndCompactionTokens(request.getCompactionTokens(), edc);
+    checkSchemaAndCompactionOrCleanupTokens(request.getCompactionTokens(), edc, "Compact"_sd);
 }
 
 void validateCleanupRequest(const CleanupStructuredEncryptionData& request, const Collection& edc) {
-    checkSchemaAndCompactionTokens(request.getCleanupTokens(), edc);
+    checkSchemaAndCompactionOrCleanupTokens(request.getCleanupTokens(), edc, "Cleanup"_sd);
 }
 
 const PrfBlock& FLECompactESCDeleteSet::at(size_t index) const {

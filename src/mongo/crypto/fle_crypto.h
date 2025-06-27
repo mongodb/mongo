@@ -1156,16 +1156,12 @@ public:
     static std::vector<CompactionToken> parseCompactionTokens(BSONObj compactionTokens);
 
     /**
-     * Validates the compaction tokens BSON contains an element for each field
+     * Validates the compaction/cleanup tokens BSON contains an element for each field
      * in the encrypted field config
      */
-    static void validateCompactionTokens(const EncryptedFieldConfig& efc, BSONObj compactionTokens);
-
-    /**
-     * Validates the compaction tokens BSON contains an element for each field
-     * in the encrypted field config
-     */
-    static void validateCleanupTokens(const EncryptedFieldConfig& efc, BSONObj cleanupTokens);
+    static void validateCompactionOrCleanupTokens(const EncryptedFieldConfig& efc,
+                                                  BSONObj tokens,
+                                                  StringData tokenType);
 
 private:
     static void _validateTokens(const EncryptedFieldConfig& efc, BSONObj tokens, StringData cmd);

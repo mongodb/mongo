@@ -4188,14 +4188,10 @@ std::vector<CompactionToken> CompactionHelpers::parseCompactionTokens(BSONObj co
     return parsed;
 }
 
-void CompactionHelpers::validateCompactionTokens(const EncryptedFieldConfig& efc,
-                                                 BSONObj compactionTokens) {
-    _validateTokens(efc, compactionTokens, "Compaction"_sd);
-}
-
-void CompactionHelpers::validateCleanupTokens(const EncryptedFieldConfig& efc,
-                                              BSONObj cleanupTokens) {
-    _validateTokens(efc, cleanupTokens, "Cleanup"_sd);
+void CompactionHelpers::validateCompactionOrCleanupTokens(const EncryptedFieldConfig& efc,
+                                                          BSONObj compactionTokens,
+                                                          StringData tokenType) {
+    _validateTokens(efc, compactionTokens, tokenType);
 }
 
 void CompactionHelpers::_validateTokens(const EncryptedFieldConfig& efc,
