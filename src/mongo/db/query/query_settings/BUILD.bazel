@@ -73,6 +73,8 @@ mongo_cc_library(
 mongo_cc_library(
     name = "query_settings_service",
     srcs = [
+        "query_settings_backfill.cpp",
+        "query_settings_backfill.h",
         "query_settings_cluster_parameter_impl.cpp",
         "query_settings_manager.cpp",
         "query_settings_manager.h",
@@ -96,6 +98,7 @@ mongo_cc_library(
         "//src/mongo/db/query:command_shapes",
         "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_shape",
+        "//src/mongo/executor:async_rpc",
         "//src/mongo/idl:cluster_server_parameter",  # TODO(SERVER-93876): Remove.
     ],
 )
@@ -110,13 +113,16 @@ mongo_cc_unit_test(
         "query_settings_manager_test.cpp",
         "query_settings_service_test.cpp",
         "query_settings_validation_test.cpp",
+        "query_shape_representative_queries_test.cpp",
     ],
     tags = ["mongo_unittest_seventh_group"],
     deps = [
         ":query_settings",
         "//src/mongo/db/commands/query_cmd:query_settings_cmds",  # Necessary because tests rely on $querySettings pipeline stage.
         "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/executor:mock_async_rpc",
         "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/s:sharding_mongos_test_fixture",
         "//src/mongo/unittest",
     ],
 )
