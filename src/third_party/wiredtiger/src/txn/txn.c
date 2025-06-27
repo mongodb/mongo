@@ -1108,6 +1108,10 @@ err:
 static void
 __txn_resolve_prepared_update_chain(WT_SESSION_IMPL *session, WT_UPDATE *upd, bool commit)
 {
+    WT_TXN *txn;
+
+    txn = session->txn;
+
     /*
      * Aborted updates can exist in the update chain of our transaction. Generally this will occur
      * due to a reserved update. As such we should skip over these updates entirely.
@@ -1126,7 +1130,20 @@ __txn_resolve_prepared_update_chain(WT_SESSION_IMPL *session, WT_UPDATE *upd, bo
     __txn_resolve_prepared_update_chain(session, upd->next, commit);
 
     if (!commit) {
-        upd->txnid = WT_TXN_ABORTED;
+        if (F_ISSET(txn, WT_TXN_HAS_TS_ROLLBACK)) {
+            /*
+             * As updating timestamp might not be an atomic operation, we will manage using state.
+             *
+             * TODO: we can remove the prepare locked state once we separate the prepared timestamp
+             * and commit timestamp.
+             */
+            upd->prepare_state = WT_PREPARE_LOCKED;
+            WT_RELEASE_BARRIER();
+            upd->start_ts = txn->rollback_timestamp;
+            upd->durable_ts = WT_TS_NONE;
+            WT_RELEASE_WRITE_WITH_BARRIER(upd->txnid, WT_TXN_ABORTED);
+        } else
+            upd->txnid = WT_TXN_ABORTED;
         WT_STAT_CONN_INCR(session, txn_prepared_updates_rolledback);
         return;
     }
@@ -1188,10 +1205,20 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
           txn->id, __wt_timestamp_to_string(txn->prepare_timestamp, ts_string[0]),
           __wt_timestamp_to_string(txn->commit_timestamp, ts_string[1]),
           __wt_timestamp_to_string(txn->durable_timestamp, ts_string[2]));
-    else
+    else {
+        /* Rollback timestamp should only be set when preserve prepared is enabled. */
+        WT_ASSERT(session,
+          !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_READY) ||
+            (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_PRESERVE_PREPARED) &&
+              F_ISSET(txn, WT_TXN_HAS_TS_ROLLBACK)) ||
+            (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_PRESERVE_PREPARED) &&
+              !F_ISSET(txn, WT_TXN_HAS_TS_ROLLBACK)));
         __wt_verbose_debug2(session, WT_VERB_TRANSACTION,
-          "rollback resolving prepared transaction with txnid: %" PRIu64 " and timestamp: %s",
-          txn->id, __wt_timestamp_to_string(txn->prepare_timestamp, ts_string[0]));
+          "rollback resolving prepared transaction with txnid: %" PRIu64
+          " and prepared timestamp: %s and rollback timestamp: %s",
+          txn->id, __wt_timestamp_to_string(txn->prepare_timestamp, ts_string[0]),
+          __wt_timestamp_to_string(txn->rollback_timestamp, ts_string[1]));
+    }
 
     /*
      * Aborted updates can exist in the update chain of our transaction due to reserved update. All
@@ -1978,7 +2005,7 @@ err:
         WT_RET_PANIC(session, ret, "failed to commit prepared transaction, failing the system");
 
     WT_TRET(__wt_session_reset_cursors(session, false));
-    WT_TRET(__wt_txn_rollback(session, cfg));
+    WT_TRET(__wt_txn_rollback(session, cfg, false));
     return (ret);
 }
 
@@ -2126,7 +2153,7 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
  *     Roll back the current transaction.
  */
 int
-__wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[], bool api_call)
 {
     WT_CURSOR *cursor;
     WT_DECL_RET;
@@ -2151,6 +2178,10 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 
     /* Configure the timeout for this rollback operation. */
     WT_TRET(__txn_config_operation_timeout(session, cfg, true));
+
+    /* Set the rollback timestamp if it is an user api call. */
+    if (api_call)
+        WT_RET(__wt_txn_set_timestamp(session, cfg, false));
 
     /*
      * Resolving prepared updates is expensive. Sort prepared modifications so all updates for each

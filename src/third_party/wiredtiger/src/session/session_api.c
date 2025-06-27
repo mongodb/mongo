@@ -1863,7 +1863,7 @@ err:
 
         WT_TRET(__wt_session_reset_cursors(session, false));
         F_SET(session, WT_SESSION_RESOLVING_TXN);
-        WT_TRET(__wt_txn_rollback(session, cfg));
+        WT_TRET(__wt_txn_rollback(session, cfg, false));
         F_CLR(session, WT_SESSION_RESOLVING_TXN);
     }
 #ifdef HAVE_CALL_LOG
@@ -1965,7 +1965,7 @@ __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
     WT_TRET(__wt_session_reset_cursors(session, false));
 
     F_SET(session, WT_SESSION_RESOLVING_TXN);
-    WT_TRET(__wt_txn_rollback(session, cfg));
+    WT_TRET(__wt_txn_rollback(session, cfg, true));
     F_CLR(session, WT_SESSION_RESOLVING_TXN);
 
 err:

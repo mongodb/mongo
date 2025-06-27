@@ -204,6 +204,9 @@ __txn_apply_prepare_state_update(WT_SESSION_IMPL *session, WT_UPDATE *upd, bool 
          * encounter a prepared update resulting in prepare conflict.
          *
          * As updating timestamp might not be an atomic operation, we will manage using state.
+         *
+         * TODO: we can remove the prepare locked state once we separate the prepared timestamp and
+         * commit timestamp.
          */
         upd->prepare_state = WT_PREPARE_LOCKED;
         WT_RELEASE_BARRIER();
@@ -1218,7 +1221,20 @@ __wt_txn_upd_visible_type(WT_SESSION_IMPL *session, WT_UPDATE *upd)
     bool upd_visible;
 
     for (;; __wt_yield()) {
-        /* Prepare state change is in progress, yield and try again. */
+        /*
+         * TODO: we can remove the prepare locked state and the check here once we separate the
+         * prepared timestamp and commit timestamp.
+         */
+        if (upd->txnid == WT_TXN_ABORTED)
+            return (WT_VISIBLE_FALSE);
+
+        /*
+         * Prepare state change is in progress, yield and try again.
+         *
+         *
+         * TODO: we can remove the prepare locked state and the check here once we separate the
+         * prepared timestamp and commit timestamp.
+         */
         WT_ACQUIRE_READ_WITH_BARRIER(prepare_state, upd->prepare_state);
         if (prepare_state == WT_PREPARE_LOCKED)
             continue;

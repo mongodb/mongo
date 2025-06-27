@@ -1833,6 +1833,11 @@ methods = {
     Config('read_timestamp', '', r'''
         read using the specified timestamp. The value must not be older than the current oldest
         timestamp. This can only be set once for a transaction. See @ref timestamp_txn_api'''),
+    Config('rollback_timestamp', '', r'''
+        set the rollback timestamp for the current transaction. This is valid only for prepared
+        transactions under the preserve_prepared config. For prepared transactions, a rollback
+        timestamp is required, must not be older than the prepare timestamp, and can be set only
+        once. See @ref timestamp_txn_api and @ref timestamp_prepare'''),
 ]),
 
 'WT_SESSION.rollback_transaction' : Method([
@@ -1843,6 +1848,11 @@ methods = {
         If WiredTiger notices the limit has been exceeded, an operation may return a WT_ROLLBACK
         error. Default is to have no limit''',
         min=0),
+    Config('rollback_timestamp', '', r'''
+        set the rollback timestamp for the current transaction. This is valid only for prepared
+        transactions under the preserve_prepared config. For prepared transactions, a rollback
+        timestamp is required, must not be older than the prepare timestamp, and can be set only
+        once. See @ref timestamp_txn_api and @ref timestamp_prepare'''),
 ]),
 
 'WT_SESSION.checkpoint' : Method([

@@ -329,7 +329,7 @@ err:
         WT_ASSERT(session, unroll || saved_ret != 0 || session->txn->mod_count == 0);
 #ifdef WT_ENABLE_SCHEMA_TXN
         __wt_err(session, saved_ret, "TRACK: Abort internal schema txn");
-        WT_TRET(__wt_txn_rollback(session, NULL));
+        WT_TRET(__wt_txn_rollback(session, NULL, false));
 #endif
     }
 

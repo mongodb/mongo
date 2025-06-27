@@ -1546,7 +1546,7 @@ err:
          */
         session->dhandle = NULL;
         WT_STAT_CONN_SET(session, checkpoint_state, WTI_CHECKPOINT_STATE_ROLLBACK);
-        WT_TRET(__wt_txn_rollback(session, NULL));
+        WT_TRET(__wt_txn_rollback(session, NULL, false));
     }
 
     /*

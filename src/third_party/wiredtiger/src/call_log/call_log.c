@@ -482,6 +482,9 @@ __wt_call_log_timestamp_transaction_uint(
     case WT_TS_TXN_TYPE_READ:
         name = "read";
         break;
+    case WT_TS_TXN_TYPE_ROLLBACK:
+        name = "rollback";
+        break;
     }
 
     WT_RET(__call_log_print_start(session, "session", "timestamp_transaction_uint"));

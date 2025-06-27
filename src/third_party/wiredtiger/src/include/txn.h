@@ -337,6 +337,12 @@ struct __wt_txn {
     wt_timestamp_t prepare_timestamp;
 
     /*
+     * Timestamp copied into updates created by this transaction, when this transaction is rolled
+     * back. Only valid for prepared transactions under the preserve_prepared config.
+     */
+    wt_timestamp_t rollback_timestamp;
+
+    /*
      * Timestamps used for reading via a checkpoint cursor instead of txn_shared->read_timestamp and
      * the current oldest/pinned timestamp, respectively.
      */
@@ -384,20 +390,21 @@ struct __wt_txn {
 #define WT_TXN_HAS_TS_COMMIT 0x000010u
 #define WT_TXN_HAS_TS_DURABLE 0x000020u
 #define WT_TXN_HAS_TS_PREPARE 0x000040u
-#define WT_TXN_IGNORE_PREPARE 0x000080u
-#define WT_TXN_IS_CHECKPOINT 0x000100u
-#define WT_TXN_PREPARE 0x000200u
-#define WT_TXN_PREPARE_IGNORE_API_CHECK 0x000400u
-#define WT_TXN_READONLY 0x000800u
-#define WT_TXN_REFRESH_SNAPSHOT 0x001000u
-#define WT_TXN_RUNNING 0x002000u
-#define WT_TXN_SHARED_TS_DURABLE 0x004000u
-#define WT_TXN_SHARED_TS_READ 0x008000u
-#define WT_TXN_SYNC_SET 0x010000u
-#define WT_TXN_TS_NOT_SET 0x020000u
-#define WT_TXN_TS_ROUND_PREPARED 0x040000u
-#define WT_TXN_TS_ROUND_READ 0x080000u
-#define WT_TXN_UPDATE 0x100000u
+#define WT_TXN_HAS_TS_ROLLBACK 0x000080u
+#define WT_TXN_IGNORE_PREPARE 0x000100u
+#define WT_TXN_IS_CHECKPOINT 0x000200u
+#define WT_TXN_PREPARE 0x000400u
+#define WT_TXN_PREPARE_IGNORE_API_CHECK 0x000800u
+#define WT_TXN_READONLY 0x001000u
+#define WT_TXN_REFRESH_SNAPSHOT 0x002000u
+#define WT_TXN_RUNNING 0x004000u
+#define WT_TXN_SHARED_TS_DURABLE 0x008000u
+#define WT_TXN_SHARED_TS_READ 0x010000u
+#define WT_TXN_SYNC_SET 0x020000u
+#define WT_TXN_TS_NOT_SET 0x040000u
+#define WT_TXN_TS_ROUND_PREPARED 0x080000u
+#define WT_TXN_TS_ROUND_READ 0x100000u
+#define WT_TXN_UPDATE 0x200000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     wt_shared uint32_t flags;
 

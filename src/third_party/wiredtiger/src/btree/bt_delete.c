@@ -233,9 +233,12 @@ int
 __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_REF_STATE current_state;
+    WT_TXN *txn;
     WT_UPDATE **updp;
     uint64_t sleep_usecs, yield_count;
     bool locked;
+
+    txn = session->txn;
 
     /* Lock the reference. We cannot access ref->page_del except when locked. */
     for (locked = false, sleep_usecs = yield_count = 0;;) {
@@ -280,6 +283,12 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
          * the reverse operation is to return the state to WT_REF_DISK.
          */
         current_state = WT_REF_DISK;
+
+        /*
+         * TODO: handle prepared rollback here. We can no longer free the page del structure if it
+         * is a prepared transaction.
+         */
+
         /*
          * Don't set the WT_PAGE_DELETED transaction ID to aborted; instead, just discard the
          * structure. This avoids having to check for an aborted delete in other situations.
@@ -295,8 +304,12 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
              * the reference to the tree required for a hazard pointer. We're safe since pages with
              * unresolved transactions aren't going anywhere.
              */
-            for (; *updp != NULL; ++updp)
+            for (; *updp != NULL; ++updp) {
+                /* The ref is locked, no need to pay attention to memory ordering here. */
+                if (F_ISSET(txn, WT_TXN_HAS_TS_ROLLBACK))
+                    (*updp)->start_ts = txn->rollback_timestamp;
                 (*updp)->txnid = WT_TXN_ABORTED;
+            }
             /* Now discard the updates. */
             __wt_free(session, ref->page->modify->inst_updates);
         }

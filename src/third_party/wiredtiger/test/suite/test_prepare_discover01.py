@@ -96,7 +96,7 @@ class test_prepare_discover01(wttest.WiredTigerTestCase, suite_subprocess):
             prepared_id = prepared_discover_cursor.get_key()
             self.assertEqual(prepared_id, 100)
             c2s2.begin_transaction("claim_prepared=" + self.timestamp_str(prepared_id))
-            c2s2.rollback_transaction()
+            c2s2.rollback_transaction("rollback_timestamp=" + self.timestamp_str(200))
         self.assertEqual(count, 1)
 
         prepared_discover_cursor.close()

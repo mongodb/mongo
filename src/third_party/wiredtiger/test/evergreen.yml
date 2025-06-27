@@ -3151,7 +3151,7 @@ tasks:
           python_binary: $(pwd)/venv/bin/python3
           tiered_storage_test_name: tiered
   - name: s3-tiered-test-small
-    tags: ["pull_request", "python"]
+    tags: ["python"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -3163,7 +3163,7 @@ tasks:
           python_binary: $(pwd)/venv/bin/python3
           tiered_storage_test_name: tiered06
   - name: s3-tiered-catch2-unittest-test
-    tags: ["pull_request", "tiered_unittest"]
+    tags: ["tiered_unittest"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -3197,7 +3197,7 @@ tasks:
           python_binary: $(pwd)/venv/bin/python3
           tiered_storage_test_name: tiered
   - name: azure-gcp-tiered-catch2-unittest-test
-    tags: ["pull_request", "tiered_unittest"]
+    tags: ["tiered_unittest"]
     commands:
       - func: "get project"
       - func: "install gcp dependencies"
@@ -3239,7 +3239,7 @@ tasks:
             ext/storage_sources/gcp_store/test/run_gcp_unit_tests
 
   - name: azure-gcp-tiered-test-small
-    tags: ["pull_request", "python"]
+    tags: ["python"]
     commands:
       - func: "get project"
       - func: "install gcp dependencies"

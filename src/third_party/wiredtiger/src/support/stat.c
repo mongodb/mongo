@@ -71,6 +71,12 @@ static const char *const __stats_dsrc_desc[] = {
   "cache: eviction gave up due to needing to remove a record from the history store but checkpoint "
   "is running",
   "cache: eviction gave up due to no progress being made",
+  "cache: eviction walk pages queued that had updates",
+  "cache: eviction walk pages queued that were clean",
+  "cache: eviction walk pages queued that were dirty",
+  "cache: eviction walk pages seen that had updates",
+  "cache: eviction walk pages seen that were clean",
+  "cache: eviction walk pages seen that were dirty",
   "cache: eviction walk passes of a file",
   "cache: eviction walk target pages histogram - 0-9",
   "cache: eviction walk target pages histogram - 10-31",
@@ -427,6 +433,12 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->cache_eviction_blocked_no_ts_checkpoint_race_4 = 0;
     stats->cache_eviction_blocked_remove_hs_race_with_checkpoint = 0;
     stats->cache_eviction_blocked_no_progress = 0;
+    stats->cache_eviction_pages_queued_updates = 0;
+    stats->cache_eviction_pages_queued_clean = 0;
+    stats->cache_eviction_pages_queued_dirty = 0;
+    stats->cache_eviction_pages_seen_updates = 0;
+    stats->cache_eviction_pages_seen_clean = 0;
+    stats->cache_eviction_pages_seen_dirty = 0;
     stats->eviction_walk_passes = 0;
     stats->cache_eviction_target_page_lt10 = 0;
     stats->cache_eviction_target_page_lt32 = 0;
@@ -761,6 +773,12 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->cache_eviction_blocked_remove_hs_race_with_checkpoint +=
       from->cache_eviction_blocked_remove_hs_race_with_checkpoint;
     to->cache_eviction_blocked_no_progress += from->cache_eviction_blocked_no_progress;
+    to->cache_eviction_pages_queued_updates += from->cache_eviction_pages_queued_updates;
+    to->cache_eviction_pages_queued_clean += from->cache_eviction_pages_queued_clean;
+    to->cache_eviction_pages_queued_dirty += from->cache_eviction_pages_queued_dirty;
+    to->cache_eviction_pages_seen_updates += from->cache_eviction_pages_seen_updates;
+    to->cache_eviction_pages_seen_clean += from->cache_eviction_pages_seen_clean;
+    to->cache_eviction_pages_seen_dirty += from->cache_eviction_pages_seen_dirty;
     to->eviction_walk_passes += from->eviction_walk_passes;
     to->cache_eviction_target_page_lt10 += from->cache_eviction_target_page_lt10;
     to->cache_eviction_target_page_lt32 += from->cache_eviction_target_page_lt32;
@@ -1102,6 +1120,16 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
       WT_STAT_DSRC_READ(from, cache_eviction_blocked_remove_hs_race_with_checkpoint);
     to->cache_eviction_blocked_no_progress +=
       WT_STAT_DSRC_READ(from, cache_eviction_blocked_no_progress);
+    to->cache_eviction_pages_queued_updates +=
+      WT_STAT_DSRC_READ(from, cache_eviction_pages_queued_updates);
+    to->cache_eviction_pages_queued_clean +=
+      WT_STAT_DSRC_READ(from, cache_eviction_pages_queued_clean);
+    to->cache_eviction_pages_queued_dirty +=
+      WT_STAT_DSRC_READ(from, cache_eviction_pages_queued_dirty);
+    to->cache_eviction_pages_seen_updates +=
+      WT_STAT_DSRC_READ(from, cache_eviction_pages_seen_updates);
+    to->cache_eviction_pages_seen_clean += WT_STAT_DSRC_READ(from, cache_eviction_pages_seen_clean);
+    to->cache_eviction_pages_seen_dirty += WT_STAT_DSRC_READ(from, cache_eviction_pages_seen_dirty);
     to->eviction_walk_passes += WT_STAT_DSRC_READ(from, eviction_walk_passes);
     to->cache_eviction_target_page_lt10 += WT_STAT_DSRC_READ(from, cache_eviction_target_page_lt10);
     to->cache_eviction_target_page_lt32 += WT_STAT_DSRC_READ(from, cache_eviction_target_page_lt32);
@@ -1518,6 +1546,12 @@ static const char *const __stats_connection_desc[] = {
   "cache: eviction server waiting for a leaf page",
   "cache: eviction state",
   "cache: eviction walk most recent sleeps for checkpoint handle gathering",
+  "cache: eviction walk pages queued that had updates",
+  "cache: eviction walk pages queued that were clean",
+  "cache: eviction walk pages queued that were dirty",
+  "cache: eviction walk pages seen that had updates",
+  "cache: eviction walk pages seen that were clean",
+  "cache: eviction walk pages seen that were dirty",
   "cache: eviction walk restored - had to walk this many pages",
   "cache: eviction walk restored position",
   "cache: eviction walk restored position differs from the saved one",
@@ -2356,6 +2390,12 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->eviction_walk_leaf_notfound = 0;
     /* not clearing eviction_state */
     stats->eviction_walk_sleeps = 0;
+    stats->cache_eviction_pages_queued_updates = 0;
+    stats->cache_eviction_pages_queued_clean = 0;
+    stats->cache_eviction_pages_queued_dirty = 0;
+    stats->cache_eviction_pages_seen_updates = 0;
+    stats->cache_eviction_pages_seen_clean = 0;
+    stats->cache_eviction_pages_seen_dirty = 0;
     stats->npos_evict_walk_max = 0;
     stats->eviction_restored_pos = 0;
     stats->eviction_restored_pos_differ = 0;
@@ -3178,6 +3218,16 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->eviction_walk_leaf_notfound += WT_STAT_CONN_READ(from, eviction_walk_leaf_notfound);
     to->eviction_state += WT_STAT_CONN_READ(from, eviction_state);
     to->eviction_walk_sleeps += WT_STAT_CONN_READ(from, eviction_walk_sleeps);
+    to->cache_eviction_pages_queued_updates +=
+      WT_STAT_CONN_READ(from, cache_eviction_pages_queued_updates);
+    to->cache_eviction_pages_queued_clean +=
+      WT_STAT_CONN_READ(from, cache_eviction_pages_queued_clean);
+    to->cache_eviction_pages_queued_dirty +=
+      WT_STAT_CONN_READ(from, cache_eviction_pages_queued_dirty);
+    to->cache_eviction_pages_seen_updates +=
+      WT_STAT_CONN_READ(from, cache_eviction_pages_seen_updates);
+    to->cache_eviction_pages_seen_clean += WT_STAT_CONN_READ(from, cache_eviction_pages_seen_clean);
+    to->cache_eviction_pages_seen_dirty += WT_STAT_CONN_READ(from, cache_eviction_pages_seen_dirty);
     if ((v = WT_STAT_CONN_READ(from, npos_evict_walk_max)) > to->npos_evict_walk_max)
         to->npos_evict_walk_max = v;
     to->eviction_restored_pos += WT_STAT_CONN_READ(from, eviction_restored_pos);
