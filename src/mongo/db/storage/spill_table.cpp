@@ -140,6 +140,7 @@ Status SpillTable::insertRecords(OperationContext* opCtx, std::vector<Record>* r
         return status;
     }
 
+    // TODO (SERVER-106716): Remove this case.
     if (!_ru) {
         std::vector<Timestamp> timestamps(records->size());
         return _rs->insertRecords(
@@ -202,6 +203,7 @@ Status SpillTable::insertRecords(OperationContext* opCtx, std::vector<Record>* r
 }
 
 bool SpillTable::findRecord(OperationContext* opCtx, const RecordId& rid, RecordData* out) const {
+    // TODO (SERVER-106716): Remove this case.
     if (!_ru) {
         return _rs->findRecord(opCtx, *storage_details::getRecoveryUnit(opCtx), rid, out);
     }
@@ -220,6 +222,7 @@ Status SpillTable::updateRecord(OperationContext* opCtx,
         return status;
     }
 
+    // TODO (SERVER-106716): Remove this case.
     if (!_ru) {
         return _rs->updateRecord(opCtx, *storage_details::getRecoveryUnit(opCtx), rid, data, len);
     }
@@ -242,6 +245,7 @@ Status SpillTable::updateRecord(OperationContext* opCtx,
 void SpillTable::deleteRecord(OperationContext* opCtx, const RecordId& rid) {
     uassertStatusOK(_checkDiskSpace());
 
+    // TODO (SERVER-106716): Remove this case.
     if (!_ru) {
         _rs->deleteRecord(opCtx, *storage_details::getRecoveryUnit(opCtx), rid);
         return;
@@ -259,6 +263,7 @@ void SpillTable::deleteRecord(OperationContext* opCtx, const RecordId& rid) {
 
 std::unique_ptr<SpillTable::Cursor> SpillTable::getCursor(OperationContext* opCtx,
                                                           bool forward) const {
+    // TODO (SERVER-106716): Remove this case.
     if (!_ru) {
         return std::make_unique<SpillTable::Cursor>(
             _ru.get(), _rs->getCursor(opCtx, *storage_details::getRecoveryUnit(opCtx), forward));
@@ -273,6 +278,7 @@ Status SpillTable::truncate(OperationContext* opCtx) {
         return status;
     }
 
+    // TODO (SERVER-106716): Remove this case.
     if (!_ru) {
         return _rs->truncate(opCtx, *storage_details::getRecoveryUnit(opCtx));
     }
@@ -300,6 +306,7 @@ Status SpillTable::rangeTruncate(OperationContext* opCtx,
         return status;
     }
 
+    // TODO (SERVER-106716): Remove this case.
     if (!_ru) {
         return _rs->rangeTruncate(opCtx,
                                   *storage_details::getRecoveryUnit(opCtx),

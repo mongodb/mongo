@@ -69,12 +69,14 @@ public:
         bool restore(RecoveryUnit& ru);
 
     private:
-        RecoveryUnit* _ru;
+        RecoveryUnit* _ru;  // TODO (SERVER-106716): Make this a reference.
         std::unique_ptr<SeekableRecordCursor> _cursor;
     };
 
     /**
      * Creates a spill table using the given recovery unit and record store.
+     *
+     * TODO (SERVER-106716): Remove this constructor.
      */
     SpillTable(std::unique_ptr<RecoveryUnit> ru, std::unique_ptr<RecordStore> rs);
 
@@ -105,6 +107,8 @@ public:
 
     /**
      * Returns the storage size on disk of the spill table.
+     *
+     * TODO (SERVER-106716): Remove the RecoveryUnit parameter.
      */
     int64_t storageSize(RecoveryUnit& ru) const;
 
@@ -171,7 +175,7 @@ public:
 protected:
     std::unique_ptr<RecoveryUnit> _ru;
     std::unique_ptr<RecordStore> _rs;
-    StorageEngine* _storageEngine{nullptr};
+    StorageEngine* _storageEngine{nullptr};  // TODO (SERVER-106716): Make this a reference.
 
 private:
     Status _checkDiskSpace() const;

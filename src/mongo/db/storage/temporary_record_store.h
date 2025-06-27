@@ -37,6 +37,8 @@ namespace mongo {
 /**
  * Manages the lifetime of a temporary RecordStore. Unless keep() is called, the managed RecordStore
  * will be dropped after destruction.
+ *
+ * TODO (SERVER-106716): Make this no longer derive from SpillTable.
  */
 class TemporaryRecordStore : public SpillTable {
 public:
