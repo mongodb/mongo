@@ -227,9 +227,8 @@ feature_flags:
     featureFlagMultiPlanLimiter:
         description: "Feature flag to enable MultiPlan rate limiter."
         cpp_varname: gfeatureFlagMultiPlanLimiter
-        default: false
         fcv_gated: false
-        incremental_rollout_phase: in_development
+        incremental_rollout_phase: rollout
 
     featureFlagSbeUpgradeBinaryTrees:
         description: "Feature flag to enable N-ary ABT nodes"
