@@ -1207,7 +1207,7 @@
         "name": "Organization: github"
       },
       "name": "SCons - a Software Construction tool",
-      "version": "3.1.2",
+      "version": "4.9.1",
       "licenses": [
         {
           "license": {
@@ -1215,7 +1215,7 @@
           }
         }
       ],
-      "purl": "pkg:github/SCons/scons@3.1.2",
+      "purl": "pkg:github/SCons/scons@4.9.1",
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -1227,7 +1227,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "src/third_party/scons-3.1.2"
+            "location": "src/third_party/scons-4.9.1"
           }
         ]
       },

@@ -25,7 +25,6 @@ from pkg_resources import parse_version
 
 import SCons
 import SCons.Script
-from mongo_tooling_metrics.lib.top_level_metrics import SConsToolingMetrics
 from site_scons.mongo import build_profiles
 
 # This must be first, even before EnsureSConsVersion, if
@@ -41,7 +40,7 @@ import mongo.generators as mongo_generators
 import mongo.install_actions as install_actions
 
 EnsurePythonVersion(3, 10)
-EnsureSConsVersion(3, 1, 1)
+EnsureSConsVersion(4, 9, 1)
 
 utc_starttime = datetime.utcnow()
 
@@ -1131,7 +1130,7 @@ env_vars.Add(
 
 
 def validate_dwarf_version(key, val, env):
-    if val == '4' or val == '5' or val == '':
+    if val == 4 or val == 5 or val == '':
         return
 
     print(f"Invalid DWARF_VERSION '{val}'. Only valid versions are 4 or 5.")
@@ -1350,6 +1349,12 @@ env_vars.Add(
     'MSVC_VERSION',
     help='Sets the version of Visual C++ to use (e.g. 14.2 for VS2019, 14.3 for VS2022)',
     default="14.3",
+)
+
+env_vars.Add(
+    'MSVC_TOOLSET_VERSION',
+    help='Sets the full toolset version of Visual C++ to use.',
+    default="14.31.31103",
 )
 
 env_vars.Add(
@@ -1725,6 +1730,8 @@ envDict = dict(
     CONFIGURELOG='$BUILD_ROOT/scons/config.log',
     CONFIG_HEADER_DEFINES={},
     LIBDEPS_TAG_EXPANSIONS=[],
+    MSVC_VERSION=variables_only_env.get("MSVC_VERSION"),
+    MSVC_TOOLSET_VERSION=variables_only_env.get("MSVC_TOOLSET_VERSION"),
 )
 
 # By default, we will get the normal SCons tool search. But if the
@@ -1737,16 +1744,6 @@ if get_option('build-tools') == 'next':
 env = Environment(variables=env_vars, **envDict)
 del envDict
 env.AddMethod(lambda env, name, **kwargs: add_option(name, **kwargs), 'AddOption')
-
-# The placement of this is intentional. Here we setup an atexit method to store tooling metrics.
-# We should only register this function after env, env_vars and the parser have been properly initialized.
-SConsToolingMetrics.register_metrics(
-    utc_starttime=datetime.utcnow(),
-    artifact_dir=env.Dir('$BUILD_DIR').get_abspath(),
-    env_vars=env_vars,
-    env=env,
-    parser=_parser,
-)
 
 if get_option('build-metrics'):
     env['BUILD_METRICS_ARTIFACTS_DIR'] = '$BUILD_ROOT/$VARIANT_DIR'
@@ -5024,7 +5021,7 @@ def doConfigure(myenv):
                 cryptoLibName,
             ["openssl/crypto.h"],
                 "C",
-                "SSLeay_version(0);",
+                call="SSLeay_version(0);",
                 autoadd=True,
         ):
             maybeIssueDarwinSSLAdvice(conf.env)
@@ -5196,7 +5193,7 @@ def doConfigure(myenv):
                 "curl",
             ["curl/curl.h"],
                 "C",
-                "curl_global_init(0);",
+                call="curl_global_init(0);",
                 autoadd=False,
         ):
             return True
@@ -5332,7 +5329,7 @@ def doConfigure(myenv):
             "sasl2",
         ["stddef.h", "sasl/sasl.h"],
             "C",
-            "sasl_version_info(0, 0, 0, 0, 0, 0);",
+            call="sasl_version_info(0, 0, 0, 0, 0, 0);",
             autoadd=False,
     ):
         myenv.ConfError("Couldn't find SASL header/libraries")
@@ -5479,7 +5476,7 @@ def doConfigure(myenv):
             ["mongoc-1.0"],
             ["mongoc/mongoc.h"],
                 "C",
-                "mongoc_get_major_version();",
+                call="mongoc_get_major_version();",
                 autoadd=False,
         ):
             conf.env['MONGO_HAVE_LIBMONGOC'] = True
@@ -5729,7 +5726,7 @@ if get_option('ninja') != 'disabled':
     if env.ToolchainIs('gcc', 'clang'):
         env.AppendUnique(CCFLAGS=["-fdiagnostics-color"])
 
-    ninja_builder = Tool("ninja")
+    ninja_builder = Tool("mongo_ninja")
 
     env["NINJA_BUILDDIR"] = env.Dir("$NINJA_BUILDDIR")
     ninja_builder.generate(env)
@@ -6696,13 +6693,15 @@ if has_option("cache"):
 if env.GetOption("patch-build-mongot-url"):
     binary_url = env.GetOption("patch-build-mongot-url")
 
-    env.Command(
+    mongot_node = env.Command(
         target="mongot-localdev",
         source=[],
         action=[
             f"curl {binary_url} | tar xvz",
         ],
     )
+    env.NoCache(mongot_node)
+    env.Precious(mongot_node)
 
     env.AutoInstall(
         target="$PREFIX_BINDIR",
@@ -6746,11 +6745,13 @@ elif env.GetOption('build-mongot'):
             f'$BUILD_ROOT/db_contrib_tool_venv/bin/python3 -m pip install db-contrib-tool',
         ], BUILD_ROOT=env.Dir("$BUILD_ROOT").path)
 
-    env.Command(
+    mongot_node = env.Command(
         target=["mongot-localdev"], source=db_contrib_tool, action=[
             f"$SOURCE setup-mongot-repro-env {binary_ver_str} --platform={platform_str} --architecture={arch_str}",
-            f"mv build/mongot-localdev mongot-localdev"
+            f"rm -rf mongot-localdev", f"mv build/mongot-localdev mongot-localdev"
         ], ENV=os.environ)
+    env.NoCache(mongot_node)
+    env.Precious(mongot_node)
 
     env.AutoInstall(
         target="$PREFIX_BINDIR",

@@ -1,0 +1,139 @@
+Changes since the 1.76.0 release
+
+Note: This document lists changes only since the 1.76.0 release. If you instead
+want a record of the complete list of changes for the codebase over its entire
+history, you can obtain one by running the following commands:
+
+  svn checkout https://docbook.svn.sourceforge.net/svnroot/docbook/trunk/xsl
+  svn log --xml --verbose xsl > ChangeHistory.xml
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Table of Contents
+
+Release Notes: 1.76.1
+
+    Common
+    FO
+    HTML
+    Epub
+    Webhelp
+    Params
+    Extensions
+
+Release Notes: 1.76.1
+
+The following is a list of changes that have been made since the 1.76.0
+release.
+
+Common
+
+The following changes have been made to the common code since the 1.76.0
+release.
+
+  ● Mauritz Jeanson: Makefile
+
+    Added eu.xml and gl.xml to SOURCES.
+
+  ● Jirka Kosek: l10n.xsl
+
+    Fixed bug when context was lost due to usage of xsl:key
+
+FO
+
+The following changes have been made to the fo code since the 1.76.0 release.
+
+  ● Robert Stayton: docbook.xsl; xref.xsl; fop1.xsl
+
+    Apply patch to support named destination in fop1.xsl, per Sourceforge
+    bug report #3029845.
+
+  ● dleidert: pagesetup.xsl
+
+    Remove the namespace mistakingly added with the last upload.
+
+HTML
+
+The following changes have been made to the html code since the 1.76.0 release.
+
+  ● Keith Fahlgren: highlight.xsl
+
+    Implementing handling for <b> and <i>: transform to <strong> and <em> for XHTML outputs and do not use in the highliting output (per Mauritz Jeanson)
+
+Epub
+
+The following changes have been made to the epub code since the 1.76.0 release.
+
+  ● Keith Fahlgren: docbook.xsl
+
+    Bugfix for [#3071521] to ensure that NCX navPoints are generated for d:book root nodes with the -NS version of the stylesheets
+
+  ● Keith Fahlgren: docbook.xsl
+
+    Remove unused NCX metadata elements
+
+  ● Keith Fahlgren: bin/spec/epub_regressions_spec.rb; docbook.xsl; bin/spec/
+    files/test_cust.x⋯
+
+    Normalizing identifier lookup between NCX and OPF
+
+  ● Keith Fahlgren: bin/dbtoepub
+
+    Reduce logging verbosity
+
+  ● Keith Fahlgren: bin/dbtoepub; bin/lib/docbook.rb
+
+    Only copy images once for the DocBook to EPUB tool to correct Windows bug reported in [#3065489]
+
+Webhelp
+
+The following changes have been made to the webhelp code since the 1.76.0
+release.
+
+  ● David Cramer: indexer
+
+    More webhelp indexer refactoring
+
+  ● David Cramer: build.xml
+
+    Removed cruft from before webhelp indexer refactoring
+
+  ● David Cramer: indexer/src
+
+    Refactoring webhelp to separate more cleanly the xsl and java code.
+
+  ● David Cramer: indexer/lib
+
+    Refactoring webhelp to separate more cleanly the xsl and java code.
+
+  ● David Cramer: Makefile; build.xml
+
+    Refactoring webhelp to separate more cleanly the xsl and java code.
+
+  ● David Cramer: indexer/src/com/nexwave/nquindexer/IndexerTask.java;
+    build.xml; indexer/src/⋯
+
+    Merged in changes from webhelp branch to address issue #3058244 regarding the xx.html temp file that was being created
+
+Params
+
+The following changes have been made to the params code since the 1.76.0
+release.
+
+  ● Robert Stayton: draft.mode.xml
+
+    Change default for draft.mode to 'no'.
+
+Extensions
+
+The following changes have been made to the extensions code since the 1.76.0
+release.
+
+  ● David Cramer: Makefile
+
+    More webhelp refactoring
+
+  ● David Cramer: Makefile
+
+    Refactoring webhelp to separate more cleanly the xsl and java code.
+

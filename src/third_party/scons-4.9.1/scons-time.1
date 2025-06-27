@@ -1,0 +1,759 @@
+'\" t
+.\"     Title: SCONS-TIME
+.\"    Author: [see the "AUTHORS" section]
+.\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
+.\"      Date: 03/27/2025
+.\"    Manual: SCons 4.9.1
+.\"    Source: SCons 4.9.1
+.\"  Language: English
+.\"
+.TH "SCONS\-TIME" "1" "03/27/2025" "SCons 4\&.9\&.1" "SCons 4\&.9\&.1"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+scons-time \- generate and display SCons timing information
+.SH "SYNOPSIS"
+.HP \w'\fBscons\-time\fR\ 'u
+\fBscons\-time\fR \fIsubcommand\fR [\fIoptions\fR...] [\fIarguments\fR...]
+.SH "GENERATING TIMING INFORMATION"
+.PP
+\fBscons\-time run\fR
+[\fB\-hnqv\fR] [\fB\-f \fR\fIFILE\fR] [\fB\-\-number=\fR\fINUMBER\fR] [\fB\-\-outdir=\fR\fIOUTDIR\fR] [\fB\-p \fR\fISTRING\fR] [\fB\-\-python=\fR\fIPYTHON\fR] [\fB\-s \fR\fIDIR\fR] [\fB\-\-scons=\fR\fISCONS\fR] [\fB\-\-svn=\fR\fIURL\fR] [\fIARGUMENTS\fR]
+.SS "Extracting Function Timings"
+.PP
+\fBscons\-time func\fR
+[\fB\-h\fR] [\fB\-\-chdir=\fR\fIDIR\fR] [\fB\-f \fR\fIFILE\fR] [\fB\-\-fmt=\fR\fIFORMAT\fR] [\fB\-\-func=\fR\fINAME\fR] [\fB\-p \fR\fISTRING\fR] [\fB\-t \fR\fINUMBER\fR] [\fB\-\-title= TITLE\fR] [\fIARGUMENTS\fR]
+.SS "Extracting Memory Statistics"
+.PP
+\fBscons\-time mem\fR
+[\fB\-h\fR] [\fB\-\-chdir=\fR\fIDIR\fR] [\fB\-f \fR\fIFILE\fR] [\fB\-\-fmt=\fR\fIFORMAT\fR] [\fB\-p \fR\fISTRING\fR] [\fB\-\-stage=\fR\fISTAGE\fR] [\fB\-t \fR\fINUMBER\fR] [\fB\-\-title=\fR\fITITLE\fR] [\fIARGUMENTS\fR]
+.SS "Extracting Object Counts"
+.PP
+\fBscons\-time obj\fR
+[\fB\-h\fR] [\fB\-\-chdir=\fR\fIDIR\fR] [\fB\-f \fR\fIFILE\fR] [\fB\-\-fmt=\fR\fIFORMAT\fR] [\fB\-p \fR\fISTRING\fR] [\fB\-\-stage=\fR\fISTAGE\fR] [\fB\-t \fR\fINUMBER\fR] [\fB\-\-title=\fR\fITITLE\fR] [\fIARGUMENTS\fR]
+.SS "Extracting Execution Times"
+.PP
+\fBscons\-time time\fR
+[\fB\-h\fR] [\fB\-\-chdir=\fR\fIDIR\fR] [\fB\-f \fR\fIFILE\fR] [\fB\-\-fmt=\fR\fIFORMAT\fR] [\fB\-p \fR\fISTRING\fR] [\fB\-t \fR\fINUMBER\fR] [\fB\-\-title=\fR\fITITLE\fR] [\fB\-\-which=\fR\fIWHICH\fR] [\fIARGUMENTS\fR]
+.SS "Help Text"
+.PP
+\fBscons\-time help\fR
+\fISUBCOMMAND\fR
+[\&.\&.\&.]
+.SH "DESCRIPTION"
+.PP
+The
+\fBscons\-time\fR
+command runs an SCons configuration through a standard set of profiled timings and can extract and graph information from the resulting profiles and log files of those timings\&. The action to be performed by the
+\fBscons\-time\fR
+script is specified by a subcommand, the first argument on the command line\&. See the
+SUBCOMMANDS
+section below for information about the operation of specific subcommands\&.
+.PP
+The basic way to use
+\fBscons\-time\fR
+is to run the
+\fBscons\-time run\fR
+subcommand (possibly multiple times) to generate profile and log file output, and then use one of the other subcommands to display the results captured in the profiles and log files for a particular kind of information: function timings (the
+\fBscons\-time func\fR
+subcommand), total memory used (the
+\fBscons\-time mem\fR
+subcommand), object counts (the
+\fBscons\-time obj\fR
+subcommand) and overall execution time (the
+\fBscons\-time time\fR
+subcommand)\&. Options exist to place and find the profiles and log files in separate directories, to generate the output in a format suitable for graphing with the
+\fBgnuplot\fR(1)
+program, and so on\&.
+.PP
+There are two basic ways the
+\fBscons\-time run\fR
+subcommand is intended to be used to gather timing statistics for a configuration\&. One is to use the
+\fB\-\-svn=\fR
+option to test a configuration against a list of revisions from the SCons Subversion repository\&. This will generate a profile and timing log file for every revision listed with the
+\fB\-\-number=\fR
+option, and can be used to look at the impact of committed changes to the SCons code base on a particular configuration over time\&.
+.PP
+The other way is to profile incremental changes to a local SCons code base during a development cycle\-\-that is, to look at the performance impact of changes you\*(Aqre making in the local tree\&. In this mode, you run the
+\fBscons\-time run\fR
+subcommand
+\fIwithout\fR
+the
+\fB\-\-svn=\fR
+option, in which case it simply looks in the profile/log file output directory (the current directory by default) and automatically figures out the
+\fInext\fR
+run number for the output profile and log file\&. Used in this way, the development cycle goes something like: make a change to SCons; run
+\fBscons\-time run\fR
+to profile it against a specific configuration; make another change to SCons; run
+\fBscons\-time run\fR
+again to profile it; etc\&.
+.SH "OPTIONS"
+.PP
+The
+\fBscons\-time\fR
+command only supports a few global options:
+.PP
+\-h, \-\-help
+.RS 4
+Displays the global help text and exits, identical to the
+\fBscons\-time help\fR
+subcommand\&.
+.RE
+.PP
+\-V, \-\-version
+.RS 4
+Displays the
+\fBscons\-time\fR
+version and exits\&.
+.RE
+.PP
+Most functionality is controlled by options to the individual subcommands\&. See the next section for information about individual subcommand options\&.
+.SH "SUBCOMMANDS"
+.PP
+The
+\fBscons\-time\fR
+command supports the following individual subcommands\&.
+.SS "The func Subcommand"
+.PP
+\fBscons\-time func\fR
+[\fB\-h\fR] [\fB\-\-chdir=\fR\fIDIR\fR] [\fB\-f \fR\fIFILE\fR] [\fB\-\-fmt=\fR\fIFORMAT\fR] [\fB\-\-func=\fR\fINAME\fR] [\fB\-p \fR\fISTRING\fR] [\fB\-t \fR\fINUMBER\fR] [\fB\-\-title= TITLE\fR] [\fIARGUMENTS\fR]
+.PP
+The
+\fBscons\-time func\fR
+subcommand displays timing information for a specific Python function within SCons\&. By default, it extracts information about the
+\fB_main\fR() function, which includes the Python profiler timing for all of SCons\&.
+.PP
+The
+\fBscons\-time func\fR
+subcommand extracts function timing information from all the specified file arguments, which should be Python profiler output files\&. (Normally, these would be
+\fB*\&.prof\fR
+files generated by the
+\fBscons\-time run\fR
+subcommand, but they can actually be generated by any Python profiler invocation\&.) All file name arguments will be globbed for on\-disk files\&.
+.PP
+If no arguments are specified, then function timing information will be extracted from all
+\fB*\&.prof\fR
+files, or the subset of them with a prefix specified by the
+\fB\-p\fR
+option\&.
+.PP
+Options include:
+.PP
+\-C DIRECTORY, \-\-chdir=DIRECTORY
+.RS 4
+Changes to the specified
+\fIDIRECTORY\fR
+before looking for the specified files (or files that match the specified patterns)\&.
+.RE
+.PP
+\-f FILE, \-\-file=FILE
+.RS 4
+Reads configuration information from the specified
+\fIFILE\fR\&.
+.RE
+.PP
+\-fmt=FORMAT, \-\-format=FORMAT
+.RS 4
+Reports the output in the specified
+\fIFORMAT\fR\&. The formats currently supported are
+\fBascii\fR
+(the default) and
+\fBgnuplot\fR\&.
+.RE
+.PP
+\-\-func=NAME
+.RS 4
+Extracts timings for the specified function
+\fINAME\fR\&. The default is to report cumulative timings for the
+\fB_main\fR() function, which contains the entire SCons run\&.
+.RE
+.PP
+\-h, \-\-help
+.RS 4
+Displays help text for the
+\fBscons\-time func\fR
+subcommand\&.
+.RE
+.PP
+\-p STRING, \-\-prefix=STRING
+.RS 4
+Specifies the prefix string for profiles from which to extract function timing information\&. This will be used to search for profiles if no arguments are specified on the command line\&.
+.RE
+.PP
+\-t NUMBER, \-\-tail=NUMBER
+.RS 4
+Only extracts function timings from the last
+\fINUMBER\fR
+files\&.
+.RE
+.SS "The help Subcommand"
+.PP
+\fBscons\-time help\fR
+\fISUBCOMMAND\fR
+[\&.\&.\&.] The
+\fBhelp\fR
+subcommand prints help text for any other subcommands listed as later arguments on the command line\&.
+.SS "The mem Subcommand"
+.PP
+\fBscons\-time mem\fR
+[\fB\-h\fR] [\fB\-\-chdir=\fR\fIDIR\fR] [\fB\-f \fR\fIFILE\fR] [\fB\-\-fmt=\fR\fIFORMAT\fR] [\fB\-p \fR\fISTRING\fR] [\fB\-\-stage=\fR\fISTAGE\fR] [\fB\-t \fR\fINUMBER\fR] [\fB\-\-title=\fR\fITITLE\fR] [\fIARGUMENTS\fR]
+.PP
+The
+\fBscons\-time mem\fR
+subcommand displays how much memory SCons uses\&.
+.PP
+The
+\fBscons\-time mem\fR
+subcommand extracts memory use information from all the specified file arguments, which should be files containing output from running SCons with the
+\fB\-\-debug=memory\fR
+option\&. (Normally, these would be
+\fB*\&.log\fR
+files generated by the
+\fBscons\-time run\fR
+subcommand\&.) All file name arguments will be globbed for on\-disk files\&.
+.PP
+If no arguments are specified, then memory information will be extracted from all
+\fB*\&.log\fR
+files, or the subset of them with a prefix specified by the
+\fB\-p\fR
+option\&.
+.PP
+\-C DIR, \-\-chdir=DIR
+.RS 4
+Changes to the specified
+\fIDIRECTORY\fR
+before looking for the specified files (or files that match the specified patterns)\&.
+.RE
+.PP
+\-f FILE, \-\-file=FILE
+.RS 4
+Reads configuration information from the specified
+\fIFILE\fR\&.
+.RE
+.PP
+\-fmt=FORMAT, \-\-format=FORMAT
+.RS 4
+Reports the output in the specified
+\fIFORMAT\fR\&. The formats currently supported are
+\fBascii\fR
+(the default) and
+\fBgnuplot\fR\&.
+.RE
+.PP
+\-h, \-\-help
+.RS 4
+Displays help text for the
+\fBscons\-time mem\fR
+subcommand\&.
+.RE
+.PP
+\-p STRING, \-\-prefix=STRING
+.RS 4
+Specifies the prefix string for log files from which to extract memory usage information\&. This will be used to search for log files if no arguments are specified on the command line\&.
+.RE
+.PP
+\-\-stage=STAGE
+.RS 4
+Prints the memory used at the end of the specified
+\fISTAGE\fR:
+\fBpre\-read\fR
+(before the SConscript files are read),
+\fBpost\-read ,\fR
+(after the SConscript files are read),
+\fBpre\-build\fR
+(before any targets are built) or
+\fBpost\-build\fR
+(after any targets are built)\&. If no
+\fB\-\-stage\fR
+option is specified, the default behavior is
+\fBpost\-build\fR, which reports the final amount of memory used by SCons during each run\&.
+.RE
+.PP
+\-t NUMBER, \-\-tail=NUMBER
+.RS 4
+Only reports memory statistics from the last
+\fINUMBER\fR
+files\&.
+.RE
+.SS "The obj Subcommand"
+.PP
+\fBscons\-time obj\fR
+[\fB\-h\fR] [\fB\-\-chdir=\fR\fIDIR\fR] [\fB\-f \fR\fIFILE\fR] [\fB\-\-fmt=\fR\fIFORMAT\fR] [\fB\-p \fR\fISTRING\fR] [\fB\-\-stage=\fR\fISTAGE\fR] [\fB\-t \fR\fINUMBER\fR] [\fB\-\-title=\fR\fITITLE\fR] [\fIARGUMENTS\fR]
+.PP
+The
+\fBscons\-time obj\fR
+subcommand displays how many objects of a specific named type are created by SCons\&.
+.PP
+The
+\fBscons\-time obj\fR
+subcommand extracts object counts from all the specified file arguments, which should be files containing output from running SCons with the
+\fB\-\-debug=count\fR
+option\&. (Normally, these would be
+\fB*\&.log\fR
+files generated by the
+\fBscons\-time run\fR
+subcommand\&.) All file name arguments will be globbed for on\-disk files\&.
+.PP
+If no arguments are specified, then object counts will be extracted from all
+\fB*\&.log\fR
+files, or the subset of them with a prefix specified by the
+\fB\-p\fR
+option\&.
+.PP
+\-C DIR, \-\-chdir=DIR
+.RS 4
+Changes to the specified
+\fIDIRECTORY\fR
+before looking for the specified files (or files that match the specified patterns)\&.
+.RE
+.PP
+\-f FILE, \-\-file=FILE
+.RS 4
+Reads configuration information from the specified
+\fIFILE\fR\&.
+.RE
+.PP
+\-fmt=FORMAT, \-\-format=FORMAT
+.RS 4
+Reports the output in the specified
+\fIFORMAT\fR\&. The formats currently supported are
+\fBascii\fR
+(the default) and
+\fBgnuplot\fR\&.
+.RE
+.PP
+\-h, \-\-help
+.RS 4
+Displays help text for the
+\fBscons\-time obj\fR
+subcommand\&.
+.RE
+.PP
+\-p STRING, \-\-prefix=STRING
+.RS 4
+Specifies the prefix string for log files from which to extract object counts\&. This will be used to search for log files if no arguments are specified on the command line\&.
+.RE
+.PP
+\-\-stage=STAGE
+.RS 4
+Prints the object count at the end of the specified
+\fISTAGE\fR:
+\fBpre\-read\fR
+(before the SConscript files are read),
+\fBpost\-read ,\fR
+(after the SConscript files are read),
+\fBpre\-build\fR
+(before any targets are built) or
+\fBpost\-build\fR
+(after any targets are built)\&. If no
+\fB\-\-stage\fR
+option is specified, the default behavior is
+\fBpost\-build\fR, which reports the final object count during each run\&.
+.RE
+.PP
+\-t NUMBER, \-\-tail=NUMBER
+.RS 4
+Only reports object counts from the last
+\fINUMBER\fR
+files\&.
+.RE
+.SS "The run Subcommand"
+.PP
+\fBscons\-time run\fR
+[\fB\-hnqv\fR] [\fB\-f \fR\fIFILE\fR] [\fB\-\-number=\fR\fINUMBER\fR] [\fB\-\-outdir=\fR\fIOUTDIR\fR] [\fB\-p \fR\fISTRING\fR] [\fB\-\-python=\fR\fIPYTHON\fR] [\fB\-s \fR\fIDIR\fR] [\fB\-\-scons=\fR\fISCONS\fR] [\fB\-\-svn=\fR\fIURL\fR] [\fIARGUMENTS\fR] The
+\fBscons\-time run\fR
+subcommand is the basic subcommand for profiling a specific configuration against a version of SCons\&.
+.PP
+The configuration to be tested is specified as a list of files or directories that will be unpacked or copied into a temporary directory in which SCons will be invoked\&. The
+\fBscons\-time run\fR
+subcommand understands file suffixes like
+\fB\&.tar\fR,
+\fB\&.tar\&.gz\fR,
+\fB\&.tgz\fR
+and
+\fB\&.zip\fR
+and will unpack their contents into a temporary directory\&. If more than one argument is specified, each one will be unpacked or copied into the temporary directory "on top of" the previous archives or directories, so the expectation is that multiple specified archives share the same directory layout\&.
+.PP
+Once the file or directory arguments are unpacked or copied to the temporary directory, the
+\fBscons\-time run\fR
+subcommand runs the requested version of SCons against the configuration three times:
+.PP
+Startup
+.RS 4
+SCons is run with the
+\fB\-\-help\fR
+option so that just the SConscript files are read, and then the default help text is printed\&. This profiles just the perceived "overhead" of starting up SCons and processing the SConscript files\&.
+.RE
+.PP
+Full build
+.RS 4
+SCons is run to build everything specified in the configuration\&. Specific targets to be passed in on the command line may be specified by the
+\fBtargets\fR
+keyword in a configuration file; see below for details\&.
+.RE
+.PP
+Rebuild
+.RS 4
+SCons is run again on the same just\-built directory\&. If the dependencies in the SCons configuration are correct, this should be an up\-to\-date, "do nothing" rebuild\&.
+.RE
+.PP
+Each invocation captures the output log file and a profile\&.
+.PP
+The
+\fBscons\-time run\fR
+subcommand supports the following options:
+.PP
+\-f FILE, \-\-file=FILE
+.RS 4
+Reads configuration information from the specified
+\fIFILE\fR\&. This often provides a more convenient way to specify and collect parameters associated with a specific timing configuration than specifying them on the command line\&. See the
+CONFIGURATION FILE
+section below for information about the configuration file parameters\&.
+.RE
+.PP
+\-h, \-\-help
+.RS 4
+Displays help text for the
+\fBscons\-time run\fR
+subcommand\&.
+.RE
+.PP
+\-n, \-\-no\-exec
+.RS 4
+Do not execute commands, just printing the command\-line equivalents of what would be executed\&. Note that the
+\fBscons\-time\fR
+script actually executes its actions in Python, where possible, for portability\&. The commands displayed are UNIX
+\fIequivalents\fR
+of what it\*(Aqs doing\&.
+.RE
+.PP
+\-\-number=NUMBER
+.RS 4
+Specifies the run number to be used in the names of the log files and profile outputs generated by this run\&.
+.RE
+.PP
+When used in conjunction with the
+\fB\-\-svn=\fR\fIURL\fR
+option,
+\fINUMBER\fR
+specifies one or more comma\-separated Subversion revision numbers that will be retrieved automatically from the Subversion repository at the specified
+\fIURL\fR\&. Ranges of delta or revision numbers may be specified be separating two numbers with a hyphen (\fB\-\fR)\&.
+.PP
+Example:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+% scons\-time run \-\-svn=\m[blue]\fBhttp://scons\&.tigris\&.org/svn/trunk\fR\m[] \-\-num=1247,1249\-1252 \&.
+.fi
+.if n \{\
+.RE
+.\}
+.PP
+\-p STRING, \-\-prefix=STRING
+.RS 4
+Specifies the prefix string to be used for all of the log files and profiles generated by this run\&. The default is derived from the first specified argument: if the first argument is a directory, the default prefix is the name of the directory; if the first argument is an archive (tar or zip file), the default prefix is the base name of the archive, that is, what remains after stripping the archive suffix (\fB\&.tgz\fR,
+\fB\&.tar\&.gz\fR
+or
+\fB\&.zip\fR)\&.
+.RE
+.PP
+\-\-python=PYTHON
+.RS 4
+Specifies a path to the Python executable to be used for the timing runs\&. The default is to use the same Python executable that is running the
+\fBscons\-time\fR
+command itself\&.
+.RE
+.PP
+\-q, \-\-quiet
+.RS 4
+Suppresses display of the command lines being executed\&.
+.RE
+.PP
+\-s DIR, \-\-subdir=DIR
+.RS 4
+Specifies the name of directory or subdirectory from which the commands should be executed\&. The default is XXX
+.RE
+.PP
+\-\-scons=SCONS
+.RS 4
+Specifies a path to the SCons script to be used for the timing runs\&. The default is XXX
+.RE
+.PP
+\-\-svn=URL, \-\-subversion=URL
+.RS 4
+Specifies the
+\fIURL\fR
+of the Subversion repository from which the version(s) of
+\fBscons\fR
+being timed will be extracted\&. When
+\fB\-\-svn\fR
+is specified, the
+\fB\-\-number=\fR\fINUMBER\fR
+option specifies revision numbers that will be tested\&. Output from each invocation run will be placed in file names that match the Subversion revision numbers\&. If the
+\fB\-\-number=\fR
+option is not specified, then the default behavior is to time the
+\fBHEAD\fR
+of the specified
+\fIURL\fR\&.
+.RE
+.PP
+\-v, \-\-verbose
+.RS 4
+Displays the output from individual commands to the screen (in addition to capturing the output in log files)\&.
+.RE
+.SS "The time Subcommand"
+.PP
+\fBscons\-time time\fR
+[\fB\-h\fR] [\fB\-\-chdir=\fR\fIDIR\fR] [\fB\-f \fR\fIFILE\fR] [\fB\-\-fmt=\fR\fIFORMAT\fR] [\fB\-p \fR\fISTRING\fR] [\fB\-t \fR\fINUMBER\fR] [\fB\-\-title=\fR\fITITLE\fR] [\fB\-\-which=\fR\fIWHICH\fR] [\fIARGUMENTS\fR]
+.PP
+The
+\fBscons\-time time\fR
+subcommand displays SCons execution times as reported by the
+\fBscons \-\-debug=time\fR
+option\&.
+.PP
+The
+\fBscons\-time time\fR
+subcommand extracts SCons timing from all the specified file arguments, which should be files containing output from running SCons with the
+\fB\-\-debug=time\fR
+option\&. (Normally, these would be
+\fB*\&.log\fR
+files generated by the
+\fBscons\-time run\fR
+subcommand\&.) All file name arguments will be globbed for on\-disk files\&.
+.PP
+If no arguments are specified, then execution timings will be extracted from all
+\fB*\&.log\fR
+files, or the subset of them with a prefix specified by the
+\fB\-p\fR
+option\&.
+.PP
+\-C DIR, \-\-chdir=DIR
+.RS 4
+Changes to the specified
+\fIDIRECTORY\fR
+before looking for the specified files (or files that match the specified patterns)\&.
+.RE
+.PP
+\-f FILE, \-\-file=FILE
+.RS 4
+Reads configuration information from the specified
+\fIFILE\fR\&.
+.RE
+.PP
+\-fmt=FORMAT, \-\-format=FORMAT
+.RS 4
+Reports the output in the specified
+\fIFORMAT\fR\&. The formats currently supported are
+\fBascii\fR
+(the default) and
+\fBgnuplot\fR\&.
+.RE
+.PP
+\-h, \-\-help
+.RS 4
+Displays help text for the
+\fBscons\-time time\fR
+subcommand\&.
+.RE
+.PP
+\-p STRING, \-\-prefix=STRING
+.RS 4
+Specifies the prefix string for log files from which to extract execution timings\&. This will be used to search for log files if no arguments are specified on the command line\&.
+.RE
+.PP
+\-t NUMBER, \-\-tail=NUMBER
+.RS 4
+Only reports object counts from the last
+\fINUMBER\fR
+files\&.
+.RE
+.PP
+\-\-which=WHICH
+.RS 4
+Prints the execution time for the specified
+\fIWHICH\fR
+value:
+\fBtotal\fR
+(the total execution time),
+\fBSConscripts\fR
+(total execution time for the SConscript files themselves),
+\fBSCons\fR
+(execution time in SCons code itself) or
+\fBcommands\fR
+(execution time of the commands and other actions used to build targets)\&. If no
+\fB\-\-which\fR
+option is specified, the default behavior is
+\fBtotal\fR, which reports the total execution time for each run\&.
+.RE
+.SH "CONFIGURATION FILE"
+.PP
+Various
+\fBscons\-time\fR
+subcommands can read information from a specified configuration file when passed the
+\fB\-f\fR
+or
+\fB\-\-file\fR
+options\&. The configuration file is actually executed as a Python script\&. Setting Python variables in the configuration file controls the behavior of the
+\fBscons\-time\fR
+script more conveniently than having to specify command\-line options or arguments for every run, and provides a handy way to "shrink\-wrap" the necessary information for producing (and reporting) consistent timing runs for a given configuration\&.
+.PP
+\fBarchive_list\fR
+.RS 4
+A list of archives (files or directories) that will be copied to the temporary directory in which SCons will be invoked\&.
+\fB\&.tar\fR,
+\fB\&.tar\&.gz\fR,
+\fB\&.tgz\fR
+and
+\fB\&.zip\fR
+files will have their contents unpacked in the temporary directory\&. Directory trees and files will be copied as\-is\&.
+.RE
+.PP
+\fBinitial_commands\fR
+.RS 4
+A list of commands that will be executed before the actual timed
+\fBscons\fR
+runs\&. This can be used for commands that are necessary to prepare the source tree\-for example, creating a configuration file that should not be part of the timed run\&.
+.RE
+.PP
+\fBkey_location\fR
+.RS 4
+The location of the key on Gnuplot graphing information generated with the
+\fB\-\-format=gnuplot\fR
+option\&. The default is
+\fBbottom left\fR\&.
+.RE
+.PP
+\fBprefix\fR
+.RS 4
+The file name prefix to be used when running or extracting timing for this configuration\&.
+.RE
+.PP
+\fBpython\fR
+.RS 4
+The path name of the Python executable to be used when running or extracting information for this configuration\&. The default is the same version of Python used to run the SCons
+.RE
+.PP
+\fBscons\fR
+.RS 4
+The path name of the SCons script to be used when running or extracting information for this configuration\&. The default is simply
+\fBscons\fR\&.
+.RE
+.PP
+\fBscons_flags\fR
+.RS 4
+The
+\fBscons\fR
+flags used when running SCons to collect timing information\&. The default value is
+\fB\-\-debug=count \-\-debug=memory \-\-debug=time \-\-debug=memoizer\fR\&.
+.RE
+.PP
+\fBscons_lib_dir\fR, \fBscons_wrapper\fR, \fBstartup_targets\fR, \fBsubdir\fR
+.RS 4
+The subdirectory of the project into which the
+\fBscons\-time\fR
+script should change before executing the SCons commands to time\&.
+.RE
+.PP
+\fBsubversion_url\fR
+.RS 4
+The Subversion URL from
+.RE
+.PP
+\fBsvn\fR
+.RS 4
+The subversion executable used to check out revisions of SCons to be timed\&. The default is simple
+\fBsvn\fR\&.
+.RE
+.PP
+\fBsvn_co_flag\fR, \fBtar\fR, \fBtargets\fR
+.RS 4
+A string containing the targets that should be added to the command line of every timed
+\fBscons\fR
+run\&. This can be used to restrict what\*(Aqs being timed to a subset of the full build for the configuration\&.
+.RE
+.PP
+\fBtargets0\fR, \fBtargets1\fR, \fBtargets2\fR, \fBtitle\fR, \fBunzip\fR, \fBverbose\fR, \fBvertical_bars\fR
+.RS 4
+.RE
+.SS "Example"
+.PP
+Here is an example
+\fBscons\-time\fR
+configuration file for a hypothetical sample project:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+# The project doesn\*(Aqt use SCons natively (yet), so we\*(Aqre
+# timing a separate set of SConscript files that we lay
+# on top of the vanilla unpacked project tarball\&.
+arguments = [\*(Aqproject\-1\&.2\&.tgz\*(Aq, \*(Aqproject\-SConscripts\&.tar\*(Aq]
+
+# The subdirectory name contains the project version number,
+# so tell scons\-time to chdir there before building\&.
+subdir = \*(Aqproject\-1\&.2\*(Aq
+
+# Set the prefix, so output log files and profiles are named:
+#     project\-000\-[012]\&.{log,prof}
+#     project\-001\-[012]\&.{log,prof}
+# etc\&.
+prefix = \*(Aqproject\*(Aq
+
+# The SConscript files being tested don\*(Aqt do any SConf
+# configuration, so run their normal \&./configure script
+# before we invoke SCons\&.
+initial_commands = [
+    \*(Aq\&./configure\*(Aq,
+]
+
+# Only time building the bin/project executable\&.
+targets = \*(Aqbin/project\*(Aq
+
+# Time against SCons revisions of the branches/core branch
+subversion_url = \*(Aq\m[blue]\fBhttp://scons\&.tigris\&.org/svn/scons/branches/core\fR\m[]\*(Aq
+.fi
+.if n \{\
+.RE
+.\}
+.SH "ENVIRONMENT"
+.PP
+The
+\fBscons\-time\fR
+script uses the following environment variables:
+.PP
+\fBPRESERVE\fR
+.RS 4
+If this value is set, the
+\fBscons\-time\fR
+script will
+\fInot\fR
+remove the temporary directory or directories in which it builds the specified configuration or downloads a specific version of SCons\&.
+.RE
+.SH "SEE ALSO"
+.PP
+\fBgnuplot\fR(1),
+\fBscons\fR(1)
+.SH "AUTHORS"
+.PP
+Steven Knight <knight at baldmt dot com>

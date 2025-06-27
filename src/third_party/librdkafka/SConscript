@@ -27,11 +27,14 @@ else:
 
 
 def remove_define(env, define_to_remove):
+    to_remove = []
     for define in env.get("CPPDEFINES", []):
         if isinstance(define, tuple) and define[0] == define_to_remove:
-            env.get("CPPDEFINES").remove(define)
+            to_remove.append(define)
         elif define == define_to_remove:
-            env.get("CPPDEFINES").remove(define)
+            to_remove.append(define)
+    for define in to_remove:
+        env.get("CPPDEFINES").remove(define)
 
 
 # Kafka manages these defines.

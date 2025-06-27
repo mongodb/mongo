@@ -169,9 +169,6 @@ opentelemetry-api = "*"
 opentelemetry-sdk = "*"
 opentelemetry-exporter-otlp-proto-common = "*"
 
-[tool.poetry.group.tooling-metrics.dependencies]
-mongo-tooling-metrics = "1.0.8"
-
 # This can be installed with "poetry install -E libdeps"
 [project.optional-dependencies]
 libdeps = [

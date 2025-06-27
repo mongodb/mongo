@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:exsl="http://exslt.org/common" xmlns:ng="http://docbook.org/docbook-ng" xmlns:db="http://docbook.org/ns/docbook"><head>
+<meta http-equiv="X-UA-Compatible" content="IE=7" />
+<title>Adding support for other (non-CJKV) languages</title><meta name="generator" content="DocBook XSL Stylesheets V1.76.1" /><link rel="home" href="index.html" title="README: Web-based Help from DocBook XML" /><link rel="up" href="ch02.html" title="Chapter 2. Using the package" /><link rel="prev" href="ch02s03.html" title="Building the indexer" /><link rel="next" href="ch03.html" title="Chapter 3. Developer Docs" /><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><script type="text/javascript">
+            //The id for tree cookie
+            var treeCookieId = "treeview-897";
+            var language = "en";
+            var w = new Object();
+            //Localization
+            txt_filesfound = 'Results';
+            txt_enter_at_least_1_char = "You must enter at least one character.";
+            txt_browser_not_supported = "Your browser is not supported. Use of Mozilla Firefox is recommended.";
+            txt_please_wait = "Please wait. Search in progress...";
+            txt_results_for = "Results for: ";
+        </script><style type="text/css">
+            input {
+            margin-bottom: 5px;
+            margin-top: 2px;
+            }
+
+            .folder {
+            display: block;
+            height: 22px;
+            padding-left: 20px;
+            background: transparent url(../common/jquery/treeview/images/folder.gif) 0 0px no-repeat;
+            }
+            </style><link rel="shortcut icon" href="../favicon.ico" type="image/x-icon" /><link rel="stylesheet" type="text/css" href="../common/css/positioning.css" /><link rel="stylesheet" type="text/css" href="../common/jquery/theme-redmond/jquery-ui-1.8.2.custom.css" /><link rel="stylesheet" type="text/css" href="../common/jquery/treeview/jquery.treeview.css" /><script type="text/javascript" src="../common/jquery/jquery-1.4.2.min.js"></script><script type="text/javascript" src="../common/jquery/jquery-ui-1.8.2.custom.min.js"></script><script type="text/javascript" src="../common/jquery/jquery.cookie.js"></script><script type="text/javascript" src="../common/jquery/treeview/jquery.treeview.min.js"></script><script type="text/javascript" src="search/htmlFileList.js"></script><script type="text/javascript" src="search/htmlFileInfoList.js"></script><script type="text/javascript" src="search/nwSearchFnt.js"></script><script type="text/javascript" src="search/stemmers/en_stemmer.js"><!--//make this scalable to other languages as well.--></script><script type="text/javascript" src="search/index-1.js"></script><script type="text/javascript" src="search/index-2.js"></script><script type="text/javascript" src="search/index-3.js"></script></head><body><div id="header"><img style="margin-right: 2px; height: 59px; padding-right: 25px; padding-top: 8px" align="right" src="../common/images/logo.png" alt="Company Logo" /><h1 align="center">Adding support for other (non-CJKV) languages<br />Chapter 2. Using the package</h1><div id="navheader" align="right"><table><tr><td style="height: 28px; width: 16px;"><a id="showHideButton" onclick="showHideToc();" class="pointLeft" title="Hide TOC tree">.
+                            </a></td><td><img src="../common/images/highlight-blue.gif" alt="H" height="25px" onclick="toggleHighlight()" id="showHideHighlight" style="cursor:pointer" title="Toggle search result highlighting" /></td><td><a accesskey="p" href="ch02s03.html">Prev</a>
+                                        |
+                                        <a accesskey="u" href="ch02.html">Up</a>
+                                    |
+                                    <a accesskey="n" href="ch03.html">Next</a></td></tr></table></div></div><div id="content"><div class="section" title="Adding support for other (non-CJKV) languages"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="id36124269"></a>Adding support for other (non-CJKV) languages</h2></div></div></div><p>To support stemming for a language, the search mechanism requires
+      a stemmer implemented in both Java and JavaScript. The Java version is
+      used by the indexer and the JavaScript verison is used to stem the
+      user's input on the search form. Currently the search mechanism supports
+      stemming for English and German. In addition, Java stemmers are included
+      for the following languages. Therefore, to support these languages, you
+      only need to implement the stemmer in JavaScript and add it to the
+      template. If you do undertake this task, please consider contributing
+      the JavaScript version back to this project and to <a class="ulink" href="http://snowball.tartarus.org/texts/stemmersoverview.html" target="_top">Martin
+      Porter's project</a>.</p><div class="itemizedlist"><ul class="itemizedlist" type="disc"><li class="listitem"><p>Danish</p></li><li class="listitem"><p>Dutch</p></li><li class="listitem"><p>Finnish</p></li><li class="listitem"><p>Hungarian</p></li><li class="listitem"><p>Italian</p></li><li class="listitem"><p>Norwegian</p></li><li class="listitem"><p>Portuguese</p></li><li class="listitem"><p>Romanian</p></li><li class="listitem"><p>Russian</p></li><li class="listitem"><p>Spanish</p></li><li class="listitem"><p>Swedish</p></li><li class="listitem"><p>Turkish</p></li></ul></div></div><script type="text/javascript" src="../common/main.js"></script><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch02s03.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch02.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch03.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></div><div><div id="leftnavigation" style="padding-top:3px; background-color:white;"><div id="tabs"><ul><li><a href="#treeDiv"><em>Contents</em></a></li><li><a href="#searchDiv"><em>Search</em></a></li></ul><div id="treeDiv"><img src="../common/images/loading.gif" alt="loading table of contents..." id="tocLoading" style="display:block;" /><div id="ulTreeDiv" style="display:none"><ul id="tree" class="filetree"><li><span class="file"><a href="ch01.html">Introduction</a></span></li><li><span class="file"><a href="ch02.html">Using the package</a></span><ul><li><span class="file"><a href="ch02s01.html">Generating webhelp output</a></span></li><li><span class="file"><a href="ch02s02.html">Using and customizing the output</a></span><ul><li><span class="file"><a href="ch02s02.html#id36124136">Recommended Apache configurations</a></span></li></ul></li><li><span class="file"><a href="ch02s03.html">Building the indexer</a></span></li><li id="webhelp-currentid"><span class="file"><a href="ch02s04.html">Adding support for other (non-CJKV) languages</a></span></li></ul></li><li><span class="file"><a href="ch03.html">Developer Docs</a></span><ul><li><span class="file"><a href="ch03s01.html">Design</a></span></li><li><span class="file"><a href="ch03s02.html">Search</a></span><ul><li><span class="file"><a href="ch03s02.html#id36124646">New Stemmers</a></span></li></ul></li></ul></li></ul></div></div><div id="searchDiv"><div id="search"><form onsubmit="Verifie(ditaSearch_Form);return false" name="ditaSearch_Form" class="searchForm" id="ditaSearch_Form"><fieldset class="searchFieldSet"><legend>Search</legend><center><input id="textToSearch" name="textToSearch" type="text" class="searchText" /> &nbsp; <input onclick="Verifie(ditaSearch_Form)" type="button" class="searchButton" value="Go" id="doSearch" /></center></fieldset></form></div><div id="searchResults"><center></center></div></div></div></div></div></body></html>

@@ -52,7 +52,7 @@ a notice will be included in
 | [S2]                       | Apache-2.0                                                     | c872048da5d1 + changes                             |          ✗           |                ✗                |
 | [SafeInt]                  | MIT                                                            | 3.0.26                                             |                      |                                 |
 | [schemastore.org]          | Apache-2.0                                                     | 6847cfc3a1                                         |                      |                                 |
-| [scons]                    | MIT                                                            | 3.1.2                                              |                      |                                 |
+| [scons]                    | MIT                                                            | 4.9.1                                              |                      |                                 |
 | [Snappy]                   | BSD-3-Clause                                                   | 1.1.10                                             |          ✗           |                ✗                |
 | [TCMalloc]                 | Apache-2.0                                                     | 093ba93 + changes                                  |                      |                ✗                |
 | [timelib]                  | MIT                                                            | 2022.10                                            |                      |                ✗                |

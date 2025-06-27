@@ -1,0 +1,41 @@
+@import url('slides.css');
+
+.toc-body             { margin-left: 2px;
+                        margin-right: 2px;
+                      }
+
+.foil-body            { margin-left: 2px;
+                        margin-right: 2px;
+                      }
+
+.foilgroup-body       { margin-left: 2px;
+                        margin-right: 2px;
+                      }
+
+h1.title              { 
+                        margin-top: 0px;
+                        padding-top: 0px;
+                      }
+
+/* ToC Stuff */
+
+.ttoc                 {
+                        font-size: 10pt;
+			color: white;
+                      }
+
+.ttoc a               { text-decoration: none; }
+.ttoc a:link          { color: white }
+.ttoc a:visited       { color: white }
+
+.ttoc-title           {
+                        font-size: 10pt;
+                      }
+
+.ttoc-foilset         {
+                        font-size: 10pt;
+                      }
+
+.ttoc-foil            {
+                        font-size: 10pt;
+                      }

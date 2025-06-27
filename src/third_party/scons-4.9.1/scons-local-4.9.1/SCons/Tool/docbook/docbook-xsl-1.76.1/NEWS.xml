@@ -1,0 +1,145 @@
+<?xml version="1.0"?>
+
+<article>
+<info>
+<abstract>
+<para><emphasis role="strong">Note:</emphasis> This
+            document lists changes only since the 1.76.0 release.
+            If you instead want a record of the complete list of
+            changes for the codebase over its entire history, you
+            can obtain one by running the following commands:
+            
+<screen>  <code>svn checkout https://docbook.svn.sourceforge.net/svnroot/docbook/trunk/xsl</code>
+  <code>svn log --xml --verbose xsl &gt; ChangeHistory.xml</code></screen></para>
+</abstract>
+</info><title>Changes since the 1.76.0 release</title>
+
+<sect1 xml:id="V1.76.1">
+<title>Release Notes: 1.76.1</title>
+<para>The following is a list of changes that have been made
+        since the 1.76.0 release.</para>
+
+<sect2 xml:id="V1.76.1_Common">
+<title>Common</title>
+<para>The following changes have been made to the
+            <filename>common</filename> code
+            since the 1.76.0 release.</para>
+<itemizedlist>
+<listitem>
+<para><literal>Mauritz Jeanson: Makefile</literal></para><screen><phrase role="commit-message">Added eu.xml and gl.xml to SOURCES.</phrase></screen>
+</listitem>
+<listitem>
+<para><literal>Jirka Kosek: l10n.xsl</literal></para><screen><phrase role="commit-message">Fixed bug when context was lost due to usage of xsl:key</phrase></screen>
+</listitem>
+</itemizedlist>
+</sect2><!--end of Common changes for 1.76.1-->
+
+<sect2 xml:id="V1.76.1_FO">
+<title>FO</title>
+<para>The following changes have been made to the
+            <filename>fo</filename> code
+            since the 1.76.0 release.</para>
+<itemizedlist>
+<listitem>
+<para><literal>Robert Stayton: docbook.xsl; xref.xsl; fop1.xsl</literal></para><screen><phrase role="commit-message">Apply patch to support named destination in fop1.xsl, per Sourceforge
+bug report #3029845.</phrase></screen>
+</listitem>
+<listitem>
+<para><literal>dleidert: pagesetup.xsl</literal></para><screen><phrase role="commit-message">Remove the namespace mistakingly added with the last upload.</phrase></screen>
+</listitem>
+</itemizedlist>
+</sect2><!--end of FO changes for 1.76.1-->
+
+<sect2 xml:id="V1.76.1_HTML">
+<title>HTML</title>
+<para>The following changes have been made to the
+            <filename>html</filename> code
+            since the 1.76.0 release.</para>
+<itemizedlist>
+<listitem>
+<para><literal>Keith Fahlgren: highlight.xsl</literal></para><screen><phrase role="commit-message">Implementing handling for &lt;b&gt; and &lt;i&gt;: transform to &lt;strong&gt; and &lt;em&gt; for XHTML outputs and do not use in the highliting output (per Mauritz Jeanson)</phrase></screen>
+</listitem>
+</itemizedlist>
+</sect2><!--end of HTML changes for 1.76.1-->
+
+<sect2 xml:id="V1.76.1_Epub">
+<title>Epub</title>
+<para>The following changes have been made to the
+            <filename>epub</filename> code
+            since the 1.76.0 release.</para>
+<itemizedlist>
+<listitem>
+<para><literal>Keith Fahlgren: docbook.xsl</literal></para><screen><phrase role="commit-message">Bugfix for [#3071521] to ensure that NCX navPoints are generated for d:<tag>book</tag> root nodes with the -NS version of the stylesheets</phrase></screen>
+</listitem>
+<listitem>
+<para><literal>Keith Fahlgren: docbook.xsl</literal></para><screen><phrase role="commit-message">Remove unused NCX metadata elements</phrase></screen>
+</listitem>
+<listitem>
+<para><literal>Keith Fahlgren: bin/spec/epub_regressions_spec.rb; docbook.xsl; bin/spec/files/test_cust.x⋯</literal></para><screen><phrase role="commit-message">Normalizing identifier lookup between NCX and OPF</phrase></screen>
+</listitem>
+<listitem>
+<para><literal>Keith Fahlgren: bin/dbtoepub</literal></para><screen><phrase role="commit-message">Reduce logging verbosity</phrase></screen>
+</listitem>
+<listitem>
+<para><literal>Keith Fahlgren: bin/dbtoepub; bin/lib/docbook.rb</literal></para><screen><phrase role="commit-message">Only copy images once for the DocBook to EPUB tool to correct Windows bug reported in [#3065489]</phrase></screen>
+</listitem>
+</itemizedlist>
+</sect2><!--end of Epub changes for 1.76.1-->
+
+<sect2 xml:id="V1.76.1_Webhelp">
+<title>Webhelp</title>
+<para>The following changes have been made to the
+            <filename>webhelp</filename> code
+            since the 1.76.0 release.</para>
+<itemizedlist>
+<listitem>
+<para><literal>David Cramer: indexer</literal></para><screen><phrase role="commit-message">More webhelp indexer refactoring</phrase></screen>
+</listitem>
+<listitem>
+<para><literal>David Cramer: build.xml</literal></para><screen><phrase role="commit-message">Removed cruft from before webhelp indexer refactoring</phrase></screen>
+</listitem>
+<listitem>
+<para><literal>David Cramer: indexer/src</literal></para><screen><phrase role="commit-message">Refactoring webhelp to separate more cleanly the xsl and java code.</phrase></screen>
+</listitem>
+<listitem>
+<para><literal>David Cramer: indexer/lib</literal></para><screen><phrase role="commit-message">Refactoring webhelp to separate more cleanly the xsl and java code.</phrase></screen>
+</listitem>
+<listitem>
+<para><literal>David Cramer: Makefile; build.xml</literal></para><screen><phrase role="commit-message">Refactoring webhelp to separate more cleanly the xsl and java code.</phrase></screen>
+</listitem>
+<listitem>
+<para><literal>David Cramer: indexer/src/com/nexwave/nquindexer/IndexerTask.java; build.xml; indexer/src/⋯</literal></para><screen><phrase role="commit-message">Merged in changes from webhelp branch to <tag>address</tag> issue #3058244 regarding the xx.html temp file that was being created</phrase></screen>
+</listitem>
+</itemizedlist>
+</sect2><!--end of Webhelp changes for 1.76.1-->
+
+<sect2 xml:id="V1.76.1_Params">
+<title>Params</title>
+<para>The following changes have been made to the
+            <filename>params</filename> code
+            since the 1.76.0 release.</para>
+<itemizedlist>
+<listitem>
+<para><literal>Robert Stayton: draft.mode.xml</literal></para><screen><phrase role="commit-message">Change default for <parameter>draft.mode</parameter> to 'no'.</phrase></screen>
+</listitem>
+</itemizedlist>
+</sect2><!--end of Params changes for 1.76.1-->
+
+<sect2 xml:id="V1.76.1_Extensions">
+<title>Extensions</title>
+<para>The following changes have been made to the
+            <filename>extensions</filename> code
+            since the 1.76.0 release.</para>
+<itemizedlist>
+<listitem>
+<para><literal>David Cramer: Makefile</literal></para><screen><phrase role="commit-message">More webhelp refactoring</phrase></screen>
+</listitem>
+<listitem>
+<para><literal>David Cramer: Makefile</literal></para><screen><phrase role="commit-message">Refactoring webhelp to separate more cleanly the xsl and java code.</phrase></screen>
+</listitem>
+</itemizedlist>
+</sect2><!--end of Extensions changes for 1.76.1-->
+
+</sect1>
+</article>
+

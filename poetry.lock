@@ -102,7 +102,7 @@ version = "1.34.40"
 description = "The AWS SDK for Python"
 optional = false
 python-versions = ">= 3.8"
-groups = ["aws", "platform", "tooling-metrics"]
+groups = ["aws", "platform"]
 files = [
     {file = "boto3-1.34.40-py3-none-any.whl", hash = "sha256:49eb215e4142d441e26eedaf5d0b43065200f0849d82c904bc9a62d1328016cd"},
     {file = "boto3-1.34.40.tar.gz", hash = "sha256:81d026ed8c8305b880c71f9f287f9b745b52bd358a91cfc133844c907db4d7ee"},
@@ -122,7 +122,7 @@ version = "1.34.40"
 description = "Low-level, data-driven core of boto 3."
 optional = false
 python-versions = ">= 3.8"
-groups = ["aws", "platform", "tooling-metrics"]
+groups = ["aws", "platform"]
 files = [
     {file = "botocore-1.34.40-py3-none-any.whl", hash = "sha256:a3edd774653a61a1b211e4ea88cdb1c2655ffcc7660ba77b41a4027b097d145d"},
     {file = "botocore-1.34.40.tar.gz", hash = "sha256:cb794bdb5b3d41845749a182ec93cb1453560e52b97ae0ab43ace81deb011f6d"},
@@ -664,7 +664,7 @@ version = "1.5.0"
 description = "Distro - an OS platform information API"
 optional = false
 python-versions = "*"
-groups = ["platform", "testing", "tooling-metrics"]
+groups = ["platform", "testing"]
 files = [
     {file = "distro-1.5.0-py2.py3-none-any.whl", hash = "sha256:df74eed763e18d10d0da624258524ae80486432cd17392d9c3d96f5e83cd2799"},
     {file = "distro-1.5.0.tar.gz", hash = "sha256:0e58756ae38fbd8fc3020d54badb8eae17c5b9dcbed388b17bb55b8a5928df92"},
@@ -676,7 +676,7 @@ version = "2.5.0"
 description = "DNS toolkit"
 optional = false
 python-versions = ">=3.8"
-groups = ["main", "core", "platform", "testing", "tooling-metrics"]
+groups = ["main", "core", "platform", "testing"]
 files = [
     {file = "dnspython-2.5.0-py3-none-any.whl", hash = "sha256:6facdf76b73c742ccf2d07add296f178e629da60be23ce4b0a9c927b1e02c3a6"},
     {file = "dnspython-2.5.0.tar.gz", hash = "sha256:a0034815a59ba9ae888946be7ccca8f7c157b286f8455b379c692efb51022a15"},
@@ -1026,7 +1026,7 @@ version = "4.0.11"
 description = "Git Object Database"
 optional = false
 python-versions = ">=3.7"
-groups = ["evergreen", "lint", "platform", "tooling-metrics"]
+groups = ["evergreen", "lint", "platform"]
 files = [
     {file = "gitdb-4.0.11-py3-none-any.whl", hash = "sha256:81a3407ddd2ee8df444cbacea00e2d038e40150acfa3001696fe0dcf1d3adfa4"},
     {file = "gitdb-4.0.11.tar.gz", hash = "sha256:bf5421126136d6d0af55bc1e7c1af1c397a34f5b7bd79e776cd3e89785c2b04b"},
@@ -1041,7 +1041,7 @@ version = "3.1.41"
 description = "GitPython is a Python library used to interact with Git repositories"
 optional = false
 python-versions = ">=3.7"
-groups = ["evergreen", "lint", "platform", "tooling-metrics"]
+groups = ["evergreen", "lint", "platform"]
 files = [
     {file = "GitPython-3.1.41-py3-none-any.whl", hash = "sha256:c36b6634d069b3f719610175020a9aed919421c87552185b085e04fbbdb10b7c"},
     {file = "GitPython-3.1.41.tar.gz", hash = "sha256:ed66e624884f76df22c8e16066d567aaa5a37d5b5fa19db2c6df6f7156db9048"},
@@ -1386,7 +1386,7 @@ version = "1.0.1"
 description = "JSON Matching Expressions"
 optional = false
 python-versions = ">=3.7"
-groups = ["aws", "platform", "tooling-metrics"]
+groups = ["aws", "platform"]
 files = [
     {file = "jmespath-1.0.1-py3-none-any.whl", hash = "sha256:02e2e4cc71b5bcab88332eebf907519190dd9e6e82107fa7f83b1003a6252980"},
     {file = "jmespath-1.0.1.tar.gz", hash = "sha256:90261b206d6defd58fdd5e85f478bf633a2901798906be2ad389150c5c60edbe"},
@@ -1703,7 +1703,8 @@ version = "1.0.8"
 description = "A slim library which leverages Pydantic to reliably collect type enforced metrics and store them to MongoDB."
 optional = false
 python-versions = ">=3.7,<4.0"
-groups = ["platform", "tooling-metrics"]
+groups = ["platform"]
+markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
 files = [
     {file = "mongo_tooling_metrics-1.0.8-py3-none-any.whl", hash = "sha256:6f022c07e55bedd06c9fbb19daf4118b38ac1bc290c9a645b5c1ef39cf905003"},
     {file = "mongo_tooling_metrics-1.0.8.tar.gz", hash = "sha256:1f10712b237a8c99551a4b63ce4e62db42aca05ef6d054af728b55081dd477d4"},
@@ -2380,7 +2381,7 @@ version = "1.10.14"
 description = "Data validation and settings management using python type hints"
 optional = false
 python-versions = ">=3.7"
-groups = ["evergreen", "platform", "testing", "tooling-metrics"]
+groups = ["evergreen", "platform", "testing"]
 files = [
     {file = "pydantic-1.10.14-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:7f4fcec873f90537c382840f330b90f4715eebc2bc9925f04cb92de593eae054"},
     {file = "pydantic-1.10.14-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:8e3a76f571970fcd3c43ad982daf936ae39b3e90b8a2e96c04113a369869dc87"},
@@ -2529,7 +2530,7 @@ version = "4.3.3"
 description = "Python driver for MongoDB <http://www.mongodb.org>"
 optional = false
 python-versions = ">=3.7"
-groups = ["core", "platform", "tooling-metrics"]
+groups = ["core", "platform"]
 files = [
     {file = "pymongo-4.3.3-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:74731c9e423c93cbe791f60c27030b6af6a948cef67deca079da6cd1bb583a8e"},
     {file = "pymongo-4.3.3-cp310-cp310-manylinux1_i686.whl", hash = "sha256:66413c50d510e5bcb0afc79880d1693a2185bcea003600ed898ada31338c004e"},
@@ -2625,7 +2626,8 @@ version = "1.1.0"
 description = "MONGODB-AWS authentication support for PyMongo"
 optional = false
 python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*"
-groups = ["platform", "tooling-metrics"]
+groups = ["platform"]
+markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
 files = [
     {file = "pymongo-auth-aws-1.1.0.tar.gz", hash = "sha256:7e04c3ba72e3138dd1dc35cbc122c97cb2341d7ff5f10271dc3e0b8adf950349"},
     {file = "pymongo_auth_aws-1.1.0-py2.py3-none-any.whl", hash = "sha256:8300b7c4bc5c81351f3f38a5de93aa547ba9bd583e98f861bf2e9aacf5b93ff3"},
@@ -2778,7 +2780,7 @@ version = "2.8.2"
 description = "Extensions to the standard Python datetime module"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
-groups = ["aws", "platform", "testing", "tooling-metrics"]
+groups = ["aws", "platform", "testing"]
 files = [
     {file = "python-dateutil-2.8.2.tar.gz", hash = "sha256:0123cacc1627ae19ddf3c27a5de5bd67ee4586fbdd6440d9748f8abb483d3e86"},
     {file = "python_dateutil-2.8.2-py2.py3-none-any.whl", hash = "sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9"},
@@ -3312,7 +3314,7 @@ version = "0.10.0"
 description = "An Amazon S3 Transfer Manager"
 optional = false
 python-versions = ">= 3.8"
-groups = ["aws", "platform", "tooling-metrics"]
+groups = ["aws", "platform"]
 files = [
     {file = "s3transfer-0.10.0-py3-none-any.whl", hash = "sha256:3cdb40f5cfa6966e812209d0994f2a4709b561c88e90cf00c2696d2df4e56b2e"},
     {file = "s3transfer-0.10.0.tar.gz", hash = "sha256:d0c8bbf672d5eebbe4e57945e23b972d963f07d82f661cabf678a5c88831595b"},
@@ -3401,7 +3403,7 @@ version = "58.1.0"
 description = "Easily download, build, install, upgrade, and uninstall Python packages"
 optional = false
 python-versions = ">=3.6"
-groups = ["main", "compile", "external-auth", "jira-client", "platform", "tooling-metrics"]
+groups = ["main", "compile", "external-auth", "jira-client", "platform"]
 files = [
     {file = "setuptools-58.1.0-py3-none-any.whl", hash = "sha256:7324fd4b66efa05cdfc9c89174573a4410acc7848f318cc0565c7fb659dfdc81"},
     {file = "setuptools-58.1.0.tar.gz", hash = "sha256:5de67252090e08d25f240f07d80310f778a5a46cdcf9ea9855662630ac8547b2"},
@@ -3447,7 +3449,7 @@ version = "1.16.0"
 description = "Python 2 and 3 compatibility utilities"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
-groups = ["aws", "export", "external-auth", "jira-client", "platform", "testing", "tooling-metrics"]
+groups = ["aws", "export", "external-auth", "jira-client", "platform", "testing"]
 files = [
     {file = "six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"},
     {file = "six-1.16.0.tar.gz", hash = "sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926"},
@@ -3460,7 +3462,7 @@ version = "5.0.1"
 description = "A pure Python implementation of a sliding window memory map manager"
 optional = false
 python-versions = ">=3.7"
-groups = ["evergreen", "lint", "platform", "tooling-metrics"]
+groups = ["evergreen", "lint", "platform"]
 files = [
     {file = "smmap-5.0.1-py3-none-any.whl", hash = "sha256:e6d8668fa5f93e706934a62d7b4db19c8d9eb8cf2adbb75ef1b675aa332b69da"},
     {file = "smmap-5.0.1.tar.gz", hash = "sha256:dceeb6c0028fdb6734471eb07c0cd2aae706ccaecab45965ee83f11c8d3b1f62"},
@@ -3870,7 +3872,7 @@ version = "4.12.2"
 description = "Backported and Experimental Type Hints for Python 3.8+"
 optional = false
 python-versions = ">=3.8"
-groups = ["main", "core", "evergreen", "external-auth", "lint", "platform", "testing", "tooling-metrics"]
+groups = ["main", "core", "evergreen", "external-auth", "lint", "platform", "testing"]
 files = [
     {file = "typing_extensions-4.12.2-py3-none-any.whl", hash = "sha256:04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d"},
     {file = "typing_extensions-4.12.2.tar.gz", hash = "sha256:1a7ead55c7e559dd4dee8856e3a88b41225abfe1ce8df57b7c13915fe121ffb8"},
@@ -3894,7 +3896,7 @@ version = "1.26.18"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*"
-groups = ["aws", "core", "export", "jira-client", "platform", "testing", "tooling-metrics"]
+groups = ["aws", "core", "export", "jira-client", "platform", "testing"]
 files = [
     {file = "urllib3-1.26.18-py2.py3-none-any.whl", hash = "sha256:34b97092d7e0a3a8cf7cd10e386f401b3737364026c45e622aa02903dffe0f07"},
     {file = "urllib3-1.26.18.tar.gz", hash = "sha256:f8ecc1bba5667413457c529ab955bf8c67b45db799d159066261719e328580a0"},
@@ -4292,4 +4294,4 @@ oldcrypt = []
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "d8969bfe2e827cb913689ba89555b4a64cd53f1b4d2f69842a72c9b86cefda6e"
+content-hash = "92fe1742fc3186364ece803540045d4a5b883eb6f42ae01ae2f36b3dba0f2ecb"

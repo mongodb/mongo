@@ -1,0 +1,9 @@
+@import url('slides.css');
+
+.toclink { font-size: 10pt;
+             font-weight: normal;
+           }
+
+.toclink a         { color: blue; }
+.toclink a:link    { color: blue; }
+.toclink a:visited { color: blue; }
