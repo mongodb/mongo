@@ -264,6 +264,16 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "kv_backup_block",
+    srcs = [],
+    hdrs = [
+        "kv_backup_block.h",
+    ],
+    deps = [
+    ],
+)
+
+mongo_cc_library(
     name = "mdb_catalog",
     srcs = [
         "mdb_catalog.cpp",
@@ -387,6 +397,7 @@ mongo_cc_library(
         "backup_block.h",
     ],
     deps = [
+        ":kv_backup_block",
         ":storage_options",
         "//src/mongo/db:server_base",
     ],

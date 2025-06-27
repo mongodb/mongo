@@ -407,9 +407,7 @@ public:
 
 DevNullKVEngine::DevNullKVEngine() : _engineDbPath(storageGlobalParams.dbpath) {
     auto testFilePath = _engineDbPath / "testFile.txt";
-    _mockBackupBlocks.push_back(BackupBlock(/*nss=*/boost::none,
-                                            /*uuid=*/boost::none,
-                                            /*filePath=*/testFilePath.string()));
+    _mockBackupBlocks.push_back(KVBackupBlock(/*ident=*/"", /*filePath=*/testFilePath.string()));
 }
 
 DevNullKVEngine::~DevNullKVEngine() = default;
@@ -461,8 +459,9 @@ namespace {
 class StreamingCursorImpl : public StorageEngine::StreamingCursor {
 public:
     StreamingCursorImpl() = delete;
-    StreamingCursorImpl(StorageEngine::BackupOptions options, std::deque<BackupBlock> backupBlocks)
-        : StorageEngine::StreamingCursor(options), _backupBlocks(std::move(backupBlocks)) {
+    StreamingCursorImpl(StorageEngine::BackupOptions options,
+                        std::deque<KVBackupBlock> kvBackupBlocks)
+        : StorageEngine::StreamingCursor(options), _kvBackupBlocks(std::move(kvBackupBlocks)) {
         _exhaustCursor = false;
     };
 
@@ -472,20 +471,17 @@ public:
         return BSONObj();
     }
 
-    void setCatalogEntries(stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>>
-                               identsToNsAndUUID) override {}
-
-    StatusWith<std::deque<BackupBlock>> getNextBatch(const std::size_t batchSize) override {
+    StatusWith<std::deque<KVBackupBlock>> getNextBatch(const std::size_t batchSize) override {
         if (_exhaustCursor) {
-            std::deque<BackupBlock> emptyVector;
+            std::deque<KVBackupBlock> emptyVector;
             return emptyVector;
         }
         _exhaustCursor = true;
-        return _backupBlocks;
+        return _kvBackupBlocks;
     }
 
 private:
-    std::deque<BackupBlock> _backupBlocks;
+    std::deque<KVBackupBlock> _kvBackupBlocks;
     bool _exhaustCursor;
 };
 

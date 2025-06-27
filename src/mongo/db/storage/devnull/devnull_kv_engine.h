@@ -216,14 +216,14 @@ public:
     void dump() const override {}
 
     // This sets the results of the backup cursor for unit tests.
-    void setBackupBlocks_forTest(std::deque<BackupBlock> newBackupBlocks) {
+    void setBackupBlocks_forTest(std::deque<KVBackupBlock> newBackupBlocks) {
         _mockBackupBlocks = std::move(newBackupBlocks);
     }
 
 private:
     std::shared_ptr<void> _catalogInfo;
     int _cachePressureForTest;
-    std::deque<BackupBlock> _mockBackupBlocks;
+    std::deque<KVBackupBlock> _mockBackupBlocks;
     boost::filesystem::path _engineDbPath;
 };
 }  // namespace mongo

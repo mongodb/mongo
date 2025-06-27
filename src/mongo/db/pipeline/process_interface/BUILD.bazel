@@ -152,6 +152,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:backup_block.h",
         "//src/mongo/db/storage:backup_cursor_hooks.h",
         "//src/mongo/db/storage:backup_cursor_state.h",
+        "//src/mongo/db/storage:kv_backup_block.h",
         "//src/mongo/db/storage:storage_engine_init.h",
         "//src/mongo/db/timeseries:timeseries_gen",
         "//src/mongo/db/timeseries:timeseries_global_options.h",

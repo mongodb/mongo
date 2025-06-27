@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,60 +29,71 @@
 
 #pragma once
 
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/storage/kv_backup_block.h"
-#include "mongo/util/uuid.h"
-
-#include <cstdint>
 #include <string>
 
 #include <boost/filesystem.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-/**
- * Represents the file blocks returned by the storage engine during both full and incremental
- * backups. In the case of a full backup, each block is an entire file holding a KVBackupBlock
- * containing an offset=0 and length=fileSize. In the case of the first basis for future incremental
- * backups, each block is an entire file with offset=0 and length=0. In the case of a subsequent
- * incremental backup, each block reflects changes made to data files since the basis (named
- * 'thisBackupName') and each block has a maximum size of 'blockSizeMB'.
+/*
+ * Represents the file blocks returned by the KVEngine during both full and incremental
+ * backups. In the case of a full backup, each block is an entire file with offset=0 and
+ * length=fileSize. In the case of the first basis for future incremental backups, each block is
+ * an entire file with offset=0 and length=0. In the case of a subsequent incremental backup,
+ * each block reflects changes made to data files since the basis (named 'thisBackupName') and
+ * each block has a maximum size of 'blockSizeMB'.
  *
  * If a file is unchanged in a subsequent incremental backup, a single block is returned with
  * offset=0 and length=0. This allows consumers of the backup API to safely truncate files that
  * are not returned by the backup cursor.
  */
-class BackupBlock final {
+class KVBackupBlock final {
 public:
-    explicit BackupBlock(boost::optional<NamespaceString> nss,
-                         boost::optional<UUID> uuid,
-                         KVBackupBlock kvBackupBlock);
-
-    ~BackupBlock() = default;
-
-    KVBackupBlock kvBackupBlock() const {
-        return _kvBackupBlock;
+    explicit KVBackupBlock(std::string ident,
+                           std::string filePath,
+                           std::uint64_t offset = 0,
+                           std::uint64_t length = 0,
+                           std::uint64_t fileSize = 0)
+        : _ident(ident),
+          _filePath(filePath),
+          _offset(offset),
+          _length(length),
+          _fileSize(fileSize) {
+        fassert(6355400, _filePath.has_root_directory());
     }
 
-    boost::optional<NamespaceString> ns() const {
-        return _nss;
+    ~KVBackupBlock() = default;
+
+    std::string ident() const {
+        return _ident;
     }
 
-    boost::optional<UUID> uuid() const {
-        return _uuid;
+    std::string filePath() const {
+        return _filePath.string();
     }
 
-    /**
-     * Returns whether the file must be copied regardless of choice for selective backups.
-     */
-    bool isRequired() const;
+    std::string fileName() const {
+        return _filePath.filename().string();
+    }
+
+    std::uint64_t offset() const {
+        return _offset;
+    }
+
+    std::uint64_t length() const {
+        return _length;
+    }
+
+    std::uint64_t fileSize() const {
+        return _fileSize;
+    }
 
 private:
-    boost::optional<NamespaceString> _nss;
-    boost::optional<UUID> _uuid;
-    KVBackupBlock _kvBackupBlock;
+    const std::string _ident;
+    const boost::filesystem::path _filePath;
+    const std::uint64_t _offset;
+    const std::uint64_t _length;
+    const std::uint64_t _fileSize;
 };
+
 }  // namespace mongo

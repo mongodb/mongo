@@ -61,9 +61,9 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/backup_block.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/kv_backup_block.h"
 #include "mongo/db/storage/snapshot_window_options_gen.h"
 #include "mongo/db/storage/storage_file_util.h"
 #include "mongo/db/storage/storage_options.h"
@@ -1190,17 +1190,12 @@ public:
 
     ~StreamingCursorImpl() override = default;
 
-    void setCatalogEntries(stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>>
-                               identsToNsAndUUID) override {
-        _identsToNsAndUUID = std::move(identsToNsAndUUID);
-    }
-
-    StatusWith<std::deque<BackupBlock>> getNextBatch(const std::size_t batchSize) override {
+    StatusWith<std::deque<KVBackupBlock>> getNextBatch(const std::size_t batchSize) override {
         int wtRet = 0;
-        std::deque<BackupBlock> backupBlocks;
+        std::deque<KVBackupBlock> kvBackupBlocks;
 
         stdx::lock_guard<stdx::mutex> backupCursorLk(_wtBackup->wtBackupCursorMutex);
-        while (backupBlocks.size() < batchSize) {
+        while (kvBackupBlocks.size() < batchSize) {
             stdx::lock_guard<stdx::mutex> backupDupCursorLk(_wtBackup->wtBackupDupCursorMutex);
 
             // We may still have backup blocks to retrieve for the existing file that
@@ -1244,9 +1239,9 @@ public:
                 // maximum size of options.blockSizeMB. Incremental backups open a duplicate cursor,
                 // which is stored in _wtBackup->dupCursor.
                 //
-                // 'backupBlocks' is an out parameter.
+                // 'kvBackupBlocks' is an out parameter.
                 Status status = _getNextIncrementalBatchForFile(
-                    filename, filePath, fileSize, batchSize, &backupBlocks);
+                    filename, filePath, fileSize, batchSize, &kvBackupBlocks);
 
                 if (!status.isOK()) {
                     return status;
@@ -1256,49 +1251,33 @@ public:
                 // to an entire file. Full backups cannot open an incremental cursor, even if they
                 // are the initial incremental backup.
                 const std::uint64_t length = options.incrementalBackup ? fileSize : 0;
-                auto nsAndUUID = _getNsAndUUID(filePath);
+                std::string ident = extractIdentFromPath(
+                    boost::filesystem::path(storageGlobalParams.dbpath), filePath);
 
                 LOGV2_DEBUG(9538603,
                             2,
                             "File to copy for backup",
-                            "nss"_attr = nsAndUUID.first,
-                            "uuid"_attr = nsAndUUID.second,
                             "filePath"_attr = filePath.string(),
                             "offset"_attr = 0,
                             "size"_attr = fileSize);
-                backupBlocks.push_back(BackupBlock(nsAndUUID.first,
-                                                   nsAndUUID.second,
-                                                   filePath.string(),
-                                                   0 /* offset */,
-                                                   length,
-                                                   fileSize));
+                kvBackupBlocks.push_back(
+                    KVBackupBlock(ident, filePath.string(), 0 /* offset */, length, fileSize));
             }
         }
 
-        if (wtRet && wtRet != WT_NOTFOUND && backupBlocks.size() != batchSize) {
+        if (wtRet && wtRet != WT_NOTFOUND && kvBackupBlocks.size() != batchSize) {
             return wtRCToStatus(wtRet, *_session);
         }
 
-        return backupBlocks;
+        return kvBackupBlocks;
     }
 
 private:
-    std::pair<boost::optional<NamespaceString>, boost::optional<UUID>> _getNsAndUUID(
-        boost::filesystem::path identAbsolutePath) const {
-        std::string ident = extractIdentFromPath(
-            boost::filesystem::path(storageGlobalParams.dbpath), identAbsolutePath);
-        auto it = _identsToNsAndUUID.find(ident);
-        if (it == _identsToNsAndUUID.end()) {
-            return std::make_pair(boost::none, boost::none);
-        }
-        return it->second;
-    }
-
     Status _getNextIncrementalBatchForFile(const char* filename,
                                            boost::filesystem::path filePath,
                                            const std::uint64_t fileSize,
                                            const std::size_t batchSize,
-                                           std::deque<BackupBlock>* backupBlocks) {
+                                           std::deque<KVBackupBlock>* kvBackupBlocks) {
         // For each file listed, open a duplicate backup cursor and get the blocks to copy.
         std::stringstream ss;
         ss << "incremental=(file=" << filename << ")";
@@ -1327,7 +1306,7 @@ private:
             fileUnchangedFlag = true;
         }
 
-        while (backupBlocks->size() < batchSize) {
+        while (kvBackupBlocks->size() < batchSize) {
             wtRet = (_wtBackup->dupCursor)->next(_wtBackup->dupCursor);
             if (wtRet == WT_NOTFOUND) {
                 break;
@@ -1336,33 +1315,30 @@ private:
             fileUnchangedFlag = false;
 
             uint64_t offset, size, type;
+            std::string ident =
+                extractIdentFromPath(boost::filesystem::path(storageGlobalParams.dbpath), filePath);
             invariantWTOK(
                 (_wtBackup->dupCursor)->get_key(_wtBackup->dupCursor, &offset, &size, &type),
                 _wtBackup->dupCursor->session);
-            auto nsAndUUID = _getNsAndUUID(filePath);
+
             LOGV2_DEBUG(22311,
                         2,
                         "Block to copy for incremental backup",
-                        "nss"_attr = nsAndUUID.first,
-                        "uuid"_attr = nsAndUUID.second,
                         "filePath"_attr = filePath.string(),
                         "offset"_attr = offset,
                         "size"_attr = size,
                         "type"_attr = type);
-            backupBlocks->push_back(BackupBlock(
-                nsAndUUID.first, nsAndUUID.second, filePath.string(), offset, size, fileSize));
+            kvBackupBlocks->push_back(
+                KVBackupBlock(ident, filePath.string(), offset, size, fileSize));
         }
 
         // If the file is unchanged, push a BackupBlock with offset=0 and length=0. This allows us
         // to distinguish between an unchanged file and a deleted file in an incremental backup.
         if (fileUnchangedFlag) {
-            auto nsAndUUID = _getNsAndUUID(filePath);
-            backupBlocks->push_back(BackupBlock(nsAndUUID.first,
-                                                nsAndUUID.second,
-                                                filePath.string(),
-                                                0 /* offset */,
-                                                0 /* length */,
-                                                fileSize));
+            std::string ident =
+                extractIdentFromPath(boost::filesystem::path(storageGlobalParams.dbpath), filePath);
+            kvBackupBlocks->push_back(
+                KVBackupBlock(ident, filePath.string(), 0 /* offset */, 0 /* length */, fileSize));
         }
 
         // If the duplicate backup cursor has been exhausted, close it and set
@@ -1381,7 +1357,6 @@ private:
 
     WiredTigerSession* _session;
     std::string _path;
-    stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>> _identsToNsAndUUID;
     WiredTigerBackup* _wtBackup;  // '_wtBackup' is an out parameter.
 };
 
