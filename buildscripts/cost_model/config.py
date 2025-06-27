@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Sequence
+from typing import Any, Callable, Sequence
 
 from random_generator import DataType, RandomDistribution
 
@@ -42,7 +42,7 @@ class Config:
 
     database: DatabaseConfig
     data_generator: DataGeneratorConfig
-    abt_calibrator: AbtCalibratorConfig
+    qs_calibrator: QuerySolutionCalibrationConfig
     workload_execution: WorkloadExecutionConfig
 
 
@@ -103,22 +103,22 @@ class FieldTemplate:
 
 
 @dataclass
-class AbtNodeCalibrationConfig:
+class QsNodeCalibrationConfig:
     type: str
-    filter_function: Callable[[any], any] = None
+    filter_function: Callable[[Any], Any] = None
     variables_override: Sequence[str] = None
 
 
 @dataclass
-class AbtCalibratorConfig:
-    """ABT Calibrator configuration."""
+class QuerySolutionCalibrationConfig:
+    """Query Solution Calibration configuration."""
 
     enabled: bool
     # Share of data used for testing the model. Usually it should be around 0.1-0.3.
     test_size: float
     input_collection_name: str
     trace: bool
-    nodes: Sequence[AbtNodeCalibrationConfig]
+    nodes: Sequence[QsNodeCalibrationConfig]
 
 
 class WriteMode(Enum):

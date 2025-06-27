@@ -50,6 +50,12 @@ def parse_explain_classic(explain: dict[str, Any]) -> (qsn.Node, classic.Node):
     return (qsn_tree, exec_tree)
 
 
+def parse_explain_classic(explain: dict[str, Any]) -> (qsn.Node, classic.Node):
+    qsn_tree = qsn.build(explain["queryPlanner"]["winningPlan"])
+    exec_tree = classic.build_execution_tree(explain["executionStats"])
+    return (qsn_tree, exec_tree)
+
+
 def find_first_node(root: Node, predicate: Callable[[Node], bool]) -> Optional[Node]:
     """Find the first node in the given tree which satisfy the predicate."""
     if predicate(root):

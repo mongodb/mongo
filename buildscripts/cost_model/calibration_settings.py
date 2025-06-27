@@ -28,6 +28,7 @@
 """Calibration configuration."""
 
 import random
+from typing import Any
 
 import config
 from random_generator import ArrayRandomDistribution, DataType, RandomDistribution, RangeGenerator
@@ -124,8 +125,8 @@ distributions["array_small"] = ArrayRandomDistribution(lengths_distr, distributi
 # Database settings
 database = config.DatabaseConfig(
     connection_string="mongodb://localhost",
-    database_name="abt_calibration",
-    dump_path="~/data/dump",
+    database_name="qsn_calibration",
+    dump_path="~/mongo/buildscripts/cost_model",
     restore_from_dump=config.RestoreMode.NEVER,
     dump_on_exit=False,
 )
@@ -325,51 +326,40 @@ workload_execution = config.WorkloadExecutionConfig(
 )
 
 
-def make_filter_by_note(note_value: any):
+def make_filter_by_note(note_value: Any):
     def impl(df):
         return df[df.note == note_value]
 
     return impl
 
 
-abt_nodes = [
-    config.AbtNodeCalibrationConfig(
-        type="PhysicalScan", filter_function=make_filter_by_note("PhysicalScan")
-    ),
-    config.AbtNodeCalibrationConfig(
-        type="IndexScan", filter_function=make_filter_by_note("IndexScan")
-    ),
-    config.AbtNodeCalibrationConfig(type="Seek", filter_function=make_filter_by_note("IndexScan")),
-    config.AbtNodeCalibrationConfig(
-        type="Filter", filter_function=make_filter_by_note("PhysicalScan")
-    ),
-    config.AbtNodeCalibrationConfig(
-        type="Evaluation", filter_function=make_filter_by_note("Evaluation")
-    ),
-    config.AbtNodeCalibrationConfig(type="NestedLoopJoin"),
-    config.AbtNodeCalibrationConfig(type="HashJoin"),
-    config.AbtNodeCalibrationConfig(type="MergeJoin"),
-    config.AbtNodeCalibrationConfig(type="Union"),
-    config.AbtNodeCalibrationConfig(
-        type="LimitSkip", filter_function=make_filter_by_note("LimitSkip")
-    ),
-    config.AbtNodeCalibrationConfig(type="GroupBy"),
-    config.AbtNodeCalibrationConfig(type="Unwind"),
-    config.AbtNodeCalibrationConfig(type="Unique"),
+qsn_nodes = [
+    config.QsNodeCalibrationConfig(type="SUBPLAN"),
+    config.QsNodeCalibrationConfig(type="COLLSCAN"),
+    config.QsNodeCalibrationConfig(type="IXSCAN"),
+    config.QsNodeCalibrationConfig(type="FETCH"),
+    config.QsNodeCalibrationConfig(type="AND_HASH"),
+    config.QsNodeCalibrationConfig(type="AND_SORTED"),
+    config.QsNodeCalibrationConfig(type="OR"),
+    config.QsNodeCalibrationConfig(type="MERGE_SORT"),
+    config.QsNodeCalibrationConfig(type="SORT_MERGE"),
+    config.QsNodeCalibrationConfig(type="SORT"),
+    config.QsNodeCalibrationConfig(type="LIMIT"),
+    config.QsNodeCalibrationConfig(type="SKIP"),
 ]
-
 # Calibrator settings
-abt_calibrator = config.AbtCalibratorConfig(
+qs_calibrator = config.QuerySolutionCalibrationConfig(
     enabled=True,
     test_size=0.2,
     input_collection_name=workload_execution.output_collection_name,
     trace=False,
-    nodes=abt_nodes,
+    nodes=qsn_nodes,
 )
+
 
 main_config = config.Config(
     database=database,
     data_generator=data_generator,
-    abt_calibrator=abt_calibrator,
+    qs_calibrator=qs_calibrator,
     workload_execution=workload_execution,
 )

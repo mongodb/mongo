@@ -98,13 +98,13 @@ from __future__ import annotations
 import dataclasses
 
 import bson.json_util as json
-import execution_tree_sbe as sbe
+import execution_tree_classic as classic
 import pandas as pd
-import physical_tree as abt
+import query_solution_tree as qsn
 import seaborn as sns
 import statsmodels.api as sm
 from database_instance import DatabaseInstance
-from parameters_extractor import extract_execution_stats
+from parameters_extractor_classic import get_execution_stats
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 
@@ -114,13 +114,11 @@ async def load_calibration_data(database: DatabaseInstance, collection_name: str
 
     data = await database.get_all_documents(collection_name)
     df = pd.DataFrame(data)
-    df["sbe"] = df.explain.apply(
-        lambda e: sbe.build_execution_tree(json.loads(e)["executionStats"])
+    df["classic"] = df.explain.apply(
+        lambda e: classic.build_execution_tree(json.loads(e)["executionStats"])
     )
-    df["abt"] = df.explain.apply(
-        lambda e: abt.build(json.loads(e)["queryPlanner"]["winningPlan"]["queryPlan"])
-    )
-    df["total_execution_time"] = df.sbe.apply(lambda t: t.total_execution_time)
+    df["qsn"] = df.explain.apply(lambda e: qsn.build(json.loads(e)["queryPlanner"]["winningPlan"]))
+    df["total_execution_time"] = df.classic.apply(lambda t: t.execution_time_nanoseconds)
     return df
 
 
@@ -170,17 +168,17 @@ def get_sbe_stage(stages_df: pd.DataFrame, stage_name: str) -> pd.DataFrame:
     return stages_df[stages_df.stage == stage_name].copy()
 
 
-def extract_abt_nodes(df: pd.DataFrame) -> pd.DataFrame:
-    """Extract ABT Nodes and execution statistics from calibration DataFrame."""
+def extract_qsn_nodes(df: pd.DataFrame) -> pd.DataFrame:
+    """Extract QSN Nodes and execution statistics from calibration DataFrame."""
 
     def extract(df_seq):
-        es_dict = extract_execution_stats(df_seq["sbe"], df_seq["abt"], [])
+        es_dict = get_execution_stats(df_seq["classic"], df_seq["qsn"], [])
 
         rows = []
-        for abt_type, es in es_dict.items():
+        for qsn_type, es in es_dict.items():
             for stat in es:
                 row = {
-                    "abt_type": abt_type,
+                    "node_type": qsn_type,
                     **dataclasses.asdict(stat),
                     **json.loads(df_seq["query_parameters"]),
                     "run_id": df_seq.run_id,
@@ -193,29 +191,29 @@ def extract_abt_nodes(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(list(df.apply(extract, axis=1).explode()))
 
 
-def print_trees(calibration_df: pd.DataFrame, abt_df: pd.DataFrame, row_index: int = 0):
-    """Print SBE and ABT Trees."""
-    row = calibration_df.loc[abt_df.iloc[row_index].source]
-    print("SBE")
-    row.sbe.print()
-    print("\nABT")
-    row.abt.print()
+def print_trees(calibration_df: pd.DataFrame, qsn_df: pd.DataFrame, row_index: int = 0):
+    """Print classic and QSN Trees."""
+    row = calibration_df.loc[qsn_df.iloc[row_index].source]
+    print("CLASSIC")
+    row.classic.print()
+    print("\QSN")
+    row.qsn.print()
 
 
-def print_explain(calibration_df: pd.DataFrame, abt_df: pd.DataFrame, row_index: int = 0):
+def print_explain(calibration_df: pd.DataFrame, qsn_df: pd.DataFrame, row_index: int = 0):
     """Print explain."""
-    row = calibration_df.loc[abt_df.iloc[row_index].source]
+    row = calibration_df.loc[qsn_df.iloc[row_index].source]
     explain = json.loads(row.explain)
     explain_str = json.dumps(explain, indent=4)
     print(explain_str)
 
 
-def calibrate(abt_node_df: pd.DataFrame, variables: list[str] = None):
-    """Calibrate the ABT node given in abd_node_df with the given model input variables."""
+def calibrate(qsn_node_df: pd.DataFrame, variables: list[str] = None):
+    """Calibrate the QSN node given in qsn_node_df with the given model input variables."""
     if variables is None:
         variables = ["n_processed"]
-    y = abt_node_df["execution_time"]
-    X = abt_node_df[variables]
+    y = qsn_node_df["execution_time"]
+    X = qsn_node_df[variables]
     X = sm.add_constant(X)
 
     nnls = LinearRegression(positive=True, fit_intercept=False)
@@ -224,8 +222,8 @@ def calibrate(abt_node_df: pd.DataFrame, variables: list[str] = None):
     print(f"R2: {r2_score(y, y_pred)}")
     print(f"Coefficients: {model.coef_}")
 
-    sns.scatterplot(x=abt_node_df["n_processed"], y=abt_node_df["execution_time"])
-    sns.lineplot(x=abt_node_df["n_processed"], y=y_pred, color="red")
+    sns.scatterplot(x=qsn_node_df["n_processed"], y=qsn_node_df["execution_time"])
+    sns.lineplot(x=qsn_node_df["n_processed"], y=y_pred, color="red")
 
 
 if __name__ == "__main__":
@@ -237,9 +235,9 @@ if __name__ == "__main__":
         """Smoke tests."""
         database_config = DatabaseConfig(
             connection_string="mongodb://localhost",
-            database_name="abt_calibration",
-            dump_path="",
-            restore_from_dump=False,
+            database_name="qsn_calibration",
+            dump_path="~/mongo/buildscripts/cost_model/dump",
+            restore_from_dump=True,
             dump_on_exit=False,
         )
         database = DatabaseInstance(database_config)
@@ -250,14 +248,8 @@ if __name__ == "__main__":
         cleaned_df = remove_outliers(raw_df, 0.0, 0.9)
         print(cleaned_df.head())
 
-        sbe_stages_df = extract_sbe_stages(cleaned_df)
-        print(sbe_stages_df.head())
-
-        seek_df = get_sbe_stage(sbe_stages_df, "seek")
-        print(seek_df.head())
-
-        abt_nodes_df = extract_abt_nodes(cleaned_df)
-        print(abt_nodes_df.head())
+        qsn_nodes_df = extract_qsn_nodes(cleaned_df)
+        print(qsn_nodes_df.head())
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(test())

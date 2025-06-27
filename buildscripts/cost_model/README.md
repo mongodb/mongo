@@ -10,6 +10,8 @@ The following assumes you are using python from the MongoDB toolchain.
 
 ### Getting started
 
+Make sure before running `start.py`, you have a locally running `mongod` instance (this must be run using the `mongo-python3` virtual environment, so do it before step 1 below).
+
 ```sh
 (mongo-python3) deactivate  # only if you have another python env activated
 sh> /opt/mongodbtoolchain/v4/bin/python3 -m venv cm  # create new env

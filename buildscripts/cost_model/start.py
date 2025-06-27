@@ -33,8 +33,8 @@ import dataclasses
 import os
 from typing import Mapping, Sequence
 
-import abt_calibrator
-import parameters_extractor
+import parameters_extractor_classic
+import qsn_calibrator
 import workload_execution
 from calibration_settings import main_config
 from config import WriteMode
@@ -48,21 +48,21 @@ __all__ = []
 
 def save_to_csv(parameters: Mapping[str, Sequence[CostModelParameters]], filepath: str) -> None:
     """Save model input parameters to a csv file."""
-    abt_type_name = "abt_type"
+    qsn_type_name = "qsn_type"
     fieldnames = [
-        abt_type_name,
+        qsn_type_name,
         *[f.name for f in dataclasses.fields(ExecutionStats)],
         *[f.name for f in dataclasses.fields(QueryParameters)],
     ]
     with open(filepath, "w", newline="") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
-        for abt_type, type_params_list in parameters.items():
+        for qsn_type, type_params_list in parameters.items():
             for type_params in type_params_list:
                 fields = dataclasses.asdict(type_params.execution_stats) | dataclasses.asdict(
                     type_params.query_params
                 )
-                fields[abt_type_name] = abt_type
+                fields[qsn_type_name] = qsn_type
                 writer.writerow(fields)
 
 
@@ -119,22 +119,14 @@ async def execute_physical_scan_queries(
 async def execute_index_intersections_with_requests(
     database: DatabaseInstance, collections: Sequence[CollectionInfo], requests: Sequence[Query]
 ):
-    try:
-        await database.set_parameter(
-            "internalCostModelCoefficients", '{"filterIncrementalCost": 10000.0}'
-        )
+    await workload_execution.execute(
+        database, main_config.workload_execution, collections, requests
+    )
 
-        await workload_execution.execute(
-            database, main_config.workload_execution, collections, requests
-        )
-
-        main_config.workload_execution.write_mode = WriteMode.APPEND
-        await workload_execution.execute(
-            database, main_config.workload_execution, collections, requests[::4]
-        )
-
-    finally:
-        await database.set_parameter("internalCostModelCoefficients", "")
+    main_config.workload_execution.write_mode = WriteMode.APPEND
+    await workload_execution.execute(
+        database, main_config.workload_execution, collections, requests[::4]
+    )
 
 
 async def execute_index_intersections(
@@ -166,53 +158,6 @@ async def execute_index_intersections(
     await execute_index_intersections_with_requests(database, collections, requests)
 
 
-async def execute_evaluation(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
-    collections = [ci for ci in collections if ci.name.startswith("c_int_05")]
-    requests = []
-
-    for i in [100, 500, 1000]:
-        requests.append(
-            Query(
-                pipeline=[{"$project": {"uniform1": 1, "mixed2": 1}}, {"$limit": i}],
-                keys_length_in_bytes=1,
-                number_of_fields=1,
-                note="Evaluation",
-            )
-        )
-
-    await workload_execution.execute(
-        database, main_config.workload_execution, collections, requests
-    )
-
-
-async def execute_unwind(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
-    collections = [ci for ci in collections if ci.name.startswith("c_arr_01")]
-    requests = []
-    # average size of arrays in the collection
-    average_size_of_arrays = 10
-
-    for _ in range(500, 1000, 100):
-        requests.append(
-            Query(pipeline=[{"$unwind": "$as"}], number_of_fields=average_size_of_arrays)
-        )
-
-    await workload_execution.execute(
-        database, main_config.workload_execution, collections, requests
-    )
-
-
-async def execute_unique(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
-    collections = [ci for ci in collections if ci.name.startswith("c_arr_01")]
-    requests = []
-
-    for i in range(500, 1000, 200):
-        requests.append(Query(pipeline=[{"$match": {"as": {"$gt": i}}}]))
-
-    await workload_execution.execute(
-        database, main_config.workload_execution, collections, requests
-    )
-
-
 async def execute_limitskip(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
     collection = [ci for ci in collections if ci.name.startswith("index_scan")][0]
     limits = [5, 10, 15, 20]
@@ -239,31 +184,26 @@ async def main():
         # 2. Data generation (optional), generates random data and populates collections with it.
         generator = DataGenerator(database, main_config.data_generator)
         await generator.populate_collections()
-
         # 3. Collecting data for calibration (optional).
         # It runs the pipelines and stores explains to the database.
         execution_query_functions = [
             execute_index_scan_queries,
             execute_physical_scan_queries,
             execute_index_intersections,
-            execute_evaluation,
-            execute_unwind,
-            execute_unique,
             execute_limitskip,
         ]
         for execute_query in execution_query_functions:
             await execute_query(database, generator.collection_infos)
             main_config.workload_execution.write_mode = WriteMode.APPEND
-
         # Calibration phase (optional).
         # Reads the explains stored on the previous step (this run and/or previous runs),
-        # aparses the explains, nd calibrates the cost model for the ABT nodes.
-        models = await abt_calibrator.calibrate(main_config.abt_calibrator, database)
-        for abt, model in models.items():
-            print(f"{abt}\t\t{model}")
+        # parses the explains, and calibrates the cost model for the QS nodes.
+        models = await qsn_calibrator.calibrate(main_config.qs_calibrator, database)
+        for qsn, model in models.items():
+            print(f"{qsn}\t\t{model}")
 
-        parameters = await parameters_extractor.extract_parameters(
-            main_config.abt_calibrator, database, []
+        parameters = await parameters_extractor_classic.extract_parameters(
+            main_config.qs_calibrator, database, []
         )
         save_to_csv(parameters, "parameters.csv")
 

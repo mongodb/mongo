@@ -30,10 +30,10 @@
 from __future__ import annotations
 
 from collections import defaultdict, deque
-from typing import Callable, Mapping, Sequence, TypeVar
+from typing import Any, Callable, Mapping, Sequence, TypeVar
 
 import bson.json_util as json
-import execution_tree_sbe
+import execution_tree
 import physical_tree
 from config import AbtCalibratorConfig
 from cost_estimator import CostModelParameters, ExecutionStats
@@ -87,9 +87,9 @@ def find_nodes(root: Node, predicate: Callable[[Node], bool]) -> list[Node]:
     return result
 
 
-def get_excution_stats(root: execution_tree_sbe.Node, node_id: int) -> ExecutionStats:
+def get_excution_stats(root: execution_tree.Node, node_id: int) -> ExecutionStats:
     """Extract execution stats from the given Execution Tree for the ABT node defined with the given node_id."""
-    queue: deque[execution_tree_sbe.Node] = deque()
+    queue: deque[execution_tree.Node] = deque()
     queue.append(root)
 
     execution_time: int = 0
@@ -116,11 +116,11 @@ def get_excution_stats(root: execution_tree_sbe.Node, node_id: int) -> Execution
     )
 
 
-def parse_explain(explain: Mapping[str, any], abt_types: Sequence[str]):
+def parse_explain(explain: Mapping[str, Any], abt_types: Sequence[str]):
     """Extract ExecutionStats from the given explain for the given ABT types."""
 
     try:
-        et = execution_tree_sbe.build_execution_tree(explain["executionStats"])
+        et = execution_tree.build_execution_tree(explain["executionStats"])
         pt = physical_tree.build(explain["queryPlanner"]["winningPlan"]["queryPlan"])
     except Exception as exception:
         print(f"*** Failed to parse explain with the followinf error: {exception}")
@@ -131,7 +131,7 @@ def parse_explain(explain: Mapping[str, any], abt_types: Sequence[str]):
 
 
 def extract_execution_stats(
-    et: execution_tree_sbe.Node, pt: physical_tree.Node, abt_types: Sequence[str]
+    et: execution_tree.Node, pt: physical_tree.Node, abt_types: Sequence[str]
 ) -> Mapping[str, Sequence[ExecutionStats]]:
     """Extract ExecutionStats from the given SBE and ABT trees for the given ABT types."""
 

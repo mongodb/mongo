@@ -72,14 +72,11 @@ class DatabaseInstance:
             ["mongorestore", "--nsInclude", f"{self.config.database_name}.*", "--drop"],
             shell=True,
             check=True,
-            cwd=self.config.dump_path,
         )
 
     def dump(self):
         """Dump the database into 'self.dump_directory'."""
-        subprocess.run(
-            ["mongodump", "--db", self.config.database_name], cwd=self.config.dump_path, check=True
-        )
+        subprocess.run(["mongodump", "--db", self.config.database_name], check=True)
 
     async def set_parameter(self, name: str, value: any) -> None:
         """Set MongoDB Parameter."""

@@ -50,7 +50,7 @@ from calibration_settings import HIDDEN_STRING_VALUE, distributions, main_config
 from cost_estimator import ExecutionStats
 from data_generator import CollectionInfo, DataGenerator
 from database_instance import DatabaseInstance, get_database_parameter
-from parameters_extractor import get_excution_stats
+from parameters_extractor_classic import get_excution_stats
 from random_generator import RandomDistribution
 from sklearn.metrics import r2_score
 from workload_execution import Query
