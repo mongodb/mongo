@@ -181,3 +181,8 @@ feature_flags:
         cpp_varname: gFeatureFlagIngressRateLimiting
         default: false
         fcv_gated: false
+    featureFlagMandatoryAuthzChecks:
+        description: "Feature flag to enable mandatory authorization checks on command and agg stages"
+        cpp_varname: gFeatureFlagMandatoryAuthzChecks
+        default: false
+        fcv_gated: false
