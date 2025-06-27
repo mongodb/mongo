@@ -48,6 +48,7 @@ selector:
     - jstests/noPassthrough/query/change_streams/change_streams_timeseries_shard_collection_event.js
     - jstests/noPassthrough/query/timeseries/bucket_unpacking_with_sort_granularity_change.js
     - jstests/noPassthrough/query/timeseries/timeseries_validate_mixed_schema_bucket.js
+    - jstests/noPassthrough/timeseries/bucket_reopening/timeseries_direct_remove_reopen.js
     - jstests/noPassthrough/timeseries/bucket_reopening/timeseries_reopen_uncompressed_bucket_for_compression.js
     - jstests/noPassthrough/timeseries/create/initial_sync_recreate_timeseries_collection.js
     - jstests/noPassthrough/timeseries/create/timeseries_block_compressor_options.js
@@ -57,6 +58,7 @@ selector:
     - jstests/noPassthrough/timeseries/data_integrity/intermediate_data_consistency_checks_skips.js
     - jstests/noPassthrough/timeseries/data_integrity/timeseries_insert_compression_failure.js
     - jstests/noPassthrough/timeseries/data_integrity/timeseries_insert_decompression_failure.js
+    - jstests/noPassthrough/timeseries/data_integrity/timeseries_partial_compressed_bucket.js
     - jstests/noPassthrough/timeseries/extended_range/timeseries_bucket_spanning_epoch.js
     - jstests/noPassthrough/timeseries/index_builds/hybrid_index_timeseries.js
     - jstests/noPassthrough/timeseries/index_builds/resumable_timeseries_index_build_collection_scan_phase.js
@@ -68,8 +70,11 @@ selector:
     - jstests/noPassthrough/timeseries/query/timeseries_group_topN_bottomN.js
     - jstests/noPassthrough/timeseries/query/timeseries_id_filtered_explicit_upack_bucket.js
     - jstests/noPassthrough/timeseries/query/timeseries_internal_bounded_sort_spilling.js
+    - jstests/noPassthrough/timeseries/query/timeseries_nested_elem_match.js
     - jstests/noPassthrough/timeseries/query/timeseries_query_knob_sbe.js
     - jstests/noPassthrough/timeseries/query/timeseries_sample_on_buckets.js
+    - jstests/noPassthrough/timeseries/query/timeseries_sort.js
+    - jstests/noPassthrough/timeseries/query/timeseries_sparse_fields.js
     - jstests/noPassthrough/timeseries/stats/timeseries_collStats.js
     - jstests/noPassthrough/timeseries/stats/timeseries_latency_stats.js
     - jstests/noPassthrough/timeseries/stats/timeseries_serverStatus.js

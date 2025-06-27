@@ -6,8 +6,6 @@
  *   requires_timeseries,
  *   # Timeseries do not support multi-document transactions with inserts.
  *   does_not_support_transactions,
- *   # TODO SERVER-104916 review the following tag
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 

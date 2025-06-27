@@ -5,8 +5,6 @@
  *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
  *   requires_timeseries,
- *   # TODO SERVER-104916 review the following tag
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 

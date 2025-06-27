@@ -132,6 +132,7 @@ selector:
     - jstests/core/timeseries/query/timeseries_match_pushdown_with_project.js
     - jstests/core/timeseries/query/timeseries_merge.js
     - jstests/core/timeseries/query/timeseries_partial_index_opt.js
+    - jstests/core/timeseries/query/timeseries_predicates.js
     - jstests/core/timeseries/query/timeseries_project.js
     - jstests/core/timeseries/query/timeseries_project_pushdown.js
     - jstests/core/timeseries/query/timeseries_raw_data_getmore.js
