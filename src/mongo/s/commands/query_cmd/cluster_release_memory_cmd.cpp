@@ -172,11 +172,24 @@ public:
                             break;
                         }
 
-                        // Do not destroy the cursor if the error is
-                        // QueryExceededMemoryLimitNoDiskUseAllowed since at this point spilling has
-                        // not yet started.
-                        if (response.code() ==
-                            ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed) {
+                        // Do not destroy the cursor if the error is any of the errors in
+                        // 'safeErrorCodes' since for those errors we can guarantee that the data
+                        // has not been corrupted and it is safe to continue the execution.
+                        static const std::unordered_set<ErrorCodes::Error> safeErrorCodes{
+                            ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+                            ErrorCodes::CursorInUse,
+                            ErrorCodes::CursorNotFound};
+
+                        // These errors should never reach this level since they are verified when
+                        // the response is received in the async results merger.
+                        tassert(10657800,
+                                str::stream() << "ErrorCode " << response.codeString()
+                                              << " is safe and should not have been propagated",
+                                safeErrorCodes.find(response.code()) == safeErrorCodes.end());
+
+                        // This is the error propagated when any of the shards returns a non fatal
+                        // error.
+                        if (response.code() == ErrorCodes::ReleaseMemoryShardError) {
                             pinnedCursor.getValue().returnCursor(
                                 ClusterCursorManager::CursorState::NotExhausted);
                             killCursorGuard.dismiss();

@@ -111,7 +111,9 @@ assert.eq(previousSpillCount, getSortSpillCounter());
     const releaseMemoryRes = db.runCommand({releaseMemory: [cursorId]});
     assert.commandWorked(releaseMemoryRes);
     assertReleaseMemoryFailedWithCode(
-        releaseMemoryRes, cursorId, ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+        releaseMemoryRes,
+        cursorId,
+        [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.ReleaseMemoryShardError]);
 
     assertCursorSortedByTime(cursor);
 }

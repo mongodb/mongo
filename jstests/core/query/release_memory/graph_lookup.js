@@ -169,7 +169,9 @@ const expectedResults =
     const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
     assert.commandWorked(releaseMemoryRes);
     assertReleaseMemoryFailedWithCode(
-        releaseMemoryRes, cursorId, ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+        releaseMemoryRes,
+        cursorId,
+        [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.ReleaseMemoryShardError]);
 
     jsTest.log.info("Running getMore");
     const results = sortPipelineResults(cursor.toArray());

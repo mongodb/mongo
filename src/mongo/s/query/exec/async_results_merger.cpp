@@ -109,6 +109,7 @@ Status getStatusFromReleaseMemoryCommandResponse(const AsyncRequestsSender::Resp
                           << reply.toBSON(),
             (reply.getCursorsReleased().size() + reply.getCursorsCurrentlyPinned().size() +
              reply.getCursorsNotFound().size() + reply.getCursorsWithErrors().size()) == 1);
+
     if (!reply.getCursorsCurrentlyPinned().empty()) {
         return Status{ErrorCodes::CursorInUse,
                       generateReason(reply.getCursorsCurrentlyPinned().front())};
@@ -770,16 +771,40 @@ Status AsyncResultsMerger::releaseMemory() {
                                nullptr /*resourceYielder*/,
                                shardHostMap};
 
-
+    Status resStatus = Status::OK();
+    BSONObjBuilder finalMessageBuilder;
     while (!sender.done()) {
-        auto response = sender.next();
-        if (auto status = getStatusFromReleaseMemoryCommandResponse(response); !status.isOK()) {
+        auto status = getStatusFromReleaseMemoryCommandResponse(sender.next());
+        if (status.isOK()) {
+            continue;
+        }
+
+        // Wait for responses from the other shards if the error is any of the errors in
+        // 'safeErrorCodes' since for those errors we can guarantee that the data has not been
+        // corrupted and it is safe to continue the execution. We must wait for the other shards
+        // to be sure that none returned a fatal error.
+        static const std::unordered_set<ErrorCodes::Error> safeErrorCodes{
+            ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+            ErrorCodes::CursorInUse,
+            ErrorCodes::CursorNotFound};
+        if (safeErrorCodes.find(status.code()) == safeErrorCodes.end()) {
+            // The shard returned a fatal error. Return immediately since the cursor will be killed
+            // anyway.
             sender.stopRetrying();
             return status;
         }
+
+        finalMessageBuilder.append(status.codeString(), status.reason());
+
+        resStatus = status;
     }
 
-    return Status::OK();
+
+    if (!resStatus.isOK()) {
+        return Status{ErrorCodes::ReleaseMemoryShardError, finalMessageBuilder.obj().toString()};
+    }
+
+    return resStatus;
 }
 
 Status AsyncResultsMerger::_scheduleGetMores(WithLock lk) {

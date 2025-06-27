@@ -104,8 +104,10 @@ for (let pipeline of pipelines) {
 
         const releaseMemoryRes = db.runCommand({releaseMemory: [cursorId]});
         assert.commandWorked(releaseMemoryRes);
-        assertReleaseMemoryFailedWithCode(
-            releaseMemoryRes, cursorId, ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+        assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, [
+            ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+            ErrorCodes.ReleaseMemoryShardError
+        ]);
 
         assertCursorSortedByIndex(cursor);
     }

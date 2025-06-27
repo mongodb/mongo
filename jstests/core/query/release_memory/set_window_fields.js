@@ -164,8 +164,11 @@ if (hasMergeCursors(explain)) {
     jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
     const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
     assert.commandWorked(releaseMemoryRes);
-    assertReleaseMemoryFailedWithCode(
-        releaseMemoryRes, cursorId, [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, 5643008]);
+    assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, [
+        ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+        5643008,
+        ErrorCodes.ReleaseMemoryShardError
+    ]);
 
     jsTest.log.info("Running getMore");
     const results = cursor.toArray();
