@@ -18,7 +18,7 @@ import {
 } from "jstests/core/libs/raw_operation_utils.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {
-    getAggPlanStage,
+    getPlanStage,
     getPlanStages,
     getRejectedPlan,
     getRejectedPlans
@@ -106,10 +106,10 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
     // Make sure the {a: 1} index was considered for this query.
     function checkPlan(predicate) {
         const explain = coll.find(predicate).explain();
-        let scan = getAggPlanStage(explain, 'IXSCAN');
+        let scan = getPlanStage(explain, 'IXSCAN');
         // If scan is not present, check rejected plans
         if (scan === null) {
-            const rejectedPlans = getRejectedPlans(getAggPlanStage(explain, "$cursor")["$cursor"]);
+            const rejectedPlans = getRejectedPlans(explain);
             if (rejectedPlans.length === 2) {
                 let firstScan = getPlanStages(getRejectedPlan(rejectedPlans[0]), "IXSCAN");
                 let secondScan = getPlanStages(getRejectedPlan(rejectedPlans[1]), "IXSCAN");
@@ -330,7 +330,7 @@ assert.sameMembers(actualBucketIndexes, extraBucketIndexes.concat([
         }
 
         const plan = cur.explain();
-        const stage = getAggPlanStage(plan, stageName);
+        const stage = getPlanStage(plan, stageName);
         assert(stage, "Expected a " + stageName + " stage: " + tojson(plan));
         if (indexName) {
             assert.eq(stage.indexName, indexName, stage);

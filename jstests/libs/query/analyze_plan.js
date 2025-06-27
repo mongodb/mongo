@@ -339,9 +339,20 @@ export function formatExplainRoot(explain) {
 }
 
 /**
- * Given the root stage of explain's JSON representation of a query plan ('root'), returns all
- * subdocuments whose stage is 'stage'. Returns an empty array if the plan does not have the
- * requested stage. if 'stage' is 'null' returns all the stages in 'root'.
+ * Traverses a explain plan to find all occurrences of a specified stage.
+ *
+ * This function recursively navigates through the 'root' document, which should be
+ * the output of an explain command (or any of its subdocuments). It
+ * identifies and collects all plan stages that match the provided 'stage' name.
+ * The function supports explain outputs from both aggregation pipelines and
+ * query commands (e.g. find, count, etc..).
+ *
+ * @param {object} root The explain plan document or a subdocument thereof.
+ * @param {string|null} stage The name of the stage to search for (e.g., 'IXSCAN', 'COLLSCAN').
+ * If 'null', the function returns all stages found in the 'root' document.
+ * @returns {Array<object>} A list of objects, where each object represents a stage
+ * matching the 'stage' argument. Returns an empty array
+ * if no matching stages are found or if the plan is empty.
  */
 export function getPlanStages(root, stage) {
     var results = [];
@@ -410,6 +421,10 @@ export function getPlanStages(root, stage) {
             results = shards.reduce(
                 (res, shard) => res.concat(getPlanStages(root.shards[shard], stage)), results);
         }
+    }
+
+    if ("stages" in root) {
+        results = results.concat(getAggPlanStages(root, stage));
     }
 
     return results;
