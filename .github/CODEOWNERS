@@ -1041,6 +1041,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/noPassthrough/libs/**/*change_stream* @10gen/query-execution-change-streams @svc-auto-approve-bot
 /jstests/noPassthrough/libs/**/*proxy_protocol* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /jstests/noPassthrough/libs/**/net.* @10gen/server-networking-and-observability @svc-auto-approve-bot
+/jstests/noPassthrough/libs/**/write_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/libs/index_builds/OWNERS.yml
 /jstests/noPassthrough/libs/index_builds/**/* @10gen/server-index-builds @svc-auto-approve-bot
@@ -1342,6 +1343,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/**/*_with_id_without_shard_key* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/*zone* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/addShard* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/sharding/**/custom_write_concern.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/check_metadata* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/sharding/analyze_shard_key/OWNERS.yml

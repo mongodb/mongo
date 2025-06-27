@@ -42,6 +42,9 @@ filters:
   - "addShard*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "custom_write_concern.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "check_metadata*":
     approvers:
       - 10gen/server-catalog-and-routing

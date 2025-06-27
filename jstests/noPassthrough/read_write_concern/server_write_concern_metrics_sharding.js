@@ -4,15 +4,14 @@
 //   requires_replication,
 // ]
 
-import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     generateCmdsWithNoWCProvided,
     verifyServerStatusChange,
     verifyServerStatusFields,
-} from "jstests/noPassthrough/read_write_concern/server_write_concern_metrics.js";
+} from "jstests/noPassthrough/libs/write_concern_metrics_helpers.js";
+import {reconfig} from "jstests/replsets/rslib.js";
 
-let rst;
 let conn;
 let st;
 let primary;
@@ -23,20 +22,27 @@ let testDB;
 let testColl;
 
 function initializeCluster() {
-    rst = new ReplSetTest({
-        nodes: [{}, {}],
-        nodeOptions: {shardsvr: "", setParameter: 'reportOpWriteConcernCountersInServerStatus=true'}
+    st = new ShardingTest({
+        name: "custom_write_concern_test",
+        shards: {
+            rs0: {
+                nodes: [{rsConfig: {tags: {dc_va: "rack1"}}}, {rsConfig: {priority: 0}}],
+                settings: {getLastErrorModes: {myTag: {dc_va: 1}}},
+                setParameter: {
+                    // Required for serverStatus() to have opWriteConcernCounters.
+                    reportOpWriteConcernCountersInServerStatus: true
+                }
+            }
+        }
     });
-    rst.startSet();
-    let config = rst.getReplSetConfig();
-    config.members[1].priority = 0;
-    config.members[0].tags = {dc_va: "rack1"};
-    config.settings = {getLastErrorModes: {myTag: {dc_va: 1}}};
-    rst.initiate(config);
-    primary = rst.getPrimary();
-    secondary = rst.getSecondary();
-    st = new ShardingTest({manualAddShard: true});
-    assert.commandWorked(st.s.adminCommand({addShard: rst.getURL()}));
+    let cfg = st.configRS.getReplSetConfigFromNode();
+    for (let i = 0; i < cfg.members.length; i++) {
+        cfg.members[i].tags = {dc_va: "rack1"};
+    }
+    cfg.settings.getLastErrorModes = {myTag: {dc_va: 1}};
+    reconfig(st.configRS, cfg);
+    primary = st.rs0.getPrimary();
+    secondary = st.rs0.getSecondary();
     conn = st.s;
     testDB = conn.getDB(dbName);
     testColl = testDB[collName];
@@ -145,8 +151,8 @@ function testWriteConcernMetrics(cmd, opName, inc, setupCommand) {
     verifyServerStatusFields(serverStatus);
     assert.commandWorked(
         testDB.runCommand(Object.assign(Object.assign({}, cmd), {writeConcern: {w: 0}})));
-    // Because 'w:0' doesn't wait for an ack, the command might return before it got executed, hence
-    // retrying.
+    // Because 'w:0' doesn't wait for an ack, the command might return before it got
+    // executed, hence retrying.
     assert.soon(() => {
         newStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
         try {
@@ -209,7 +215,6 @@ function testWriteConcernMetrics(cmd, opName, inc, setupCommand) {
                   tojson(serverStatus) + ", after: " + tojson(newStatus));
 
     st.stop();
-    rst.stopSet();
 }
 
 // Test single insert/update/delete.
