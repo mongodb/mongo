@@ -385,6 +385,12 @@ QuerySettingsUtils.prototype.getQueryShapeHashFromQuerySettings = function(repre
         this, applyTimefieldProjectionToRepresentativeQuery(representativeQuery));
 };
 
+const getQueryShapeHashFromExplainInit = QuerySettingsUtils.prototype.getQueryShapeHashFromExplain;
+QuerySettingsUtils.prototype.getQueryShapeHashFromExplain = function(representativeQuery) {
+    return getQueryShapeHashFromExplainInit.call(
+        this, applyTimefieldProjectionToRepresentativeQuery(representativeQuery));
+};
+
 const getQuerySettingsInit = QuerySettingsUtils.prototype.getQuerySettings;
 QuerySettingsUtils.prototype.getQuerySettings = function(
     {showDebugQueryShape = false, showQueryShapeHash = false, filter = undefined} = {}) {

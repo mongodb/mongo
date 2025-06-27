@@ -75,17 +75,16 @@ const unencryptedQueries = {
 (function testEncryptedQueriesIgnoreQuerySettings() {
     for (const query of Object.values(queries)) {
         const queryToRun = qsutils.withoutDollarDB(query);
+        const queryShapeHash = qsutils.getQueryShapeHashFromExplain(query);
 
         // Add 'reject' query settings to the base query without encryption.
-        const queryShapeHash = qsutils.withQuerySettings(query, {reject: true}, function() {
+        qsutils.withQuerySettings(query, {reject: true}, function() {
             // Ensure the query executed over the encrypted connection is not rejected.
             assertEncryptedQuerySucceeds(queryToRun);
 
             // Ensure the query executed over the unencrypted connection is rejected.
             assert.commandFailedWithCode(db.runCommand(queryToRun),
                                          ErrorCodes.QueryRejectedBySettings);
-
-            return qsutils.getQueryShapeHashFromQuerySettings(query);
         });
 
         // Repeat the same test while rejecting the base query by the query shape hash.

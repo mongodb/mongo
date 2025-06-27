@@ -99,6 +99,10 @@ selector:
     # SERVER-85456: this test uses benchRun which does not use runCommand and index creation can fail.
     - jstests/core/shell/bench_test1.js
 
+    # This test assumes query settings representative queries are stored in the cluster parameter,
+    # which is not the case if featureFlagPQSBackfill is on.
+    - jstests/core/query/query_settings/query_settings_size_limits.js
+
 executor:
   archive:
     hooks:
@@ -111,6 +115,10 @@ executor:
       eval: >-
         globalThis.testingReplication = true;
         await import("jstests/libs/override_methods/retry_aborted_db_and_index_creation.js");
+        await import("jstests/libs/override_methods/implicitly_retry_on_fcv_upgrade_downgrade.js");
+      global_vars:
+        TestData:
+          isRunningFCVUpgradeDowngradeSuite: true
   hooks:
     - class: CheckReplOplogs
     - class: CheckReplDBHash

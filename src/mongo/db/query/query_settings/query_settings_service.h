@@ -112,6 +112,25 @@ public:
      */
     static const stdx::unordered_set<StringData, StringMapHasher>& getRejectionIncompatibleStages();
 
+    /**
+     * Creates the QuerySettingsService that is attached to the 'serviceContext' with the logic
+     * specific to the router/mongos.
+     */
+    static void initializeForRouter(ServiceContext* serviceContext);
+
+    /**
+     * Creates the QuerySettingsService that is attached to the 'serviceContext' with the logic
+     * specific to the shard/mongod.
+     */
+    static void initializeForShard(ServiceContext* serviceContext,
+                                   SetClusterParameterFn setClusterParameterFn);
+
+    /**
+     * Creates the QuerySettingsService that is attached to the 'serviceContext' with the logic
+     * specific to the shard/mongod, without providing the necessary dependencies.
+     */
+    static void initializeForTest(ServiceContext* serviceContext);
+
     virtual ~QuerySettingsService() = default;
 
     /**
@@ -164,7 +183,50 @@ public:
      * issues the setClusterParameter command.
      */
     virtual void setQuerySettingsClusterParameter(
-        OperationContext* opCtx, const QueryShapeConfigurationsWithTimestamp& config) = 0;
+        OperationContext* opCtx, const QueryShapeConfigurationsWithTimestamp& config) const = 0;
+
+    /**
+     * Creates 'queryShapeRepresentativeQueries' collection locally. Throws an exception in case of
+     * collection creation failure, unless the collection already exists.
+     */
+    virtual void createQueryShapeRepresentativeQueriesCollection(OperationContext* opCtx) const = 0;
+
+    /**
+     * Drops 'queryShapeRepresentativeQueries' collection locally. Throws an exception in case of
+     * collection drop failure, unless the collection doesn't exist.
+     */
+    virtual void dropQueryShapeRepresentativeQueriesCollection(OperationContext* opCtx) const = 0;
+
+    /**
+     * Clears the 'representativeQuery' field from each QueryShapeConfiguration in 'querySettings'
+     * cluster parameter and upserts these entries into 'queryShapeRepresentativeQueries'
+     * collection.
+     */
+    virtual void migrateRepresentativeQueriesFromQuerySettingsClusterParameterToDedicatedCollection(
+        OperationContext* opCtx) const = 0;
+
+    /**
+     * Populates the 'representativeQuery' field for each QueryShapeConfiguration from the
+     * 'queryShapeRepresentativeQueries' collection. In case of BSONObjectTooLarge exception,
+     * catches it, without performing any further migration.
+     */
+    virtual void migrateRepresentativeQueriesFromDedicatedCollectionToQuerySettingsClusterParameter(
+        OperationContext* opCtx) const = 0;
+
+    /**
+     * Upserts the 'representativeQueries' into the 'queryShapeRepresentativeQueries' collection
+     * locally via DBDirectClient. Catches all DBExceptions on failed upsert.
+     */
+    virtual void upsertRepresentativeQueries(
+        OperationContext* opCtx,
+        const std::vector<QueryShapeRepresentativeQuery>& representativeQueries) const = 0;
+
+    /**
+     * Deletes the 'representativeQuery' from the 'queryShapeRepresentativeQueries' collection by
+     * 'queryShapeHash' locally via DBDirectClient. Catches all DBExceptions on failed delete.
+     */
+    virtual void deleteQueryShapeRepresentativeQuery(
+        OperationContext* opCtx, const query_shape::QueryShapeHash& queryShapeHash) const = 0;
 
     /**
      * Validates that 'querySettings' do not have:
@@ -206,11 +268,6 @@ public:
     void sanitizeQuerySettingsHints(
         std::vector<QueryShapeConfiguration>& queryShapeConfigurations) const;
 };
-
-void initializeForRouter(ServiceContext* serviceContext);
-void initializeForShard(ServiceContext* serviceContext,
-                        SetClusterParameterFn setClusterParameterFn);
-void initializeForTest(ServiceContext* serviceContext);
 
 /**
  * Retrieves the QuerySettings for a specified 'queryShape' over namespace 'nss'. If no settings are

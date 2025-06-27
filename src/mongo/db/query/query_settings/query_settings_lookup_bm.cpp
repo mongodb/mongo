@@ -360,7 +360,7 @@ class QuerySettingsNotMultitenantLookupBenchmark : public QuerySettingsLookupBen
             // On the first launch, initialize global service context and initialize the query
             // settings.
             setGlobalServiceContext(ServiceContext::make());
-            query_settings::initializeForTest(getGlobalServiceContext());
+            query_settings::QuerySettingsService::initializeForTest(getGlobalServiceContext());
 
             // Initialize the feature flag.
             _querySettingsFeatureFlag.emplace("featureFlagQuerySettings", true);
@@ -388,7 +388,7 @@ class QuerySettingsMultiTenantLookupBenchmark : public QuerySettingsLookupBenchm
             // On the first launch, initialize global service context and initialize the query
             // settings.
             setGlobalServiceContext(ServiceContext::make());
-            query_settings::initializeForTest(getGlobalServiceContext());
+            query_settings::QuerySettingsService::initializeForTest(getGlobalServiceContext());
 
             // Initialize the feature flags.
             _querySettingsFeatureFlag.emplace("featureFlagQuerySettings", true);

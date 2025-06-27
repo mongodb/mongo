@@ -15,3 +15,6 @@ filters:
   - "fle2_text_search_preview.js":
     approvers:
       - 10gen/server-security
+  - "query_settings_upgrade_downgrade.js":
+    approvers:
+      - 10gen/query-execution-query-settings

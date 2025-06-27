@@ -34,7 +34,8 @@ qsutils.removeAllQuerySettings();
  *  params.querySettingsB - query setting for all queries of the shape as params.queryB
  */
 function testQuerySettingsUsing(params) {
-    let queryShapeHashA = null;
+    const queryShapeHashA = qsutils.getQueryShapeHashFromExplain(params.queryA);
+
     // Ensure that query settings cluster parameter is empty.
     {
         qsutils.assertQueryShapeConfiguration([]);
@@ -65,7 +66,6 @@ function testQuerySettingsUsing(params) {
     // Ensure that 'querySettings' cluster parameter gets updated on subsequent call of
     // setQuerySettings by passing a QueryShapeHash.
     {
-        queryShapeHashA = qsutils.getQueryShapeHashFromQuerySettings(params.queryA);
         assert.neq(queryShapeHashA, undefined);
         assert.commandWorked(
             db.adminCommand({setQuerySettings: queryShapeHashA, settings: params.querySettingsB}));
@@ -355,10 +355,15 @@ testQuerySettingsParameterized({
     assert.commandWorked(db.adminCommand({setQuerySettings: queryB, settings: {reject: true}}));
     assert.commandWorked(db.adminCommand({setQuerySettings: queryC, settings: {reject: true}}));
 
-    assert.sameMembers(
-        [queryA, queryB, queryC],
-        db.getSiblingDB("admin")
-            .aggregate([{$querySettings: {}}, {$replaceRoot: {newRoot: "$representativeQuery"}}],
-                       {cursor: {batchSize: 1}})
-            .toArray());
+    // Due to possible race conditions, we wrap the assertion into soon block.
+    assert.soonNoExcept(() => {
+        assert.sameMembers(
+            [queryA, queryB, queryC],
+            db.getSiblingDB("admin")
+                .aggregate(
+                    [{$querySettings: {}}, {$replaceRoot: {newRoot: "$representativeQuery"}}],
+                    {cursor: {batchSize: 1}})
+                .toArray());
+        return true;
+    });
 }

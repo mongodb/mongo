@@ -66,6 +66,8 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/read_write_concern_defaults_gen.h"
 #include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/bgsync.h"
@@ -698,6 +700,20 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
             VersionContext::getDecoration(opCtx))) {
         ChangeStreamPreImagesCollectionManager::get(opCtx).createPreImagesCollection(
             opCtx, boost::none /* tenantId */);
+    }
+
+    // Ensure that 'queryShapeRepresentativeQueries' collection exists only:
+    // - in plain replica sets or
+    // - on configsvr in sharded cluster deployments.
+    auto role = ShardingState::get(opCtx)->pollClusterRole();
+    const bool isConfigsvr = role && role->has(ClusterRole::ConfigServer);
+    const bool isReplSet = !role.has_value();
+    if (::mongo::feature_flags::gFeatureFlagPQSBackfill.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        (isConfigsvr || isReplSet)) {
+        query_settings::QuerySettingsService::get(opCtx)
+            .createQueryShapeRepresentativeQueriesCollection(opCtx);
     }
 
     serverGlobalParams.validateFeaturesAsPrimary.store(true);

@@ -151,6 +151,7 @@ public:
 
 private:
     GetNextResult doGetNext() final;
+    void doDispose() final;
 
     /**
      * DocumentSource that holds a cursor over the 'queryShapeRepresentativeQueries' collection:

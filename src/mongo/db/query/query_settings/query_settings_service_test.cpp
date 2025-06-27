@@ -240,13 +240,14 @@ public:
                                    const query_shape::DeferredQueryShape& deferredShape,
                                    const NamespaceString& nss) {
         {
-            initializeForRouter(getServiceContext());
+            QuerySettingsService::initializeForRouter(getServiceContext());
             assertQuerySettingsLookupWithoutRejectionCheckForRouter(cmdBSON, deferredShape, nss);
             assertQuerySettingsLookupWithRejectionCheckForRouter(cmdBSON, deferredShape, nss);
         }
 
         {
-            initializeForShard(getServiceContext(), nullptr /* setClusterParameterImplFn */);
+            QuerySettingsService::initializeForShard(getServiceContext(),
+                                                     nullptr /* setClusterParameterImplFn */);
             assertQuerySettingsLookupWithoutRejectionCheckForShard(cmdBSON, deferredShape, nss);
             assertQuerySettingsLookupWithRejectionCheckForShard(cmdBSON, deferredShape, nss);
         }

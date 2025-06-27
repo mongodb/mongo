@@ -283,7 +283,7 @@ int dbtestsMain(int argc, char** argv) {
     AuthorizationManager::get(service->getService())->setAuthEnabled(false);
     ScriptEngine::setup(ExecutionEnvironment::Server);
 
-    query_settings::initializeForTest(service);
+    query_settings::QuerySettingsService::initializeForTest(service);
 
     return mongo::dbtests::runDbTests(argc, argv);
 }

@@ -32,6 +32,8 @@
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
@@ -44,6 +46,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log_and_backoff.h"
 #include "mongo/util/serialization_context.h"
 
 #include <boost/optional/optional.hpp>
@@ -51,6 +54,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo::query_settings {
+MONGO_FAIL_POINT_DEFINE(throwConflictingOperationInProgressOnQuerySettingsSetClusterParameter);
 
 using namespace query_shape;
 
@@ -385,6 +389,31 @@ void sanitizeKeyPatternIndexHints(QueryShapeConfiguration& queryShapeItem) {
         }
     }
 }
+
+/**
+ * Runs the 'fn' and retries up to 'maxNumRetries' on ConflictingOperationInProgress exception.
+ */
+template <typename Fn>
+auto conflictingOperationInProgressRetry(Fn&& fn, size_t maxNumRetries = 100) {
+    size_t numAttempts = 0;
+    while (true) {
+        try {
+            return fn();
+        } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& ex) {
+            if (numAttempts == maxNumRetries) {
+                throw;
+            }
+
+            logAndBackoff(10445112,
+                          logv2::LogComponent::kQuery,
+                          logv2::LogSeverity::Info(),
+                          numAttempts,
+                          "Caught ConflictingOperationInProgress",
+                          "reason"_attr = ex.reason());
+            numAttempts++;
+        }
+    }
+}
 }  // namespace
 
 class QuerySettingsRouterService : public QuerySettingsService {
@@ -464,8 +493,38 @@ public:
     }
 
     void setQuerySettingsClusterParameter(
-        OperationContext* opCtx, const QueryShapeConfigurationsWithTimestamp& config) override {
+        OperationContext* opCtx,
+        const QueryShapeConfigurationsWithTimestamp& config) const override {
         MONGO_UNREACHABLE_TASSERT(10397900);
+    }
+
+    void createQueryShapeRepresentativeQueriesCollection(OperationContext* opCtx) const override {
+        MONGO_UNIMPLEMENTED_TASSERT(10445100);
+    }
+
+    void dropQueryShapeRepresentativeQueriesCollection(OperationContext* opCtx) const override {
+        MONGO_UNIMPLEMENTED_TASSERT(10445101);
+    }
+
+    void migrateRepresentativeQueriesFromQuerySettingsClusterParameterToDedicatedCollection(
+        OperationContext* opCtx) const override {
+        MONGO_UNIMPLEMENTED_TASSERT(10445102);
+    }
+
+    void migrateRepresentativeQueriesFromDedicatedCollectionToQuerySettingsClusterParameter(
+        OperationContext* opCtx) const override {
+        MONGO_UNIMPLEMENTED_TASSERT(10445103);
+    }
+
+    void upsertRepresentativeQueries(
+        OperationContext* opCtx,
+        const std::vector<QueryShapeRepresentativeQuery>& representativeQueries) const override {
+        MONGO_UNIMPLEMENTED_TASSERT(10445104);
+    }
+
+    void deleteQueryShapeRepresentativeQuery(
+        OperationContext* opCtx, const query_shape::QueryShapeHash& queryShapeHash) const override {
+        MONGO_UNIMPLEMENTED_TASSERT(10445105);
     }
 
 private:
@@ -474,7 +533,7 @@ private:
 
 class QuerySettingsShardService : public QuerySettingsRouterService {
 public:
-    explicit QuerySettingsShardService(SetClusterParameterFn setClusterParameterFn)
+    QuerySettingsShardService(SetClusterParameterFn setClusterParameterFn)
         : _setClusterParameterFn(std::move(setClusterParameterFn)) {}
 
     QuerySettings lookupQuerySettingsWithRejectionCheck(
@@ -501,8 +560,14 @@ public:
     }
 
     void setQuerySettingsClusterParameter(
-        OperationContext* opCtx, const QueryShapeConfigurationsWithTimestamp& config) final {
+        OperationContext* opCtx, const QueryShapeConfigurationsWithTimestamp& config) const final {
         try {
+            if (MONGO_unlikely(throwConflictingOperationInProgressOnQuerySettingsSetClusterParameter
+                                   .shouldFail())) {
+                uasserted(ErrorCodes::ConflictingOperationInProgress,
+                          "ConflictingOperationInProgress");
+            }
+
             BSONObjBuilder bob;
             BSONArrayBuilder arrayBuilder(
                 bob.subarrayStart(QuerySettingsClusterParameterValue::kSettingsArrayFieldName));
@@ -512,14 +577,176 @@ public:
             arrayBuilder.done();
             SetClusterParameter request(BSON(getQuerySettingsClusterParameterName() << bob.done()));
             request.setDbName(DatabaseName::kConfig);
-
-            tassert(
-                10397800, "setClusterParameter() function must be present", _setClusterParameterFn);
+            tassert(10445106, "setClusterParameter must be provided", _setClusterParameterFn);
             _setClusterParameterFn(opCtx, request, boost::none, config.clusterParameterTime);
         } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
             uasserted(ErrorCodes::BSONObjectTooLarge,
                       str::stream() << "cannot modify query settings: the total size exceeds "
                                     << BSONObjMaxInternalSize << " bytes");
+        }
+    }
+
+    void createQueryShapeRepresentativeQueriesCollection(OperationContext* opCtx) const override {
+        constexpr auto& nss = NamespaceString::kQueryShapeRepresentativeQueriesNamespace;
+        DBDirectClient client(opCtx);
+        std::ignore = client.createCollection(nss);
+    }
+
+    void dropQueryShapeRepresentativeQueriesCollection(OperationContext* opCtx) const override {
+        constexpr auto& nss = NamespaceString::kQueryShapeRepresentativeQueriesNamespace;
+        DBDirectClient client(opCtx);
+        std::ignore = client.dropCollection(nss);
+    }
+
+    void migrateRepresentativeQueriesFromQuerySettingsClusterParameterToDedicatedCollection(
+        OperationContext* opCtx) const override {
+        conflictingOperationInProgressRetry([&]() {
+            std::vector<QueryShapeRepresentativeQuery> queryShapeRepresentativeQueries;
+            auto config = getAllQueryShapeConfigurations(boost::none /* tenantId */);
+            for (auto& queryShapeConfig : config.queryShapeConfigurations) {
+                if (auto&& representativeQuery = queryShapeConfig.getRepresentativeQuery()) {
+                    queryShapeRepresentativeQueries.emplace_back(
+                        queryShapeConfig.getQueryShapeHash(),
+                        *representativeQuery,
+                        config.clusterParameterTime);
+
+                    // Clear the representativeQuery information as it will be stored in a separate
+                    // collection.
+                    queryShapeConfig.setRepresentativeQuery(boost::none);
+                }
+            }
+
+            // Early exit if there are no representative queries to migrate.
+            if (queryShapeRepresentativeQueries.empty()) {
+                return;
+            }
+
+            // Upsert all representative queries into the dedicated collection.
+            upsertRepresentativeQueries(opCtx, queryShapeRepresentativeQueries);
+
+            // Clear 'representativeQuery' info from QueryShapeConfiguration entries in
+            // 'querySettings' cluster parameter.
+            setQuerySettingsClusterParameter(opCtx, config);
+        });
+    }
+
+    void migrateRepresentativeQueriesFromDedicatedCollectionToQuerySettingsClusterParameter(
+        OperationContext* opCtx) const override {
+        conflictingOperationInProgressRetry([&]() {
+            // Read the QueryShapeConfigurations snapshot here as opposed to after opening the find
+            // cursor to ensure that we detect the case of 'querySettings' cluster parameter
+            // changes while having the cursor opened.
+            auto config = getAllQueryShapeConfigurations(boost::none /* tenantId */);
+            stdx::unordered_map<query_shape::QueryShapeHash, QueryInstance, QueryShapeHashHasher>
+                representativeQueryMapping;
+
+            int newQuerySettingsClusterParameterEstimatedBsonSize = [&]() {
+                BSONObjBuilder bob;
+                QuerySettingsClusterParameter p("querySettings"_sd,
+                                                ServerParameterType::kClusterWide);
+                p.append(opCtx, &bob, "", boost::none /* tenantId */);
+                return bob.obj().objsize();
+            }();
+
+            // Issue a find request over queryShapeRepresentativeQueries collection, while sorting
+            // over representativeQuery size in ascending order. We will try to migrate as many
+            // representativeQueries back to the 'querySettings' cluster parameter as possible by
+            // performing final 'querySettings' parameter size estimation.
+            FindCommandRequest findRepresentativeQueries{
+                NamespaceString::kQueryShapeRepresentativeQueriesNamespace};
+            std::string dollarRepresentativeQuery = str::stream()
+                << "$" << QueryShapeRepresentativeQuery::kRepresentativeQueryFieldName;
+            findRepresentativeQueries.setProjection(
+                BSON("_id" << 1 << QueryShapeRepresentativeQuery::kRepresentativeQueryFieldName << 1
+                           << QueryShapeRepresentativeQuery::kLastModifiedTimeFieldName << 1
+                           << "bsonSize" << BSON("$bsonSize" << dollarRepresentativeQuery)));
+            findRepresentativeQueries.setSort(BSON("bsonSize" << -1));
+            DBDirectClient client(opCtx);
+            auto cursor = client.find(std::move(findRepresentativeQueries));
+            while (cursor->more()) {
+                BSONObj obj = cursor->next();
+                auto representativeQueryBsonSize =
+                    obj.getField(QueryShapeRepresentativeQuery::kRepresentativeQueryFieldName)
+                        .objsize();
+
+                // Do not read further from the cursor if total BSONObj size surpasses 16MB.
+                if (newQuerySettingsClusterParameterEstimatedBsonSize +
+                        representativeQueryBsonSize >
+                    BSONObj::DefaultSizeTrait::MaxSize) {
+                    cursor->kill();
+                    break;
+                }
+
+                auto representativeQuery = QueryShapeRepresentativeQuery::parse(
+                    IDLParserContext{"QueryShapeRepresentativeQuery"}, obj);
+                representativeQueryMapping.insert(
+                    {representativeQuery.get_id(), representativeQuery.getRepresentativeQuery()});
+                newQuerySettingsClusterParameterEstimatedBsonSize += representativeQueryBsonSize;
+            }
+
+            // Early exit if there are no representative queries to migrate.
+            if (representativeQueryMapping.empty()) {
+                return;
+            }
+
+            // Repopulate representative query information for the QueryShapeConfigurations.
+            for (auto& queryShapeConfig : config.queryShapeConfigurations) {
+                if (auto it = representativeQueryMapping.find(queryShapeConfig.getQueryShapeHash());
+                    it != representativeQueryMapping.end()) {
+                    queryShapeConfig.setRepresentativeQuery(std::move(it->second));
+                }
+            }
+
+            // Try updating 'querySettings' cluster parameter. As we do accurate querySettings
+            // cluster parameter size estimation, we do not expect BSONObjectTooLarge exception to
+            // be thrown. But in case our estimation was incorrect, we do not retry and users will
+            // lose representative queries, however, they will be backfilled, once users upgrade
+            // their FCV.
+            try {
+                setQuerySettingsClusterParameter(opCtx, config);
+            } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
+                LOGV2_WARNING(10445109,
+                              "Failed migrating representative queries to query settings storage");
+            }
+        });
+    }
+
+    void upsertRepresentativeQueries(
+        OperationContext* opCtx,
+        const std::vector<QueryShapeRepresentativeQuery>& representativeQueries) const override {
+        const auto& nss = NamespaceString::kQueryShapeRepresentativeQueriesNamespace;
+        DBDirectClient client(opCtx);
+        for (auto&& query : representativeQueries) {
+            try {
+                client.update(nss,
+                              BSON("_id" << query.get_id().toHexString()),
+                              query.toBSON(),
+                              true /* upsert */,
+                              false /* multi */,
+                              defaultMajorityWriteConcern().toBSON());
+            } catch (const DBException& ex) {
+                LOGV2_DEBUG(10445110,
+                            1,
+                            "Error occurred when upserting the representative query",
+                            "error"_attr = redact(ex));
+            }
+        }
+    }
+
+    void deleteQueryShapeRepresentativeQuery(
+        OperationContext* opCtx, const query_shape::QueryShapeHash& queryShapeHash) const override {
+        const auto& nss = NamespaceString::kQueryShapeRepresentativeQueriesNamespace;
+        DBDirectClient client(opCtx);
+        try {
+            client.remove(nss,
+                          BSON("_id" << queryShapeHash.toHexString()),
+                          false /* removeMany */,
+                          defaultMajorityWriteConcern().toBSON());
+        } catch (const DBException& ex) {
+            LOGV2_DEBUG(10445111,
+                        1,
+                        "Error occurred when deleting the representative query",
+                        "error"_attr = redact(ex));
         }
     }
 
@@ -544,6 +771,20 @@ QuerySettingsService::getRejectionIncompatibleStages() {
     return rejectionIncompatibleStages;
 };
 
+void QuerySettingsService::initializeForRouter(ServiceContext* serviceContext) {
+    getQuerySettingsService(serviceContext) = std::make_unique<QuerySettingsRouterService>();
+}
+
+void QuerySettingsService::initializeForShard(ServiceContext* serviceContext,
+                                              SetClusterParameterFn setClusterParameterFn) {
+    getQuerySettingsService(serviceContext) =
+        std::make_unique<QuerySettingsShardService>(std::move(setClusterParameterFn));
+}
+
+void QuerySettingsService::initializeForTest(ServiceContext* serviceContext) {
+    initializeForShard(serviceContext, nullptr);
+}
+
 RepresentativeQueryInfo createRepresentativeInfo(OperationContext* opCtx,
                                                  const BSONObj& cmd,
                                                  const boost::optional<TenantId>& tenantId) {
@@ -558,20 +799,6 @@ RepresentativeQueryInfo createRepresentativeInfo(OperationContext* opCtx,
         return createRepresentativeInfoDistinct(opCtx, cmd, tenantId);
     }
     uasserted(7746402, str::stream() << "QueryShape can not be computed for command: " << cmd);
-}
-
-void initializeForRouter(ServiceContext* serviceContext) {
-    getQuerySettingsService(serviceContext) = std::make_unique<QuerySettingsRouterService>();
-}
-
-void initializeForShard(ServiceContext* serviceContext,
-                        SetClusterParameterFn setClusterParameterFn) {
-    getQuerySettingsService(serviceContext) =
-        std::make_unique<QuerySettingsShardService>(std::move(setClusterParameterFn));
-}
-
-void initializeForTest(ServiceContext* serviceContext) {
-    initializeForShard(serviceContext, nullptr);
 }
 
 QuerySettings lookupQuerySettingsWithRejectionCheckOnRouter(
@@ -719,12 +946,12 @@ ServiceContext::ConstructorActionRegisterer querySettingsServiceRegisterer(
         auto& dependencies = getServiceDependencies(serviceContext);
         auto role = serverGlobalParams.clusterRole;
         if (role.hasExclusively(ClusterRole::RouterServer)) {
-            initializeForRouter(serviceContext);
+            QuerySettingsService::initializeForRouter(serviceContext);
         } else {
-            initializeForShard(serviceContext,
-                               role.has(ClusterRole::ConfigServer)
-                                   ? dependencies.setClusterParameterConfigsvr
-                                   : dependencies.setClusterParameterReplSet);
+            QuerySettingsService::initializeForShard(serviceContext,
+                                                     role.has(ClusterRole::ConfigServer)
+                                                         ? dependencies.setClusterParameterConfigsvr
+                                                         : dependencies.setClusterParameterReplSet);
         }
     },
     {});

@@ -44,7 +44,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/rwmutex.h"
-#include "mongo/stdx/trusted_hasher.h"
 
 #include <cstddef>
 #include <string>
@@ -168,4 +167,4 @@ private:
     absl::flat_hash_map<boost::optional<TenantId>, VersionedQueryShapeConfigurations>
         _tenantIdToVersionedQueryShapeConfigurationsMap;
 };
-};  // namespace mongo::query_settings
+}  // namespace mongo::query_settings

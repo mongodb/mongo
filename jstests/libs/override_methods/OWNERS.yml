@@ -37,3 +37,8 @@ filters:
   - "txn_passthrough_cmd_massage.js":
     approvers:
       - 10gen/server-transactions
+  - "implicitly_retry_on_fcv_upgrade_downgrade.js":
+    approvers:
+      - 10gen/query-execution-query-settings
+      - 10gen/server-replication
+      - 10gen/server-catalog-and-routing

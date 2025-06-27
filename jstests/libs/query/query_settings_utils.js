@@ -91,9 +91,12 @@ export class QuerySettingsUtils {
     /**
      * Return query settings for the current tenant without query shape hashes.
      */
-    getQuerySettings({showDebugQueryShape = false,
-                      showQueryShapeHash = false,
-                      filter = undefined} = {}) {
+    getQuerySettings({
+        showDebugQueryShape = false,
+        showQueryShapeHash = false,
+        showRepresentativeQuery = true,
+        filter = undefined
+    } = {}) {
         const pipeline = [{$querySettings: showDebugQueryShape ? {showDebugQueryShape} : {}}];
         if (filter) {
             pipeline.push({$match: filter});
@@ -102,6 +105,9 @@ export class QuerySettingsUtils {
             pipeline.push({$project: {queryShapeHash: 0}});
         }
         pipeline.push({$sort: {representativeQuery: 1}});
+        if (!showRepresentativeQuery) {
+            pipeline.push({$project: {representativeQuery: 0}});
+        }
         return this._adminDB.aggregate(pipeline).toArray();
     }
 
@@ -117,6 +123,15 @@ export class QuerySettingsUtils {
             `query ${tojson(representativeQuery)} is expected to have 0 or 1 settings, but got ${
                 tojson(settings)}`);
         return settings.length === 0 ? undefined : settings[0].queryShapeHash;
+    }
+
+    /**
+     * Return 'queryShapeHash' for a given 'representativeQuery' by calling explain over it.
+     */
+    getQueryShapeHashFromExplain(representativeQuery) {
+        const explainCmd = getExplainCommand(this.withoutDollarDB(representativeQuery));
+        const explain = assert.commandWorked(this._db.runCommand(explainCmd));
+        return explain.queryShapeHash;
     }
 
     /**
@@ -137,24 +152,54 @@ export class QuerySettingsUtils {
      * The settings list is not expected to be in any particular order.
      */
     assertQueryShapeConfiguration(expectedQueryShapeConfigurations, shouldRunExplain = true) {
+        const isRunningFCVUpgradeDowngradeSuite =
+            TestData.isRunningFCVUpgradeDowngradeSuite || false;
+
+        // In case 'expectedQueryShapeConfigurations' has no 'representativeQuery' attribute, we do
+        // not perform queryShapeHash assertions.
+        const expectedQueryShapeConfigurationsHaveRepresentativeQuery =
+            expectedQueryShapeConfigurations.every(
+                config => config.hasOwnProperty("representativeQuery"));
+        let showQueryShapeHash = expectedQueryShapeConfigurationsHaveRepresentativeQuery &&
+            isRunningFCVUpgradeDowngradeSuite;
         const rewrittenExpectedQueryShapeConfigurations =
             expectedQueryShapeConfigurations.map(config => {
-                return {...config, settings: this.wrapIndexHintsIntoArrayIfNeeded(config.settings)};
+                const {settings, representativeQuery} = config;
+                const rewrittenSettings = this.wrapIndexHintsIntoArrayIfNeeded(settings);
+                if (!isRunningFCVUpgradeDowngradeSuite || !representativeQuery) {
+                    return {...config, settings: rewrittenSettings};
+                }
+
+                // If running in FCV upgrade/downgrade suites, the 'representativeQuery' may be
+                // missing. In that case we avoid asserting for 'representativeQuery' equality.
+                // Instead, we ensure that queryShapeHashes are same.
+                return {
+                    queryShapeHash: this.getQueryShapeHashFromExplain(representativeQuery),
+                    settings: rewrittenSettings,
+                };
             });
+
         assert.soonNoExcept(
             () => {
-                assert.sameMembers(this.getQuerySettings(),
+                const actualQueryShapeConfigurations = this.getQuerySettings({
+                    showQueryShapeHash,
+                    showRepresentativeQuery: !isRunningFCVUpgradeDowngradeSuite
+                });
+                assert.sameMembers(actualQueryShapeConfigurations,
                                    rewrittenExpectedQueryShapeConfigurations);
                 return true;
             },
-            () => "current query settings = " + toJsonForLog(this.getQuerySettings()) +
-                ", expected query settings = " +
-                toJsonForLog(rewrittenExpectedQueryShapeConfigurations));
+            () => `current query settings = ${toJsonForLog(this.getQuerySettings({
+                showQueryShapeHash: true,
+            }))}, expected query settings = ${
+                toJsonForLog(rewrittenExpectedQueryShapeConfigurations)}`);
 
-        if (shouldRunExplain) {
+        if (shouldRunExplain && expectedQueryShapeConfigurationsHaveRepresentativeQuery) {
             const settingsArray = this.getQuerySettings({showQueryShapeHash: true});
             for (const {representativeQuery, settings, queryShapeHash} of settingsArray) {
-                this.assertExplainQuerySettings(representativeQuery, settings, queryShapeHash);
+                if (representativeQuery) {
+                    this.assertExplainQuerySettings(representativeQuery, settings, queryShapeHash);
+                }
             }
         }
     }
@@ -179,6 +224,28 @@ export class QuerySettingsUtils {
                 assert.eq(queryShapeHash, expectedQueryShapeHash);
             }
         }
+    }
+
+    /**
+     * Asserts the 'expectedRepresentativeQueries' are present in the
+     * 'queryShapeRepresentativeQueries' collection.
+     */
+    assertRepresentativeQueries(expectedRepresentativeQueries) {
+        // In sharded clusters, the representative queries are stored in the config server. So we
+        // need to return the connection to the node that stores them.
+        const nodeThatStoresRepresentativeQueries = (function(db) {
+            const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
+            if (topology.configsvr) {
+                return new Mongo(topology.configsvr.nodes[0]);
+            }
+            return db.getMongo();
+        })(this._db);
+
+        assert.sameMembers(nodeThatStoresRepresentativeQueries.getDB("config")
+                               .queryShapeRepresentativeQueries
+                               .aggregate([{$replaceRoot: {newRoot: "$representativeQuery"}}])
+                               .toArray(),
+                           expectedRepresentativeQueries);
     }
 
     /**

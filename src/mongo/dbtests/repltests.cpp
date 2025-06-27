@@ -211,7 +211,7 @@ public:
         deleteAll(cllNS());
 
         // Initialize the query settings.
-        query_settings::initializeForTest(_opCtx.getServiceContext());
+        query_settings::QuerySettingsService::initializeForTest(_opCtx.getServiceContext());
     }
 
     ~Base() {

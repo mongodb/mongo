@@ -44,7 +44,7 @@ protected:
     QuerySettingsValidationTestFixture() {
         ShardingState::create(getServiceContext());
         expCtx = make_intrusive<ExpressionContextForTest>();
-        query_settings::initializeForTest(getServiceContext());
+        query_settings::QuerySettingsService::initializeForTest(getServiceContext());
     }
 
     QuerySettingsService& service() {

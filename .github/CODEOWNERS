@@ -831,6 +831,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/override_methods/**/set_api* @10gen/query-optimization @svc-auto-approve-bot
 /jstests/libs/override_methods/**/send_command_to_initial_sync_node* @10gen/server-initial-sync @svc-auto-approve-bot
 /jstests/libs/override_methods/**/txn_passthrough_cmd_massage.js @10gen/server-transactions @svc-auto-approve-bot
+/jstests/libs/override_methods/**/implicitly_retry_on_fcv_upgrade_downgrade.js @10gen/query-execution-query-settings @10gen/server-catalog-and-routing @10gen/server-replication @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/libs/override_methods/collection_write_path/OWNERS.yml
 /jstests/libs/override_methods/collection_write_path/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
@@ -936,6 +937,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/multiVersion/targetedTestsLastLtsFeatures/**/create_coll_validator_new_feature_no_applyops_check.js @10gen/query-optimization @svc-auto-approve-bot
 /jstests/multiVersion/targetedTestsLastLtsFeatures/**/profile_filter_query_feature_flag.js @10gen/query-integration-observability @svc-auto-approve-bot
 /jstests/multiVersion/targetedTestsLastLtsFeatures/**/fle2_text_search_preview.js @10gen/server-security @svc-auto-approve-bot
+/jstests/multiVersion/targetedTestsLastLtsFeatures/**/query_settings_upgrade_downgrade.js @10gen/query-execution-query-settings @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/multiVersion/targetedTestsLastLtsFeatures/storage_engine/OWNERS.yml
 /jstests/multiVersion/targetedTestsLastLtsFeatures/storage_engine/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot

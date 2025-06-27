@@ -10,6 +10,11 @@
  *   directly_against_shardsvrs_incompatible,
  *   uses_parallel_shell,
  *   requires_fcv_80,
+ *   # This test assumes 'querySettings' cluster-wide parameter is not modified outside of the test.
+ *   # This is not true when running in FCV upgrade/downgrade suite, which involves 'querySettings'
+ *   # migration.
+ *   # TODO: SERVER-94927 Remove Feature Flag for SPM-3684.
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 

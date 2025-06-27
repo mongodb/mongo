@@ -84,7 +84,7 @@ public:
         ChangeStreamOptionsManager::create(service);
 
         // Initialize the query settings.
-        query_settings::initializeForTest(service);
+        query_settings::QuerySettingsService::initializeForTest(service);
 
         // Ensure that we are primary.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());

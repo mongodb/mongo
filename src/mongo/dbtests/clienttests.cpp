@@ -74,7 +74,7 @@ public:
         db.dropDatabase(DatabaseName::createDatabaseName_forTest(boost::none, "test"));
 
         // Initialize the query settings.
-        query_settings::initializeForTest(opCtx.getServiceContext());
+        query_settings::QuerySettingsService::initializeForTest(opCtx.getServiceContext());
     }
 
     virtual ~Base() {

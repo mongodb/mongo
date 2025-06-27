@@ -140,14 +140,17 @@ DocumentSource::GetNextResult DocumentSourceQuerySettings::doGetNext() {
     MONGO_UNREACHABLE_TASSERT(10397700);
 }
 
+void DocumentSourceQuerySettings::doDispose() {
+    // Because $querySettings stage owns a separate exec::agg::Stage to provide data from the
+    // dedicated 'queryShapeRepresentativeQueries' collection we need to be sure we dispose it
+    // appropriately.
+    if (_queryShapeRepresentativeQueriesCursor.isInitialized()) {
+        (*_queryShapeRepresentativeQueriesCursor)->dispose();
+    }
+}
+
 boost::intrusive_ptr<DocumentSource>
 DocumentSourceQuerySettings::createQueryShapeRepresentativeQueriesCursor(OperationContext* opCtx) {
-    if (!feature_flags::gFeatureFlagPQSBackfill.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return DocumentSourceQueue::create(getContext());
-    }
-
     auto nss = NamespaceString::kQueryShapeRepresentativeQueriesNamespace;
     auto* grid = Grid::get(opCtx);
     if (getContext()->getInRouter() || grid->isShardingInitialized()) {

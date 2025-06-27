@@ -22,10 +22,19 @@ const sendFCVUpDown = function(ver) {
         const res = conn.adminCommand({setFeatureCompatibilityVersion: ver, confirm: true});
         assert.commandWorked(res);
     } catch (e) {
-        if (e.code === 332) {
+        if (e.code === ErrorCodes.CannotDowngrade) {
             // Cannot downgrade the cluster as collection xxx has 'encryptedFields' with range
             // indexes.
             jsTestLog('setFCV: Can not downgrade');
+            return;
+        }
+        if (e.code === ErrorCodes.TemporarilyUnavailable) {
+            // Cannot upgrade FCV if there is a temporary unavailability of the server.
+            jsTest.log.info('setFCV: Temporarily unavailable', {e});
+            return;
+        }
+        if (e.code === ErrorCodes.CannotUpgrade) {
+            jsTest.log.info("setFCV: Can not upgrade", {e});
             return;
         }
         if (e.code === 5147403) {

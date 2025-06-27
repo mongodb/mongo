@@ -30,6 +30,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/query_cmd/query_settings_cmds_gen.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context.h"
@@ -37,9 +38,7 @@
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-// TODO SERVER-104451: Perform representative queries migration on FCV upgrade/downgrade.
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/create_collection.h"
+#include "mongo/util/version/releases.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -103,76 +102,17 @@ QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& 
     return querySettings;
 }
 
-// TODO SERVER-104451: Perform representative queries migration on FCV upgrade/downgrade.
-void createQueryShapeRepresentativeQueriesCollection(OperationContext* opCtx) {
-    if (!feature_flags::gFeatureFlagPQSBackfill.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return;
+bool isUpgradingToVersionThatHasDedicatedRepresentativeQueriesCollection(OperationContext* opCtx) {
+    // (Generic FCV reference): Check if the server is in the process of upgrading the FCV to the
+    // version that has 'gFeatureFlagPQSBackfill' enabled.
+    switch (serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion()) {
+        case multiversion::GenericFCV::kUpgradingFromLastLTSToLatest:
+            [[fallthrough]];
+        case multiversion::GenericFCV::kUpgradingFromLastContinuousToLatest:
+            return true;
+        default:
+            return false;
     }
-
-    const auto& nss = NamespaceString::kQueryShapeRepresentativeQueriesNamespace;
-    CollectionOptions collOptions;
-
-    const auto status = createCollection(opCtx, nss, collOptions, BSONObj());
-    uassert(status.code(),
-            str::stream() << "Failed to create the queryShapeRepresentativeQuery collection: "
-                          << nss.toStringForErrorMsg() << causedBy(status.reason()),
-            status.isOK() || status.code() == ErrorCodes::NamespaceExists);
-}
-
-void upsertQueryShapeRepresentativeQuery(
-    OperationContext* opCtx, const QueryShapeRepresentativeQuery& queryShapeRepresentativeQuery) {
-    if (!feature_flags::gFeatureFlagPQSBackfill.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return;
-    }
-
-    createQueryShapeRepresentativeQueriesCollection(opCtx);
-
-    const auto& nss = NamespaceString::kQueryShapeRepresentativeQueriesNamespace;
-    auto collection = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
-        MODE_IX);
-
-    try {
-        WriteUnitOfWork wunit(opCtx);
-        std::ignore = Helpers::upsert(opCtx, collection, queryShapeRepresentativeQuery.toBSON());
-        wunit.commit();
-    } catch (const DBException& ex) {
-        LOGV2(10397701,
-              "Error occurred when upserting the representative query",
-              "error"_attr = redact(ex));
-    }
-}
-
-void deleteQueryShapeRepresentativeQuery(OperationContext* opCtx,
-                                         const query_shape::QueryShapeHash& queryShapeHash) {
-    if (!feature_flags::gFeatureFlagPQSBackfill.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return;
-    }
-
-    createQueryShapeRepresentativeQueriesCollection(opCtx);
-
-    const auto& nss = NamespaceString::kQueryShapeRepresentativeQueriesNamespace;
-    auto collection = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
-        MODE_IX);
-
-    RecordId recordId = Helpers::findOne(
-        opCtx, collection.getCollectionPtr(), BSON("_id" << queryShapeHash.toHexString()));
-    if (recordId.isNull()) {
-        return;
-    }
-
-    WriteUnitOfWork wunit(opCtx);
-    Helpers::deleteByRid(opCtx, collection, recordId);
-    wunit.commit();
 }
 
 /**
@@ -198,15 +138,23 @@ void readModifyWriteQuerySettingsConfigOption(
     modify(queryShapeConfigurations.queryShapeConfigurations);
 
     // Upsert QueryShapeRepresentativeQuery into the corresponding collection if provided.
+    // In case of FCV upgrade to the version that has 'gFeatureFlagPQSBackfill' enabled we act as if
+    // FCV upgrade is successful and record representative queries in the dedicated collection.
+    const bool shouldUpsertRepresentativeQuery =
+        isUpgradingToVersionThatHasDedicatedRepresentativeQueriesCollection(opCtx) ||
+        feature_flags::gFeatureFlagPQSBackfill.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     if constexpr (CmdType == QuerySettingsCmdType::kSet) {
-        if (queryShapeHashQueryInstanceOptPair.second.has_value()) {
-            upsertQueryShapeRepresentativeQuery(
+        if (queryShapeHashQueryInstanceOptPair.second.has_value() &&
+            shouldUpsertRepresentativeQuery) {
+            querySettingsService.upsertRepresentativeQueries(
                 opCtx,
-                QueryShapeRepresentativeQuery(
+                {QueryShapeRepresentativeQuery(
                     /* queryShapeHash */ queryShapeHashQueryInstanceOptPair.first,
                     /* representativeQuery */ *queryShapeHashQueryInstanceOptPair.second,
                     // TODO SERVER-105686 Avoid removing in-progress representative queries.
-                    /* lastModifiedTime */ LogicalTime()));
+                    /* lastModifiedTime */ LogicalTime())});
         }
     }
 
@@ -241,7 +189,8 @@ void readModifyWriteQuerySettingsConfigOption(
 
     // Remove QueryShapeRepresentativeQuery from the corresponding collection if present.
     if constexpr (CmdType == QuerySettingsCmdType::kRemove) {
-        deleteQueryShapeRepresentativeQuery(opCtx, queryShapeHashQueryInstanceOptPair.first);
+        querySettingsService.deleteQueryShapeRepresentativeQuery(
+            opCtx, queryShapeHashQueryInstanceOptPair.first);
     }
 
     // Clears the SBE plan cache if 'querySettingsPlanCacheInvalidation' fail-point is set. Used in
@@ -319,6 +268,9 @@ public:
                     feature_flags::gFeatureFlagQuerySettings.isEnabled(
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             assertNoStandalone(opCtx, definition()->getName());
+
+            // Ensure FCV is not changing throughout the command execution.
+            FixedFCVRegion fixedFcvRegion(opCtx);
             uassert(8727502,
                     "settings field in setQuerySettings command cannot be empty",
                     !request().getSettings().toBSON().isEmpty());
@@ -500,6 +452,9 @@ public:
                     feature_flags::gFeatureFlagQuerySettings.isEnabled(
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             assertNoStandalone(opCtx, definition()->getName());
+
+            // Ensure FCV is not changing throughout the command execution.
+            FixedFCVRegion fixedFcvRegion(opCtx);
             auto tenantId = request().getDbName().tenantId();
             QueryShapeHashQueryInstanceOptPair queryShapeHashAndRepresentativeQuery =
                 visit(OverloadedVisitor{

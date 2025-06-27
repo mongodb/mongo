@@ -90,6 +90,10 @@ selector:
     # Resharding is not permitted during fcv upgrade and downgrade.
     - jstests/core_sharding/resharding/*.js
 
+    # This test assumes query settings representative queries are stored in the cluster parameter,
+    # which is not the case if featureFlagPQSBackfill is on.
+    - jstests/core/query/query_settings/query_settings_size_limits.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
@@ -131,6 +135,10 @@ executor:
     shell_options:
       eval: >-
         await import("jstests/libs/override_methods/retry_aborted_db_and_index_creation.js");
+        await import("jstests/libs/override_methods/implicitly_retry_on_fcv_upgrade_downgrade.js");
+      global_vars:
+        TestData:
+          isRunningFCVUpgradeDowngradeSuite: true
   hooks:
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground

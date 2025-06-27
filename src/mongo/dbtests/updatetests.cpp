@@ -68,7 +68,7 @@ class ClientBase {
 public:
     ClientBase() : _client(&_opCtx) {
         // Initialize the query settings.
-        query_settings::initializeForTest(_opCtx.getServiceContext());
+        query_settings::QuerySettingsService::initializeForTest(_opCtx.getServiceContext());
     }
 
 protected:

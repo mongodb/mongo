@@ -85,5 +85,6 @@ const StringDataSet kConfigCollections{
     NamespaceString::kVectorClockNamespace.coll(),
     NamespaceString::kConfigShardCatalogDatabasesNamespace.coll(),
     NamespaceString::kBlockFCVChangesNamespace.coll(),
+    NamespaceString::kQueryShapeRepresentativeQueriesNamespace.coll(),
 };
 }  // namespace mongo

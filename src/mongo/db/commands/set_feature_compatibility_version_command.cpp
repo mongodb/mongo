@@ -69,6 +69,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/write_ops/delete.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
@@ -1721,6 +1722,7 @@ private:
     // back to the user/client. Therefore, these tasks **must** be idempotent/retryable.
     void _finalizeUpgrade(OperationContext* opCtx, const FCV requestedVersion) {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
+        const bool isConfigsvr = role && role->has(ClusterRole::ConfigServer);
 
         // Drain outstanding DDL operations that are incompatible with the target FCV.
         if (role && role->has(ClusterRole::ShardServer)) {
@@ -1735,14 +1737,14 @@ private:
         }
 
         // TODO (SERVER-100309): Remove once 9.0 becomes last lts.
-        if (role && role->has(ClusterRole::ConfigServer) &&
+        if (isConfigsvr &&
             feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabledOnVersion(
                 requestedVersion)) {
             _createConfigSessionsCollectionLocally(opCtx);
         }
 
         // TODO (SERVER-97816): Remove once 9.0 becomes last lts.
-        if (role && role->has(ClusterRole::ConfigServer) &&
+        if (isConfigsvr &&
             feature_flags::gUseTopologyChangeCoordinators.isEnabledOnVersion(requestedVersion)) {
             // The old remove shard is not a coordinator, so we can only drain this operation by
             // acquiring the same DDL lock that it acquires (config.shards).
@@ -1752,6 +1754,26 @@ private:
                 "setFCVFinalizeUpgrade",
                 LockMode::MODE_IX);
         }
+
+        // TODO SERVER-94927: Remove once 9.0 becomes last lts.
+        const bool isReplSet = !role.has_value();
+        if ((isReplSet || isConfigsvr) &&
+            feature_flags::gFeatureFlagPQSBackfill.isEnabledOnVersion(requestedVersion)) {
+            auto& service = query_settings::QuerySettingsService::get(opCtx);
+            try {
+                service.createQueryShapeRepresentativeQueriesCollection(opCtx);
+                service
+                    .migrateRepresentativeQueriesFromQuerySettingsClusterParameterToDedicatedCollection(
+                        opCtx);
+            } catch (const ExceptionFor<ErrorCodes::Interrupted>&) {
+                throw;
+            } catch (const DBException& ex) {
+                uasserted(ErrorCodes::TemporarilyUnavailable,
+                          str::stream()
+                              << "Cannot upgrade to the new FCV due to QuerySettingsService issue: "
+                              << ex.reason());
+            }
+        }
     }
 
     // _finalizeDowngrade is analogous to _finalizeUpgrade, but runs on downgrade. As with
@@ -1759,8 +1781,10 @@ private:
     void _finalizeDowngrade(OperationContext* opCtx,
                             const multiversion::FeatureCompatibilityVersion requestedVersion) {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
+        const bool isConfigsvr = role && role->has(ClusterRole::ConfigServer);
+        const bool isShardsvr = role && role->has(ClusterRole::ShardServer);
 
-        if (role && role->has(ClusterRole::ShardServer)) {
+        if (isShardsvr) {
             // TODO SERVER-99655: always use requestedVersion as expectedOfcv - and remove the note
             // above about sub-optimal behavior.
             auto expectedOfcv =
@@ -1775,7 +1799,7 @@ private:
         }
 
         // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
-        if (role && role->has(ClusterRole::ShardServer) &&
+        if (isShardsvr &&
             !feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabledOnVersion(requestedVersion)) {
             // Dropping the authoritative collections (config.shard.catalog.X) as the final step of
             // the downgrade ensures that no leftover data remains. This guarantees a clean
@@ -1787,6 +1811,27 @@ private:
                 false /* dropSystemCollections */,
                 boost::none,
                 false /* requireCollectionEmpty */);
+        }
+
+        // TODO SERVER-94927: Remove once 9.0 becomes last lts.
+        const bool isReplSet = !role.has_value();
+        if ((isReplSet || isConfigsvr) &&
+            !feature_flags::gFeatureFlagPQSBackfill.isEnabledOnVersion(requestedVersion)) {
+            auto& service = query_settings::QuerySettingsService::get(opCtx);
+            try {
+                service
+                    .migrateRepresentativeQueriesFromDedicatedCollectionToQuerySettingsClusterParameter(
+                        opCtx);
+                service.dropQueryShapeRepresentativeQueriesCollection(opCtx);
+            } catch (const ExceptionFor<ErrorCodes::Interrupted>&) {
+                throw;
+            } catch (const DBException& ex) {
+                uasserted(
+                    ErrorCodes::TemporarilyUnavailable,
+                    str::stream()
+                        << "Cannot downgrade to the old FCV due to QuerySettingsService issue: "
+                        << ex.reason());
+            }
         }
     }
 };
