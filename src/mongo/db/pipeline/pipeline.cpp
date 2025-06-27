@@ -622,7 +622,7 @@ void Pipeline::addInitialSource(intrusive_ptr<DocumentSource> source) {
 
 void Pipeline::addFinalSource(intrusive_ptr<DocumentSource> source) {
     if (!_sources.empty()) {
-        auto& finalStage = dynamic_cast<exec::agg::Stage&>(*_sources.back());
+        auto& finalStage = dynamic_cast<exec::agg::Stage&>(*source.get());
         finalStage.setSource(dynamic_cast<exec::agg::Stage*>(_sources.back().get()));
     }
     _sources.push_back(source);
