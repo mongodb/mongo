@@ -37,6 +37,9 @@ def write_workstation_bazelrc(args):
 
         try:
             remote = repo.branches.master.repo.remote().url
+            if "@" in remote:
+                # If the remote is an SSH URL, we want to use the URL without the user part.
+                remote = remote.split("@")[-1]
         except Exception:
             try:
                 remote = repo.remotes[0].url
