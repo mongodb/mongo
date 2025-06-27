@@ -90,6 +90,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/control/journal_flusher.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -608,6 +609,21 @@ void reconcileCatalogAndRestartUnfinishedIndexBuilds(
         LOGV2(5676600, "Clearing temp directory except for files for resumable builds");
 
         clearTempFilesExceptForResumableBuilds(reconcileResult.indexBuildsToResume, tempDir);
+    }
+
+    if (auto* spillEngine = storageEngine->getSpillEngine()) {
+        auto ru = spillEngine->newRecoveryUnit();
+        auto idents = spillEngine->getAllIdents(*ru);
+        LOGV2(10682200, "Dropping spill idents", "numIdents"_attr = idents.size());
+        for (auto&& ident : idents) {
+            auto result = spillEngine->dropIdent(*ru, ident, false);
+            if (!result.isOK()) {
+                LOGV2(10682201,
+                      "Failed to drop spill table ident during startup recovery",
+                      "ident"_attr = ident,
+                      "error"_attr = result);
+            }
+        }
     }
 
     // Two-phase index builds depend on an eventually-replicated 'commitIndexBuild' oplog entry to

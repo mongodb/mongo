@@ -183,6 +183,10 @@ TEST_F(StorageEngineTest, TemporaryRecordStoreClustered) {
 
 class StorageEngineReconcileTest : public StorageEngineTest {
 protected:
+    StorageEngineReconcileTest()
+        : StorageEngineTest(
+              StorageEngineTest::Options{}.setParameter("featureFlagCreateSpillKVEngine", true)) {}
+
     UUID collectionUUID = UUID::gen();
     UUID buildUUID = UUID::gen();
     std::string resumableIndexFileName = "foo";
@@ -196,6 +200,13 @@ protected:
         }
         ASSERT_TRUE(identExists(opCtx, ret->rs()->getIdent()));
         return ret;
+    }
+
+    std::unique_ptr<SpillTable> makeSpillTable(OperationContext* opCtx) {
+        Lock::GlobalLock lk{opCtx, MODE_IS};
+        auto spillTable = StorageEngineTest::makeSpillTable(opCtx, KeyFormat::Long, 1024);
+        ASSERT_TRUE(spillIdentExists(opCtx, spillTable->ident()));
+        return spillTable;
     }
 
     std::string prepareIndexBuild(OperationContext* opCtx, BSONObj& indexSpec) {
@@ -302,19 +313,9 @@ TEST_F(StorageEngineReconcileTest, ReconcileOnlyKeepsNecessaryIdentsForCleanShut
     ASSERT_TRUE(identExists(opCtx.get(), necessaryRs->rs()->getIdent()));
 }
 
-void createTempFiles(const boost::filesystem::path& tempDir,
-                     boost::optional<const boost::filesystem::path&> indexFile = boost::none,
-                     boost::optional<const boost::filesystem::path&> irrelevantFile = boost::none) {
-    boost::filesystem::remove_all(tempDir);
-    ASSERT_TRUE(boost::filesystem::create_directory(tempDir));
-    if (indexFile) {
-        std::ofstream file(indexFile->string());
-        ASSERT_TRUE(boost::filesystem::exists(*indexFile));
-    }
-    if (irrelevantFile) {
-        std::ofstream file(irrelevantFile->string());
-        ASSERT_TRUE(boost::filesystem::exists(*irrelevantFile));
-    }
+void createTempFile(const boost::filesystem::path& path) {
+    std::ofstream file(path.string());
+    ASSERT_TRUE(boost::filesystem::exists(path));
 }
 
 TEST_F(StorageEngineReconcileTest, StartupRecoveryForUncleanShutdown) {
@@ -326,21 +327,16 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryForUncleanShutdown) {
     std::unique_ptr<TemporaryRecordStore> necessaryRs = makeInternalTable(opCtx.get());
     std::unique_ptr<TemporaryRecordStore> resumableIndexRs =
         makeIndexBuildResumeTable(opCtx.get(), *necessaryRs);
-
-    // Test cleanup of temporary directory used by resumable index build
-    auto tempDir = boost::filesystem::path(storageGlobalParams.dbpath).append("_tmp");
-    createTempFiles(tempDir);
+    auto spillTable = makeSpillTable(opCtx.get());
 
     startup_recovery::repairAndRecoverDatabases(opCtx.get(),
                                                 StorageEngine::LastShutdownState::kUnclean);
-
-    // tempDir is not used and completely cleared when starting up after an unclean shutdown.
-    ASSERT_FALSE(boost::filesystem::exists(tempDir));
 
     // Reconcile will drop all temporary idents when starting up after an unclean shutdown.
     ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->rs()->getIdent()));
     ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->rs()->getIdent()));
     ASSERT_FALSE(identExists(opCtx.get(), necessaryRs->rs()->getIdent()));
+    ASSERT_FALSE(spillIdentExists(opCtx.get(), spillTable->ident()));
 }
 
 // Abort the two-phase index build since it hangs in vote submission, because we are not running
@@ -374,7 +370,8 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryResumableIndexForCleanShutdown
     auto irrelevantFile = tempDir / "garbage";
     // Create a file for resumable index build
     auto indexFile = tempDir / resumableIndexFileName;
-    createTempFiles(tempDir, indexFile, irrelevantFile);
+    createTempFile(indexFile);
+    createTempFile(irrelevantFile);
 
     ScopeGuard abortIndexOnExit([this, &opCtx] { abortIndexBuild(opCtx.get(), buildUUID); });
     startup_recovery::repairAndRecoverDatabases(opCtx.get(),
@@ -414,7 +411,7 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryResumableIndexFallbackToRestar
     // Test cleanup of temporary directory used by resumable index build
     auto tempDir = boost::filesystem::path(storageGlobalParams.dbpath).append("_tmp");
     auto indexFile = tempDir / resumableIndexFileName;
-    createTempFiles(tempDir, indexFile);
+    createTempFile(indexFile);
 
     ScopeGuard abortIndexOnExit([this, &opCtx] { abortIndexBuild(opCtx.get(), buildUUID); });
     startup_recovery::repairAndRecoverDatabases(opCtx.get(),
@@ -441,16 +438,9 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryRestartIndexForCleanShutdown) 
         indexIdent = prepareIndexBuild(opCtx.get(), unusedSpec);
     }
 
-    // Test cleanup of temporary directory used by resumable index build
-    auto tempDir = boost::filesystem::path(storageGlobalParams.dbpath).append("_tmp");
-    createTempFiles(tempDir);
-
     ScopeGuard abortIndexOnExit([this, &opCtx] { abortIndexBuild(opCtx.get(), buildUUID); });
     startup_recovery::repairAndRecoverDatabases(opCtx.get(),
                                                 StorageEngine::LastShutdownState::kClean);
-
-    // tempDir is removed because there is no resumable build.
-    ASSERT_FALSE(boost::filesystem::exists(tempDir));
 
     ASSERT(identExists(opCtx.get(), indexIdent));
 }
