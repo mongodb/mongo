@@ -413,12 +413,24 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_library(
+    name = "sock_test_utils",
+    srcs = [
+        "sock_test_utils.cpp",
+    ],
+    hdrs = [
+        "sock_test_utils.h",
+    ],
+    deps = [
+        ":network",
+        ":ssl_manager",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "util_net_ssl_test",
     srcs = [
         "sock_test.cpp",
-        "sock_test_utils.cpp",
-        "sock_test_utils.h",
         "ssl_manager_test.cpp",
         "ssl_options_test.cpp",
         "//src/mongo/util/cmdline_utils:censor_cmdline_test.h",
@@ -433,6 +445,7 @@ mongo_cc_unit_test(
     }),
     deps = [
         ":network",
+        ":sock_test_utils",
         ":ssl_manager",
         ":ssl_options_server",
         ":ssl_types",
