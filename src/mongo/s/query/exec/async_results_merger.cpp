@@ -109,7 +109,6 @@ Status getStatusFromReleaseMemoryCommandResponse(const AsyncRequestsSender::Resp
                           << reply.toBSON(),
             (reply.getCursorsReleased().size() + reply.getCursorsCurrentlyPinned().size() +
              reply.getCursorsNotFound().size() + reply.getCursorsWithErrors().size()) == 1);
-
     if (!reply.getCursorsCurrentlyPinned().empty()) {
         return Status{ErrorCodes::CursorInUse,
                       generateReason(reply.getCursorsCurrentlyPinned().front())};
@@ -742,39 +741,47 @@ Status AsyncResultsMerger::scheduleGetMores() {
 
 
 Status AsyncResultsMerger::releaseMemory() {
-    AsyncRequestsSender::ShardHostMap shardHostMap;
-    std::vector<AsyncRequestsSender::Request> requests;
-    requests.reserve(_remotes.size());
-    for (const auto& remote : _remotes) {
-        if (!remote->status.isOK()) {
-            return remote->status;
-        }
-        if (remote->exhausted()) {
-            continue;
-        }
-        const std::vector<mongo::CursorId> params{remote->cursorId};
-        ReleaseMemoryCommandRequest releaseMemoryCmd(params);
-        releaseMemoryCmd.setDbName(remote->cursorNss.dbName());
-        BSONObjBuilder commandObj;
-        releaseMemoryCmd.serialize(&commandObj);
+    boost::optional<AsyncRequestsSender> sender;
 
-        shardHostMap.emplace(remote->shardId, remote->shardHostAndPort);
-        requests.emplace_back(remote->shardId, commandObj.obj());
+    {
+        AsyncRequestsSender::ShardHostMap shardHostMap;
+        std::vector<AsyncRequestsSender::Request> requests;
+
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+        requests.reserve(_remotes.size());
+        for (const auto& remote : _remotes) {
+            if (!remote->status.isOK()) {
+                return remote->status;
+            }
+            if (remote->exhausted()) {
+                continue;
+            }
+            const std::vector<mongo::CursorId> params{remote->cursorId};
+            ReleaseMemoryCommandRequest releaseMemoryCmd(params);
+            releaseMemoryCmd.setDbName(remote->cursorNss.dbName());
+            BSONObjBuilder commandObj;
+            releaseMemoryCmd.serialize(&commandObj);
+
+            shardHostMap.emplace(remote->shardId, remote->shardHostAndPort);
+            requests.emplace_back(remote->shardId, commandObj.obj());
+        }
+
+        sender.emplace(_opCtx,
+                       _executor,
+                       _params.getNss().dbName(),
+                       requests,
+                       ReadPreferenceSetting::get(_opCtx),
+                       Shard::RetryPolicy::kNoRetry,
+                       nullptr /*resourceYielder*/,
+                       shardHostMap);
     }
-
-    AsyncRequestsSender sender{_opCtx,
-                               _executor,
-                               _params.getNss().dbName(),
-                               requests,
-                               ReadPreferenceSetting::get(_opCtx),
-                               Shard::RetryPolicy::kNoRetry,
-                               nullptr /*resourceYielder*/,
-                               shardHostMap};
 
     Status resStatus = Status::OK();
     BSONObjBuilder finalMessageBuilder;
-    while (!sender.done()) {
-        auto status = getStatusFromReleaseMemoryCommandResponse(sender.next());
+
+    while (!sender->done()) {
+        auto status = getStatusFromReleaseMemoryCommandResponse(sender->next());
         if (status.isOK()) {
             continue;
         }
@@ -790,7 +797,7 @@ Status AsyncResultsMerger::releaseMemory() {
         if (safeErrorCodes.find(status.code()) == safeErrorCodes.end()) {
             // The shard returned a fatal error. Return immediately since the cursor will be killed
             // anyway.
-            sender.stopRetrying();
+            sender->stopRetrying();
             return status;
         }
 
@@ -798,7 +805,6 @@ Status AsyncResultsMerger::releaseMemory() {
 
         resStatus = status;
     }
-
 
     if (!resStatus.isOK()) {
         return Status{ErrorCodes::ReleaseMemoryShardError, finalMessageBuilder.obj().toString()};
