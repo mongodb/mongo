@@ -6,6 +6,7 @@
  * By using a fresh connection the client last op begins as null.  This test explicitly tests that
  * write concern for noop writes works when the client last op has not already been set by a
  * duplicate operation.
+ *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
@@ -43,7 +44,7 @@ function runTest(readConcernLevel) {
     const sessionDB1 = session1.getDatabase(dbName);
     // TODO (SERVER-100669): Remove version check once 9.0 becomes last LTS.
     const versionSupportsAbortWaitingForWC =
-        MongoRunner.compareBinVersions(mongo1.adminCommand({serverStatus: 1}).version, "8.1") >= 0;
+        MongoRunner.compareBinVersions(mongo1.adminCommand({serverStatus: 1}).version, "8.0") >= 0;
     session1.startTransaction({
         writeConcern: {
             w: "majority",
