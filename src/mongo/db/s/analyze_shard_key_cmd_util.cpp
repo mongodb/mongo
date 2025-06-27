@@ -44,11 +44,14 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -80,6 +83,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/idl/idl_parser.h"
@@ -346,23 +350,20 @@ void runClusterAggregate(OperationContext* opCtx,
     boost::optional<UUID> collUuid;
     std::unique_ptr<CollatorInterface> collation;
     {
-        const auto collection = acquireCollectionMaybeLockFree(
-            opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead));
+        AutoGetCollectionForReadCommandMaybeLockFree collection(opCtx, nss);
 
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Cannot run aggregation against a non-existing collection",
-                collection.exists());
+                collection);
 
-        collUuid = collection.uuid();
+        collUuid = collection->uuid();
         collation = [&] {
             auto collationObj = aggRequest.getCollation();
             if (collationObj && !collationObj->isEmpty()) {
                 return uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
                                            ->makeFromBSON(*collationObj));
             }
-            return CollatorInterface::cloneCollator(
-                collection.getCollectionPtr()->getDefaultCollator());
+            return CollatorInterface::cloneCollator(collection->getDefaultCollator());
         }();
     }
 
@@ -447,6 +448,7 @@ struct IndexSpec {
  */
 boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
                                                        const CollectionPtr& collection,
+                                                       const IndexCatalog* indexCatalog,
                                                        const BSONObj& shardKey) {
     if (collection->isClustered()) {
         auto indexSpec = collection->getClusteredInfo()->getIndexSpec();
@@ -460,8 +462,7 @@ boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
     // Go through the indexes in the index catalog to find the most compatible index.
     boost::optional<IndexSpec> compatibleIndexSpec;
 
-    auto indexIterator =
-        collection->getIndexCatalog()->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
+    auto indexIterator = indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
     while (indexIterator->more()) {
         auto indexEntry = indexIterator->next();
         auto indexDesc = indexEntry->descriptor();
@@ -1083,19 +1084,17 @@ boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
     auto shardKeyBson = shardKey.toBSON();
     BSONObj indexKeyBson;
     {
-        const auto collection = acquireCollectionMaybeLockFree(
-            opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead));
+        AutoGetCollectionForReadCommandMaybeLockFree collection(opCtx, nss);
 
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Cannot analyze a shard key for a non-existing collection",
-                collection.exists());
+                collection);
         // Perform best-effort validation that the collection has not been dropped and recreated.
         uassert(CollectionUUIDMismatchInfo(
                     nss.dbName(), collUuid, std::string{nss.coll()}, boost::none),
                 str::stream() << "Found that the collection UUID has changed from " << collUuid
-                              << " to " << collection.uuid() << " since the command started",
-                collection.uuid() == collUuid);
+                              << " to " << collection->uuid() << " since the command started",
+                collection->uuid() == collUuid);
 
         // Performs best-effort validation that the shard key does not contain an array field by
         // extracting the shard key value from a random document in the collection and asserting
@@ -1119,8 +1118,8 @@ boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
         // Restore the original readConcern.
         repl::ReadConcernArgs::get(opCtx) = originalReadConcernArgs;
 
-        const auto& collectionPtr = collection.getCollectionPtr();
-        auto indexSpec = findCompatiblePrefixedIndex(opCtx, collectionPtr, shardKeyBson);
+        auto indexSpec = findCompatiblePrefixedIndex(
+            opCtx, *collection, collection->getIndexCatalog(), shardKeyBson);
 
         if (!indexSpec) {
             return boost::none;
@@ -1145,7 +1144,7 @@ boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
               logAttrs(nss),
               "analyzeShardKeyId"_attr = analyzeShardKeyId);
         auto monotonicityMetrics = calculateMonotonicity(
-            opCtx, analyzeShardKeyId, collectionPtr, shardKeyBson, sampleRate, sampleSize);
+            opCtx, analyzeShardKeyId, *collection, shardKeyBson, sampleRate, sampleSize);
         LOGV2(7790002,
               "Finished calculating metrics about the monotonicity of the shard key",
               logAttrs(nss),

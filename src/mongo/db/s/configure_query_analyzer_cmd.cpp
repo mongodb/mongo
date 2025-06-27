@@ -188,7 +188,7 @@ public:
             // Wait for the metadata for this collection in the CollectionCatalog to be majority
             // committed before validating its options and persisting the configuration.
             waitUntilMajorityLastOpTime(opCtx);
-            const auto collUuid = uassertStatusOK(validateCollectionOptions(opCtx, nss));
+            auto collUuid = uassertStatusOK(validateCollectionOptions(opCtx, nss));
 
             LOGV2(6915001,
                   "Persisting query analyzer configuration",

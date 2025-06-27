@@ -680,17 +680,5 @@ NamespaceString resolveNssWithoutAcquisition(OperationContext* opCtx,
 boost::optional<NamespaceString> lookupNssWithoutAcquisition(OperationContext* opCtx,
                                                              const UUID& uuid);
 
-/**
- * Returns the CollectionOptions or ViewDefinition for a given namespace, or a monostate if it does
- * not exist. This method does not guarantee stability, so it may only be used when that stability
- * is not necessary or guaranteed otherwise (e.g. a dbPrimary shard executing a DDL under DDL
- * locks).
- * This method will check the database version, if any attached on the opCtx's
- * OperationShardingState.
- */
-std::variant<CollectionOptions, std::shared_ptr<const ViewDefinition>, std::monostate>
-getCollectionOptionsOrViewDefinitionWithoutAcquisition(OperationContext* opCtx,
-                                                       const NamespaceString& nss);
-
 }  // namespace shard_role_nocheck
 }  // namespace mongo
