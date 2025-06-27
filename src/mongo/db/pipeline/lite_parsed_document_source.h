@@ -331,14 +331,6 @@ protected:
     }
 
 private:
-    /**
-     * Give access to 'parserMap' so we can remove a registered parser. unregisterParser_forTest is
-     * only meant to be used in the context of unit tests. This is because the parserMap is not
-     * thread safe, so modifying it at runtime is unsafe.
-     */
-    friend class DocumentSourceExtensionTest;
-    static void unregisterParser_forTest(const std::string& name);
-
     std::string _parseTimeName;
 };
 
