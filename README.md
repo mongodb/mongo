@@ -11,7 +11,7 @@ Welcome to MongoDB!
 
 - https://www.mongodb.com/try/download/community
 - Using homebrew `brew tap mongodb/brew`
-- Using docker image `docker pull mongo`
+- Using docker image `docker pull mongodb/mongodb-community-server`
 
 ## Download the MongoDB Shell
 
