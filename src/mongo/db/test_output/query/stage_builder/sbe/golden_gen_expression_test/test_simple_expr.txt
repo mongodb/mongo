@@ -65,43 +65,43 @@ isMember(getField(s1, "field1"), [1, 2, 3, 4, 5])
 ExpressionIsNumber
 
     let [
-        l18.0 = getField(s1, "field1") 
+        l17.0 = getField(s1, "field1") 
     ] 
     in 
-        if exists(l18.0) 
-        then isNumber(move(l18.0)) 
+        if exists(l17.0) 
+        then isNumber(move(l17.0)) 
         else false 
 
 # Golden test output of GoldenGenExpressionTest/TestSimpleExpr
 ExpressionLet
 
     let [
-        l23.0 = 
+        l21.0 = 
             let [
-                l24.0 = getField(s1, "field1") 
+                l22.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l24.0, 1088) ?: true) 
+                if (typeMatch(l22.0, 1088) ?: true) 
                 then null 
                 elif ((
-                    if isNumber(l24.0) 
+                    if isNumber(l22.0) 
                     then 0 
-                    elif isDate(l24.0) 
+                    elif isDate(l22.0) 
                     then 1 
                     else fail(7157723, "only numbers and dates are allowed in an $add expression") 
                 + 0) > 1) 
                 then fail(7157722, "only one date allowed in an $add expression") 
-                else (move(l24.0) + 1) 
+                else (move(l22.0) + 1) 
     ] 
     in 
         let [
-            l25.0 = getField(s1, "field1") 
+            l23.0 = getField(s1, "field1") 
         ] 
         in 
-            if ((typeMatch(l23.0, 1088) ?: true) || (typeMatch(l25.0, 1088) ?: true)) 
+            if ((typeMatch(l21.0, 1088) ?: true) || (typeMatch(l23.0, 1088) ?: true)) 
             then null 
-            elif (isNumber(l23.0) && isNumber(l25.0)) 
-            then (move(l23.0) * move(l25.0)) 
+            elif (isNumber(l21.0) && isNumber(l23.0)) 
+            then (move(l21.0) * move(l23.0)) 
             else fail(7157721, "only numbers are allowed in an $multiply expression") 
 
 # Golden test output of GoldenGenExpressionTest/TestSimpleExpr
@@ -117,17 +117,17 @@ ExpressionOr
 ExpressionRange
 
     let [
-        l32.0 = getField(s1, "field1") 
+        l26.0 = getField(s1, "field1") 
     ] 
     in 
-        if isNumber(l32.0) 
+        if isNumber(l26.0) 
         then 
             let [
-                l33.0 = convert ( move(l32.0), int32) 
+                l27.0 = convert ( move(l26.0), int32) 
             ] 
             in 
-                if exists(l33.0) 
-                then newArrayFromRange(0, move(l33.0), 2) 
+                if exists(l27.0) 
+                then newArrayFromRange(0, move(l27.0), 2) 
                 else fail(7157715, "$range end argument cannot be represented as a 32-bit integer") 
         
         else fail(7157712, "$range only supports numeric types for end") 

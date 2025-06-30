@@ -28,26 +28,26 @@ ExprMatchExpression
 (coerceToBool(isMember(getField(s1, "field1"), [1, 2, 3, 4, 5])) ?: false) 
 # Golden test output of GoldenGenFilternTest/TestSimpleExpr
 InMatchExpression
-traverseF(getField(s1, "field1"), lambda(l15.0) { isMember(move(l15.0), s2) }, false) 
+traverseF(getField(s1, "field1"), lambda(l14.0) { isMember(move(l14.0), s2) }, false) 
 # Golden test output of GoldenGenFilternTest/TestSimpleExpr
 InMatchExpressionRegex
-traverseF(getField(s1, "str"), lambda(l17.0) { (isMember(
-    if (typeMatch(l17.0, 1024) ?: true) 
+traverseF(getField(s1, "str"), lambda(l16.0) { (isMember(
+    if (typeMatch(l16.0, 1024) ?: true) 
     then null 
-    else l17.0 
-, s3) || ((isMember(l17.0, [/ABc/i]) ?: false) || (regexMatch([PcreRegex(/ABc/i)], l17.0) ?: false))) }, false) 
+    else l16.0 
+, s3) || ((isMember(l16.0, [/ABc/i]) ?: false) || (regexMatch([PcreRegex(/ABc/i)], l16.0) ?: false))) }, false) 
 # Golden test output of GoldenGenFilternTest/TestSimpleExpr
 ModMatchExpression
-traverseF(getField(s1, "field1"), lambda(l19.0) { ((mod(convert ( trunc(move(l19.0)), int64), 4ll) == 1ll) ?: false) }, false) 
+traverseF(getField(s1, "field1"), lambda(l18.0) { ((mod(convert ( trunc(move(l18.0)), int64), 4ll) == 1ll) ?: false) }, false) 
 # Golden test output of GoldenGenFilternTest/TestSimpleExpr
 NorMatchExpression
-!(traverseF(getField(s1, "field1"), lambda(l21.0) { ((move(l21.0) == 4) ?: false) }, false)) 
+!(traverseF(getField(s1, "field1"), lambda(l20.0) { ((move(l20.0) == 4) ?: false) }, false)) 
 # Golden test output of GoldenGenFilternTest/TestSimpleExpr
 RegexMatchExpression
-traverseF(getField(s1, "str"), lambda(l23.0) { (((l23.0 == /ABc/i) ?: false) || (regexMatch(PcreRegex(/ABc/i), l23.0) ?: false)) }, false) 
+traverseF(getField(s1, "str"), lambda(l22.0) { (((l22.0 == /ABc/i) ?: false) || (regexMatch(PcreRegex(/ABc/i), l22.0) ?: false)) }, false) 
 # Golden test output of GoldenGenFilternTest/TestSimpleExpr
 SizeMatchExpression
 ((getArraySize(getField(s1, "str")) == 4) ?: false) 
 # Golden test output of GoldenGenFilternTest/TestSimpleExpr
 TypeMatchExpression
-traverseF(getField(s1, "field1"), lambda(l26.0) { (typeMatch(move(l26.0), 65536) ?: false) }, false) 
+traverseF(getField(s1, "field1"), lambda(l25.0) { (typeMatch(move(l25.0), 65536) ?: false) }, false) 
