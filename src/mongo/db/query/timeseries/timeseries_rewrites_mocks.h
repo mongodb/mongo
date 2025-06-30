@@ -354,7 +354,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void onDeregisterFromCatalog(OperationContext*) override {
+    void onDeregisterFromCatalog(ServiceContext*) override {
         MONGO_UNREACHABLE;
     }
 
