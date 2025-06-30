@@ -121,6 +121,13 @@ outputs. Verifies the output with the expected output that is in the source repo
 
 See: [golden_test.h](../src/mongo/unittest/golden_test.h)
 
+Described below is the config file created during setup, which the golden testing framework knows to
+reference by the `GOLDEN_TEST_CONFIG_PATH` environment variable. Bazel does not propagate environment
+variables, so when running a golden unit test we need to manually specify the variable via
+`bazel test --test_env=GOLDEN_TEST_CONFIG_PATH="/path/to/config/.golden_test_config.yml" +my_golden_test`.
+Without this, the test will still pass or fail as expected, but this does ensure that the test outputs
+are written to the expected location so that the `diff` and `accept` functions work as expected.
+
 **Example:**
 
 ```c++
