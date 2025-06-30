@@ -2120,17 +2120,6 @@ TEST(ExpressionFilterTest, CorrectRedactionWithLimit) {
         serialized);
 }
 
-// This test fails since featureFlagQETextSearchPreview is disabled by default.
-// TODO SERVER-65769: Remove when feature flag is enabled by default.
-TEST(ExpressionFLEStartsWithTest, FeatureFlagDisabled) {
-    auto expCtx = ExpressionContextForTest();
-    auto vps = expCtx.variablesParseState;
-    {
-        auto expr = fromjson("{$encStrStartsWith: 12}");
-        ASSERT_THROWS_CODE(Parse::Object::parseObject(expr), DBException, 168);
-    }
-}
-
 TEST(ExpressionFLEStartsWithTest, ParseAssertConstraints) {
     auto expCtx = ExpressionContextForTest();
     auto vps = expCtx.variablesParseState;
@@ -2279,17 +2268,6 @@ TEST(ExpressionFLEStartsWithTest, ParseBinDataPayloadRoundtrip) {
         }})");
 
     ASSERT_BSONOBJ_EQ(value.getDocument().toBson(), roundTripExpr);
-}
-
-// This test fails since featureFlagQETextSearchPreview is disabled by default.
-// TODO SERVER-65769: Remove when feature flag is enabled by default.
-TEST(ExpressionFLEEndsWithTest, FeatureFlagDisabled) {
-    auto expCtx = ExpressionContextForTest();
-    auto vps = expCtx.variablesParseState;
-    {
-        auto expr = fromjson("{$encStrEndsWith: 12}");
-        ASSERT_THROWS_CODE(Parse::Object::parseObject(expr), DBException, 168);
-    }
 }
 
 TEST(ExpressionFLEEndsWithTest, ParseAssertConstraints) {
@@ -2442,17 +2420,6 @@ TEST(ExpressionFLEEndsWithTest, ParseBinDataPayloadRoundtrip) {
     ASSERT_BSONOBJ_EQ(value.getDocument().toBson(), roundTripExpr);
 }
 
-// This test fails since featureFlagQETextSearchPreview is disabled by default.
-// TODO SERVER-65769: Remove when feature flag is enabled by default.
-TEST(ExpressionFLEStrContainsTest, FeatureFlagDisabled) {
-    auto expCtx = ExpressionContextForTest();
-    auto vps = expCtx.variablesParseState;
-    {
-        auto expr = fromjson("{$encStrContains: 12}");
-        ASSERT_THROWS_CODE(Parse::Object::parseObject(expr), DBException, 168);
-    }
-}
-
 TEST(ExpressionFLEStrContainsTest, ParseAssertConstraints) {
     auto expCtx = ExpressionContextForTest();
     auto vps = expCtx.variablesParseState;
@@ -2599,17 +2566,6 @@ TEST(ExpressionFLEStrContainsTest, ParseBinDataPayloadRoundtrip) {
                 }}}}})");
 
     ASSERT_BSONOBJ_EQ(value.getDocument().toBson(), roundTripExpr);
-}
-
-// This test fails since featureFlagQETextSearchPreview is disabled by default.
-// TODO SERVER-65769: Remove when feature flag is enabled by default.
-TEST(ExpressionFLEStrNormalizedEqTest, FeatureFlagDisabled) {
-    auto expCtx = ExpressionContextForTest();
-    auto vps = expCtx.variablesParseState;
-    {
-        auto expr = fromjson("{$encStrNormalizedEq: 12}");
-        ASSERT_THROWS_CODE(Parse::Object::parseObject(expr), DBException, 168);
-    }
 }
 
 TEST(ExpressionFLEStrNormalizedEqTest, ParseAssertConstraints) {

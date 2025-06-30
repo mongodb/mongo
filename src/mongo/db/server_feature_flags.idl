@@ -133,7 +133,8 @@ feature_flags:
     featureFlagQETextSearchPreview:
         description: "Queryable Encryption text search"
         cpp_varname: gFeatureFlagQETextSearchPreview
-        default: false
+        default: true
+        version: 8.2
         fcv_gated: true
     featureFlagExposeClientIpInAuditLogs:
         description: "Expose client IP in audit logs for load-balanced connections"
