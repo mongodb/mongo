@@ -36,25 +36,25 @@ ExpressionFromAccumulator<AccumulatorStdDevPop>
 ExpressionFromAccumulator<AccumulatorStdDevSamp>
 
     let [
-        l12.0 = 
+        l11.0 = 
             let [
-                l13.0 = getField(s1, "arr") 
+                l12.0 = getField(s1, "arr") 
             ] 
             in 
-                if (typeMatch(l13.0, 1088) ?: true) 
+                if (typeMatch(l12.0, 1088) ?: true) 
                 then null 
-                elif isArray(l13.0) 
-                then (stdDevSamp(move(l13.0)) ?: null) 
+                elif isArray(l12.0) 
+                then (stdDevSamp(move(l12.0)) ?: null) 
                 else null 
     ] 
     in 
-        if (typeMatch(l12.0, 1088) ?: true) 
+        if (typeMatch(l11.0, 1088) ?: true) 
         then null 
-        elif !(isNumber(l12.0)) 
+        elif !(isNumber(l11.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
         elif ((4 != trunc(4)) ?: true) 
         then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
-        else trunc(move(l12.0), 4) 
+        else trunc(move(l11.0), 4) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprAccumulator
 ExpressionFromAccumulator<AccumulatorSum>
