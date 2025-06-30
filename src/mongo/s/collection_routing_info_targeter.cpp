@@ -245,19 +245,22 @@ std::unique_ptr<RoutingContext> CollectionRoutingInfoTargeter::_init(OperationCo
         }
     };
 
-    // For a tracked time-series collection, only the underlying buckets collection is stored on the
-    // config servers. If the user operation is on the time-series view namespace, we should check
-    // if the buckets namespace is tracked on the configsvr. There are a few cases that we need to
-    // take care of:
+    // For a tracked viewful time-series collection, only the underlying buckets collection is
+    // stored on the config servers. If the user operation is on the time-series view namespace, we
+    // should check if the buckets namespace is tracked on the configsvr. There are a few cases that
+    // we need to take care of:
     // 1. The request is on the view namespace. We check if the buckets collection is tracked. If it
     //    is, we use the buckets collection namespace for the purpose of targeting. Additionally, we
-    //    set the '_isRequestOnTimeseriesViewNamespace' to true for this case.
+    //    set the `_nssConvertedToTimeseriesBuckets` to true for this case.
     // 2. If request is on the buckets namespace, we don't need to execute any additional
     //    time-series logic. We can treat the request as though it was a request on a regular
     //    collection.
     // 3. During a cache refresh the buckets collection changes from tracked to untracked. In this
     //    case, if the original request is on the view namespace, then we should reset the namespace
-    //    back to the view namespace and reset '_isRequestOnTimeseriesViewNamespace'.
+    //    back to the view namespace and reset `_nssConvertedToTimeseriesBuckets`.
+    //
+    // TODO SERVER-106874 remove this if/else block entirely once 9.0 becomes last LTS. By then we
+    // will only have viewless timeseries that do not require nss translation.
     if (!cm.hasRoutingTable() && !_nss.isTimeseriesBucketsCollection()) {
         auto bucketsNs = _nss.makeTimeseriesBucketsNamespace();
         auto bucketsRoutingCtx = createDatabaseAndGetRoutingCtx(bucketsNs);
@@ -265,19 +268,17 @@ std::unique_ptr<RoutingContext> CollectionRoutingInfoTargeter::_init(OperationCo
         if (bucketsCri.hasRoutingTable()) {
             _nss = bucketsNs;
             cm = std::move(bucketsCri.getChunkManager());
-            if (!isRawDataOperation(opCtx)) {
-                _isRequestOnTimeseriesViewNamespace = true;
-            }
+            _nssConvertedToTimeseriesBuckets = true;
             checkStaleEpoch(cm);
             return bucketsRoutingCtx;
         }
-    } else if (!cm.hasRoutingTable() && _isRequestOnTimeseriesViewNamespace) {
+    } else if (!cm.hasRoutingTable() && _nssConvertedToTimeseriesBuckets) {
         // This can happen if a tracked time-series collection is dropped and re-created. Then we
         // need to reset the namespace to the original namespace.
         _nss = _nss.getTimeseriesViewNamespace();
         auto newRoutingCtx = createDatabaseAndGetRoutingCtx(_nss);
         cm = std::move(newRoutingCtx->getCollectionRoutingInfo(_nss).getChunkManager());
-        _isRequestOnTimeseriesViewNamespace = false;
+        _nssConvertedToTimeseriesBuckets = false;
         checkStaleEpoch(cm);
         return newRoutingCtx;
     }
@@ -299,8 +300,9 @@ BSONObj CollectionRoutingInfoTargeter::extractBucketsShardKeyFromTimeseriesDoc(
     auto timeField = timeseriesOptions.getTimeField();
     auto timeElement = doc.getField(timeField);
     uassert(5743702,
-            str::stream() << "'" << timeField
-                          << "' must be present and contain a valid BSON UTC datetime value",
+            fmt::format("Timeseries time field '{}' must be present and contain a valid BSON UTC "
+                        "datetime value",
+                        timeField),
             !timeElement.eoo() && timeElement.type() == BSONType::date);
     auto roundedTimeValue =
         timeseries::roundTimestampToGranularity(timeElement.date(), timeseriesOptions);
@@ -365,6 +367,17 @@ bool CollectionRoutingInfoTargeter::isExactIdQuery(OperationContext* opCtx,
     return cq.isOK() && _isExactIdQuery(*cq.getValue(), cm);
 }
 
+bool CollectionRoutingInfoTargeter::_isTimeseriesLogicalOperation(OperationContext* opCtx) const {
+    // For viewless timeseries collections logical operations are those that do not specifcy
+    // rawData flag.
+    //
+    // For legacy viewful timeseries collection logical operations are the ones that either:
+    //  - Target the view namespace and specify the rawData flag
+    //  - Target directly the bucket namespace
+    return _cri.getChunkManager().isTimeseriesCollection() && !isRawDataOperation(opCtx) &&
+        (_cri.getChunkManager().isNewTimeseriesWithoutView() || _nssConvertedToTimeseriesBuckets);
+}
+
 ShardEndpoint CollectionRoutingInfoTargeter::targetInsert(OperationContext* opCtx,
                                                           const BSONObj& doc) const {
     if (!_cri.isSharded()) {
@@ -380,9 +393,9 @@ ShardEndpoint CollectionRoutingInfoTargeter::targetInsert(OperationContext* opCt
                     "Document is missing _id field, which is part of the shard key pattern",
                     doc.hasField("_id"));
         }
-        if (_isRequestOnTimeseriesViewNamespace) {
-            auto tsFields = _cri.getChunkManager().getTimeseriesFields();
-            tassert(5743701, "Missing timeseriesFields on buckets collection", tsFields);
+        if (_isTimeseriesLogicalOperation(opCtx)) {
+            const auto& tsFields = _cri.getChunkManager().getTimeseriesFields();
+            tassert(5743701, "Missing timeseriesFields on timeseries collection", tsFields);
             shardKey = extractBucketsShardKeyFromTimeseriesDoc(
                 doc, shardKeyPattern, tsFields->getTimeseriesOptions());
         } else {
@@ -439,7 +452,7 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
     const bool isUpsert = updateOp.getUpsert();
     auto query = updateOp.getFilter();
 
-    if (_isRequestOnTimeseriesViewNamespace) {
+    if (_isTimeseriesLogicalOperation(opCtx)) {
         uassert(ErrorCodes::InvalidOptions,
                 str::stream()
                     << "A {multi:false} update on a sharded timeseries collection is disallowed.",
@@ -495,7 +508,7 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetUpdate(
 
     bool multipleEndpoints = result.endpoints.size() > 1u;
     const bool isExactId =
-        _isExactIdQuery(*cq, _cri.getChunkManager()) && !_isRequestOnTimeseriesViewNamespace;
+        _isExactIdQuery(*cq, _cri.getChunkManager()) && !_isTimeseriesLogicalOperation(opCtx);
 
     // For multi:false upserts that involve multiple shards, and for multi:false non-upsert updates
     // whose filter doesn't have an "_id" equality that involve multiple shards, we use the two
@@ -564,7 +577,7 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetDelete(
 
     BSONObj deleteQuery = deleteOp.getFilter();
 
-    if (_isRequestOnTimeseriesViewNamespace) {
+    if (_isTimeseriesLogicalOperation(opCtx)) {
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot perform a non-multi delete on a time-series collection",
                 feature_flags::gTimeseriesDeletesSupport.isEnabled(
@@ -596,7 +609,7 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetDelete(
         str::stream() << "Could not parse delete query " << deleteQuery);
 
     const bool isExactId =
-        _isExactIdQuery(*cq, _cri.getChunkManager()) && !_isRequestOnTimeseriesViewNamespace;
+        _isExactIdQuery(*cq, _cri.getChunkManager()) && !_isTimeseriesLogicalOperation(opCtx);
 
     // Target based on the delete's filter.
     auto endpoints = uassertStatusOK(_targetQuery(*cq));

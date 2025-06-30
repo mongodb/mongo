@@ -217,6 +217,8 @@ private:
 
     static bool _isExactIdQuery(const CanonicalQuery& query, const ChunkManager& cm);
 
+    bool _isTimeseriesLogicalOperation(OperationContext* opCtx) const;
+
     /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard query.
      *
@@ -256,9 +258,13 @@ private:
     // Full namespace of the collection for this targeter
     NamespaceString _nss;
 
-    // Used to identify the original namespace that the user has requested. Note: this will only
-    // be true if the buckets namespace is tracked by the configsvr.
-    bool _isRequestOnTimeseriesViewNamespace = false;
+    // Set to true when the request was originally targeting the view of a tracked timeseries
+    // collection and the namespace got converted to the underlying buckets collection. Note: this
+    // will only be true if the timeseries collection is tracked in the global catalog.
+    //
+    // TODO SERVER-106874 remove this parameter once 9.0 becomes last LTS. By then we will only have
+    // viewless timeseries so nss conversion will not be needed anymore
+    bool _nssConvertedToTimeseriesBuckets = false;
 
     // Stores last error occurred
     boost::optional<LastErrorType> _lastError;
