@@ -63,6 +63,10 @@ void LiteParsedDocumentSource::registerParser(const std::string& name,
     aggStageCounters.addMetric(name);
 }
 
+void LiteParsedDocumentSource::unregisterParser_forTest(const std::string& name) {
+    parserMap.erase(name);
+}
+
 std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
     const NamespaceString& nss, const BSONObj& spec, const LiteParserOptions& options) {
     uassert(40323,

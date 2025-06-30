@@ -743,6 +743,13 @@ protected:
         return shardId;
     }};
 
+    /**
+     * unregisterParser_forTest is only meant to be used in the context of unit tests. This is
+     * because the parserMap is not thread safe, so modifying it at runtime is unsafe.
+     */
+
+    static void unregisterParser_forTest(const std::string& name);
+
 private:
     // Give access to 'parserMap' for the implementation of $listMqlEntities but hiding 'parserMap'
     // from all other DocumentSource implementations.
