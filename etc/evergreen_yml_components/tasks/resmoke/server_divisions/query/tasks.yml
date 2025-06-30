@@ -1126,6 +1126,16 @@ tasks:
         vars:
           suite: core
 
+  - <<: *gen_task_template
+    name: jsCore_in_parts_gen
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: core
+          use_large_distro: "true"
+          fallback_num_sub_suites: 2
+
   ## jstestfuzz ##
   - <<: *jstestfuzz_template
     name: jstestfuzz_gen
@@ -1995,15 +2005,15 @@ tasks:
           suite: generational_fuzzer
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
-  - <<: *task_template
-    name: jsCore_wildcard_indexes
+  - <<: *gen_task_template
+    name: jsCore_wildcard_indexes_gen
     tags:
       ["assigned_to_jira_team_server_query_optimization", "default", "jscore"]
     commands:
-      - func: "do setup"
-      - func: "run tests"
+      - func: "generate resmoke tasks"
         vars:
           suite: core_wildcard_indexes
+          fallback_num_sub_suites: 2
 
   - <<: *task_template
     name: json_schema

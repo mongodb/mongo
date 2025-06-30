@@ -312,9 +312,9 @@ buildvariants:
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_aubsan
     tasks:
-      - name: jsCore
+      - name: jsCore_in_parts_gen
       - name: jsCore_txns
-      - name: jsCore_wildcard_indexes
+      - name: jsCore_wildcard_indexes_gen
 
   - <<: *linux_debug_aubsan_compile_variant_dependency
     name: rhel8-debug-aubsan
