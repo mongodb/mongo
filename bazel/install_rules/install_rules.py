@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import shutil
+import time
 
 parser = argparse.ArgumentParser()
 
@@ -60,6 +61,13 @@ def install(src, install_type):
                         # when one should be linked into the general install dir
                         # so we pass on exceptions
                         pass
+                    else:
+                        raise exc
+                except OSError as exc:
+                    if exc.strerror == "Directory not empty":
+                        print("Encountered OSError: Directory not empty. Retrying...")
+                        time.sleep(1)
+                        shutil.rmtree(dst)
                     else:
                         raise exc
             if not os.path.exists(dst):
