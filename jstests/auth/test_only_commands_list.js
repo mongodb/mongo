@@ -9,6 +9,8 @@ export const testOnlyCommands = [
     'sysprofile',
     '_dropConnectionsToMongot',
     '_mongotConnPoolStats',
+    '_mirrorMaestroConnPoolStats',
+    '_dropMirrorMaestroConnections',
     'analyze',
     '_shardsvrRunSearchIndexCommand'
 ];

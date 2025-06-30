@@ -1,6 +1,6 @@
 import {Thread} from "jstests/libs/parallelTester.js";
 
-export function launchFinds(mongos, threads, {times, readPref, shouldFail}) {
+export function launchFinds(conn, threads, {times, readPref, shouldFail}) {
     jsTestLog("Starting " + times + " connections");
     for (var i = 0; i < times; i++) {
         var thread = new Thread(function(connStr, readPref, dbName, shouldFail) {
@@ -13,7 +13,7 @@ export function launchFinds(mongos, threads, {times, readPref, shouldFail}) {
             } else {
                 assert.commandWorked(ret);
             }
-        }, mongos.host, readPref, 'test', shouldFail);
+        }, conn.host, readPref, 'test', shouldFail);
         thread.start();
         threads.push(thread);
     }
@@ -33,7 +33,7 @@ export function launchFinds(mongos, threads, {times, readPref, shouldFail}) {
  * Runs a connPoolStats and asserts values for each specified host. Can optionally run a command
  * besides connPoolStats.
  *
- * @param {Mongo} mongos - The connection to the mongos that will run the connPoolStats cmd.
+ * @param {Mongo} conn - The connection to the mongod/s that will run the connPoolStats cmd.
  * @param {Array} allHosts - The list of hosts to assert stats on.
  * @param {Object} args - The arguments used for assertion.
  * @param {number} checkNum - A counter used to identify the current invocation.
@@ -41,7 +41,7 @@ export function launchFinds(mongos, threads, {times, readPref, shouldFail}) {
  * @returns {number} - The updated check number.
  */
 export function assertHasConnPoolStats(
-    mongos, allHosts, args, checkNum, connPoolStatsCmd = undefined) {
+    conn, allHosts, args, checkNum, connPoolStatsCmd = undefined) {
     checkNum++;
     jsTestLog("Check #" + checkNum + ": " + tojson(args));
     let {ready = 0, pending = 0, active = 0, hosts = allHosts, isAbsent, checkStatsFunc} = args;
@@ -63,7 +63,7 @@ export function assertHasConnPoolStats(
 
     function checkAllStats() {
         let cmdName = connPoolStatsCmd ? connPoolStatsCmd : "connPoolStats";
-        let res = mongos.adminCommand({[cmdName]: 1});
+        let res = conn.adminCommand({[cmdName]: 1});
         return hosts.map(host => checkStats(res, host)).every(x => x);
     }
 

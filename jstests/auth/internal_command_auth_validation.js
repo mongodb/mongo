@@ -300,6 +300,10 @@ const internalCommandsMap = {
         testname: "_dropConnectionsToMongot",
         command: {_dropConnectionsToMongot: 1, hostAndPort: []},
     },
+    _dropMirrorMaestroConnections: {
+        testname: "_dropMirrorMaestroConnections",
+        command: {_dropMirrorMaestroConnections: 1, hostAndPort: []},
+    },
     _flushDatabaseCacheUpdates: {
         skip: true,  // This command isn't valid when the shards are authoritative for DB metadata.
                      // Also, it can not be used during the FCV upgrade. The command will be removed
@@ -366,6 +370,10 @@ const internalCommandsMap = {
     _migrateClone: {
         testname: "_migrateClone",
         command: {_migrateClone: "test"},
+    },
+    _mirrorMaestroConnPoolStats: {
+        testname: "_mirrorMaestroConnPoolStats",
+        command: {_mirrorMaestroConnPoolStats: 1},
     },
     _mongotConnPoolStats: {
         testname: "_mongotConnPoolStats",

@@ -49,6 +49,7 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/executor/connection_pool.h"
+#include "mongo/executor/connection_pool_controllers.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/remote_command_request.h"
@@ -93,7 +94,6 @@ namespace {
 constexpr auto kMirrorMaestroName = "MirrorMaestro"_sd;
 constexpr auto kMirrorMaestroThreadPoolMaxThreads = 2ull;  // Just enough to allow concurrency
 constexpr auto kMirrorMaestroConnPoolMinSize = 1ull;       // Always be able to mirror eventually
-constexpr auto kMirrorMaestroConnPoolMaxSize = 4ull;       // Never use more than a handful
 
 constexpr auto kMirroredReadsParamName = "mirrorReads"_sd;
 
@@ -142,6 +142,10 @@ public:
      */
     void updateCachedHostsForTargetedMirroring(const repl::ReplSetConfig& replSetConfig,
                                                bool tagChanged);
+
+    auto getExecutor() {
+        return _executor;
+    }
 
     /**
      * Maintains the state required for mirroring requests.
@@ -693,8 +697,12 @@ void MirrorMaestroImpl::init(ServiceContext* serviceContext) {
 
     auto makeNet = [&] {
         executor::ConnectionPool::Options options;
-        options.minConnections = kMirrorMaestroConnPoolMinSize;
-        options.maxConnections = kMirrorMaestroConnPoolMaxSize;
+        options.controllerFactory = [] {
+            return std::make_shared<executor::DynamicLimitController>(
+                [] { return kMirrorMaestroConnPoolMinSize; },
+                [] { return gMirrorMaestroConnPoolMaxSize.load(); },
+                "MirrorMaestroDynamicLimitController");
+        };
         return executor::makeNetworkInterface(
             std::string{kMirrorMaestroName}, {}, {}, std::move(options));
     };
@@ -754,6 +762,12 @@ void MirrorMaestroImpl::shutdown() {
 
     // Set _initGuard.liveness to kShutdown
     _initGuard.liveness = Liveness::kShutdown;
+}
+
+std::shared_ptr<executor::TaskExecutor> getMirroringTaskExecutor_forTest(
+    ServiceContext* serviceContext) {
+    auto& impl = getMirrorMaestroImpl(serviceContext);
+    return impl.getExecutor();
 }
 
 std::vector<HostAndPort> getCachedHostsForTargetedMirroring_forTest(

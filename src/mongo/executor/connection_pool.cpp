@@ -80,6 +80,9 @@ MONGO_FAIL_POINT_DEFINE(connectionPoolReturnsErrorOnGet);
 MONGO_FAIL_POINT_DEFINE(connectionPoolDropConnectionsBeforeGetConnection);
 MONGO_FAIL_POINT_DEFINE(connectionPoolDoesNotFulfillRequests);
 MONGO_FAIL_POINT_DEFINE(connectionPoolRejectsConnectionRequests);
+// This does not guarantee that a new connection will be returned, but rather that a request for one
+// will be submitted.
+MONGO_FAIL_POINT_DEFINE(connectionPoolAlwaysRequestsNewConn);
 
 static const Status kCancelledStatus{ErrorCodes::CallbackCanceled,
                                      "Cancelled acquiring connection"};
@@ -1045,7 +1048,7 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
         return s;
     }
 
-    if (_requests.size() == 0) {
+    if (_requests.size() == 0 && MONGO_likely(!connectionPoolAlwaysRequestsNewConn.shouldFail())) {
         auto conn = tryGetConnection(lk, lease);
 
         if (conn) {
