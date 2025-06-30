@@ -292,7 +292,7 @@ feature_flags:
     featureFlagCreateSpillKVEngine:
         description: "When enabled, create a second storage engine instance that is used for creating SpillTables."
         cpp_varname: feature_flags::gFeatureFlagCreateSpillKVEngine
-        default: false
+        default: true
         fcv_gated: false
     featureFlagReplicateLocalCatalogIdentifiers:
         description: >-
