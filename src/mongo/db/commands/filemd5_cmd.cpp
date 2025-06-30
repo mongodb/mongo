@@ -45,6 +45,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_collection.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/get_executor.h"
@@ -174,12 +175,20 @@ public:
             // Check shard version at startup.
             // This will throw before we've done any work if shard version is outdated
             // We drop and re-acquire these locks every document because md5'ing is expensive
-            std::unique_ptr<AutoGetCollectionForReadCommand> ctx(
-                new AutoGetCollectionForReadCommand(opCtx, nss));
-            const CollectionPtr& coll = ctx->getCollection();
+            auto ctx = acquireCollection(opCtx,
+                                         CollectionAcquisitionRequest::fromOpCtx(
+                                             opCtx, nss, AcquisitionPrerequisites::kRead),
+                                         MODE_IS);
+
+            AutoStatsTracker statsTracker(opCtx,
+                                          nss,
+                                          Top::LockType::ReadLocked,
+                                          AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                          DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                              .getDatabaseProfileLevel(nss.dbName()));
 
             auto exec = uassertStatusOK(getExecutorFind(opCtx,
-                                                        MultipleCollectionAccessor{coll},
+                                                        MultipleCollectionAccessor{ctx},
                                                         std::move(cq),
                                                         PlanYieldPolicy::YieldPolicy::YIELD_MANUAL,
                                                         QueryPlannerParams::NO_TABLE_SCAN));
@@ -215,7 +224,7 @@ public:
 
                     exec->saveState();
                     // UNLOCKED
-                    ctx.reset();
+                    auto yieldResources = yieldTransactionResourcesFromOperationContext(opCtx);
 
                     int len;
                     const char* data = owned["data"].binDataClean(len);
@@ -228,7 +237,8 @@ public:
 
                     try {
                         // RELOCKED
-                        ctx.reset(new AutoGetCollectionForReadCommand(opCtx, nss));
+                        restoreTransactionResourcesToOperationContext(opCtx,
+                                                                      std::move(yieldResources));
                     } catch (const ExceptionFor<ErrorCodes::StaleConfig>&) {
                         LOGV2_DEBUG(
                             20453,
@@ -238,7 +248,7 @@ public:
                     }
 
                     // Now that we have the lock again, we can restore the PlanExecutor.
-                    exec->restoreState(&ctx->getCollection());
+                    exec->restoreState(nullptr);
                 }
             } catch (DBException& exception) {
                 exception.addContext("Executor error during filemd5 command");

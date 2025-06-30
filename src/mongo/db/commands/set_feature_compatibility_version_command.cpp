@@ -1290,15 +1290,25 @@ private:
         bool hasUserDocs, hasRoleDocs = false;
         BSONObj userDoc, roleDoc;
         {
-            AutoGetCollectionForReadCommandMaybeLockFree usersColl(
-                opCtx, NamespaceString::kAdminUsersNamespace);
-            hasUserDocs = Helpers::findOne(opCtx, usersColl.getCollection(), BSONObj(), userDoc);
+            auto userColl = acquireCollectionMaybeLockFree(
+                opCtx,
+                CollectionAcquisitionRequest{
+                    NamespaceString::kAdminUsersNamespace,
+                    PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                    repl::ReadConcernArgs::get(opCtx),
+                    AcquisitionPrerequisites::kRead});
+            hasUserDocs = Helpers::findOne(opCtx, userColl.getCollectionPtr(), BSONObj(), userDoc);
         }
 
         {
-            AutoGetCollectionForReadCommandMaybeLockFree rolesColl(
-                opCtx, NamespaceString::kAdminRolesNamespace);
-            hasRoleDocs = Helpers::findOne(opCtx, rolesColl.getCollection(), BSONObj(), roleDoc);
+            auto rolesColl = acquireCollectionMaybeLockFree(
+                opCtx,
+                CollectionAcquisitionRequest{
+                    NamespaceString::kAdminRolesNamespace,
+                    PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                    repl::ReadConcernArgs::get(opCtx),
+                    AcquisitionPrerequisites::kRead});
+            hasRoleDocs = Helpers::findOne(opCtx, rolesColl.getCollectionPtr(), BSONObj(), roleDoc);
         }
 
         // If they do, write an authorization schema document to disk set to schemaVersionSCRAM28.

@@ -44,6 +44,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
@@ -189,14 +190,23 @@ bool PlanCacheClearCommand::run(OperationContext* opCtx,
     const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
 
     // This is a read lock. The query cache is owned by the collection.
-    AutoGetCollectionForReadCommand ctx(opCtx, nss);
-    if (!ctx.getCollection()) {
+    auto ctx = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    AutoStatsTracker statsTracker(opCtx,
+                                  nss,
+                                  Top::LockType::ReadLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(nss.dbName()));
+    if (!ctx.exists()) {
         // Clearing a non-existent collection always succeeds.
         return true;
     }
 
-    auto planCache = getPlanCache(opCtx, ctx.getCollection());
-    uassertStatusOK(clear(opCtx, ctx.getCollection(), planCache, nss, cmdObj));
+    auto planCache = getPlanCache(opCtx, ctx.getCollectionPtr());
+    uassertStatusOK(clear(opCtx, ctx.getCollectionPtr(), planCache, nss, cmdObj));
     return true;
 }
 

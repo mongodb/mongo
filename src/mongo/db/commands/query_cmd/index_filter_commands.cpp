@@ -50,6 +50,7 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collection_query_info.h"
@@ -97,8 +98,19 @@ bool IndexFilterCommand::run(OperationContext* opCtx,
                       "https://www.mongodb.com/docs/manual/reference/command/setQuerySettings");
     }
     const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
-    AutoGetCollectionForReadCommand ctx(opCtx, nss);
-    uassertStatusOK(runIndexFilterCommand(opCtx, ctx.getCollection(), cmdObj, &result));
+
+    auto ctx = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+        MODE_IS);
+
+    AutoStatsTracker statsTracker(opCtx,
+                                  nss,
+                                  Top::LockType::ReadLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(nss.dbName()));
+    uassertStatusOK(runIndexFilterCommand(opCtx, ctx.getCollectionPtr(), cmdObj, &result));
     return true;
 }
 
