@@ -76,6 +76,7 @@ private:
     int64_t _bytesWrite{0};
     int64_t _lockDhandleWait{0};
     int64_t _txnBytesDirty{0};
+    int64_t _txnNumUpdates{0};
     Microseconds _readTime{0};
     Microseconds _writeTime{0};
     int64_t _lockSchemaWait{0};

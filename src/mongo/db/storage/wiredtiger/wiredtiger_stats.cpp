@@ -94,6 +94,9 @@ void WiredTigerStats::updateCounter(int32_t key_id, uint64_t value) {
         case WT_STAT_SESSION_TXN_BYTES_DIRTY:
             _txnBytesDirty = value;
             break;
+        case WT_STAT_SESSION_TXN_UPDATES:
+            _txnNumUpdates = value;
+            break;
         case WT_STAT_SESSION_READ_TIME:
             _readTime = Microseconds((int64_t)value);
             break;
@@ -124,13 +127,14 @@ BSONObj WiredTigerStats::toBSON() const {
 
     // Only output metrics for non-zero values
     if (_bytesRead != 0 || _bytesWrite != 0 || _readTime.count() != 0 || _writeTime.count() != 0 ||
-        _txnBytesDirty != 0) {
+        _txnBytesDirty != 0 || _txnNumUpdates != 0) {
         BSONObjBuilder dataSection(builder.subobjStart("data"));
         appendIfNonZero("bytesRead", _bytesRead, &dataSection);
         appendIfNonZero("bytesWritten", _bytesWrite, &dataSection);
         appendIfNonZero("timeReadingMicros", durationCount<Microseconds>(_readTime), &dataSection);
         appendIfNonZero("timeWritingMicros", durationCount<Microseconds>(_writeTime), &dataSection);
         appendIfNonZero("txnBytesDirty", _txnBytesDirty, &dataSection);
+        appendIfNonZero("txnNumUpdates", _txnNumUpdates, &dataSection);
     }
 
     if (_lockDhandleWait != 0 || _lockSchemaWait != 0 || _cacheTime.count() != 0 ||
@@ -175,6 +179,7 @@ WiredTigerStats& WiredTigerStats::operator+=(const WiredTigerStats& other) {
     _bytesWrite += other._bytesWrite;
     _lockDhandleWait += other._lockDhandleWait;
     _txnBytesDirty += other._txnBytesDirty;
+    _txnNumUpdates += other._txnNumUpdates;
     _readTime += other._readTime;
     _writeTime += other._writeTime;
     _lockSchemaWait += other._lockSchemaWait;
@@ -195,6 +200,7 @@ WiredTigerStats& WiredTigerStats::operator-=(const WiredTigerStats& other) {
     _bytesWrite -= other._bytesWrite;
     _lockDhandleWait -= other._lockDhandleWait;
     _txnBytesDirty -= other._txnBytesDirty;
+    _txnNumUpdates -= other._txnNumUpdates;
     _readTime -= other._readTime;
     _writeTime -= other._writeTime;
     _lockSchemaWait -= other._lockSchemaWait;
