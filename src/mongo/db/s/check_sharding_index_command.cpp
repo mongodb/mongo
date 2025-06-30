@@ -39,10 +39,11 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/namespace_string_util.h"
 
 #include <string>
@@ -108,15 +109,24 @@ public:
             return true;
         }
 
-        AutoGetCollectionForReadCommand collection(opCtx, nss);
-        if (!collection) {
+        AutoStatsTracker statsTracker(opCtx,
+                                      nss,
+                                      Top::LockType::ReadLocked,
+                                      AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                      DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                          .getDatabaseProfileLevel(nss.dbName()));
+
+        const auto collection = acquireCollectionMaybeLockFree(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead));
+        if (!collection.exists()) {
             errmsg = "ns not found";
             return false;
         }
 
         std::string tmpErrMsg = "couldn't find valid index for shard key";
         const auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
-                                                           *collection,
+                                                           collection.getCollectionPtr(),
                                                            keyPattern,
                                                            /*requireSingleKey=*/true,
                                                            &tmpErrMsg);

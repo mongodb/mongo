@@ -188,7 +188,21 @@ public:
             // Wait for the metadata for this collection in the CollectionCatalog to be majority
             // committed before validating its options and persisting the configuration.
             waitUntilMajorityLastOpTime(opCtx);
-            auto collUuid = uassertStatusOK(validateCollectionOptions(opCtx, nss));
+            const auto collUuid = [&] {
+                // Routers route the configureQueryAnalyzerCmd to the db-primary shard, with a
+                // 'databaseVersion' attached to the command but no 'shardVersion'. This is okay,
+                // because the db-primary shard is guaranteed to know the correct collection options
+                // and uuid, but we need to enter an IGNORED Shard Role so that we are able to
+                // access the collection metadata.
+                boost::optional<ScopedSetShardRole> optShardRoleIgnore;
+                if (!OperationShardingState::get(opCtx).getShardVersion(nss)) {
+                    ShardVersion shardVersionIgnored;
+                    shardVersionIgnored.setPlacementVersionIgnored();
+                    optShardRoleIgnore.emplace(opCtx, nss, shardVersionIgnored, boost::none);
+                }
+
+                return uassertStatusOK(validateCollectionOptions(opCtx, nss));
+            }();
 
             LOGV2(6915001,
                   "Persisting query analyzer configuration",

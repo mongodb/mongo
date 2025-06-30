@@ -32,11 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/transport/session.h"
@@ -55,30 +51,32 @@ namespace mongo {
 namespace analyze_shard_key {
 
 StatusWith<UUID> validateCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollectionForReadCommandMaybeLockFree collection(
+    const auto collectionOrView = acquireCollectionOrViewMaybeLockFree(
         opCtx,
-        nss,
-        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
+        CollectionOrViewAcquisitionRequest::fromOpCtx(
+            opCtx, nss, AcquisitionPrerequisites::kRead, AcquisitionPrerequisites::kCanBeView));
 
-    if (auto view = collection.getView()) {
-        if (view->timeseries()) {
+    if (collectionOrView.isView()) {
+        if (collectionOrView.getView().getViewDefinition().timeseries()) {
             return Status{ErrorCodes::IllegalOperation,
                           "Operation not supported for a timeseries collection"};
         }
         return Status{ErrorCodes::CommandNotSupportedOnView, "Operation not supported for a view"};
     }
-    if (!collection) {
+
+    const auto& collection = collectionOrView.getCollection();
+    if (!collection.exists()) {
         return Status{ErrorCodes::NamespaceNotFound,
                       str::stream() << "The namespace does not exist"};
     }
-    if (collection->getCollectionOptions().encryptedFieldConfig.has_value()) {
+    if (collection.getCollectionPtr()->getCollectionOptions().encryptedFieldConfig.has_value()) {
         return Status{
             ErrorCodes::IllegalOperation,
             str::stream()
                 << "Operation not supported for a collection with queryable encryption enabled"};
     }
 
-    return collection->uuid();
+    return collection.uuid();
 }
 
 Status validateIndexKey(const BSONObj& indexKey) {
