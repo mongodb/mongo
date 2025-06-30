@@ -40,6 +40,13 @@ buildvariants:
     tasks:
       - name: burn_in_tags_gen
 
+  - name: promote-custom-build
+    display_name: "Promote Custom Build"
+    activate: false
+    allowed_requesters: ["patch"]
+    tasks:
+      - name: promote_custom_build
+
   - name: copybara-sync-between-repos
     display_name: "* Copybara Sync Between Repos"
     tags: ["suggested"]

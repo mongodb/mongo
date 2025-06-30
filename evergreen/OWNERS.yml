@@ -18,6 +18,9 @@ filters:
   - "/generate_evergreen_bazelrc.sh":
     approvers:
       - 10gen/devprod-build
+  - "generate_custom_build_promotion_expansions.sh":
+    approvers:
+      - 10gen/devprod-build
   - "/package*":
     approvers:
       - 10gen/devprod-build

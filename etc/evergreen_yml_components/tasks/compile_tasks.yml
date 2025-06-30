@@ -837,6 +837,48 @@ tasks:
           args:
             - "./src/evergreen/packages_publish.sh"
 
+  - name: promote_custom_build
+    run_on: amazon2023-small
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    allowed_requesters: ["patch"]
+    stepback: false
+    commands:
+      - command: git.get_project
+        params:
+          directory: src
+          clone_depth: 1
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          env:
+            PROMOTE_TASK_ID: ${promote_task_id}
+            EVERGREEN_API_USER: ${evergreen_api_user}
+            EVERGREEN_API_KEY: ${evergreen_api_key}
+          args:
+            - "./src/evergreen/generate_custom_build_promotion_expansions.sh"
+      - command: expansions.update
+        params:
+          file: promote-expansions.yml
+      - func: "f_expansions_write"
+      - command: s3.get
+        display_name: "fetch dist tarball for promotion"
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          remote_file: ${promote_project_id}/${promote_build_variant}/${promote_revision}/dist/mongo-${promote_build_id}.tgz
+          bucket: mciuploads
+          local_file: src/mongo-binaries.tgz
+      - command: s3.put
+        params:
+          role_arn: "arn:aws:iam::119629040606:role/s3-access.cdn-origin-server-custom-builds"
+          remote_file: "server-custom-builds/${promote_project_id}/${promote_version_id}/${promote_build_variant}/mongo-${promte_build_id}.tgz"
+          bucket: cdn-origin-server-custom-builds
+          permissions: private
+          local_file: src/mongo-binaries.tgz
+          content_type: application/gzip
+          skip_existing: true
+
   - name: crypt_push
     run_on: rhel8.7-small
     tags:
