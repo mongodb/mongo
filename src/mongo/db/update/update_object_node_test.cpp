@@ -2866,5 +2866,53 @@ TEST(ParseRenameTest, ConflictWithRenameDestinationFailsToParse) {
     ASSERT_EQ(result.getStatus().reason(), "Updating the path 'b' would create a conflict at 'b'");
 }
 
+TEST(ParseArrayFilterIdentifierTest, ValidIdentifier) {
+    // create dummy expression
+    auto arrayFilter = fromjson("{i: 0}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    arrayFilters["validIdentifier"] =
+        assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
+
+    std::set<std::string> foundIdentifiers;
+
+    auto result = UpdateObjectNode::parseArrayFilterIdentifier(
+        "$[validIdentifier]", 1, FieldRef(), arrayFilters, foundIdentifiers);
+
+    ASSERT_OK(result);
+    ASSERT_EQ(result.getValue(), "validIdentifier");
+    ASSERT_NE(foundIdentifiers.find("validIdentifier"), foundIdentifiers.end());
+}
+
+TEST(ParseArrayFilterIdentifierTest, InvalidPosition) {
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters{};
+    std::set<std::string> foundIdentifiers;
+
+    auto result = UpdateObjectNode::parseArrayFilterIdentifier(
+        "$[validIdentifier]", 0, FieldRef(), arrayFilters, foundIdentifiers);
+
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+    ASSERT_EQ(result.getStatus().reason(),
+              "Cannot have array filter identifier (i.e. '$[<id>]') element in the first position "
+              "in path ''");
+    ASSERT_TRUE(foundIdentifiers.empty());
+}
+
+TEST(ParseArrayFilterIdentifierTest, ArrayFilterNotFound) {
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters{};
+    std::set<std::string> foundIdentifiers;
+
+    auto result = UpdateObjectNode::parseArrayFilterIdentifier(
+        "$[validIdentifier]", 1, FieldRef(), arrayFilters, foundIdentifiers);
+
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+    ASSERT_EQ(result.getStatus().reason(),
+              "No array filter found for identifier 'validIdentifier' in path ''");
+    ASSERT_TRUE(foundIdentifiers.empty());
+}
+
 }  // namespace
 }  // namespace mongo

@@ -69,6 +69,19 @@ public:
         std::set<std::string>& foundIdentifiers);
 
     /**
+     * Parses a field of the form $[<identifier>] into <identifier>. 'field' must be of the form
+     * $[<identifier>]. Returns a non-ok status if 'field' is in the first position in the path or
+     * the array filter identifier does not have a corresponding filter in 'arrayFilters'. Adds the
+     * identifier to 'foundIdentifiers'.
+     */
+    static StatusWith<std::string> parseArrayFilterIdentifier(
+        StringData field,
+        size_t position,
+        const FieldRef& fieldRef,
+        const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
+        std::set<std::string>& foundIdentifiers);
+
+    /**
      * Creates a new UpdateObjectNode by merging two input UpdateObjectNode objects and their
      * children. Each field that lives on one side of the merge but not the other (according to
      * field name) is cloned to the newly created UpdateObjectNode. Fields that exist on both sides

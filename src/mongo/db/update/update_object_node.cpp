@@ -44,42 +44,6 @@ namespace mongo {
 namespace {
 
 /**
- * Parses a field of the form $[<identifier>] into <identifier>. 'field' must be of the form
- * $[<identifier>]. Returns a non-ok status if 'field' is in the first position in the path or the
- * array filter identifier does not have a corresponding filter in 'arrayFilters'. Adds the
- * identifier to 'foundIdentifiers'.
- */
-StatusWith<std::string> parseArrayFilterIdentifier(
-    StringData field,
-    size_t position,
-    const FieldRef& fieldRef,
-    const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
-    std::set<std::string>& foundIdentifiers) {
-    dassert(fieldchecker::isArrayFilterIdentifier(field));
-
-    if (position == 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Cannot have array filter identifier (i.e. '$[<id>]') "
-                                       "element in the first position in path '"
-                                    << fieldRef.dottedField() << "'");
-    }
-
-    auto identifier = field.substr(2, field.size() - 3);
-
-    if (!identifier.empty() && arrayFilters.find(identifier) == arrayFilters.end()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "No array filter found for identifier '" << identifier
-                                    << "' in path '" << fieldRef.dottedField() << "'");
-    }
-
-    if (!identifier.empty()) {
-        foundIdentifiers.emplace(std::string{identifier});
-    }
-
-    return std::string{identifier};
-}
-
-/**
  * Gets the child of 'element' named 'field', if it exists. Otherwise returns a non-ok element.
  */
 mutablebson::Element getChild(mutablebson::Element element, StringData field) {
@@ -346,6 +310,37 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
     current->setChild(std::move(childName), std::move(leaf));
 
     return positional;
+}
+
+// static
+StatusWith<std::string> UpdateObjectNode::parseArrayFilterIdentifier(
+    StringData field,
+    size_t position,
+    const FieldRef& fieldRef,
+    const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
+    std::set<std::string>& foundIdentifiers) {
+    dassert(fieldchecker::isArrayFilterIdentifier(field));
+
+    if (position == 0) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Cannot have array filter identifier (i.e. '$[<id>]') "
+                                       "element in the first position in path '"
+                                    << fieldRef.dottedField() << "'");
+    }
+
+    auto identifier = field.substr(2, field.size() - 3);
+
+    if (!identifier.empty() && arrayFilters.find(identifier) == arrayFilters.end()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "No array filter found for identifier '" << identifier
+                                    << "' in path '" << fieldRef.dottedField() << "'");
+    }
+
+    if (!identifier.empty()) {
+        foundIdentifiers.emplace(std::string{identifier});
+    }
+
+    return std::string{identifier};
 }
 
 // static
