@@ -5,6 +5,7 @@ selector:
     - jstests/query_golden/**/*.js
   exclude_files:
     - jstests/query_golden/libs/**/*.js
+    - jstests/query_golden/test_inputs/**/*.js
 executor:
   archive:
     hooks:
