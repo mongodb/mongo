@@ -657,6 +657,20 @@ tasks:
           resmoke_jobs_max: 1
 
   ################################################
+  #            Workload Scheduling tasks         #
+  ################################################
+
+  - <<: *task_template
+    name: jsCore_ingress_request_rate_limiter
+    tags:
+      ["assigned_to_jira_team_server_workload_scheduling", "default", "jscore"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: core_ingress_request_rate_limiter
+
+  ################################################
   #            Server Security tasks             #
   ################################################
 

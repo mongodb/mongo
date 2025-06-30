@@ -30,3 +30,6 @@ filters:
   - "stepdown_primary_change_streams.yml":
     approvers:
       - 10gen/query-execution-change-streams
+  - "ingress_request_rate_limiter.yml":
+    approvers:
+      - 10gen/server-workload-scheduling

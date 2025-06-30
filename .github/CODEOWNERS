@@ -91,6 +91,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/*viewless_timeseries.yml @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/sharding_task_executor_pool_size* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/change_streams_* @10gen/query-execution-change-streams @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/generated_suites/*ingress_request_rate_limiter* @10gen/server-workload-scheduling @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokeconfig/matrix_suites/mappings/OWNERS.yml
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/* @10gen/mongo-default-approvers @svc-auto-approve-bot
@@ -112,6 +113,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/sharding_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/sharding_task_executor_pool_size* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/update_fuzzer* @10gen/query-execution-write-exec @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/*ingress_request_rate_limiter* @10gen/server-workload-scheduling @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokeconfig/matrix_suites/overrides/OWNERS.yml
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/* @10gen/mongo-default-approvers @svc-auto-approve-bot
@@ -124,6 +126,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/repeat_queries.yml @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/*viewless_timeseries.yml @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/stepdown_primary_change_streams.yml @10gen/query-execution-change-streams @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/overrides/**/ingress_request_rate_limiter.yml @10gen/server-workload-scheduling @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokeconfig/suites/OWNERS.yml
 /buildscripts/resmokeconfig/suites/**/* @10gen/mongo-default-approvers @svc-auto-approve-bot

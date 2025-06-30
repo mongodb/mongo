@@ -59,3 +59,6 @@ filters:
   - "update_fuzzer*":
     approvers:
       - 10gen/query-execution-write-exec
+  - "*ingress_request_rate_limiter*":
+    approvers:
+      - 10gen/server-workload-scheduling

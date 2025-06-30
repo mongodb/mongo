@@ -1,0 +1,42 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/core_ingress_request_rate_limiter.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      crashOnInvalidBSONError: ""
+      eval: await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+      objcheck: ""
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagIngressRateLimiting: true
+        ingressRequestRateLimiterEnabled: true
+  hooks:
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnNamespaceNotFound: false
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/core/txns/**/*.js
+    - jstests/core/query/queryable_encryption/**/*.js
+    - jstests/core/query/query_settings/**/*.js
+  roots:
+    - jstests/core/**/*.js
+    - jstests/core_standalone/**/*.js
+test_kind: js_test
