@@ -18,7 +18,7 @@ filters:
   - ".clang-tidy.in":
     approvers:
       - 10gen/server-programmability
-  - ".gitignore":
+  - ".git*":
     approvers:
       - 10gen/devprod-build
   - ".mypy.ini":
