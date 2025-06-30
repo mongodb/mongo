@@ -59,6 +59,18 @@ env.SConscript(
     ],
 )
 
+env.Library(
+    target='server_parameter_insert_max_batch_size',
+    source=[
+        'server_parameter_insert_max_batch_size.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        'repl/repl_server_parameters',
+        'server_base',
+        'storage/storage_options',
+    ],
+)
+
 # The 'server_base' library must only contain basic, stateless, value types which are used throughout
 # all the server binaries. It must not depend on anything other than utilities that are outside of
 # the server codebase.
@@ -2879,6 +2891,7 @@ if wiredtiger:
             'record_id_test.cpp',
             'resource_yielder_test.cpp',
             'server_options_test.cpp',
+            'server_parameter_insert_max_batch_size_test.cpp',
             'service_liaison_mock.cpp',
             'session/internal_session_pool_test.cpp',
             'session/internal_transactions_reap_service_test.cpp',
@@ -2969,6 +2982,7 @@ if wiredtiger:
             's/shard_server_test_fixture',
             'server_base',
             'server_options_servers',
+            'server_parameter_insert_max_batch_size',
             'session/logical_session_cache_impl',
             'session/logical_session_id_helpers',
             'session/session_catalog_mongod',

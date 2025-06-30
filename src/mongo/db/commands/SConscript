@@ -423,6 +423,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/s/query_analysis_writer',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_feature_flags',
+        '$BUILD_DIR/mongo/db/server_parameter_insert_max_batch_size',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/stats/server_read_concern_write_concern_metrics',

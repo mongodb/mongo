@@ -34,10 +34,10 @@ assert.commandWorked(primary.adminCommand(
     {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 replTest.awaitReplication();
 
-var getParameterResult =
-    primary.getDB("admin").runCommand({getParameter: 1, internalInsertMaxBatchSize: 1});
-assert.commandWorked(getParameterResult);
-const batchSize = getParameterResult.internalInsertMaxBatchSize;
+const batchSize = 500;
+const setParameterResult =
+    primary.getDB("admin").runCommand({setParameter: 1, internalInsertMaxBatchSize: batchSize});
+assert.commandWorked(setParameterResult);
 
 // Prevent any writes to node 0 (the primary) from replicating to nodes 1 and 2.
 stopServerReplication(conns[1]);
