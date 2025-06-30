@@ -97,9 +97,11 @@ if (typeof DBQuery !== 'undefined' && typeof DBQuery.prototype.rawData === 'func
             assert(
                 value === undefined || value === true,
                 "Detected illegal usage of rawData function. rawData(false) can't be used on a cluster with binary versions that do not support 'rawData' parameter.");
-            assert(
-                this._collection.getName().startsWith('system.buckets.'),
-                `Detected illegal usage of rawData function. The query target '${this._collection.getName()}' that is not a system.buckets collection and the cluster contains binaries that do not support 'rawData' parameter.`);
+            if (!this._collection.getName().startsWith('system.buckets.')) {  // Fast path
+                const collMetadata = this._collection.getMetadata();
+                assert(!collMetadata || collMetadata.type === 'collection',
+                    `Detected illegal usage of rawData function. The query target '${this._collection.getName()}' that is not a regular collection and the cluster contains binaries that do not support 'rawData' parameter.`);
+            }
             return this;
         }
     };

@@ -1,4 +1,4 @@
-
+import {getRawOperationSpec} from "jstests/libs/raw_operation_utils.js";
 
 export var CheckOrphansAreDeletedHelpers = (function() {
     function runCheck(mongosConn, shardConn, shardId) {
@@ -90,6 +90,7 @@ export var CheckOrphansAreDeletedHelpers = (function() {
 
             const hintRes = shardConn.getDB(dbName).runCommand({
                 find: collName,
+                ...getRawOperationSpec(configDB),
                 hint: collDoc.key,
                 limit: 1,
                 singleBatch: true,
@@ -101,6 +102,7 @@ export var CheckOrphansAreDeletedHelpers = (function() {
                 mongosConn.getDB('config').chunks.find(chunksQuery).forEach(chunkDoc => {
                     // Use $min/$max so this will also work with hashed and compound shard keys.
                     const orphans = coll.find({})
+                                        .rawData()
                                         .collation({locale: "simple"})
                                         .hint(collDoc.key)
                                         .min(chunkDoc.min)
@@ -178,7 +180,7 @@ export var CheckOrphansAreDeletedHelpers = (function() {
                             }
                         }
                     }
-                }], { collation: { locale: "simple" } }).toArray();
+                }], { collation: { locale: "simple" }, ...getRawOperationSpec(configDB) }).toArray();
                 assert.eq(0,
                           orphans.length,
                           'found orphans @ ' + shardId + ', orphans: ' + tojson(orphans) +
