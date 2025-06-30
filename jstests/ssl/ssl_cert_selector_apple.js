@@ -11,6 +11,10 @@
 
 import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
+// Due to a race condition in shutdown-during-startup, this test sometimes produces core dumps.
+// TODO SERVER-99909 Remove this once shutdown-during-startup issues are fixed.
+TestData.cleanUpCoreDumpsFromExpectedCrash = true;
+
 requireSSLProvider('apple', function() {
     const CLIENT =
         'CN=Trusted Kernel Test Client,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US';
