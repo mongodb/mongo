@@ -32,7 +32,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/s/metrics/cumulative_metrics_state_tracker.h"
 #include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
-#include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_observer_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
@@ -58,7 +57,7 @@ namespace mongo {
 class ShardingDataTransformCumulativeMetrics {
 public:
     using NameProvider = ShardingDataTransformCumulativeMetricsFieldNameProvider;
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     using InstanceObserver = ShardingDataTransformMetricsObserverInterface;
     using DeregistrationFunction = unique_function<void()>;
     using StateTracker =

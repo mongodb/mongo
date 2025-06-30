@@ -65,7 +65,6 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
@@ -189,13 +188,13 @@ public:
                     opCtx.get(), nss, CollectionOptions{});
             }
 
-            _metrics = ReshardingMetrics::makeInstance_forTest(
-                UUID::gen(),
-                BSON("y" << 1),
-                _outputNss,
-                ShardingDataTransformMetrics::Role::kRecipient,
-                serviceContext->getFastClockSource()->now(),
-                serviceContext);
+            _metrics =
+                ReshardingMetrics::makeInstance_forTest(UUID::gen(),
+                                                        BSON("y" << 1),
+                                                        _outputNss,
+                                                        ReshardingMetricsCommon::Role::kRecipient,
+                                                        serviceContext->getFastClockSource()->now(),
+                                                        serviceContext);
             _metrics->registerDonors({_myDonorId});
 
             _applierMetrics = std::make_unique<ReshardingOplogApplierMetrics>(

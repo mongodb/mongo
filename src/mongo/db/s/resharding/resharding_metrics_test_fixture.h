@@ -43,13 +43,13 @@ namespace mongo {
 
 class ObserverMock : public ShardingDataTransformMetricsObserverInterface {
 public:
-    constexpr static auto kDefaultRole = ShardingDataTransformMetrics::Role::kCoordinator;
+    constexpr static auto kDefaultRole = ReshardingMetricsCommon::Role::kCoordinator;
     ObserverMock(Date_t startTime, int64_t timeRemaining)
         : ObserverMock{startTime, timeRemaining, timeRemaining, kDefaultRole} {}
     ObserverMock(Date_t startTime,
                  int64_t timeRemainingHigh,
                  int64_t timeRemainingLow,
-                 ShardingDataTransformMetrics::Role role)
+                 ReshardingMetricsCommon::Role role)
         : _uuid{UUID::gen()},
           _startTime{startTime},
           _timeRemainingHigh{timeRemainingHigh},
@@ -74,7 +74,7 @@ public:
         return _startTime;
     }
 
-    ShardingDataTransformMetrics::Role getRole() const override {
+    ReshardingMetricsCommon::Role getRole() const override {
         return _role;
     }
 
@@ -83,7 +83,7 @@ private:
     Date_t _startTime;
     Milliseconds _timeRemainingHigh;
     Milliseconds _timeRemainingLow;
-    ShardingDataTransformMetrics::Role _role;
+    ReshardingMetricsCommon::Role _role;
 };
 
 class ShardingDataTransformCumulativeMetricsFieldNameProviderForTest
@@ -101,7 +101,7 @@ public:
 class ReshardingMetricsTestFixture : public unittest::Test {
 
 public:
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     template <typename T>
     void runTimeReportTest(const std::string& testName,
                            const std::initializer_list<Role>& roles,

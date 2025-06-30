@@ -27,29 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
+#pragma once
 
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/base/string_data.h"
 
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
+#include <cstddef>
 
 namespace mongo {
 
-namespace {
-const stdx::unordered_map<ShardingDataTransformMetrics::Role, StringData> roleToName = {
-    {ShardingDataTransformMetrics::Role::kCoordinator, "Coordinator"_sd},
-    {ShardingDataTransformMetrics::Role::kDonor, "Donor"_sd},
-    {ShardingDataTransformMetrics::Role::kRecipient, "Recipient"_sd},
+class ReshardingMetricsCommon {
+public:
+    static constexpr size_t kRoleCount = 3;
+    enum class Role { kCoordinator, kDonor, kRecipient };
+    static StringData getRoleName(Role role);
 };
-}
-
-StringData ShardingDataTransformMetrics::getRoleName(Role role) {
-    auto it = roleToName.find(role);
-    invariant(it != roleToName.end());
-    return it->second;
-}
 
 }  // namespace mongo

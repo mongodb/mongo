@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
-#include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics_test_fixture.h"
@@ -308,7 +307,7 @@ TEST_F(ReshardingMetricsTest, ReportForCurrentOpShouldHaveReshardingMetricsDescr
 
         ASSERT_EQ(report.getStringField("desc"),
                   fmt::format("ReshardingMetrics{}Service {}",
-                              ShardingDataTransformMetrics::getRoleName(role),
+                              ReshardingMetricsCommon::getRoleName(role),
                               instanceId.toString()));
     });
 }
@@ -1402,7 +1401,7 @@ TEST_F(ReshardingMetricsTest, GetRoleNameShouldReturnCorrectName) {
     };
 
     std::for_each(roles.begin(), roles.end(), [&](auto role) {
-        ASSERT_EQ(ShardingDataTransformMetrics::getRoleName(role.first), role.second);
+        ASSERT_EQ(ReshardingMetricsCommon::getRoleName(role.first), role.second);
     });
 }
 

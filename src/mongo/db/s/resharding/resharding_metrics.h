@@ -74,7 +74,7 @@ public:
     using State = ReshardingCumulativeMetrics::AnyState;
     using TimedPhase = resharding_metrics::TimedPhase;
     using TimedPhaseNameMap = resharding_metrics::PhaseDurationTracker::TimedPhaseNameMap;
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     using FieldNameProviderPtr =
         std::unique_ptr<ShardingDataTransformInstanceMetricsFieldNameProvider>;
     using ObserverPtr = std::unique_ptr<ShardingDataTransformMetricsObserverInterface>;

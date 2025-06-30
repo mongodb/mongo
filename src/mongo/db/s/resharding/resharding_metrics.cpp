@@ -33,8 +33,8 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_observer.h"
+#include "mongo/db/s/resharding/resharding_metrics_common.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/server_options.h"
@@ -229,7 +229,7 @@ ReshardingMetrics::State ReshardingMetrics::getDefaultState(Role role) {
 
 std::string ReshardingMetrics::createOperationDescription() const {
     return fmt::format("ReshardingMetrics{}Service {}",
-                       ShardingDataTransformMetrics::getRoleName(_role),
+                       ReshardingMetricsCommon::getRoleName(_role),
                        _instanceId.toString());
 }
 

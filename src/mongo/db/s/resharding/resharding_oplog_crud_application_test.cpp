@@ -66,7 +66,6 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
@@ -185,13 +184,13 @@ public:
                         CollectionMetadata(makeChunkManagerForOutputCollection(), _myDonorId));
             }
 
-            _metrics = ReshardingMetrics::makeInstance_forTest(
-                _sourceUUID,
-                BSON(_newShardKey << 1),
-                _outputNss,
-                ShardingDataTransformMetrics::Role::kRecipient,
-                serviceContext->getFastClockSource()->now(),
-                serviceContext);
+            _metrics =
+                ReshardingMetrics::makeInstance_forTest(_sourceUUID,
+                                                        BSON(_newShardKey << 1),
+                                                        _outputNss,
+                                                        ReshardingMetricsCommon::Role::kRecipient,
+                                                        serviceContext->getFastClockSource()->now(),
+                                                        serviceContext);
             _oplogApplierMetrics = std::make_unique<ReshardingOplogApplierMetrics>(
                 _myDonorId, _metrics.get(), boost::none);
             _applier = std::make_unique<ReshardingOplogApplicationRules>(

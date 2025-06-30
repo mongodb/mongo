@@ -97,7 +97,7 @@ ShardingDataTransformCumulativeMetrics::ShardingDataTransformCumulativeMetrics(
     : _rootSectionName{rootSectionName},
       _operationWasAttempted{false},
       _fieldNames{std::move(fieldNameProvider)},
-      _instanceMetricsForAllRoles(ShardingDataTransformMetrics::kRoleCount) {}
+      _instanceMetricsForAllRoles(ReshardingMetricsCommon::kRoleCount) {}
 
 ShardingDataTransformCumulativeMetrics::UniqueScopedObserver
 ShardingDataTransformCumulativeMetrics::registerInstanceMetrics(const InstanceObserver* metrics) {

@@ -55,7 +55,7 @@ const UUID& ShardingDataTransformMetricsObserver::getUuid() const {
     return _metrics->getInstanceId();
 }
 
-ShardingDataTransformMetrics::Role ShardingDataTransformMetricsObserver::getRole() const {
+ReshardingMetricsCommon::Role ShardingDataTransformMetricsObserver::getRole() const {
     return _metrics->getRole();
 }
 

@@ -27,20 +27,25 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/s/resharding/resharding_metrics_common.h"
 
-#include "mongo/base/string_data.h"
-
-#include <cstddef>
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-class ShardingDataTransformMetrics {
-public:
-    static constexpr size_t kRoleCount = 3;
-    enum class Role { kCoordinator, kDonor, kRecipient };
-    static StringData getRoleName(Role role);
-    static bool isEnabled();
+namespace {
+const stdx::unordered_map<ReshardingMetricsCommon::Role, StringData> roleToName = {
+    {ReshardingMetricsCommon::Role::kCoordinator, "Coordinator"_sd},
+    {ReshardingMetricsCommon::Role::kDonor, "Donor"_sd},
+    {ReshardingMetricsCommon::Role::kRecipient, "Recipient"_sd},
 };
+}
+
+StringData ReshardingMetricsCommon::getRoleName(Role role) {
+    auto it = roleToName.find(role);
+    invariant(it != roleToName.end());
+    return it->second;
+}
 
 }  // namespace mongo

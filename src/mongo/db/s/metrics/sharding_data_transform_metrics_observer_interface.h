@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
+#include "mongo/db/s/resharding/resharding_metrics_common.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -40,7 +40,7 @@ public:
     virtual boost::optional<Milliseconds> getLowEstimateRemainingTimeMillis() const = 0;
     virtual Date_t getStartTimestamp() const = 0;
     virtual const UUID& getUuid() const = 0;
-    virtual ShardingDataTransformMetrics::Role getRole() const = 0;
+    virtual ReshardingMetricsCommon::Role getRole() const = 0;
 };
 
 }  // namespace mongo

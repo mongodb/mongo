@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_observer_interface.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/util/duration.h"
@@ -47,7 +46,7 @@ public:
     boost::optional<Milliseconds> getLowEstimateRemainingTimeMillis() const override;
     Date_t getStartTimestamp() const override;
     const UUID& getUuid() const override;
-    ShardingDataTransformMetrics::Role getRole() const override;
+    ReshardingMetricsCommon::Role getRole() const override;
 
 private:
     ReshardingMetrics* _metrics;

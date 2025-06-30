@@ -31,7 +31,6 @@
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -200,7 +199,7 @@ protected:
 
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsInsertsDuringFetching) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
@@ -217,7 +216,7 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsInsertsDuringFetching) {
 
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsBatchRetrievedDuringApplying) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
@@ -234,7 +233,7 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsBatchRetrievedDuringApplyi
 
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsBatchApplied) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
@@ -250,7 +249,7 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsBatchApplied) {
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsInsertsApplied) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
@@ -264,7 +263,7 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsInsertsApplied) {
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsUpdatesApplied) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
@@ -278,7 +277,7 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsUpdatesApplied) {
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsDeletesApplied) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
@@ -292,7 +291,7 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsDeletesApplied) {
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsOplogEntriesFetched) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
@@ -315,7 +314,7 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsOplogEntriesFetched) {
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsOplogEntriesApplied) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
@@ -330,7 +329,7 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsOplogEntriesApplied) {
 
 TEST_F(ReshardingCumulativeMetricsTest,
        SimulatedNormalCoordinatorStateTransitionReportsStateCorrectly) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
 
@@ -358,7 +357,7 @@ TEST_F(ReshardingCumulativeMetricsTest,
 
 TEST_F(ReshardingCumulativeMetricsTest,
        SimulatedAbortedCoordinatorStateTransitionReportsStateCorrectly) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
 
@@ -383,7 +382,7 @@ TEST_F(ReshardingCumulativeMetricsTest,
 
 TEST_F(ReshardingCumulativeMetricsTest,
        SimulatedSteppedDownCoordinatorStateFromUnusedReportsStateCorrectly) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
 
@@ -396,7 +395,7 @@ TEST_F(ReshardingCumulativeMetricsTest,
 
 TEST_F(ReshardingCumulativeMetricsTest,
        SimulatedSteppedDownCoordinatorStateTransitionReportsStateCorrectly) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
 
@@ -419,7 +418,7 @@ TEST_F(ReshardingCumulativeMetricsTest,
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, SimulatedNormalDonorStateTransitionReportsStateCorrectly) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock donor{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kDonor};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&donor);
 
@@ -446,7 +445,7 @@ TEST_F(ReshardingCumulativeMetricsTest, SimulatedNormalDonorStateTransitionRepor
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, SimulatedAbortedDonorStateTransitionReportsStateCorrectly) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock donor{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kDonor};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&donor);
 
@@ -471,7 +470,7 @@ TEST_F(ReshardingCumulativeMetricsTest, SimulatedAbortedDonorStateTransitionRepo
 
 TEST_F(ReshardingCumulativeMetricsTest,
        SimulatedSteppedDownDonorStateFromUnusedReportsStateCorrectly) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock donor{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kDonor};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&donor);
 
@@ -484,7 +483,7 @@ TEST_F(ReshardingCumulativeMetricsTest,
 
 TEST_F(ReshardingCumulativeMetricsTest,
        SimulatedSteppedDownDonorStateTransitionReportsStateCorrectly) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock donor{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kDonor};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&donor);
 
@@ -508,7 +507,7 @@ TEST_F(ReshardingCumulativeMetricsTest,
 
 TEST_F(ReshardingCumulativeMetricsTest,
        SimulatedNormalRecipientStateTransitionReportsStateCorrectly) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
@@ -536,7 +535,7 @@ TEST_F(ReshardingCumulativeMetricsTest,
 
 TEST_F(ReshardingCumulativeMetricsTest,
        SimulatedAbortedRecipientStateTransitionReportsStateCorrectly) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
@@ -560,7 +559,7 @@ TEST_F(ReshardingCumulativeMetricsTest,
 
 TEST_F(ReshardingCumulativeMetricsTest,
        SimulatedSteppedDownRecipientStateFromUnusedReportsStateCorrectly) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
@@ -573,7 +572,7 @@ TEST_F(ReshardingCumulativeMetricsTest,
 
 TEST_F(ReshardingCumulativeMetricsTest,
        SimulatedSteppedDownRecipientStateTransitionReportsStateCorrectly) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kRecipient};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&recipient);
 
@@ -596,7 +595,7 @@ TEST_F(ReshardingCumulativeMetricsTest,
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsRunCount) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
 
@@ -625,7 +624,7 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsRunCount) {
 
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsSucceededCount) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
     auto ignore = _cumulativeMetrics->registerInstanceMetrics(&coordinator);
 
@@ -656,7 +655,7 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsSucceededCount) {
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsFailedCount) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
 
@@ -687,7 +686,7 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsFailedCount) {
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsCanceledCount) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
 
@@ -718,7 +717,7 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsCanceledCount) {
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnStartedDoesNotIncrementCount) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
 
@@ -743,7 +742,7 @@ TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnStartedDoesNotIncrement
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnFailedDoesNotIncrementCount) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
 
@@ -770,7 +769,7 @@ TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnFailedDoesNotIncrementC
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnSuccessDoesNotIncrementCount) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
 
@@ -797,7 +796,7 @@ TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnSuccessDoesNotIncrement
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnCanceledDoesNotIncrementCount) {
-    using Role = ShardingDataTransformMetrics::Role;
+    using Role = ReshardingMetricsCommon::Role;
     ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
 
