@@ -69,6 +69,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
+#include "mongo/db/pipeline/document_source_change_stream_handle_topology_change_v2.h"
 #include "mongo/db/pipeline/document_source_change_stream_inject_control_events.h"
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
 #include "mongo/db/pipeline/document_source_change_stream_split_large_event.h"
@@ -3411,6 +3412,72 @@ TEST_F(ChangeStreamStageTest, InjectControlEventsHandlesMatchingInputsCorrectly)
     ASSERT_TRUE(next.isEOF());
 }
 
+TEST_F(ChangeStreamStageTest, DSCSHandleTopologyChangeV2CreateFromInvalidInput) {
+    // Test invalid top-level BSON type.
+    BSONObj spec = BSON("$_internalChangeStreamHandleTopologyChangeV2" << BSON("foo" << "bar"));
+    ASSERT_THROWS_CODE(DocumentSourceChangeStreamHandleTopologyChangeV2::createFromBson(
+                           spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       10612600);
+}
+
+TEST_F(ChangeStreamStageTest, DSCSHandleTopologyChangeV2HandleInputs) {
+    // The only valid spec for this stage is an empty object.
+    BSONObj spec = BSON("$_internalChangeStreamHandleTopologyChangeV2" << BSONObj());
+    auto handleTopologyChangeStage =
+        DocumentSourceChangeStreamHandleTopologyChangeV2::createFromBson(spec.firstElement(),
+                                                                         getExpCtx());
+
+    // Test that the stage returns all inputs as they are.
+    const BSONObj doc1 = BSON("operationType" << "test1" << "foo" << "bar");
+    const BSONObj doc2 = BSON("operationType" << "test2" << "test" << "value");
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        DocumentSource::GetNextResult::makePauseExecution(),
+        Document::fromBsonWithMetaData(doc1),
+        DocumentSource::GetNextResult::makePauseExecution(),
+        Document::fromBsonWithMetaData(doc2),
+        DocumentSource::GetNextResult::makeEOF(),
+    };
+
+    auto source = DocumentSourceMock::createForTest(inputDocs, getExpCtx());
+    handleTopologyChangeStage->setSource(source.get());
+
+    auto next = handleTopologyChangeStage->getNext();
+    ASSERT_TRUE(next.isPaused());
+
+    next = handleTopologyChangeStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc1), next.getDocument());
+
+    next = handleTopologyChangeStage->getNext();
+    ASSERT_TRUE(next.isPaused());
+
+    next = handleTopologyChangeStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc2), next.getDocument());
+
+    next = handleTopologyChangeStage->getNext();
+    ASSERT_TRUE(next.isEOF());
+}
+
+TEST_F(ChangeStreamStageTest, DSCSHandleTopologyChangeV2Serialization) {
+    // The only valid spec for this stage is an empty object.
+    BSONObj spec = BSON("$_internalChangeStreamHandleTopologyChangeV2" << BSONObj());
+    auto handleTopologyChangeStage =
+        DocumentSourceChangeStreamHandleTopologyChangeV2::createFromBson(spec.firstElement(),
+                                                                         getExpCtx());
+
+    std::vector<Value> serialization;
+    handleTopologyChangeStage->serializeToArray(serialization);
+
+    ASSERT_EQ(serialization.size(), 1UL);
+    ASSERT_EQ(serialization[0].getType(), BSONType::object);
+    ASSERT_BSONOBJ_EQ(
+        serialization[0].getDocument().toBson(),
+        BSON(DocumentSourceChangeStreamHandleTopologyChangeV2::kStageName << BSONObj()));
+}
+
 TEST_F(ChangeStreamStageTest, DSCSOplogMatchStageSerialization) {
     auto expCtx = getExpCtx();
 
@@ -5411,6 +5478,19 @@ TEST_F(ChangeStreamStageTestNoSetup,
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamHandleTopologyChange":{}})",
+        docSource->serialize().getDocument().toBson());
+
+    auto opts = SerializationOptions{
+        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    ASSERT(docSource->serialize(opts).missing());
+}
+
+TEST_F(ChangeStreamStageTestNoSetup,
+       DocumentSourceChangeStreamHandleTopologyChangeV2EmptyForQueryStats) {
+    auto docSource = DocumentSourceChangeStreamHandleTopologyChangeV2::create(getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$_internalChangeStreamHandleTopologyChangeV2":{}})",
         docSource->serialize().getDocument().toBson());
 
     auto opts = SerializationOptions{
