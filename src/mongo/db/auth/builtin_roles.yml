@@ -657,7 +657,7 @@ roles:
       - readAnyDatabase
     privileges:
       - matchType: database
-        db: "config"
+        db: "__mdb_internal_search"
         actions: *readWriteRoleActions
       - matchType: cluster
         actions:
