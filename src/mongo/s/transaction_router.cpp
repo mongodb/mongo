@@ -1726,41 +1726,24 @@ BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
                                            Shard::RetryPolicy::kIdempotent,
                                            abortRequests);
 
-    // TODO (SERVER-103580): Replace the following with appendRawResponses when that helper has been
-    // fixed to properly return WCE.
     BSONObj lastResult;
-    boost::optional<BSONObj> errorResult;
-    boost::optional<BSONObj> wceResult;
     for (const auto& response : responses) {
         uassertStatusOK(response.swResponse);
 
         lastResult = response.swResponse.getValue().data;
 
-        // If any shard returned an error, store that error to be returned. We do not return
-        // immediately so we do not accidentally hide a possible writeConcernError that a different
-        // participant could return.
+        // If any shard returned an error, return the error immediately.
         const auto commandStatus = getStatusFromCommandResult(lastResult);
-        if (!commandStatus.isOK() && !errorResult) {
-            errorResult.emplace(lastResult);
+        if (!commandStatus.isOK()) {
+            return lastResult;
         }
 
-        // If any participant had a writeConcern error, store it to be returned. If a participant
-        // had both a normal error and a writeConcern error return that immediately.
+        // If any participant had a writeConcern error, return the participant's writeConcern
+        // error immediately.
         const auto writeConcernStatus = getWriteConcernStatusFromCommandResult(lastResult);
-        if (!writeConcernStatus.isOK() && !wceResult) {
-            wceResult.emplace(lastResult);
-            if (!commandStatus.isOK()) {
-                return lastResult;
-            }
+        if (!writeConcernStatus.isOK()) {
+            return lastResult;
         }
-    }
-
-    if (errorResult) {
-        return errorResult.get();
-    }
-
-    if (wceResult) {
-        return wceResult.get();
     }
 
     // If all the responses were ok, return the last response.

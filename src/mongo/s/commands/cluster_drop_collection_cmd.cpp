@@ -138,9 +138,7 @@ public:
                 BSONObjBuilder result;
                 CommandHelpers::filterCommandReplyForPassthrough(remoteResponse.data, &result);
                 auto resultObj = result.obj();
-                // TODO SERVER-103506 consider removing the following line since `writeConcernError`
-                // will be included in the DropReply (check SERVER-104220 for additional details)
-                uassertStatusOK(getStatusFromWriteCommandReply(resultObj));
+                uassertStatusOK(getStatusFromCommandResult(resultObj));
                 // Ensure our reply conforms to the IDL-defined reply structure.
                 return DropReply::parse(IDLParserContext{"drop"}, resultObj);
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {

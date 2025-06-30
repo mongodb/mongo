@@ -175,8 +175,7 @@ public:
      * BatchWriteOp.
      */
     void noteBatchError(const TargetedWriteBatch& targetedBatch,
-                        const write_ops::WriteError& error,
-                        const WriteConcernErrorDetail* wce = nullptr);
+                        const write_ops::WriteError& error);
 
     /**
      * Aborts any further writes in the batch with the provided error.  There must be no pending
