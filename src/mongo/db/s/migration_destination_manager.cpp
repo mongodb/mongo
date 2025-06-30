@@ -540,8 +540,6 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
     _lsid = cloneRequest.getLsid();
     _txnNumber = cloneRequest.getTxnNumber();
 
-    _parallelFetchersSupported = cloneRequest.parallelFetchingSupported();
-
     _nss = nss;
     _fromShard = cloneRequest.getFromShardId();
     _fromShardConnString =
@@ -1536,7 +1534,6 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                     *_migrationId,
                     *_collectionUuid,
                     _migrationCloningProgress,
-                    _parallelFetchersSupported,
                     chunkMigrationFetcherMaxBufferedSizeBytesPerThread.load()};
                 fetcher.fetchAndScheduleInsertion();
             }

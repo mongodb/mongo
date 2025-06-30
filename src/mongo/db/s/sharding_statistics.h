@@ -130,10 +130,6 @@ struct ShardingStatistics {
     // completion. Valid only when this process is the repl set primary.
     AtomicWord<long long> unfinishedMigrationFromPreviousPrimary{0};
 
-    // Current number for chunkMigrationConcurrency that defines concurrent fetchers and inserters
-    // used for _migrateClone(step 4) of chunk migration
-    AtomicWord<int> chunkMigrationConcurrencyCnt{1};
-
     // Total number of commands run directly against this shard without the directShardOperations
     // role.
     AtomicWord<long long> unauthorizedDirectShardOperations{0};

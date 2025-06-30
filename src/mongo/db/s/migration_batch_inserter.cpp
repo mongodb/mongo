@@ -206,7 +206,7 @@ void MigrationBatchInserter::run(Status status) const try {
         _migrationProgress->incNumCloned(batchNumCloned);
         _migrationProgress->incNumBytes(batchClonedBytes);
 
-        if (_writeConcern.needToWaitForOtherNodes() && _threadCount == 1) {
+        if (_writeConcern.needToWaitForOtherNodes()) {
             if (auto ticket =
                     _secondaryThrottleTicket->tryAcquire(&ExecutionAdmissionContext::get(opCtx))) {
                 runWithoutSession(_outerOpCtx, [&] {

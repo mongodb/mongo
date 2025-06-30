@@ -116,7 +116,6 @@ public:
                            const UUID& collectionUuid,
                            std::shared_ptr<MigrationCloningProgressSharedState> migrationProgress,
                            const UUID& migrationId,
-                           int threadCount,
                            TicketHolder* secondaryThrottleTicket)
         : _outerOpCtx{outerOpCtx},
           _innerOpCtx{innerOpCtx},
@@ -127,7 +126,6 @@ public:
           _collectionUuid{collectionUuid},
           _migrationProgress{migrationProgress},
           _migrationId{migrationId},
-          _threadCount{threadCount},
           _secondaryThrottleTicket{secondaryThrottleTicket} {}
 
     static void onCreateThread(const std::string& threadName);
@@ -142,7 +140,6 @@ private:
     UUID _collectionUuid;
     std::shared_ptr<MigrationCloningProgressSharedState> _migrationProgress;
     UUID _migrationId;
-    int _threadCount;
     TicketHolder* _secondaryThrottleTicket;
 };
 

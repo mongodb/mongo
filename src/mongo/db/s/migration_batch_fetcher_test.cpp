@@ -195,12 +195,6 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicEmptyFetchingTest) {
     auto newClient =
         outerOpCtx->getServiceContext()->getService()->makeClient("MigrationCoordinator");
 
-    int concurrency = 30;
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagConcurrencyInChunkMigration", true);
-    RAIIServerParameterControllerForTest setMigrationConcurrencyParam{"chunkMigrationConcurrency",
-                                                                      concurrency};
-
     AlternativeClientRegion acr(newClient);
     auto executor =
         Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
@@ -219,10 +213,7 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicEmptyFetchingTest) {
         UUID::gen(),
         UUID::gen(),
         nullptr,
-        true,
         0 /* maxBytesPerThread */);
-
-    ASSERT_EQ(fetcher->getChunkMigrationConcurrency(), 1);
 
     // Start asynchronous task for responding to _migrateClone requests.
     // Must name the return of value std::async.  The destructor of std::future joins the
@@ -249,13 +240,6 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicFetching) {
         cc().makeOperationContext(), outerOpCtx->getCancellationToken(), executor);
     auto opCtx = newOpCtxPtr.get();
 
-
-    int concurrency = 30;
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagConcurrencyInChunkMigration", true);
-    RAIIServerParameterControllerForTest setMigrationConcurrencyParam{"chunkMigrationConcurrency",
-                                                                      concurrency};
-
     auto fetcher = std::make_unique<MigrationBatchFetcher<MigrationBatchMockInserter>>(
         outerOpCtx,
         opCtx,
@@ -267,10 +251,7 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicFetching) {
         UUID::gen(),
         UUID::gen(),
         nullptr,
-        true,
         0 /* maxBytesPerThread */);
-
-    ASSERT_EQ(fetcher->getChunkMigrationConcurrency(), 1);
 
     auto fut = stdx::async(stdx::launch::async, [&]() {
         for (int i = 0; i < 8; ++i) {

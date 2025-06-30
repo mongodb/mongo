@@ -103,10 +103,6 @@ public:
         return _migrationId.is_initialized();
     }
 
-    bool parallelFetchingSupported() const {
-        return _parallelFetchingSupported;
-    }
-
     const UUID& getMigrationId() const {
         invariant(_migrationId);
         return *_migrationId;
@@ -175,8 +171,6 @@ private:
 
     // The parsed secondary throttle options
     MigrationSecondaryThrottleOptions _secondaryThrottle;
-
-    bool _parallelFetchingSupported;
 };
 
 }  // namespace mongo

@@ -38,8 +38,6 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: chunkMigrationConcurrency
-        validator:
-            callback: validateChunkMigrationConcurrency
         default: 1
         redact: false
 

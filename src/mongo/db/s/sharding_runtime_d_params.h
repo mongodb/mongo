@@ -37,27 +37,6 @@
 #include <fmt/core.h>
 
 namespace mongo {
-
-inline Status validateChunkMigrationConcurrency(const int& chunkMigrationConcurrency,
-                                                const boost::optional<TenantId>&) {
-    const int maxConcurrency = 500;
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (!mongo::feature_flags::gConcurrencyInChunkMigration.isEnabledAndIgnoreFCVUnsafe()) {
-        return Status{ErrorCodes::InvalidOptions,
-                      "Cannot set migration concurrency number without enabling migration "
-                      "concurrency feature flag"};
-    }
-
-    if (chunkMigrationConcurrency <= 0 ||
-        (chunkMigrationConcurrency > maxConcurrency && !getTestCommandsEnabled())) {
-        return Status{
-            ErrorCodes::InvalidOptions,
-            fmt::format("Chunk migration concurrency level must be positive and less than {}.",
-                        maxConcurrency)};
-    }
-    return Status::OK();
-}
-
 inline Status validateChunkMigrationFetcherMaxBufferedSizeBytesPerThread(
     const int& maxSize, const boost::optional<TenantId>&) {
     if (maxSize == 0) {

@@ -63,12 +63,6 @@ config_fuzzer_params = {
             "default": 0,
             "fuzz_at": ["startup"],
         },
-        "chunkMigrationConcurrency": {
-            "choices": [1, 4, 16],
-            "min": 1,
-            "max": 16,
-            "fuzz_at": ["startup"],
-        },
         "collectionSamplingLogIntervalSeconds": {
             "min": 5,
             "max": 15,

@@ -294,7 +294,6 @@ class TestRunner(Subcommand):
         set_parameters - A string consisting with a key of being the parameter being fuzzed and the value being the fuzzed parameter value.
                         e.g.:
                         analyzeShardKeySplitPointExpirationSecs: 50
-                        chunkMigrationConcurrency: 4
                         ...
                         mirrorReads:
                             samplingRate: 0.25
@@ -302,7 +301,7 @@ class TestRunner(Subcommand):
         Output:
         A string that can be used for an argument to --mongo(d/s)SetParameters
         e.g.:
-        '{analyzeShardKeySplitPointExpirationSecs: 216, chunkMigrationConcurrency: 4, ..., mirrorReads: {samplingRate: 0.25}}'
+        '{analyzeShardKeySplitPointExpirationSecs: 216, ..., mirrorReads: {samplingRate: 0.25}}'
         """
 
         def format_item(key, value):
@@ -326,13 +325,12 @@ class TestRunner(Subcommand):
         set_parameters - A string consisting with a key of being the parameter being fuzzed and the value being the fuzzed parameter value.
                          e.g.:
                          analyzeShardKeySplitPointExpirationSecs: 50
-                         chunkMigrationConcurrency: 4
                          ...
 
         Output:
         e.g.:
         analyzeShardKeySplitPointExpirationSecs: 216, 50: 1, max: 300
-        chunkMigrationConcurrency: 4, min: 1, max: 16, options: [1, 4, 16]
+        min: 1, max: 16, options: [1, 4, 16]
         ...
         """
         from buildscripts.resmokelib.config_fuzzer_limits import (
