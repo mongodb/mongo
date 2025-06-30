@@ -11,15 +11,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({mongos: 1, shards: 2});
 
 // Test transaction with concurrent chunk migration.
-const commands = ['find', 'aggregate', 'update'];
-// Do not test the bulkWrite case in multiversion
-// TODO (SERVER-103224) remove this check after the solution is backported and always include
-// 'bulkWrite'
-const res = st.s.getDB("admin").system.version.findOne({_id: "featureCompatibilityVersion"});
-if (MongoRunner.compareBinVersions(res.version, "8.2") >= 0) {
-    commands.push('bulkWrite');
-}
-
+const commands = ['find', 'aggregate', 'update', 'bulkWrite'];
 {
     function runTest(command) {
         jsTest.log("Test transaction with concurrent chunk migration. Command :" + command);

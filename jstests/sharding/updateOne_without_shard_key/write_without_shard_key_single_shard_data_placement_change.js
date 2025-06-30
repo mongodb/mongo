@@ -52,10 +52,6 @@ function getDB(session, testCase) {
 
 function runTest(testCase) {
     withRetryOnTransientTxnError(() => {
-        // Do not test the bulkWrite case in multiversion
-        // TODO (SERVER-103224) remove this check after the solution is backported.
-        if (!is82OrAbove() && testCase.cmdObj.bulkWrite)
-            return;
         const session = st.s.startSession();
         session.startTransaction({readConcern: {level: "snapshot"}});
         session.getDatabase(dbName).getCollection(collName2).insert({x: 1});
