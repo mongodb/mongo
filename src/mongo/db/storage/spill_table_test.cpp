@@ -52,7 +52,8 @@ protected:
     SpillTableTest()
         : StorageEngineTest(StorageEngineTest::Options{}
                                 .setParameter("featureFlagCreateSpillKVEngine", true)
-                                .setParameter("spillWiredTigerCacheSizeMB", kCacheSizeMB)) {}
+                                .setParameter("spillWiredTigerCacheSizeMinMB", kCacheSizeMB)
+                                .setParameter("spillWiredTigerCacheSizeMaxMB", kCacheSizeMB)) {}
 };
 
 TEST_F(SpillTableTest, InsertRecords) {

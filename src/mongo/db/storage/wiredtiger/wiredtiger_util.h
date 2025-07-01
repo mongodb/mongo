@@ -277,6 +277,14 @@ public:
      */
     static size_t getMainCacheSizeMB(double requestedCacheSizeGB, double requestedCacheSizePct = 0);
 
+    /**
+     * Returns the amount of memory in MB to use for the spill WiredTiger instance cache.
+     */
+    static int32_t getSpillCacheSizeMB(int32_t systemMemoryMB,
+                                       double pct,
+                                       int32_t minMB,
+                                       int32_t maxMB);
+
     class ErrorAccumulator : public WT_EVENT_HANDLER {
     public:
         explicit ErrorAccumulator(StringSet* errors);

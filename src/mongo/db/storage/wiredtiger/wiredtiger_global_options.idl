@@ -298,12 +298,39 @@ server_parameters:
         condition: {expr: false}
         redact: false
 
-    spillWiredTigerCacheSizeMB:
-        description: The amount of memory in MB to allocate for the spill WiredTiger instance cache.
+    spillWiredTigerCacheSizePercentage:
+        description: >-
+            The amount of memory, as a percentage of system memory, to allocate for the spill
+            WiredTiger instance cache, bounded by spillWiredTigerCacheSizeMinMB and
+            spillWiredTigerCacheSizeMaxMB.
+        set_at: startup
+        cpp_vartype: double
+        cpp_varname: gSpillWiredTigerCacheSizePercentage
+        default: 2.5
+        validator:
+            gte: 0
+            lte: 10
+        redact: false
+
+    spillWiredTigerCacheSizeMinMB:
+        description: >-
+            The lower bound for spillWiredTigerCacheSizePercentage in MB.
         set_at: startup
         cpp_vartype: int32_t
-        cpp_varname: gSpillWiredTigerCacheSizeMB
+        cpp_varname: gSpillWiredTigerCacheSizeMinMB
         default: 100
+        validator:
+            gte: 50
+            lte: 10000000 # 10TB
+        redact: false
+
+    spillWiredTigerCacheSizeMaxMB:
+        description: >-
+            The upper bound for spillWiredTigerCacheSizePercentage in MB.
+        set_at: startup
+        cpp_vartype: int32_t
+        cpp_varname: gSpillWiredTigerCacheSizeMaxMB
+        default: 1000
         validator:
             gte: 50
             lte: 10000000 # 10TB

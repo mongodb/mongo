@@ -44,6 +44,8 @@
 #include "mongo/util/processinfo.h"
 #include "mongo/util/testing_proctor.h"
 
+#include <algorithm>
+
 #include <boost/filesystem/directory.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
@@ -490,6 +492,16 @@ size_t WiredTigerUtil::getMainCacheSizeMB(double requestedCacheSizeGB,
         cacheSizeMB = kMaxSizeCacheMB;
     }
     return static_cast<size_t>(std::floor(cacheSizeMB));
+}
+
+int32_t WiredTigerUtil::getSpillCacheSizeMB(int32_t systemMemoryMB,
+                                            double pct,
+                                            int32_t minMB,
+                                            int32_t maxMB) {
+    uassert(10698700,
+            "Min spill engine cache size cannot be greater than max spill engine cache size",
+            minMB <= maxMB);
+    return std::clamp(static_cast<int32_t>(systemMemoryMB * pct * 0.01), minMB, maxMB);
 }
 
 logv2::LogSeverity getWTLogSeverityLevel(const BSONObj& obj) {

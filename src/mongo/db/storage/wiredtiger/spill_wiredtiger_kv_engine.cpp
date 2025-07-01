@@ -38,6 +38,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/processinfo.h"
 
 #include <memory>
 
@@ -225,7 +226,10 @@ void SpillWiredTigerKVEngine::cleanShutdown(bool memLeakAllowed) {
 WiredTigerKVEngineBase::WiredTigerConfig getSpillWiredTigerConfigFromStartupOptions() {
     WiredTigerKVEngineBase::WiredTigerConfig wtConfig;
 
-    wtConfig.cacheSizeMB = gSpillWiredTigerCacheSizeMB;
+    wtConfig.cacheSizeMB = WiredTigerUtil::getSpillCacheSizeMB(ProcessInfo{}.getMemSizeMB(),
+                                                               gSpillWiredTigerCacheSizePercentage,
+                                                               gSpillWiredTigerCacheSizeMinMB,
+                                                               gSpillWiredTigerCacheSizeMaxMB);
     wtConfig.sessionMax = wiredTigerGlobalOptions.sessionMax;
     wtConfig.evictionThreadsMin = gSpillWiredTigerEvictionThreadsMin;
     wtConfig.evictionThreadsMax = gSpillWiredTigerEvictionThreadsMax;

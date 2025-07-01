@@ -1160,5 +1160,16 @@ DEATH_TEST_F(WiredTigerUtilTest, WTMainCacheSizeInvalidValues, "invariant") {
     WiredTigerUtil::getMainCacheSizeMB(10, 0.1);
 }
 
+TEST(WiredTigerUtilTest, SpillCacheSize) {
+    ASSERT_EQ(
+        WiredTigerUtil::getSpillCacheSizeMB(1024 * 8, 5, 1, std::numeric_limits<int32_t>::max()),
+        static_cast<int32_t>(1024 * 8 * 0.05));
+    ASSERT_EQ(WiredTigerUtil::getSpillCacheSizeMB(1024 * 8, 5, 1, 100), 100);
+    ASSERT_EQ(WiredTigerUtil::getSpillCacheSizeMB(1024 * 8, 0, 1, 100), 1);
+    ASSERT_EQ(WiredTigerUtil::getSpillCacheSizeMB(1024 * 8, 0, 100, 100), 100);
+    ASSERT_THROWS_CODE(
+        WiredTigerUtil::getSpillCacheSizeMB(1024 * 8, 5, 101, 100), DBException, 10698700);
+}
+
 }  // namespace
 }  // namespace mongo
