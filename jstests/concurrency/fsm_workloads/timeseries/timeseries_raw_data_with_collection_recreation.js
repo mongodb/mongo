@@ -3,6 +3,8 @@
  * re-creating them.
  *
  * @tags: [
+ *  # Config fuzzer can make timeseriesBucketMaxCount < 500, which will lead to incorrect failures.
+ *  does_not_support_config_fuzzer,
  *  requires_timeseries,
  *  requires_fcv_82,
  *  # Time-series collections cannot be written to in a transaction.
@@ -22,7 +24,7 @@ export const $config = (function() {
     const threadCount = 10;
     const metaFieldName = "meta";
     const timeFieldName = "time";
-    const measurementsPerBucket = 2;
+    const measurementsPerBucket = 500;
     const bucketsPerCollection = 5;
 
     const acceptableErrorCodes = [

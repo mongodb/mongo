@@ -104,7 +104,7 @@ export const $config = (function() {
 
     return {
         threadCount: 10,
-        iterations: 500,
+        iterations: 1000,
         startState: 'init',
         states: states,
         data: initData,

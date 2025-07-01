@@ -16,7 +16,7 @@
 export const $config = (function() {
     const threadCount = 20;
     // These buckets are not deleted during the test.
-    const initialBucketCount = 100;
+    const initialBucketCount = 500;
 
     const data = {
         addedBucketCount: 0,
