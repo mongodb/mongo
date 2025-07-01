@@ -1,5 +1,10 @@
 version: 1.0.0
 filters:
+  # Added shared ownership until this can be decided
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/server-cluster-scalability
+      - 10gen/server-catalog-and-routing
   - "*migration*":
     approvers:
       - 10gen/server-cluster-scalability
@@ -32,10 +37,10 @@ filters:
       - 10gen/server-cluster-scalability
   - "*range*deleter*":
     approvers:
-      - "10gen/server-cluster-scalability"
+      - 10gen/server-cluster-scalability
   - "*range*deletion*":
     approvers:
-      - "10gen/server-cluster-scalability"
+      - 10gen/server-cluster-scalability
   - "*reshard*":
     approvers:
       - 10gen/server-cluster-scalability
