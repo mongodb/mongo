@@ -68,12 +68,13 @@ echo ${ALL_FLAGS} > .bazel_build_flags
 
 set +o errexit
 
+# Retry the build since it's deterministic and may fail due to transient issues.
 for i in {1..3}; do
-  eval ${TIMEOUT_CMD} ${BAZEL_BINARY} fetch ${ALL_FLAGS} ${targets} && RET=0 && break || RET=$? && sleep 60
+  eval ${TIMEOUT_CMD} ${BAZEL_BINARY} build ${ALL_FLAGS} ${targets} && RET=0 && break || RET=$? && sleep 1
   if [ $RET -eq 124 ]; then
-    echo "Bazel fetch timed out after ${build_timeout_seconds} seconds, retrying..."
+    echo "Bazel build timed out after ${build_timeout_seconds} seconds, retrying..."
   else
-    echo "Bazel fetch failed, retrying..."
+    echo "Bazel build failed, retrying..."
   fi
   $BAZEL_BINARY shutdown
 done
