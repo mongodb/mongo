@@ -81,7 +81,8 @@ public:
     static constexpr StringData kCollName = "exampleCol"_sd;
     static constexpr StringData kDbName = "foo"_sd;
 
-    std::vector<QueryShapeConfiguration> getExampleQueryShapeConfigurations(TenantId tenantId) {
+    std::vector<QueryShapeConfiguration> getExampleQueryShapeConfigurations(
+        boost::optional<TenantId> tenantId) {
         NamespaceSpec ns;
         ns.setDb(DatabaseNameUtil::deserialize(tenantId, kDbName, kSerializationContext));
         ns.setColl(kCollName);
@@ -154,5 +155,57 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsLookup) {
     ASSERT_EQ(
         manager().getQuerySettingsForQueryShapeHash(configs[1].getQueryShapeHash(), tenantId2),
         boost::none);
+}
+
+TEST_F(QuerySettingsManagerTest, QuerySettingsMarkBackfilled) {
+    const boost::optional<TenantId> tenantId = boost::none;
+    const auto configs = getExampleQueryShapeConfigurations(tenantId);
+    const auto& hash0 = configs[0].getQueryShapeHash();
+    const auto& hash1 = configs[1].getQueryShapeHash();
+
+    // Ensure that the 'hasRepresentativeQuery' flag is initially set to false for both queries.
+    LogicalTime time;
+    manager().setAllQueryShapeConfigurations({{configs}, time}, tenantId);
+    ASSERT_FALSE(
+        manager().getQuerySettingsForQueryShapeHash(hash0, tenantId)->hasRepresentativeQuery);
+    ASSERT_FALSE(
+        manager().getQuerySettingsForQueryShapeHash(hash1, tenantId)->hasRepresentativeQuery);
+
+    // Mark the first query as backfilled and ensure that the 'hasRepresentativeQuery' flag is now
+    // set to true for the first one, and false for the second one.
+    manager().markBackfilledRepresentativeQueries({hash0}, time, tenantId);
+    ASSERT_TRUE(
+        manager().getQuerySettingsForQueryShapeHash(hash0, tenantId)->hasRepresentativeQuery);
+    ASSERT_FALSE(
+        manager().getQuerySettingsForQueryShapeHash(hash1, tenantId)->hasRepresentativeQuery);
+
+    // Mark the second query as backfilled and ensure that both flags are now set to true.
+    manager().markBackfilledRepresentativeQueries({hash1}, time, tenantId);
+    ASSERT_TRUE(
+        manager().getQuerySettingsForQueryShapeHash(hash0, tenantId)->hasRepresentativeQuery);
+    ASSERT_TRUE(
+        manager().getQuerySettingsForQueryShapeHash(hash1, tenantId)->hasRepresentativeQuery);
+
+    // Set a new configuration with an advanced timestamp and assert that both flags are now false.
+    LogicalTime nextTime = time;
+    nextTime.addTicks(1);
+    manager().setAllQueryShapeConfigurations({{configs}, nextTime}, tenantId);
+    ASSERT_FALSE(
+        manager().getQuerySettingsForQueryShapeHash(hash0, tenantId)->hasRepresentativeQuery);
+    ASSERT_FALSE(
+        manager().getQuerySettingsForQueryShapeHash(hash1, tenantId)->hasRepresentativeQuery);
+
+    // Ensure that calling markBackfilledRepresentativeQueries() with a stale time throws a
+    // "ConflictingOperationsInProgress" error.
+    ASSERT_THROWS_CODE(manager().markBackfilledRepresentativeQueries({hash0}, time, tenantId),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    // Ensure that it's possible to mark both queries with the new time.
+    manager().markBackfilledRepresentativeQueries({hash0, hash1}, nextTime, tenantId);
+    ASSERT_TRUE(
+        manager().getQuerySettingsForQueryShapeHash(hash0, tenantId)->hasRepresentativeQuery);
+    ASSERT_TRUE(
+        manager().getQuerySettingsForQueryShapeHash(hash1, tenantId)->hasRepresentativeQuery);
 }
 }  // namespace mongo::query_settings

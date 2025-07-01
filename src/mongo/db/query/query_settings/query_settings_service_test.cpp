@@ -133,6 +133,7 @@ public:
     }
 
     ~QuerySettingsScope() {
+        _previousQueryShapeConfigurationsWithTimestamp.clusterParameterTime.addTicks(1);
         QuerySettingsService::get(_opCtx).setAllQueryShapeConfigurations(
             std::move(_previousQueryShapeConfigurationsWithTimestamp), boost::none /* tenantId */);
     }
