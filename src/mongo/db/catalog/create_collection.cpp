@@ -486,10 +486,10 @@ Status _createDefaultTimeseriesIndex(OperationContext* opCtx,
         builder.append("collation", collation);
     }
 
-    IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(opCtx,
-                                                                       collection,
-                                                                       {builder.obj()},
-                                                                       /*fromMigrate=*/false);
+    IndexBuildsCoordinator::createIndexesOnEmptyCollection(opCtx,
+                                                           collection,
+                                                           {builder.obj()},
+                                                           /*fromMigrate=*/false);
     return Status::OK();
 }
 

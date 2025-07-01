@@ -178,7 +178,7 @@ protected:
 
         if (shouldSucceed) {
             try {
-                opObserver.onCreateIndex(opCtx, nss, uuid, BSONObj(), false);
+                opObserver.onCreateIndex(opCtx, nss, uuid, BSONObj(), "", false);
                 opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, false);
                 opObserver.onStartIndexBuildSinglePhase(opCtx, nss);
                 opObserver.onCreateCollection(
@@ -230,7 +230,7 @@ protected:
                 ASSERT_OK(exceptionToStatus());
             }
         } else {
-            ASSERT_THROWS(opObserver.onCreateIndex(opCtx, nss, uuid, BSONObj(), false),
+            ASSERT_THROWS(opObserver.onCreateIndex(opCtx, nss, uuid, BSONObj(), "", false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, false),
                           AssertionException);

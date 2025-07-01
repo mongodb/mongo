@@ -228,7 +228,7 @@ Status createIndex(OperationContext* opCtx,
                    const NamespaceString& nss,
                    const CollectionOptions& collectionOptions,
                    const IndexConfig& indexConfig,
-                   const std::string& ident) {
+                   StringData ident) {
     auto engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
     invariant(collectionOptions.uuid);
     Status status =
@@ -240,7 +240,7 @@ Status createIndex(OperationContext* opCtx,
                                           collectionOptions.indexOptionDefaults.getStorageEngine());
     if (status.isOK()) {
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-        ru.onRollback([engine, ident, &ru](OperationContext*) {
+        ru.onRollback([engine, ident = std::string(ident), &ru](OperationContext*) {
             // Intentionally ignoring failure.
             engine->dropIdent(ru, ident, /*identHasSizeInfo=*/false).ignore();
         });

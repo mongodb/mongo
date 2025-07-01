@@ -1634,11 +1634,8 @@ void CollectionImpl::removeIndex(OperationContext* opCtx, StringData indexName) 
 
 Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
                                             const IndexDescriptor* spec,
+                                            StringData ident,
                                             boost::optional<UUID> buildUUID) {
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto ident = storageEngine->generateNewIndexIdent(ns().dbName());
-    invariant(!ident.empty());
-
     durable_catalog::CatalogEntryMetaData::IndexMetaData imd;
     imd.spec = spec->infoObj();
     imd.ready = false;

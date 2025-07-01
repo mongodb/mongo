@@ -164,6 +164,7 @@ void UserWriteBlockModeOpObserver::onCreateIndex(OperationContext* opCtx,
                                                  const NamespaceString& nss,
                                                  const UUID& uuid,
                                                  BSONObj indexDoc,
+                                                 StringData ident,
                                                  bool fromMigrate) {
     _checkWriteAllowed(opCtx, nss);
 }

@@ -974,6 +974,7 @@ public:
         CollectionWriter collection(opCtx, nss);
 
         auto writableColl = collection.getWritableCollection(opCtx);
+        auto storageEngine = getServiceContext()->getStorageEngine();
 
         // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
         StatusWith<BSONObj> statusWithSpec = writableColl->getIndexCatalog()->prepareSpecForCreate(
@@ -983,7 +984,11 @@ public:
 
         auto indexBuildBlock = std::make_unique<IndexBuildBlock>(
             writableColl->ns(), indexSpec, IndexBuildMethod::kForeground, UUID::gen());
-        uassertStatusOK(indexBuildBlock->init(opCtx, writableColl, /*forRecover=*/false));
+        uassertStatusOK(
+            indexBuildBlock->init(opCtx,
+                                  writableColl,
+                                  storageEngine->generateNewCollectionIdent(nss.dbName()),
+                                  /*forRecover=*/false));
         uassertStatusOK(indexBuildBlock->getWritableEntry(opCtx, writableColl)
                             ->accessMethod()
                             ->initializeAsEmpty());
@@ -1279,7 +1284,7 @@ private:
     void _createIndex(OperationContext* opCtx, const NamespaceString& nss, BSONObj indexSpec) {
         AutoGetCollection autoColl(opCtx, nss, MODE_X);
         CollectionWriter collection(opCtx, nss);
-        IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
+        IndexBuildsCoordinator::createIndexesOnEmptyCollection(
             opCtx, collection, {indexSpec}, /*fromMigrate=*/false);
     }
 
@@ -3378,7 +3383,8 @@ TEST_F(CollectionCatalogTimestampTest, IndexCatalogEntryCopying) {
         WriteUnitOfWork wuow(opCtx.get());
         CollectionWriter writer{opCtx.get(), autoColl};
         auto writableColl = writer.getWritableCollection(opCtx.get());
-        ASSERT_OK(writableColl->prepareForIndexBuild(opCtx.get(), &desc, boost::none));
+        ASSERT_OK(
+            writableColl->prepareForIndexBuild(opCtx.get(), &desc, "index-ident", boost::none));
         wuow.commit();
     }
 

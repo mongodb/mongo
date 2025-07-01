@@ -165,6 +165,7 @@ public:
                        const NamespaceString& nss,
                        const UUID& uuid,
                        BSONObj indexDoc,
+                       StringData ident,
                        bool fromMigrate) override;
 
     /**
@@ -214,7 +215,7 @@ public:
                        bool)>
         onRenameCollectionFn;
 
-    std::function<void(OperationContext*, const NamespaceString&, UUID, BSONObj, bool)>
+    std::function<void(OperationContext*, const NamespaceString&, UUID, BSONObj, StringData, bool)>
         onCreateIndexFn;
 
     std::function<void(OperationContext*,

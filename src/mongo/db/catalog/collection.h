@@ -583,6 +583,7 @@ public:
      */
     virtual Status prepareForIndexBuild(OperationContext* opCtx,
                                         const IndexDescriptor* spec,
+                                        StringData indexIdent,
                                         boost::optional<UUID> buildUUID) = 0;
 
     /**

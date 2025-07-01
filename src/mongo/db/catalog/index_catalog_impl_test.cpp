@@ -67,7 +67,8 @@ TEST_F(IndexCatalogImplTest, WithInvalidIndexSpec) {
 
         auto writableColl = writer.getWritableCollection(operationContext());
         IndexDescriptor desc{IndexNames::BTREE, bson};
-        ASSERT_OK(writableColl->prepareForIndexBuild(operationContext(), &desc, boost::none));
+        ASSERT_OK(
+            writableColl->prepareForIndexBuild(operationContext(), &desc, "ident", boost::none));
         auto entry = writableColl->getIndexCatalog()->getWritableEntryByName(
             operationContext(), desc.indexName(), IndexCatalog::InclusionPolicy::kAll);
         writableColl->indexBuildSuccess(operationContext(), entry);

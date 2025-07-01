@@ -41,16 +41,14 @@
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_index_usage_tracker.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
@@ -136,7 +134,10 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection, bool forRecovery) {
+Status IndexBuildBlock::init(OperationContext* opCtx,
+                             Collection* collection,
+                             StringData ident,
+                             bool forRecovery) {
     // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
@@ -158,7 +159,7 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection, bo
     if (!forRecovery) {
         // Setup on-disk structures. We skip this during startup recovery for unfinished indexes as
         // everything is already in-place.
-        Status status = collection->prepareForIndexBuild(opCtx, &descriptor, _buildUUID);
+        Status status = collection->prepareForIndexBuild(opCtx, &descriptor, ident, _buildUUID);
         if (!status.isOK())
             return status;
     }
@@ -284,6 +285,33 @@ IndexCatalogEntry* IndexBuildBlock::getWritableEntry(OperationContext* opCtx,
         opCtx,
         _indexName,
         IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
+}
+
+Status IndexBuildBlock::buildEmptyIndex(OperationContext* opCtx,
+                                        Collection* collection,
+                                        BSONObj spec,
+                                        StringData ident) {
+    IndexBuildBlock indexBuildBlock(
+        collection->ns(), spec, IndexBuildMethod::kForeground, boost::none);
+    if (auto status = indexBuildBlock.init(opCtx, collection, ident, /*forRecovery=*/false);
+        !status.isOK()) {
+        return status;
+    }
+
+    // sanity checks, etc...
+    IndexCatalogEntry* entry = indexBuildBlock.getWritableEntry(opCtx, collection);
+    invariant(entry);
+    IndexDescriptor* descriptor = entry->descriptor();
+    invariant(descriptor);
+
+    if (auto status = entry->accessMethod()->initializeAsEmpty(); !status.isOK())
+        return status;
+    indexBuildBlock.success(opCtx, collection);
+
+    // sanity check
+    invariant(collection->isIndexReady(descriptor->indexName()));
+
+    return Status::OK();
 }
 
 }  // namespace mongo

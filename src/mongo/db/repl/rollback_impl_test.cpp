@@ -46,6 +46,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
@@ -2187,10 +2188,7 @@ TEST_F(RollbackImplObserverInfoTest,
     auto uuid = UUID::gen();
 
     BSONObj indexObj;
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (fcvSnapshot.isVersionInitialized() &&
-        mongo::feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabled(
-            VersionContext::getDecoration(_opCtx.get()), fcvSnapshot)) {
+    if (shouldReplicateLocalCatalogIdentifers(_opCtx.get())) {
         indexObj = BSON("createIndexes" << nss.coll() << "spec"
                                         << BSON("v" << 2 << "key"
                                                     << "x"

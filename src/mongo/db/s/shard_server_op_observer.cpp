@@ -732,6 +732,7 @@ void ShardServerOpObserver::onCreateIndex(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const UUID& uuid,
                                           BSONObj indexDoc,
+                                          StringData ident,
                                           bool fromMigrate) {
     // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
     if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {

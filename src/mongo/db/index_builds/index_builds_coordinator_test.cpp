@@ -40,6 +40,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -206,6 +207,83 @@ TEST_F(IndexBuildsCoordinatorTest, ForegroundIndexOptionsConflictRelax) {
     ASSERT_DOES_NOT_THROW(
         indexBuildsCoord->createIndex(opCtx, uuid, spec2, indexConstraints, fromMigrate));
     ASSERT_EQ(coll(opCtx, nss)->getIndexCatalog()->numIndexesTotal(), 2);
+}
+
+class OpObserverMock : public OpObserverNoop {
+public:
+    boost::optional<std::string> createIndexIdent;
+
+    void onCreateIndex(OperationContext* opCtx,
+                       const NamespaceString& nss,
+                       const UUID& uuid,
+                       BSONObj indexDoc,
+                       StringData ident,
+                       bool fromMigrate) override {
+        createIndexIdent.emplace(ident);
+    }
+};
+
+TEST_F(IndexBuildsCoordinatorTest, CreateIndexOnEmptyCollectionReplicatesIdent) {
+    auto opObserverRegistry =
+        dynamic_cast<OpObserverRegistry*>(operationContext()->getServiceContext()->getOpObserver());
+    auto mockObserver = std::make_unique<OpObserverMock>();
+    auto opObserver = mockObserver.get();
+    opObserverRegistry->addObserver(std::move(mockObserver));
+
+    const auto nss = NamespaceString::createNamespaceString_forTest(
+        "IndexBuildsCoordinatorTest.CreateIndexOnEmptyCollectionReplicatesIdent");
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, CollectionOptions()));
+
+    {
+        AutoGetCollection autoColl(operationContext(), nss, MODE_X);
+        WriteUnitOfWork wuow(operationContext());
+        CollectionWriter writer{operationContext(), autoColl};
+        IndexBuildsCoordinator::createIndexesOnEmptyCollection(
+            operationContext(),
+            writer,
+            {BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1")},
+            false);
+        wuow.commit();
+    }
+
+    // Verify that the op observer was called and that it was given the correct ident
+    AutoGetCollection autoColl(operationContext(), nss, MODE_X);
+    ASSERT(opObserver->createIndexIdent);
+    ASSERT(autoColl->getIndexCatalog()->findIndexByIdent(operationContext(),
+                                                         *opObserver->createIndexIdent));
+}
+
+TEST_F(IndexBuildsCoordinatorTest, CreateIndexOnNonEmptyCollectionReplicatesIdent) {
+    auto opObserverRegistry =
+        dynamic_cast<OpObserverRegistry*>(operationContext()->getServiceContext()->getOpObserver());
+    auto mockObserver = std::make_unique<OpObserverMock>();
+    auto opObserver = mockObserver.get();
+    opObserverRegistry->addObserver(std::move(mockObserver));
+
+    const auto nss = NamespaceString::createNamespaceString_forTest(
+        "IndexBuildsCoordinatorTest.CreateIndexOnEmptyCollectionReplicatesIdent");
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, CollectionOptions()));
+
+    {
+        AutoGetCollection autoColl(operationContext(), nss, MODE_X);
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(collection_internal::insertDocument(
+            operationContext(), *autoColl, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullptr));
+        wuow.commit();
+
+        auto indexBuildsCoord = IndexBuildsCoordinator::get(operationContext());
+        indexBuildsCoord->createIndex(operationContext(),
+                                      autoColl->uuid(),
+                                      BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
+                                      IndexBuildsManager::IndexConstraints::kRelax,
+                                      false);
+    }
+
+    // Verify that the op observer was called and that it was given the correct ident
+    AutoGetCollection autoColl(operationContext(), nss, MODE_X);
+    ASSERT(opObserver->createIndexIdent);
+    ASSERT(autoColl->getIndexCatalog()->findIndexByIdent(operationContext(),
+                                                         *opObserver->createIndexIdent));
 }
 
 }  // namespace

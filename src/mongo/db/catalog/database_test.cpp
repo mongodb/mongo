@@ -400,16 +400,16 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
             BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << BSON("a" << 1) << "name"
                      << "a_1");
 
-        auto indexBuildBlock = std::make_unique<IndexBuildBlock>(
+        IndexBuildBlock indexBuildBlock(
             collection->ns(), indexInfoObj, IndexBuildMethod::kHybrid, UUID::gen());
         {
             WriteUnitOfWork wuow(opCtx);
-            ASSERT_OK(indexBuildBlock->init(opCtx, collection, /*forRecovery=*/false));
+            ASSERT_OK(indexBuildBlock.init(opCtx, collection, "ident", /*forRecovery=*/false));
             wuow.commit();
         }
         ON_BLOCK_EXIT([&indexBuildBlock, opCtx, collection] {
             WriteUnitOfWork wuow(opCtx);
-            indexBuildBlock->success(opCtx, collection);
+            indexBuildBlock.success(opCtx, collection);
             wuow.commit();
         });
 

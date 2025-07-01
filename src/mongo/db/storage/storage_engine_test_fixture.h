@@ -202,7 +202,8 @@ public:
         CollectionWriter writer{opCtx, collNs};
         Collection* collection = writer.getWritableCollection(opCtx);
         IndexDescriptor descriptor(IndexNames::BTREE, spec);
-        return collection->prepareForIndexBuild(opCtx, &descriptor, buildUUID);
+        return collection->prepareForIndexBuild(
+            opCtx, &descriptor, _storageEngine->generateNewIndexIdent(collNs.dbName()), buildUUID);
     }
 
     void indexBuildSuccess(OperationContext* opCtx, NamespaceString collNs, StringData key) {

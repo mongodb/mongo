@@ -317,18 +317,18 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const UUID& uuid,
                                    BSONObj indexDoc,
+                                   StringData ident,
                                    bool fromMigrate) {
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
     }
 
+    bool replicateLocalCatalogIdentifiers = shouldReplicateLocalCatalogIdentifers(opCtx);
+
     BSONObjBuilder builder;
     // Note that despite using this constant, we are not building a CreateIndexCommand here
     builder.append(CreateIndexesCommand::kCommandName, nss.coll());
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabled(
-            VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+    if (replicateLocalCatalogIdentifiers) {
         builder.append("spec", indexDoc);
     } else {
         builder.appendElements(indexDoc);
@@ -340,6 +340,9 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setUuid(uuid);
     oplogEntry.setObject(builder.obj());
+    if (replicateLocalCatalogIdentifiers) {
+        oplogEntry.setObject2(BSON("ident" << ident));
+    }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
 
     auto opTime = logMutableOplogEntry(opCtx, &oplogEntry, _operationLogger.get());

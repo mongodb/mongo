@@ -739,34 +739,19 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
     // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     StatusWith<BSONObj> statusWithSpec =
         prepareSpecForCreate(opCtx, CollectionPtr::CollectionPtr_UNSAFE(collection), spec);
-    Status status = statusWithSpec.getStatus();
-    if (!status.isOK())
-        return status;
+    if (!statusWithSpec.isOK())
+        return statusWithSpec;
     spec = statusWithSpec.getValue();
 
-    // now going to touch disk
-    boost::optional<UUID> buildUUID = boost::none;
-    IndexBuildBlock indexBuildBlock(
-        collection->ns(), spec, IndexBuildMethod::kForeground, buildUUID);
-    status = indexBuildBlock.init(opCtx, collection, /*forRecovery=*/false);
-    if (!status.isOK())
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto ident = storageEngine->generateNewIndexIdent(collection->ns().dbName());
+    invariant(!ident.empty());
+    if (auto status = IndexBuildBlock::buildEmptyIndex(opCtx, collection, spec, ident);
+        !status.isOK()) {
         return status;
+    }
 
-    // sanity checks, etc...
-    IndexCatalogEntry* entry = indexBuildBlock.getWritableEntry(opCtx, collection);
-    invariant(entry);
-    IndexDescriptor* descriptor = entry->descriptor();
-    invariant(descriptor);
-
-    status = entry->accessMethod()->initializeAsEmpty();
-    if (!status.isOK())
-        return status;
-    indexBuildBlock.success(opCtx, collection);
-
-    // sanity check
-    invariant(collection->isIndexReady(descriptor->indexName()));
-
-    return spec;
+    return statusWithSpec;
 }
 
 void IndexCatalogImpl::_rebuildIndexUpdateIdentifier() {

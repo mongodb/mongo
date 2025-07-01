@@ -92,6 +92,7 @@ public:
                        const NamespaceString& nss,
                        const UUID& uuid,
                        BSONObj indexDoc,
+                       StringData ident,
                        bool fromMigrate) final;
 
     // We need to check the startIndexBuild ops because onCreateIndex is only called for empty

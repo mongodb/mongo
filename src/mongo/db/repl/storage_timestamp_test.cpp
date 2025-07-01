@@ -75,6 +75,7 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
@@ -501,9 +502,9 @@ public:
             ASSERT_OK(indexer.commit(
                 _opCtx,
                 coll.getWritableCollection(_opCtx),
-                [&](const BSONObj& indexSpec) {
+                [&](const BSONObj& indexSpec, StringData ident) {
                     _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                        _opCtx, coll->ns(), coll->uuid(), indexSpec, false);
+                        _opCtx, coll->ns(), coll->uuid(), indexSpec, ident, false);
                 },
                 MultiIndexBlock::kNoopOnCommitFn));
             // The timestamping repsponsibility is placed on the caller rather than the
@@ -896,13 +897,7 @@ public:
     }
 
     StringData indexNameOplogField() const {
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        if (fcvSnapshot.isVersionInitialized() &&
-            feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabled(
-                VersionContext::getDecoration(_opCtx), fcvSnapshot)) {
-            return "o.spec.name";
-        }
-        return "o.name";
+        return shouldReplicateLocalCatalogIdentifers(_opCtx) ? "o.spec.name" : "o.name";
     }
 
 private:
@@ -2065,12 +2060,12 @@ public:
             ASSERT_OK(indexer.commit(
                 _opCtx,
                 coll.getWritableCollection(_opCtx),
-                [&](const BSONObj& indexSpec) {
+                [&](const BSONObj& indexSpec, StringData ident) {
                     if (simulatePrimary) {
                         // The timestamping responsibility for each index is placed
                         // on the caller.
                         _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                            _opCtx, nss, coll->uuid(), indexSpec, false);
+                            _opCtx, nss, coll->uuid(), indexSpec, ident, false);
                     } else {
                         const auto currentTime = _clock->getTime();
                         ASSERT_OK(shard_role_details::getRecoveryUnit(_opCtx)->setTimestamp(
@@ -2750,9 +2745,9 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
         ASSERT_OK(indexer.commit(
             _opCtx,
             collection.getWritableCollection(_opCtx),
-            [&](const BSONObj& indexSpec) {
+            [&](const BSONObj& indexSpec, StringData ident) {
                 _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                    _opCtx, collection->ns(), collection->uuid(), indexSpec, false);
+                    _opCtx, collection->ns(), collection->uuid(), indexSpec, ident, false);
             },
             MultiIndexBlock::kNoopOnCommitFn));
         wuow.commit();

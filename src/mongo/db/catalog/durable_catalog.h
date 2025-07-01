@@ -115,7 +115,7 @@ Status createIndex(OperationContext* opCtx,
                    const NamespaceString& nss,
                    const CollectionOptions& collectionOptions,
                    const IndexConfig& indexConfig,
-                   const std::string& ident);
+                   StringData ident);
 
 /**
  * Import a collection by inserting the given metadata into the durable catalog and instructing

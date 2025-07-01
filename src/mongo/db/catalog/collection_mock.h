@@ -427,6 +427,7 @@ public:
 
     Status prepareForIndexBuild(OperationContext* opCtx,
                                 const IndexDescriptor* spec,
+                                StringData indexIdent,
                                 boost::optional<UUID> buildUUID) override {
         MONGO_UNREACHABLE;
     }

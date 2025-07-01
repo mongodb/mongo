@@ -304,12 +304,10 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
         // we've been requested to build. We skip this step when initializing unfinished index
         // builds during startup recovery as they are already in the index catalog.
         if (!forRecovery) {
-            for (size_t i = 0; i < indexSpecs.size(); i++) {
-                BSONObj info = indexSpecs[i];
-                StatusWith<BSONObj> statusWithInfo =
-                    collection->getIndexCatalog()->prepareSpecForCreate(
-                        opCtx, collection.get(), info, resumeInfo);
-                Status status = statusWithInfo.getStatus();
+            for (auto&& info : indexSpecs) {
+                auto status = collection->getIndexCatalog()
+                                  ->prepareSpecForCreate(opCtx, collection.get(), info, resumeInfo)
+                                  .getStatus();
                 if (!status.isOK()) {
                     return status;
                 }
@@ -325,6 +323,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
         if (onInit) {
             onInit();
         }
+
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
         // Then proceed to start the index builds. If we encounter conflicts for the index specs at
         // this point we know it is a conflict between the indexes we are requested to build.
@@ -390,8 +390,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                 if (!status.isOK())
                     return status;
             } else {
-                auto status =
-                    index.block->init(opCtx, collection.getWritableCollection(opCtx), forRecovery);
+                auto ident = storageEngine->generateNewIndexIdent(collection->ns().dbName());
+                auto status = index.block->init(
+                    opCtx, collection.getWritableCollection(opCtx), ident, forRecovery);
                 if (!status.isOK())
                     return status;
             }
@@ -1016,9 +1017,10 @@ Status MultiIndexBlock::checkConstraints(OperationContext* opCtx, const Collecti
     return Status::OK();
 }
 
-MultiIndexBlock::OnCreateEachFn MultiIndexBlock::kNoopOnCreateEachFn = [](const BSONObj& spec) {
-};
-MultiIndexBlock::OnCommitFn MultiIndexBlock::kNoopOnCommitFn = []() {
+MultiIndexBlock::OnCreateEachFn MultiIndexBlock::kNoopOnCreateEachFn =
+    +[](const BSONObj&, StringData) {
+    };
+MultiIndexBlock::OnCommitFn MultiIndexBlock::kNoopOnCommitFn = +[]() {
 };
 
 Status MultiIndexBlock::commit(OperationContext* opCtx,
@@ -1066,16 +1068,13 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
     }
     MultikeyPathTracker::get(opCtx).stopTrackingMultikeyPathInfo();
 
-    for (size_t i = 0; i < _indexes.size(); i++) {
-        onCreateEach(_indexes[i].block->getSpec());
-
+    for (auto& index : _indexes) {
         // Do this before calling success(), which unsets the interceptor pointer on the index
         // catalog entry. The interceptor will write multikey metadata keys into the index during
         // IndexBuildInterceptor::sideWrite, so we only need to pass the cached MultikeyPaths into
         // IndexCatalogEntry::setMultikey here.
-        auto indexCatalogEntry = _indexes[i].block->getWritableEntry(opCtx, collection);
-        auto interceptor = indexCatalogEntry->indexBuildInterceptor();
-        if (interceptor) {
+        auto indexCatalogEntry = index.block->getWritableEntry(opCtx, collection);
+        if (auto interceptor = indexCatalogEntry->indexBuildInterceptor()) {
             auto multikeyPaths = interceptor->getMultikeyPaths();
             if (multikeyPaths) {
                 // TODO(SERVER-103400): Investigate usage validity of
@@ -1097,12 +1096,12 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
             }
         }
 
-        _indexes[i].block->success(opCtx, collection);
+        index.block->success(opCtx, collection);
 
         // The bulk builder will track multikey information itself, and will write cached multikey
         // metadata keys into the index just before committing. We therefore only need to pass the
         // MultikeyPaths into IndexCatalogEntry::setMultikey here.
-        const auto& bulkBuilder = _indexes[i].bulk;
+        const auto& bulkBuilder = index.bulk;
         if (bulkBuilder && bulkBuilder->isMultikey()) {
             // TODO(SERVER-103400): Investigate usage validity of
             // CollectionPtr::CollectionPtr_UNSAFE
@@ -1111,6 +1110,8 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
                                            {},
                                            bulkBuilder->getMultikeyPaths());
         }
+
+        onCreateEach(index.block->getSpec(), indexCatalogEntry->getIdent());
     }
 
     onCommit();

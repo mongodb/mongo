@@ -279,6 +279,7 @@ public:
                        const NamespaceString& nss,
                        const UUID& uuid,
                        BSONObj indexDoc,
+                       StringData ident,
                        bool fromMigrate) override;
 
     /**
@@ -341,6 +342,7 @@ void MapReduceOpObserver::onCreateIndex(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         const UUID& uuid,
                                         BSONObj indexDoc,
+                                        StringData ident,
                                         bool fromMigrate) {
     indexesCreated.push_back(indexDoc.getOwned());
 }

@@ -101,6 +101,7 @@ public:
                        const NamespaceString& nss,
                        const UUID& uuid,
                        BSONObj indexDoc,
+                       StringData ident,
                        bool fromMigrate) override;
 
     void onStartIndexBuild(OperationContext* opCtx,
@@ -200,9 +201,10 @@ void OpObserverMock::onCreateIndex(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const UUID& uuid,
                                    BSONObj indexDoc,
+                                   StringData ident,
                                    bool fromMigrate) {
     _logOp(opCtx, nss, "index");
-    OpObserverNoop::onCreateIndex(opCtx, nss, uuid, indexDoc, fromMigrate);
+    OpObserverNoop::onCreateIndex(opCtx, nss, uuid, indexDoc, ident, fromMigrate);
 }
 
 void OpObserverMock::onStartIndexBuild(OperationContext* opCtx,

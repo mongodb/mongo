@@ -80,6 +80,7 @@ public:
                        const NamespaceString& nss,
                        const UUID& uuid,
                        BSONObj indexDoc,
+                       StringData ident,
                        bool fromMigrate) final;
 
     void onStartIndexBuild(OperationContext* opCtx,

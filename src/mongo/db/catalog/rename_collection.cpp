@@ -797,20 +797,13 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
     }
 
     // Create indexes using the index specs on the empty temporary collection that was just created.
-    // Since each index build is possibly replicated to downstream nodes, each createIndex oplog
-    // entry must have a distinct timestamp to support correct rollback operation. This is achieved
-    // by writing the createIndexes oplog entry *before* creating the index. Using
-    // IndexCatalog::createIndexOnEmptyCollection() for the index creation allows us to add and
-    // commit the index within a single WriteUnitOfWork and avoids the possibility of seeing the
-    // index in an unfinished state. For more information on assigning timestamps to multiple index
-    // builds, please see SERVER-35780 and SERVER-35070.
     if (!indexesToCopy.empty()) {
         Status status = writeConflictRetry(opCtx, "renameCollection", tmpName, [&] {
             WriteUnitOfWork wunit(opCtx);
             auto fromMigrate = false;
             try {
                 CollectionWriter tmpCollWriter(opCtx, tmpCollUUID.uuid());
-                IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
+                IndexBuildsCoordinator::createIndexesOnEmptyCollection(
                     opCtx, tmpCollWriter, indexesToCopy, fromMigrate);
             } catch (DBException& ex) {
                 return ex.toStatus();

@@ -70,6 +70,7 @@ public:
                        const NamespaceString& nss,
                        const UUID& uuid,
                        BSONObj indexDoc,
+                       StringData ident,
                        bool fromMigrate) override;
 
     void onStartIndexBuild(OperationContext* opCtx,

@@ -135,10 +135,11 @@ public:
                        const NamespaceString& nss,
                        const UUID& uuid,
                        BSONObj indexDoc,
+                       StringData ident,
                        bool fromMigrate) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onCreateIndex(opCtx, nss, uuid, indexDoc, fromMigrate);
+            o->onCreateIndex(opCtx, nss, uuid, indexDoc, ident, fromMigrate);
     }
 
     void onStartIndexBuild(OperationContext* opCtx,

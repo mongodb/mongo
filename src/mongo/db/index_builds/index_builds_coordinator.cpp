@@ -2121,12 +2121,12 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
     uassertStatusOK(_indexBuildsManager.startBuildingIndex(opCtx, collection.get(), buildUUID));
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
-    auto onCreateEachFn = [&](const BSONObj& spec) {
-        opObserver->onCreateIndex(opCtx, collection->ns(), collectionUUID, spec, fromMigrate);
+    auto onCreateEachFn = [&](const BSONObj& spec, StringData ident) {
+        opObserver->onCreateIndex(
+            opCtx, collection->ns(), collectionUUID, spec, ident, fromMigrate);
     };
-    auto onCommitFn = MultiIndexBlock::kNoopOnCommitFn;
     uassertStatusOK(_indexBuildsManager.commitIndexBuild(
-        opCtx, collection, nss, buildUUID, onCreateEachFn, onCommitFn));
+        opCtx, collection, nss, buildUUID, onCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
     abortOnExit.dismiss();
 }
 
@@ -2134,32 +2134,49 @@ void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* op
                                                             CollectionWriter& collection,
                                                             const std::vector<BSONObj>& specs,
                                                             bool fromMigrate) {
+    invariant(collection);
+
     auto collectionUUID = collection->uuid();
 
-    invariant(collection, str::stream() << collectionUUID);
-    invariant(collection->isEmpty(opCtx), str::stream() << collectionUUID);
-    invariant(!specs.empty(), str::stream() << collectionUUID);
+    invariant(collection->isEmpty(opCtx), collectionUUID.toString());
+    invariant(!specs.empty(), collectionUUID.toString());
 
     auto nss = collection->ns();
-    CollectionCatalog::get(opCtx)->invariantHasExclusiveAccessToCollection(opCtx, collection->ns());
+    CollectionCatalog::get(opCtx)->invariantHasExclusiveAccessToCollection(opCtx, nss);
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
-
     auto indexCatalog = collection.getWritableCollection(opCtx)->getIndexCatalog();
-    // Always run single phase index build for empty collection. And, will be coordinated using
-    // createIndexes oplog entry.
+
+    // The collection is empty, so we always do a single phase index build
+    // within a single WriteUnitOfWork. This ensures that the indexes can not be
+    // seen in an incomplete state.
+    //
+    // To properly support rollback, each index must have a distinct creation timestamp, and all
+    // writes associated with creating a specific index must use the same timestamp. This means that
+    // onCreateIndex() must occur *before* we actually create the index, and must be interleaved
+    // between each index that is created rather than doing all of the replication work at once.
+    //
+    // For more information on assigning timestamps to multiple index builds, please see
+    // SERVER-35780 and SERVER-35070.
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    auto writeableCollection = collection.getWritableCollection(opCtx);
+    auto collectionPtr = CollectionPtr::CollectionPtr_UNSAFE(writeableCollection);
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+
     for (const auto& spec : specs) {
-        if (spec.hasField(IndexDescriptor::kClusteredFieldName) &&
-            spec.getBoolField(IndexDescriptor::kClusteredFieldName)) {
+        if (spec.getBoolField(IndexDescriptor::kClusteredFieldName)) {
             // The index is already built implicitly.
             continue;
         }
 
         // Each index will be added to the mdb catalog using the preceding createIndexes
         // timestamp.
-        opObserver->onCreateIndex(opCtx, nss, collectionUUID, spec, fromMigrate);
-        uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(
-            opCtx, collection.getWritableCollection(opCtx), spec));
+        auto ident = storageEngine->generateNewIndexIdent(collection->ns().dbName());
+        BSONObj validatedSpec = uassertStatusOK(
+            indexCatalog->prepareSpecForCreate(opCtx, collectionPtr, spec, boost::none));
+        opObserver->onCreateIndex(opCtx, nss, collectionUUID, validatedSpec, ident, fromMigrate);
+        uassertStatusOK(
+            IndexBuildBlock::buildEmptyIndex(opCtx, writeableCollection, validatedSpec, ident));
     }
 }
 
@@ -3211,7 +3228,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
             onCommitIndexBuild(opCtx, collection->ns(), replState);
         };
 
-        auto onCreateEachFn = [&](const BSONObj& spec) {
+        auto onCreateEachFn = [&](const BSONObj& spec, StringData ident) {
             if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
                 return;
             }
@@ -3219,7 +3236,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
             auto opObserver = opCtx->getServiceContext()->getOpObserver();
             auto fromMigrate = false;
             opObserver->onCreateIndex(
-                opCtx, collection->ns(), replState->collectionUUID, spec, fromMigrate);
+                opCtx, collection->ns(), replState->collectionUUID, spec, ident, fromMigrate);
         };
 
         // Commit index build.

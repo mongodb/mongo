@@ -164,11 +164,12 @@ void OplogApplierImplOpObserver::onCreateIndex(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const UUID& uuid,
                                                BSONObj indexDoc,
+                                               StringData ident,
                                                bool fromMigrate) {
     if (!onCreateIndexFn) {
         return;
     }
-    onCreateIndexFn(opCtx, nss, uuid, indexDoc, fromMigrate);
+    onCreateIndexFn(opCtx, nss, uuid, indexDoc, ident, fromMigrate);
 }
 
 void OplogApplierImplOpObserver::onDropIndex(OperationContext* opCtx,

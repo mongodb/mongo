@@ -201,7 +201,8 @@ public:
             WriteUnitOfWork wuow(operationContext());
             boost::optional<UUID> buildUUID(twoPhase, UUID::gen());
             ASSERT_OK(collWriter.getWritableCollection(operationContext())
-                          ->prepareForIndexBuild(operationContext(), &desc, buildUUID));
+                          ->prepareForIndexBuild(
+                              operationContext(), &desc, generateNewIndexIdent(_nss), buildUUID));
             entry = collWriter.getWritableCollection(operationContext())
                         ->getIndexCatalog()
                         ->getWritableEntryByName(
