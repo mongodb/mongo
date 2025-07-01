@@ -1514,6 +1514,7 @@ mongo_cc_library(
         "repl_set_request_votes.cpp",
     ],
     deps = [
+        ":parsing_utils",
         ":repl_coordinator_interface",
         ":repl_server_parameters",
         ":repl_set_status_commands",
@@ -1938,6 +1939,21 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "parsing_utils",
+    srcs = [
+        "parsing_utils.cpp",
+    ],
+    hdrs = [
+        "parsing_utils.h",
+    ],
+    deps = [
+        ":serveronly_repl",
+        "//src/mongo:base",
+        "//src/mongo/util/net:network",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "db_repl_intent_registry_test",
     srcs = [
@@ -1964,6 +1980,19 @@ mongo_cc_unit_test(
         ":idempotency_test_util",
         "//src/mongo/db/update:update_test_helpers",
         "//src/mongo/idl:server_parameter_test_util",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "parsing_utils_test",
+    srcs = [
+        "parsing_utils_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":parsing_utils",
+        ":replmocks",
+        "//src/mongo/db:service_context_test_fixture",
     ],
 )
 

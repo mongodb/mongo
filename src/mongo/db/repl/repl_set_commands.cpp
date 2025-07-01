@@ -66,6 +66,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/parsing_utils.h"
 #include "mongo/db/repl/repl_set_command.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
@@ -313,53 +314,6 @@ HostAndPort someHostAndPortForMe() {
     MONGO_verify(h != "localhost");
     return HostAndPort(h, serverGlobalParams.port);
 }
-
-void parseReplSetSeedList(ReplicationCoordinatorExternalState* externalState,
-                          const std::string& replSetString,
-                          std::string* setname,
-                          std::vector<HostAndPort>* seeds) {
-    const char* p = replSetString.c_str();
-    const char* slash = strchr(p, '/');
-    std::set<HostAndPort> seedSet;
-    if (slash) {
-        *setname = std::string(p, slash - p);
-    } else {
-        *setname = p;
-    }
-
-    if (slash == nullptr) {
-        return;
-    }
-
-    p = slash + 1;
-    while (1) {
-        const char* comma = strchr(p, ',');
-        if (comma == nullptr) {
-            comma = strchr(p, 0);
-        }
-        if (p == comma) {
-            break;
-        }
-        HostAndPort m;
-        try {
-            m = HostAndPort(std::string(p, comma - p));
-        } catch (...) {
-            uassert(13114, "bad --replSet seed hostname", false);
-        }
-        uassert(13096, "bad --replSet command line config string - dups?", seedSet.count(m) == 0);
-        seedSet.insert(m);
-        // uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
-        if (externalState->isSelf(m, getGlobalServiceContext())) {
-            LOGV2_DEBUG(21576, 1, "Ignoring seed (=self)", "seed"_attr = m.toString());
-        } else {
-            seeds->push_back(m);
-        }
-        if (*comma == 0) {
-            break;
-        }
-        p = comma + 1;
-    }
-}
 }  // namespace
 
 class CmdReplSetInitiate : public ReplSetCommand {
@@ -403,9 +357,10 @@ public:
             ReplicationCoordinatorExternalStateImpl externalState(opCtx->getServiceContext(),
                                                                   StorageInterface::get(opCtx),
                                                                   ReplicationProcess::get(opCtx));
-            std::string name;
-            std::vector<HostAndPort> seeds;
-            parseReplSetSeedList(&externalState, replSetString, &name, &seeds);  // may throw...
+            auto [name, seeds] = parseReplSetSeedList(
+                &externalState,
+                replSetString);  // May throw on invalid/duplicate seeds, localhost usage, or
+                                 // parsing errors (via HostAndPort::parseThrowing).
 
             BSONObjBuilder b;
             b.append("_id", name);
