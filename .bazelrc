@@ -368,6 +368,8 @@ coverage --experimental_use_llvm_covmap
 coverage --experimental_generate_llvm_lcov
 coverage --remote_download_outputs=all
 coverage --fission=no
+coverage --build_runfile_links
+coverage --legacy_external_runfiles
 # This is set in .bazelrc.evergreen:
 # coverage --config=no-remote-exec
 
