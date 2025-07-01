@@ -175,8 +175,7 @@ void WindowStage::spill() {
     }
 
     auto writeBatch = [&]() {
-        auto status = _recordStore->insertRecords(_opCtx, &_records);
-        tassert(7870901, "Failed to spill records in the window stage", status.isOK());
+        uassertStatusOK(_recordStore->insertRecords(_opCtx, &_records));
         _records.clear();
         _recordBuffers.clear();
     };
