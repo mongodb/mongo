@@ -45,7 +45,7 @@
 namespace mongo {
 namespace {
 
-std::function<std::unique_ptr<SortedDataInterfaceHarnessHelper>()>
+std::function<std::unique_ptr<SortedDataInterfaceHarnessHelper>(int32_t cacheSizeMB)>
     sortedDataInterfaceHarnessFactory;
 
 }  // namespace
@@ -117,12 +117,13 @@ key_string::Builder makeKeyStringForSeek(SortedDataInterface* sorted,
 }
 
 void registerSortedDataInterfaceHarnessHelperFactory(
-    std::function<std::unique_ptr<SortedDataInterfaceHarnessHelper>()> factory) {
+    std::function<std::unique_ptr<SortedDataInterfaceHarnessHelper>(int32_t cacheSizeMB)> factory) {
     sortedDataInterfaceHarnessFactory = std::move(factory);
 }
 
-auto newSortedDataInterfaceHarnessHelper() -> std::unique_ptr<SortedDataInterfaceHarnessHelper> {
-    return sortedDataInterfaceHarnessFactory();
+auto newSortedDataInterfaceHarnessHelper(int32_t cacheSizeMB)
+    -> std::unique_ptr<SortedDataInterfaceHarnessHelper> {
+    return sortedDataInterfaceHarnessFactory(cacheSizeMB);
 }
 
 }  // namespace mongo

@@ -122,9 +122,10 @@ public:
 };
 
 void registerSortedDataInterfaceHarnessHelperFactory(
-    std::function<std::unique_ptr<SortedDataInterfaceHarnessHelper>()> factory);
+    std::function<std::unique_ptr<SortedDataInterfaceHarnessHelper>(int32_t cacheSizeMB)> factory);
 
-std::unique_ptr<SortedDataInterfaceHarnessHelper> newSortedDataInterfaceHarnessHelper();
+std::unique_ptr<SortedDataInterfaceHarnessHelper> newSortedDataInterfaceHarnessHelper(
+    int32_t cacheSizeMB = 64);
 
 key_string::Value makeKeyString(SortedDataInterface* sorted,
                                 BSONObj bsonKey,

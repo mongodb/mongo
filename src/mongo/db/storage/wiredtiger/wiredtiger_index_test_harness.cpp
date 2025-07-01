@@ -64,9 +64,9 @@ static constexpr bool kIsLogged = false;
 
 class WiredTigerIndexHarnessHelper final : public SortedDataInterfaceHarnessHelper {
 public:
-    WiredTigerIndexHarnessHelper() : _dbpath("wt_test"), _conn(nullptr) {
-        const char* config = "create,cache_size=64M,";
-        int ret = wiredtiger_open(_dbpath.path().c_str(), nullptr, config, &_conn);
+    WiredTigerIndexHarnessHelper(int32_t cacheSizeMB) : _dbpath("wt_test"), _conn(nullptr) {
+        std::string config = fmt::format("create,cache_size={}M,", cacheSizeMB);
+        int ret = wiredtiger_open(_dbpath.path().c_str(), nullptr, config.c_str(), &_conn);
         invariantWTOK(ret, nullptr);
 
         _fastClockSource = std::make_unique<SystemClockSource>();
@@ -171,8 +171,9 @@ private:
 };
 
 MONGO_INITIALIZER(RegisterSortedDataInterfaceHarnessFactory)(InitializerContext* const) {
-    registerSortedDataInterfaceHarnessHelperFactory(
-        [] { return std::make_unique<WiredTigerIndexHarnessHelper>(); });
+    registerSortedDataInterfaceHarnessHelperFactory([](int32_t cacheSizeMB) {
+        return std::make_unique<WiredTigerIndexHarnessHelper>(cacheSizeMB);
+    });
 }
 
 }  // namespace

@@ -62,7 +62,7 @@ struct Fixture {
         : uniqueness(uniqueness),
           direction(direction),
           nToInsert(nToInsert),
-          harness(newSortedDataInterfaceHarnessHelper()),
+          harness(newSortedDataInterfaceHarnessHelper(1024)),
           opCtx(harness->newOperationContext()),
           sorted(harness->newSortedDataInterface(
               opCtx.get(), uniqueness == kUnique, /*partial*/ false, keyFormat)),
