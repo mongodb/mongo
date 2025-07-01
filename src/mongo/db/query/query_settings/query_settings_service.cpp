@@ -414,6 +414,24 @@ auto conflictingOperationInProgressRetry(Fn&& fn, size_t maxNumRetries = 100) {
         }
     }
 }
+
+/**
+ * Returns a SetClusterParameter request object created from 'config'.
+ */
+SetClusterParameter makeQuerySettingsClusterParameter(
+    const QueryShapeConfigurationsWithTimestamp& config) {
+    BSONObjBuilder bob;
+    BSONArrayBuilder arrayBuilder(
+        bob.subarrayStart(QuerySettingsClusterParameterValue::kSettingsArrayFieldName));
+    for (const auto& item : config.queryShapeConfigurations) {
+        arrayBuilder.append(item.toBSON());
+    }
+    arrayBuilder.done();
+    SetClusterParameter request(BSON(getQuerySettingsClusterParameterName() << bob.done()));
+    request.setDbName(DatabaseName::kConfig);
+    return request;
+}
+
 }  // namespace
 
 class QuerySettingsRouterService : public QuerySettingsService {
@@ -568,15 +586,7 @@ public:
                           "ConflictingOperationInProgress");
             }
 
-            BSONObjBuilder bob;
-            BSONArrayBuilder arrayBuilder(
-                bob.subarrayStart(QuerySettingsClusterParameterValue::kSettingsArrayFieldName));
-            for (const auto& item : config.queryShapeConfigurations) {
-                arrayBuilder.append(item.toBSON());
-            }
-            arrayBuilder.done();
-            SetClusterParameter request(BSON(getQuerySettingsClusterParameterName() << bob.done()));
-            request.setDbName(DatabaseName::kConfig);
+            auto request = makeQuerySettingsClusterParameter(config);
             tassert(10445106, "setClusterParameter must be provided", _setClusterParameterFn);
             _setClusterParameterFn(opCtx, request, boost::none, config.clusterParameterTime);
         } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
@@ -891,6 +901,11 @@ void QuerySettingsService::validateQueryCompatibleWithQuerySettings(
             str::stream() << "Setting {reject:true} is forbidden for query containing stage: "
                           << *representativeQueryInfo.systemStage,
             !(settings.getReject() && representativeQueryInfo.systemStage.has_value()));
+}
+
+void QuerySettingsService::validateQueryShapeConfigurations(
+    const QueryShapeConfigurationsWithTimestamp& config) const {
+    std::ignore = makeQuerySettingsClusterParameter(config).toBSON();
 }
 
 void QuerySettingsService::simplifyQuerySettings(QuerySettings& settings) const {

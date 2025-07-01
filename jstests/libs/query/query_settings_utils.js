@@ -227,10 +227,10 @@ export class QuerySettingsUtils {
     }
 
     /**
-     * Asserts the 'expectedRepresentativeQueries' are present in the
-     * 'queryShapeRepresentativeQueries' collection.
+     * Returns the representative queries stored in the 'queryShapeRepresentativeQueries'
+     * collection.
      */
-    assertRepresentativeQueries(expectedRepresentativeQueries) {
+    getRepresentativeQueries() {
         // In sharded clusters, the representative queries are stored in the config server. So we
         // need to return the connection to the node that stores them.
         const nodeThatStoresRepresentativeQueries = (function(db) {
@@ -241,11 +241,18 @@ export class QuerySettingsUtils {
             return db.getMongo();
         })(this._db);
 
-        assert.sameMembers(nodeThatStoresRepresentativeQueries.getDB("config")
-                               .queryShapeRepresentativeQueries
-                               .aggregate([{$replaceRoot: {newRoot: "$representativeQuery"}}])
-                               .toArray(),
-                           expectedRepresentativeQueries);
+        return nodeThatStoresRepresentativeQueries.getDB("config")
+            .queryShapeRepresentativeQueries
+            .aggregate([{$replaceRoot: {newRoot: "$representativeQuery"}}])
+            .toArray();
+    }
+
+    /**
+     * Asserts the 'expectedRepresentativeQueries' are present in the
+     * 'queryShapeRepresentativeQueries' collection.
+     */
+    assertRepresentativeQueries(expectedRepresentativeQueries) {
+        assert.sameMembers(this.getRepresentativeQueries(), expectedRepresentativeQueries);
     }
 
     /**

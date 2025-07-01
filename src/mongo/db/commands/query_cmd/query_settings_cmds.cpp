@@ -137,6 +137,9 @@ void readModifyWriteQuerySettingsConfigOption(
     // Modify the query settings array (append, replace, or remove).
     modify(queryShapeConfigurations.queryShapeConfigurations);
 
+    // Ensure 'queryShapeConfigurations' is in valid after modification.
+    querySettingsService.validateQueryShapeConfigurations(queryShapeConfigurations);
+
     // Upsert QueryShapeRepresentativeQuery into the corresponding collection if provided.
     // In case of FCV upgrade to the version that has 'gFeatureFlagPQSBackfill' enabled we act as if
     // FCV upgrade is successful and record representative queries in the dedicated collection.

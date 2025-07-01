@@ -253,6 +253,13 @@ public:
                                                   const QuerySettings& querySettings) const;
 
     /**
+     * Validates that 'config' is valid and does not exceed the allowed storage limits, throws a
+     * DBException otherwise.
+     */
+    void validateQueryShapeConfigurations(
+        const QueryShapeConfigurationsWithTimestamp& config) const;
+
+    /**
      * Simplifies 'querySettings' in-place by:
      * - resetting the 'reject' field to boost::none if it contains a false value
      * - removing index hints that specify empty 'allowedIndexes', potentially resetting
