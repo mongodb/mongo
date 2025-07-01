@@ -63,6 +63,9 @@ filters:
   - "mochalite.js":
     approvers:
       - 10gen/devprod-correctness
+  - "mirror_reads_helpers.js":
+    approvers:
+      - 10gen/server-networking-and-observability
   - "conn_pool_helpers.js":
     approvers:
       - 10gen/server-networking-and-observability

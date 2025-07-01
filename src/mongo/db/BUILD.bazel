@@ -2657,6 +2657,7 @@ mongo_cc_library(
     hdrs = [
         "mirror_maestro.h",
         "mirroring_sampler.h",
+        ":mirror_maestro_gen",
     ],
     deps = [
         ":client_out_of_line_executor",
@@ -2689,6 +2690,9 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:replmocks",
+        "//src/mongo/executor:network_test_env",
+        "//src/mongo/executor:task_executor_test_fixture",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
         "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/unittest",
     ],
