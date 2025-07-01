@@ -229,17 +229,19 @@ WiredTigerKVEngineBase::WiredTigerConfig getSpillWiredTigerConfigFromStartupOpti
     wtConfig.sessionMax = wiredTigerGlobalOptions.sessionMax;
     wtConfig.evictionThreadsMin = gSpillWiredTigerEvictionThreadsMin;
     wtConfig.evictionThreadsMax = gSpillWiredTigerEvictionThreadsMax;
-    wtConfig.evictionDirtyTargetMB = wiredTigerGlobalOptions.evictionDirtyTargetGB * 1024;
+    wtConfig.evictionDirtyTargetMB =
+        gSpillWiredTigerEvictionDirtyTargetPercentage * wtConfig.cacheSizeMB / 100;
     wtConfig.evictionDirtyTriggerMB =
         gSpillWiredTigerEvictionDirtyTriggerPercentage * wtConfig.cacheSizeMB / 100;
     wtConfig.evictionUpdatesTriggerMB =
-        gSpillWiredTigerEvictionDirtyTriggerPercentage * wtConfig.cacheSizeMB / 100;
+        gSpillWiredTigerEvictionUpdatesTriggerPercentage * wtConfig.cacheSizeMB / 100;
     wtConfig.statisticsLogWaitSecs = wiredTigerGlobalOptions.statisticsLogDelaySecs;
     wtConfig.inMemory = false;
     wtConfig.logEnabled = false;
     wtConfig.prefetchEnabled = false;
     wtConfig.restoreEnabled = false;
     wtConfig.zstdCompressorLevel = gSpillWiredTigerZstdCompressionLevel;
+    wtConfig.extraOpenOptions = gSpillWiredTigerEngineConfig;
 
     return wtConfig;
 }

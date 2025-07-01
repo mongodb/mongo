@@ -54,10 +54,12 @@ protected:
         WiredTigerKVEngineBase::WiredTigerConfig wtConfig =
             getSpillWiredTigerConfigFromStartupOptions();
         wtConfig.cacheSizeMB = kWtCacheSizeBytes / (1 * 1024 * 1024);
+        wtConfig.evictionDirtyTargetMB =
+            gSpillWiredTigerEvictionDirtyTargetPercentage * wtConfig.cacheSizeMB / 100;
         wtConfig.evictionDirtyTriggerMB =
             gSpillWiredTigerEvictionDirtyTriggerPercentage * wtConfig.cacheSizeMB / 100;
         wtConfig.evictionUpdatesTriggerMB =
-            gSpillWiredTigerEvictionDirtyTriggerPercentage * wtConfig.cacheSizeMB / 100;
+            gSpillWiredTigerEvictionUpdatesTriggerPercentage * wtConfig.cacheSizeMB / 100;
 
         _kvEngine = std::make_unique<SpillWiredTigerKVEngine>(
             std::string{kWiredTigerEngineName},

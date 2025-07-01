@@ -335,12 +335,36 @@ server_parameters:
             lte: 20
         redact: false
 
+    spillWiredTigerEvictionDirtyTargetPercentage:
+        description: >-
+            Percentage threshold at which eviction threads start dirty cache eviction on the spill engine.
+        set_at: startup
+        cpp_vartype: int32_t
+        cpp_varname: gSpillWiredTigerEvictionDirtyTargetPercentage
+        default: 5
+        validator:
+            gte: 1
+            lte: 100
+        redact: false
+
     spillWiredTigerEvictionDirtyTriggerPercentage:
         description: >-
             Percentage threshold at which application threads start dirty cache eviction on the spill engine.
         set_at: startup
         cpp_vartype: int32_t
         cpp_varname: gSpillWiredTigerEvictionDirtyTriggerPercentage
+        default: 80
+        validator:
+            gte: 1
+            lte: 100
+        redact: false
+
+    spillWiredTigerEvictionUpdatesTriggerPercentage:
+        description: >-
+            Percentage threshold for updates in cache at which eviction starts operating aggressively on the spill engine.
+        set_at: startup
+        cpp_vartype: int32_t
+        cpp_varname: gSpillWiredTigerEvictionUpdatesTriggerPercentage
         default: 80
         validator:
             gte: 1
@@ -370,6 +394,14 @@ server_parameters:
         validator:
             gte: -7
             lte: 22
+        redact: false
+
+    spillWiredTigerEngineConfig:
+        description: >-
+            The config string of WiredTiger storage engine options used for the spill engine.
+        set_at: startup
+        cpp_vartype: std::string
+        cpp_varname: gSpillWiredTigerEngineConfig
         redact: false
 
     enableTemporarilyUnavailableExceptions:
