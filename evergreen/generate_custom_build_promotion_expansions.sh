@@ -31,3 +31,9 @@ echo "promote expansions"
 echo ".................."
 
 cat ./promote-expansions.yml
+
+artifact_address="https://internal-downloads.mongodb.com/server-custom-builds/${promote_project_id}/${promote_version_id}/${promote_build_variant}/mongo-${promote_build_id}.tgz"
+
+echo ""
+echo "The artifact will be accessible at '$artifact_address'"
+echo ""

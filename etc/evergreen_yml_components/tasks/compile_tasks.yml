@@ -872,7 +872,7 @@ tasks:
       - command: s3.put
         params:
           role_arn: "arn:aws:iam::119629040606:role/s3-access.cdn-origin-server-custom-builds"
-          remote_file: "server-custom-builds/${promote_project_id}/${promote_version_id}/${promote_build_variant}/mongo-${promte_build_id}.tgz"
+          remote_file: "server-custom-builds/${promote_project_id}/${promote_version_id}/${promote_build_variant}/mongo-${promote_build_id}.tgz"
           bucket: cdn-origin-server-custom-builds
           permissions: private
           local_file: src/mongo-binaries.tgz
