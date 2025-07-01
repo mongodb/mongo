@@ -608,6 +608,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/shard_role_api',
+        'collection_catalog',
         'index_catalog',
     ],
 )

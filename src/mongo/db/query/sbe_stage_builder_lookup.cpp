@@ -712,6 +712,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     CurOp::get(state.opCtx)->debug().indexedLoopJoin += 1;
 
     const auto foreignCollUUID = foreignColl->uuid();
+    const auto foreignCollDbName = foreignColl->ns().dbName();
     const auto indexName = index.identifier.catalogName;
     const auto indexDescriptor =
         foreignColl->getIndexCatalog()->findIndexByName(state.opCtx, indexName);
@@ -890,6 +891,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     auto snapshotIdSlot = slotIdGenerator.generate();
     auto indexIdentSlot = slotIdGenerator.generate();
     auto ixScanStage = makeS<SimpleIndexScanStage>(foreignCollUUID,
+                                                   foreignCollDbName,
                                                    indexName,
                                                    true /* forward */,
                                                    indexKeySlot,
@@ -1165,8 +1167,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto [matchedDocumentsSlot, foreignStage] = [&, localStage = std::move(localStage)]() mutable
         -> std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> {
-        const auto& foreignColl =
-            _collections.lookupCollection(NamespaceString(eqLookupNode->foreignCollection));
+        NamespaceString foreignNss(eqLookupNode->foreignCollection);
+        auto foreignColl = _collections.lookupCollection(foreignNss);
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "Collection "
+                              << eqLookupNode->foreignCollection.toStringForErrorMsg()
+                              << " either dropped or renamed",
+                (eqLookupNode->lookupStrategy ==
+                 EqLookupNode::LookupStrategy::kNonExistentForeignCollection) ||
+                    (foreignColl && foreignColl->ns() == foreignNss));
 
         boost::optional<SlotId> collatorSlot = _state.data->env->getSlotIfExists("collator"_sd);
         switch (eqLookupNode->lookupStrategy) {
@@ -1208,6 +1217,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 auto foreignRecordIdSlot = _slotIdGenerator.generate();
 
                 auto foreignStage = makeS<ScanStage>(foreignColl->uuid(),
+                                                     foreignColl->ns().dbName(),
                                                      foreignResultSlot,
                                                      foreignRecordIdSlot,
                                                      boost::none /* snapshotIdSlot */,

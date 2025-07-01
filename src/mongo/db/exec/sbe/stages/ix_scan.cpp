@@ -42,6 +42,7 @@
 namespace mongo::sbe {
 IndexScanStageBase::IndexScanStageBase(StringData stageType,
                                        UUID collUuid,
+                                       DatabaseName dbName,
                                        StringData indexName,
                                        bool forward,
                                        boost::optional<value::SlotId> indexKeySlot,
@@ -56,6 +57,7 @@ IndexScanStageBase::IndexScanStageBase(StringData stageType,
                                        bool participateInTrialRunTracking)
     : PlanStage(stageType, yieldPolicy, nodeId, participateInTrialRunTracking),
       _collUuid(collUuid),
+      _dbName(dbName),
       _indexName(indexName),
       _forward(forward),
       _indexKeySlot(indexKeySlot),
@@ -88,7 +90,7 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
     }
 
     tassert(5709602, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
-    std::tie(_coll, _collName, _catalogEpoch) = acquireCollection(_opCtx, _collUuid);
+    std::tie(_coll, _collName, _catalogEpoch) = acquireCollection(_opCtx, _dbName, _collUuid);
 
     auto indexCatalog = _coll->getIndexCatalog();
     auto indexDesc = indexCatalog->findIndexByName(_opCtx, _indexName);
@@ -172,7 +174,7 @@ void IndexScanStageBase::doSaveState(bool relinquishCursor) {
 void IndexScanStageBase::restoreCollectionAndIndex() {
     tassert(5777406, "Collection name should be initialized", _collName);
     tassert(5777407, "Catalog epoch should be initialized", _catalogEpoch);
-    _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
+    _coll = restoreCollection(_opCtx, *_collName, _dbName, _collUuid, *_catalogEpoch);
 
     auto [identTag, identVal] = _indexIdentAccessor.getViewOfValue();
     tassert(7566700, "Expected ident to be a string", value::isString(identTag));
@@ -453,6 +455,7 @@ std::string IndexScanStageBase::getIndexName() const {
 }
 
 SimpleIndexScanStage::SimpleIndexScanStage(UUID collUuid,
+                                           DatabaseName dbName,
                                            StringData indexName,
                                            bool forward,
                                            boost::optional<value::SlotId> indexKeySlot,
@@ -469,6 +472,7 @@ SimpleIndexScanStage::SimpleIndexScanStage(UUID collUuid,
                                            bool participateInTrialRunTracking)
     : IndexScanStageBase(seekKeyLow ? "ixseek"_sd : "ixscan"_sd,
                          collUuid,
+                         dbName,
                          indexName,
                          forward,
                          indexKeySlot,
@@ -490,6 +494,7 @@ SimpleIndexScanStage::SimpleIndexScanStage(UUID collUuid,
 
 std::unique_ptr<PlanStage> SimpleIndexScanStage::clone() const {
     return std::make_unique<SimpleIndexScanStage>(_collUuid,
+                                                  _dbName,
                                                   _indexName,
                                                   _forward,
                                                   _indexKeySlot,
@@ -665,6 +670,7 @@ bool SimpleIndexScanStage::validateKey(const boost::optional<KeyStringEntry>& ke
 }
 
 GenericIndexScanStage::GenericIndexScanStage(UUID collUuid,
+                                             DatabaseName dbName,
                                              StringData indexName,
                                              GenericIndexScanStageParams params,
                                              boost::optional<value::SlotId> indexKeySlot,
@@ -678,6 +684,7 @@ GenericIndexScanStage::GenericIndexScanStage(UUID collUuid,
                                              bool participateInTrialRunTracking)
     : IndexScanStageBase("ixscan_generic"_sd,
                          collUuid,
+                         dbName,
                          indexName,
                          params.direction == 1,
                          indexKeySlot,
@@ -698,6 +705,7 @@ std::unique_ptr<PlanStage> GenericIndexScanStage::clone() const {
                                             _params.version,
                                             _params.ord};
     return std::make_unique<GenericIndexScanStage>(_collUuid,
+                                                   _dbName,
                                                    _indexName,
                                                    std::move(params),
                                                    _indexKeySlot,

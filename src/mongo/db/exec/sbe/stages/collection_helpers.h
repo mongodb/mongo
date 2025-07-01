@@ -56,18 +56,21 @@ using IndexKeyCorruptionCheckCallback =
                        const NamespaceString& nss)>;
 
 /**
- * Given a collection UUID, looks up the UUID in the catalog and returns a pointer to the
- * collection, the collection's name, and the current catalog epoch.
+ * Given a collection UUID and dbName, establishes a consistent collection instance with respect
+ * to the snapshot and returns a pointer to the collection, the collection's name, and the current
+ * catalog epoch.
  *
  * This is intended for use during the preparation of an SBE plan. The caller must hold the
  * appropriate db_raii object in order to ensure that SBE plan preparation sees a consistent view of
  * the catalog.
  */
 std::tuple<CollectionPtr, NamespaceString, uint64_t> acquireCollection(OperationContext* opCtx,
+                                                                       const DatabaseName& dbName,
                                                                        const UUID& collUuid);
 
 /**
- * Re-acquires a pointer to the collection, intended for use during SBE yield recovery or when a
+ * Re-acquires a pointer to the collection, after establishing a collection instance consistent
+ * with the snashot, intended for use during SBE yield recovery or when a
  * closed SBE plan is re-opened. In addition to acquiring the collection pointer, throws a
  * UserException if the collection has been dropped or renamed, or if the catalog has been closed
  * and re-opened. SBE query execution currently cannot survive such events if they occur during a
@@ -75,6 +78,7 @@ std::tuple<CollectionPtr, NamespaceString, uint64_t> acquireCollection(Operation
  */
 CollectionPtr restoreCollection(OperationContext* opCtx,
                                 const NamespaceString& collName,
+                                const DatabaseName& dbName,
                                 const UUID& collUuid,
                                 uint64_t catalogEpoch);
 }  // namespace mongo::sbe

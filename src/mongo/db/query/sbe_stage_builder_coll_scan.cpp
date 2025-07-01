@@ -164,6 +164,7 @@ std::unique_ptr<sbe::PlanStage> buildResumeFromRecordIdSubtree(
     auto seekBranch =
         sbe::makeS<sbe::LoopJoinStage>(std::move(projStage),
                                        sbe::makeS<sbe::ScanStage>(collection->uuid(),
+                                                                  collection->ns().dbName(),
                                                                   boost::none /* recordSlot */,
                                                                   boost::none /* recordIdSlot*/,
                                                                   boost::none /* snapshotIdSlot */,
@@ -308,6 +309,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
 
     sbe::ScanCallbacks callbacks({}, {}, makeOpenCallbackIfNeeded(collection, csn));
     auto stage = sbe::makeS<sbe::ScanStage>(collection->uuid(),
+                                            collection->ns().dbName(),
                                             resultSlot,
                                             recordIdSlot,
                                             boost::none /* snapshotIdSlot */,
@@ -382,6 +384,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
         sbe::ScanCallbacks branchCallbacks{};
         auto minTsBranch = sbe::makeS<sbe::FilterStage<false, true>>(
             sbe::makeS<sbe::ScanStage>(collection->uuid(),
+                                       collection->ns().dbName(),
                                        boost::none /* resultSlot */,
                                        boost::none /* recordIdSlot */,
                                        boost::none /* snapshotIdSlot */,
@@ -521,6 +524,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                 sbe::makeS<sbe::LimitSkipStage>(
                     std::move(stage), makeInt64Constant(1), nullptr, csn->nodeId()),
                 sbe::makeS<sbe::ScanStage>(collection->uuid(),
+                                           collection->ns().dbName(),
                                            resultSlot,
                                            recordIdSlot,
                                            boost::none /* snapshotIdSlot */,
@@ -612,6 +616,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
 
     sbe::ScanCallbacks callbacks({}, {}, makeOpenCallbackIfNeeded(collection, csn));
     auto stage = sbe::makeS<sbe::ScanStage>(collection->uuid(),
+                                            collection->ns().dbName(),
                                             resultSlot,
                                             recordIdSlot,
                                             boost::none /* snapshotIdSlot */,

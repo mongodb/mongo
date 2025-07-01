@@ -48,6 +48,7 @@ MONGO_FAIL_POINT_DEFINE(hangScanGetNext);
 namespace mongo {
 namespace sbe {
 ScanStage::ScanStage(UUID collectionUuid,
+                     DatabaseName dbName,
                      boost::optional<value::SlotId> recordSlot,
                      boost::optional<value::SlotId> recordIdSlot,
                      boost::optional<value::SlotId> snapshotIdSlot,
@@ -68,6 +69,7 @@ ScanStage::ScanStage(UUID collectionUuid,
     : PlanStage(
           seekKeySlot ? "seek"_sd : "scan"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
       _collUuid(collectionUuid),
+      _dbName(dbName),
       _recordSlot(recordSlot),
       _recordIdSlot(recordIdSlot),
       _snapshotIdSlot(snapshotIdSlot),
@@ -100,6 +102,7 @@ ScanStage::ScanStage(UUID collectionUuid,
 
 std::unique_ptr<PlanStage> ScanStage::clone() const {
     return std::make_unique<ScanStage>(_collUuid,
+                                       _dbName,
                                        _recordSlot,
                                        _recordIdSlot,
                                        _snapshotIdSlot,
@@ -184,7 +187,7 @@ void ScanStage::prepare(CompileCtx& ctx) {
     }
 
     tassert(5709600, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
-    std::tie(_coll, _collName, _catalogEpoch) = acquireCollection(_opCtx, _collUuid);
+    std::tie(_coll, _collName, _catalogEpoch) = acquireCollection(_opCtx, _dbName, _collUuid);
 }
 
 value::SlotAccessor* ScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -267,7 +270,7 @@ void ScanStage::doRestoreState(bool relinquishCursor) {
     }
 
     tassert(5777408, "Catalog epoch should be initialized", _catalogEpoch);
-    _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
+    _coll = restoreCollection(_opCtx, *_collName, _dbName, _collUuid, *_catalogEpoch);
 
     if (auto cursor = getActiveCursor(); cursor != nullptr) {
         if (relinquishCursor) {
@@ -383,7 +386,7 @@ void ScanStage::open(bool reOpen) {
 
     // We need to re-acquire '_coll' in this case and make some validity checks (the collection has
     // not been dropped, renamed, etc).
-    _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
+    _coll = restoreCollection(_opCtx, *_collName, _dbName, _collUuid, *_catalogEpoch);
 
     tassert(5959701, "restoreCollection() unexpectedly returned null in ScanStage", _coll);
 
@@ -719,6 +722,7 @@ size_t ScanStage::estimateCompileTimeSize() const {
 }
 
 ParallelScanStage::ParallelScanStage(UUID collectionUuid,
+                                     DatabaseName dbName,
                                      boost::optional<value::SlotId> recordSlot,
                                      boost::optional<value::SlotId> recordIdSlot,
                                      boost::optional<value::SlotId> snapshotIdSlot,
@@ -733,6 +737,7 @@ ParallelScanStage::ParallelScanStage(UUID collectionUuid,
                                      bool participateInTrialRunTracking)
     : PlanStage("pscan"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
       _collUuid(collectionUuid),
+      _dbName(dbName),
       _recordSlot(recordSlot),
       _recordIdSlot(recordIdSlot),
       _snapshotIdSlot(snapshotIdSlot),
@@ -749,6 +754,7 @@ ParallelScanStage::ParallelScanStage(UUID collectionUuid,
 
 ParallelScanStage::ParallelScanStage(const std::shared_ptr<ParallelState>& state,
                                      const UUID& collectionUuid,
+                                     DatabaseName dbName,
                                      boost::optional<value::SlotId> recordSlot,
                                      boost::optional<value::SlotId> recordIdSlot,
                                      boost::optional<value::SlotId> snapshotIdSlot,
@@ -763,6 +769,7 @@ ParallelScanStage::ParallelScanStage(const std::shared_ptr<ParallelState>& state
                                      bool participateInTrialRunTracking)
     : PlanStage("pscan"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
       _collUuid(collectionUuid),
+      _dbName(dbName),
       _recordSlot(recordSlot),
       _recordIdSlot(recordIdSlot),
       _snapshotIdSlot(snapshotIdSlot),
@@ -779,6 +786,7 @@ ParallelScanStage::ParallelScanStage(const std::shared_ptr<ParallelState>& state
 std::unique_ptr<PlanStage> ParallelScanStage::clone() const {
     return std::make_unique<ParallelScanStage>(_state,
                                                _collUuid,
+                                               _dbName,
                                                _recordSlot,
                                                _recordIdSlot,
                                                _snapshotIdSlot,
@@ -827,7 +835,7 @@ void ParallelScanStage::prepare(CompileCtx& ctx) {
     }
 
     tassert(5709601, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
-    std::tie(_coll, _collName, _catalogEpoch) = acquireCollection(_opCtx, _collUuid);
+    std::tie(_coll, _collName, _catalogEpoch) = acquireCollection(_opCtx, _dbName, _collUuid);
 }
 
 value::SlotAccessor* ParallelScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -900,7 +908,7 @@ void ParallelScanStage::doRestoreState(bool relinquishCursor) {
     }
 
     tassert(5777409, "Catalog epoch should be initialized", _catalogEpoch);
-    _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
+    _coll = restoreCollection(_opCtx, *_collName, _dbName, _collUuid, *_catalogEpoch);
 
     if (_cursor && relinquishCursor) {
         const bool couldRestore = _cursor->restore();
@@ -952,7 +960,7 @@ void ParallelScanStage::open(bool reOpen) {
         tassert(5071013, "ParallelScanStage is not open but have _cursor", !_cursor);
         tassert(5777403, "Collection name should be initialized", _collName);
         tassert(5777404, "Catalog epoch should be initialized", _catalogEpoch);
-        _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
+        _coll = restoreCollection(_opCtx, *_collName, _dbName, _collUuid, *_catalogEpoch);
     }
 
     {

@@ -1061,6 +1061,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
         sbe::ScanCallbacks callbacks({}, {}, {});
         if (n.useParallelScan()) {
             return sbe::makeS<sbe::ParallelScanStage>(nss.uuid(),
+                                                      nss.dbName(),
                                                       rootSlot,
                                                       scanRidSlot,
                                                       boost::none,
@@ -1085,6 +1086,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
             MONGO_UNREACHABLE;
         }();
         return sbe::makeS<sbe::ScanStage>(nss.uuid(),
+                                          nss.dbName(),
                                           rootSlot,
                                           scanRidSlot,
                                           boost::none,
@@ -1212,6 +1214,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n,
     boost::optional<sbe::value::SlotId> resultSlot;
 
     return sbe::makeS<sbe::SimpleIndexScanStage>(nss.uuid(),
+                                                 nss.dbName(),
                                                  indexDefName,
                                                  !reverse,
                                                  resultSlot,
@@ -1249,6 +1252,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SeekNode& n,
     sbe::ScanCallbacks callbacks({}, {}, {});
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
     return sbe::makeS<sbe::ScanStage>(nss.uuid(),
+                                      nss.dbName(),
                                       rootSlot,
                                       seekRidSlot,
                                       boost::none,

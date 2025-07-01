@@ -871,8 +871,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                            : sbe::makeE<sbe::EFunction>("newObj", sbe::EExpression::Vector{});
     }
 
+    auto coll = getCurrentCollection(reqs);
     std::unique_ptr<sbe::PlanStage> stage =
-        std::make_unique<sbe::ColumnScanStage>(getCurrentCollection(reqs)->uuid(),
+        std::make_unique<sbe::ColumnScanStage>(coll->uuid(),
+                                               coll->ns().dbName(),
                                                csn->indexEntry.identifier.catalogName,
                                                std::move(paths),
                                                densePathIncludeInFields,
@@ -1993,7 +1995,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildTextMatch(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     auto textNode = static_cast<const TextMatchNode*>(root);
-    const auto& coll = getCurrentCollection(reqs);
+    auto coll = getCurrentCollection(reqs);
     tassert(5432212, "no collection object", coll);
     tassert(6023410, "buildTextMatch() does not support kSortKey", !reqs.hasSortKeys());
     tassert(5432215,
@@ -3081,7 +3083,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             std::move(outputs)};
 }
 
-const CollectionPtr& SlotBasedStageBuilder::getCurrentCollection(const PlanStageReqs& reqs) const {
+CollectionPtr SlotBasedStageBuilder::getCurrentCollection(const PlanStageReqs& reqs) const {
     return _collections.lookupCollection(reqs.getTargetNamespace());
 }
 

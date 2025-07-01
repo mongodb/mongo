@@ -95,7 +95,11 @@ struct ScanCallbacks {
  */
 class ScanStage final : public PlanStage {
 public:
-    ScanStage(UUID collectionUuid,
+    /**
+     * Regular constructor. Initializes static '_state' managed by a shared_ptr.
+     */
+    ScanStage(UUID collUuid,
+              DatabaseName dbName,
               boost::optional<value::SlotId> recordSlot,
               boost::optional<value::SlotId> recordIdSlot,
               boost::optional<value::SlotId> snapshotIdSlot,
@@ -157,6 +161,7 @@ private:
     value::OwnedValueAccessor* getFieldAccessor(StringData name, size_t offset) const;
 
     const UUID _collUuid;
+    const DatabaseName _dbName;
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;
     const boost::optional<value::SlotId> _snapshotIdSlot;
@@ -265,6 +270,7 @@ class ParallelScanStage final : public PlanStage {
 
 public:
     ParallelScanStage(UUID collectionUuid,
+                      DatabaseName dbName,
                       boost::optional<value::SlotId> recordSlot,
                       boost::optional<value::SlotId> recordIdSlot,
                       boost::optional<value::SlotId> snapshotIdSlot,
@@ -280,6 +286,7 @@ public:
 
     ParallelScanStage(const std::shared_ptr<ParallelState>& state,
                       const UUID& collectionUuid,
+                      DatabaseName dbName,
                       boost::optional<value::SlotId> recordSlot,
                       boost::optional<value::SlotId> recordIdSlot,
                       boost::optional<value::SlotId> snapshotIdSlot,
@@ -322,6 +329,8 @@ private:
     }
 
     const UUID _collUuid;
+    const DatabaseName _dbName;
+
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;
     const boost::optional<value::SlotId> _snapshotIdSlot;

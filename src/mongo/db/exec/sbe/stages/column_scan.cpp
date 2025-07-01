@@ -41,6 +41,7 @@ ColumnScanStage::RowstoreScanModeTracker::RowstoreScanModeTracker()
       _batchSize(_minBatchSize) {}
 
 ColumnScanStage::ColumnScanStage(UUID collectionUuid,
+                                 DatabaseName dbName,
                                  StringData columnIndexName,
                                  std::vector<std::string> paths,
                                  bool densePathIncludedInScan,
@@ -55,6 +56,7 @@ ColumnScanStage::ColumnScanStage(UUID collectionUuid,
                                  bool participateInTrialRunTracking)
     : PlanStage("columnscan"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
       _collUuid(collectionUuid),
+      _dbName(dbName),
       _columnIndexName(columnIndexName),
       _paths(std::move(paths)),
       _includeInOutput(std::move(includeInOutput)),
@@ -75,6 +77,7 @@ std::unique_ptr<PlanStage> ColumnScanStage::clone() const {
         filteredPaths.emplace_back(fp.pathIndex, fp.filterExpr->clone(), fp.inputSlotId);
     }
     return std::make_unique<ColumnScanStage>(_collUuid,
+                                             _dbName,
                                              _columnIndexName,
                                              _paths,
                                              _densePathIncludedInScan,
@@ -115,7 +118,7 @@ void ColumnScanStage::prepare(CompileCtx& ctx) {
     }
 
     tassert(6610200, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
-    std::tie(_coll, _collName, _catalogEpoch) = acquireCollection(_opCtx, _collUuid);
+    std::tie(_coll, _collName, _catalogEpoch) = acquireCollection(_opCtx, _dbName, _collUuid);
 
     auto indexCatalog = _coll->getIndexCatalog();
     auto indexDesc = indexCatalog->findIndexByName(_opCtx, _columnIndexName);
@@ -182,7 +185,7 @@ void ColumnScanStage::doRestoreState(bool relinquishCursor) {
     }
 
     tassert(6610202, "Catalog epoch should be initialized", _catalogEpoch);
-    _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
+    _coll = restoreCollection(_opCtx, *_collName, _dbName, _collUuid, *_catalogEpoch);
 
     auto indexCatalogEntry = _weakIndexCatalogEntry.lock();
     uassert(ErrorCodes::QueryPlanKilled,
@@ -266,7 +269,7 @@ void ColumnScanStage::open(bool reOpen) {
                 6610207, "ColumnScanStage is not open but have _rowStoreCursor", !_rowStoreCursor);
             tassert(6610208, "Collection name should be initialized", _collName);
             tassert(6610209, "Catalog epoch should be initialized", _catalogEpoch);
-            _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
+            _coll = restoreCollection(_opCtx, *_collName, _dbName, _collUuid, *_catalogEpoch);
         }
     }
 

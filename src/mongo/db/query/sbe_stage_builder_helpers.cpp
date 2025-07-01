@@ -843,6 +843,7 @@ std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanSt
 
     // Scan the collection in the range [seekKeySlot, Inf).
     auto scanStage = sbe::makeS<sbe::ScanStage>(collToFetch->uuid(),
+                                                collToFetch->ns().dbName(),
                                                 resultSlot,
                                                 recordIdSlot,
                                                 snapshotIdSlot,
