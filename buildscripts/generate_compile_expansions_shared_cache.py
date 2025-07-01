@@ -70,6 +70,7 @@ def generate_scons_cache_expansions():
         else:
             default_cache_path = os.path.join(shared_mount_root, system_uuid, "4_9_1-scons-cache")
 
+        os.makedirs(default_cache_path, exist_ok=True)
         expansions["scons_cache_path"] = default_cache_path
         expansions["scons_cache_args"] = "--cache=nolinked --cache-dir={0} --cache-show".format(
             shlex.quote(default_cache_path))
