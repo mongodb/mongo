@@ -39,8 +39,10 @@
 namespace mongo {
 class ReplayTestServer {
 public:
-    explicit ReplayTestServer();
-    explicit ReplayTestServer(const std::vector<std::string>&, const std::vector<std::string>&);
+    explicit ReplayTestServer(std::string = "$local:12345");
+    explicit ReplayTestServer(const std::vector<std::string>&,
+                              const std::vector<std::string>&,
+                              std::string = "$local:12345");
     ~ReplayTestServer();
     const std::string& getFakeResponse(const std::string&) const;
     std::string getConnectionString() const;
@@ -51,7 +53,7 @@ private:
     void setUp();
     void tearDown();
 
-    std::string _hostName = "$local:12345";
+    std::string _hostName;
     std::unique_ptr<MockRemoteDBServer> _mockServer;
     int _originalSeverity;
     stdx::unordered_map<std::string, std::string> _fakeResponseMap;

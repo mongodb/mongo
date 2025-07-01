@@ -28,19 +28,29 @@
  */
 
 #include <string>
-
+#include <vector>
 namespace mongo {
 struct ReplayOptions {
-    std::string inputFile;
+    std::string recordingPath;
     std::string mongoURI;
 
     explicit operator bool() const {
-        return !inputFile.empty() && !mongoURI.empty();
+        return !recordingPath.empty() && !mongoURI.empty();
     }
 };
 
 class OptionsHandler {
 public:
-    static ReplayOptions handle(int argc, char** argv);
+    /*
+     * Handle command line arguments.
+     * -i <input file> => recording path
+     * -t <target> => uri of the mongodb server
+     * -c <config> => config file. A list of <recording file>,<uri>. Used for spinning up multiple
+     * mongor.
+     */
+    std::vector<ReplayOptions> handle(int argc, char** argv);
+
+private:
+    std::vector<ReplayOptions> parseMultipleInstanceConfig(const std::string& path);
 };
 }  // namespace mongo

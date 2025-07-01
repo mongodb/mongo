@@ -29,8 +29,13 @@
 
 #include "mongo/replay/options_handler.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/util/assert_util.h"
+
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <sstream>
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/program_options.hpp>
@@ -38,20 +43,26 @@
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/variables_map.hpp>
 #include <fmt/format.h>
-
+#include <yaml-cpp/yaml.h>
 
 namespace mongo {
 
-
-ReplayOptions OptionsHandler::handle(int argc, char** argv) {
-    auto inputStr = "Path to file input file (defaults to stdin)";
+std::vector<ReplayOptions> OptionsHandler::handle(int argc, char** argv) {
+    auto recordingPath = "Path to the recording file";
     auto mongodbTarget = "URI of the shadow mongod/s";
+    auto configFilePath = "Path to the config file";
 
-    boost::program_options::variables_map vm;
-    boost::program_options::options_description desc{"Options"};
-    desc.add_options()("help,h",
-                       "help")("input,i", boost::program_options::value<std::string>(), inputStr)(
-        "target,t", boost::program_options::value<std::string>(), mongodbTarget);
+    namespace po = boost::program_options;
+
+    po::variables_map vm;
+    po::options_description desc{"Options"};
+    // clang-format off
+    desc.add_options()
+        ("help,h", "help")
+        ("input,i", po::value<std::string>(), recordingPath)
+        ("target,t", po::value<std::string>(), mongodbTarget)
+        ("config,c", po::value<std::string>(), configFilePath);
+    // clang-format on
 
     // Parse the program options
     store(parse_command_line(argc, argv, desc), vm);
@@ -59,32 +70,92 @@ ReplayOptions OptionsHandler::handle(int argc, char** argv) {
 
     // Handle the help option
     if (vm.count("help") || vm.empty()) {
-        std::cout << "MongoR Help: \n\n\t./mongor "
-                     "-i trafficinput.txt -t <mongod/s uri> \n\n";
+        std::cout << "MongoR Help: \n\n"
+                  << "\tUsage:\n"
+                  << "\t\t./mongor -i <traffic input file> -t <mongod/s uri>\n"
+                  << "\t\t./mongor -c <YAML config file path>\n\n"
+                  << "\tConfig file format (YAML):\n"
+                  << "\t\trecordings:\n"
+                  << "\t\t  - path: \"recording_path1\"\n"
+                  << "\t\t    uri: \"uri1\"\n"
+                  << "\t\t  - path: \"recording_path2\"\n"
+                  << "\t\t    uri: \"uri2\"\n\n";
         std::cout << desc << std::endl;
         return {};
     }
 
+    const bool singleInstanceOptionsSpecified = vm.count("input") && vm.count("target");
+    const bool configFileSpecified = vm.count("config");
+
+    //-c <config file> has the precedence over -i -t options
+    uassert(ErrorCodes::ReplayClientConfigurationError,
+            "config file cannot be specified if single instance options are specified",
+            singleInstanceOptionsSpecified ^ configFileSpecified);
+
+    if (configFileSpecified) {
+        // extract configuration file parameters.
+        auto configPath = vm["config"].as<std::string>();
+        uassert(ErrorCodes::ReplayClientConfigurationError,
+                "config file path does not exist",
+                std::filesystem::exists(configPath));
+        return parseMultipleInstanceConfig(configPath);
+    }
+
+    // single instance bootstrapping. recording replayed against single server instance.
+    uassert(ErrorCodes::ReplayClientConfigurationError,
+            "target and input file must be specified for single instance configuration",
+            singleInstanceOptionsSpecified);
+
     ReplayOptions options;
+    // extract file path
+    auto filePath = vm["input"].as<std::string>();
+    uassert(ErrorCodes::ReplayClientConfigurationError,
+            "input file path does not exist",
+            std::filesystem::exists(filePath));
+    options.recordingPath = filePath;
+    // extract mongo uri
+    auto uri = vm["target"].as<std::string>();
+    uassert(ErrorCodes::ReplayClientConfigurationError, "target URI is empty", !uri.empty());
+    options.mongoURI = uri;
 
-    // User can specify a --input param and it must point to a valid file
-    if (vm.count("input")) {
-        auto inputFile = vm["input"].as<std::string>();
-        if (!std::filesystem::exists(inputFile)) {
-            fmt::print(stderr, "Error: {} does not exist", inputFile);
-            return {};
-        }
-        options.inputFile = inputFile;
-    }
-
-    if (vm.count("target")) {
-        auto uri = vm["target"].as<std::string>();
-        if (uri.empty()) {
-            return {};
-        }
-        options.mongoURI = uri;
-    }
-
-    return options;
+    return {options};
 }
+
+std::vector<ReplayOptions> OptionsHandler::parseMultipleInstanceConfig(const std::string& path) {
+    std::vector<ReplayOptions> parsedReplayOptions;
+    uassert(ErrorCodes::ReplayClientConfigurationError,
+            "Impossible to open config file",
+            std::filesystem::exists(path));
+
+    //   recordings:
+    //      - path: "recording_path1"
+    //        uri: "uri1"
+    //      - path: "recording_path2"
+    //        uri: "uri2"
+
+    try {
+        YAML::Node config = YAML::LoadFile(path);
+
+        uassert(ErrorCodes::ReplayClientConfigurationError,
+                "'recordings' key is missing",
+                config["recordings"]);
+
+        for (const auto& recordingNode : config["recordings"]) {
+            uassert(ErrorCodes::ReplayClientConfigurationError,
+                    "'recordings' key is missing",
+                    recordingNode["path"] && recordingNode["uri"]);
+            std::string filePath = recordingNode["path"].as<std::string>();
+            std::string targetUri = recordingNode["uri"].as<std::string>();
+            ReplayOptions replayOption = {filePath, targetUri};
+            parsedReplayOptions.push_back(replayOption);
+        }
+    } catch (const YAML::Exception& ex) {
+        uassert(ErrorCodes::ReplayClientConfigurationError, ex.what(), false);
+    } catch (const std::exception& ex) {
+        uassert(ErrorCodes::ReplayClientConfigurationError, ex.what(), false);
+    }
+
+    return parsedReplayOptions;
+}
+
 }  // namespace mongo

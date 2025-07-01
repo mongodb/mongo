@@ -34,13 +34,15 @@
 
 namespace mongo {
 
-ReplayTestServer::ReplayTestServer() {
+ReplayTestServer::ReplayTestServer(std::string hostname /*= "$local:12345" */)
+    : _hostName(std::move(hostname)) {
     setUp();
 }
 
 ReplayTestServer::ReplayTestServer(const std::vector<std::string>& names,
-                                   const std::vector<std::string>& responses)
-    : ReplayTestServer() {
+                                   const std::vector<std::string>& responses,
+                                   std::string hostName)
+    : ReplayTestServer(hostName) {
     invariant(names.size() == responses.size());
     for (size_t i = 0; i < names.size(); ++i) {
         setupServerResponse(names[i], responses[i]);

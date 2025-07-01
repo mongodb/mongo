@@ -46,6 +46,7 @@ mongo_cc_binary(
 mongo_cc_unit_test(
     name = "mongor-test",
     srcs = [
+        "options_handler_test.cpp",
         "raw_op_document.cpp",
         "raw_op_document.h",
         "replay_command_executor_test.cpp",
