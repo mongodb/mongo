@@ -393,6 +393,7 @@ mongo_cc_library(
         "sbe_hashAgg_increased_spilling_mode.cpp",
         "//src/mongo/db/query/plan_cache:sbe_plan_cache_on_parameter_change.cpp",
         "//src/mongo/db/query/query_stats:query_stats_on_parameter_change.cpp",
+        "//src/mongo/db/query/query_stats:rate_limiting.h",
     ],
     hdrs = [
         "//src/mongo/db/query/plan_cache:sbe_plan_cache_on_parameter_change.h",

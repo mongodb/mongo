@@ -82,16 +82,24 @@ Status validateQueryStatsStoreSize(const std::string& str, const boost::optional
     return memory_util::MemorySize::parse(str).getStatus();
 }
 
-Status onQueryStatsSamplingRateUpdate(int samplingRate) {
+Status onQueryStatsRateLimiterUpdateImpl() {
     // The client is nullptr if the parameter is supplied from the command line. In this case, we
     // ignore the update event, the parameter will be processed when initializing the service
     // context.
     if (auto client = Client::getCurrent()) {
         auto&& [serviceCtx, updater] = getUpdater(*client);
-        updater->updateSamplingRate(serviceCtx, samplingRate < 0 ? INT_MAX : samplingRate);
+        updater->updateRateLimiter(serviceCtx);
     }
 
     return Status::OK();
+}
+
+Status onQueryStatsRateLimitUpdate(int) {
+    return onQueryStatsRateLimiterUpdateImpl();
+}
+
+Status onQueryStatsSamplingRateUpdate(double) {
+    return onQueryStatsRateLimiterUpdateImpl();
 }
 
 const Decorable<ServiceContext>::Decoration<std::unique_ptr<OnParamChangeUpdater>>

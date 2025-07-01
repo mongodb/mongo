@@ -107,4 +107,10 @@ RateLimiter::PolicyType RateLimiter::getPolicyType() const {
                                         }},
                       _policy);
 }
+
+int RateLimiter::roundSampleRateToPerThousand(double samplingRate) {
+    // Round up to ensure that any nonzero sample rate is not rounded down to zero.
+    return static_cast<int>(ceil(samplingRate * SampleBasedPolicy::kDenominator));
+}
+
 }  // namespace mongo

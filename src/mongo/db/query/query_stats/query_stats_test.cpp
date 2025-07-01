@@ -234,4 +234,58 @@ TEST_F(QueryStatsTest, RegisterRequestAbsorbsErrors) {
                        ErrorCodes::QueryStatsFailedToRecord);
 }
 
+TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
+    auto opCtx = makeOperationContext();
+
+    {
+        RAIIServerParameterControllerForTest flagCtrl("featureFlagQueryStats", true);
+        RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsSampleRate", 0.042);
+        auto& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
+        ASSERT_EQ(rateLimiter->getPolicyType(), RateLimiter::kSampleBasedPolicy);
+        ASSERT_EQ(rateLimiter->getSamplingRate(), 42);
+    }
+
+    {  // Test that window-based rate limiting will be elected when sampling rate is set to 0.0
+        RAIIServerParameterControllerForTest flagCtrl("featureFlagQueryStats", true);
+        RAIIServerParameterControllerForTest rateLimitCtrl("internalQueryStatsRateLimit", 10);
+        RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsSampleRate", 0.0);
+
+        auto& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
+        ASSERT_EQ(rateLimiter->getPolicyType(), RateLimiter::kWindowBasedPolicy);
+        ASSERT_EQ(rateLimiter->getSamplingRate(), 10);
+    }
+
+    {  // Test that sampling-based rate limiting takes precedence over window-based policy when both
+       // are enabled.
+        RAIIServerParameterControllerForTest flagCtrl("featureFlagQueryStats", true);
+        RAIIServerParameterControllerForTest rateLimitCtrl("internalQueryStatsRateLimit", 10);
+        RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsSampleRate", 0.042);
+
+        auto& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
+        ASSERT_EQ(rateLimiter->getPolicyType(), RateLimiter::kSampleBasedPolicy);
+        ASSERT_EQ(rateLimiter->getSamplingRate(), 42);
+    }
+
+    {  // Test idempotency when both parameters are set but being set in different order.
+        RAIIServerParameterControllerForTest flagCtrl("featureFlagQueryStats", true);
+        RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsSampleRate", 0.042);
+        RAIIServerParameterControllerForTest rateLimitCtrl("internalQueryStatsRateLimit", 10);
+
+        auto& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
+        ASSERT_EQ(rateLimiter->getPolicyType(), RateLimiter::kSampleBasedPolicy);
+        ASSERT_EQ(rateLimiter->getSamplingRate(), 42);
+    }
+
+    {  // Test that query stats is disabled when both rate limit and sample rate are set to 0.
+        RAIIServerParameterControllerForTest flagCtrl("featureFlagQueryStats", true);
+        RAIIServerParameterControllerForTest rateLimitCtrl("internalQueryStatsRateLimit", 0.0);
+        RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsSampleRate", 0.0);
+
+        auto& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
+        ASSERT_EQ(rateLimiter->getPolicyType(), RateLimiter::kWindowBasedPolicy);
+        ASSERT_EQ(rateLimiter->getSamplingRate(), 0);
+        ASSERT_FALSE(rateLimiter->handle());
+    }
+}
+
 }  // namespace mongo::query_stats

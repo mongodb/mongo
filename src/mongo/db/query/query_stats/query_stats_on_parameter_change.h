@@ -48,7 +48,9 @@ Status onQueryStatsStoreSizeUpdate(const std::string& str);
 
 Status validateQueryStatsStoreSize(const std::string& str, const boost::optional<TenantId>&);
 
-Status onQueryStatsSamplingRateUpdate(int samplingRate);
+Status onQueryStatsRateLimitUpdate(int requestLimit);
+
+Status onQueryStatsSamplingRateUpdate(double samplingRate);
 
 /**
  * An interface used to modify the queryStats store when query setParameters are modified. This is
@@ -69,7 +71,7 @@ public:
     /**
      * Updates the sampling rate for the queryStats rate limiter.
      */
-    virtual void updateSamplingRate(ServiceContext* serviceCtx, int samplingRate) = 0;
+    virtual void updateRateLimiter(ServiceContext* serviceCtx) = 0;
 };
 
 /**

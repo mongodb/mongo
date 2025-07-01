@@ -741,7 +741,15 @@ function getSingleQueryStatsEntryForNs(testDB, namespace) {
     return queryStats[0];
 }
 
-function getExecCount(testDB, namespace) {
+/**
+ * Gets the execution count of the latest query stat entry for the given nss. It assumes that there
+ * is only one query stats entry. If multiple entries are found, it will raise an assertion error.
+ *
+ * @param {string} testDB
+ * @param {string} namespace
+ * @returns {number} The execution count
+ */
+export function getExecCount(testDB, namespace) {
     const queryStats = getQueryStatsForNs(testDB, namespace);
     assert.lte(queryStats.length, 1, "Multiple query stats entries found for " + namespace);
     return queryStats.length == 0 ? 0 : queryStats[0].metrics.execCount;

@@ -40,6 +40,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_stats/query_stats_failed_to_record_info.h"
 #include "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
+#include "mongo/db/query/query_stats/rate_limiting.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -134,6 +135,28 @@ void assertConfigurationAllowed() {
             isQueryStatsFeatureEnabled());
 }
 
+
+/**
+ * Configure the rate limiter. This reads the configured values from the server parameters. To
+ * ensure idempotency when both parameters are set to non-zero values, the sample-based policy takes
+ * precedence over the window-based policy.
+ */
+void configureRateLimiter(ServiceContext* serviceCtx) {
+    auto& rateLimiter = QueryStatsStoreManager::getRateLimiter(serviceCtx);
+
+    auto configuredRateLimit = internalQueryStatsRateLimit.load();
+    auto configuredSamplingRate =
+        RateLimiter::roundSampleRateToPerThousand(internalQueryStatsSampleRate.load());
+
+    if (configuredSamplingRate > 0) {
+        rateLimiter =
+            RateLimiter::createSampleBased(configuredSamplingRate, SecureRandom().nextInt32());
+    } else {
+        rateLimiter = RateLimiter::createWindowBased(
+            configuredRateLimit < 0 ? INT_MAX : configuredRateLimit, Seconds{1});
+    }
+}
+
 class QueryStatsOnParamChangeUpdaterImpl final : public query_stats_util::OnParamChangeUpdater {
 public:
     void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) final {
@@ -148,9 +171,9 @@ public:
         // challenging while there is concurrent traffic.
     }
 
-    void updateSamplingRate(ServiceContext* serviceCtx, int samplingRate) override {
+    void updateRateLimiter(ServiceContext* serviceCtx) override {
         assertConfigurationAllowed();
-        QueryStatsStoreManager::getRateLimiter(serviceCtx).get()->setSamplingRate(samplingRate);
+        configureRateLimiter(serviceCtx);
     }
 };
 
@@ -186,9 +209,7 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
 
         globalQueryStatsStoreManager =
             std::make_unique<QueryStatsStoreManager>(size, numPartitions);
-        auto configuredSamplingRate = internalQueryStatsRateLimit.load();
-        QueryStatsStoreManager::getRateLimiter(serviceCtx) = RateLimiter::createWindowBased(
-            configuredSamplingRate < 0 ? INT_MAX : configuredSamplingRate, Seconds{1});
+        configureRateLimiter(serviceCtx);
     }};
 
 /**

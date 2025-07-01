@@ -221,6 +221,12 @@ public:
      */
     PolicyType getPolicyType() const;
 
+    /**
+     * Round a fractional sampling rate to an integer value per thousand. For example, a
+     * samplingRate of 0.1 (10%) will be rounded to 100 (per thousand).
+     */
+    static int roundSampleRateToPerThousand(double samplingRate);
+
 private:
     std::variant<WindowBasedPolicy, SampleBasedPolicy> _policy;
 

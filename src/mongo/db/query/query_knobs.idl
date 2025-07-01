@@ -1231,16 +1231,37 @@ server_parameters:
 
     internalQueryStatsRateLimit:
         description: >-
-            The maximum number of queries per second that are sampled for query stats.
+            The maximum number of queries per second that are sampled for query stats using window-based rate limiting.
             If the rate of queries goes above this number, then rate limiting will kick in, and any
-            further queries will not be sampled. To sample all queries, this can be set to -1. This can be
-            set to 0 to turn queryStats off completely.
+            further queries will not be sampled. To sample all queries, this can be set to -1.
+            When both internalQueryStatsSampleRate and internalQueryStatsRateLimit are set to non-zero
+            values, the sampling-based rate limiting takes precedence over this window-based rate limiting. To disable
+            query stats collection completely, set both internalQueryStatsRateLimit and internalQueryStatsSampleRate to 0.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryStatsRateLimit"
         cpp_vartype: AtomicWord<int>
         default: 0
         validator:
             gte: -1
+        on_update: query_stats_util::onQueryStatsRateLimitUpdate
+        redact: false
+
+    internalQueryStatsSampleRate:
+        description: >-
+            The fractional number representing the rate of the queries that are sampled for query stats using
+            sampling-based rate limiting. To sample all queries, this can be set to 1.
+            When both internalQueryStatsSampleRate and internalQueryStatsRateLimit are set to non-zero
+            values, this sampling-based rate limiting takes precedence over window-based rate limiting.
+            If internalQueryStatsSampleRate is set to 0, query sampling will be controlled by the window-based
+            rate limiter. To disable query stats collection completely, set both internalQueryStatsSampleRate and
+            internalQueryStatsRateLimit to 0.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryStatsSampleRate"
+        cpp_vartype: AtomicDouble
+        default: 0
+        validator:
+            gte: 0.0
+            lte: 1.0
         on_update: query_stats_util::onQueryStatsSamplingRateUpdate
         redact: false
 
