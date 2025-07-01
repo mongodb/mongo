@@ -478,21 +478,17 @@ public:
         }
     }
 
-    void createCreateIndexBatch(int size) {
+    void createCreateIndexBatch() {
+        const int maxIndexCount = 62;
         const long long term1 = 1;
-        const int indexesPerCollection = 62;
-        for (int i = 0; i < size; i += indexesPerCollection) {
-            auto ns = fmt::format("foo.bar{}", i);
-            for (int j = 0; j < indexesPerCollection; ++j) {
-                auto o = BSON("createIndexes" << ns << "v" << 2 << "key"
-                                              << BSON(fmt::format("a_{}", j) << 1) << "name"
-                                              << fmt::format("a_{}_1", j));
-                _oplogEntries.emplace_back(
-                    BSON("op" << "c"
-                              << "ns" << ns << "ui" << _foobarUUID << "o" << o << "ts"
-                              << Timestamp(1, i * indexesPerCollection + j) << "t" << term1 << "v"
-                              << 2 << "wall" << Date_t::now()));
-            }
+        for (int i = 0; i < maxIndexCount; ++i) {
+            auto o = BSON("createIndexes" << _foobarNs.coll() << "v" << 2 << "key"
+                                          << BSON(fmt::format("a_{}", i) << 1) << "name"
+                                          << fmt::format("a_{}_1", i));
+            _oplogEntries.emplace_back(BSON(
+                "op" << "c"
+                     << "ns" << _foobarNs.getCommandNS().toString_forTest() << "o" << o << "ts"
+                     << Timestamp(1, i) << "t" << term1 << "v" << 2 << "wall" << Date_t::now()));
         }
     }
 
@@ -626,7 +622,7 @@ void BM_TestPrepares(benchmark::State& state) {
 void BM_TestCreateIndex(benchmark::State& state) {
     TestServiceContext testSvcCtx;
     Fixture fixture(&testSvcCtx);
-    fixture.createCreateIndexBatch(state.range(0));
+    fixture.createCreateIndexBatch();
     runBMTest(testSvcCtx, fixture, state);
 }
 
@@ -672,7 +668,7 @@ BENCHMARK(BM_TestPrepares)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
 
-BENCHMARK(BM_TestCreateIndex)->Arg(100 * 1000)->UseManualTime()->Unit(benchmark::kMillisecond);
+BENCHMARK(BM_TestCreateIndex)->UseManualTime()->Unit(benchmark::kMillisecond);
 
 }  // namespace
 }  // namespace mongo

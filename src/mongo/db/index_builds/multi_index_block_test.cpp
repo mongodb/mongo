@@ -33,9 +33,11 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -278,6 +280,47 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     }
 
     indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+TEST_F(MultiIndexBlockTest, AddDocumentBetweenInitAndInsertAll) {
+    auto indexer = getIndexer();
+
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    BSONObj spec = BSON("key" << BSON("a" << 1) << "name"
+                              << "a_1"
+                              << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion));
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(indexer->init(operationContext(), coll, {spec}, MultiIndexBlock::kNoopOnInitFn)
+                      .getStatus());
+        wuow.commit();
+    }
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(collection_internal::insertDocument(operationContext(),
+                                                      autoColl.getCollection(),
+                                                      InsertStatement(BSON("_id" << 0 << "a" << 1)),
+                                                      nullptr));
+        wuow.commit();
+    }
+
+    ASSERT_OK(indexer->insertAllDocumentsInCollection(operationContext(), coll.get()));
+    ASSERT_OK(indexer->drainBackgroundWrites(operationContext(),
+                                             RecoveryUnit::ReadSource::kNoTimestamp,
+                                             IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(indexer->commit(operationContext(),
+                                  coll.getWritableCollection(operationContext()),
+                                  MultiIndexBlock::kNoopOnCreateEachFn,
+                                  MultiIndexBlock::kNoopOnCommitFn));
+        wuow.commit();
+    }
 }
 
 }  // namespace

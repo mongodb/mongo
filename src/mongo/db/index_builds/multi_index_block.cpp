@@ -269,8 +269,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
         _phase = resumeInfo->getPhase();
     }
 
-    bool isEmpty = collection->isEmpty(opCtx);
-
     bool forRecovery = initMode == InitMode::Recovery;
     // Guarantees that exceptions cannot be returned from index builder initialization except for
     // WriteConflictExceptions, which should be dealt with by the caller.
@@ -404,15 +402,10 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             if (auto status = index.real->initializeAsEmpty(); !status.isOK())
                 return status;
 
-            // In steady state mode we're building an index for a collection that already exists, so
-            // if the collection is empty we don't need a bulk loader. In other modes we're building
-            // a collection and its indexes at the same time, so we always need a bulk loader.
-            if (!isEmpty || initMode != InitMode::SteadyState) {
-                index.bulk = index.real->initiateBulk(indexCatalogEntry,
-                                                      eachIndexBuildMaxMemoryUsageBytes,
-                                                      stateInfo,
-                                                      collection->ns().dbName());
-            }
+            index.bulk = index.real->initiateBulk(indexCatalogEntry,
+                                                  eachIndexBuildMaxMemoryUsageBytes,
+                                                  stateInfo,
+                                                  collection->ns().dbName());
 
             const IndexDescriptor* descriptor = indexCatalogEntry->descriptor();
 
@@ -539,6 +532,13 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         shard_role_details::getLocker(opCtx)->restoreLockState(opCtx, lockInfo);
         shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
         collection.restore();
+    }
+
+    // If the collection is empty we can skip the collection scan and committing the bulk loader.
+    // Note that this cannot use numRecords, as that's a fastcount and may be wrong.
+    if (collection->isEmpty(opCtx)) {
+        _phase = IndexBuildPhaseEnum::kBulkLoad;
+        return Status::OK();
     }
 
     // Hint to the storage engine that this collection scan should not keep data in the cache.
@@ -885,9 +885,6 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                     "Index build: inserting from external sorter into index",
                     "index"_attr = entry->descriptor()->indexName(),
                     "buildUUID"_attr = _buildUUID);
-        if (!_indexes[i].bulk) {
-            continue;
-        }
 
         // SERVER-41918 This call to bulk->commit() results in file I/O that may result in an
         // exception.
