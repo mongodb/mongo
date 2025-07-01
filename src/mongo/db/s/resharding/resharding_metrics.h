@@ -77,7 +77,7 @@ public:
     using Role = ReshardingMetricsCommon::Role;
     using FieldNameProviderPtr =
         std::unique_ptr<ShardingDataTransformInstanceMetricsFieldNameProvider>;
-    using ObserverPtr = std::unique_ptr<ShardingDataTransformMetricsObserverInterface>;
+    using ObserverPtr = std::unique_ptr<ReshardingMetricsObserver>;
 
     /**
      * To be used by recipients only. Tracks the exponential moving average of the time it takes for

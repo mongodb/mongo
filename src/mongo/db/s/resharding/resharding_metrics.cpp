@@ -33,8 +33,8 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/s/metrics/sharding_data_transform_metrics_observer.h"
 #include "mongo/db/s/resharding/resharding_metrics_common.h"
+#include "mongo/db/s/resharding/resharding_metrics_observer_impl.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/server_options.h"
@@ -172,7 +172,7 @@ ReshardingMetrics::ReshardingMetrics(UUID instanceId,
                         clockSource,
                         cumulativeMetrics,
                         state,
-                        std::make_unique<ShardingDataTransformMetricsObserver>(this),
+                        std::make_unique<ReshardingMetricsObserverImpl>(this),
                         provenance} {}
 
 ReshardingMetrics::ReshardingMetrics(UUID instanceId,

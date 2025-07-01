@@ -100,7 +100,8 @@ ShardingDataTransformCumulativeMetrics::ShardingDataTransformCumulativeMetrics(
       _instanceMetricsForAllRoles(ReshardingMetricsCommon::kRoleCount) {}
 
 ShardingDataTransformCumulativeMetrics::UniqueScopedObserver
-ShardingDataTransformCumulativeMetrics::registerInstanceMetrics(const InstanceObserver* metrics) {
+ShardingDataTransformCumulativeMetrics::registerInstanceMetrics(
+    const ReshardingMetricsObserver* metrics) {
     _operationWasAttempted.store(true);
     auto role = metrics->getRole();
     auto it = insertMetrics(metrics, getMetricsSetForRole(role));
@@ -131,7 +132,7 @@ int64_t ShardingDataTransformCumulativeMetrics::getOldestOperationEstimateRemain
 }
 
 boost::optional<Milliseconds> ShardingDataTransformCumulativeMetrics::getEstimate(
-    const InstanceObserver* op, EstimateType type) const {
+    const ReshardingMetricsObserver* op, EstimateType type) const {
     switch (type) {
         case kHigh:
             return op->getHighEstimateRemainingTimeMillis();
@@ -283,8 +284,8 @@ void ShardingDataTransformCumulativeMetrics::reportCountsForAllStates(
     _stateTracker.reportCountsForAllStates(names, bob);
 }
 
-const ShardingDataTransformCumulativeMetrics::InstanceObserver*
-ShardingDataTransformCumulativeMetrics::getOldestOperation(WithLock, Role role) const {
+const ReshardingMetricsObserver* ShardingDataTransformCumulativeMetrics::getOldestOperation(
+    WithLock, Role role) const {
     auto set = getMetricsSetForRole(role);
     if (set.empty()) {
         return nullptr;
@@ -303,7 +304,7 @@ ShardingDataTransformCumulativeMetrics::getMetricsSetForRole(Role role) const {
 }
 
 ShardingDataTransformCumulativeMetrics::MetricsSet::iterator
-ShardingDataTransformCumulativeMetrics::insertMetrics(const InstanceObserver* metrics,
+ShardingDataTransformCumulativeMetrics::insertMetrics(const ReshardingMetricsObserver* metrics,
                                                       MetricsSet& set) {
     stdx::unique_lock guard(_mutex);
     auto before = set.size();

@@ -32,7 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/s/metrics/cumulative_metrics_state_tracker.h"
 #include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
-#include "mongo/db/s/metrics/sharding_data_transform_metrics_observer_interface.h"
+#include "mongo/db/s/resharding/resharding_metrics_observer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/resharding/common_types_gen.h"
@@ -58,14 +58,14 @@ class ShardingDataTransformCumulativeMetrics {
 public:
     using NameProvider = ShardingDataTransformCumulativeMetricsFieldNameProvider;
     using Role = ReshardingMetricsCommon::Role;
-    using InstanceObserver = ShardingDataTransformMetricsObserverInterface;
     using DeregistrationFunction = unique_function<void()>;
     using StateTracker =
         CumulativeMetricsStateTracker<CoordinatorStateEnum, DonorStateEnum, RecipientStateEnum>;
     using AnyState = StateTracker::AnyState;
 
     struct MetricsComparer {
-        inline bool operator()(const InstanceObserver* a, const InstanceObserver* b) const {
+        inline bool operator()(const ReshardingMetricsObserver* a,
+                               const ReshardingMetricsObserver* b) const {
             auto aTime = a->getStartTimestamp();
             auto bTime = b->getStartTimestamp();
             if (aTime == bTime) {
@@ -74,7 +74,7 @@ public:
             return aTime < bTime;
         }
     };
-    using MetricsSet = std::set<const InstanceObserver*, MetricsComparer>;
+    using MetricsSet = std::set<const ReshardingMetricsObserver*, MetricsComparer>;
 
     /**
      * RAII type that takes care of deregistering the observer once it goes out of scope.
@@ -108,7 +108,8 @@ public:
     ShardingDataTransformCumulativeMetrics(const std::string& rootSectionName,
                                            std::unique_ptr<NameProvider> fieldNameProvider);
     virtual ~ShardingDataTransformCumulativeMetrics() = default;
-    [[nodiscard]] UniqueScopedObserver registerInstanceMetrics(const InstanceObserver* metrics);
+    [[nodiscard]] UniqueScopedObserver registerInstanceMetrics(
+        const ReshardingMetricsObserver* metrics);
     int64_t getOldestOperationHighEstimateRemainingTimeMillis(Role role) const;
     int64_t getOldestOperationLowEstimateRemainingTimeMillis(Role role) const;
     size_t getObservedMetricsCount() const;
@@ -215,11 +216,12 @@ private:
 
     MetricsSet& getMetricsSetForRole(Role role);
     const MetricsSet& getMetricsSetForRole(Role role) const;
-    const InstanceObserver* getOldestOperation(WithLock, Role role) const;
+    const ReshardingMetricsObserver* getOldestOperation(WithLock, Role role) const;
     int64_t getOldestOperationEstimateRemainingTimeMillis(Role role, EstimateType type) const;
-    boost::optional<Milliseconds> getEstimate(const InstanceObserver* op, EstimateType type) const;
+    boost::optional<Milliseconds> getEstimate(const ReshardingMetricsObserver* op,
+                                              EstimateType type) const;
 
-    MetricsSet::iterator insertMetrics(const InstanceObserver* metrics, MetricsSet& set);
+    MetricsSet::iterator insertMetrics(const ReshardingMetricsObserver* metrics, MetricsSet& set);
     void deregisterMetrics(const Role& role, const MetricsSet::iterator& metrics);
 
     mutable stdx::mutex _mutex;

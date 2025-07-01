@@ -33,9 +33,9 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
-class ShardingDataTransformMetricsObserverInterface {
+class ReshardingMetricsObserver {
 public:
-    virtual ~ShardingDataTransformMetricsObserverInterface() = default;
+    virtual ~ReshardingMetricsObserver() = default;
     virtual boost::optional<Milliseconds> getHighEstimateRemainingTimeMillis() const = 0;
     virtual boost::optional<Milliseconds> getLowEstimateRemainingTimeMillis() const = 0;
     virtual Date_t getStartTimestamp() const = 0;

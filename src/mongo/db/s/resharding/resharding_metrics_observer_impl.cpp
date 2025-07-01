@@ -27,35 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/metrics/sharding_data_transform_metrics_observer.h"
+#include "mongo/db/s/resharding/resharding_metrics_observer_impl.h"
 
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-ShardingDataTransformMetricsObserver::ShardingDataTransformMetricsObserver(
-    ReshardingMetrics* metrics)
+ReshardingMetricsObserverImpl::ReshardingMetricsObserverImpl(ReshardingMetrics* metrics)
     : _metrics(metrics) {}
 
-boost::optional<Milliseconds>
-ShardingDataTransformMetricsObserver::getHighEstimateRemainingTimeMillis() const {
+boost::optional<Milliseconds> ReshardingMetricsObserverImpl::getHighEstimateRemainingTimeMillis()
+    const {
     return _metrics->getHighEstimateRemainingTimeMillis();
 }
 
-boost::optional<Milliseconds>
-ShardingDataTransformMetricsObserver::getLowEstimateRemainingTimeMillis() const {
+boost::optional<Milliseconds> ReshardingMetricsObserverImpl::getLowEstimateRemainingTimeMillis()
+    const {
     return _metrics->getLowEstimateRemainingTimeMillis();
 }
 
-Date_t ShardingDataTransformMetricsObserver::getStartTimestamp() const {
+Date_t ReshardingMetricsObserverImpl::getStartTimestamp() const {
     return _metrics->getStartTimestamp();
 }
 
-const UUID& ShardingDataTransformMetricsObserver::getUuid() const {
+const UUID& ReshardingMetricsObserverImpl::getUuid() const {
     return _metrics->getInstanceId();
 }
 
-ReshardingMetricsCommon::Role ShardingDataTransformMetricsObserver::getRole() const {
+ReshardingMetricsCommon::Role ReshardingMetricsObserverImpl::getRole() const {
     return _metrics->getRole();
 }
 

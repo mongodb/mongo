@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/s/metrics/sharding_data_transform_metrics_observer_interface.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
@@ -39,9 +38,9 @@
 
 namespace mongo {
 
-class ShardingDataTransformMetricsObserver : public ShardingDataTransformMetricsObserverInterface {
+class ReshardingMetricsObserverImpl : public ReshardingMetricsObserver {
 public:
-    ShardingDataTransformMetricsObserver(ReshardingMetrics* metrics);
+    ReshardingMetricsObserverImpl(ReshardingMetrics* metrics);
     boost::optional<Milliseconds> getHighEstimateRemainingTimeMillis() const override;
     boost::optional<Milliseconds> getLowEstimateRemainingTimeMillis() const override;
     Date_t getStartTimestamp() const override;

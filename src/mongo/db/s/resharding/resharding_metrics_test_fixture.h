@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-class ObserverMock : public ShardingDataTransformMetricsObserverInterface {
+class ObserverMock : public ReshardingMetricsObserver {
 public:
     constexpr static auto kDefaultRole = ReshardingMetricsCommon::Role::kCoordinator;
     ObserverMock(Date_t startTime, int64_t timeRemaining)
