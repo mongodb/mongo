@@ -53,7 +53,7 @@ function testMinAndMax(primary, secondaries) {
 
     let hostsToAssertStatsOn = [];
     for (let secondary of secondaries) {
-        hostsToAssertStatsOn.push(secondary.host);
+        hostsToAssertStatsOn.push(secondary.name);
     }
 
     // Launch an initial find query to trigger to min. Since some internal replset operations may
