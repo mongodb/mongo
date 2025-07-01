@@ -324,10 +324,10 @@ void ReplicaSetNodeProcessInterface::_attachGenericCommandArgs(OperationContext*
 bool ReplicaSetNodeProcessInterface::_canWriteLocally(OperationContext* opCtx,
                                                       const NamespaceString& ns) const {
     Lock::ResourceLock rstl(opCtx, resourceIdReplicationStateTransitionLock, MODE_IX);
-    boost::optional<rss::consensus::IntentGuard> write_guard;
+    boost::optional<rss::consensus::WriteIntentGuard> write_guard;
     if (gFeatureFlagIntentRegistration.isEnabled()) {
         try {
-            write_guard.emplace(rss::consensus::IntentRegistry::Intent::Write, opCtx);
+            write_guard.emplace(opCtx);
         } catch (const ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
             return false;
         }

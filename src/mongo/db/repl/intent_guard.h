@@ -39,7 +39,7 @@ namespace mongo::rss::consensus {
  * RAII class used to handle registering and deregistering intents with the IntentRegistration
  * system.
  */
-class IntentGuard final {
+class IntentGuard {
 public:
     /**
      * Registers an intent. If the intent is not granted, an exception will be thrown. It will be up
@@ -71,5 +71,17 @@ public:
 private:
     OperationContext* _opCtx;
     IntentRegistry::IntentToken _token;
+};
+
+/**
+ * A wrapper class around IntentGuard that is only used for Write Intents.
+ */
+class WriteIntentGuard final : public IntentGuard {
+public:
+    WriteIntentGuard(OperationContext* opCtx);
+
+    WriteIntentGuard(const WriteIntentGuard&) = delete;
+
+    WriteIntentGuard(WriteIntentGuard&&) = delete;
 };
 }  // namespace mongo::rss::consensus

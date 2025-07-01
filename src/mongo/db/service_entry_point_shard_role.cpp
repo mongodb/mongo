@@ -1648,7 +1648,7 @@ void ExecCommandDatabase::_initiateCommand() {
 
     _invocation->checkAuthorization(opCtx, _execContext.getRequest());
 
-    boost::optional<rss::consensus::IntentGuard> writeGuard;
+    boost::optional<rss::consensus::WriteIntentGuard> writeGuard;
 
     if (!opCtx->getClient()->isInDirectClient() &&
         !MONGO_unlikely(skipCheckingForNotPrimaryInCommandDispatch.shouldFail())) {
@@ -1705,7 +1705,7 @@ void ExecCommandDatabase::_initiateCommand() {
             // Declaring Write intent ensures we are the primary node and this operation will be
             // interrupted by StepDown.
             if (gFeatureFlagIntentRegistration.isEnabled()) {
-                writeGuard.emplace(rss::consensus::IntentRegistry::Intent::Write, opCtx);
+                writeGuard.emplace(opCtx);
             }
             repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
             uassert(ErrorCodes::NotWritablePrimary,

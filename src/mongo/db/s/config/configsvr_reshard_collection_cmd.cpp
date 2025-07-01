@@ -117,9 +117,9 @@ public:
 
             // Declaring Write intent ensures we are the primary node and this operation will be
             // interrupted by StepDown.
-            boost::optional<rss::consensus::IntentGuard> writeGuard;
+            boost::optional<rss::consensus::WriteIntentGuard> writeGuard;
             if (gFeatureFlagIntentRegistration.isEnabled()) {
-                writeGuard.emplace(rss::consensus::IntentRegistry::Intent::Write, opCtx);
+                writeGuard.emplace(opCtx);
             }
 
             {

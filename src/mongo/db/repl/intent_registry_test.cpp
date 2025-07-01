@@ -510,7 +510,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsShutdown) {
     auto newClient = serviceContext->getService()->makeClient("testClient");
     auto newOpCtx = newClient->makeOperationContext();
     try {
-        IntentGuard writeGuard(IntentRegistry::Intent::Write, newOpCtx.get());
+        WriteIntentGuard writeGuard(newOpCtx.get());
         // Fail the test if constructing the intentGuard succeeds, as it means it incorrectly
         // registered the intent and did not throw an exception.
         ASSERT_TRUE(false);
@@ -604,7 +604,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsSameOpCtxCanDeclareIntents) 
 
     // Since we are using the same opCtx we should be able to register any intent.
     {
-        IntentGuard writeGuard(IntentRegistry::Intent::Write, opCtx.get());
+        WriteIntentGuard writeGuard(opCtx.get());
     }
 
     {
@@ -691,7 +691,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsRollback) {
     auto newClient = serviceContext->getService()->makeClient("testClient");
     auto newOpCtx = newClient->makeOperationContext();
     try {
-        IntentGuard writeGuard(IntentRegistry::Intent::Write, newOpCtx.get());
+        WriteIntentGuard writeGuard(newOpCtx.get());
         // Fail the test if constructing the intentGuard succeeds, as it means it incorrectly
         // registered the intent and did not throw an exception.
         ASSERT_TRUE(false);
@@ -793,7 +793,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsStepDown) {
         auto opCtx = clientWritePrepared->makeOperationContext();
 
         try {
-            IntentGuard writeGuard(IntentRegistry::Intent::Write, opCtx.get());
+            WriteIntentGuard writeGuard(opCtx.get());
             // Fail the test if constructing the intentGuard succeeds, as it means it incorrectly
             // registered the intent and did not throw an exception.
             ASSERT_TRUE(false);

@@ -56,4 +56,7 @@ boost::optional<IntentRegistry::Intent> IntentGuard::intent() const {
     return _token.intent();
 }
 
+WriteIntentGuard::WriteIntentGuard(OperationContext* opCtx)
+    : IntentGuard(IntentRegistry::Intent::Write, opCtx) {}
+
 }  // namespace mongo::rss::consensus
