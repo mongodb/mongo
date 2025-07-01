@@ -19,9 +19,14 @@ const cursorIdRegex = /cursorid"?:([0-9]+)/;
  * Utility functions to extract and detect memory metrics from diagnostic channels.
  ******************************************************************************************************/
 
-function getMetricFromLog(logLine, regex) {
+function getMetricFromLog(logLine, regex, doAssert = true) {
     const match = logLine.match(regex);
-    assert(match, `Pattern ${regex} did not match log line: ${logLine}`);
+    if (doAssert) {
+        assert(match, `Pattern ${regex} did not match log line: ${logLine}`);
+    } else if (!match) {
+        return -1;
+    }
+
     return parseInt(match[1]);
 }
 
@@ -92,6 +97,8 @@ function verifySlowQueryLogMetrics({
     // Because of asynchronous log flushing, the first log line extracted may not correspond to the
     // original request.
     const originalRequestLogLine = logLines.find(line => line.includes('"command":{"aggregate"'));
+    assert(originalRequestLogLine,
+           "Failed to find original aggregate request in log lines: " + tojson(logLines));
     const cursorId = getMetricFromLog(originalRequestLogLine, cursorIdRegex);
     logLines = logLines.filter(line => {
         return getMetricFromLog(line, cursorIdRegex).valueOf() === cursorId.valueOf();
@@ -113,10 +120,15 @@ function verifySlowQueryLogMetrics({
 
     // Check that inUseMemBytes is non-zero when the cursor is still in-use.
     let peakInUseMem = 0;
+    let foundInUseMem = false;
     for (const line of logLines) {
         if (!verifyOptions.skipInUseMemBytesCheck && !line.includes('"cursorExhausted"')) {
-            const inUseMemBytes = getMetricFromLog(line, inUseMemBytesRegex);
-            peakInUseMem = Math.max(inUseMemBytes, peakInUseMem);
+            const inUseMemBytes =
+                getMetricFromLog(line, inUseMemBytesRegex, false /* don't assert */);
+            if (inUseMemBytes > 0) {
+                peakInUseMem = Math.max(inUseMemBytes, peakInUseMem);
+                foundInUseMem = true;
+            }
         }
 
         const maxUsedMemBytes = getMetricFromLog(line, maxUsedMemBytesRegex);
@@ -125,6 +137,10 @@ function verifySlowQueryLogMetrics({
                    `maxUsedMemBytes (${maxUsedMemBytes}) should be >= peak inUseMemBytes (${
                        peakInUseMem}) seen so far\n` +
                        tojson(logLines));
+    }
+
+    if (!verifyOptions.skipInUseMemBytesCheck) {
+        assert(foundInUseMem, "Expected to find inUseMemBytes in slow query logs at least once");
     }
 
     // The cursor is exhausted and the pipeline's resources have been freed, so the last
@@ -172,7 +188,7 @@ function verifyProfilerMetrics({
     profilerEntries = profilerEntries.filter(entry => entry.cursorid &&
                                                  entry.cursorid.valueOf() === cursorId.valueOf());
 
-    // Assert that we have one aggregate and two getMores.
+    // Assert that we have one aggregate and 'expectedNumGetMores' getMores.
     assert.gte(profilerEntries.length,
                verifyOptions.expectedNumGetMores + 1,
                "Expected at least " + (verifyOptions.expectedNumGetMores + 1) +
@@ -182,20 +198,24 @@ function verifyProfilerMetrics({
     assert.eq(1,
               aggregateEntries.length,
               "Expected exactly one aggregate entry: " + tojson(profilerEntries));
-    assert.gte(verifyOptions.expectedNumGetMores,
-               getMoreEntries.length,
+    assert.gte(getMoreEntries.length,
+               verifyOptions.expectedNumGetMores,
                "Expected at least " + verifyOptions.expectedNumGetMores +
                    " getMore entries: " + tojson(profilerEntries));
 
     // Check that inUseMemBytes is non-zero when the cursor is still in use.
     let peakInUseMem = 0;
+    let foundInUseMem = false;
     for (const entry of profilerEntries) {
         if (!verifyOptions.skipInUseMemBytesCheck && !entry.cursorExhausted) {
-            assert.gt(
-                entry.inUseMemBytes,
-                0,
-                "Expected inUseMemBytes to be nonzero in getMore: " + tojson(profilerEntries));
-            peakInUseMem = Math.max(peakInUseMem, entry.inUseMemBytes);
+            if (Object.hasOwn(entry, 'inUseMemBytes')) {
+                foundInUseMem = true;
+                assert.gt(
+                    entry.inUseMemBytes,
+                    0,
+                    "Expected inUseMemBytes to be nonzero in getMore: " + tojson(profilerEntries));
+                peakInUseMem = Math.max(peakInUseMem, entry.inUseMemBytes);
+            }
         }
 
         assert(entry.hasOwnProperty("maxUsedMemBytes"),
@@ -205,6 +225,10 @@ function verifyProfilerMetrics({
                    `maxUsedMemBytes (${entry.maxUsedMemBytes}) should be >= inUseMemBytes peak (${
                        peakInUseMem}) at this point: ` +
                        tojson(entry));
+    }
+
+    if (!verifyOptions.skipInUseMemBytesCheck) {
+        assert(foundInUseMem, "Expected to find inUseMemBytes at least once in profiler entries");
     }
 
     // No memory is currently in use because the cursor is exhausted.

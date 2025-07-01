@@ -40,6 +40,7 @@
 #include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/expression.h"
@@ -230,6 +231,7 @@ DocumentSource::GetNextResult DocumentSourceGraphLookUp::getNextUnwound() {
 }
 
 void DocumentSourceGraphLookUp::doDispose() {
+    updateSpillingStats();
     _cache.clear();
     _queue.finalize();
     _visitedDocuments.dispose();
@@ -750,6 +752,10 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
             opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledBytes()));
         out["spilledRecords"] =
             opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledRecords()));
+        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+            out["maxUsedMemBytes"] =
+                opts.serializeLiteral(static_cast<long long>(_stats.maxMemoryUsageBytes));
+        }
     }
 
     array.push_back(out.freezeToValue());
@@ -795,8 +801,10 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _additionalFilter(additionalFilter),
       _depthField(depthField),
       _maxDepth(maxDepth),
-      _memoryUsageTracker(pExpCtx->getAllowDiskUse(),
-                          internalDocumentSourceGraphLookupMaxMemoryBytes.load()),
+      _memoryUsageTracker(OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(
+          *expCtx,
+          expCtx->getAllowDiskUse(),
+          internalDocumentSourceGraphLookupMaxMemoryBytes.load())),
       _queue(pExpCtx.get(), &_memoryUsageTracker),
       _visitedDocuments(pExpCtx.get(), &_memoryUsageTracker, "VisitedDocumentsMap"),
       _visitedFromValues(pExpCtx.get(), &_memoryUsageTracker, "VisitedFromValuesSet"),
@@ -836,8 +844,10 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
           original._fromExpCtx->copyWith(original.pExpCtx->getResolvedNamespace(_from).ns,
                                          original.pExpCtx->getResolvedNamespace(_from).uuid)),
       _fromPipeline(original._fromPipeline),
-      _memoryUsageTracker(pExpCtx->getAllowDiskUse(),
-                          internalDocumentSourceGraphLookupMaxMemoryBytes.load()),
+      _memoryUsageTracker(OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(
+          *newExpCtx,
+          newExpCtx->getAllowDiskUse(),
+          internalDocumentSourceGraphLookupMaxMemoryBytes.load())),
       _queue(pExpCtx.get(), &_memoryUsageTracker),
       _visitedDocuments(pExpCtx.get(), &_memoryUsageTracker, "VisitedDocumentsMap"),
       _visitedFromValues(pExpCtx.get(), &_memoryUsageTracker, "VisitedFromValuesSet"),
