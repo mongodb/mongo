@@ -43,6 +43,31 @@ During multiplanning, each `QuerySolution` is evaluated by running each candidat
 1. `NEED_TIME`: More works are needed to produce a query result.
 1. `NEED_YIELD`: Query execution needs to [yield](#aside-yielding) to the storage engine.
 
+> ### Aside: Rate Limiter
+>
+> The multi plan [rate limiter](https://github.com/mongodb/mongo/blob/349c84c0c1f79c717cbe66a580af68d3a218937c/src/mongo/db/exec/multi_plan_rate_limiter.h#L117-L180) manages access to a limited pool of concurrency, distributing it among plan cache keys. The rate limiter becomes active and enforces its limits only when the total number of concurrent candidate plans currently being trialed across all plan cache keys exceeds a predefined system-wide threshold (`internalQueryConcurrentMultiPlanningThreshold` query knob).
+
+> When the rate limiter is active, for each plan cache key, the number of "tickets" it receives is dynamically calculated. These tickets represent its share of the total allowed concurrency. The formula is:
+
+> $$ Number \ of \ Tickets = max( \frac{internalQueryMaxConcurrentMultiPlanJobsPerCacheKey}{Number \ of \ Candidate \ Plans \ for \ the \ Plan \ Cache \ Key}, 1) $$
+
+> where `internalQueryMaxConcurrentMultiPlanJobsPerCacheKey` is a query knob.
+
+> When a thread attempts to start multiplanning in `MultiPlanStage`, it asks for a ticket from its ticket holder. If it gets the ticket, the thread continues with multiplanning as usual, otherwise it leaves the multiplanning with the custom error code `RetryMultiPlanning`. The borrowed ticket is returned back to the ticket holder when the ticket is destroyed and notifies one thread that there is a ticket available.
+
+> We avoid waking up all waiting threads when the plan cache entry is not yet active, as this would lead to replanning and potential blocking by the rate limiter. The assumption is that all multiplanning operations sharing the same plan cache key will have an identical number of candidate plans, ensuring that once a thread resumes, it will have sufficient tickets to proceed with multi-planning.
+
+> In case of earlier return with `RetryMultiPlanning` error code this is handled in get_executor, in which case the query is sent to be replanned. Hopefully, a plan will already be in the cache by then, otherwise the thread will continue with multiplanning once a ticket is obtained. We don’t try to do replanning the second time to a loop of constant replanning if for some reasons a stable plan cache entry cannot be established.
+
+> When an entry is added for a plan cache key all threads awaiting for this key are notified.
+
+> If no tickets are available in the ticket holder the thread, after releasing all locks (yield), is blocked and waits for the tickets availability, once a ticket is available it resumes.If no tickets are available in the ticket holder, the thread releases all locks (yields), blocks, and waits for ticket availability. Once a ticket is available, it resumes.
+
+> #### Cleaning ticket holder
+
+> The number of unique query shapes could be quite large (according to this document Query Shape Cardinality Analysis it could be larger than 1mln query shapes) and we need to have a strategy to clean up the ticker holder table. We release a ticket holder every time when its plan cache entry is added or there are no active threads using this ticket holder.
+> A ticket holder is released whenever its corresponding plan cache entry is added, or when no active threads are utilizing it.
+
 > ### Aside: Yielding
 >
 > "Yielding" refers to releasing locks on storage resources during execution to prevent long-running queries from blocking other queries. By default, queries are intended to yield every 10ms or 1000 iterations.
