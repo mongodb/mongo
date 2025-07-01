@@ -33,8 +33,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/exec/agg/exec_pipeline.h"
-#include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -560,7 +558,6 @@ private:
     void stitch();
 
     DocumentSourceContainer _sources;
-    std::unique_ptr<exec::agg::Pipeline> _execPipeline;
 
     PipelineSplitState _splitState = PipelineSplitState::kUnsplit;
     boost::intrusive_ptr<ExpressionContext> pCtx;

@@ -124,6 +124,7 @@ void DocumentSourceSetVariableFromSubPipeline::doDispose() {
         _subPipeline.get_deleter().dismissDisposal();
         _subPipeline->dispose(pExpCtx->getOperationContext());
         _subPipeline.reset();
+        _subExecPipeline.reset();
     }
 }
 

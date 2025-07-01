@@ -162,6 +162,10 @@ private:
     // Keep a copy of the spec for serialization purposes.
     const ExchangeSpec _spec;
 
+    // An input to the exchange operator
+    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
+    std::unique_ptr<exec::agg::Pipeline> _execPipeline;
+
     // A pattern for extracting a key from a document used by range and hash policies.
     const BSONObj _keyPattern;
 
@@ -190,10 +194,6 @@ private:
 
     // A maximum size of buffer per consumer.
     const size_t _maxBufferSize;
-
-    // An input to the exchange operator
-    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
-    std::unique_ptr<exec::agg::Pipeline> _execPipeline;
 
     // Synchronization.
     stdx::mutex _mutex;

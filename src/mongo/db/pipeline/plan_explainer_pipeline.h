@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_explainer.h"

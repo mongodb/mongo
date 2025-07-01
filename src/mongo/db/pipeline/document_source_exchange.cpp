@@ -129,6 +129,8 @@ DocumentSource::GetNextResult DocumentSourceExchange::doGetNext() {
 
 Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
     : _spec(std::move(spec)),
+      _pipeline(std::move(pipeline)),
+      _execPipeline{exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext())},
       _keyPattern(_spec.getKey().getOwned()),
       _ordering(extractOrdering(_keyPattern)),
       _keyPaths(extractKeyPaths(_keyPattern)),
@@ -136,8 +138,7 @@ Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter>
       _consumerIds(extractConsumerIds(_spec.getConsumerIds(), _spec.getConsumers())),
       _policy(_spec.getPolicy()),
       _orderPreserving(_spec.getOrderPreserving()),
-      _maxBufferSize(_spec.getBufferSize()),
-      _pipeline(std::move(pipeline)) {
+      _maxBufferSize(_spec.getBufferSize()) {
     uassert(50901, "Exchange must have at least one consumer", _spec.getConsumers() > 0);
 
     uassert(50951,
@@ -160,7 +161,6 @@ Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter>
         uassert(50899, "Exchange boundaries must not be specified.", _boundaries.empty());
     }
 
-    _execPipeline = exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
     _execPipeline->detachFromOperationContext();
 }
 

@@ -165,10 +165,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingTxnCloner::_restartPipeline
     auto progressLsid = _fetchProgressLsid(opCtx);
     auto pipeline = _targetAggregationRequest(
         opCtx, *makePipeline(opCtx, std::move(mongoProcessInterface), progressLsid));
-
-    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
-    execPipeline->detachFromOperationContext();
-    pipeline.get_deleter().dismissDisposal();
     return pipeline;
 }
 
@@ -264,8 +260,10 @@ SemiFuture<void> ReshardingTxnCloner::run(
                                             MONGO_unlikely(mongoProcessInterface_forTest)
                                                 ? mongoProcessInterface_forTest
                                                 : MongoProcessInterface::create(opCtx.get()));
+                       chainCtx->pipeline.get_deleter().dismissDisposal();
                        chainCtx->execPipeline = exec::agg::buildPipeline(
                            chainCtx->pipeline->getSources(), chainCtx->pipeline->getContext());
+                       chainCtx->execPipeline->detachFromOperationContext();
                        chainCtx->donorRecord = boost::none;
                    }
 

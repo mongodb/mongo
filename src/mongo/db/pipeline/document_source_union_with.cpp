@@ -118,7 +118,6 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
       _variables(original._variables),
       _variablesParseState(original._variablesParseState) {
     _pipeline->getContext()->setInUnionWith(true);
-    _execPipeline = exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
 }
 
 DocumentSourceUnionWith::DocumentSourceUnionWith(
@@ -132,7 +131,6 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
         serviceOpCounters(expCtx->getOperationContext()).gotNestedAggregate();
     }
     _pipeline->getContext()->setInUnionWith(true);
-    _execPipeline = exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
 }
 
 DocumentSourceUnionWith::DocumentSourceUnionWith(
@@ -161,8 +159,6 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
 DocumentSourceUnionWith::~DocumentSourceUnionWith() {
     if (_pipeline && _pipeline->getContext()->getExplain()) {
         _pipeline->dispose(pExpCtx->getOperationContext());
-        _pipeline.reset();
-        _execPipeline.reset();
     }
 }
 
@@ -337,8 +333,6 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
                 ResolvedNamespace{e->getNamespace(), e->getPipeline()},
                 std::move(serializedPipe),
                 _userNss);
-            _execPipeline =
-                exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
             logShardedViewFound(e);
             return doGetNext();
         }
@@ -417,7 +411,9 @@ void DocumentSourceUnionWith::doDispose() {
         _pipeline.get_deleter().dismissDisposal();
         _stats.planSummaryStats.usedDisk =
             _stats.planSummaryStats.usedDisk || _pipeline->usedDisk();
-        _execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
+        if (_execPipeline) {
+            _execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
+        }
 
         if (!_pipeline->getContext()->getExplain()) {
             _pipeline->dispose(pExpCtx->getOperationContext());
@@ -582,12 +578,33 @@ void DocumentSourceUnionWith::addVariableRefs(std::set<Variables::Id>* refs) con
     }
 }
 
+namespace {
+void setPipelineOperationContext(OperationContext* opCtx,
+                                 Pipeline& pipeline,
+                                 std::function<void(OperationContext*, exec::agg::Stage&)> fn) {
+    pipeline.getContext()->setOperationContext(opCtx);
+    for (auto&& source : pipeline.getSources()) {
+        if (auto stage = boost::dynamic_pointer_cast<exec::agg::Stage>(source)) {
+            fn(opCtx, *stage);
+        }
+    }
+}
+}  // namespace
+
 void DocumentSourceUnionWith::detachFromOperationContext() {
     // We have a pipeline we're going to be executing across multiple calls to getNext(), so we
     // use Pipeline::detachFromOperationContext() to take care of updating the Pipeline's
     // ExpressionContext.
     if (_execPipeline) {
         _execPipeline->detachFromOperationContext();
+    } else if (_pipeline) {
+        // If '_execPipeline' was not yet initialized we still need to call detach on all stages to
+        // make sure that they don't use an invalid operation context.
+        // TODO SERVER-106560: Remove the following line when it is not necessary anymore.
+        setPipelineOperationContext(
+            nullptr, *_pipeline, [](OperationContext*, exec::agg::Stage& stage) {
+                stage.detachFromOperationContext();
+            });
     }
 }
 
@@ -597,6 +614,13 @@ void DocumentSourceUnionWith::reattachToOperationContext(OperationContext* opCtx
     // ExpressionContext.
     if (_execPipeline) {
         _execPipeline->reattachToOperationContext(opCtx);
+    } else if (_pipeline) {
+        // If '_execPipeline' was not yet initialized we still need to call re-attach on all stages.
+        // TODO SERVER-106560: Remove the following line when it is not necessary anymore.
+        setPipelineOperationContext(
+            opCtx, *_pipeline, [](OperationContext* opCtx, exec::agg::Stage& stage) {
+                stage.reattachToOperationContext(opCtx);
+            });
     }
 }
 
