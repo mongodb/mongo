@@ -106,8 +106,6 @@ public:
      */
     void registerTopologyChangeObserver(TopologyChangeCallback cb);
 
-    ReplSetConfig getReplSetConfig();
-
     std::string toString() const;
 
     /**

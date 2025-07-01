@@ -799,7 +799,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/**/shard_targeting_util.js @10gen/query-optimization @svc-auto-approve-bot
 /jstests/libs/**/api_version_helpers.js @10gen/query-optimization @svc-auto-approve-bot
 /jstests/libs/**/mochalite.js @10gen/devprod-correctness @svc-auto-approve-bot
-/jstests/libs/**/mirror_reads_helpers.js @10gen/server-networking-and-observability @svc-auto-approve-bot
 /jstests/libs/**/conn_pool_helpers.js @10gen/server-networking-and-observability @svc-auto-approve-bot
 /jstests/libs/**/pause_after_populate.js @10gen/query-optimization @svc-auto-approve-bot
 
