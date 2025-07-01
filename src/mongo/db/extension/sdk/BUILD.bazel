@@ -11,6 +11,7 @@ mongo_cc_library(
         "aggregation_stage.h",
         "byte_buf.h",
         "byte_buf_utils.h",
+        "extension.h",
         "extension_status.h",
         "handle.h",
     ],
