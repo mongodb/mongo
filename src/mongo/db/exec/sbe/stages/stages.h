@@ -36,6 +36,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/trial_run_tracker.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -488,6 +489,10 @@ public:
         return _slotsAccessible;
     }
 
+    const boost::optional<SimpleMemoryUsageTracker>& getMemoryTracker() const {
+        return _memoryTracker;
+    }
+
 protected:
     bool participateInTrialRunTracking() const {
         return _participateInTrialRunTracking;
@@ -556,6 +561,8 @@ protected:
     }
 
     CommonStats _commonStats;
+
+    boost::optional<SimpleMemoryUsageTracker> _memoryTracker{boost::none};
 
 private:
     // Attaches the trial run tracker to this specific node if needed.
