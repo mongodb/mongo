@@ -303,6 +303,7 @@ car_common_catalog_ddl:
     - src/mongo/db/drop_indexes.idl
     - src/mongo/db/list_collections.idl
     - src/mongo/db/list_indexes.idl
+    - src/mongo/db/commands/collmod_cmd.cpp
     - src/mongo/db/commands/create.idl
     - src/mongo/db/commands/create_command*
     - src/mongo/db/commands/drop*

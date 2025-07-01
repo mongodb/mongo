@@ -1678,6 +1678,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/**/buildinfo_common.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/commands/**/*cluster*parameter* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/commands/**/cluster_server_parameter_cmds.idl @10gen/server-security @svc-auto-approve-bot
+/src/mongo/db/commands/**/collmod_cmd.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/commands/**/connection_status.* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/commands/**/cpuload.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/commands/**/create* @10gen/server-catalog-and-routing @svc-auto-approve-bot

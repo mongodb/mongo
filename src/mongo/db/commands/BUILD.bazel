@@ -1392,6 +1392,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "standalone",
     srcs = [
+        "collmod_cmd.cpp",
         "create_command.cpp",
         "create_indexes_cmd.cpp",
         "dbcommands.cpp",

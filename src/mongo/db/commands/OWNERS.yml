@@ -15,6 +15,9 @@ filters:
   - "cluster_server_parameter_cmds.idl":
     approvers:
       - 10gen/server-security
+  - "collmod_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "connection_status.*":
     approvers:
       - 10gen/server-security
