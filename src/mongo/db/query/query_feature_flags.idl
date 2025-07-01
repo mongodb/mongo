@@ -247,3 +247,9 @@ feature_flags:
         cpp_varname: gFeatureFlagPQSBackfill
         default: false
         fcv_gated: true
+
+    featureFlagExtensionsAPI:
+        description: "Feature flag to enable loading extensions via the Extensions API."
+        cpp_varname: gFeatureFlagExtensionsAPI
+        default: false
+        fcv_gated: false
