@@ -1424,7 +1424,7 @@ public:
                                   varName,
                                   lower,
                                   upper)
-                    : fmt::format("'{}' must must evaluate to a value in the range [{}, {}]",
+                    : fmt::format("'{}' must evaluate to a value in the range [{}, {}]",
                                   varName,
                                   lower,
                                   upper);
