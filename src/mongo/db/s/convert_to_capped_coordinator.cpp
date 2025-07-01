@@ -280,7 +280,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                         participantsNotOwningData,
                         **executor,
                         session,
-                        false /* fromMigrate */,
+                        true /* fromMigrate */,
                         false /* dropSystemCollections */,
                         _doc.getOriginalCollection()->getUuid());
                 }
