@@ -9,8 +9,6 @@
  *   does_not_support_transactions,
  *   no_selinux,
  *   requires_non_retryable_writes,
- *   # TODO SERVER-87044: re-enable test in suites that perform random migrations
- *   assumes_balancer_off,
  * ]
  */
 
