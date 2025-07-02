@@ -818,6 +818,24 @@ class TestEvergreenYML(unittest.TestCase):
 
         self.assertNotEqual(0, jstestfuzz_count, msg="Could not find any jstestfuzz tasks")
 
+    # our unittest names need to be correct for the spawnhost script to work.
+    # If you change the unittest names please also change them in the spawnhost script.
+    def test_unittest_name(self):
+        tasks = self.evg_conf.tasks
+        unit_test_string = "unit_test_group"
+        unit_test_tasks = []
+        for task in tasks:
+            # We found at least one unit test task that matched!
+            if unit_test_string in task.name:
+                unit_test_tasks.append(task.name)
+
+        # as of the time of writing this there are 16 different "unit_test_group" task definitions
+        self.assertGreaterEqual(
+            len(unit_test_tasks),
+            16,
+            "Something changed about unittest tasks, please make sure the spawnhost is also updated and update this test after.",
+        )
+
 
 class TestMultiversionConfig(unittest.TestCase):
     def test_valid_yaml(self):
