@@ -134,6 +134,12 @@ void ClusterCommandTestFixture::expectReturnsError(ErrorCodes::Error code) {
     });
 }
 
+OpMsgRequest ClusterCommandTestFixture::makeRequest(const NamespaceString& nss,
+                                                    const BSONObj& body) {
+    return OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, nss.dbName(), body);
+}
+
 DbResponse ClusterCommandTestFixture::runCommand(BSONObj cmd) {
     // Create a new client/operation context per command
     auto client = getServiceContext()->getService()->makeClient("ClusterCmdClient");

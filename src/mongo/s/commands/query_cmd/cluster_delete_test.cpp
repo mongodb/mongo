@@ -104,5 +104,16 @@ TEST_F(ClusterDeleteTest, CorrectMetrics) {
     testOpcountersAreCorrect(kDeleteCmdTargeted, /* expectedValue */ b.obj());
 }
 
+TEST_F(ClusterDeleteTest, RejectsCmdAggregateNamespace) {
+    auto opCtx = operationContext();
+    const auto badDelete =
+        fromjson("{delete: '$cmd.aggregate', deletes: [{'q': {'_id': 1}, limit: 0}]}");
+    auto req = makeRequest(kNss, badDelete);
+    auto deleteCmd = CommandHelpers::findCommand(opCtx, "delete");
+
+    ASSERT_THROWS_CODE(
+        deleteCmd->parse(opCtx, req), AssertionException, ErrorCodes::InvalidNamespace);
+}
+
 }  // namespace
 }  // namespace mongo

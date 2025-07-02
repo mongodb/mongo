@@ -245,10 +245,13 @@ private:
 
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& request) final {
+        auto parsedRequest = BatchedCommandRequest::parseInsert(request);
+        uassert(ErrorCodes::InvalidNamespace,
+                "Cannot specify insert without a real namespace",
+                !parsedRequest.getNS().isCollectionlessAggregateNS());
+
         return std::make_unique<Invocation>(
-            this,
-            request,
-            BatchedCommandRequest::cloneInsertWithIds(BatchedCommandRequest::parseInsert(request)));
+            this, request, BatchedCommandRequest::cloneInsertWithIds(std::move(parsedRequest)));
     }
 
     std::string help() const override {
@@ -302,6 +305,10 @@ private:
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& request) final {
         auto parsedRequest = BatchedCommandRequest::parseUpdate(request);
+        uassert(ErrorCodes::InvalidNamespace,
+                "Cannot specify update without a real namespace",
+                !parsedRequest.getNS().isCollectionlessAggregateNS());
+
         if (!opCtx->isCommandForwardedFromRouter()) {
             uassert(51195,
                     "Cannot specify runtime constants option to a mongos",
@@ -363,8 +370,12 @@ private:
 
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& request) final {
-        return std::make_unique<Invocation>(
-            this, request, BatchedCommandRequest::parseDelete(request));
+        auto parsedRequest = BatchedCommandRequest::parseDelete(request);
+        uassert(ErrorCodes::InvalidNamespace,
+                "Cannot specify delete without a real namespace",
+                !parsedRequest.getNS().isCollectionlessAggregateNS());
+
+        return std::make_unique<Invocation>(this, request, std::move(parsedRequest));
     }
 
     std::string help() const override {

@@ -77,6 +77,8 @@ protected:
 
     void expectAbortTransaction();
 
+    OpMsgRequest makeRequest(const NamespaceString& nss, const BSONObj& body);
+
     DbResponse runCommand(BSONObj cmd);
 
     DbResponse runCommandSuccessful(BSONObj cmd, bool isTargeted);

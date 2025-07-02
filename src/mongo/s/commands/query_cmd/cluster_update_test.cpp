@@ -108,5 +108,18 @@ TEST_F(ClusterUpdateTest, CorrectMetrics) {
     testOpcountersAreCorrect(kUpdateCmdTargeted, /* expectedValue */ b.obj());
 }
 
+TEST_F(ClusterUpdateTest, RejectsCmdAggregateNamespace) {
+    auto opCtx = operationContext();
+    const auto badUpdate = fromjson(
+        "{ update: '$cmd.aggregate',"
+        "  updates: [ { q: { _id: -1 }, u: { $set: { x: 1 } } } ]"
+        "}");
+    auto req = makeRequest(kNss, badUpdate);
+    auto updateCmd = CommandHelpers::findCommand(opCtx, "update");
+
+    ASSERT_THROWS_CODE(
+        updateCmd->parse(opCtx, req), AssertionException, ErrorCodes::InvalidNamespace);
+}
+
 }  // namespace
 }  // namespace mongo

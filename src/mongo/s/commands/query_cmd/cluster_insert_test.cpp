@@ -118,5 +118,15 @@ TEST_F(ClusterInsertTest, CorrectMetricsBulkInsert) {
     testOpcountersAreCorrect(bulkInsertCmd, /* expectedValue */ b.obj());
 }
 
+TEST_F(ClusterInsertTest, RejectsCmdAggregateNamespace) {
+    auto opCtx = operationContext();
+    const auto badInsert = fromjson("{insert: '$cmd.aggregate', documents: [{'_id': 1}]}");
+    auto req = makeRequest(kNss, badInsert);
+    auto insertCmd = CommandHelpers::findCommand(opCtx, "insert");
+
+    ASSERT_THROWS_CODE(
+        insertCmd->parse(opCtx, req), AssertionException, ErrorCodes::InvalidNamespace);
+}
+
 }  // namespace
 }  // namespace mongo
