@@ -29,6 +29,7 @@
 
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -74,6 +75,15 @@ SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTra
     }
 
     OperationContext* opCtx = expCtx.getOperationContext();
+    OperationMemoryUsageTracker* opTracker = getOperationMemoryUsageTracker(opCtx);
+    return SimpleMemoryUsageTracker{opTracker, maxMemoryUsageBytes};
+}
+
+SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
+    OperationContext* opCtx, int64_t maxMemoryUsageBytes) {
+    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+        return SimpleMemoryUsageTracker{maxMemoryUsageBytes};
+    }
     OperationMemoryUsageTracker* opTracker = getOperationMemoryUsageTracker(opCtx);
     return SimpleMemoryUsageTracker{opTracker, maxMemoryUsageBytes};
 }

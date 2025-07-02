@@ -75,6 +75,9 @@ public:
         if (_stage._limitExpr) {
             _limitCode = _stage._limitExpr->compile(ctx);
         }
+
+        _stage._memoryTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
+            _stage._opCtx, _stage._specificStats.maxMemoryUsageBytes);
     }
 
     value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) override {
@@ -120,6 +123,8 @@ public:
                 }
                 return vals;
             });
+
+            _stage._memoryTracker.value().set(_sorter->stats().memUsage());
         }
 
         _stage._specificStats.totalDataSizeBytes += _sorter->stats().bytesSorted();
@@ -157,6 +162,8 @@ public:
         _stage.trackClose();
         _outputIt.reset();
         _sorter.reset();
+        _stage._specificStats.maxUsedMemBytes = _stage._memoryTracker.value().maxMemoryBytes();
+        _stage._memoryTracker.value().set(0);
     }
 
     void forceSpill() override {
@@ -171,6 +178,7 @@ public:
                 opts.sorterTracker = &tracker;
 
                 _outputIt = _outputIt->spill(opts, typename Sorter<KeyRow, ValueRow>::Settings());
+                _stage._memoryTracker.value().set(0);
 
                 spillingStats.incrementSpills(tracker.spilledRanges.loadRelaxed());
                 spillingStats.incrementSpilledRecords(tracker.spilledKeyValuePairs.loadRelaxed());
@@ -181,6 +189,7 @@ public:
             }
         } else if (_sorter) {
             _sorter->spill();
+            _stage._memoryTracker.value().set(_sorter->stats().memUsage());
         }
     }
 

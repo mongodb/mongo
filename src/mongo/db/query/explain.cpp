@@ -384,6 +384,7 @@ void Explain::explainStages(PlanExecutor* exec,
     }
 
     explain_common::generateQueryShapeHash(exec->getOpCtx(), out);
+    explain_common::generateMaxUsedMemBytes(exec->getOpCtx(), out);
     explain_common::appendIfRoom(command, "command", out);
 }
 

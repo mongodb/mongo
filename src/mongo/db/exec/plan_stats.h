@@ -835,6 +835,9 @@ struct SortStats : public SpecificStats {
     // The amount of memory that is currently being used, even prior to being sorted.
     uint64_t memoryUsageBytes = 0u;
 
+    // The maximum amount of memory that was used.
+    uint64_t maxUsedMemBytes = 0u;
+
     // The number of keys that we've sorted.
     uint64_t keysSorted = 0u;
 

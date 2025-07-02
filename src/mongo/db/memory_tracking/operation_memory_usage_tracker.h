@@ -71,6 +71,9 @@ public:
         const ExpressionContext& expCtx,
         int64_t maxMemoryUsageBytes = std::numeric_limits<int64_t>::max());
 
+    static SimpleMemoryUsageTracker createSimpleMemoryUsageTrackerForSBE(
+        OperationContext* opCtx, int64_t maxMemoryUsageBytes = std::numeric_limits<int64_t>::max());
+
     /**
      * When constructing a stage containing a MemoryUsageTracker, use this method to ensure that we
      * aggregate operation-wide memory stats.

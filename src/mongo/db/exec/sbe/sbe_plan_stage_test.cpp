@@ -216,6 +216,9 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResultsMult
         if (forceSpill && resultsView->size() % 3 == 0) {
             // check the forceSpill stage
             stage->forceSpill(nullptr /*yieldPolicy*/);
+            if (stage->getMemoryTracker()) {
+                ASSERT_EQ(stage->getMemoryTracker()->currentMemoryBytes(), 0);
+            }
         }
     }
 
