@@ -54,7 +54,9 @@ ExecutorFuture<void> RemoveShardCommitCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kJoinMigrationsAndCheckRangeDeletions,
-            [this, anchor = shared_from_this()] { return _doc.getIsTransitionToDedicated(); },
+            [this, anchor = shared_from_this()](auto* opCtx) {
+                return _doc.getIsTransitionToDedicated();
+            },
             [this, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 _joinMigrationsAndCheckRangeDeletions(opCtx);
             }))

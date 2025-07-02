@@ -45,18 +45,22 @@
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/notify_sharding_event_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/list_collections_gen.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/distinct_command_gen.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
+#include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -283,78 +287,122 @@ void checkCatalogConsistencyAcrossShards(OperationContext* opCtx,
     }
 }
 
-std::vector<ShardId> getLatestCollectionPlacementInfoFor(OperationContext* opCtx,
-                                                         const NamespaceString& nss,
-                                                         const UUID& uuid) {
-    // Use the content of config.chunks to obtain the placement of the collection being renamed.
-    // The request is equivalent to 'configDb.chunks.distinct("shard", {uuid:collectionUuid})'.
-    auto query = BSON(NamespacePlacementType::kNssFieldName
-                      << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
+// TODO (SERVER-98118): Remove this method (assuming a true condition on each invocation)
+// once v9.0 become last-lts.
+bool supportsPreciseChangeStreamTargeter(OperationContext* opCtx) {
+    return feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
+        VersionContext::getDecoration(opCtx),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+}
 
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+void upsertPlacementHistoryDocStatement(const txn_api::TransactionClient& txnClient,
+                                        const NamespaceString& nss,
+                                        const boost::optional<UUID>& uuid,
+                                        const Timestamp& timeAtPlacementChange,
+                                        const std::vector<ShardId>&& shards,
+                                        int stmtId) {
+    write_ops::UpdateCommandRequest upsertPlacementChangeRequest(
+        NamespaceString::kConfigsvrPlacementHistoryNamespace);
+    upsertPlacementChangeRequest.setUpdates({[&] {
+        NamespacePlacementType placementInfo(nss, timeAtPlacementChange, std::move(shards));
+        placementInfo.setUuid(uuid);
 
+        write_ops::UpdateOpEntry entry;
+        entry.setQ(BSON(NamespacePlacementType::kNssFieldName
+                        << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
+                        << NamespacePlacementType::kTimestampFieldName << timeAtPlacementChange));
+        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(placementInfo.toBSON()));
+        entry.setUpsert(true);
+        entry.setMulti(false);
+        return entry;
+    }()});
 
+    auto upsertPlacementEntryResponse =
+        txnClient.runCRUDOpSync(upsertPlacementChangeRequest, {stmtId});
+
+    uassertStatusOK(upsertPlacementEntryResponse.toStatus());
+}
+
+std::vector<ShardId> getCurrentCollPlacement(const txn_api::TransactionClient& txnClient,
+                                             const UUID& collUuid) {
+    // Use the content of config.chunks to obtain the placement of the collection being
+    // renamed. The request is equivalent to 'configDb.chunks.distinct("shard",
+    // {uuid:collectionUuid})'.
     DistinctCommandRequest distinctRequest(NamespaceString::kConfigsvrChunksNamespace);
     distinctRequest.setKey(ChunkType::shard.name());
-    distinctRequest.setQuery(BSON(ChunkType::collectionUUID.name() << uuid));
-    distinctRequest.setReadConcern(repl::ReadConcernArgs::kLocal);
+    distinctRequest.setQuery(BSON(ChunkType::collectionUUID.name() << collUuid));
 
-    auto reply = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
-        DatabaseName::kConfig,
-        distinctRequest.toBSON(),
-        Shard::RetryPolicy::kIdempotent));
+    auto distinctResponse =
+        txnClient.runCommandSync(DatabaseName::kConfig, distinctRequest.toBSON());
+    uassertStatusOK(getStatusFromWriteCommandReply(distinctResponse));
 
-    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(reply));
     std::vector<ShardId> shardIds;
-    for (const auto& valueElement : reply.response.getField("values").Array()) {
+    for (const auto& valueElement : distinctResponse.getField("values").Array()) {
         shardIds.emplace_back(valueElement.String());
     }
-
     return shardIds;
 }
 
-SemiFuture<BatchedCommandResponse> noOpStatement() {
-    BatchedCommandResponse noOpResponse;
-    noOpResponse.setStatus(Status::OK());
-    noOpResponse.setN(0);
-    return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
-}
-
-SemiFuture<BatchedCommandResponse> deleteTrackedCollectionStatement(
-    const txn_api::TransactionClient& txnClient,
+void persistPlacementChangeForCollectionBeingRenamed(
+    OperationContext* opCtx,
     const NamespaceString& nss,
-    const boost::optional<UUID>& uuid,
-    int stmtId) {
+    const UUID& originalUUID,
+    const UUID& uuidUponRename,
+    const Timestamp& clusterTimeUponRename,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    const OperationSessionInfo& osi) {
 
-    if (uuid) {
-        const auto deleteCollectionQuery =
-            BSON(CollectionType::kNssFieldName
-                 << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
-                 << CollectionType::kUuidFieldName << *uuid);
+    auto transactionChain = [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+        // Upsert new data to the config.placementHistory collection.
+        auto shardIds = getCurrentCollPlacement(txnClient, originalUUID);
 
-        write_ops::DeleteCommandRequest deleteOp(CollectionType::ConfigNS);
-        deleteOp.setDeletes({[&]() {
-            write_ops::DeleteOpEntry entry;
-            entry.setMulti(false);
-            entry.setQ(deleteCollectionQuery);
-            return entry;
-        }()});
+        constexpr auto stmtId = 1;
+        upsertPlacementHistoryDocStatement(
+            txnClient, nss, uuidUponRename, clusterTimeUponRename, std::move(shardIds), stmtId);
 
-        return txnClient.runCRUDOp(deleteOp, {stmtId});
-    } else {
-        return noOpStatement();
-    }
+        return SemiFuture<void>::makeReady();
+    };
+
+    sharding_ddl_util::runTransactionOnShardingCatalog(
+        opCtx, std::move(transactionChain), defaultMajorityWriteConcernDoNotUse(), osi, executor);
 }
 
-SemiFuture<BatchedCommandResponse> renameTrackedCollectionStatement(
-    const txn_api::TransactionClient& txnClient,
-    const CollectionType& oldCollection,
-    const NamespaceString& newNss,
-    const boost::optional<UUID>& newTargetCollectionUuid,
-    const Timestamp& timeInsertion,
-    int stmtId) {
+// Removes the namespace from config.collections. Query by 'ns' AND 'uuid' so that the operation can
+// be resolved with an IXSCAN (thanks to the index on '_id') and is idempotent (thanks to the
+// 'uuid').
+// Returns whether the deletion was actually executed - or resolved into a no-op.
+bool deleteTrackedCollectionStatement(const txn_api::TransactionClient& txnClient,
+                                      const NamespaceString& nss,
+                                      const boost::optional<UUID>& uuid,
+                                      int stmtId) {
+    if (!uuid) {
+        return false;
+    }
+
+    const auto deleteCollectionQuery =
+        BSON(CollectionType::kNssFieldName
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
+             << CollectionType::kUuidFieldName << *uuid);
+
+    write_ops::DeleteCommandRequest deleteOp(CollectionType::ConfigNS);
+    deleteOp.setDeletes({[&]() {
+        write_ops::DeleteOpEntry entry;
+        entry.setMulti(false);
+        entry.setQ(deleteCollectionQuery);
+        return entry;
+    }()});
+
+    const auto deleteResponse = txnClient.runCRUDOpSync(deleteOp, {stmtId});
+    uassertStatusOK(deleteResponse.toStatus());
+    return deleteResponse.getN() != 0;
+}
+
+void renameTrackedCollectionStatement(const txn_api::TransactionClient& txnClient,
+                                      const CollectionType& oldCollection,
+                                      const NamespaceString& newNss,
+                                      const boost::optional<UUID>& newTargetCollectionUuid,
+                                      const Timestamp& timeInsertion,
+                                      int stmtId) {
     auto newCollectionType = oldCollection;
     newCollectionType.setNss(newNss);
     newCollectionType.setTimestamp(timeInsertion);
@@ -377,70 +425,50 @@ SemiFuture<BatchedCommandResponse> renameTrackedCollectionStatement(
         return entry;
     }()});
 
-    return txnClient.runCRUDOp(updateOp, {stmtId} /*stmtIds*/);
+    uassertStatusOK(txnClient.runCRUDOpSync(updateOp, {stmtId} /*stmtIds*/).toStatus());
 }
 
-SemiFuture<BatchedCommandResponse> updateChunksUuid(
-    const txn_api::TransactionClient& txnClient,
-    const CollectionType& oldCollection,
-    const boost::optional<UUID>& newTargetCollectionUuid) {
-    if (newTargetCollectionUuid.has_value() &&
-        newTargetCollectionUuid.get() != oldCollection.getUuid()) {
-        const auto query = BSON(ChunkType::collectionUUID() << oldCollection.getUuid());
-        const auto update =
-            BSON("$set" << BSON(ChunkType::collectionUUID() << *newTargetCollectionUuid));
-
-        // This query is expected to target unsplittable collections with one chunk.
-        // Don't use this for updating a high amount of chunks because the transaction
-        // may abort due to hitting the `transactionLifetimeLimitSeconds`.
-        BatchedCommandRequest request([&] {
-            write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigsvrChunksNamespace);
-            updateOp.setUpdates({[&] {
-                write_ops::UpdateOpEntry entry;
-                entry.setQ(query);
-                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
-                entry.setUpsert(false);
-                entry.setMulti(true);
-                return entry;
-            }()});
-            return updateOp;
-        }());
-
-        return txnClient.runCRUDOp(request, {-1} /*stmtIds*/);
+void updateUnsplittableCollChunkStmt(const txn_api::TransactionClient& txnClient,
+                                     const CollectionType& oldCollection,
+                                     const boost::optional<UUID>& newTargetCollectionUuid) {
+    // Skip the statement in case the commit does not involve the cross-DB rename of an unsplittable
+    // collection.
+    if (!newTargetCollectionUuid.has_value() ||
+        newTargetCollectionUuid.get() == oldCollection.getUuid()) {
+        return;
     }
 
-    return noOpStatement();
+    const auto query = BSON(ChunkType::collectionUUID() << oldCollection.getUuid());
+    const auto update =
+        BSON("$set" << BSON(ChunkType::collectionUUID() << *newTargetCollectionUuid));
+
+    // This query is expected to target unsplittable collections with one chunk.
+    // Don't use this for updating a high amount of chunks because the transaction
+    // may abort due to hitting the `transactionLifetimeLimitSeconds`.
+    BatchedCommandRequest request([&] {
+        write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigsvrChunksNamespace);
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(query);
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+            entry.setUpsert(false);
+            entry.setMulti(true);
+            return entry;
+        }()});
+        return updateOp;
+    }());
+
+    const auto response = txnClient.runCRUDOpSync(request, {-1} /*stmtIds*/);
+    uassertStatusOK(response.toStatus());
+    // Only one chunk should have been updated (unless the transaction is repeated due to a
+    // stepdown).
+    tassert(
+        10488804, "Unexpectedly found collection with more than one chunk", response.getN() <= 1);
 }
 
-SemiFuture<BatchedCommandResponse> insertToPlacementHistoryStatement(
-    const txn_api::TransactionClient& txnClient,
-    const NamespaceString& nss,
-    const boost::optional<UUID>& uuid,
-    const Timestamp& clusterTime,
-    const std::vector<ShardId>& shards,
-    int stmtId,
-    const BatchedCommandResponse& previousOperationResult) {
-
-    // Skip the insertion of the placement entry if the previous statement didn't change any
-    // document - we can deduce that the whole transaction was already committed in a previous
-    // attempt.
-    if (previousOperationResult.getN() == 0) {
-        return noOpStatement();
-    }
-
-    NamespacePlacementType placementInfo(NamespaceString(nss), clusterTime, shards);
-    if (uuid)
-        placementInfo.setUuid(*uuid);
-    write_ops::InsertCommandRequest insertPlacementEntry(
-        NamespaceString::kConfigsvrPlacementHistoryNamespace, {placementInfo.toBSON()});
-
-    return txnClient.runCRUDOp(insertPlacementEntry, {stmtId} /*stmtIds*/);
-}
-
-
-SemiFuture<BatchedCommandResponse> updateZonesStatement(const txn_api::TransactionClient& txnClient,
-                                                        const NamespaceString& oldNss,
-                                                        const NamespaceString& newNss) {
+void updateZonesStatement(const txn_api::TransactionClient& txnClient,
+                          const NamespaceString& oldNss,
+                          const NamespaceString& newNss) {
 
     const auto query = BSON(
         TagsType::ns(NamespaceStringUtil::serialize(oldNss, SerializationContext::stateDefault())));
@@ -459,11 +487,11 @@ SemiFuture<BatchedCommandResponse> updateZonesStatement(const txn_api::Transacti
         }()});
         return updateOp;
     }());
-    return txnClient.runCRUDOp(request, {-1} /*stmtIds*/);
+
+    uassertStatusOK(txnClient.runCRUDOpSync(request, {-1} /*stmtIds*/).toStatus());
 }
 
-SemiFuture<BatchedCommandResponse> deleteZonesStatement(const txn_api::TransactionClient& txnClient,
-                                                        const NamespaceString& nss) {
+void deleteZonesStatement(const txn_api::TransactionClient& txnClient, const NamespaceString& nss) {
 
     const auto query = BSON(
         TagsType::ns(NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())));
@@ -481,174 +509,92 @@ SemiFuture<BatchedCommandResponse> deleteZonesStatement(const txn_api::Transacti
         return deleteOp;
     }());
 
-    return txnClient.runCRUDOp(request, {-1});
+    uassertStatusOK(txnClient.runCRUDOpSync(request, {-1}).toStatus());
 }
 
+// TODO (SERVER-98118): remove the logTargetPlacementChange parameter (assuming a 'false' value)
+// once v9.0 become last-lts.
 void renameCollectionMetadataInTransaction(OperationContext* opCtx,
                                            const boost::optional<CollectionType>& optFromCollType,
                                            const NamespaceString& fromNss,
                                            const NamespaceString& toNss,
                                            const boost::optional<UUID>& droppedTargetUUID,
                                            const boost::optional<UUID>& newTargetCollectionUuid,
-                                           const WriteConcernOptions& writeConcern,
+                                           const Timestamp& commitTime,
+                                           bool logTargetPlacementChange,
                                            const std::shared_ptr<executor::TaskExecutor>& executor,
                                            const OperationSessionInfo& osi) {
+    const auto isFromCollTracked = optFromCollType.has_value();
 
-    std::string logMsg = str::stream()
-        << toStringForLogging(fromNss) << " to " << toStringForLogging(toNss);
-    if (optFromCollType) {
-        // Case FROM collection is tracked by the config server
-        auto fromUUID = optFromCollType->getUuid();
+    auto transactionChain = [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+        int stmtId = 1;
+        if (isFromCollTracked) {
+            auto fromUUID = optFromCollType->getUuid();
+            // Delete TO collection (if it is also tracked).
+            deleteTrackedCollectionStatement(txnClient, toNss, droppedTargetUUID, stmtId++);
+            // If requested, log the placement change of TO.
+            if (logTargetPlacementChange) {
+                auto shardIds = getCurrentCollPlacement(txnClient, fromUUID);
+                if (!shardIds.empty()) {
+                    upsertPlacementHistoryDocStatement(txnClient,
+                                                       toNss,
+                                                       newTargetCollectionUuid,
+                                                       commitTime,
+                                                       std::move(shardIds),
+                                                       stmtId++);
+                }
+            }
+            // Delete FROM collection.
+            deleteTrackedCollectionStatement(txnClient, fromNss, fromUUID, stmtId++);
+            // Persist the entry for the renamed collection
+            renameTrackedCollectionStatement(
+                txnClient, *optFromCollType, toNss, newTargetCollectionUuid, commitTime, stmtId++);
+            // Log the placement change of FROM.
+            upsertPlacementHistoryDocStatement(
+                txnClient, fromNss, fromUUID, commitTime, {} /*shards*/, stmtId++);
+            // Reassign original zones to the renamed collection entry.
+            updateZonesStatement(txnClient, fromNss, toNss);
+            // A rename request across databases (only allowed when FROM is unsharded or
+            // unsplittable) causes a change of the collection UUID; config.chunks needs to be
+            // updated accordingly.
+            updateUnsplittableCollChunkStmt(txnClient, *optFromCollType, newTargetCollectionUuid);
+        } else {
+            // Just remove the metadata concerning the target collection (if any).
+            const auto targetMetadataDeleted =
+                deleteTrackedCollectionStatement(txnClient, toNss, droppedTargetUUID, stmtId++);
+            if (targetMetadataDeleted && logTargetPlacementChange) {
+                upsertPlacementHistoryDocStatement(txnClient,
+                                                   toNss,
+                                                   newTargetCollectionUuid,
+                                                   commitTime,
+                                                   {} /*shards=*/,
+                                                   stmtId++);
+            }
+            deleteZonesStatement(txnClient, toNss);
+        }
 
-        // Every statement in the transaction runs under the same clusterTime. To ensure in the
-        // placementHistory the drop of the target will appear earlier then the insert of the target
-        // we forcely add a tick to have 2 valid timestamp that we can use to differentiate the 2
-        // operations.
-        auto now = VectorClock::get(opCtx)->getTime();
-        auto nowClusterTime = now.clusterTime();
-        auto timeDrop = nowClusterTime.asTimestamp();
+        return SemiFuture<void>::makeReady();
+    };
 
-        nowClusterTime.addTicks(1);
-        auto timeInsert = nowClusterTime.asTimestamp();
+    sharding_ddl_util::runTransactionOnShardingCatalog(
+        opCtx, std::move(transactionChain), defaultMajorityWriteConcernDoNotUse(), osi, executor);
 
-        // Retrieve the latest placement information about "FROM".
-        auto fromNssShards = getLatestCollectionPlacementInfoFor(opCtx, fromNss, fromUUID);
+    const std::string logWhatParam = str::stream()
+        << toStringForLogging(fromNss) << " to " << toStringForLogging(toNss)
+        << " : dropped target collection"
+        << (isFromCollTracked ? " and renamed source collection." : ".");
+    const auto logDetailParam =
+        isFromCollTracked ? BSON("newCollMetadata" << optFromCollType->toBSON()) : BSONObj();
 
-        auto transactionChain = [&](const txn_api::TransactionClient& txnClient,
-                                    ExecutorPtr txnExec) {
-            // Remove config.collection entry. Query by 'ns' AND 'uuid' so that the remove can be
-            // resolved with an IXSCAN (thanks to the index on '_id') and is idempotent (thanks to
-            // the 'uuid') delete TO collection if exists.
-            return deleteTrackedCollectionStatement(txnClient, toNss, droppedTargetUUID, 1)
-                .thenRunOn(txnExec)
-                .then([&](const BatchedCommandResponse& deleteCollResponse) {
-                    uassertStatusOK(deleteCollResponse.toStatus());
-
-                    return insertToPlacementHistoryStatement(txnClient,
-                                                             toNss,
-                                                             droppedTargetUUID,
-                                                             timeDrop,
-                                                             {} /*shards*/,
-                                                             2,
-                                                             deleteCollResponse);
-                })
-                // Delete "FROM" collection
-                .thenRunOn(txnExec)
-                .then([&](const BatchedCommandResponse& response) {
-                    uassertStatusOK(response.toStatus());
-                    return deleteTrackedCollectionStatement(txnClient, fromNss, fromUUID, 3);
-                })
-                .thenRunOn(txnExec)
-                .then([&](const BatchedCommandResponse& deleteCollResponse) {
-                    uassertStatusOK(deleteCollResponse.toStatus());
-
-                    return insertToPlacementHistoryStatement(txnClient,
-                                                             fromNss,
-                                                             fromUUID,
-                                                             timeDrop,
-                                                             {} /*shards*/,
-                                                             4,
-                                                             deleteCollResponse);
-                })
-                .thenRunOn(txnExec)
-                .then([&](const BatchedCommandResponse& deleteCollResponse) {
-                    uassertStatusOK(deleteCollResponse.toStatus());
-                    // Use the modified entries to insert collection and placement entries for "TO".
-                    return renameTrackedCollectionStatement(
-                        txnClient, *optFromCollType, toNss, newTargetCollectionUuid, timeInsert, 5);
-                })
-                .thenRunOn(txnExec)
-                .then([&](const BatchedCommandResponse& upsertCollResponse) {
-                    uassertStatusOK(upsertCollResponse.toStatus());
-
-                    return insertToPlacementHistoryStatement(
-                        txnClient,
-                        toNss,
-                        newTargetCollectionUuid.get_value_or(fromUUID),
-                        timeInsert,
-                        fromNssShards,
-                        6,
-                        upsertCollResponse);
-                })
-                // update tags and check it was successful
-                .thenRunOn(txnExec)
-                .then([&](const BatchedCommandResponse& insertCollResponse) {
-                    uassertStatusOK(insertCollResponse.toStatus());
-
-                    return updateZonesStatement(txnClient, fromNss, toNss);
-                })
-                .thenRunOn(txnExec)
-                .then([&](const BatchedCommandResponse& response) {
-                    uassertStatusOK(response.toStatus());
-                    return updateChunksUuid(txnClient, *optFromCollType, newTargetCollectionUuid);
-                })
-                .thenRunOn(txnExec)
-                .then([&](const BatchedCommandResponse& updateChunksResponse) {
-                    uassertStatusOK(updateChunksResponse.toStatus());
-                    // Make sure the chunks update query must target unsplittable collections with
-                    // one chunk.
-                    dassert(updateChunksResponse.getN() <= 1);
-                })
-                .semi();
-        };
-        sharding_ddl_util::runTransactionOnShardingCatalog(
-            opCtx, std::move(transactionChain), writeConcern, osi, executor);
-
-        ShardingLogging::get(opCtx)->logChange(
-            opCtx,
-            str::stream() << logMsg << ": dropped target collection and renamed source collection",
-            NamespaceStringUtil::deserialize(
-                boost::none, "renameCollection.metadata", SerializationContext::stateDefault()),
-            BSON("newCollMetadata" << optFromCollType->toBSON()),
-            defaultMajorityWriteConcernDoNotUse(),
-            Grid::get(opCtx)->shardRegistry()->getConfigShard(),
-            Grid::get(opCtx)->catalogClient());
-    } else {
-        // Case FROM collection is not tracked by the config server: just delete the target
-        // collection if it was registered in the CSRS
-        auto now = VectorClock::get(opCtx)->getTime();
-        auto newTimestamp = now.clusterTime().asTimestamp();
-
-        auto transactionChain = [&](const txn_api::TransactionClient& txnClient,
-                                    ExecutorPtr txnExec) {
-            return deleteTrackedCollectionStatement(txnClient, toNss, droppedTargetUUID, 1)
-                .thenRunOn(txnExec)
-                .then([&](const BatchedCommandResponse& deleteCollResponse) {
-                    uassertStatusOK(deleteCollResponse.toStatus());
-                    return insertToPlacementHistoryStatement(txnClient,
-                                                             toNss,
-                                                             droppedTargetUUID,
-                                                             newTimestamp,
-                                                             {},
-                                                             2,
-                                                             deleteCollResponse);
-                })
-                .thenRunOn(txnExec)
-                .then([&](const BatchedCommandResponse& response) {
-                    uassertStatusOK(response.toStatus());
-
-                    return deleteZonesStatement(txnClient, toNss);
-                })
-                .thenRunOn(txnExec)
-                .then([&](const BatchedCommandResponse& response) {
-                    uassertStatusOK(response.toStatus());
-                })
-                .semi();
-        };
-
-        sharding_ddl_util::runTransactionOnShardingCatalog(
-            opCtx, std::move(transactionChain), writeConcern, osi, executor);
-
-        ShardingLogging::get(opCtx)->logChange(
-            opCtx,
-            str::stream() << logMsg << " : dropped target collection.",
-            NamespaceStringUtil::deserialize(
-                boost::none, "renameCollection.metadata", SerializationContext::stateDefault()),
-            BSONObj(),
-            defaultMajorityWriteConcernDoNotUse(),
-            Grid::get(opCtx)->shardRegistry()->getConfigShard(),
-            Grid::get(opCtx)->catalogClient());
-    }
+    ShardingLogging::get(opCtx)->logChange(
+        opCtx,
+        logWhatParam,
+        NamespaceStringUtil::deserialize(
+            boost::none, "renameCollection.metadata", SerializationContext::stateDefault()),
+        logDetailParam,
+        defaultMajorityWriteConcernDoNotUse(),
+        Grid::get(opCtx)->shardRegistry()->getConfigShard(),
+        Grid::get(opCtx)->catalogClient());
 }
 
 void checkExpectedTargetCollectionOptionsMatch(OperationContext* opCtx,
@@ -950,6 +896,118 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 }
             }))
         .then(_buildPhaseHandler(
+            Phase::kSetupChangeStreamsPreconditions,
+            supportsPreciseChangeStreamTargeter /*shouldExecute*/,
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+                const auto& fromNss = nss();
+                const auto& toNss = _request.getTo();
+                const auto reason =
+                    sharding_ddl_util::getCriticalSectionReasonForRename(fromNss, toNss);
+
+                auto acquireCriticalSectionOnParticipantsFor = [&](const NamespaceString& nss) {
+                    LOGV2_DEBUG(10488800, 2, "Acquiring critical section", "nss"_attr = nss);
+
+                    ShardsvrParticipantBlock blockCRUDOperationsRequest(nss);
+                    blockCRUDOperationsRequest.setBlockType(
+                        mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
+                    blockCRUDOperationsRequest.setReason(reason);
+
+                    generic_argument_util::setMajorityWriteConcern(blockCRUDOperationsRequest);
+                    generic_argument_util::setOperationSessionInfo(blockCRUDOperationsRequest,
+                                                                   getNewSession(opCtx));
+                    auto opts =
+                        std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
+                            **executor, token, blockCRUDOperationsRequest);
+                    sharding_ddl_util::sendAuthenticatedCommandToShards(
+                        opCtx, opts, Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx));
+
+                    LOGV2_DEBUG(10488801, 2, "Acquired critical section", "nss"_attr = nss);
+                };
+
+                auto getChangeStreamNotifierShardIdFor =
+                    [&](const boost::optional<UUID>& collUUID) {
+                        // In case of tracked collection, a data bearing shard needs to generate
+                        // events about the upcoming placement change.
+                        if (collUUID.has_value()) {
+                            auto shardWithChunks =
+                                sharding_ddl_util::pickShardOwningCollectionChunks(opCtx,
+                                                                                   *collUUID);
+                            if (shardWithChunks.has_value()) {
+                                return *shardWithChunks;
+                            }
+                        }
+
+                        // In case the collection is untracked or does not currently exist, change
+                        // stream readers are expected to tail the primary shard of the parent DB.
+                        return ShardingState::get(opCtx)->shardId();
+                    };
+
+                // 1. Block CRUD operations on any node for both namespaces before emitting any
+                // pre-post commit notification to change stream readers.
+                acquireCriticalSectionOnParticipantsFor(fromNss);
+                acquireCriticalSectionOnParticipantsFor(toNss);
+
+                // 2. Define stable values for:
+                // - The cluster time at which the commit of this operation will be recorded in the
+                //   content of notification events and config.collections/placementHistory
+                //   documents;
+                // - The identity of the shard that will notify change stream readers of FROM once
+                //   the operation gets committed.
+                if (!_doc.getCommitTimeInGlobalCatalog()) {
+                    auto newDoc = _doc;
+
+                    auto now = VectorClock::get(opCtx)->getTime();
+                    auto commitTime = now.clusterTime().asTimestamp();
+                    newDoc.setCommitTimeInGlobalCatalog(commitTime);
+                    auto changeStreamsNotifierForSource =
+                        getChangeStreamNotifierShardIdFor(_doc.getSourceUUID().value());
+                    LOGV2(10488802,
+                          "Defined notifier shard Id for change streams tracking the source nss",
+                          "sourceNss"_attr = fromNss,
+                          "notifierId"_attr = changeStreamsNotifierForSource);
+                    newDoc.setChangeStreamsNotifier(std::move(changeStreamsNotifierForSource));
+
+                    _updateStateDocument(opCtx, std::move(newDoc));
+                }
+
+                // 3. Generate placement change metadata (config.placementHistory doc + control
+                // event on data bearing shard) for TO before the commit; this will redirect new
+                // and existing change stream readers for this collection to the data bearing shards
+                // of FROM, where they will be able to observe the "commit" event involving both
+                // namespaces.
+                const auto session = getNewSession(opCtx);
+                persistPlacementChangeForCollectionBeingRenamed(
+                    opCtx,
+                    toNss,
+                    _doc.getSourceUUID().value(),
+                    _doc.getNewTargetCollectionUuid().value(),
+                    _doc.getCommitTimeInGlobalCatalog().value(),
+                    **executor,
+                    session);
+
+
+                const auto changeStreamNotifierForTarget =
+                    getChangeStreamNotifierShardIdFor(_doc.getTargetUUID());
+
+                NamespacePlacementChanged notification(toNss, *_doc.getCommitTimeInGlobalCatalog());
+                auto buildNewSessionFn = [this](OperationContext* opCtx) {
+                    return getNewSession(opCtx);
+                };
+
+                LOGV2(10488803,
+                      "Defined notifier shard Id for change streams tracking the target nss",
+                      "targetNss"_attr = toNss,
+                      "notifierId"_attr = changeStreamNotifierForTarget);
+
+                sharding_ddl_util::generatePlacementChangeNotificationOnShard(
+                    opCtx,
+                    notification,
+                    changeStreamNotifierForTarget,
+                    buildNewSessionFn,
+                    executor,
+                    token);
+            }))
+        .then(_buildPhaseHandler(
             Phase::kBlockCrudAndRename,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 if (!_firstExecution) {
@@ -972,26 +1030,52 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     _doc.getNewTargetCollectionUuid());
                 renameCollParticipantRequest.setRenameCollectionRequest(_request);
 
-                // We need to send the command to all the shards because both movePrimary and
-                // moveChunk leave garbage behind for sharded collections. At the same time, the
-                // primary shard needs to be last participant to perfom its local rename operation:
-                // this will ensure that the op entries generated by the collections being
-                // renamed/dropped will be generated at points in time where all shards have a
-                // consistent view of the metadata and no concurrent writes are being performed.
-                const auto primaryShardId = ShardingState::get(opCtx)->shardId();
-                auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-                participants.erase(
-                    std::remove(participants.begin(), participants.end(), primaryShardId),
-                    participants.end());
-
+                const auto opSessionInfo = getNewSession(opCtx);
                 generic_argument_util::setMajorityWriteConcern(renameCollParticipantRequest);
                 generic_argument_util::setOperationSessionInfo(renameCollParticipantRequest,
-                                                               getNewSession(opCtx));
-                auto opts = std::make_shared<
-                    async_rpc::AsyncRPCOptions<ShardsvrRenameCollectionParticipant>>(
-                    **executor, token, renameCollParticipantRequest);
-                sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
-                sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, {primaryShardId});
+                                                               opSessionInfo);
+
+                auto getOtherParticipants = [&](const ShardId& mainParticipant) {
+                    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+                    participants.erase(
+                        std::remove(participants.begin(), participants.end(), mainParticipant),
+                        participants.end());
+                    return participants;
+                };
+
+                auto sendRequestTo = [&](const ShardsvrRenameCollectionParticipant& request,
+                                         const std::vector<ShardId>& participants) {
+                    auto opts = std::make_shared<
+                        async_rpc::AsyncRPCOptions<ShardsvrRenameCollectionParticipant>>(
+                        **executor, token, request);
+                    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
+                };
+
+                // Perform the local commit on each shard. The command is sent out everywhere, since
+                // both movePrimary and moveChunk leave garbage behind for sharded collections.
+                if (supportsPreciseChangeStreamTargeter(opCtx)) {
+                    // Instruct the notifier shard ID to generate user-visible commit events for
+                    // change streams...
+                    const auto& notifierShardId = _doc.getChangeStreamsNotifier().value();
+                    renameCollParticipantRequest.setFromMigrate(false);
+                    sendRequestTo(renameCollParticipantRequest, {notifierShardId});
+
+                    // .. and the opposite for the rest of the participants.
+                    const auto otherParticipants = getOtherParticipants(notifierShardId);
+                    renameCollParticipantRequest.setFromMigrate(true);
+                    sendRequestTo(renameCollParticipantRequest, otherParticipants);
+                } else {
+                    // (Since critical sections may not be taken at this stage), the primary shard
+                    // needs to be last participant to perform its local rename operation: this will
+                    // ensure that the op entries generated by the collections being renamed/dropped
+                    // will be generated at points in time where all shards have a consistent view
+                    // of the metadata and no concurrent writes are being performed.
+                    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+                    const auto otherParticipants = getOtherParticipants(primaryShardId);
+
+                    sendRequestTo(renameCollParticipantRequest, otherParticipants);
+                    sendRequestTo(renameCollParticipantRequest, {primaryShardId});
+                }
             }))
         .then(_buildPhaseHandler(
             Phase::kRenameMetadata,
@@ -1017,19 +1101,51 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         opCtx, getNewSession(opCtx), **executor);
                 }
 
-                // Update the collection metadata after the rename.
-                // Renaming the metadata will also resume migrations for the resulting collection.
-                {
-                    const auto session = getNewSession(opCtx);
-                    renameCollectionMetadataInTransaction(opCtx,
-                                                          _doc.getOptTrackedCollInfo(),
-                                                          nss(),
-                                                          _request.getTo(),
-                                                          _doc.getTargetUUID(),
-                                                          _doc.getNewTargetCollectionUuid(),
-                                                          defaultMajorityWriteConcernDoNotUse(),
-                                                          **executor,
-                                                          session);
+                // Commit the collection and chunks metadata on the global catalog.
+                // (This will also have the effect of resuming migrations on the renamed namespace).
+                const auto& fromNss = nss();
+                const auto& toNss = _request.getTo();
+                const auto preciseChangeStreamTargeterEnabled =
+                    supportsPreciseChangeStreamTargeter(opCtx);
+                const auto commitTime = [&] {
+                    if (preciseChangeStreamTargeterEnabled) {
+                        return _doc.getCommitTimeInGlobalCatalog().value();
+                    }
+
+                    auto now = VectorClock::get(opCtx)->getTime();
+                    return now.clusterTime().asTimestamp();
+                }();
+                const auto session = getNewSession(opCtx);
+                // When precise change stream targeting is not enabled, the execution of the
+                // kSetupChangeStreamsPreconditions phase is skipped, so that no placement change
+                // for the target is performed. To amend this, perform the step as part of the
+                // transaction.
+                const auto logTargetPlacementChange = !preciseChangeStreamTargeterEnabled;
+                renameCollectionMetadataInTransaction(opCtx,
+                                                      _doc.getOptTrackedCollInfo(),
+                                                      fromNss,
+                                                      toNss,
+                                                      _doc.getTargetUUID(),
+                                                      _doc.getNewTargetCollectionUuid(),
+                                                      commitTime,
+                                                      logTargetPlacementChange,
+                                                      **executor,
+                                                      session);
+
+                // Generate post-commit placement change event for FROM.
+                if (preciseChangeStreamTargeterEnabled) {
+                    NamespacePlacementChanged notification(fromNss,
+                                                           *_doc.getCommitTimeInGlobalCatalog());
+                    auto buildNewSessionFn = [this](OperationContext* opCtx) {
+                        return getNewSession(opCtx);
+                    };
+                    sharding_ddl_util::generatePlacementChangeNotificationOnShard(
+                        opCtx,
+                        notification,
+                        _doc.getChangeStreamsNotifier().value(),
+                        buildNewSessionFn,
+                        executor,
+                        token);
                 }
 
                 // Checkpoint the configTime to ensure that, in the case of a stepdown, the new

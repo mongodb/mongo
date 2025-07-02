@@ -155,6 +155,7 @@ testSuccessOnTxnCommit(dbName, dropDatabaseCmd, {
     testSuccessOnTxnCommit("admin", renameCollectionCmdSameDB, {
         $or: [
             {"command._shardsvrRenameCollectionParticipant": collName},
+            {"command._shardsvrParticipantBlock": collName},
             {
                 $and: [
                     {"command.renameCollection": sessionColl.getFullName()},
@@ -189,6 +190,7 @@ testSuccessOnTxnCommit(dbName, dropDatabaseCmd, {
     testSuccessOnTxnCommit("admin", renameCollectionCmdDifferentDB, {
         $or: [
             {"command._shardsvrRenameCollectionParticipant": collName},
+            {"command._shardsvrParticipantBlock": collName},
             {
                 $and: [
                     {"command.renameCollection": sessionColl.getFullName()},

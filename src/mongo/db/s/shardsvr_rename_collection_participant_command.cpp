@@ -114,6 +114,7 @@ public:
                 fromNss, ForwardableOperationMetadata(opCtx), req.getSourceUUID());
             participantDoc.setTargetUUID(req.getTargetUUID());
             participantDoc.setNewTargetCollectionUuid(req.getNewTargetCollectionUuid());
+            participantDoc.setFromMigrate(req.getFromMigrate());
             participantDoc.setRenameCollectionRequest(req.getRenameCollectionRequest());
 
             const auto service = RenameCollectionParticipantService::getService(opCtx);

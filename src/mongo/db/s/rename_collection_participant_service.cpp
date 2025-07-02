@@ -368,22 +368,31 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                 const auto& fromNss = _doc.getFromNss();
                 const auto& toNss = _doc.getTo();
 
-                // TODO SERVER-74719 replace with a query to config.system.sharding_ddl_coordinators
-                const auto primaryShardId =
-                    Grid::get(opCtx)
-                        ->catalogClient()
-                        ->getDatabase(
-                            opCtx, fromNss.dbName(), repl::ReadConcernLevel::kMajorityReadConcern)
-                        .getPrimary();
-                const auto thisShardId = ShardingState::get(opCtx)->shardId();
-
                 RenameCollectionOptions options;
                 options.dropTarget = _doc.getDropTarget();
                 options.stayTemp = _doc.getStayTemp();
                 options.newTargetCollectionUuid = _doc.getNewTargetCollectionUuid();
                 // Use the "markFromMigrate" option so that change streams capturing events about
                 // fromNss/toNss won't receive duplicate drop notifications.
-                options.markFromMigrate = (thisShardId != primaryShardId);
+                options.markFromMigrate = [&] {
+                    // TODO SERVER-73741 replace this 'if' with a tassert once 9.0 becomes last LTS.
+                    if (_doc.getFromMigrate().has_value()) {
+                        return _doc.getFromMigrate().value();
+                    }
+
+                    // TODO SERVER-73741 Remove this alternative exit (which is a fallback for
+                    // multiversion scenarios where the coordinator omits the 'fromMigrate' field)
+                    // once 9.0 becomes last LTS.
+                    const auto primaryShardId =
+                        Grid::get(opCtx)
+                            ->catalogClient()
+                            ->getDatabase(opCtx,
+                                          fromNss.dbName(),
+                                          repl::ReadConcernLevel::kMajorityReadConcern)
+                            .getPrimary();
+                    const auto thisShardId = ShardingState::get(opCtx)->shardId();
+                    return thisShardId != primaryShardId;
+                }();
 
                 renameOrDropTarget(
                     opCtx, fromNss, toNss, options, _doc.getSourceUUID(), _doc.getTargetUUID());

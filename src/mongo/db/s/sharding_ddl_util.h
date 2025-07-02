@@ -366,7 +366,15 @@ void sendFetchCollMetadataToShards(OperationContext* opCtx,
 AuthoritativeMetadataAccessLevelEnum getGrantedAuthoritativeMetadataAccessLevel(
     const VersionContext& vCtx, const ServerGlobalParams::FCVSnapshot& snapshot);
 
-boost::optional<ShardId> pickDataBearingShard(OperationContext* opCtx, const UUID& collUuid);
+/*
+ * Provided a collection UUID, returns the ID of one of the shards that are currently owning its
+ * chunks (or boost:node when the collection is untracked or non-existing).
+ * The method assumes that the caller is currently holding a Critical Section for the namespace
+ * requested and ensures a stable value across calls as long as the queried routing table isn't
+ * modified.
+ */
+boost::optional<ShardId> pickShardOwningCollectionChunks(OperationContext* opCtx,
+                                                         const UUID& collUuid);
 
 /**
  * Request to the specified shard the generation of a 'namespacePlacementChange' notification

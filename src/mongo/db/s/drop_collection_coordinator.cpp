@@ -309,8 +309,8 @@ void DropCollectionCoordinator::_commitDropCollection(
             return _doc.getChangeStreamsNotifier().value();
         }
 
-        auto dataBearingShard =
-            sharding_ddl_util::pickDataBearingShard(opCtx, _doc.getCollInfo()->getUuid());
+        auto dataBearingShard = sharding_ddl_util::pickShardOwningCollectionChunks(
+            opCtx, _doc.getCollInfo()->getUuid());
         if (!dataBearingShard) {
             LOGV2_WARNING(10361100,
                           "Unable to retrieve the identity of a data bearing shard for the "

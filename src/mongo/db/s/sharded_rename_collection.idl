@@ -47,6 +47,7 @@ enums:
             kUnset: "unset"
             kCheckPreconditions: "checkPreconditions"
             kFreezeMigrations: "freezeMigrations"
+            kSetupChangeStreamsPreconditions: "setupChangeStreamsPreconditions"
             kBlockCrudAndRename: "blockCRUDAndRename"
             kRenameMetadata: "renameMetadata"
             kUnblockCRUD: "unblockCRUD"
@@ -83,6 +84,12 @@ commands:
             newTargetCollectionUuid:
                 type: uuid
                 description: "New ID for the renamed collection in case of renaming across DBs."
+                optional: true
+            fromMigrate:
+                type: bool
+                description:
+                    "When set, the participant will apply the specified value to the oplog entry generated upon locally committing the operation.
+                    When missing, the participant will infer the value to be applied based on whether it is the primary shard of the targeted namespaces."
                 optional: true
         reply_type: OkReply
 
@@ -135,6 +142,16 @@ structs:
                     C2C needs to do the renames to replicate create collection."
                 type: bool
                 optional: true
+            commitTimeInGlobalCatalog:
+                type: timestamp
+                description: "Cluster time referenced in each config.collections and config.placementHistory document inserted of modified by the commit of this operation."
+                optional: true
+            changeStreamsNotifier:
+                type: shard_id
+                description:
+                    "The identity of the Shard that will be responsible to generate the op log entries supporting change stream readers.
+                    Only set/consumed when changeStreamPreciseShardTargetingEnabled is true."
+                optional: true
 
     RenameCollectionParticipantDocument:
         description: "Represents a rename collection operation on a participant shard."
@@ -161,4 +178,10 @@ structs:
             newTargetCollectionUuid:
                 type: uuid
                 description: "New ID for the renamed collection in case of renaming across DBs."
+                optional: true
+            fromMigrate:
+                type: bool
+                description:
+                    "When set, the participant will apply the specified value to the oplog entry generated upon locally committing the operation.
+                    When missing, the participant will infer the value to be applied based on whether it is the primary shard of the targeted namespaces."
                 optional: true

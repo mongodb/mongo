@@ -441,7 +441,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                                 VersionContext::getDecoration(opCtx),
                                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                             auto dataBearingShardId =
-                                sharding_ddl_util::pickDataBearingShard(opCtx, coll.getUuid());
+                                sharding_ddl_util::pickShardOwningCollectionChunks(opCtx,
+                                                                                   coll.getUuid());
                             if (dataBearingShardId) {
                                 changeStreamsNotifier = *dataBearingShardId;
                             } else {

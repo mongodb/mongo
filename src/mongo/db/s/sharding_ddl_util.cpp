@@ -922,7 +922,8 @@ AuthoritativeMetadataAccessLevelEnum getGrantedAuthoritativeMetadataAccessLevel(
     return AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed;
 }
 
-boost::optional<ShardId> pickDataBearingShard(OperationContext* opCtx, const UUID& collUuid) {
+boost::optional<ShardId> pickShardOwningCollectionChunks(OperationContext* opCtx,
+                                                         const UUID& collUuid) {
     const Timestamp dummyTimestamp;
     const OID dummyEpoch;
     auto chunks = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getChunks(
