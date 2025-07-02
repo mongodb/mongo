@@ -32,6 +32,10 @@ overrides:
     - task: change_stream_serverless_no_optimization_fuzzer
       exec_timeout: 600 # 10 hours
 
+  enterprise-amazon-linux2023-arm64-all-non-rollback-feature-flags-fuzzers:
+    - task: ^change_stream_.*_fuzzer
+      exec_timeout: 210 # 3.5 hours
+
   enterprise-amazon2-streams:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
@@ -53,6 +57,10 @@ overrides:
       exec_timeout: 600 # 10 hours
     - task: change_stream_serverless_no_optimization_fuzzer
       exec_timeout: 600 # 10 hours
+
+  enterprise-amazon2023-arm64-fuzzers-roll-back-incremental-feature-flags:
+    - task: ^change_stream_.*_fuzzer
+      exec_timeout: 210 # 3.5 hours
 
   debian12:
     - task: aggregation_blockprocessing_fuzzer
@@ -85,6 +93,10 @@ overrides:
       exec_timeout: 600 # 10 hours
     - task: change_stream_optimization_fuzzer
       exec_timeout: 600 # 10 hours
+
+  enterprise-rhel-8-64-bit-dynamic-classic-engine-all-non-rollback-feature-flags-fuzzers:
+    - task: ^change_stream_.*_fuzzer
+      exec_timeout: 210 # 3.5 hours
 
   enterprise-rhel-8-64-bit-inmem:
     - task: change_stream_optimization_fuzzer
