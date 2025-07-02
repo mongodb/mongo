@@ -301,9 +301,7 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
         if (memberI.getHostAndPort().isLocalHost()) {
             ++localhostCount;
         }
-        // Using getBaseNumVotes() here instead of isVoter() because isVoter does not count voting
-        // members with the newlyAdded field while getBaseNumVotes() counts all nodes with votes: 1.
-        if (memberI.getBaseNumVotes()) {
+        if (memberI.isVoter()) {
             ++voterCount;
         }
         // Nodes may be arbiters or electable, or neither, but never both.
