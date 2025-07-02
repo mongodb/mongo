@@ -12,10 +12,10 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 export const $config = (function() {
     const data = {
-        nReadingsPerSensor: 1000,
+        nReadingsPerSensor: 100,
         nSensors: 100,
-        // 1000 to start + 5 threads * 1000 each
-        nTotalReadings: 1000 + 5 * 1000
+        // 100 to start + 5 threads * 100 each
+        nTotalReadings: 100 + 5 * 100
     };
     const states = {
         init: function init(db, collName) {

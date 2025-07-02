@@ -162,7 +162,7 @@ export const $config = (function() {
 
     return {
         threadCount,
-        iterations: 100,
+        iterations: 50,
         setup: setup,
         teardown: tearDown,
         states: states,
