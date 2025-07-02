@@ -256,6 +256,9 @@ filters:
   - "migration_util*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "random_migration_testing_utils*":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "range_arithmetic*":
     approvers:
       - 10gen/server-catalog-and-routing

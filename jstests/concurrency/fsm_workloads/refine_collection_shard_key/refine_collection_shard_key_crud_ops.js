@@ -93,6 +93,18 @@ export const $config = (function() {
                 : coll.update({tid: this.tid, a: this.updateIdx, b: this.updateIdx},
                               {tid: this.tid, a: this.insertIdx, b: this.insertIdx});
 
+            if (res.hasWriteError()) {
+                let err = res.getWriteError();
+                if (TestData.runningWithBalancer && err.code === ErrorCodes.DuplicateKey &&
+                    err.errmsg.includes("Failed to update document's shard key field")) {
+                    // If we are running with the balancer disabled, we might update the document so
+                    // that it moves to a shard which contains an orphaned version of the document.
+                    jsTest.log(
+                        "Ignoring DuplicateKey error during update due to ongoing migrations");
+                    return;
+                }
+            }
+
             assert.commandWorked(res);
             assert.eq(res.nMatched, 1);
             assert.eq(res.nUpserted, 0);

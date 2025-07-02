@@ -224,6 +224,8 @@ export const runner = (function() {
                         (typeof context[workload].config.data.shardKey !== "undefined") ||
                         (typeof TestData.shardCollectionProbability == "undefined") ||
                         (Math.random() < TestData.shardCollectionProbability);
+                    const shouldDisableBalancing = cluster.isBalancerEnabled() &&
+                        context[workload].config.data.disableBalancingForSetup;
                     print("Preparing test collection " + tojsononeline({
                               dbName,
                               collName,
@@ -232,9 +234,19 @@ export const runner = (function() {
                               shouldShard,
                           }));
                     if (shouldShard) {
+                        if (shouldDisableBalancing) {
+                            assert.commandWorked(
+                                cluster.getDB("admin").runCommand({balancerStop: 1}));
+                        }
                         var shardKey = context[workload].config.data.shardKey || {_id: "hashed"};
                         // TODO: allow workload config data to specify split
                         cluster.shardCollection(myDB[collName], shardKey, false);
+                        if (shouldDisableBalancing) {
+                            assert.commandWorked(cluster.getDB('config').collections.update(
+                                {_id: dbName + '.' + collName}, {$set: {"noBalance": true}}));
+                            assert.commandWorked(
+                                cluster.getDB("admin").runCommand({balancerStart: 1}));
+                        }
                     }
                 }
             }

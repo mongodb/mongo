@@ -460,6 +460,8 @@ last-continuous:
       ticket: SERVER-103172
     - test_file: jstests/sharding/config_shards_on_repl_set_changes.js
       ticket: SERVER-106614
+    - test_file: jstests/sharding/balancer_should_return_random_migrations_failpoint.js
+      ticket: SERVER-105874
   suites: null
 last-lts:
   all:
@@ -975,4 +977,6 @@ last-lts:
       ticket: SERVER-103172
     - test_file: jstests/sharding/config_shards_on_repl_set_changes.js
       ticket: SERVER-106614
+    - test_file: jstests/sharding/balancer_should_return_random_migrations_failpoint.js
+      ticket: SERVER-105874
   suites: null

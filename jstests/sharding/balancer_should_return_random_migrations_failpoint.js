@@ -25,7 +25,9 @@ var st = new ShardingTest({
                 "reshardingMinimumOperationDurationMillis": 0,
                 "balancerMigrationsThrottlingMs": 0,
             }
-        }
+        },
+        rsOptions:
+            {setParameter: {"failpoint.balancerShouldReturnRandomMigrations": "{mode: 'alwaysOn'}"}}
     }
 });
 
@@ -65,16 +67,38 @@ const isReshardingForTimeseriesEnabled =
 }
 
 // Get the data shard for a given collection
-function getDataShard(nss) {
+function getPlacement(nss) {
     // wait until the collection gets tracked
     // We need to wait because collection get tracked only on the db
     assert.soon(() => {
         return st.s.getCollection('config.collections').countDocuments({_id: nss}) > 0;
     }, `Timed out waiting for collection ${nss} to get tracked`);
 
-    let chunk = findChunksUtil.findOneChunkByNs(st.getDB('config'), nss);
-    assert(chunk, `Couldn't find chunk for collection ${nss}`);
-    return chunk.shard;
+    let chunks = findChunksUtil.findChunksByNs(st.getDB('config'), nss).toArray();
+    assert(chunks.length > 0, `Couldn't find chunk for collection ${nss}`);
+    let shards = [];
+    chunks.forEach((chunk) => {
+        if (!shards.includes(chunk.shard)) {
+            shards.push(chunk.shard);
+        }
+    });
+    return {shards: shards, numChunks: chunks.length};
+}
+
+function placementDiffers(currentPlacement, initialPlacement) {
+    let differs = false;
+    if (currentPlacement.shards.length != initialPlacement.shards.length) {
+        differs = true;
+    }
+    if (currentPlacement.numChunks != initialPlacement.numChunks) {
+        differs = true;
+    }
+    initialPlacement.shards.forEach((shard) => {
+        if (!currentPlacement.shards.includes(shard)) {
+            differs = true;
+        }
+    });
+    return differs;
 }
 
 // Store the initial shard for every namespace
@@ -90,15 +114,16 @@ if (isReshardingForTimeseriesEnabled) {
 for (const dbName of dbNames) {
     for (const collName of trackableCollections) {
         const fullName = `${dbName}.${collName}`;
-        initialPlacements[fullName] = getDataShard(fullName);
+        initialPlacements[fullName] = getPlacement(fullName);
     }
 }
 
-jsTest.log(`Intial placement: ${tojson(initialPlacements)}`);
+jsTest.log(`Initial placement: ${tojson(initialPlacements)}`);
 
-for (const [nss, initialShard] of Object.entries(initialPlacements)) {
+for (const [nss, initialPlacement] of Object.entries(initialPlacements)) {
     assert.soon(() => {
-        return getDataShard(nss) != initialShard;
+        let currentPlacement = getPlacement(nss);
+        return placementDiffers(currentPlacement, initialPlacement);
     }, `Data shard for collection ${nss} didn't change`);
 }
 

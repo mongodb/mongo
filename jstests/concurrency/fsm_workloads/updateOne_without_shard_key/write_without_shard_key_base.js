@@ -33,6 +33,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.tertiaryDocField = 'tertiaryField';
     $config.data.runningWithStepdowns =
         TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
+    $config.data.disableBalancingForSetup = true;
 
     /**
      * Returns a random integer between min (inclusive) and max (inclusive).
@@ -647,10 +648,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
         const nss = db + "." + collName;
 
-        // Disallow balancing 'ns' during $setup so it does not interfere with the splits.
-        BalancerHelper.disableBalancerForCollection(db, nss);
-        BalancerHelper.joinBalancerRound(db);
-
         const shards = Object.keys(cluster.getSerializedCluster().shards);
         ChunkHelper.moveChunk(
             db,
@@ -690,7 +687,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             this.insertInitialDocuments(db, collName, tid);
         }
 
-        // Allow balancing 'nss' again.
+        // Allow balancing 'nss' again - this may have been disabled during the workload setup.
         BalancerHelper.enableBalancerForCollection(db, nss);
     };
 

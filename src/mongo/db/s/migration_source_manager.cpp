@@ -61,11 +61,13 @@
 #include "mongo/db/s/migration_coordinator.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/random_migration_testing_utils.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/type_shard_collection.h"
 #include "mongo/db/service_context.h"
@@ -130,6 +132,24 @@ BSONObj computeOtherBound(OperationContext* opCtx,
         opCtx, acquisition, skPattern.toBSON(), min, max, maxChunkSizeBytes, 1, needMaxBound);
     if (splitKeys.size()) {
         return std::move(splitKeys.front());
+    }
+
+    // During testing, we try to randomly find a split point 50% of the time (so long as this shard
+    // is not draining) in order to improve testing with multi-chunk collections.
+    if (MONGO_unlikely(
+            globalFailPointRegistry().find("balancerShouldReturnRandomMigrations")->shouldFail()) &&
+        !random_migration_testing_utils::isCurrentShardDraining(opCtx) &&
+        opCtx->getClient()->getPrng().nextCanonicalDouble() < 0.5) {
+        if (auto randomSplitPoint = random_migration_testing_utils::generateRandomSplitPoint(
+                opCtx, acquisition, skPattern.toBSON(), min, max)) {
+            LOGV2(10587400,
+                  "Selected random split point for balancing",
+                  "min"_attr = min,
+                  "max"_attr = max,
+                  "skey"_attr = skPattern,
+                  "splitPoint"_attr = *randomSplitPoint);
+            return *randomSplitPoint;
+        }
     }
 
     return needMaxBound ? max : min;

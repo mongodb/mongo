@@ -28,6 +28,13 @@ const $extendedBaseConfig = extendWithInternalTransactionsUnsharded(
     Object.extend({}, parsedBaseConfig, true), parsedBaseConfig);
 
 export const $config = extendWorkload($extendedBaseConfig, function($config, $super) {
+    $config.data.disableBalancingForSetup = true;
+    // When the balancer is enabled, the manual chunk migrations done by the moveChunk base might
+    // conflict with the splits being done by the balancer.
+    $config.data.isMoveChunkErrorAcceptable = (err) => {
+        return TestData.runningWithBalancer && err.code == 656452;
+    };
+
     $config.data.getQueryForDocument = function getQueryForDocument(doc) {
         // The query for a write command against a sharded collection must contain the shard key.
         const query = $super.data.getQueryForDocument.apply(this, arguments);
@@ -72,10 +79,6 @@ export const $config = extendWorkload($extendedBaseConfig, function($config, $su
     $config.setup = function setup(db, collName, cluster) {
         const ns = db.getName() + "." + collName;
 
-        // Disallow balancing 'ns' during $setup so it does not interfere with the splits.
-        BalancerHelper.disableBalancerForCollection(db, ns);
-        BalancerHelper.joinBalancerRound(db);
-
         // Move the initial chunk to shard0.
         const shards = Object.keys(cluster.getSerializedCluster().shards);
         ChunkHelper.moveChunk(
@@ -90,7 +93,8 @@ export const $config = extendWorkload($extendedBaseConfig, function($config, $su
             // Create two chunks for the partition assigned to this thread:
             // [partition.lower, partition.mid] and [partition.mid, partition.upper]
             if (!partition.isLowChunk) {
-                // The lower bound for a low chunk partition is minKey, so a split is not necessary.
+                // The lower bound for a low chunk partition is minKey, so a split is not
+                // necessary.
                 assert.commandWorked(db.adminCommand(
                     {split: ns, middle: {[this.defaultShardKeyField]: partition.lower}}));
             }
@@ -98,8 +102,8 @@ export const $config = extendWorkload($extendedBaseConfig, function($config, $su
             assert.commandWorked(
                 db.adminCommand({split: ns, middle: {[this.defaultShardKeyField]: partition.mid}}));
 
-            // Move one of the two chunks assigned to this thread to one of the other shards so that
-            // about half of the internal transactions run on this thread are cross-shard
+            // Move one of the two chunks assigned to this thread to one of the other shards so
+            // that about half of the internal transactions run on this thread are cross-shard
             // transactions.
             ChunkHelper.moveChunk(
                 db,
@@ -121,7 +125,7 @@ export const $config = extendWorkload($extendedBaseConfig, function($config, $su
             }
         }
 
-        // Allow balancing 'ns' again.
+        // Allow balancing 'ns' again - this may have been disabled during the workload setup.
         BalancerHelper.enableBalancerForCollection(db, ns);
 
         this.overrideInternalTransactionsReapThreshold(cluster);

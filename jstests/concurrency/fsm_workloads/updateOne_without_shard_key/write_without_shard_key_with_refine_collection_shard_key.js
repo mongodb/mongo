@@ -41,6 +41,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.newShardKey = {a: 1, b: 1};
     $config.data.newShardKeyFields = ["a", "b"];
 
+    $config.data.isMoveChunkErrorAcceptable = (err) => {
+        // When running with the balancer, manual chunk migrations might conflict with the
+        // balancer issued splits.
+        return TestData.runningWithBalancer && err.code == 656452;
+    };
+
     $config.setup = function setup(db, collName, cluster) {
         // Proactively create and shard all possible collections suffixed with this.latch.getCount()
         // that could receive CRUD operations over the course of the FSM workload. This prevents the

@@ -2486,6 +2486,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/**/migration_destination_manager.* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/migration_source_manager* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/migration_util* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/s/**/random_migration_testing_utils* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/range_arithmetic* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/shard_identity_rollback* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/shard_key*util* @10gen/server-catalog-and-routing @svc-auto-approve-bot

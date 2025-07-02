@@ -92,7 +92,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 // the chunk is moved back to the original shard, the moveChunk may fail as a result
                 // of a duplicate key error on the recipient.
                 errorMsg.includes("Location51008") || errorMsg.includes("Location6718402") ||
-                errorMsg.includes("Location16977"));
+                errorMsg.includes("Location16977") ||
+                // When running with the balancer, manual chunk migrations might conflict with the
+                // balancer issued splits.
+                (TestData.runningWithBalancer && err.code == 656452));
     };
 
     return $config;

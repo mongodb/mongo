@@ -436,14 +436,19 @@ boost::optional<MigrateInfo> chooseRandomMigration(
             return true;
         });
 
-        invariant(rndChunk.getShard().isValid());
         return rndChunk;
     }();
 
     tassert(8245222, "randomChunk's shard is invalid", randomChunk.getShard().isValid());
 
-    return MigrateInfo{
-        recipientShard.get(), distribution.nss(), randomChunk, ForceJumbo::kDoNotForce};
+    return MigrateInfo{recipientShard.get(),
+                       randomChunk.getShard(),
+                       distribution.nss(),
+                       randomChunk.getCollectionUUID(),
+                       randomChunk.getMin(),
+                       boost::none,
+                       randomChunk.getVersion(),
+                       ForceJumbo::kDoNotForce};
 }
 
 MigrateInfosWithReason BalancerPolicy::balance(
@@ -551,8 +556,7 @@ MigrateInfosWithReason BalancerPolicy::balance(
     // Select random migrations after checking for draining shards so tests with removeShard or
     // transitionToDedicatedConfigServer can eventually drain shards.
     // NOTE: randomly chosen migrations do not respect zones.
-    if (MONGO_unlikely(balancerShouldReturnRandomMigrations.shouldFail()) &&
-        !distribution.nss().isConfigDB()) {
+    if (MONGO_unlikely(balancerShouldReturnRandomMigrations.shouldFail())) {
         LOGV2_DEBUG(21881, 1, "balancerShouldReturnRandomMigrations failpoint is set");
 
         auto migration = chooseRandomMigration(shardStats, *availableShards, distribution);
