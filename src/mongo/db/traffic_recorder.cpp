@@ -46,6 +46,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/sorter/sorter_checksum_calculator.h"
+#include "mongo/db/traffic_recorder.h"
 #include "mongo/db/traffic_recorder_gen.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
@@ -54,6 +56,7 @@
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/time_support.h"
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -121,17 +124,50 @@ public:
 
     void run() {
         _thread = stdx::thread([consumer = std::move(_pcqPipe.consumer), this] {
-            try {
-                DataBuilder db;
-                boost::filesystem::path recordingFile(boost::filesystem::absolute(_path));
-                if (!boost::filesystem::is_directory(recordingFile)) {
-                    boost::filesystem::create_directory(recordingFile);
-                }
+            if (!boost::filesystem::is_directory(boost::filesystem::absolute(_path))) {
+                boost::filesystem::create_directory(boost::filesystem::absolute(_path));
+            }
+
+            static const std::string checkSumFileName = "checksum.txt";
+            boost::filesystem::path checksumFile(boost::filesystem::absolute(_path));
+            checksumFile /= checkSumFileName;
+            boost::filesystem::ofstream checksumOut(checksumFile,
+                                                    std::ios_base::app | std::ios_base::out);
+
+            // The calculator calculates the checksum of each recording for integrity check.
+            auto checksumCalculator =
+                std::make_unique<SorterChecksumCalculator>(SorterChecksumVersion::v2);
+            auto writeChecksum = [&checksumOut,
+                                  &checksumCalculator](const std::string& recordingFile) {
+                size_t checkSumVal = checksumCalculator->checksum();
+                checksumOut << recordingFile << "\t" << checkSumVal << "\n";
+                checksumCalculator =
+                    std::make_unique<SorterChecksumCalculator>(SorterChecksumVersion::v2);
+            };
+
+            // This function guarantees to open a new recording file. Force the thread to sleep for
+            // a very short period of time if a file with the same name exists and then create a new
+            // file. This case is rare and only happens when the 'maxFileSize' is too small. The
+            // same recording file could be opened twice within 1 millisecond.
+            auto openNewRecordingFile = [this](boost::filesystem::path& recordingFile,
+                                               boost::filesystem::ofstream& out) {
+                recordingFile = boost::filesystem::absolute(_path);
                 recordingFile /= std::to_string(Date_t::now().toMillisSinceEpoch());
                 recordingFile += ".bin";
-                boost::filesystem::ofstream out(recordingFile,
-                                                std::ios_base::binary | std::ios_base::trunc |
-                                                    std::ios_base::out);
+                while (boost::filesystem::exists(recordingFile)) {
+                    stdx::this_thread::sleep_for(stdx::chrono::milliseconds(5));
+                    recordingFile = boost::filesystem::absolute(_path);
+                    recordingFile /= std::to_string(Date_t::now().toMillisSinceEpoch());
+                    recordingFile += ".bin";
+                }
+                out.open(recordingFile,
+                         std::ios_base::binary | std::ios_base::trunc | std::ios_base::out);
+            };
+            boost::filesystem::path recordingFile;
+            boost::filesystem::ofstream out;
+            try {
+                DataBuilder db;
+                openNewRecordingFile(recordingFile, out);
 
                 while (true) {
                     std::deque<TrafficRecordingPacket> storage;
@@ -166,16 +202,11 @@ public:
                         }
 
                         if (maxSizeExceeded) {
+                            writeChecksum(recordingFile.string());
+                            out.close();
                             // The current recording file hits the maximum file size, open a new
                             // recording file.
-                            boost::filesystem::path recordingFile(
-                                boost::filesystem::absolute(_path));
-                            recordingFile /= std::to_string(Date_t::now().toMillisSinceEpoch());
-                            recordingFile += ".bin";
-                            out.close();
-                            out.open(recordingFile,
-                                     std::ios_base::binary | std::ios_base::trunc |
-                                         std::ios_base::out);
+                            openNewRecordingFile(recordingFile, out);
                             // We assume that the size of one packet message is greater than the max
                             // file size. It's intentional to not assert if
                             // 'size' >= '_maxLogSize' for testing purposes.
@@ -186,12 +217,16 @@ public:
                         }
 
                         out.write(db.getCursor().data(), db.size());
+                        checksumCalculator->addData(db.getCursor().data(), db.size());
                         out.write(toWrite.buf(), toWrite.size());
+                        checksumCalculator->addData(toWrite.buf(), toWrite.size());
                     }
                 }
             } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueConsumed>&) {
                 // Close naturally
+                writeChecksum(recordingFile.string());
             } catch (...) {
+                writeChecksum(recordingFile.string());
                 auto status = exceptionToStatus();
 
                 stdx::lock_guard<stdx::mutex> lk(_mutex);

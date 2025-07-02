@@ -1710,6 +1710,7 @@ mongo_cc_library(
         ":server_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/sorter:sorter_base",
         "//src/mongo/rpc",
     ],
 )
