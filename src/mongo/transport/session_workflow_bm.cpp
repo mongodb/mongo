@@ -32,9 +32,12 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/ingress_request_rate_limiter.h"
+#include "mongo/db/admission/ingress_request_rate_limiter_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/message.h"
@@ -129,6 +132,14 @@ public:
             LOGV2_DEBUG(7015132, 3, "sourceMessage", "rounds"_attr = _rounds);
             if (!_rounds)
                 return makeClosedSessionError();
+
+            // If only one round is left, we don't have more exhaust loops to fulfill.
+            // Decrement the number of rounds to allow the session to close before reaching
+            // handleRequest.
+            if (_rounds == 1) {
+                _rounds--;
+            }
+
             return _request;
         }
 
@@ -168,9 +179,10 @@ public:
 
             auto session = _mc->opCtxToSession(opCtx);
             invariant(session);
-            if (int& rounds = session->rounds(); --rounds) {
+            if (auto& rounds = session->rounds()) {
                 response.nextInvocation = BSONObjBuilder{}.append("ping", 1).obj();
                 response.shouldRunAgainForExhaust = true;
+                rounds--;
             }
             return Future{std::move(response)};
         }
@@ -225,7 +237,11 @@ public:
         sc->getService()->setServiceEntryPoint(
             std::make_unique<MockCoordinator::Sep>(_coordinator.get()));
         _initTransportLayerManager(sc);
+
+        doConfigureServerParameters(sc);
     }
+
+    virtual void doConfigureServerParameters(ServiceContext*) {}
 
     void _initTransportLayerManager(ServiceContext* svcCtx) {
         auto sm = std::make_unique<AsioSessionManager>(svcCtx);
@@ -283,6 +299,36 @@ private:
 };
 
 /**
+ * This benchmark enables the ingress request rate limiter, which is set by default to accept all
+ * requests.
+ */
+class SessionWorkflowRateLimitAcceptAllBm : public SessionWorkflowBm {
+    void doConfigureServerParameters(ServiceContext* sc) override {
+        gFeatureFlagIngressRateLimiting.setForServerParameter(true);
+        gIngressRequestRateLimiterEnabled.store(true);
+    }
+};
+
+/**
+ * This benchmark enables the ingress request rate limiter, and also sets parameters such that
+ * every request will get rejected.
+ */
+class SessionWorkflowRateLimitRejectAllBm : public SessionWorkflowBm {
+    void doConfigureServerParameters(ServiceContext* sc) override {
+        gFeatureFlagIngressRateLimiting.setForServerParameter(true);
+        gIngressRequestRateLimiterEnabled.store(true);
+
+        auto& rateLimiter = IngressRequestRateLimiter::get(getGlobalServiceContext());
+
+        auto const verySlowRatePerSec = 5e-6;
+        auto const smallestPossibleBurstSize = 1.0;
+        auto const smallestPossibleBurstCapacitySecs =
+            smallestPossibleBurstSize / verySlowRatePerSec;
+        rateLimiter.updateRateParameters(verySlowRatePerSec, smallestPossibleBurstCapacitySecs);
+    }
+};
+
+/**
  * ASAN can't handle the # of threads the benchmark creates.
  * With sanitizers, run this in a diminished "correctness check" mode.
  */
@@ -295,22 +341,43 @@ const auto kMaxThreads = 2 * ProcessInfo::getNumLogicalCores();
 constexpr std::array exhaustRounds{0, 1, 8};
 #endif
 
+static void benchmarkExhaustInnerLoop(benchmark::internal::Benchmark* b, int exhaust) {
+    std::vector<int> res{0};
+#if TRANSITIONAL_SERVICE_EXECUTOR_SYNCHRONOUS_HAS_RESERVE
+    res = {0, 1, 4, 16};
+#endif
+    for (int reserved : res)
+        b->Args({exhaust, reserved});
+}
+
+static void benchmarkLoop(benchmark::internal::Benchmark* b) {
+    b->ArgNames({"ExhaustRounds", "ReservedThreads"});
+    for (int exhaust : exhaustRounds) {
+        benchmarkExhaustInnerLoop(b, exhaust);
+    }
+    b->ThreadRange(1, kMaxThreads);
+}
+
+static void benchmarkLoopNoExhaust(benchmark::internal::Benchmark* b) {
+    b->ArgNames({"ExhaustRounds", "ReservedThreads"});
+    benchmarkExhaustInnerLoop(b, 0);
+    b->ThreadRange(1, kMaxThreads);
+}
+
 BENCHMARK_DEFINE_F(SessionWorkflowBm, Loop)(benchmark::State& state) {
     run(state);
 }
+BENCHMARK_REGISTER_F(SessionWorkflowBm, Loop)->Apply(benchmarkLoop);
 
-BENCHMARK_REGISTER_F(SessionWorkflowBm, Loop)->Apply([](auto* b) {
-    b->ArgNames({"ExhaustRounds", "ReservedThreads"});
-    for (int exhaust : exhaustRounds) {
-        std::vector<int> res{0};
-#if TRANSITIONAL_SERVICE_EXECUTOR_SYNCHRONOUS_HAS_RESERVE
-        res = {0, 1, 4, 16};
-#endif
-        for (int reserved : res)
-            b->Args({exhaust, reserved});
-    }
-    b->ThreadRange(1, kMaxThreads);
-});
+BENCHMARK_DEFINE_F(SessionWorkflowRateLimitAcceptAllBm, Loop)(benchmark::State& state) {
+    run(state);
+}
+BENCHMARK_REGISTER_F(SessionWorkflowRateLimitAcceptAllBm, Loop)->Apply(benchmarkLoop);
+
+BENCHMARK_DEFINE_F(SessionWorkflowRateLimitRejectAllBm, Loop)(benchmark::State& state) {
+    run(state);
+}
+BENCHMARK_REGISTER_F(SessionWorkflowRateLimitRejectAllBm, Loop)->Apply(benchmarkLoopNoExhaust);
 
 }  // namespace
 }  // namespace mongo::transport
