@@ -126,28 +126,6 @@ function MongoBridge(options) {
         return _stopMongoProgram(this.port);
     };
 
-    // Throws an error if 'obj' is not a MongoBridge instance.
-    function throwErrorIfNotMongoBridgeInstance(obj) {
-        if (!(obj instanceof MongoBridge)) {
-            throw new Error('Expected MongoBridge instance, but got ' + tojson(obj));
-        }
-    }
-
-    // Runs a command intended to configure the mongobridge.
-    function runBridgeCommand(conn, cmdName, cmdArgs) {
-        // The wire version of this mongobridge is detected as the wire version of the corresponding
-        // mongod or mongos process because the message is simply forwarded to that process.
-        // Create a new Object with 'cmdName' as the first key and $forBridge=true.
-        var cmdObj = {};
-        cmdObj[cmdName] = 1;
-        cmdObj.$forBridge = true;
-        Object.extend(cmdObj, cmdArgs);
-
-        var dbName = 'test';
-        var noQueryOptions = 0;
-        return conn.runCommand(dbName, cmdObj, noQueryOptions);
-    }
-
     /**
      * Allows communication between 'this.dest' and the 'dest' of each of the 'bridges'.
      *
@@ -184,16 +162,6 @@ function MongoBridge(options) {
         this.rejectConnectionsFrom(bridges);
         bridges.forEach(bridge => bridge.rejectConnectionsFrom(this));
     };
-
-    // All *From functions require that test commands be enabled on the mongod
-    // instance (which populates the hostInfo field).
-    function checkTestCommandsEnabled(fn_name) {
-        return function(bridge) {
-            assert(bridge._testCommandsEnabledAtInit,
-                   "testing commands have not been enabled. " + fn_name +
-                       " will not work as expected");
-        };
-    }
 
     /**
      * Configures 'this' bridge to accept new connections from the 'dest' of each of the 'bridges'.
@@ -320,7 +288,40 @@ function MongoBridge(options) {
     });
 }
 
+// Throws an error if 'obj' is not a MongoBridge instance.
+function throwErrorIfNotMongoBridgeInstance(obj) {
+    if (!(obj instanceof MongoBridge)) {
+        throw new Error('Expected MongoBridge instance, but got ' + tojson(obj));
+    }
+}
+
+// Runs a command intended to configure the mongobridge.
+function runBridgeCommand(conn, cmdName, cmdArgs) {
+    // The wire version of this mongobridge is detected as the wire version of the corresponding
+    // mongod or mongos process because the message is simply forwarded to that process.
+    // Create a new Object with 'cmdName' as the first key and $forBridge=true.
+    var cmdObj = {};
+    cmdObj[cmdName] = 1;
+    cmdObj.$forBridge = true;
+    Object.extend(cmdObj, cmdArgs);
+
+    var dbName = 'test';
+    var noQueryOptions = 0;
+    return conn.runCommand(dbName, cmdObj, noQueryOptions);
+}
+
+// All *From functions require that test commands be enabled on the mongod
+// instance (which populates the hostInfo field).
+function checkTestCommandsEnabled(fn_name) {
+    return function(bridge) {
+        assert(bridge._testCommandsEnabledAtInit,
+               "testing commands have not been enabled. " + fn_name + " will not work as expected");
+    };
+}
+
 // The number of ports that ReplSetTest and ShardingTest should stagger the port number of the
 // mongobridge process and its corresponding mongod/mongos process by. The resulting port number of
 // the mongod/mongos process is MongoBridge#port + MongoBridge.kBridgeOffset.
 MongoBridge.kBridgeOffset = 10;
+
+export {MongoBridge};

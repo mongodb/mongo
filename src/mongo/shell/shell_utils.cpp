@@ -159,6 +159,7 @@ extern const JSFile servers;
 extern const JSFile servers_misc;
 extern const JSFile data_consistency_checker;
 extern const JSFile bridge;
+extern const JSFile bridge_global;
 extern const JSFile feature_compatibility_version;
 }  // namespace JSFiles
 
@@ -1226,10 +1227,17 @@ void initScope(Scope& scope) {
     scope.injectNative("_apiParameters", apiParameters);
     scope.externalSetup();
     mongo::shell_utils::installShellUtils(scope);
+
+    // modules
+    scope.execSetup(JSFiles::bridge);
+
+    // globals
+    scope.execSetup(JSFiles::bridge_global);
+
+    // scripts
     scope.execSetup(JSFiles::servers);
     scope.execSetup(JSFiles::servers_misc);
     scope.execSetup(JSFiles::data_consistency_checker);
-    scope.execSetup(JSFiles::bridge);
     scope.execSetup(JSFiles::feature_compatibility_version);
 
     initializeEnterpriseScope(scope);
