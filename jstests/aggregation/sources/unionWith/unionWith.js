@@ -3,6 +3,8 @@
  *
  * @tags: [
  *   not_allowed_with_signed_security_token,
+ *   # TODO (SERVER-107034): Re-enable this test in in-memory configurations.
+ *   requires_persistence,
  * ]
  */
 
