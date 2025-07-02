@@ -56,7 +56,8 @@ namespace mongo {
  */
 class RouterStagePipeline final : public RouterExecStage {
 public:
-    RouterStagePipeline(std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline);
+    RouterStagePipeline(std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline,
+                        std::unique_ptr<exec::agg::Pipeline> mergeExecPipeline);
 
     StatusWith<ClusterQueryResult> next() final;
 

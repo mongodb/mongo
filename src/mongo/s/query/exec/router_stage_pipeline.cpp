@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -51,11 +50,11 @@
 
 namespace mongo {
 
-RouterStagePipeline::RouterStagePipeline(std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline)
+RouterStagePipeline::RouterStagePipeline(std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline,
+                                         std::unique_ptr<exec::agg::Pipeline> mergeExecPipeline)
     : RouterExecStage(mergePipeline->getContext()->getOperationContext()),
       _mergePipeline(std::move(mergePipeline)),
-      _mergeExecPipeline(
-          exec::agg::buildPipeline(_mergePipeline->getSources(), _mergePipeline->getContext())) {
+      _mergeExecPipeline(std::move(mergeExecPipeline)) {
     invariant(!_mergePipeline->getSources().empty());
     _mergeCursorsStage =
         dynamic_cast<DocumentSourceMergeCursors*>(_mergePipeline->getSources().front().get());

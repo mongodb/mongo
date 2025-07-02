@@ -839,12 +839,14 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                             {"stages", targeter.pipeline->writeExplainOps(opts)}};
                         return Status::OK();
                     }
-
+                    auto execPipeline = exec::agg::buildPipeline(targeter.pipeline->getSources(),
+                                                                 targeter.pipeline->getContext());
                     return cluster_aggregation_planner::runPipelineOnMongoS(
                         namespaces,
                         request.getCursor().getBatchSize().value_or(
                             aggregation_request_helper::kDefaultBatchSize),
                         std::move(targeter.pipeline),
+                        std::move(execPipeline),
                         result,
                         privileges,
                         requestQueryStatsFromRemotes);
