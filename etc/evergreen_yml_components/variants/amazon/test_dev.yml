@@ -555,6 +555,7 @@ buildvariants:
         --ssl=off
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
         CCFLAGS="-fno-gnu-unique"
+      evergreen_remote_exec: on
     run_on:
       - amazon2-arm64-latest-xlarge
     tasks:
@@ -583,6 +584,7 @@ buildvariants:
         --ssl=off
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
         CCFLAGS="-fno-gnu-unique"
+      evergreen_remote_exec: on
     run_on:
       - amazon2023.3-arm64-xlarge
     tasks:
