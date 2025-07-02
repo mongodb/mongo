@@ -33,7 +33,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
-#include "mongo/db/query/stage_builder/sbe/abt_holder_def.h"
+#include "mongo/db/query/stage_builder/sbe/abt_defs.h"
 #include "mongo/db/query/stage_builder/sbe/type_signature.h"
 
 #include <vector>
@@ -362,10 +362,10 @@ public:
     using LocalVarInfo = std::pair<int32_t, int32_t>;
 
     struct Abt {
-        HolderPtr ptr;
+        abt::ABT ptr;
     };
     struct OptimizedAbt {
-        HolderPtr ptr;
+        abt::ABT ptr;
     };
 
     /**
@@ -456,9 +456,9 @@ public:
 
     SbExpr(boost::optional<SbVar> var) : SbExpr(var ? SbExpr{*var} : SbExpr{}) {}
 
-    SbExpr(const HolderPtr& a, boost::optional<TypeSignature> typeSig = boost::none);
+    SbExpr(const abt::ABT& a, boost::optional<TypeSignature> typeSig = boost::none);
 
-    SbExpr(HolderPtr&& a, boost::optional<TypeSignature> typeSig = boost::none) noexcept;
+    SbExpr(abt::ABT&& a, boost::optional<TypeSignature> typeSig = boost::none) noexcept;
 
     SbExpr(Abt a, boost::optional<TypeSignature> typeSig = boost::none) noexcept;
 
@@ -514,9 +514,9 @@ public:
         return *this;
     }
 
-    SbExpr& operator=(const HolderPtr& a);
+    SbExpr& operator=(const abt::ABT& a);
 
-    SbExpr& operator=(HolderPtr&& a) noexcept;
+    SbExpr& operator=(abt::ABT&& a) noexcept;
 
     SbExpr& operator=(Abt a) noexcept;
 
@@ -566,7 +566,7 @@ public:
      * As its name suggests, extractABT() should be treated like a "move-from" style operation
      * that leaves 'this' in a valid but indeterminate state.
      */
-    HolderPtr extractABT();
+    abt::ABT extractABT();
 
     bool hasTypeSignature() const {
         return _typeSig.has_value();
@@ -608,13 +608,13 @@ private:
         return holds_alternative<Abt>(_storage) || holds_alternative<OptimizedAbt>(_storage);
     }
 
-    const HolderPtr& getAbtInternal() const {
+    const abt::ABT& getAbtInternal() const {
         tassert(8455819, "Expected ABT expression", holdsAbtInternal());
         return holds_alternative<Abt>(_storage) ? get<Abt>(_storage).ptr
                                                 : get<OptimizedAbt>(_storage).ptr;
     }
 
-    HolderPtr& getAbtInternal() {
+    abt::ABT& getAbtInternal() {
         tassert(8455820, "Expected ABT expression", holdsAbtInternal());
         return holds_alternative<Abt>(_storage) ? get<Abt>(_storage).ptr
                                                 : get<OptimizedAbt>(_storage).ptr;

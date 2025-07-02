@@ -50,14 +50,14 @@
 #include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/exec/sbe/stages/virtual_scan.h"
-#include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
+#include "mongo/db/query/stage_builder/sbe/abt_defs.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 
 namespace mongo::stage_builder {
 namespace {
 inline abt::ABT extractABT(SbExpr& e) {
-    return unwrap(e.extractABT());
+    return e.extractABT();
 }
 
 inline abt::ABTVector extractABT(SbExpr::Vector& exprs) {
@@ -208,20 +208,19 @@ std::vector<sbe::WindowStage::Window> SbExprBuilder::lower(std::vector<SbWindow>
 }
 
 SbExpr SbExprBuilder::makeNot(SbExpr e) {
-    return wrap(stage_builder::makeNot(extractABT(e)));
+    return stage_builder::makeNot(extractABT(e));
 }
 
 SbExpr SbExprBuilder::makeUnaryOp(sbe::EPrimUnary::Op unaryOp, SbExpr e) {
-    return wrap(stage_builder::makeUnaryOp(getOptimizerOp(unaryOp), extractABT(e)));
+    return stage_builder::makeUnaryOp(getOptimizerOp(unaryOp), extractABT(e));
 }
 
 SbExpr SbExprBuilder::makeUnaryOp(abt::Operations unaryOp, SbExpr e) {
-    return wrap(stage_builder::makeUnaryOp(unaryOp, extractABT(e)));
+    return stage_builder::makeUnaryOp(unaryOp, extractABT(e));
 }
 
 SbExpr SbExprBuilder::makeBinaryOp(sbe::EPrimBinary::Op binaryOp, SbExpr lhs, SbExpr rhs) {
-    return wrap(
-        stage_builder::makeBinaryOp(getOptimizerOp(binaryOp), extractABT(lhs), extractABT(rhs)));
+    return stage_builder::makeBinaryOp(getOptimizerOp(binaryOp), extractABT(lhs), extractABT(rhs));
 }
 
 SbExpr SbExprBuilder::makeBinaryOp(abt::Operations binaryOp, SbExpr lhs, SbExpr rhs) {
@@ -229,72 +228,71 @@ SbExpr SbExprBuilder::makeBinaryOp(abt::Operations binaryOp, SbExpr lhs, SbExpr 
 }
 
 SbExpr SbExprBuilder::makeNaryOp(abt::Operations naryOp, SbExpr::Vector args) {
-    return wrap(stage_builder::makeNaryOp(naryOp, extractABT(args)));
+    return stage_builder::makeNaryOp(naryOp, extractABT(args));
 }
 
 SbExpr SbExprBuilder::makeConstant(sbe::value::TypeTags tag, sbe::value::Value val) {
-    return wrap(abt::make<abt::Constant>(tag, val));
+    return abt::make<abt::Constant>(tag, val);
 }
 
 SbExpr SbExprBuilder::makeNothingConstant() {
-    return wrap(abt::Constant::nothing());
+    return abt::Constant::nothing();
 }
 
 SbExpr SbExprBuilder::makeNullConstant() {
-    return wrap(abt::Constant::null());
+    return abt::Constant::null();
 }
 
 SbExpr SbExprBuilder::makeBoolConstant(bool boolVal) {
-    return wrap(abt::Constant::boolean(boolVal));
+    return abt::Constant::boolean(boolVal);
 }
 
 SbExpr SbExprBuilder::makeInt32Constant(int32_t num) {
-    return wrap(abt::Constant::int32(num));
+    return abt::Constant::int32(num);
 }
 
 SbExpr SbExprBuilder::makeInt64Constant(int64_t num) {
-    return wrap(abt::Constant::int64(num));
+    return abt::Constant::int64(num);
 }
 
 SbExpr SbExprBuilder::makeDoubleConstant(double num) {
-    return wrap(abt::Constant::fromDouble(num));
+    return abt::Constant::fromDouble(num);
 }
 
 SbExpr SbExprBuilder::makeDecimalConstant(const Decimal128& num) {
-    return wrap(abt::Constant::fromDecimal(num));
+    return abt::Constant::fromDecimal(num);
 }
 
 SbExpr SbExprBuilder::makeStrConstant(StringData str) {
-    return wrap(abt::Constant::str(str));
+    return abt::Constant::str(str);
 }
 
 SbExpr SbExprBuilder::makeUndefinedConstant() {
-    return wrap(abt::make<abt::Constant>(sbe::value::TypeTags::bsonUndefined, 0));
+    return abt::make<abt::Constant>(sbe::value::TypeTags::bsonUndefined, 0);
 }
 
 SbExpr SbExprBuilder::makeFunction(StringData name, SbExpr::Vector args) {
-    return wrap(stage_builder::makeABTFunction(name, extractABT(args)));
+    return stage_builder::makeABTFunction(name, extractABT(args));
 }
 
 SbExpr SbExprBuilder::makeIf(SbExpr condExpr, SbExpr thenExpr, SbExpr elseExpr) {
-    return wrap(
-        stage_builder::makeIf(extractABT(condExpr), extractABT(thenExpr), extractABT(elseExpr)));
+    return stage_builder::makeIf(extractABT(condExpr), extractABT(thenExpr), extractABT(elseExpr));
 }
 
 SbExpr SbExprBuilder::makeLet(sbe::FrameId frameId, SbExpr::Vector binds, SbExpr expr) {
-    return wrap(stage_builder::makeLet(frameId, extractABT(binds), extractABT(expr)));
+    return stage_builder::makeLet(frameId, extractABT(binds), extractABT(expr));
 }
 
 SbExpr SbExprBuilder::makeLocalLambda(sbe::FrameId frameId, SbExpr expr) {
-    return wrap(stage_builder::makeLocalLambda(frameId, extractABT(expr)));
+    return stage_builder::makeLocalLambda(frameId, extractABT(expr));
 }
 
 SbExpr SbExprBuilder::makeNumericConvert(SbExpr expr, sbe::value::TypeTags tag) {
-    return wrap(stage_builder::makeNumericConvert(extractABT(expr), tag));
+    return stage_builder::makeNumericConvert(extractABT(expr), tag);
 }
 
 SbExpr SbExprBuilder::makeFail(ErrorCodes::Error error, StringData errorMessage) {
-    return wrap(stage_builder::makeABTFail(error, errorMessage));
+    return stage_builder::makeABTFail(error, errorMessage);
 }
 
 SbExpr SbExprBuilder::makeFillEmpty(SbExpr expr, SbExpr altExpr) {
@@ -318,7 +316,7 @@ SbExpr SbExprBuilder::makeFillEmptyUndefined(SbExpr expr) {
 }
 
 SbExpr SbExprBuilder::makeIfNullExpr(SbExpr::Vector values) {
-    return wrap(stage_builder::makeIfNullExpr(extractABT(values), _state.frameIdGenerator));
+    return stage_builder::makeIfNullExpr(extractABT(values), _state.frameIdGenerator);
 }
 
 SbExpr SbExprBuilder::generateNullOrMissing(SbExpr expr) {
@@ -339,63 +337,63 @@ SbExpr SbExprBuilder::generateNullMissingOrUndefined(SbExpr expr) {
 }
 
 SbExpr SbExprBuilder::generatePositiveCheck(SbExpr expr) {
-    return wrap(stage_builder::generateABTPositiveCheck(extractABT(expr)));
+    return stage_builder::generateABTPositiveCheck(extractABT(expr));
 }
 
 SbExpr SbExprBuilder::generateNullOrMissing(SbVar var) {
-    return wrap(stage_builder::generateABTNullOrMissing(var.getABTName()));
+    return stage_builder::generateABTNullOrMissing(var.getABTName());
 }
 
 SbExpr SbExprBuilder::generateNullMissingOrUndefined(SbVar var) {
-    return wrap(stage_builder::generateABTNullMissingOrUndefined(var.getABTName()));
+    return stage_builder::generateABTNullMissingOrUndefined(var.getABTName());
 }
 
 SbExpr SbExprBuilder::generateNonStringCheck(SbVar var) {
-    return wrap(stage_builder::generateABTNonStringCheck(var.getABTName()));
+    return stage_builder::generateABTNonStringCheck(var.getABTName());
 }
 
 SbExpr SbExprBuilder::generateNonTimestampCheck(SbVar var) {
-    return wrap(stage_builder::generateABTNonTimestampCheck(var.getABTName()));
+    return stage_builder::generateABTNonTimestampCheck(var.getABTName());
 }
 
 SbExpr SbExprBuilder::generateNegativeCheck(SbVar var) {
-    return wrap(stage_builder::generateABTNegativeCheck(var.getABTName()));
+    return stage_builder::generateABTNegativeCheck(var.getABTName());
 }
 
 SbExpr SbExprBuilder::generateNonPositiveCheck(SbVar var) {
-    return wrap(stage_builder::generateABTNonPositiveCheck(var.getABTName()));
+    return stage_builder::generateABTNonPositiveCheck(var.getABTName());
 }
 
 SbExpr SbExprBuilder::generateNonNumericCheck(SbVar var) {
-    return wrap(stage_builder::generateABTNonNumericCheck(var.getABTName()));
+    return stage_builder::generateABTNonNumericCheck(var.getABTName());
 }
 
 SbExpr SbExprBuilder::generateLongLongMinCheck(SbVar var) {
-    return wrap(stage_builder::generateABTLongLongMinCheck(var.getABTName()));
+    return stage_builder::generateABTLongLongMinCheck(var.getABTName());
 }
 
 SbExpr SbExprBuilder::generateNonArrayCheck(SbVar var) {
-    return wrap(stage_builder::generateABTNonArrayCheck(var.getABTName()));
+    return stage_builder::generateABTNonArrayCheck(var.getABTName());
 }
 
 SbExpr SbExprBuilder::generateNonObjectCheck(SbVar var) {
-    return wrap(stage_builder::generateABTNonObjectCheck(var.getABTName()));
+    return stage_builder::generateABTNonObjectCheck(var.getABTName());
 }
 
 SbExpr SbExprBuilder::generateNullishOrNotRepresentableInt32Check(SbVar var) {
-    return wrap(stage_builder::generateABTNullishOrNotRepresentableInt32Check(var.getABTName()));
+    return stage_builder::generateABTNullishOrNotRepresentableInt32Check(var.getABTName());
 }
 
 SbExpr SbExprBuilder::generateNaNCheck(SbVar var) {
-    return wrap(stage_builder::generateABTNaNCheck(var.getABTName()));
+    return stage_builder::generateABTNaNCheck(var.getABTName());
 }
 
 SbExpr SbExprBuilder::generateInfinityCheck(SbVar var) {
-    return wrap(stage_builder::generateABTInfinityCheck(var.getABTName()));
+    return stage_builder::generateABTInfinityCheck(var.getABTName());
 }
 
 SbExpr SbExprBuilder::generateInvalidRoundPlaceArgCheck(SbVar var) {
-    return wrap(stage_builder::generateInvalidRoundPlaceArgCheck(var.getABTName()));
+    return stage_builder::generateInvalidRoundPlaceArgCheck(var.getABTName());
 }
 
 SbExpr SbExprBuilder::buildMultiBranchConditionalFromCaseValuePairs(
@@ -409,7 +407,7 @@ SbExpr SbExprBuilder::buildMultiBranchConditionalFromCaseValuePairs(
                 return buildMultiBranchConditional(std::move(caseValuePair), std::move(expression));
             });
     } else {
-        return wrap(abt::make<abt::Switch>(extractABT(caseValPairs), extractABT(defaultVal)));
+        return abt::make<abt::Switch>(extractABT(caseValPairs), extractABT(defaultVal));
     }
 }
 

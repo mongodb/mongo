@@ -32,7 +32,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/query/algebra/polyvalue.h"
 #include "mongo/db/query/bson_typemask.h"
-#include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
+#include "mongo/db/query/stage_builder/sbe/abt_defs.h"
 #include "mongo/util/assert_util.h"
 
 #include <algorithm>
@@ -52,9 +52,9 @@ SbExpr makeBooleanOpTree(abt::Operations logicOp,
     std::vector<abt::ABT> abtExprs;
     abtExprs.reserve(leaves.size());
     for (auto&& e : leaves) {
-        abtExprs.push_back(unwrap(e.extractABT()));
+        abtExprs.push_back(e.extractABT());
     }
-    return wrap(makeBooleanOpTree(logicOp, std::move(abtExprs)));
+    return makeBooleanOpTree(logicOp, std::move(abtExprs));
 }
 
 abt::ABT makeBooleanOpTree(abt::Operations logicOp, std::vector<abt::ABT> leaves) {

@@ -59,9 +59,8 @@
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
-#include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
+#include "mongo/db/query/stage_builder/sbe/abt_defs.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
-#include "mongo/db/query/stage_builder/sbe/gen_abt_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/util/assert_util.h"
@@ -83,10 +82,6 @@
 namespace mongo::stage_builder {
 namespace {
 size_t kArgumentCountForBinaryTree = 100;
-
-inline abt::ProjectionName makeLocalVariableName(sbe::FrameId frameId, sbe::value::SlotId slotId) {
-    return getABTLocalVariableName(frameId, slotId);
-}
 
 struct ExpressionVisitorContext {
     struct VarsFrame {
@@ -120,14 +115,6 @@ struct ExpressionVisitorContext {
 
     void pushExpr(SbExpr expr) {
         exprStack.emplace_back(std::move(expr));
-    }
-
-    abt::ABT popABTExpr() {
-        tassert(6987504, "tried to pop from empty SbExpr stack", !exprStack.empty());
-
-        auto expr = std::move(exprStack.back());
-        exprStack.pop_back();
-        return unwrap(expr.extractABT());
     }
 
     SbExpr popExpr() {
@@ -3141,25 +3128,23 @@ public:
         size_t arity = expr->getChildren().size();
         _context->ensureArity(arity);
         if (arity == 0) {
-            pushABT(abt::Constant::null());
+            pushExpr(_b.makeNullConstant());
         } else if (arity == 1) {
-            abt::ABT singleInput = _context->popABTExpr();
-            abt::ProjectionName singleInputName =
-                makeLocalVariableName(_context->state.frameId(), 0);
-            auto k = makeVariable(singleInputName);
+            SbExpr singleInput = popExpr();
+            auto frameId = _context->state.frameId();
+            SbVar singleInputVar{frameId, 0};
 
-            abt::ABT stdDevSampExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-                {ABTCaseValuePair{generateABTNullMissingOrUndefined(singleInputName),
-                                  abt::Constant::null()},
-                 ABTCaseValuePair{makeABTFunction("isArray", makeVariable(singleInputName)),
-                                  makeFillEmptyNull(makeABTFunction(
-                                      "avgOfArray", makeVariable(singleInputName)))},
-                 ABTCaseValuePair{makeABTFunction("isNumber", makeVariable(singleInputName)),
-                                  makeVariable(singleInputName)}},
-                abt::Constant::null());
+            SbExpr avgOfArrayExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
+                SbExpr::makeExprPairVector(
+                    SbExprPair{_b.generateNullMissingOrUndefined(singleInputVar),
+                               _b.makeNullConstant()},
+                    SbExprPair{_b.makeFunction("isArray", singleInputVar),
+                               _b.makeFillEmptyNull(_b.makeFunction("avgOfArray", singleInputVar))},
+                    SbExprPair{_b.makeFunction("isNumber", singleInputVar), singleInputVar}),
+                _b.makeNullConstant());
 
-            pushABT(abt::make<abt::Let>(
-                std::move(singleInputName), std::move(singleInput), std::move(stdDevSampExpr)));
+            pushExpr(_b.makeLet(
+                frameId, SbExpr::makeSeq(std::move(singleInput)), std::move(avgOfArrayExpr)));
         } else {
             generateExpressionFromAccumulatorExpression(expr, _context, "avgOfArray");
         }
@@ -3195,25 +3180,27 @@ public:
         _context->ensureArity(arity);
 
         if (arity == 0) {
-            pushABT(abt::Constant::null());
+            pushExpr(_b.makeNullConstant());
         } else if (arity == 1) {
-            abt::ABT singleInput = _context->popABTExpr();
-            abt::ProjectionName singleInputName =
-                makeLocalVariableName(_context->state.frameId(), 0);
-            abt::ABT stdDevPopExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-                {ABTCaseValuePair{generateABTNullMissingOrUndefined(singleInputName),
-                                  abt::Constant::null()},
-                 ABTCaseValuePair{makeABTFunction("isArray", makeVariable(singleInputName)),
-                                  makeFillEmptyNull(
-                                      makeABTFunction("stdDevPop", makeVariable(singleInputName)))},
-                 ABTCaseValuePair{
-                     makeABTFunction("isNumber", makeVariable(singleInputName)),
-                     // Population standard deviation for a single numeric input is always 0.
-                     abt::Constant::int32(0)}},
-                abt::Constant::null());
+            SbExpr singleInput = popExpr();
 
-            pushABT(abt::make<abt::Let>(
-                std::move(singleInputName), std::move(singleInput), std::move(stdDevPopExpr)));
+            auto frameId = _context->state.frameId();
+            SbVar singleInputVar{frameId, 0};
+
+            SbExpr stdDevPopExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
+                SbExpr::makeExprPairVector(
+                    SbExprPair{_b.generateNullMissingOrUndefined(singleInputVar),
+                               _b.makeNullConstant()},
+                    SbExprPair{_b.makeFunction("isArray", singleInputVar),
+                               _b.makeFillEmptyNull(_b.makeFunction("stdDevPop", singleInputVar))},
+                    SbExprPair{
+                        _b.makeFunction("isNumber", singleInputVar),
+                        // Population standard deviation for a single numeric input is always 0.
+                        _b.makeInt32Constant(0)}),
+                _b.makeNullConstant());
+
+            pushExpr(_b.makeLet(
+                frameId, SbExpr::makeSeq(std::move(singleInput)), std::move(stdDevPopExpr)));
         } else {
             generateExpressionFromAccumulatorExpression(expr, _context, "stdDevPop");
         }
@@ -3223,22 +3210,25 @@ public:
         _context->ensureArity(arity);
 
         if (arity == 0) {
-            pushABT(abt::Constant::null());
+            pushExpr(_b.makeNullConstant());
         } else if (arity == 1) {
-            abt::ABT singleInput = _context->popABTExpr();
-            abt::ProjectionName singleInputName =
-                makeLocalVariableName(_context->state.frameId(), 0);
-            abt::ABT stdDevSampExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-                {ABTCaseValuePair{generateABTNullMissingOrUndefined(singleInputName),
-                                  abt::Constant::null()},
-                 ABTCaseValuePair{makeABTFunction("isArray", makeVariable(singleInputName)),
-                                  makeFillEmptyNull(makeABTFunction(
-                                      "stdDevSamp", makeVariable(singleInputName)))}},
-                // Sample standard deviation is undefined for a single input.
-                abt::Constant::null());
+            SbExpr singleInput = popExpr();
 
-            pushABT(abt::make<abt::Let>(
-                std::move(singleInputName), std::move(singleInput), std::move(stdDevSampExpr)));
+            auto frameId = _context->state.frameId();
+            SbVar singleInputVar{frameId, 0};
+
+            SbExpr stdDevSampExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
+                SbExpr::makeExprPairVector(
+                    SbExprPair{_b.generateNullMissingOrUndefined(singleInputVar),
+                               _b.makeNullConstant()},
+                    SbExprPair{
+                        _b.makeFunction("isArray", singleInputVar),
+                        _b.makeFillEmptyNull(_b.makeFunction("stdDevSamp", singleInputVar))}),
+                // Sample standard deviation is undefined for a single input.
+                _b.makeNullConstant());
+
+            pushExpr(_b.makeLet(
+                frameId, SbExpr::makeSeq(std::move(singleInput)), std::move(stdDevSampExpr)));
         } else {
             generateExpressionFromAccumulatorExpression(expr, _context, "stdDevSamp");
         }
@@ -3247,26 +3237,25 @@ public:
         size_t arity = expr->getChildren().size();
         _context->ensureArity(arity);
         if (arity == 0) {
-            pushABT(abt::Constant::null());
+            pushExpr(_b.makeNullConstant());
         } else if (arity == 1) {
-            abt::ABT singleInput = _context->popABTExpr();
-            abt::ProjectionName singleInputName =
-                makeLocalVariableName(_context->state.frameId(), 0);
-            auto k = makeVariable(singleInputName);
+            SbExpr singleInput = popExpr();
+
+            auto frameId = _context->state.frameId();
+            SbVar singleInputVar{frameId, 0};
 
             // $sum returns 0 if the operand is missing, undefined, or non-numeric.
-            abt::ABT stdDevSampExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-                {ABTCaseValuePair{generateABTNullMissingOrUndefined(singleInputName),
-                                  abt::Constant::int32(0)},
-                 ABTCaseValuePair{makeABTFunction("isArray", makeVariable(singleInputName)),
-                                  makeFillEmptyNull(makeABTFunction(
-                                      "sumOfArray", makeVariable(singleInputName)))},
-                 ABTCaseValuePair{makeABTFunction("isNumber", makeVariable(singleInputName)),
-                                  makeVariable(singleInputName)}},
-                abt::Constant::int32(0));
+            SbExpr sumOfArrayExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
+                SbExpr::makeExprPairVector(
+                    SbExprPair{_b.generateNullMissingOrUndefined(singleInputVar),
+                               _b.makeInt32Constant(0)},
+                    SbExprPair{_b.makeFunction("isArray", singleInputVar),
+                               _b.makeFillEmptyNull(_b.makeFunction("sumOfArray", singleInputVar))},
+                    SbExprPair{_b.makeFunction("isNumber", singleInputVar), singleInputVar}),
+                _b.makeInt32Constant(0));
 
-            pushABT(abt::make<abt::Let>(
-                std::move(singleInputName), std::move(singleInput), std::move(stdDevSampExpr)));
+            pushExpr(_b.makeLet(
+                frameId, SbExpr::makeSeq(std::move(singleInput)), std::move(sumOfArrayExpr)));
         } else {
             generateExpressionFromAccumulatorExpression(expr, _context, "sumOfArray");
         }
@@ -3296,16 +3285,16 @@ public:
     void visit(const ExpressionRandom* expr) final {
         uassert(
             5155201, "$rand does not currently accept arguments", expr->getChildren().size() == 0);
-        auto expression = makeABTFunction("rand");
-        pushABT(std::move(expression));
+        auto expression = _b.makeFunction("rand");
+        pushExpr(std::move(expression));
     }
 
     void visit(const ExpressionCurrentDate* expr) final {
         uassert(9940500,
                 "$currentDate does not currently accept arguments",
                 expr->getChildren().size() == 0);
-        auto expression = makeABTFunction("currentDate");
-        pushABT(std::move(expression));
+        auto expression = _b.makeFunction("currentDate");
+        pushExpr(std::move(expression));
     }
 
     void visit(const ExpressionToHashedIndexKey* expr) final {
@@ -3336,37 +3325,39 @@ public:
     void visit(const ExpressionTsSecond* expr) final {
         _context->ensureArity(1);
 
-        auto frameId = _context->state.frameId();
-        auto arg = _context->popABTExpr();
-        auto name = makeLocalVariableName(frameId, 0);
-        auto var = makeVariable(name);
+        auto arg = popExpr();
 
-        auto tsSecondExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(name), abt::Constant::null()},
-             ABTCaseValuePair{generateABTNonTimestampCheck(name),
-                              makeABTFail(ErrorCodes::Error{7157900},
-                                          str::stream() << expr->getOpName()
-                                                        << " expects argument of type timestamp")}},
-            makeABTFunction("tsSecond", makeVariable(name)));
-        pushABT(abt::make<abt::Let>(std::move(name), std::move(arg), std::move(tsSecondExpr)));
+        auto frameId = _context->state.frameId();
+        SbVar var{frameId, 0};
+
+        auto tsSecondExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
+            SbExpr::makeExprPairVector(
+                SbExprPair{_b.generateNullMissingOrUndefined(var), _b.makeNullConstant()},
+                SbExprPair{_b.generateNonTimestampCheck(var),
+                           _b.makeFail(ErrorCodes::Error{7157900},
+                                       str::stream() << expr->getOpName()
+                                                     << " expects argument of type timestamp")}),
+            _b.makeFunction("tsSecond", var));
+        pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(std::move(arg)), std::move(tsSecondExpr)));
     }
 
     void visit(const ExpressionTsIncrement* expr) final {
         _context->ensureArity(1);
 
-        auto frameId = _context->state.frameId();
-        auto arg = _context->popABTExpr();
-        auto name = makeLocalVariableName(frameId, 0);
-        auto var = makeVariable(name);
+        auto arg = popExpr();
 
-        auto tsIncrementExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(name), abt::Constant::null()},
-             ABTCaseValuePair{generateABTNonTimestampCheck(name),
-                              makeABTFail(ErrorCodes::Error{7157901},
-                                          str::stream() << expr->getOpName()
-                                                        << " expects argument of type timestamp")}},
-            makeABTFunction("tsIncrement", makeVariable(name)));
-        pushABT(abt::make<abt::Let>(std::move(name), std::move(arg), std::move(tsIncrementExpr)));
+        auto frameId = _context->state.frameId();
+        SbVar var{frameId, 0};
+
+        auto tsIncrementExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
+            SbExpr::makeExprPairVector(
+                SbExprPair{_b.generateNullMissingOrUndefined(var), _b.makeNullConstant()},
+                SbExprPair{_b.generateNonTimestampCheck(var),
+                           _b.makeFail(ErrorCodes::Error{7157901},
+                                       str::stream() << expr->getOpName()
+                                                     << " expects argument of type timestamp")}),
+            _b.makeFunction("tsIncrement", var));
+        pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(std::move(arg)), std::move(tsIncrementExpr)));
     }
 
     void visit(const ExpressionInternalOwningShard* expr) final {
@@ -3423,10 +3414,10 @@ private:
                 (opName == "$round" ? "round"_sd : "trunc"_sd), inputNumVar, inputPlaceVar));
 
         // "place" argument defaults to 0.
-        SbExpr placeABT = hasPlaceArg ? popExpr() : _b.makeInt32Constant(0);
-        SbExpr inputABT = popExpr();
+        SbExpr placeExpr = hasPlaceArg ? popExpr() : _b.makeInt32Constant(0);
+        SbExpr inputExpr = popExpr();
         pushExpr(_b.makeLet(frameId,
-                            SbExpr::makeSeq(std::move(inputABT), std::move(placeABT)),
+                            SbExpr::makeSeq(std::move(inputExpr), std::move(placeExpr)),
                             std::move(abtExpr)));
     }
 
@@ -3444,19 +3435,18 @@ private:
             // Empty $and and $or always evaluate to their logical operator's identity value:
             // true and false, respectively.
             auto logicIdentityVal = (logicOp == abt::Operations::And);
-            pushABT(abt::Constant::boolean(logicIdentityVal));
+            pushExpr(_b.makeBoolConstant(logicIdentityVal));
             return;
         }
 
-        std::vector<abt::ABT> exprs;
+        SbExpr::Vector exprs;
         exprs.reserve(numChildren);
         for (size_t i = 0; i < numChildren; ++i) {
-            exprs.emplace_back(
-                makeFillEmptyFalse(makeABTFunction("coerceToBool", _context->popABTExpr())));
+            exprs.emplace_back(_b.makeFillEmptyFalse(_b.makeFunction("coerceToBool", popExpr())));
         }
         std::reverse(exprs.begin(), exprs.end());
 
-        pushABT(makeBooleanOpTree(logicOp, std::move(exprs)));
+        pushExpr(_b.makeBooleanOpTree(logicOp, std::move(exprs)));
     }
 
     /**
@@ -3468,26 +3458,25 @@ private:
         // in the user's query, it is a nullptr. In ExpressionCond, the last child is the "else"
         // branch, and it is guaranteed not to be nullptr.
         auto defaultExpr = expr->getChildren().back() != nullptr
-            ? _context->popABTExpr()
-            : makeABTFail(ErrorCodes::Error{7158303},
+            ? popExpr()
+            : _b.makeFail(ErrorCodes::Error{7158303},
                           "$switch could not find a matching branch for an "
                           "input, and no default was specified.");
 
         size_t numCases = expr->getChildren().size() / 2;
-        std::vector<ABTCaseValuePair> cases;
+        std::vector<SbExprPair> cases;
         cases.reserve(numCases);
 
         for (size_t i = 0; i < numCases; ++i) {
-            auto valueExpr = _context->popABTExpr();
-            auto conditionExpr =
-                makeFillEmptyFalse(makeABTFunction("coerceToBool", _context->popABTExpr()));
+            auto valueExpr = popExpr();
+            auto conditionExpr = _b.makeFillEmptyFalse(_b.makeFunction("coerceToBool", popExpr()));
             cases.emplace_back(std::move(conditionExpr), std::move(valueExpr));
         }
 
         std::reverse(cases.begin(), cases.end());
 
-        pushABT(buildABTMultiBranchConditionalFromCaseValuePairs(std::move(cases),
-                                                                 std::move(defaultExpr)));
+        pushExpr(_b.buildMultiBranchConditionalFromCaseValuePairs(std::move(cases),
+                                                                  std::move(defaultExpr)));
     }
 
     void generateDateExpressionAcceptingTimeZone(StringData exprName, const Expression* expr) {
@@ -3615,20 +3604,21 @@ private:
      * is numeric and is not null.
      */
     void generateTrigonometricExpression(StringData exprName) {
-        auto frameId = _context->state.frameId();
-        auto arg = _context->popABTExpr();
-        auto argName = makeLocalVariableName(frameId, 0);
+        auto arg = popExpr();
 
-        auto genericTrigonometricExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(argName), abt::Constant::null()},
-             ABTCaseValuePair{makeABTFunction("isNumber", makeVariable(argName)),
-                              makeABTFunction(exprName, makeVariable(argName))}},
-            makeABTFail(ErrorCodes::Error{7157800},
+        auto frameId = _context->state.frameId();
+        SbVar argVar{frameId, 0};
+
+        auto genericTrigonometricExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
+            SbExpr::makeExprPairVector(
+                SbExprPair{_b.generateNullMissingOrUndefined(argVar), _b.makeNullConstant()},
+                SbExprPair{_b.makeFunction("isNumber", argVar), _b.makeFunction(exprName, argVar)}),
+            _b.makeFail(ErrorCodes::Error{7157800},
                         str::stream()
                             << "$" << std::string{exprName} << " supports only numeric types"));
 
-        pushABT(abt::make<abt::Let>(
-            std::move(argName), std::move(arg), std::move(genericTrigonometricExpr)));
+        pushExpr(_b.makeLet(
+            frameId, SbExpr::makeSeq(std::move(arg)), std::move(genericTrigonometricExpr)));
     }
 
     /**
@@ -3637,34 +3627,31 @@ private:
      */
     void generateTrigonometricExpressionBinary(StringData exprName) {
         _context->ensureArity(2);
-        auto rhs = _context->popABTExpr();
-        auto lhs = _context->popABTExpr();
-        auto lhsName = makeLocalVariableName(_context->state.frameId(), 0);
-        auto rhsName = makeLocalVariableName(_context->state.frameId(), 0);
-        auto lhsVariable = makeVariable(lhsName);
-        auto rhsVariable = makeVariable(rhsName);
+        auto rhs = popExpr();
+        auto lhs = popExpr();
 
-        auto checkNullOrMissing =
-            abt::make<abt::BinaryOp>(abt::Operations::Or,
-                                     generateABTNullMissingOrUndefined(lhsName),
-                                     generateABTNullMissingOrUndefined(rhsName));
+        auto frameId = _context->state.frameId();
+        SbVar lhsVar{frameId, 0};
+        SbVar rhsVar{frameId, 1};
 
-        auto checkIsNumber = abt::make<abt::BinaryOp>(abt::Operations::And,
-                                                      makeABTFunction("isNumber", lhsVariable),
-                                                      makeABTFunction("isNumber", rhsVariable));
+        auto checkNullOrMissing = _b.makeBinaryOp(abt::Operations::Or,
+                                                  _b.generateNullMissingOrUndefined(lhsVar),
+                                                  _b.generateNullMissingOrUndefined(rhsVar));
 
-        auto genericTrigonometricExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{std::move(checkNullOrMissing), abt::Constant::null()},
-             ABTCaseValuePair{
-                 std::move(checkIsNumber),
-                 makeABTFunction(exprName, std::move(lhsVariable), std::move(rhsVariable))}},
-            makeABTFail(ErrorCodes::Error{7157801},
+        auto checkIsNumber = _b.makeBinaryOp(abt::Operations::And,
+                                             _b.makeFunction("isNumber", lhsVar),
+                                             _b.makeFunction("isNumber", rhsVar));
+
+        auto genericTrigonometricExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
+            SbExpr::makeExprPairVector(
+                SbExprPair{std::move(checkNullOrMissing), _b.makeNullConstant()},
+                SbExprPair{std::move(checkIsNumber), _b.makeFunction(exprName, lhsVar, rhsVar)}),
+            _b.makeFail(ErrorCodes::Error{7157801},
                         str::stream() << "$" << exprName << " supports only numeric types"));
 
-
-        pushABT(makeLet({std::move(lhsName), std::move(rhsName)},
-                        abt::makeSeq(std::move(lhs), std::move(rhs)),
-                        std::move(genericTrigonometricExpr)));
+        pushExpr(_b.makeLet(frameId,
+                            SbExpr::makeSeq(std::move(lhs), std::move(rhs)),
+                            std::move(genericTrigonometricExpr)));
     }
 
     /**
@@ -3674,39 +3661,39 @@ private:
     void generateTrigonometricExpressionWithBounds(StringData exprName,
                                                    const DoubleBound& lowerBound,
                                                    const DoubleBound& upperBound) {
+        auto arg = popExpr();
+
         auto frameId = _context->state.frameId();
-        auto arg = _context->popABTExpr();
-        auto argName = makeLocalVariableName(frameId, 0);
-        auto variable = makeVariable(argName);
+        SbVar argVar{frameId, 0};
+
         abt::Operations lowerCmp =
             lowerBound.inclusive ? abt::Operations::Gte : abt::Operations::Gt;
         abt::Operations upperCmp =
             upperBound.inclusive ? abt::Operations::Lte : abt::Operations::Lt;
-        auto checkBounds = abt::make<abt::BinaryOp>(
+        auto checkBounds = _b.makeBinaryOp(
             abt::Operations::And,
-            abt::make<abt::BinaryOp>(
-                lowerCmp, variable, abt::Constant::fromDouble(lowerBound.bound)),
-            abt::make<abt::BinaryOp>(
-                upperCmp, variable, abt::Constant::fromDouble(upperBound.bound)));
+            _b.makeBinaryOp(lowerCmp, argVar, _b.makeDoubleConstant(lowerBound.bound)),
+            _b.makeBinaryOp(upperCmp, argVar, _b.makeDoubleConstant(upperBound.bound)));
 
-        auto checkIsNumber = makeABTFunction("isNumber", variable);
-        auto trigonometricExpr = makeABTFunction(exprName, variable);
+        auto checkIsNumber = _b.makeFunction("isNumber", argVar);
+        auto trigonometricExpr = _b.makeFunction(exprName, argVar);
 
-        auto genericTrigonometricExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(argName), abt::Constant::null()},
-             ABTCaseValuePair{makeNot(std::move(checkIsNumber)),
-                              makeABTFail(ErrorCodes::Error{7157802},
-                                          str::stream() << "$" << std::string{exprName}
-                                                        << " supports only numeric types")},
-             ABTCaseValuePair{generateABTNaNCheck(argName), std::move(variable)},
-             ABTCaseValuePair{std::move(checkBounds), std::move(trigonometricExpr)}},
-            makeABTFail(ErrorCodes::Error{7157803},
+        auto genericTrigonometricExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
+            SbExpr::makeExprPairVector(
+                SbExprPair{_b.generateNullMissingOrUndefined(argVar), _b.makeNullConstant()},
+                SbExprPair{_b.makeNot(std::move(checkIsNumber)),
+                           _b.makeFail(ErrorCodes::Error{7157802},
+                                       str::stream() << "$" << std::string{exprName}
+                                                     << " supports only numeric types")},
+                SbExprPair{_b.generateNaNCheck(argVar), argVar},
+                SbExprPair{std::move(checkBounds), std::move(trigonometricExpr)}),
+            _b.makeFail(ErrorCodes::Error{7157803},
                         str::stream() << "Cannot apply $" << std::string{exprName}
                                       << ", value must be in " << lowerBound.printLowerBound()
                                       << ", " << upperBound.printUpperBound()));
 
-        pushABT(abt::make<abt::Let>(
-            std::move(argName), std::move(arg), std::move(genericTrigonometricExpr)));
+        pushExpr(_b.makeLet(
+            frameId, SbExpr::makeSeq(std::move(arg)), std::move(genericTrigonometricExpr)));
     }
 
     /*
@@ -3716,111 +3703,94 @@ private:
                               ExpressionVisitorContext* _context,
                               const std::string& indexOfFunction) {
         const auto& children = expr->getChildren();
-        auto operandSize = children.size() <= 3 ? 3 : 4;
-        abt::ABTVector operands;
-        operands.reserve(operandSize);
+        invariant(children.size() >= 2 && children.size() <= 4);
 
-        auto strName = makeLocalVariableName(_context->state.frameId(), 0);
-        auto substrName = makeLocalVariableName(_context->state.frameId(), 0);
-        auto startIndexName = makeLocalVariableName(_context->state.frameId(), 0);
-        boost::optional<abt::ProjectionName> endIndexName;
+        // Set up the frame and get arguments from the stack.
+        auto frameId = _context->state.frameId();
+        sbe::value::SlotId numLocalVars = 0;
 
-        // Get arguments from stack.
-        std::vector<abt::ProjectionName> varNames;
-        switch (children.size()) {
-            case 2: {
-                varNames.emplace_back(startIndexName);
-                operands.emplace_back(abt::Constant::int64(0));
-                varNames.emplace_back(substrName);
-                operands.emplace_back(_context->popABTExpr());
-                varNames.emplace_back(strName);
-                operands.emplace_back(_context->popABTExpr());
-                break;
-            }
-            case 3: {
-                varNames.emplace_back(startIndexName);
-                operands.emplace_back(_context->popABTExpr());
-                varNames.emplace_back(substrName);
-                operands.emplace_back(_context->popABTExpr());
-                varNames.emplace_back(strName);
-                operands.emplace_back(_context->popABTExpr());
-                break;
-            }
-            case 4: {
-                endIndexName.emplace(makeLocalVariableName(_context->state.frameId(), 0));
-                varNames.emplace_back(*endIndexName);
-                operands.emplace_back(_context->popABTExpr());
-                varNames.emplace_back(startIndexName);
-                operands.emplace_back(_context->popABTExpr());
-                varNames.emplace_back(substrName);
-                operands.emplace_back(_context->popABTExpr());
-                varNames.emplace_back(strName);
-                operands.emplace_back(_context->popABTExpr());
-                break;
-            }
-            default:
-                MONGO_UNREACHABLE;
+        SbVar strVar{frameId, numLocalVars++};
+        SbVar substrVar{frameId, numLocalVars++};
+        SbVar startIndexVar{frameId, numLocalVars++};
+
+        boost::optional<SbVar> endIndexVar;
+        SbExpr endIndexExpr;
+        if (children.size() >= 4) {
+            endIndexVar = SbVar{frameId, numLocalVars++};
+            endIndexExpr = popExpr();
         }
 
-        // Add string and substring operands.
-        abt::ABTVector functionArgs{makeVariable(strName), makeVariable(substrName)};
+        SbExpr startIndexExpr = children.size() >= 3 ? popExpr() : _b.makeInt64Constant(0);
+        SbExpr substrExpr = popExpr();
+        SbExpr strExpr = popExpr();
+
+        SbExpr::Vector binds =
+            SbExpr::makeSeq(std::move(strExpr), std::move(substrExpr), std::move(startIndexExpr));
+
+        if (endIndexVar) {
+            binds.emplace_back(std::move(endIndexExpr));
+        }
+
+        // Add string and substring binds.
+        SbExpr::Vector functionArgs = SbExpr::makeSeq(strVar, substrVar);
 
         // Add start index operand.
-        auto checkValidStartIndex = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullishOrNotRepresentableInt32Check(startIndexName),
-                              makeABTFail(ErrorCodes::Error{7158003},
-                                          str::stream()
-                                              << "$" << indexOfFunction
-                                              << " start index must resolve to a number")},
-             ABTCaseValuePair{generateABTNegativeCheck(startIndexName),
-                              makeABTFail(ErrorCodes::Error{7158004},
-                                          str::stream() << "$" << indexOfFunction
-                                                        << " start index must be positive")}},
-            makeABTFunction(
+        auto checkValidStartIndex = _b.buildMultiBranchConditionalFromCaseValuePairs(
+            SbExpr::makeExprPairVector(
+                SbExprPair{_b.generateNullishOrNotRepresentableInt32Check(startIndexVar),
+                           _b.makeFail(ErrorCodes::Error{7158003},
+                                       str::stream() << "$" << indexOfFunction
+                                                     << " start index must resolve to a number")},
+                SbExprPair{_b.generateNegativeCheck(startIndexVar),
+                           _b.makeFail(ErrorCodes::Error{7158004},
+                                       str::stream() << "$" << indexOfFunction
+                                                     << " start index must be positive")}),
+            _b.makeFunction(
                 "convert",
-                makeVariable(startIndexName),
-                abt::Constant::int32(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
+                startIndexVar,
+                _b.makeInt32Constant(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
         functionArgs.push_back(std::move(checkValidStartIndex));
 
         // Add end index operand.
-        if (endIndexName) {
-            auto checkValidEndIndex = buildABTMultiBranchConditionalFromCaseValuePairs(
-                {ABTCaseValuePair{generateABTNullishOrNotRepresentableInt32Check(*endIndexName),
-                                  makeABTFail(ErrorCodes::Error{7158005},
-                                              str::stream()
-                                                  << "$" << indexOfFunction
-                                                  << " end index must resolve to a number")},
-                 ABTCaseValuePair{generateABTNegativeCheck(*endIndexName),
-                                  makeABTFail(ErrorCodes::Error{7158006},
-                                              str::stream() << "$" << indexOfFunction
-                                                            << " end index must be positive")}},
-                makeABTFunction(
+        if (endIndexVar) {
+            auto checkValidEndIndex = _b.buildMultiBranchConditionalFromCaseValuePairs(
+                SbExpr::makeExprPairVector(
+                    SbExprPair{_b.generateNullishOrNotRepresentableInt32Check(*endIndexVar),
+                               _b.makeFail(ErrorCodes::Error{7158005},
+                                           str::stream() << "$" << indexOfFunction
+                                                         << " end index must resolve to a number")},
+                    SbExprPair{_b.generateNegativeCheck(*endIndexVar),
+                               _b.makeFail(ErrorCodes::Error{7158006},
+                                           str::stream() << "$" << indexOfFunction
+                                                         << " end index must be positive")}),
+                _b.makeFunction(
                     "convert",
-                    makeVariable(*endIndexName),
-                    abt::Constant::int32(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
+                    *endIndexVar,
+                    _b.makeInt32Constant(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
             functionArgs.push_back(std::move(checkValidEndIndex));
         }
 
         // Check if string or substring are null or missing before calling indexOfFunction.
-        auto resultExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(strName), abt::Constant::null()},
-             ABTCaseValuePair{generateABTNonStringCheck(strName),
-                              makeABTFail(ErrorCodes::Error{7158007},
-                                          str::stream()
-                                              << "$" << indexOfFunction
-                                              << " string must resolve to a string or null")},
-             ABTCaseValuePair{generateABTNullMissingOrUndefined(substrName),
-                              makeABTFail(ErrorCodes::Error{7158008},
-                                          str::stream() << "$" << indexOfFunction
-                                                        << " substring must resolve to a string")},
-             ABTCaseValuePair{generateABTNonStringCheck(substrName),
-                              makeABTFail(ErrorCodes::Error{7158009},
-                                          str::stream() << "$" << indexOfFunction
-                                                        << " substring must resolve to a string")}},
-            abt::make<abt::FunctionCall>(indexOfFunction, std::move(functionArgs)));
+        auto resultExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
+            SbExpr::makeExprPairVector(
+                SbExprPair{_b.generateNullMissingOrUndefined(strVar), _b.makeNullConstant()},
+                SbExprPair{_b.generateNonStringCheck(strVar),
+                           _b.makeFail(ErrorCodes::Error{7158007},
+                                       str::stream()
+                                           << "$" << indexOfFunction
+                                           << " string must resolve to a string or null")},
+                SbExprPair{_b.generateNullMissingOrUndefined(substrVar),
+                           _b.makeFail(ErrorCodes::Error{7158008},
+                                       str::stream() << "$" << indexOfFunction
+                                                     << " substring must resolve to a string")},
+                SbExprPair{_b.generateNonStringCheck(substrVar),
+                           _b.makeFail(ErrorCodes::Error{7158009},
+                                       str::stream() << "$" << indexOfFunction
+                                                     << " substring must resolve to a string")}),
+            _b.makeFunction(indexOfFunction, std::move(functionArgs)));
 
         // Build local binding tree.
-        pushABT(makeLet(std::move(varNames), std::move(operands), std::move(resultExpr)));
+        pushExpr(_b.makeLet(frameId, std::move(binds), std::move(resultExpr)));
     }
 
     /*
@@ -3833,25 +3803,26 @@ private:
         _context->ensureArity(arity);
 
         if (arity == 0) {
-            pushABT(abt::Constant::null());
+            pushExpr(_b.makeNullConstant());
         } else if (arity == 1) {
-            abt::ABT singleInput = _context->popABTExpr();
-            abt::ProjectionName singleInputName =
-                makeLocalVariableName(_context->state.frameId(), 0);
+            SbExpr singleInput = popExpr();
 
-            abt::ABT maxMinExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-                {ABTCaseValuePair{generateABTNullMissingOrUndefined(singleInputName),
-                                  abt::Constant::null()},
-                 ABTCaseValuePair{
-                     makeABTFunction("isArray", makeVariable(singleInputName)),
-                     // In the case of a single argument, if the input is an array, $min or $max
-                     // operates on the elements of array to return a single value.
-                     makeFillEmptyNull(
-                         makeABTFunction(maxMinFunction, makeVariable(singleInputName)))}},
-                makeVariable(singleInputName));
+            auto frameId = _context->state.frameId();
+            SbVar singleInputVar{frameId, 0};
 
-            pushABT(abt::make<abt::Let>(
-                std::move(singleInputName), std::move(singleInput), std::move(maxMinExpr)));
+            SbExpr maxMinExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
+                SbExpr::makeExprPairVector(
+                    SbExprPair{_b.generateNullMissingOrUndefined(singleInputVar),
+                               _b.makeNullConstant()},
+                    SbExprPair{
+                        _b.makeFunction("isArray", singleInputVar),
+                        // In the case of a single argument, if the input is an array, $min or $max
+                        // operates on the elements of array to return a single value.
+                        _b.makeFillEmptyNull(_b.makeFunction(maxMinFunction, singleInputVar))}),
+                singleInputVar);
+
+            pushExpr(_b.makeLet(
+                frameId, SbExpr::makeSeq(std::move(singleInput)), std::move(maxMinExpr)));
         } else {
             generateExpressionFromAccumulatorExpression(expr, _context, maxMinFunction);
         }
@@ -3866,25 +3837,26 @@ private:
                                                      ExpressionVisitorContext* _context,
                                                      const std::string& functionCall) {
         size_t arity = expr->getChildren().size();
-        std::vector<abt::ProjectionName> varNames;
-        std::vector<abt::ABT> binds;
-        for (size_t idx = 0; idx < arity; ++idx) {
-            varNames.emplace_back(makeLocalVariableName(_context->state.frameId(), 0));
-            binds.emplace_back(_context->popABTExpr());
-        }
 
+        SbExpr::Vector binds;
+        for (size_t idx = 0; idx < arity; ++idx) {
+            binds.emplace_back(popExpr());
+        }
         std::reverse(std::begin(binds), std::end(binds));
-        abt::ABTVector argVars;
-        for (auto& name : varNames) {
-            argVars.push_back(makeVariable(name));
+
+        auto frameId = _context->state.frameId();
+        sbe::value::SlotId numLocalVars = 0;
+
+        SbExpr::Vector argVars;
+        for (size_t idx = 0; idx < arity; ++idx) {
+            argVars.push_back(SbVar{frameId, numLocalVars++});
         }
 
         // Take in all arguments and construct an array.
-        auto arrayExpr = makeLet(std::move(varNames),
-                                 std::move(binds),
-                                 abt::make<abt::FunctionCall>("newArray", std::move(argVars)));
+        auto arrayExpr =
+            _b.makeLet(frameId, std::move(binds), _b.makeFunction("newArray", std::move(argVars)));
 
-        pushABT(makeFillEmptyNull(makeABTFunction(functionCall, std::move(arrayExpr))));
+        pushExpr(_b.makeFillEmptyNull(_b.makeFunction(functionCall, std::move(arrayExpr))));
     }
 
     /**
@@ -3896,17 +3868,20 @@ private:
         size_t arity = expr->getChildren().size();
         _context->ensureArity(arity);
 
-        abt::ABTVector args;
-        abt::ProjectionNameVector argNames;
-        abt::ABTVector variables;
+        SbExpr::Vector args;
+        for (size_t idx = 0; idx < arity; ++idx) {
+            args.push_back(popExpr());
+        }
+        // Reverse the args array to preserve the original order of the arguments, since some set
+        // operations, such as $setDifference, are not commutative.
+        std::reverse(std::begin(args), std::end(args));
 
-        abt::ABTVector checkNulls;
-        abt::ABTVector checkNotArrays;
+        SbExpr::Vector variables;
+        SbExpr::Vector checkNulls;
+        SbExpr::Vector checkNotArrays;
 
         auto collatorSlot = _context->state.getCollatorSlot();
 
-        args.reserve(arity);
-        argNames.reserve(arity);
         variables.reserve(arity + (collatorSlot.has_value() ? 1 : 0));
         checkNulls.reserve(arity);
         checkNotArrays.reserve(arity);
@@ -3916,50 +3891,48 @@ private:
         auto operatorName = operatorNameSetFunctionNamePair.first;
         auto setFunctionName = operatorNameSetFunctionNamePair.second;
         if (collatorSlot) {
-            variables.push_back(makeABTVariable(*collatorSlot));
+            variables.push_back(SbVar{*collatorSlot});
         }
+
+        auto frameId = _context->state.frameId();
+        sbe::value::SlotId numLocalVars = 0;
 
         for (size_t idx = 0; idx < arity; ++idx) {
-            args.push_back(_context->popABTExpr());
-            auto argName = makeLocalVariableName(_context->state.frameId(), 0);
-            argNames.push_back(argName);
-            variables.push_back(makeVariable(argName));
+            SbVar argVar{frameId, numLocalVars++};
 
-            checkNulls.push_back(generateABTNullMissingOrUndefined(argName));
-            checkNotArrays.push_back(generateABTNonArrayCheck(std::move(argName)));
+            variables.push_back(argVar);
+            checkNulls.push_back(_b.generateNullMissingOrUndefined(argVar));
+            checkNotArrays.push_back(_b.generateNonArrayCheck(argVar));
         }
-        // Reverse the args array to preserve the original order of the arguments, since some set
-        // operations, such as $setDifference, are not commutative.
-        std::reverse(std::begin(args), std::end(args));
 
-        auto checkNullAnyArgument = makeBooleanOpTree(abt::Operations::Or, std::move(checkNulls));
+        auto checkNullAnyArgument =
+            _b.makeBooleanOpTree(abt::Operations::Or, std::move(checkNulls));
         auto checkNotArrayAnyArgument =
-            makeBooleanOpTree(abt::Operations::Or, std::move(checkNotArrays));
-        abt::ABT setExpr = [&]() -> abt::ABT {
+            _b.makeBooleanOpTree(abt::Operations::Or, std::move(checkNotArrays));
+        SbExpr setExpr = [&]() -> SbExpr {
             // To match classic engine semantics, $setEquals and $setIsSubset should throw an error
             // for any non-array arguments including null and missing values.
             if (setOp == SetOperation::Equals || setOp == SetOperation::IsSubset) {
-                return makeIf(makeFillEmptyTrue(std::move(checkNotArrayAnyArgument)),
-                              makeABTFail(ErrorCodes::Error{7158100},
-                                          str::stream() << "All operands of $" << operatorName
-                                                        << " must be arrays."),
-                              abt::make<abt::FunctionCall>(std::string{setFunctionName},
-                                                           std::move(variables)));
+                return _b.makeIf(
+                    _b.makeFillEmptyTrue(std::move(checkNotArrayAnyArgument)),
+                    _b.makeFail(ErrorCodes::Error{7158100},
+                                str::stream()
+                                    << "All operands of $" << operatorName << " must be arrays."),
+                    _b.makeFunction(std::string{setFunctionName}, std::move(variables)));
             } else {
-                return buildABTMultiBranchConditionalFromCaseValuePairs(
-                    {ABTCaseValuePair{std::move(checkNullAnyArgument), abt::Constant::null()},
-                     ABTCaseValuePair{std::move(checkNotArrayAnyArgument),
-                                      makeABTFail(ErrorCodes::Error{7158101},
-                                                  str::stream()
-                                                      << "All operands of $" << operatorName
-                                                      << " must be arrays.")}},
-                    abt::make<abt::FunctionCall>(std::string{setFunctionName},
-                                                 std::move(variables)));
+                return _b.buildMultiBranchConditionalFromCaseValuePairs(
+                    SbExpr::makeExprPairVector(
+                        SbExprPair{std::move(checkNullAnyArgument), _b.makeNullConstant()},
+                        SbExprPair{std::move(checkNotArrayAnyArgument),
+                                   _b.makeFail(ErrorCodes::Error{7158101},
+                                               str::stream() << "All operands of $" << operatorName
+                                                             << " must be arrays.")}),
+                    _b.makeFunction(std::string{setFunctionName}, std::move(variables)));
             }
         }();
 
-        setExpr = makeLet(std::move(argNames), std::move(args), std::move(setExpr));
-        pushABT(std::move(setExpr));
+        setExpr = _b.makeLet(frameId, std::move(args), std::move(setExpr));
+        pushExpr(std::move(setExpr));
     }
 
     std::pair<StringData, StringData> getSetOperatorAndFunctionNames(SetOperation setOp,
@@ -3992,39 +3965,40 @@ private:
         size_t arity = expr->hasOptions() ? 3 : 2;
         _context->ensureArity(arity);
 
-        boost::optional<abt::ABT> options;
-        if (expr->hasOptions()) {
-            options = _context->popABTExpr();
-        }
-        auto pattern = _context->popABTExpr();
-        auto input = _context->popABTExpr();
+        SbExpr options = expr->hasOptions() ? popExpr() : SbExpr{};
+        auto pattern = popExpr();
+        auto input = popExpr();
 
-        auto inputVar = makeLocalVariableName(_context->state.frameId(), 0);
-        auto patternVar = makeLocalVariableName(_context->state.frameId(), 0);
+        auto outerFrameId = _context->state.frameId();
+        SbVar inputVar{outerFrameId, 0};
+        SbVar patternVar{outerFrameId, 1};
 
-        auto generateRegexNullResponse = [exprName]() {
+        auto generateRegexNullResponse = [&]() {
             if (exprName == "regexMatch"_sd) {
-                return abt::Constant::boolean(false);
+                return _b.makeBoolConstant(false);
             } else if (exprName == "regexFindAll"_sd) {
-                return abt::Constant::emptyArray();
+                auto [emptyArrTag, emptyArrVal] = sbe::value::makeNewArray();
+                return _b.makeConstant(emptyArrTag, emptyArrVal);
             } else {
-                return abt::Constant::null();
+                return _b.makeNullConstant();
             }
         };
 
-        auto makeError = [exprName](int errorCode, StringData message) {
-            return makeABTFail(ErrorCodes::Error{errorCode},
+        auto makeError = [&](int errorCode, StringData message) {
+            return _b.makeFail(ErrorCodes::Error{errorCode},
                                str::stream() << "$" << std::string{exprName} << ": " << message);
         };
 
-        auto makeRegexFunctionCall = [&](abt::ABT compiledRegex) {
-            auto resultVar = makeLocalVariableName(_context->state.frameId(), 0);
-            return abt::make<abt::Let>(
-                resultVar,
-                makeABTFunction(exprName, std::move(compiledRegex), makeVariable(inputVar)),
-                abt::make<abt::If>(
-                    makeABTFunction("exists"_sd, makeVariable(resultVar)),
-                    makeVariable(resultVar),
+        auto makeRegexFunctionCall = [&](SbExpr compiledRegex) {
+            auto resultFrameId = _context->state.frameId();
+            SbVar resultVar{resultFrameId, 0};
+
+            return _b.makeLet(
+                resultFrameId,
+                SbExpr::makeSeq(_b.makeFunction(exprName, std::move(compiledRegex), inputVar)),
+                _b.makeIf(
+                    _b.makeFunction("exists"_sd, resultVar),
+                    resultVar,
                     makeError(5073403, "error occurred while executing the regular expression")));
         };
 
@@ -4038,7 +4012,7 @@ private:
 
                 // Create the compiled Regex from constant pattern and options.
                 auto [regexTag, regexVal] = sbe::makeNewPcreRegex(*pattern, options);
-                auto compiledRegex = makeABTConstant(regexTag, regexVal);
+                auto compiledRegex = _b.makeConstant(regexTag, regexVal);
                 return makeRegexFunctionCall(std::move(compiledRegex));
             }
 
@@ -4055,39 +4029,40 @@ private:
             // } else {
             //     fail('pattern must be either string or BSON RegEx')
             // }
-            auto patternArgument = abt::make<abt::If>(
-                makeABTFunction("isString"_sd, makeVariable(patternVar)),
-                abt::make<abt::If>(
-                    makeABTFunction("hasNullBytes"_sd, makeVariable(patternVar)),
-                    makeError(5126602, "regex pattern must not have embedded null bytes"),
-                    makeVariable(patternVar)),
-                abt::make<abt::If>(
-                    makeABTFunction("typeMatch"_sd,
-                                    makeVariable(patternVar),
-                                    abt::Constant::int32(getBSONTypeMask(BSONType::regEx))),
-                    makeABTFunction("getRegexPattern"_sd, makeVariable(patternVar)),
-                    makeError(5126601,
-                              "regex pattern must have either string or BSON RegEx type")));
+            auto patternArgument = _b.makeIf(
+                _b.makeFunction("isString"_sd, patternVar),
+                _b.makeIf(_b.makeFunction("hasNullBytes"_sd, patternVar),
+                          makeError(5126602, "regex pattern must not have embedded null bytes"),
+                          patternVar),
+                _b.makeIf(_b.makeFunction("typeMatch"_sd,
+                                          patternVar,
+                                          _b.makeInt32Constant(getBSONTypeMask(BSONType::regEx))),
+                          _b.makeFunction("getRegexPattern"_sd, patternVar),
+                          makeError(5126601,
+                                    "regex pattern must have either string or BSON RegEx type")));
 
-            if (!options) {
+            if (options.isNull()) {
                 // If no options are passed to the expression, try to extract them from the
                 // pattern.
-                auto optionsArgument = abt::make<abt::If>(
-                    makeABTFunction("typeMatch"_sd,
-                                    makeVariable(patternVar),
-                                    abt::Constant::int32(getBSONTypeMask(BSONType::regEx))),
-                    makeABTFunction("getRegexFlags"_sd, makeVariable(patternVar)),
-                    makeABTConstant(""_sd));
-                auto compiledRegex = makeABTFunction(
+                auto optionsArgument = _b.makeIf(
+                    _b.makeFunction("typeMatch"_sd,
+                                    patternVar,
+                                    _b.makeInt32Constant(getBSONTypeMask(BSONType::regEx))),
+                    _b.makeFunction("getRegexFlags"_sd, patternVar),
+                    _b.makeStrConstant(""_sd));
+                auto compiledRegex = _b.makeFunction(
                     "regexCompile"_sd, std::move(patternArgument), std::move(optionsArgument));
-                return abt::make<abt::If>(makeABTFunction("isNull"_sd, makeVariable(patternVar)),
-                                          generateRegexNullResponse(),
-                                          makeRegexFunctionCall(std::move(compiledRegex)));
+                return _b.makeIf(_b.makeFunction("isNull"_sd, patternVar),
+                                 generateRegexNullResponse(),
+                                 makeRegexFunctionCall(std::move(compiledRegex)));
             }
 
             // If there are options passed to the expression, we construct local bind with
             // options argument because it needs to be validated even when pattern is null.
-            auto userOptionsVar = makeLocalVariableName(_context->state.frameId(), 0);
+            auto optionsFrameId = _context->state.frameId();
+            SbVar userOptionsVar{optionsFrameId, 0};
+            SbVar optionsVar{optionsFrameId, 1};
+
             auto optionsArgument = [&]() {
                 // The code below generates the following expression:
                 //
@@ -4117,66 +4092,65 @@ private:
                 //     } else {
                 //         stringOptions
                 //     }
-                auto stringOptions = abt::make<abt::If>(
-                    makeABTFunction("isString"_sd, makeVariable(userOptionsVar)),
-                    abt::make<abt::If>(
-                        makeABTFunction("hasNullBytes"_sd, makeVariable(userOptionsVar)),
-                        makeError(5126604, "regex flags must not have embedded null bytes"),
-                        makeVariable(userOptionsVar)),
-                    abt::make<abt::If>(
-                        makeABTFunction("isNull"_sd, makeVariable(userOptionsVar)),
-                        makeABTConstant(""_sd),
+                auto stringOptions = _b.makeIf(
+                    _b.makeFunction("isString"_sd, userOptionsVar),
+                    _b.makeIf(_b.makeFunction("hasNullBytes"_sd, userOptionsVar),
+                              makeError(5126604, "regex flags must not have embedded null bytes"),
+                              userOptionsVar),
+                    _b.makeIf(
+                        _b.makeFunction("isNull"_sd, userOptionsVar),
+                        _b.makeStrConstant(""_sd),
                         makeError(5126603, "regex flags must have either string or null type")));
 
-                auto generateIsEmptyString = [](const abt::ProjectionName& var) {
-                    return abt::make<abt::BinaryOp>(
-                        abt::Operations::Eq, makeVariable(var), makeABTConstant(""_sd));
+                auto generateIsEmptyString = [&](const SbVar& var) {
+                    return _b.makeBinaryOp(abt::Operations::Eq, var, _b.makeStrConstant(""_sd));
                 };
 
-                auto stringVar = makeLocalVariableName(_context->state.frameId(), 0);
-                auto bsonPatternVar = makeLocalVariableName(_context->state.frameId(), 0);
-                return abt::make<abt::Let>(
-                    stringVar,
-                    std::move(stringOptions),
-                    abt::make<abt::If>(
-                        makeABTFunction("typeMatch"_sd,
-                                        makeVariable(patternVar),
-                                        abt::Constant::int32(getBSONTypeMask(BSONType::regEx))),
-                        abt::make<abt::Let>(
-                            bsonPatternVar,
-                            makeABTFunction("getRegexFlags", makeVariable(patternVar)),
-                            buildABTMultiBranchConditionalFromCaseValuePairs(
-                                {ABTCaseValuePair{generateIsEmptyString(stringVar),
-                                                  makeVariable(bsonPatternVar)},
-                                 ABTCaseValuePair{generateIsEmptyString(bsonPatternVar),
-                                                  makeVariable(stringVar)}},
+                auto stringFrameId = _context->state.frameId();
+                SbVar stringVar{stringFrameId, 0};
+
+                auto bsonPatternFrameId = _context->state.frameId();
+                SbVar bsonPatternVar{bsonPatternFrameId, 0};
+
+                return _b.makeLet(
+                    stringFrameId,
+                    SbExpr::makeSeq(std::move(stringOptions)),
+                    _b.makeIf(
+                        _b.makeFunction("typeMatch"_sd,
+                                        patternVar,
+                                        _b.makeInt32Constant(getBSONTypeMask(BSONType::regEx))),
+                        _b.makeLet(
+                            bsonPatternFrameId,
+                            SbExpr::makeSeq(_b.makeFunction("getRegexFlags", patternVar)),
+                            _b.buildMultiBranchConditionalFromCaseValuePairs(
+                                SbExpr::makeExprPairVector(
+                                    SbExprPair{generateIsEmptyString(stringVar), bsonPatternVar},
+                                    SbExprPair{generateIsEmptyString(bsonPatternVar), stringVar}),
                                 makeError(5126605,
                                           "regex options cannot be specified in both BSON "
                                           "RegEx and 'options' field"))),
-                        makeVariable(stringVar)));
+                        stringVar));
             }();
 
-            auto optionsVar = makeLocalVariableName(_context->state.frameId(), 0);
-            return makeLet(
-                {userOptionsVar, optionsVar},
-                abt::makeSeq(std::move(*options), std::move(optionsArgument)),
-                abt::make<abt::If>(
-                    makeABTFunction("isNull"_sd, makeVariable(patternVar)),
-                    generateRegexNullResponse(),
-                    makeRegexFunctionCall(makeABTFunction(
-                        "regexCompile"_sd, makeVariable(patternVar), makeVariable(optionsVar)))));
+            return _b.makeLet(optionsFrameId,
+                              SbExpr::makeSeq(std::move(options), std::move(optionsArgument)),
+                              _b.makeIf(_b.makeFunction("isNull"_sd, patternVar),
+                                        generateRegexNullResponse(),
+                                        makeRegexFunctionCall(_b.makeFunction(
+                                            "regexCompile"_sd, patternVar, optionsVar))));
         }();
 
-        auto regexCall = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(inputVar),
-                              generateRegexNullResponse()},
-             ABTCaseValuePair{makeNot(makeABTFunction("isString"_sd, makeVariable(inputVar))),
-                              makeError(5073401, "input must be of type string")}},
+        auto regexCall = _b.buildMultiBranchConditionalFromCaseValuePairs(
+            SbExpr::makeExprPairVector(
+                SbExprPair{_b.generateNullMissingOrUndefined(inputVar),
+                           generateRegexNullResponse()},
+                SbExprPair{_b.makeNot(_b.makeFunction("isString"_sd, inputVar)),
+                           makeError(5073401, "input must be of type string")}),
             std::move(regexFunctionResult));
 
-        pushABT(makeLet({inputVar, patternVar},
-                        abt::makeSeq(std::move(input), std::move(pattern)),
-                        std::move(regexCall)));
+        pushExpr(_b.makeLet(outerFrameId,
+                            SbExpr::makeSeq(std::move(input), std::move(pattern)),
+                            std::move(regexCall)));
     }
 
     /**
@@ -4187,93 +4161,85 @@ private:
         const auto& children = expr->getChildren();
         auto arity = children.size();
         invariant(arity == 4);
-        auto timezoneExpr = children[3] ? _context->popABTExpr() : abt::Constant::str("UTC"_sd);
-        auto amountExpr = _context->popABTExpr();
-        auto unitExpr = _context->popABTExpr();
-        auto startDateExpr = _context->popABTExpr();
+        auto timezoneExpr = children[3] ? popExpr() : _b.makeStrConstant("UTC"_sd);
+        auto amountExpr = popExpr();
+        auto unitExpr = popExpr();
+        auto startDateExpr = popExpr();
 
-        auto startDateName = makeLocalVariableName(_context->state.frameId(), 0);
-        auto unitName = makeLocalVariableName(_context->state.frameId(), 0);
-        auto origAmountName = makeLocalVariableName(_context->state.frameId(), 0);
-        auto tzName = makeLocalVariableName(_context->state.frameId(), 0);
-        auto amountName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto frameId = _context->state.frameId();
+        SbVar startDateVar{frameId, 0};
+        SbVar unitVar{frameId, 1};
+        SbVar origAmountVar{frameId, 2};
+        SbVar tzVar{frameId, 3};
+        SbVar amountVar{frameId, 4};
 
         auto convertedAmountInt64 = [&]() {
             if (dateExprName == "dateAdd") {
-                return makeABTFunction(
+                return _b.makeFunction(
                     "convert",
-                    makeVariable(origAmountName),
-                    abt::Constant::int32(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64)));
+                    origAmountVar,
+                    _b.makeInt32Constant(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64)));
             } else if (dateExprName == "dateSubtract") {
-                return makeABTFunction(
+                return _b.makeFunction(
                     "convert",
-                    abt::make<abt::UnaryOp>(abt::Operations::Neg, makeVariable(origAmountName)),
-                    abt::Constant::int32(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64)));
+                    _b.makeUnaryOp(abt::Operations::Neg, origAmountVar),
+                    _b.makeInt32Constant(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64)));
             } else {
                 MONGO_UNREACHABLE;
             }
         }();
 
         auto timeZoneDBSlot = *_context->state.getTimeZoneDBSlot();
-        auto timeZoneDBVar = makeABTVariable(timeZoneDBSlot);
+        auto timeZoneDBVar = SbVar{timeZoneDBSlot};
 
-        abt::ABTVector checkNullArg;
-        checkNullArg.push_back(generateABTNullMissingOrUndefined(startDateName));
-        checkNullArg.push_back(generateABTNullMissingOrUndefined(unitName));
-        checkNullArg.push_back(generateABTNullMissingOrUndefined(origAmountName));
-        checkNullArg.push_back(generateABTNullMissingOrUndefined(tzName));
+        SbExpr::Vector checkNullArg;
+        checkNullArg.push_back(_b.generateNullMissingOrUndefined(startDateVar));
+        checkNullArg.push_back(_b.generateNullMissingOrUndefined(unitVar));
+        checkNullArg.push_back(_b.generateNullMissingOrUndefined(origAmountVar));
+        checkNullArg.push_back(_b.generateNullMissingOrUndefined(tzVar));
 
-        auto checkNullAnyArgument = makeBooleanOpTree(abt::Operations::Or, std::move(checkNullArg));
+        auto checkNullAnyArgument =
+            _b.makeBooleanOpTree(abt::Operations::Or, std::move(checkNullArg));
 
-        auto dateAddExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{std::move(checkNullAnyArgument), abt::Constant::null()},
-             ABTCaseValuePair{generateABTNonStringCheck(tzName),
-                              makeABTFail(ErrorCodes::Error{7157902},
-                                          str::stream()
-                                              << "$" << dateExprName
-                                              << " expects timezone argument of type string")},
-             ABTCaseValuePair{
-                 makeNot(makeABTFunction("isTimezone", timeZoneDBVar, makeVariable(tzName))),
-                 makeABTFail(ErrorCodes::Error{7157903},
-                             str::stream() << "$" << dateExprName << " expects a valid timezone")},
-             ABTCaseValuePair{
-                 makeNot(makeABTFunction("typeMatch",
-                                         makeVariable(startDateName),
-                                         abt::Constant::int32(dateTypeMask()))),
-                 makeABTFail(ErrorCodes::Error{7157904},
-                             str::stream() << "$" << dateExprName
+        auto dateAddExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
+            SbExpr::makeExprPairVector(
+                SbExprPair{std::move(checkNullAnyArgument), _b.makeNullConstant()},
+                SbExprPair{_b.generateNonStringCheck(tzVar),
+                           _b.makeFail(ErrorCodes::Error{7157902},
+                                       str::stream()
+                                           << "$" << dateExprName
+                                           << " expects timezone argument of type string")},
+                SbExprPair{_b.makeNot(_b.makeFunction("isTimezone", timeZoneDBVar, tzVar)),
+                           _b.makeFail(ErrorCodes::Error{7157903},
+                                       str::stream()
+                                           << "$" << dateExprName << " expects a valid timezone")},
+                SbExprPair{_b.makeNot(_b.makeFunction(
+                               "typeMatch", startDateVar, _b.makeInt32Constant(dateTypeMask()))),
+                           _b.makeFail(ErrorCodes::Error{7157904},
+                                       str::stream()
+                                           << "$" << dateExprName
                                            << " must have startDate argument convertable to date")},
-             ABTCaseValuePair{generateABTNonStringCheck(unitName),
-                              makeABTFail(ErrorCodes::Error{7157905},
-                                          str::stream()
-                                              << "$" << dateExprName
-                                              << " expects unit argument of type string")},
-             ABTCaseValuePair{
-                 makeNot(makeABTFunction("isTimeUnit", makeVariable(unitName))),
-                 makeABTFail(ErrorCodes::Error{7157906},
-                             str::stream() << "$" << dateExprName << " expects a valid time unit")},
-             ABTCaseValuePair{makeNot(makeABTFunction("exists", makeVariable(amountName))),
-                              makeABTFail(ErrorCodes::Error{7157907},
-                                          str::stream() << "invalid $" << dateExprName
-                                                        << " 'amount' argument value")}},
-            makeABTFunction("dateAdd",
-                            timeZoneDBVar,
-                            makeVariable(startDateName),
-                            makeVariable(unitName),
-                            makeVariable(amountName),
-                            makeVariable(tzName)));
+                SbExprPair{_b.generateNonStringCheck(unitVar),
+                           _b.makeFail(ErrorCodes::Error{7157905},
+                                       str::stream() << "$" << dateExprName
+                                                     << " expects unit argument of type string")},
+                SbExprPair{_b.makeNot(_b.makeFunction("isTimeUnit", unitVar)),
+                           _b.makeFail(ErrorCodes::Error{7157906},
+                                       str::stream()
+                                           << "$" << dateExprName << " expects a valid time unit")},
+                SbExprPair{_b.makeNot(_b.makeFunction("exists", amountVar)),
+                           _b.makeFail(ErrorCodes::Error{7157907},
+                                       str::stream() << "invalid $" << dateExprName
+                                                     << " 'amount' argument value")}),
+            _b.makeFunction("dateAdd", timeZoneDBVar, startDateVar, unitVar, amountVar, tzVar));
 
-        pushABT(makeLet({std::move(startDateName),
-                         std::move(unitName),
-                         std::move(origAmountName),
-                         std::move(tzName),
-                         std::move(amountName)},
-                        abt::makeSeq(std::move(startDateExpr),
-                                     std::move(unitExpr),
-                                     std::move(amountExpr),
-                                     std::move(timezoneExpr),
-                                     std::move(convertedAmountInt64)),
-                        std::move(dateAddExpr)));
+        pushExpr(_b.makeLet(frameId,
+                            SbExpr::makeSeq(std::move(startDateExpr),
+                                            std::move(unitExpr),
+                                            std::move(amountExpr),
+                                            std::move(timezoneExpr),
+                                            std::move(convertedAmountInt64)),
+                            std::move(dateAddExpr)));
     }
 
     void unsupportedExpression(const char* op) const {
@@ -4284,10 +4250,6 @@ private:
     }
 
 private:
-    void pushABT(abt::ABT abt) {
-        _context->pushExpr(wrap(std::move(abt)));
-    }
-
     void pushExpr(SbExpr expr) {
         _context->pushExpr(std::move(expr));
     }

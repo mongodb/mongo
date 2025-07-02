@@ -119,7 +119,6 @@ mongo_cc_benchmark(
 mongo_cc_library(
     name = "stage_builder",
     srcs = [
-        "abt_holder_impl.cpp",
         "analysis.cpp",
         "builder.cpp",
         "builder_data.cpp",
@@ -148,8 +147,7 @@ mongo_cc_library(
         "//src/mongo/db/query:shard_filterer_factory_impl.cpp",
     ],
     hdrs = [
-        "abt_holder_def.h",
-        "abt_holder_impl.h",
+        "abt_defs.h",
         "analysis.h",
         "builder.h",
         "builder_data.h",

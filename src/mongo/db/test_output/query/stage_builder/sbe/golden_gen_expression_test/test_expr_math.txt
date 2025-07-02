@@ -309,224 +309,224 @@ ExpressionArcTangent
 ExpressionArcTangent2
 
     let [
-        l50.0 = 
+        l49.0 = 
             let [
-                l51.0 = getField(s1, "field1") 
-                l51.1 = getField(s1, "field2") 
+                l50.0 = getField(s1, "field1") 
+                l50.1 = getField(s1, "field2") 
             ] 
             in 
-                if ((typeMatch(l51.0, 1088) ?: true) || (typeMatch(l51.1, 1088) ?: true)) 
+                if ((typeMatch(l50.0, 1088) ?: true) || (typeMatch(l50.1, 1088) ?: true)) 
                 then null 
-                elif (isNumber(l51.0) && isNumber(l51.1)) 
-                then atan2(move(l51.0), move(l51.1)) 
+                elif (isNumber(l50.0) && isNumber(l50.1)) 
+                then atan2(move(l50.0), move(l50.1)) 
                 else fail(7157801, "$atan2 supports only numeric types") 
     ] 
     in 
-        if (typeMatch(l50.0, 1088) ?: true) 
+        if (typeMatch(l49.0, 1088) ?: true) 
         then null 
-        elif !(isNumber(l50.0)) 
+        elif !(isNumber(l49.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
         elif ((4 != trunc(4)) ?: true) 
         then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
-        else trunc(move(l50.0), 4) 
+        else trunc(move(l49.0), 4) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionHyperbolicArcTangent
 
     let [
-        l54.0 = 
+        l53.0 = 
             let [
-                l55.0 = getField(s1, "field2") 
+                l54.0 = getField(s1, "field2") 
             ] 
             in 
-                if (typeMatch(l55.0, 1088) ?: true) 
+                if (typeMatch(l54.0, 1088) ?: true) 
                 then null 
-                elif !(isNumber(l55.0)) 
+                elif !(isNumber(l54.0)) 
                 then fail(7157802, "$atanh supports only numeric types") 
-                elif isNaN(l55.0) 
-                then move(l55.0) 
-                elif ((l55.0 >= -1L) && (l55.0 <= 1L)) 
-                then atanh(move(l55.0)) 
+                elif isNaN(l54.0) 
+                then move(l54.0) 
+                elif ((l54.0 >= -1L) && (l54.0 <= 1L)) 
+                then atanh(move(l54.0)) 
                 else fail(7157803, "Cannot apply $atanh, value must be in [-1, 1]") 
     ] 
     in 
-        if (typeMatch(l54.0, 1088) ?: true) 
+        if (typeMatch(l53.0, 1088) ?: true) 
         then null 
-        elif !(isNumber(l54.0)) 
+        elif !(isNumber(l53.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
         elif ((4 != trunc(4)) ?: true) 
         then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
-        else trunc(move(l54.0), 4) 
+        else trunc(move(l53.0), 4) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionHyperbolicArcCosine
 
     let [
-        l58.0 = 
+        l57.0 = 
             let [
-                l59.0 = getField(s1, "field1") 
+                l58.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l59.0, 1088) ?: true) 
+                if (typeMatch(l58.0, 1088) ?: true) 
                 then null 
-                elif !(isNumber(l59.0)) 
+                elif !(isNumber(l58.0)) 
                 then fail(7157802, "$acosh supports only numeric types") 
-                elif isNaN(l59.0) 
-                then move(l59.0) 
-                elif ((l59.0 >= 1L) && (l59.0 <= infL)) 
-                then acosh(move(l59.0)) 
+                elif isNaN(l58.0) 
+                then move(l58.0) 
+                elif ((l58.0 >= 1L) && (l58.0 <= infL)) 
+                then acosh(move(l58.0)) 
                 else fail(7157803, "Cannot apply $acosh, value must be in [1, inf]") 
     ] 
     in 
-        if (typeMatch(l58.0, 1088) ?: true) 
+        if (typeMatch(l57.0, 1088) ?: true) 
         then null 
-        elif !(isNumber(l58.0)) 
+        elif !(isNumber(l57.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
         elif ((4 != trunc(4)) ?: true) 
         then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
-        else trunc(move(l58.0), 4) 
+        else trunc(move(l57.0), 4) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionHyperbolicArcSine
 
     let [
-        l62.0 = 
+        l61.0 = 
             let [
-                l63.0 = getField(s1, "field1") 
+                l62.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l63.0, 1088) ?: true) 
+                if (typeMatch(l62.0, 1088) ?: true) 
                 then null 
-                elif isNumber(l63.0) 
-                then asinh(move(l63.0)) 
+                elif isNumber(l62.0) 
+                then asinh(move(l62.0)) 
                 else fail(7157800, "$asinh supports only numeric types") 
     ] 
     in 
-        if (typeMatch(l62.0, 1088) ?: true) 
+        if (typeMatch(l61.0, 1088) ?: true) 
         then null 
-        elif !(isNumber(l62.0)) 
+        elif !(isNumber(l61.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
         elif ((4 != trunc(4)) ?: true) 
         then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
-        else trunc(move(l62.0), 4) 
+        else trunc(move(l61.0), 4) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionHyperbolicCosine
 
     let [
-        l66.0 = 
+        l65.0 = 
             let [
-                l67.0 = getField(s1, "field1") 
+                l66.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l67.0, 1088) ?: true) 
+                if (typeMatch(l66.0, 1088) ?: true) 
                 then null 
-                elif isNumber(l67.0) 
-                then cosh(move(l67.0)) 
+                elif isNumber(l66.0) 
+                then cosh(move(l66.0)) 
                 else fail(7157800, "$cosh supports only numeric types") 
     ] 
     in 
-        if (typeMatch(l66.0, 1088) ?: true) 
+        if (typeMatch(l65.0, 1088) ?: true) 
         then null 
-        elif !(isNumber(l66.0)) 
+        elif !(isNumber(l65.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
         elif ((4 != trunc(4)) ?: true) 
         then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
-        else trunc(move(l66.0), 4) 
+        else trunc(move(l65.0), 4) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionHyperbolicSine
 
     let [
-        l70.0 = 
+        l69.0 = 
             let [
-                l71.0 = getField(s1, "field1") 
+                l70.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l71.0, 1088) ?: true) 
+                if (typeMatch(l70.0, 1088) ?: true) 
                 then null 
-                elif isNumber(l71.0) 
-                then sinh(move(l71.0)) 
+                elif isNumber(l70.0) 
+                then sinh(move(l70.0)) 
                 else fail(7157800, "$sinh supports only numeric types") 
     ] 
     in 
-        if (typeMatch(l70.0, 1088) ?: true) 
+        if (typeMatch(l69.0, 1088) ?: true) 
         then null 
-        elif !(isNumber(l70.0)) 
+        elif !(isNumber(l69.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
         elif ((4 != trunc(4)) ?: true) 
         then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
-        else trunc(move(l70.0), 4) 
+        else trunc(move(l69.0), 4) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionHyperbolicTangent
 
     let [
-        l74.0 = 
+        l73.0 = 
             let [
-                l75.0 = getField(s1, "field1") 
+                l74.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l75.0, 1088) ?: true) 
+                if (typeMatch(l74.0, 1088) ?: true) 
                 then null 
-                elif isNumber(l75.0) 
-                then tanh(move(l75.0)) 
+                elif isNumber(l74.0) 
+                then tanh(move(l74.0)) 
                 else fail(7157800, "$tanh supports only numeric types") 
     ] 
     in 
-        if (typeMatch(l74.0, 1088) ?: true) 
+        if (typeMatch(l73.0, 1088) ?: true) 
         then null 
-        elif !(isNumber(l74.0)) 
+        elif !(isNumber(l73.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
         elif ((4 != trunc(4)) ?: true) 
         then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
-        else trunc(move(l74.0), 4) 
+        else trunc(move(l73.0), 4) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionDegreesToRadians
 
     let [
-        l78.0 = 
+        l77.0 = 
             let [
-                l79.0 = getField(s1, "field1") 
+                l78.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l79.0, 1088) ?: true) 
+                if (typeMatch(l78.0, 1088) ?: true) 
                 then null 
-                elif isNumber(l79.0) 
-                then degreesToRadians(move(l79.0)) 
+                elif isNumber(l78.0) 
+                then degreesToRadians(move(l78.0)) 
                 else fail(7157800, "$degreesToRadians supports only numeric types") 
     ] 
     in 
-        if (typeMatch(l78.0, 1088) ?: true) 
+        if (typeMatch(l77.0, 1088) ?: true) 
         then null 
-        elif !(isNumber(l78.0)) 
+        elif !(isNumber(l77.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
         elif ((4 != trunc(4)) ?: true) 
         then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
-        else trunc(move(l78.0), 4) 
+        else trunc(move(l77.0), 4) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprMath
 ExpressionRadiansToDegrees
 
     let [
-        l82.0 = 
+        l81.0 = 
             let [
-                l83.0 = getField(s1, "field1") 
+                l82.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l83.0, 1088) ?: true) 
+                if (typeMatch(l82.0, 1088) ?: true) 
                 then null 
-                elif isNumber(l83.0) 
-                then radiansToDegrees(move(l83.0)) 
+                elif isNumber(l82.0) 
+                then radiansToDegrees(move(l82.0)) 
                 else fail(7157800, "$radiansToDegrees supports only numeric types") 
     ] 
     in 
-        if (typeMatch(l82.0, 1088) ?: true) 
+        if (typeMatch(l81.0, 1088) ?: true) 
         then null 
-        elif !(isNumber(l82.0)) 
+        elif !(isNumber(l81.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
         elif ((3 != trunc(3)) ?: true) 
         then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
-        else trunc(move(l82.0), 3) 
+        else trunc(move(l81.0), 3) 
 

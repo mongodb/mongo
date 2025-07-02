@@ -29,18 +29,5 @@
 
 #pragma once
 
-
-namespace mongo::stage_builder {
-
-/**
- * Forward declaration for ABT Holder. Only include from header files.
- */
-struct Holder;
-
-struct HolderDeleter {
-    void operator()(Holder* ptr) const;
-};
-
-using HolderPtr = std::unique_ptr<Holder, HolderDeleter>;
-
-}  // namespace mongo::stage_builder
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"

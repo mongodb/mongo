@@ -146,13 +146,13 @@ ExpressionTrim
 ExpressionIndexOfBytes
 
     let [
-        l27.0 = getField(s1, "str") 
+        l25.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l27.0, 1088) ?: true) 
+        if (typeMatch(l25.0, 1088) ?: true) 
         then null 
-        elif isString(l27.0) 
-        then indexOfBytes(move(l27.0), "is", 
+        elif isString(l25.0) 
+        then indexOfBytes(move(l25.0), "is", 
             if (!(isNaN(0ll)) && false) 
             then fail(7158004, "$indexOfBytes start index must be positive") 
             else 0ll 
@@ -163,13 +163,13 @@ ExpressionIndexOfBytes
 ExpressionIndexOfCP
 
     let [
-        l31.0 = getField(s1, "str") 
+        l27.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l31.0, 1088) ?: true) 
+        if (typeMatch(l27.0, 1088) ?: true) 
         then null 
-        elif isString(l31.0) 
-        then indexOfCP(move(l31.0), "is", 
+        elif isString(l27.0) 
+        then indexOfCP(move(l27.0), "is", 
             if (!(isNaN(4)) && false) 
             then fail(7158004, "$indexOfCP start index must be positive") 
             else 4ll 
@@ -180,13 +180,13 @@ ExpressionIndexOfCP
 ExpressionIndexOfCP
 
     let [
-        l36.0 = getField(s1, "str") 
+        l29.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l36.0, 1088) ?: true) 
+        if (typeMatch(l29.0, 1088) ?: true) 
         then null 
-        elif isString(l36.0) 
-        then indexOfCP(move(l36.0), " ", 
+        elif isString(l29.0) 
+        then indexOfCP(move(l29.0), " ", 
             if (!(isNaN(1)) && false) 
             then fail(7158004, "$indexOfCP start index must be positive") 
             else 1ll 
@@ -201,19 +201,19 @@ ExpressionIndexOfCP
 ExpressionRegexFind
 
     let [
-        l40.0 = getField(s1, "str") 
+        l32.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l40.0, 1088) ?: true) 
+        if (typeMatch(l32.0, 1088) ?: true) 
         then null 
-        elif isString(l40.0) 
+        elif isString(l32.0) 
         then 
             let [
-                l41.0 = regexFind(PcreRegex(/test/), move(l40.0)) 
+                l33.0 = regexFind(PcreRegex(/test/), move(l32.0)) 
             ] 
             in 
-                if exists(l41.0) 
-                then makeOwn(move(l41.0)) 
+                if exists(l33.0) 
+                then makeOwn(move(l33.0)) 
                 else fail(5073403, "$regexFind: error occurred while executing the regular expression") 
         
         else fail(5073401, "$regexFind: input must be of type string") 
@@ -222,38 +222,38 @@ ExpressionRegexFind
 ExpressionRegexFindAll
 
     let [
-        l45.0 = getField(s1, "str") 
-        l45.1 = getField(s1, "pattern") 
+        l36.0 = getField(s1, "str") 
+        l36.1 = getField(s1, "pattern") 
     ] 
     in 
-        if (typeMatch(l45.0, 1088) ?: true) 
+        if (typeMatch(l36.0, 1088) ?: true) 
         then [] 
-        elif isString(l45.0) 
+        elif isString(l36.0) 
         then 
-            if isNull(l45.1) 
+            if isNull(l36.1) 
             then [] 
             else 
                 let [
-                    l46.0 = regexFindAll(regexCompile(
-                        if isString(l45.1) 
+                    l37.0 = regexFindAll(regexCompile(
+                        if isString(l36.1) 
                         then 
-                            if hasNullBytes(l45.1) 
+                            if hasNullBytes(l36.1) 
                             then fail(5126602, "$regexFindAll: regex pattern must not have embedded null bytes") 
-                            else l45.1 
+                            else l36.1 
                         
                         else 
-                            if typeMatch(l45.1, 2048) 
-                            then getRegexPattern(l45.1) 
+                            if typeMatch(l36.1, 2048) 
+                            then getRegexPattern(l36.1) 
                             else fail(5126601, "$regexFindAll: regex pattern must have either string or BSON RegEx type") 
                    , 
-                        if typeMatch(l45.1, 2048) 
-                        then getRegexFlags(l45.1) 
+                        if typeMatch(l36.1, 2048) 
+                        then getRegexFlags(l36.1) 
                         else "" 
-                   ), move(l45.0)) 
+                   ), move(l36.0)) 
                 ] 
                 in 
-                    if exists(l46.0) 
-                    then makeOwn(move(l46.0)) 
+                    if exists(l37.0) 
+                    then makeOwn(move(l37.0)) 
                     else fail(5073403, "$regexFindAll: error occurred while executing the regular expression") 
         
         else fail(5073401, "$regexFindAll: input must be of type string") 
@@ -262,19 +262,19 @@ ExpressionRegexFindAll
 ExpressionRegexMatch
 
     let [
-        l50.0 = getField(s1, "str") 
+        l40.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l50.0, 1088) ?: true) 
+        if (typeMatch(l40.0, 1088) ?: true) 
         then false 
-        elif isString(l50.0) 
+        elif isString(l40.0) 
         then 
             let [
-                l51.0 = regexMatch(PcreRegex(/test/), move(l50.0)) 
+                l41.0 = regexMatch(PcreRegex(/test/), move(l40.0)) 
             ] 
             in 
-                if exists(l51.0) 
-                then makeOwn(move(l51.0)) 
+                if exists(l41.0) 
+                then makeOwn(move(l41.0)) 
                 else fail(5073403, "$regexMatch: error occurred while executing the regular expression") 
         
         else fail(5073401, "$regexMatch: input must be of type string") 

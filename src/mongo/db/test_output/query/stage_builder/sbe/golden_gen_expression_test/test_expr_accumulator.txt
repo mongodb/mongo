@@ -5,14 +5,14 @@ ExpressionFromAccumulator<AccumulatorAvg>
 ExpressionFromAccumulator<AccumulatorMax>
 
     let [
-        l4.0 = getField(s1, "arr") 
+        l3.0 = getField(s1, "arr") 
     ] 
     in 
-        if (typeMatch(l4.0, 1088) ?: true) 
+        if (typeMatch(l3.0, 1088) ?: true) 
         then null 
-        elif isArray(l4.0) 
-        then (maxOfArray(move(l4.0)) ?: null) 
-        else move(l4.0) 
+        elif isArray(l3.0) 
+        then (maxOfArray(move(l3.0)) ?: null) 
+        else move(l3.0) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprAccumulator
 ExpressionFromAccumulator<AccumulatorMin>
@@ -21,14 +21,14 @@ ExpressionFromAccumulator<AccumulatorMin>
 ExpressionFromAccumulator<AccumulatorStdDevPop>
 
     let [
-        l8.0 = getField(s1, "arr") 
+        l6.0 = getField(s1, "arr") 
     ] 
     in 
-        if (typeMatch(l8.0, 1088) ?: true) 
+        if (typeMatch(l6.0, 1088) ?: true) 
         then null 
-        elif isArray(l8.0) 
-        then (stdDevPop(move(l8.0)) ?: null) 
-        elif isNumber(move(l8.0)) 
+        elif isArray(l6.0) 
+        then (stdDevPop(move(l6.0)) ?: null) 
+        elif isNumber(move(l6.0)) 
         then 0 
         else null 
 
@@ -36,25 +36,25 @@ ExpressionFromAccumulator<AccumulatorStdDevPop>
 ExpressionFromAccumulator<AccumulatorStdDevSamp>
 
     let [
-        l11.0 = 
+        l9.0 = 
             let [
-                l12.0 = getField(s1, "arr") 
+                l10.0 = getField(s1, "arr") 
             ] 
             in 
-                if (typeMatch(l12.0, 1088) ?: true) 
+                if (typeMatch(l10.0, 1088) ?: true) 
                 then null 
-                elif isArray(l12.0) 
-                then (stdDevSamp(move(l12.0)) ?: null) 
+                elif isArray(l10.0) 
+                then (stdDevSamp(move(l10.0)) ?: null) 
                 else null 
     ] 
     in 
-        if (typeMatch(l11.0, 1088) ?: true) 
+        if (typeMatch(l9.0, 1088) ?: true) 
         then null 
-        elif !(isNumber(l11.0)) 
+        elif !(isNumber(l9.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
         elif ((4 != trunc(4)) ?: true) 
         then fail(5155301, "$trunc requires "place" argument to be an integer between -20 and 100") 
-        else trunc(move(l11.0), 4) 
+        else trunc(move(l9.0), 4) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprAccumulator
 ExpressionFromAccumulator<AccumulatorSum>
