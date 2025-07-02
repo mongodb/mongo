@@ -155,12 +155,13 @@ boost::filesystem::path mongo::shell_utils::getHistoryFilePath() {
 
 namespace mongo {
 namespace JSFiles {
-extern const JSFile servers;
-extern const JSFile servers_misc;
-extern const JSFile data_consistency_checker;
 extern const JSFile bridge;
 extern const JSFile bridge_global;
+extern const JSFile data_consistency_checker;
+extern const JSFile data_consistency_checker_global;
 extern const JSFile feature_compatibility_version;
+extern const JSFile servers;
+extern const JSFile servers_misc;
 }  // namespace JSFiles
 
 namespace {
@@ -1230,14 +1231,15 @@ void initScope(Scope& scope) {
 
     // modules
     scope.execSetup(JSFiles::bridge);
+    scope.execSetup(JSFiles::data_consistency_checker);
 
     // globals
     scope.execSetup(JSFiles::bridge_global);
+    scope.execSetup(JSFiles::data_consistency_checker_global);
 
     // scripts
     scope.execSetup(JSFiles::servers);
     scope.execSetup(JSFiles::servers_misc);
-    scope.execSetup(JSFiles::data_consistency_checker);
     scope.execSetup(JSFiles::feature_compatibility_version);
 
     initializeEnterpriseScope(scope);

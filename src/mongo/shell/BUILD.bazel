@@ -315,6 +315,7 @@ MONGO_SERVER_CPP_JS_FILES = [
     "bridge.js",
     "bridge_global.js",
     "data_consistency_checker.js",
+    "data_consistency_checker_global.js",
     "feature_compatibility_version.js",
     "keyvault.js",
     "servers.js",
