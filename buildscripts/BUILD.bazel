@@ -98,34 +98,6 @@ py_library(
     ],
 )
 
-py_library(
-    name = "download_buildifier",
-    srcs = [
-        "download_buildifier.py",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        dependency(
-            "retry",
-            group = "testing",
-        ),
-    ],
-)
-
-py_binary(
-    name = "buildifier",
-    srcs = [
-        "buildifier.py",
-    ],
-    main = "buildifier.py",
-    visibility = ["//visibility:public"],
-    deps = [
-        "download_buildifier",
-        "simple_report",
-        "unittest_grouper",
-    ],
-)
-
 py_binary(
     name = "legacy_commands_check",
     srcs = [

@@ -68,7 +68,7 @@ def download_buildozer(download_location: str = "./"):
     operating_system = determine_platform()
     architechture = determine_architecture()
     if operating_system == "windows" and architechture == "arm64":
-        raise RuntimeError("There are no published arm windows releases for buildifier.")
+        raise RuntimeError("There are no published arm windows releases for buildozer.")
 
     extension = ".exe" if operating_system == "windows" else ""
     binary_name = f"buildozer-{operating_system}-{architechture}{extension}"
