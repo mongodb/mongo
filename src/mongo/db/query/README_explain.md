@@ -68,7 +68,7 @@ The **verbosity mode** describes the amount of information returned by the `expl
 
 1. **`queryPlanner`**: The query optimizer is run to choose the winning plan for the operation under evaluation.
 1. **`executionStats`**: The query optimizer chooses the winning plan and executes it to completion. This mode returns its execution statistics.
-1. **`allPlansExecution`**: The query optimizer chooses the winning plan and executes it to completion. This mode returns statistics about the execution of the winning plan as well as of the other candidate plans captured during [plan selection](classic_runtime_planner/README.md).
+1. **`allPlansExecution`**: The query optimizer chooses the winning plan and executes it to completion. This mode returns statistics about the execution of the winning plan as well as of the other candidate plans captured during [plan selection](../exec/runtime_planners/classic_runtime_planner/README.md).
 
 ### Analyze Explain Output
 
@@ -456,11 +456,11 @@ For write operations, query execution refers to the modifications that **would**
 }
 ```
 
-This contains all the information in the `executionStats` mode, with additional execution information for the rejected plans such as the estimated execution time (`executionTimeMillisEstimate`) and the candidate plan's `score`, which is calculated based on how [productive](classic_runtime_planner/README.md#plan-ranking) it was during the trial period.
+This contains all the information in the `executionStats` mode, with additional execution information for the rejected plans such as the estimated execution time (`executionTimeMillisEstimate`) and the candidate plan's `score`, which is calculated based on how [productive](../exec/runtime_planners/classic_runtime_planner/README.md#plan-ranking) it was during the trial period.
 
 From the output above, we can see that the plans using the `{a: 1}` and `{a: 1, b: 1}` indexes resulted in higher-scoring plans than the `{b: 1}` index, which is expected because the predicate on `a` is far more selective than the predicate on `b` (100 unique values for the former vs 2 buckets of values for the latter). The better plans also have the `isEOF` flag set, meaning they ran to completion and returned all results in the trial period, whereas the worst plan did not run to completion and has a value of 0 in that field.
 
-The multiplanner has additional [tie-breaking](classic_runtime_planner/README.md#tie-breakers) heuristics when two plans score equally well. While both the plan using the index on `{a: 1, b: 1}` and the plan using the index on `{a: 1}` only needed to examine one document and scan one index key, the latter plan required a residual filter predicate on `{ b: { '$eq': 1 } }` in its `FETCH` stage. Thus, the plan using the `{a: 1, b: 1}` index is the most optimal.
+The multiplanner has additional [tie-breaking](../exec/runtime_planners/classic_runtime_planner/README.md#tie-breakers) heuristics when two plans score equally well. While both the plan using the index on `{a: 1, b: 1}` and the plan using the index on `{a: 1}` only needed to examine one document and scan one index key, the latter plan required a residual filter predicate on `{ b: { '$eq': 1 } }` in its `FETCH` stage. Thus, the plan using the `{a: 1, b: 1}` index is the most optimal.
 
 For a full list of fields and their definitions in the `explain` output, refer to the [docs](https://www.mongodb.com/docs/manual/reference/explain-results/).
 
@@ -483,7 +483,7 @@ The [`CmdExplain::Invocation::run()`](https://github.com/mongodb/mongo/blob/28df
 1. Begin the [query planning timer](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/commands/query_cmd/find_cmd.cpp#L432) after the command has been parsed.
 1. Acquire any locks that are required.
 1. Construct a [`CanonicalQuery`](README_logical_models.md#canonicalquery) from the parsed request.
-1. Get a plan executor for the query. This phase covers [plan enumeration](plan_enumerator/README.md) and [plan selection](classic_runtime_planner/README.md).
+1. Get a plan executor for the query. This phase covers [plan enumeration](plan_enumerator/README.md) and [plan selection](../exec/runtime_planners/classic_runtime_planner/README.md).
 1. Once the executor is returned, it [stops the query planning timer](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/query/get_executor.cpp#L1307).
 1. Get a [`PlanExplainer`](#plan-explainers) with query planning stats from the `PlanExecutor`.
 1. Given the [`PlanExecutor`](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/query/plan_executor.h#L168), if the verbosity level is `executionStats` or higher, the [`explainStages()`](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/query/explain.cpp#L471) function first calls [`executePlan()`](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/query/explain.cpp#L326), executing the `PlanExecutor` and discarding the resulting documents until it reaches `EOF`. It will log an error and throw an exception if the query doesn't run to completion successfully. This function calls [`getNextBatch()`](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/query/plan_executor.cpp#L88) under the hood so that the `PlanExecutor` is executed in a tighter loop.
@@ -527,7 +527,7 @@ The [`accumulate()`](https://github.com/mongodb/mongo/blob/28df8e56046e44f597767
 
 Different executors will provide overrides of the functions in the `PlanExplainer` interface, and will provide its own stats in the `PlanSummaryStats` container:
 
-- **Classic executor**: Uses [`PlanExplainerImpl`](https://github.com/mongodb/mongo/blob/11b6fc54aaeddbb6dd85d2a808827f8048f366a1/src/mongo/db/query/plan_explainer_impl.h#L59). All the information required to generate `explain` output in various formats is stored in the execution tree. Starting from the root stage of the execution tree, plan summary stats are gathered by traversing through the rest of the tree. The `MultiPlanStage` is skipped, and stats are extracted from its children. Note that if [subplanning](classic_runtime_planner/README.md#subplanner) was triggered, it doesn't include information about rejected plans.
+- **Classic executor**: Uses [`PlanExplainerImpl`](https://github.com/mongodb/mongo/blob/11b6fc54aaeddbb6dd85d2a808827f8048f366a1/src/mongo/db/query/plan_explainer_impl.h#L59). All the information required to generate `explain` output in various formats is stored in the execution tree. Starting from the root stage of the execution tree, plan summary stats are gathered by traversing through the rest of the tree. The `MultiPlanStage` is skipped, and stats are extracted from its children. Note that if [subplanning](../exec/runtime_planners/classic_runtime_planner/README.md#subplanner) was triggered, it doesn't include information about rejected plans.
 - **Express executor**: Uses [`PlanExplainerExpress`](https://github.com/mongodb/mongo/blob/11b6fc54aaeddbb6dd85d2a808827f8048f366a1/src/mongo/db/query/plan_explainer_express.h#L193). Since we don't build a plan tree for express queries, this doesn't include stage information that's typically included in other `PlanExplainer`s, such as whether shard filtering was required and what index bounds were used. It will, however, include the chosen index.
 
 > ### Aside: Express Executor

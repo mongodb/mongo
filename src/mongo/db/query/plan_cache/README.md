@@ -108,7 +108,7 @@ When a query is planned for the first time and a winning solution is selected, t
 
 > ### Aside: Plan Cache "Works"
 >
-> The plan cache stores a [`ReadsOrWorks`](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/query/plan_cache/plan_cache.h#L112) value for each entry, equivalent to the amount of ["work"](../classic_runtime_planner/README.md#aside-works) associated with the plan at the time of caching.
+> The plan cache stores a [`ReadsOrWorks`](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/query/plan_cache/plan_cache.h#L112) value for each entry, equivalent to the amount of ["work"](../../exec/runtime_planners/classic_runtime_planner/README.md#aside-works) associated with the plan at the time of caching.
 >
 > - For Classic, this is the number of calls to `PlanStage::work()`
 > - For SBE, this is the number of individual _reads_ done from storage-level cursors.
@@ -201,7 +201,7 @@ There is a long-standing request ([SERVER-13341](https://jira.mongodb.org/browse
 
 ## Subplanning
 
-Rooted `$or` queries (queries that include a `$or` at the top level) interact differently with the [plan cache](https://github.com/mongodb/mongo/blob/17f71567688c266de1f9a4cfc20ef6a42570ba03/src/mongo/db/exec/subplan.cpp#L188-L203). For an introduction to subplanning, refer to [Classic Runtime Planning](../classic_runtime_planner/README#subplanning).
+Rooted `$or` queries (queries that include a `$or` at the top level) interact differently with the [plan cache](https://github.com/mongodb/mongo/blob/17f71567688c266de1f9a4cfc20ef6a42570ba03/src/mongo/db/exec/subplan.cpp#L188-L203). For an introduction to subplanning, refer to [Classic Runtime Planning](../../exec/runtime_planners/classic_runtime_planner/README.md#subplanner).
 
 Rooted `$or` queries interact with the plan cache on a [_per-clause basis_](https://github.com/mongodb/mongo/blob/17f71567688c266de1f9a4cfc20ef6a42570ba03/src/mongo/db/exec/subplan.cpp#L247-L249); each branch of the `$or` uses the plan cache separately.
 
