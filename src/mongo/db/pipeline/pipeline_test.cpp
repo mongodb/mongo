@@ -150,11 +150,9 @@ class StubExplainInterface : public StubMongoProcessInterface {
                                       ExplainOptions::Verbosity verbosity) override {
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
             ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->getOperationContext()));
-        auto execPipeline =
-            exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
         BSONArrayBuilder bab;
         auto opts = SerializationOptions{.verbosity = boost::make_optional(verbosity)};
-        auto pipelineVec = mergeExplains(*pipeline, *execPipeline, opts);
+        auto pipelineVec = pipeline->writeExplainOps(opts);
         for (auto&& stage : pipelineVec) {
             bab << stage;
         }
@@ -208,11 +206,9 @@ protected:
         // We normalize match expressions in the pipeline here to ensure the stability of the
         // predicate order after optimizations.
         outputPipe = normalizeMatchStageInPipeline(std::move(outputPipe));
-        auto outputExecPipe =
-            exec::agg::buildPipeline(outputPipe->getSources(), outputPipe->getContext());
         auto opts = SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
-        ASSERT_VALUE_EQ(Value(mergeExplains(*outputPipe, *outputExecPipe, opts)),
+        ASSERT_VALUE_EQ(Value(outputPipe->writeExplainOps(opts)),
                         Value(outputPipeExpected["pipeline"]));
         return outputPipe;
     }
@@ -4444,11 +4440,9 @@ void assertTwoPipelinesOptimizeAndMergeTo(const std::string& inputPipe1,
         pipeline1->pushBack(source);
     }
     pipeline1->optimizePipeline();
-    auto execPipeline1 = exec::agg::buildPipeline(pipeline1->getSources(), pipeline1->getContext());
     auto opts = SerializationOptions{
         .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
-    ASSERT_VALUE_EQ(Value(mergeExplains(*pipeline1, *execPipeline1, opts)),
-                    Value(outputBson["pipeline"]));
+    ASSERT_VALUE_EQ(Value(pipeline1->writeExplainOps(opts)), Value(outputBson["pipeline"]));
 }
 
 TEST_F(PipelineOptimizationTest, MergeUnwindPipelineWithSortLimitPipelineDoesNotSwapIfNoPreserve) {
@@ -4773,17 +4767,11 @@ public:
             sharded_agg_helpers::SplitPipeline::split(std::move(mergePipe), shardKey);
         const auto explain = SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
-        auto shardsExecPipeline = exec::agg::buildPipeline(
-            splitPipeline.shardsPipeline->getSources(), splitPipeline.shardsPipeline->getContext());
-        auto mergeExecPipeline = exec::agg::buildPipeline(
-            splitPipeline.mergePipeline->getSources(), splitPipeline.mergePipeline->getContext());
 
-        ASSERT_VALUE_EQ(
-            Value(mergeExplains(*splitPipeline.shardsPipeline, *shardsExecPipeline, explain)),
-            Value(shardPipeExpected["pipeline"]));
-        ASSERT_VALUE_EQ(
-            Value(mergeExplains(*splitPipeline.mergePipeline, *mergeExecPipeline, explain)),
-            Value(mergePipeExpected["pipeline"]));
+        ASSERT_VALUE_EQ(Value(splitPipeline.shardsPipeline->writeExplainOps(explain)),
+                        Value(shardPipeExpected["pipeline"]));
+        ASSERT_VALUE_EQ(Value(splitPipeline.mergePipeline->writeExplainOps(explain)),
+                        Value(mergePipeExpected["pipeline"]));
 
         shardPipe = std::move(splitPipeline.shardsPipeline);
         mergePipe = std::move(splitPipeline.mergePipeline);
