@@ -42,6 +42,8 @@ namespace mongo {
 using boolean_simplification::BitsetTreeNode;
 using boolean_simplification::Maxterm;
 
+ExpressionSimplifierMetrics expressionSimplifierMetrics;
+
 namespace {
 struct Context {
     /**
@@ -241,18 +243,21 @@ boost::optional<std::unique_ptr<MatchExpression>> simplifyMatchExpression(
                     2,
                     "The query contains schema expressions or maximum number of unique predicates "
                     "in DNF transformer exceeded");
+        expressionSimplifierMetrics.abortedTooLargeCount.incrementRelaxed();
         return boost::none;
     }
 
     auto bitsetTreeResult =
         simplifyBitsetTree(std::move(bitsetAndExpressions->bitsetTree), settings);
     if (MONGO_unlikely(!bitsetTreeResult.has_value())) {
+        expressionSimplifierMetrics.abortedTooLargeCount.incrementRelaxed();
         return boost::none;
     }
 
     if (bitsetAndExpressions->expressionSize * settings.maxSizeFactor <=
         bitsetTreeResult->calculateSize()) {
         LOGV2_DEBUG(8113910, 2, "The number of predicates has exceeded the 'maxSizeFactor' limit");
+        expressionSimplifierMetrics.notSimplifiedCount.incrementRelaxed();
         return boost::none;
     }
 
@@ -269,6 +274,9 @@ boost::optional<std::unique_ptr<MatchExpression>> simplifyMatchExpression(
             "simplifiedExpression"_attr = redact(root->debugString()));
         return boost::none;
     }
+
+    // The simplification ran until the end, so it completed with  a simplified formula.
+    expressionSimplifierMetrics.simplifiedCount.incrementRelaxed();
 
     LOGV2_DEBUG(7767002,
                 5,

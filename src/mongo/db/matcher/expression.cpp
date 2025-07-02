@@ -147,8 +147,11 @@ std::unique_ptr<MatchExpression> MatchExpression::optimize(
 
     try {
         auto optimizedExpr = optimizer(std::move(expression));
-        if (enableSimplification && !isTriviallySimple(*optimizedExpr) &&
-            internalQueryEnableBooleanExpressionsSimplifier.load()) {
+        if (enableSimplification && internalQueryEnableBooleanExpressionsSimplifier.load()) {
+            if (isTriviallySimple(*optimizedExpr)) {
+                expressionSimplifierMetrics.trivialCount.incrementRelaxed();
+                return optimizedExpr;
+            }
             ExpressionSimplifierSettings settings{
                 static_cast<size_t>(internalQueryMaximumNumberOfUniquePredicatesToSimplify.load()),
                 static_cast<size_t>(internalQueryMaximumNumberOfMintermsInSimplifier.load()),

@@ -29,9 +29,35 @@
 
 #pragma once
 
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/matcher/expression_bitset_tree_converter.h"
 
 namespace mongo {
+/**
+ * Class containing metrics about simplification of boolean expressions.
+ */
+struct ExpressionSimplifierMetrics {
+    /**
+     * Amount of times the simplifier did not run due to a trivial filter
+     */
+    Counter64& trivialCount = *MetricBuilder<Counter64>{"query.expressionSimplifier.trivial"};
+    /**
+     * Amount of times the simplifier aborted because the resulting expression became too large
+     */
+    Counter64& abortedTooLargeCount =
+        *MetricBuilder<Counter64>{"query.expressionSimplifier.abortedTooLarge"};
+    /**
+     * Amount of times the simplifier completed without simplifying the expression
+     */
+    Counter64& notSimplifiedCount =
+        *MetricBuilder<Counter64>{"query.expressionSimplifier.notSimplified"};
+    /**
+     * Amount of times the simplifier completed and simplified the expression
+     */
+    Counter64& simplifiedCount = *MetricBuilder<Counter64>{"query.expressionSimplifier.simplified"};
+};
+extern ExpressionSimplifierMetrics expressionSimplifierMetrics;
+
 /**
  * Settings to control simplification of boolean expressions.
  */
