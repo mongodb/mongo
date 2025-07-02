@@ -622,8 +622,11 @@ void ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
         // Specify the config version in the filter and the update to prevent overwriting a
         // newer connection string when there are concurrent updates.
         auto filter =
-            BSON(ShardType::name() << shard->getId().toString() << ShardType::replSetConfigVersion()
-                                   << BSON("$lt" << replSetConfigVersion));
+            BSON(ShardType::name()
+                 << shard->getId().toString() << "$or"
+                 << BSON_ARRAY(BSON(ShardType::replSetConfigVersion() << BSON("$exists" << false))
+                               << BSON(ShardType::replSetConfigVersion()
+                                       << BSON("$lt" << replSetConfigVersion))));
         auto update = BSON("$set" << BSON(ShardType::host()
                                           << connStr.toString() << ShardType::replSetConfigVersion()
                                           << replSetConfigVersion));
