@@ -21,8 +21,7 @@ const comboField = new SuffixAndPrefixField(2, 5, 2, 5, false, false, 1);
 
 function testBinaryDowngrade(queryTypeConfig) {
     jsTestLog("Testing downgrade from latest to last-lts");
-    const rst = new ReplSetTest(
-        {nodes: 2, nodeOptions: {setParameter: {featureFlagQETextSearchPreview: true}}});
+    const rst = new ReplSetTest({nodes: 2});
     rst.startSet();
     rst.initiate();
 

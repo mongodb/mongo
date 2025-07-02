@@ -515,11 +515,6 @@ def mongo_shell_program(
         val = str(mongo_set_parameters[key])
         args.append(f"--setShellParameter={key}={val}")
 
-    # if featureFlagQETextSearchPreview is enabled in setParameter, enable it in the shell also
-    # TODO: SERVER-65769 remove once FF is enabled by default
-    if mongod_set_parameters.get("featureFlagQETextSearchPreview"):
-        args.append("--setShellParameter=featureFlagQETextSearchPreview=true")
-
     # Apply the rest of the command line arguments.
     _apply_kwargs(args, kwargs)
 
