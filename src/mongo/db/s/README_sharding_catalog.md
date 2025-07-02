@@ -65,7 +65,6 @@ When a piece of code is running in a router loop, it is also said that it is exe
 - [ShardRegistry](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/client/shard_registry.h#L164)
 - [CatalogCache](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/catalog_cache.h#L134)
 - [Router](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/router.h#L41)
-- [Stale Shard Version Helpers](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/stale_shard_version_helpers.h#L71-L72)
 
 ### Shard role
 

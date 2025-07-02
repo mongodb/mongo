@@ -102,9 +102,6 @@ filters:
   - "stale_exception*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "stale_shard_version_helpers*":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "type_collection_common_types.idl":
     approvers:
       - 10gen/server-catalog-and-routing

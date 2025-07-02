@@ -66,7 +66,6 @@
 #include "mongo/s/query_analysis_sample_tracker.h"
 #include "mongo/s/router_role.h"
 #include "mongo/s/shard_version.h"
-#include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/net/hostandport.h"
@@ -92,13 +91,12 @@ namespace {
  * Returns the routing information for the namespace set on the passed ExpressionContext. Also
  * verifies that the ExpressionContext's UUID, if present, matches that of the routing table entry.
  */
-StatusWith<std::unique_ptr<RoutingContext>> getRoutingCtx(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+StatusWith<std::unique_ptr<RoutingContext>> getAndValidateRoutingCtx(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, const CollectionRoutingInfo& cri) {
     const auto& nss = expCtx->getNamespaceString();
     auto swRoutingCtx = getRoutingContext(expCtx->getOperationContext(), {nss});
     // Additionally check that the ExpressionContext's UUID matches the collection routing info.
     if (swRoutingCtx.isOK()) {
-        const auto& cri = swRoutingCtx.getValue()->getCollectionRoutingInfo(nss);
         if (expCtx->getUUID() && cri.hasRoutingTable() &&
             !cri.getChunkManager().uuidMatches(*expCtx->getUUID())) {
             return {ErrorCodes::NamespaceNotFound,
@@ -216,61 +214,53 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
 
     try {
         auto findCmd = cmdBuilder.obj();
-        auto catalogCache = Grid::get(expCtx->getOperationContext())->catalogCache();
         const auto& foreignNss = foreignExpCtx->getNamespaceString();
-        auto shardResults = shardVersionRetry(
-            expCtx->getOperationContext(),
-            catalogCache,
-            foreignNss,
+        sharding::router::CollectionRouter router(
+            expCtx->getOperationContext()->getServiceContext(), foreignNss);
+        auto shardResults = router.route(
+            foreignExpCtx->getOperationContext(),
             str::stream() << "Looking up document matching " << redact(filter.toBson()),
-            [&]() -> std::vector<RemoteCursor> {
-                // Verify that the collection exists, with the correct UUID.
-                auto routingCtxPtr = uassertStatusOK(getRoutingCtx(foreignExpCtx));
-                return routing_context_utils::runAndValidate(
-                    *routingCtxPtr, [&](RoutingContext& routingCtx) {
-                        const auto& cri = routingCtx.getCollectionRoutingInfo(foreignNss);
-                        // Finalize the 'find' command object based on the routing table
-                        // information.
-                        if (findCmdIsByUuid && cri.hasRoutingTable()) {
-                            // Find by UUID and shard versioning do not work together
-                            // (SERVER-31946).  In the sharded case we've already checked the UUID,
-                            // so find by namespace is safe.  In the unlikely case that the
-                            // collection has been deleted and a new collection with the same name
-                            // created through a different mongos or the collection had its shard
-                            // key refined, the shard version will be detected as stale, as shard
-                            // versions contain an 'epoch' field unique to the collection.
-                            findCmd =
-                                findCmd.addField(BSON("find" << foreignNss.coll()).firstElement());
-                            findCmdIsByUuid = false;
-                        }
+            [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+                auto routingCtxPtr = uassertStatusOK(getAndValidateRoutingCtx(foreignExpCtx, cri));
+                // Finalize the 'find' command object based on the routing table
+                // information.
+                if (findCmdIsByUuid && cri.hasRoutingTable()) {
+                    // Find by UUID and shard versioning do not work together
+                    // (SERVER-31946).  In the sharded case we've already checked the UUID,
+                    // so find by namespace is safe.  In the unlikely case that the
+                    // collection has been deleted and a new collection with the same name
+                    // created through a different mongos or the collection had its shard
+                    // key refined, the shard version will be detected as stale, as shard
+                    // versions contain an 'epoch' field unique to the collection.
+                    findCmd = findCmd.addField(BSON("find" << foreignNss.coll()).firstElement());
+                    findCmdIsByUuid = false;
+                }
 
-                        // Build the versioned requests to be dispatched to the shards. Typically,
-                        // only a single shard will be targeted here; however, in certain cases
-                        // where only the _id is present, we may need to scatter-gather the query to
-                        // all shards in order to find the document.
-                        auto requests =
-                            getVersionedRequestsForTargetedShards(expCtx->getOperationContext(),
-                                                                  foreignNss,
-                                                                  cri,
-                                                                  findCmd,
-                                                                  filterObj,
-                                                                  CollationSpec::kSimpleSpec,
-                                                                  boost::none /*letParameters*/,
-                                                                  boost::none /*runtimeConstants*/);
+                // Build the versioned requests to be dispatched to the shards. Typically,
+                // only a single shard will be targeted here; however, in certain cases
+                // where only the _id is present, we may need to scatter-gather the query to
+                // all shards in order to find the document.
+                auto requests =
+                    getVersionedRequestsForTargetedShards(expCtx->getOperationContext(),
+                                                          foreignNss,
+                                                          cri,
+                                                          findCmd,
+                                                          filterObj,
+                                                          CollationSpec::kSimpleSpec,
+                                                          boost::none /*letParameters*/,
+                                                          boost::none /*runtimeConstants*/);
 
-                        // Dispatch the requests. The 'establishCursors' method conveniently
-                        // prepares the result into a vector of cursor responses for us.
-                        return establishCursors(
-                            expCtx->getOperationContext(),
-                            Grid::get(expCtx->getOperationContext())
-                                ->getExecutorPool()
-                                ->getArbitraryExecutor(),
-                            foreignNss,
-                            ReadPreferenceSetting::get(expCtx->getOperationContext()),
-                            std::move(requests),
-                            false,
-                            &routingCtx);
-                    });
+                // Dispatch the requests. The 'establishCursors' method conveniently
+                // prepares the result into a vector of cursor responses for us.
+                return establishCursors(expCtx->getOperationContext(),
+                                        Grid::get(expCtx->getOperationContext())
+                                            ->getExecutorPool()
+                                            ->getArbitraryExecutor(),
+                                        foreignNss,
+                                        ReadPreferenceSetting::get(expCtx->getOperationContext()),
+                                        std::move(requests),
+                                        false,
+                                        routingCtxPtr.get());
             });
 
         // Iterate all shard results and build a single composite batch. We also enforce the

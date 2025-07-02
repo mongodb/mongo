@@ -197,6 +197,10 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
             }
 
             catalogCache->onStaleCollectionVersion(si->getNss(), si->getVersionWanted());
+        } else {
+            for (const auto& nss : _targetedNamespaces) {
+                catalogCache->onStaleCollectionVersion(nss, boost::none);
+            }
         }
     } else if (s == ErrorCodes::TransactionParticipantFailedUnyield) {
         auto extraInfo = s.extraInfo<TransactionParticipantFailedUnyieldInfo>();

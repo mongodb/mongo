@@ -56,7 +56,6 @@
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/s/router_role.h"
 #include "mongo/s/routing_information_cache.h"
-#include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -191,46 +190,32 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                     auto request = aggregation_request_helper::parseFromBSON(
                         requestBuilder.obj(), auth::ValidatedTenancyScope::get(opCtx), boost::none);
 
-                    auto routingInfoCache = RoutingInformationCache::get(opCtx);
-                    shardVersionRetry(
+                    sharding::router::CollectionRouter router(opCtx->getServiceContext(), nss);
+                    router.route(
                         opCtx,
-                        routingInfoCache,
-                        nss,
                         "pipeline to detect inconsistent sharded indexes"_sd,
-                        [&] {
+                        [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                             BSONObjBuilder responseBuilder;
-                            auto cri = uassertStatusOK(
-                                RoutingInformationCache::get(opCtx)->getCollectionRoutingInfo(opCtx,
-                                                                                              nss));
-                            // TODO SERVER-95927 This should be replaced with the
-                            // withValidatedRoutingContext() helper, which accesses the routing
-                            // tables in the Grid's CatalogCache.
                             auto routingCtxPtr = RoutingContext::createSynthetic({{nss, cri}});
-                            routing_context_utils::runAndValidate(
-                                *routingCtxPtr, [&](RoutingContext& routingCtx) {
-                                    auto status = ClusterAggregate::runAggregate(
-                                        opCtx,
-                                        &routingCtx,
-                                        ClusterAggregate::Namespaces{nss, nss},
-                                        request,
-                                        LiteParsedPipeline{request},
-                                        PrivilegeVector(),
-                                        boost::none /* ResolvedView */,
-                                        boost::none /* verbosity */,
-                                        &responseBuilder);
+                            auto status = ClusterAggregate::runAggregate(
+                                opCtx,
+                                routingCtxPtr.get(),
+                                ClusterAggregate::Namespaces{nss, nss},
+                                request,
+                                LiteParsedPipeline{request},
+                                PrivilegeVector(),
+                                boost::none /* ResolvedView */,
+                                boost::none /* verbosity */,
+                                &responseBuilder);
 
-                                    // Stop counting if the agg command failed for one of the
-                                    // collections to avoid recording a false count.
-                                    uassertStatusOKWithContext(
-                                        status,
-                                        str::stream() << "nss " << nss.toStringForErrorMsg());
+                            // Stop counting if the agg command failed for one of the
+                            // collections to avoid recording a false count.
+                            uassertStatusOKWithContext(
+                                status, str::stream() << "nss " << nss.toStringForErrorMsg());
 
-                                    if (!responseBuilder.obj()["cursor"]["firstBatch"]
-                                             .Array()
-                                             .empty()) {
-                                        numShardedCollsWithInconsistentIndexes++;
-                                    }
-                                });
+                            if (!responseBuilder.obj()["cursor"]["firstBatch"].Array().empty()) {
+                                numShardedCollsWithInconsistentIndexes++;
+                            }
                         });
                 }
 

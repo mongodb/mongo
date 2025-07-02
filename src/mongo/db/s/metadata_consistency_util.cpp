@@ -62,16 +62,15 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/intrusive_counter.h"
@@ -375,9 +374,9 @@ std::vector<BSONObj> _runExhaustiveAggregation(OperationContext* opCtx,
 
     std::vector<BSONObj> results;
 
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
     try {
-        shardVersionRetry(opCtx, catalogCache, nss, reason, [&] {
+        sharding::router::CollectionRouter router(opCtx->getServiceContext(), nss);
+        router.route(opCtx, reason, [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
             auto cursor = [&] {
                 BSONObjBuilder responseBuilder;
                 auto status = ClusterAggregate::runAggregate(opCtx,
@@ -932,7 +931,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistencyAcrossS
             pipeline.emplace_back(fromjson(R"(
                 {$group: {
                     _id: 0,
-                    docs: { $push: "$$ROOT" } 
+                    docs: { $push: "$$ROOT" }
                 }})"));
             pipeline.emplace_back(
                 BSON("$project" << BSON(

@@ -225,11 +225,6 @@ public:
     static CollectionOptionsAndUUID getCollectionOptions(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nssOrUUID,
-        boost::optional<Timestamp> afterClusterTime);
-
-    static CollectionOptionsAndUUID getCollectionOptions(
-        OperationContext* opCtx,
-        const NamespaceStringOrUUID& nssOrUUID,
         const ShardId& fromShardId,
         const boost::optional<DatabaseVersion>& dbVersion,
         boost::optional<Timestamp> afterClusterTime);

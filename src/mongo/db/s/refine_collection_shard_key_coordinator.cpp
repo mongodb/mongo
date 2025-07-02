@@ -53,15 +53,14 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/s/stale_shard_version_helpers.h"
 
 #include <string>
 #include <tuple>
@@ -267,29 +266,25 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                         opCtx, ns, shardsWithData, session, executor, token);
                 }
 
-                auto catalogCache = Grid::get(opCtx)->catalogCache();
+                sharding::router::CollectionRouter router(opCtx->getServiceContext(), ns);
+                router.route(opCtx,
+                             "validating indexes for refineCollectionShardKey"_sd,
+                             [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+                                 ShardsvrValidateShardKeyCandidate validateRequest(ns);
+                                 validateRequest.setKey(_doc.getNewShardKey());
+                                 validateRequest.setEnforceUniquenessCheck(
+                                     _request.getEnforceUniquenessCheck());
+                                 validateRequest.setDbName(DatabaseName::kAdmin);
 
-                shardVersionRetry(
-                    opCtx,
-                    catalogCache,
-                    ns,
-                    "validating indexes for refineCollectionShardKey"_sd,
-                    [&] {
-                        ShardsvrValidateShardKeyCandidate validateRequest(ns);
-                        validateRequest.setKey(_doc.getNewShardKey());
-                        validateRequest.setEnforceUniquenessCheck(
-                            _request.getEnforceUniquenessCheck());
-                        validateRequest.setDbName(DatabaseName::kAdmin);
-
-                        sharding_util::sendCommandToShardsWithVersion(
-                            opCtx,
-                            ns.dbName(),
-                            validateRequest.toBSON(),
-                            shardsWithData,
-                            **executor,
-                            uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, ns)),
-                            true /* throwOnError */);
-                    });
+                                 sharding_util::sendCommandToShardsWithVersion(
+                                     opCtx,
+                                     ns.dbName(),
+                                     validateRequest.toBSON(),
+                                     shardsWithData,
+                                     **executor,
+                                     cri,
+                                     true /* throwOnError */);
+                             });
             }))
         .then(_buildPhaseHandler(
             Phase::kBlockCrud,

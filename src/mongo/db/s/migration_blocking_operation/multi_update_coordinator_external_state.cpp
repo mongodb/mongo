@@ -38,7 +38,6 @@
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/s/request_types/migration_blocking_operation_gen.h"
 #include "mongo/s/service_entry_point_router_role.h"
-#include "mongo/s/stale_shard_version_helpers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -49,13 +48,13 @@ auto runDDLOperationWithRetry(OperationContext* opCtx,
                               const NamespaceString& nss,
                               BSONObj command) {
     auto cmdName = command.firstElement().fieldNameStringData();
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-    return shardVersionRetry(opCtx, catalogCache, nss, cmdName, [&] {
-        const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.dbName()));
+
+    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+    router.route(opCtx, cmdName, [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
         auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
             opCtx,
             DatabaseName::kAdmin,
-            dbInfo,
+            cdb,
             command,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             Shard::RetryPolicy::kIdempotent);
@@ -93,24 +92,19 @@ void MultiUpdateCoordinatorExternalStateImpl::stopBlockingMigrations(OperationCo
 
 bool MultiUpdateCoordinatorExternalStateImpl::isUpdatePending(
     OperationContext* opCtx, const NamespaceString& nss, AggregateCommandRequest& request) const {
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-    return shardVersionRetry(
-        opCtx, catalogCache, nss, "AggregationForMultiUpdateCoordinator"_sd, [&] {
-            BSONObjBuilder responseBuilder;
-            auto status = ClusterAggregate::runAggregate(opCtx,
-                                                         ClusterAggregate::Namespaces{nss, nss},
-                                                         request,
-                                                         LiteParsedPipeline{request},
-                                                         PrivilegeVector(),
-                                                         boost::none, /* verbosity */
-                                                         &responseBuilder);
+    BSONObjBuilder responseBuilder;
+    auto status = ClusterAggregate::runAggregate(opCtx,
+                                                 ClusterAggregate::Namespaces{nss, nss},
+                                                 request,
+                                                 LiteParsedPipeline{request},
+                                                 PrivilegeVector(),
+                                                 boost::none, /* verbosity */
+                                                 &responseBuilder);
 
-            uassertStatusOKWithContext(status,
-                                       "Aggregation request in MultiUpdateCoordinator failed.");
+    uassertStatusOKWithContext(status, "Aggregation request in MultiUpdateCoordinator failed.");
 
-            auto resultArr = responseBuilder.obj()["cursor"]["firstBatch"].Array();
-            return (!resultArr.empty());
-        });
+    auto resultArr = responseBuilder.obj()["cursor"]["firstBatch"].Array();
+    return (!resultArr.empty());
 }
 
 bool MultiUpdateCoordinatorExternalStateImpl::collectionExists(OperationContext* opCtx,

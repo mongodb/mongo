@@ -45,7 +45,6 @@
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -117,15 +116,6 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
         ->clearFilteringMetadata(opCtx);
 }
 
-template <typename Callable>
-auto RecipientStateMachineExternalStateImpl::_withShardVersionRetry(OperationContext* opCtx,
-                                                                    const NamespaceString& nss,
-                                                                    StringData reason,
-                                                                    Callable&& callable) {
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-    return shardVersionRetry(opCtx, catalogCache, nss, reason, std::move(callable));
-}
-
 ShardId RecipientStateMachineExternalStateImpl::myShardId(ServiceContext* serviceContext) const {
     return ShardingState::get(serviceContext)->shardId();
 }
@@ -156,9 +146,14 @@ RecipientStateMachineExternalStateImpl::getCollectionOptions(
     boost::optional<Timestamp> afterClusterTime,
     StringData reason) {
     // Load the collection options from the primary shard for the database.
-    return _withShardVersionRetry(opCtx, nss, reason, [&] {
+    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+    return router.route(opCtx, reason, [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
         return MigrationDestinationManager::getCollectionOptions(
-            opCtx, NamespaceStringOrUUID{nss.dbName(), uuid}, afterClusterTime);
+            opCtx,
+            NamespaceStringOrUUID{nss.dbName(), uuid},
+            cdb->getPrimary(),
+            cdb->getVersion(),
+            afterClusterTime);
     });
 }
 
@@ -184,24 +179,35 @@ RecipientStateMachineExternalStateImpl::getCollectionIndexes(OperationContext* o
                                                              StringData reason,
                                                              bool expandSimpleCollation) {
     // Load the list of indexes from the shard which owns the global minimum chunk.
-    return _withShardVersionRetry(opCtx, nss, reason, [&] {
-        auto cri = getTrackedCollectionRoutingInfo(opCtx, nss);
-        return MigrationDestinationManager::getCollectionIndexes(
-            opCtx,
-            nss,
-            cri.getChunkManager().getMinKeyShardIdWithSimpleCollation(),
-            cri,
-            afterClusterTime,
-            expandSimpleCollation);
-    });
+    sharding::router::CollectionRouter router(opCtx->getServiceContext(), nss);
+    return router.route(
+        opCtx, reason, [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << "Expected collection " << nss.toStringForErrorMsg()
+                                  << " to be tracked",
+                    cri.hasRoutingTable());
+            return MigrationDestinationManager::getCollectionIndexes(
+                opCtx,
+                nss,
+                cri.getChunkManager().getMinKeyShardIdWithSimpleCollation(),
+                cri,
+                afterClusterTime,
+                expandSimpleCollation);
+        });
 }
 
-void RecipientStateMachineExternalStateImpl::withShardVersionRetry(
+/**
+ * A wrapper method that routes to `CollectionRouter`, primarily intended for use within
+ * `RecipientStateMachineExternalState`. It facilitates testing and mocking scenarios,
+ * particularly in unit tests such as `resharding_recipient_service_test.cpp`.
+ */
+void RecipientStateMachineExternalStateImpl::route(
     OperationContext* opCtx,
     const NamespaceString& nss,
     StringData reason,
-    unique_function<void()> callback) {
-    _withShardVersionRetry(opCtx, nss, reason, std::move(callback));
+    unique_function<void(OperationContext* opCtx, const CollectionRoutingInfo& cri)> callback) {
+    sharding::router::CollectionRouter router(opCtx->getServiceContext(), nss);
+    router.route(opCtx, reason, callback);
 }
 
 void RecipientStateMachineExternalStateImpl::updateCoordinatorDocument(OperationContext* opCtx,

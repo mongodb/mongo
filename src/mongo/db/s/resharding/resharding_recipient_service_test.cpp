@@ -195,11 +195,12 @@ public:
         return {std::vector<BSONObj>{}, BSONObj()};
     }
 
-    void withShardVersionRetry(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               StringData reason,
-                               unique_function<void()> callback) override {
-        callback();
+    void route(OperationContext* opCtx,
+               const NamespaceString& nss,
+               StringData reason,
+               unique_function<void(OperationContext* opCtx, const CollectionRoutingInfo& cri)>
+                   callback) override {
+        callback(opCtx, getTrackedCollectionRoutingInfo(opCtx, nss));
     }
 
     void updateCoordinatorDocument(OperationContext* opCtx,

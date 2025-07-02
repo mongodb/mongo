@@ -98,10 +98,11 @@ public:
         StringData reason,
         bool expandSimpleCollation = true) = 0;
 
-    virtual void withShardVersionRetry(OperationContext* opCtx,
-                                       const NamespaceString& nss,
-                                       StringData reason,
-                                       unique_function<void()> callback) = 0;
+    virtual void route(OperationContext* opCtx,
+                       const NamespaceString& nss,
+                       StringData reason,
+                       unique_function<void(OperationContext* opCtx,
+                                            const CollectionRoutingInfo& cri)> callback) = 0;
 
     virtual void updateCoordinatorDocument(OperationContext* opCtx,
                                            const BSONObj& query,
@@ -157,10 +158,11 @@ public:
         bool expandSimpleCollation = true) override;
 
 
-    void withShardVersionRetry(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               StringData reason,
-                               unique_function<void()> callback) override;
+    void route(OperationContext* opCtx,
+               const NamespaceString& nss,
+               StringData reason,
+               unique_function<void(OperationContext* opCtx, const CollectionRoutingInfo& cri)>
+                   callback) override;
 
     void updateCoordinatorDocument(OperationContext* opCtx,
                                    const BSONObj& query,
@@ -168,13 +170,6 @@ public:
 
     void clearFilteringMetadataOnTempReshardingCollection(
         OperationContext* opCtx, const NamespaceString& tempReshardingNss) override;
-
-private:
-    template <typename Callable>
-    auto _withShardVersionRetry(OperationContext* opCtx,
-                                const NamespaceString& nss,
-                                StringData reason,
-                                Callable&& callable);
 };
 
 }  // namespace mongo

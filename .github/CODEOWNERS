@@ -2769,7 +2769,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/**/shard_version* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/sharding_types.idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/stale_exception* @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/s/**/stale_shard_version_helpers* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/type_collection_common_types.idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/balancer_configuration* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/gossiped_routing_cache.idl @10gen/server-catalog-and-routing @svc-auto-approve-bot

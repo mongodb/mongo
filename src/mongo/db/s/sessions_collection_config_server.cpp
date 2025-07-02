@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/session/sessions_collection.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -60,7 +61,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/router_role.h"
-#include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
@@ -134,47 +134,39 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
 
 void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* opCtx) {
     const auto nss = NamespaceString::kLogicalSessionsNamespace;
-    auto shardResults = shardVersionRetry(
-        opCtx,
-        Grid::get(opCtx)->catalogCache(),
-        nss,
-        "SessionsCollectionConfigServer::_generateIndexesIfNeeded",
-        [&] {
-            const auto cri = [&]() {
-                // (SERVER-61214) wait for the catalog cache to acknowledge that the sessions
-                // collection is sharded in order to be sure to get a valid routing table
-                while (true) {
+    sharding::router::CollectionRouter router(opCtx->getServiceContext(), nss);
+    auto shardResults =
+        router.route(opCtx,
+                     "SessionsCollectionConfigServer::_generateIndexesIfNeeded",
+                     [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+                         // (SERVER-61214) This assertion ensures that the catalog cache recognizes
+                         // the sessions collection as sharded, guaranteeing the retrieval of a
+                         // valid routing table.
+                         uassert(StaleConfigInfo(nss,
+                                                 cri.getCollectionVersion() /* receivedVersion */,
+                                                 ShardVersion::UNSHARDED() /* wantedVersion */,
+                                                 ShardingState::get(opCtx)->shardId()),
+                                 str::stream() << "Collection " << nss.toStringForErrorMsg()
+                                               << " is not sharded",
+                                 cri.isSharded());
 
-                    const auto& cri = uassertStatusOK(
-                        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-
-                    if (cri.isSharded()) {
-                        return cri;
-                    }
-
-                    // Force a refresh of the catalog cache on next lookup
-                    Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(
-                        nss, boost::none /* wantedVersion */);
-                }
-            }();
-
-            // TODO SERVER-104347 Acquire CollectionRoutingInfo through RoutingContext only and
-            // remove direct CatalogCache access in the check above.
-            return routing_context_utils::withValidatedRoutingContext(
-                opCtx, {{nss, cri}}, [&](RoutingContext& routingCtx) {
-                    return scatterGatherVersionedTargetByRoutingTable(
-                        opCtx,
-                        nss,
-                        routingCtx,
-                        SessionsCollection::generateCreateIndexesCmd(),
-                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                        Shard::RetryPolicy::kNoRetry,
-                        BSONObj() /*query*/,
-                        BSONObj() /*collation*/,
-                        boost::none /*letParameters*/,
-                        boost::none /*runtimeConstants*/);
-                });
-        });
+                         // TODO SERVER-104347 Acquire CollectionRoutingInfo through RoutingContext
+                         // only and remove direct CatalogCache access in the check above.
+                         return routing_context_utils::withValidatedRoutingContext(
+                             opCtx, {{nss, cri}}, [&](RoutingContext& routingCtx) {
+                                 return scatterGatherVersionedTargetByRoutingTable(
+                                     opCtx,
+                                     nss,
+                                     routingCtx,
+                                     SessionsCollection::generateCreateIndexesCmd(),
+                                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                     Shard::RetryPolicy::kNoRetry,
+                                     BSONObj() /*query*/,
+                                     BSONObj() /*collation*/,
+                                     boost::none /*letParameters*/,
+                                     boost::none /*runtimeConstants*/);
+                             });
+                     });
 
     for (auto& shardResult : shardResults) {
         const auto shardResponse = uassertStatusOK(std::move(shardResult.swResponse));

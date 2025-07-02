@@ -568,7 +568,6 @@ routing_and_topology:
     - src/mongo/s/*ns_targeter*
     - src/mongo/s/router_role[._]*
     - src/mongo/s/*routing*
-    - src/mongo/s/stale_shard_version_helpers*
 
     # catalog cache
     - src/mongo/db/s/*catalog_cache*

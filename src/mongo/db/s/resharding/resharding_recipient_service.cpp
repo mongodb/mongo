@@ -838,13 +838,13 @@ void ReshardingRecipientService::RecipientStateMachine::
 
         if (!_metadata.getProvenance() ||
             _metadata.getProvenance() == ReshardingProvenanceEnum::kReshardCollection) {
-            _externalState->withShardVersionRetry(
+            _externalState->route(
                 opCtx.get(),
                 _metadata.getSourceNss(),
                 "validating shard key index for reshardCollection"_sd,
-                [&] {
+                [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                     shardkeyutil::validateShardKeyIsNotEncrypted(
-                        opCtx.get(),
+                        opCtx,
                         _metadata.getSourceNss(),
                         ShardKeyPattern(_metadata.getReshardingKey()));
                     // This behavior in this phase is only used to validate whether this
@@ -852,10 +852,10 @@ void ReshardingRecipientService::RecipientStateMachine::
                     // validateShardKeyIndexExistsOrCreateIfPossible again in the buildIndex
                     // phase to make sure we have the indexSpecs even after restart.
                     shardkeyutil::ValidationBehaviorsReshardingBulkIndex behaviors;
-                    behaviors.setOpCtxAndCloneTimestamp(opCtx.get(), *_cloneTimestamp);
+                    behaviors.setOpCtxAndCloneTimestamp(opCtx, *_cloneTimestamp);
 
                     auto [collOptions, _] = _externalState->getCollectionOptions(
-                        opCtx.get(),
+                        opCtx,
                         _metadata.getSourceNss(),
                         _metadata.getSourceUUID(),
                         *_cloneTimestamp,
@@ -865,7 +865,7 @@ void ReshardingRecipientService::RecipientStateMachine::
                         CollectionOptions::parse(collOptions, CollectionOptions::parseForStorage));
 
                     shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
-                        opCtx.get(),
+                        opCtx,
                         _metadata.getSourceNss(),
                         ShardKeyPattern{_metadata.getReshardingKey()},
                         CollationSpec::kSimpleSpec,

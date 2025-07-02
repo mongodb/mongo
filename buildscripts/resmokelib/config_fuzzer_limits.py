@@ -57,12 +57,6 @@ If the min/max is not inclusive, this is added as a note above the parameter.
 config_fuzzer_params = {
     "mongod": {
         "analyzeShardKeySplitPointExpirationSecs": {"min": 1, "max": 300, "fuzz_at": ["startup"]},
-        "analyzeShardKeyMaxNumStaleVersionRetries": {
-            "min": 0,
-            "max": 10,
-            "default": 0,
-            "fuzz_at": ["startup"],
-        },
         "collectionSamplingLogIntervalSeconds": {
             "min": 5,
             "max": 15,

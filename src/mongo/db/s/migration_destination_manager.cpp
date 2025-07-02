@@ -939,16 +939,6 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
 MigrationDestinationManager::CollectionOptionsAndUUID
 MigrationDestinationManager::getCollectionOptions(OperationContext* opCtx,
                                                   const NamespaceStringOrUUID& nssOrUUID,
-                                                  boost::optional<Timestamp> afterClusterTime) {
-    const auto dbInfo =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nssOrUUID.dbName()));
-    return getCollectionOptions(
-        opCtx, nssOrUUID, dbInfo->getPrimary(), dbInfo->getVersion(), afterClusterTime);
-}
-
-MigrationDestinationManager::CollectionOptionsAndUUID
-MigrationDestinationManager::getCollectionOptions(OperationContext* opCtx,
-                                                  const NamespaceStringOrUUID& nssOrUUID,
                                                   const ShardId& fromShardId,
                                                   const boost::optional<DatabaseVersion>& dbVersion,
                                                   boost::optional<Timestamp> afterClusterTime) {

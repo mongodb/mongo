@@ -94,7 +94,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query_analysis_client.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -388,22 +387,8 @@ void runClusterAggregate(OperationContext* opCtx,
                       .tmpDir(storageGlobalParams.dbpath + "/_tmp")
                       .build();
 
-    size_t altNumRetries = 0;  // 0 means use the default max number of retries.
-    if (MONGO_unlikely(analyzeShardKeyMaxNumStaleVersionRetries > 0)) {
-        altNumRetries = analyzeShardKeyMaxNumStaleVersionRetries;
-    }
-    auto&& [pipeline, execPipeline] = shardVersionRetry(
-        opCtx,
-        Grid::get(opCtx)->catalogCache(),
-        nss,
-        "AnalyzeShardKey"_sd,
-        [&] {
-            auto pipeline = Pipeline::makePipeline(aggRequest, expCtx);
-            auto execPipeline =
-                exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
-            return std::make_pair(std::move(pipeline), std::move(execPipeline));
-        },
-        altNumRetries);
+    auto pipeline = Pipeline::makePipeline(aggRequest, expCtx);
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
 
     while (auto doc = execPipeline->getNext()) {
         callbackFn(doc->toBson());
