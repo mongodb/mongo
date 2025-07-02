@@ -5,7 +5,6 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {iterateMatchingLogLines} from "jstests/libs/log.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 /******************************************************************************************************
  * Constants for the regexes used to extract memory tracking metrics from the slow query log.
@@ -43,7 +42,8 @@ function assertNoMatchInLog(logLine, regex) {
 function runPipelineAndGetDiagnostics({db, collName, commandObj, source}) {
     const pipelineComment = commandObj.comment;
 
-    // Use toArray() to exhaust the cursor.
+    // Use toArray() to exhaust the cursor. We use a batchSize of 1 to ensure that a getMore is
+    // issued and disallow spilling to disk to prevent clearing of inUseMemBytes.
     const options = {
         comment: pipelineComment,
         cursor: commandObj.cursor,
@@ -245,9 +245,7 @@ function verifyProfilerMetrics({
 }
 
 function verifyExplainMetrics({db, collName, pipeline, stageName, featureFlagEnabled, numStages}) {
-    const isSbeEnabled = checkSbeFullyEnabled(db);
-    const stageKey = isSbeEnabled ? stageName : '$' + stageName;
-
+    const stageKey = '$' + stageName;
     const explainRes = db[collName].explain("executionStats").aggregate(pipeline);
 
     function assertNoMemoryMetricsInStages(explainRes, stageKey) {
@@ -315,11 +313,7 @@ function verifyExplainMetrics({db, collName, pipeline, stageName, featureFlagEna
     const explainQueryPlannerRes = db[collName].explain("queryPlanner").aggregate(pipeline);
     assert(!explainQueryPlannerRes.hasOwnProperty("maxUsedMemBytes"),
            "Unexpected maxUsedMemBytes in explain: " + tojson(explainQueryPlannerRes));
-    // If sbe is enabled, stage metrics aren't outputted in queryPlanner explain, so checking the
-    // stageKey will result in no stages.
-    if (!isSbeEnabled) {
-        assertNoMemoryMetricsInStages(explainQueryPlannerRes, stageKey);
-    }
+    assertNoMemoryMetricsInStages(explainQueryPlannerRes, stageKey);
 }
 
 /**
@@ -384,8 +378,8 @@ export function runMemoryStatsTest({
 
 /**
  * For a given pipeline in a sharded cluster, verify that memory tracking statistics are correctly
- * reported to the slow query log and explain("executionStats"). We don't check profiler metrics as
- * the profiler doesn't exist for mongos so we don't test it here.
+ * reported to the slow query log and explain("executionStats").  We don't check profiler
+ * metrics as the profiler doesn't exist for mongos so we don't test it here.
  */
 export function runShardedMemoryStatsTest({
     db,

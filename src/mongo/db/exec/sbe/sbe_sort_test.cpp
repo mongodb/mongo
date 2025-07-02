@@ -144,7 +144,6 @@ TEST_F(SortStageTest, SortStringsWithSpillingTest) {
         ASSERT_GT(sortStats->spillingStats.getSpilledDataStorageSize(), 0);
         ASSERT_LT(sortStats->spillingStats.getSpilledDataStorageSize(),
                   sortStats->spillingStats.getSpilledBytes());
-        ASSERT_EQ(sortStats->maxMemoryUsageBytes, 10 * 1024 * 1024);
     };
 
     inputGuard.reset();
@@ -188,7 +187,6 @@ TEST_F(SortStageTest, SortStringsWithForceSpillingTest) {
         ASSERT_GT(sortStats->spillingStats.getSpilledDataStorageSize(), 0);
         ASSERT_LT(sortStats->spillingStats.getSpilledDataStorageSize(),
                   sortStats->spillingStats.getSpilledBytes());
-        ASSERT_GT(sortStats->maxMemoryUsageBytes, 0);
     };
 
     inputGuard.reset();
