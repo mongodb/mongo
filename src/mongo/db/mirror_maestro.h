@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/mirror_maestro_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/service_context.h"
@@ -106,5 +107,8 @@ std::vector<HostAndPort> getCachedHostsForTargetedMirroring_forTest(ServiceConte
 void updateCachedHostsForTargetedMirroring_forTest(ServiceContext* serviceContext,
                                                    const repl::ReplSetConfig& replSetConfig,
                                                    bool tagChanged);
+
+void setExecutor_forTest(ServiceContext* serviceContext,
+                         std::shared_ptr<executor::TaskExecutor> executor);
 
 }  // namespace mongo

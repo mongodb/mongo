@@ -89,8 +89,7 @@ public:
         /**
          * Construct with a value from defaultRandomFunc().
          */
-        // TODO SERVER-104849 Remove default for targetedRatio
-        explicit SamplingParameters(const double generalRatio, double targetedRatio = 0.0)
+        explicit SamplingParameters(const double generalRatio, double targetedRatio)
             : SamplingParameters(
                   generalRatio, targetedRatio, defaultRandomMax(), defaultRandomFunc()) {}
 

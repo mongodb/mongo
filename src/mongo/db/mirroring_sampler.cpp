@@ -29,6 +29,7 @@
 
 #include "mongo/db/mirroring_sampler.h"
 
+#include "mongo/db/mirror_maestro_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 
 #include <chrono>
@@ -76,27 +77,28 @@ MirroringSampler::MirroringMode MirroringSampler::getMirrorMode(
     const std::shared_ptr<const repl::HelloResponse>& helloResp,
     const SamplingParameters& params) const {
     MirroringMode mode;
-    // TODO SERVER-104848 Only general mirroring must have a hello response
-    if (!helloResp) {
-        // If we don't have a HelloResponse, we can't know where to send our mirrored request.
-        return mode;
+
+    if (helloResp && params.generalRatio != 0) {
+        const auto secondariesCount = helloResp->getHosts().size() - 1;
+        if (secondariesCount < 1) {
+            // There are no eligible nodes to mirror to
+            return mode;
+        }
+        invariant(secondariesCount > 0);
+
+        // Adjust ratio to mirror read requests to approximately `samplingRate x secondariesCount`.
+        const auto secondariesRatio = secondariesCount * params.generalRatio;
+        const auto mirroringFactor = std::ceil(secondariesRatio);
+        invariant(mirroringFactor > 0 && mirroringFactor <= secondariesCount);
+        const double adjustedRatio = secondariesRatio / mirroringFactor;
+        if (helloResp->isWritablePrimary() &&
+            (params.value < static_cast<int>(params.max * adjustedRatio))) {
+            mode.generalEnabled = true;
+        }
     }
 
-    const auto secondariesCount = helloResp->getHosts().size() - 1;
-    if (secondariesCount < 1) {
-        // There are no eligible nodes to mirror to
+    if (!gFeatureFlagTargetedMirrorReads.isEnabled()) {
         return mode;
-    }
-    invariant(secondariesCount > 0);
-
-    // Adjust ratio to mirror read requests to approximately `samplingRate x secondariesCount`.
-    const auto secondariesRatio = secondariesCount * params.generalRatio;
-    const auto mirroringFactor = std::ceil(secondariesRatio);
-    invariant(mirroringFactor > 0 && mirroringFactor <= secondariesCount);
-    const double adjustedRatio = secondariesRatio / mirroringFactor;
-    if (helloResp->isWritablePrimary() &&
-        (params.value < static_cast<int>(params.max * adjustedRatio))) {
-        mode.generalEnabled = true;
     }
 
     if (params.value < static_cast<int>(params.max * params.targetedRatio)) {

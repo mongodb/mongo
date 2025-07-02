@@ -27,8 +27,6 @@
 
 global:
     cpp_namespace: mongo
-    cpp_includes:
-        - "mongo/db/mirror_maestro.h"
 
 imports:
     - "mongo/db/basic_types.idl"

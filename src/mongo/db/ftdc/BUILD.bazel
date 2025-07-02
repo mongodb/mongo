@@ -106,6 +106,7 @@ mongo_cc_library(
         "ftdc_server.h",
         "ftdc_system_stats.h",
         "//src/mongo/db:mirror_maestro.h",
+        "//src/mongo/db:mirror_maestro_gen",
         "//src/mongo/transport:transport_layer_ftdc_collector.h",
     ],
     deps = [

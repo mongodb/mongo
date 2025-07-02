@@ -136,6 +136,10 @@ void TopologyVersionObserver::registerTopologyChangeObserver(TopologyChangeCallb
     _callbacks.push_back(std::move(cb));
 }
 
+ReplSetConfig TopologyVersionObserver::getReplSetConfig() {
+    return _replCoordinator->getConfig();
+}
+
 std::string TopologyVersionObserver::toString() const {
     return str::stream() << kTopologyVersionObserverName;
 }
