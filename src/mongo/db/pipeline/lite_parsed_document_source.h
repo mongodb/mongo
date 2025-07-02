@@ -262,6 +262,14 @@ public:
     }
 
     /**
+     * Returns false if aggregation stages manually opt out of mandatory authorization checks, true
+     otherwise. Will enable mandatory authorization checks by default.
+     */
+    virtual bool requiresAuthzChecks() const {
+        return true;
+    }
+
+    /**
      * Returns Status::OK() if the involved namespace 'nss' is allowed to be sharded. The behavior
      * is to allow by default. Stages should opt-out if foreign collections are not allowed to be
      * sharded by returning a Status with a message explaining why.
