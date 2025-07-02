@@ -140,7 +140,10 @@
         shell_options:
           global_vars:
             TestData:
-              useRandomBinVersionsWithinReplicaSet: 'last-lts'
+              useRandomBinVersionsWithinReplicaSet: "last-lts"
+              # Since a test in replica_sets could start up a sharded cluster, we
+              # need to set this variable so that the right version of mongos is chosen.
+              mongosBinVersion: "last-lts"
 
 - name: replica_sets_multiversion_testdata_last_continuous
   value:
@@ -149,7 +152,10 @@
         shell_options:
           global_vars:
             TestData:
-              useRandomBinVersionsWithinReplicaSet: 'last-continuous'
+              useRandomBinVersionsWithinReplicaSet: "last-continuous"
+              # Since a test in replica_sets could start up a sharded cluster, we
+              # need to set this variable so that the right version of mongos is chosen.
+              mongosBinVersion: "last-continuous"
 
 - name: rollback_multiversion_fuzzer_testdata_last_lts
   value:
