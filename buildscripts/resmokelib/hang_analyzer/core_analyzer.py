@@ -24,11 +24,17 @@ class CoreAnalyzer(Subcommand):
         self.execution = options.execution
         self.gdb_index_cache = options.gdb_index_cache
         self.root_logger = self.setup_logging(logger)
+        self.extra_otel_options = {}
+        for option in options.otel_extra_data:
+            key, val = option.split("=")
+            self.extra_otel_options[key] = val
 
     @TRACER.start_as_current_span("core_analyzer.execute")
     def execute(self):
         base_dir = self.options.working_dir
-        current_span = get_default_current_span({"failed_task_id": self.task_id})
+        current_span = get_default_current_span(
+            {"failed_task_id": self.task_id} | self.extra_otel_options
+        )
         dumpers = dumper.get_dumpers(self.root_logger, None)
 
         if self.task_id:
@@ -191,6 +197,13 @@ class CoreAnalyzerPlugin(PluginInterface):
             choices=["on", "off"],
             metavar="ON|OFF",
             help="Set core analyzer GDB index cache enabled state (default: on)",
+        )
+
+        parser.add_argument(
+            "--otel-extra-data",
+            action="append",
+            default=[],
+            help="Add any data input here to otel trace, format: key=val",
         )
 
         configure_resmoke.add_otel_args(parser)

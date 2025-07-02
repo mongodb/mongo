@@ -14,6 +14,7 @@ from typing import List
 from shrub.v2 import BuildVariant, FunctionCall, ShrubProject, Task, TaskDependency
 from shrub.v2.command import BuiltInCommand
 
+from buildscripts.resmokelib.core.process import BORING_CORE_DUMP_PIDS_FILE
 from buildscripts.resmokelib.hang_analyzer import dumper
 
 mongo_path = pathlib.Path(__file__).parents[3]
@@ -39,8 +40,46 @@ def get_generated_task_name(current_task_name: str, execution: str) -> str:
     return f"{GENERATED_TASK_PREFIX}_{current_task_name}{execution}_{random_string}"
 
 
+def should_activate_core_analysis_task(task: Task) -> bool:
+    core_dump_pids = set()
+    for artifact in task.artifacts:
+        regex = re.search(r"Core Dump [0-9]+ \((.*)\.gz\)", artifact.name)
+        if not regex:
+            continue
+
+        core_file = regex.group(1)
+        core_file_parts = core_file.split(".")
+        assert len(core_file_parts) == 3, "Unknown core dump file name format"
+        pid = core_file_parts[1]
+        core_dump_pids.add(pid)
+
+    boring_core_dump_pids = set()
+    if os.path.exists(BORING_CORE_DUMP_PIDS_FILE):
+        with open(BORING_CORE_DUMP_PIDS_FILE, "r") as file:
+            boring_core_dump_pids = set(file.read().split())
+
+    print(f"detected core dump pids: {core_dump_pids}")
+    print(f"boring core dump pids: {boring_core_dump_pids}")
+
+    interesting_core_dumps = core_dump_pids - boring_core_dump_pids
+
+    if interesting_core_dumps:
+        print(f"The following interesting core dump pids were found: {interesting_core_dumps}")
+        print("Activating core analysis task.")
+        should_activate = True
+    else:
+        print("No interesting core dumps were found. Not activating core analysis task.")
+        should_activate = False
+
+    return should_activate
+
+
 def get_core_analyzer_commands(
-    task_id: str, execution: str, core_analyzer_results_url: str, gdb_index_cache: str
+    task_id: str,
+    execution: str,
+    core_analyzer_results_url: str,
+    gdb_index_cache: str,
+    has_interesting_core_dumps: bool,
 ) -> List[FunctionCall]:
     """Return setup commands."""
     return [
@@ -65,6 +104,8 @@ def get_core_analyzer_commands(
                     f"--execution={execution}",
                     f"--gdb-index-cache={gdb_index_cache}",
                     "--generate-report",
+                    "--otel-extra-data",
+                    f"has_interesting_core_dumps={str(has_interesting_core_dumps).lower()}",
                 ],
                 "env": {
                     "OTEL_TRACE_ID": "${otel_trace_id}",
@@ -184,17 +225,19 @@ def generate(
         )
         return
 
+    should_activate = should_activate_core_analysis_task(task_info)
+
     # Make the evergreen variant that will be generated
-    build_variant = BuildVariant(name=build_variant_name, activate=True)
+    build_variant = BuildVariant(name=build_variant_name)
     commands = get_core_analyzer_commands(
-        task_id, execution, core_analyzer_results_url, gdb_index_cache
+        task_id, execution, core_analyzer_results_url, gdb_index_cache, should_activate
     )
 
     deps = {TaskDependency("archive_dist_test_debug", compile_variant)}
     # TODO SERVER-92571 add archive_jstestshell_debug dep for variants that have it.
     sub_tasks = set([Task(get_generated_task_name(current_task_name, execution), commands, deps)])
 
-    build_variant.add_tasks(sub_tasks, distros=[distro], activate=True)
+    build_variant.add_tasks(sub_tasks, distros=[distro], activate=should_activate)
 
     shrub_project = ShrubProject.empty()
     shrub_project.add_build_variant(build_variant)
