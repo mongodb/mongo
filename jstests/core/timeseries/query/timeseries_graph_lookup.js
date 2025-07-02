@@ -5,6 +5,7 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   references_foreign_collection,
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";

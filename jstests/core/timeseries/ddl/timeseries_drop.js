@@ -7,7 +7,6 @@
  *   # drop a sharded timeseries collection by the buckets namespace).
  *   assumes_unsharded_collection,
  *   assumes_no_implicit_collection_creation_after_drop,
- *
  *   # drop collection is NOT retryable under the conditions of this test. Consider the scenario:
  *   #  - We have a situation like case 9 (normal collection, buckets exists, drop by the main NS).
  *   #  - Drop command of the main NS is started.
@@ -16,6 +15,7 @@
  *   #  - The command is retryed, but now the main collection doesn't exist, so the buckets
  *   #    collection is dropped instead.
  *   requires_non_retryable_commands,
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 

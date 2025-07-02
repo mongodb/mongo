@@ -6,6 +6,7 @@
  *   requires_timeseries,
  *   requires_non_retryable_writes,
  *   requires_fcv_70,
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 

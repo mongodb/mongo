@@ -13,8 +13,8 @@
  *   # Running shardCollection instead of createCollection returns different error types which are
  *   # not expected by the test
  *   assumes_unsharded_collection,
- *
- * ]
+ *   does_not_support_viewless_timeseries_yet,
+ *  ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 

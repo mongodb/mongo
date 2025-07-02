@@ -9,6 +9,7 @@
  *  assumes_unsharded_collection,
  *  # Creates chunks on specific shards
  *  assumes_stable_shard_list,
+ *  does_not_support_viewless_timeseries_yet,
  * ]
  */
 

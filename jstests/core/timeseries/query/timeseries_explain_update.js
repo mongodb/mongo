@@ -8,7 +8,8 @@
  *   # TODO SERVER-78683: Remove this tag.
  *   # Internal transaction api might not handle stepdowns correctly and time-series retryable
  *   # updates use internal transaction api.
- *   does_not_support_stepdowns
+ *   does_not_support_stepdowns,
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 

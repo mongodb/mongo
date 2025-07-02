@@ -17,6 +17,7 @@
  *   # Multi clients cannot share global fail points. When one client turns off a fail point, other
  *   # clients waiting on the fail point will get failed.
  *   multi_clients_incompatible,
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";

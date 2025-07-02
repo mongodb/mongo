@@ -10,7 +10,8 @@
  *   references_foreign_collection,
  *   requires_fcv_81,
  *   # Setting a server parameter is not allowed with a security token.
- *   not_allowed_with_signed_security_token
+ *   not_allowed_with_signed_security_token,
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";

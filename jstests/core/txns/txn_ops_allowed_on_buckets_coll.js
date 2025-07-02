@@ -3,7 +3,8 @@
  *
  * @tags: [
  *   uses_transactions,
- *   uses_snapshot_read_concern
+ *   uses_snapshot_read_concern,
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";

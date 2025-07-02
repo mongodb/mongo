@@ -9,6 +9,7 @@
  *  # rename only works across databases with same primary shard
  *  # TODO SERVER-90096: change this tag with a more specific one
  *  assumes_balancer_off,
+ *  does_not_support_viewless_timeseries_yet,
  * ]
  */
 

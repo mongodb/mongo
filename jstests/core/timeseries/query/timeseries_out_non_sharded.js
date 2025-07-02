@@ -18,6 +18,7 @@
  *   assumes_balancer_off,
  *   # We cannot rename to a sharded collection, so the output collection must be unsharded.
  *   assumes_unsharded_collection,
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";

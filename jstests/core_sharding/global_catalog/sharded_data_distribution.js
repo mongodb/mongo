@@ -8,6 +8,7 @@
  *   assumes_balancer_off,
  *   # $shardedDataDistribution is incompatible with causally consistent majority reads.
  *   does_not_support_stepdowns,
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 

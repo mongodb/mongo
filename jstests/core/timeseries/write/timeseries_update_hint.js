@@ -7,7 +7,8 @@
  *   assumes_read_concern_unchanged,
  *   # This test only synchronizes updates on the primary.
  *   assumes_read_preference_unchanged,
- *   assumes_unsharded_collection, # TODO SERVER-60233: Remove this tag.
+ *   # TODO SERVER-60233: Remove this tag.
+ *   assumes_unsharded_collection,
  *   # This test depends on certain writes ending up in the same bucket. Stepdowns and tenant
  *   # migrations may result in writes splitting between two primaries, and thus different buckets.
  *   does_not_support_stepdowns,
@@ -20,6 +21,7 @@
  *   # Multi clients cannot share global fail points. When one client turns off a fail point, other
  *   # clients waiting on the fail point will get failed.
  *   multi_clients_incompatible,
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";

@@ -11,6 +11,7 @@
  *   # TODO SERVER-88275: background moveCollections can cause the aggregation below to fail with
  *   # QueryPlanKilled.
  *   assumes_balancer_off,
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";

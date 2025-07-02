@@ -14,7 +14,8 @@
  *   cannot_run_during_upgrade_downgrade,
  *   requires_fcv_81,
  *   # cannot be run if fuzzer config is set
- *   does_not_support_config_fuzzer
+ *   does_not_support_config_fuzzer,
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {
