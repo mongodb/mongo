@@ -1,14 +1,17 @@
-version: 1.0.0
+version: 2.0.0
 filters:
+  - "backports_required_for_multiversion_tests.yml":
+    approvers:
+      - 10gen/devprod-correctness
+  - "burn_in_tests.yml":
+    approvers:
+      - 10gen/devprod-correctness
+  - "code_lockdown.yml":
+    approvers:
+      - 10gen/devprod-correctness
+  - "evergreen_yml_components/tasks/compile_tasks*.yml":
+    approvers:
+      - 10gen/devprod-build
   - "performance_thresholds.yml":
     approvers:
       - 10gen/performance
-  - "evergreen_yml_components/tasks/compile_tasks_nightly.yml":
-    approvers:
-      - 10gen/devprod-build
-  - "evergreen_yml_components/tasks/compile_tasks_shared.yml":
-    approvers:
-      - 10gen/devprod-build
-  - "evergreen_yml_components/tasks/compile_tasks.yml":
-    approvers:
-      - 10gen/devprod-build
