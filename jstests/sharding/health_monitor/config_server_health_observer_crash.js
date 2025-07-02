@@ -133,4 +133,5 @@ try {
     st.stop({skipValidatingExitCode: true, skipValidation: true});
 } catch (e) {
     jsTestLog(`Exception during shutdown: ${e}`);
+    st.stopOnFail();
 }
