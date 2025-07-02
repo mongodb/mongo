@@ -35,30 +35,9 @@
 extern "C" {
 #endif
 
-/**
- * Represents the API version of the MongoDB extension, to ensure compatibility between the MongoDB
- * server and the extension.
- *
- * The version is composed of three parts: major, minor, and patch. The major version is incremented
- * for incompatible changes, the minor version for for backward-compatible changes, and the patch
- * version for bug fixes.
- */
-typedef struct {
-    uint32_t major;
-    uint32_t minor;
-    uint32_t patch;
-} MongoExtensionAPIVersion;
-
 #define MONGODB_EXTENSION_API_MAJOR_VERSION 0
 #define MONGODB_EXTENSION_API_MINOR_VERSION 0
 #define MONGODB_EXTENSION_API_PATCH_VERSION 0
-
-// The current API version of the MongoDB extension.
-#define MONGODB_EXTENSION_API_VERSION                                             \
-    MongoExtensionAPIVersion {                                                    \
-        MONGODB_EXTENSION_API_MAJOR_VERSION, MONGODB_EXTENSION_API_MINOR_VERSION, \
-            MONGODB_EXTENSION_API_PATCH_VERSION                                   \
-    }
 
 /**
  * A read-only view of a byte array.
@@ -198,35 +177,6 @@ typedef struct MongoExtensionLogicalAggregationStageVTable {
      */
     void (*destroy)(MongoExtensionLogicalAggregationStage* logicalStage);
 } MongoExtensionLogicalAggregationStageVTable;
-
-/**
- * MongoExtension is the top-level struct that must be defined by any MongoDB extension. It contains
- * the API version and an initialization function.
- *
- * At extension loading time, the MongoDB server will check compatibility of the extension's API
- * version with the server's API version then invoke the initializer.
- *
- * TODO SERVER-106242 Flesh out initialization function.
- *
- * NOTE: If any new fields need to be added to this struct in the future, they must be added
- * at the end to maintain backward compatibility. Any older extensions will zero out the additional
- * field automatically.
- */
-typedef void (*mongo_extension_init_t)();
-typedef struct {
-    MongoExtensionAPIVersion version;
-    mongo_extension_init_t initialize;
-} MongoExtension;
-
-/**
- * The symbol that must be defined in all extension shared libraries to register the extension with
- * the MongoDB server when the extension is loaded.
- *
- * NOTE: You must define this symbol in your extension shared library and avoid name mangling (for
- * example, with 'extern "C"') so that the MongoDB server can find it at loadtime.
- */
-#define GET_MONGODB_EXTENSION_SYMBOL "get_mongodb_extension"
-typedef const MongoExtension* (*get_mongo_extension_t)();
 
 #ifdef __cplusplus
 }  // extern "C"
