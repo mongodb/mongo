@@ -77,6 +77,7 @@ const mongos = st.s;
 
 const ns1 = "test.foo";
 const ns2 = "bar.baz";
+const nsEmptyColl = "test.emptyColl";
 
 const adminDb = mongos.getDB("admin");
 const testDb = mongos.getDB("test");
@@ -86,11 +87,12 @@ const bazColl = barDb.getCollection("baz");
 const timeseriesColl = testDb.getCollection("timeseriesColl");
 
 st.adminCommand({enablesharding: testDb.getName(), primaryShard: st.shard1.shardName});
+
 st.adminCommand({shardcollection: ns1, key: {skey: 1}});
+st.adminCommand({shardcollection: ns2, key: {skey: 1}});
+st.adminCommand({shardcollection: nsEmptyColl, key: {skey: 1}});
 st.adminCommand(
     {shardcollection: timeseriesColl.getFullName(), timeseries: {timeField: "ts"}, key: {ts: 1}});
-st.adminCommand({enablesharding: barDb.getName(), primaryShard: st.shard1.shardName});
-st.adminCommand({shardcollection: ns2, key: {skey: 1}});
 
 assert.commandWorked(timeseriesColl.insertOne({
     "metadata": {"sensorId": 5578, "type": "temperature"},
@@ -188,6 +190,26 @@ assert.eq(1,
                           $and: [
                               {"shards.numOwnedDocuments": {$eq: 1}},
                               {"shards.ownedSizeBytes": {$gt: 0}},
+                              {"shards.orphanedSizeBytes": {$eq: 0}}
+                          ]
+                      }
+                  }
+              ])
+              .itcount());
+
+// Test that vierfies the corresponding fields returned by $shardedDataDistribution are properly set
+// to 0 on an empty collection.
+assert.eq(1,
+          adminDb
+              .aggregate([
+                  {$shardedDataDistribution: {}},
+                  {$match: {ns: nsEmptyColl}},
+                  {
+                      $match: {
+                          $and: [
+                              {"shards.numOrphanedDocs": {$eq: 0}},
+                              {"shards.numOwnedDocuments": {$eq: 0}},
+                              {"shards.ownedSizeBytes": {$eq: 0}},
                               {"shards.orphanedSizeBytes": {$eq: 0}}
                           ]
                       }
