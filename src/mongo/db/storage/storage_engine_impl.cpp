@@ -631,10 +631,9 @@ Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx,
 std::unique_ptr<SpillTable> StorageEngineImpl::makeSpillTable(OperationContext* opCtx,
                                                               KeyFormat keyFormat,
                                                               int64_t thresholdBytes) {
-    invariant(_spillEngine);
-    auto ru = _spillEngine->newRecoveryUnit();
-    std::unique_ptr<RecordStore> rs =
-        _spillEngine->makeTemporaryRecordStore(*ru, ident::generateNewInternalIdent(), keyFormat);
+    auto& engine = _spillEngine ? _spillEngine : _engine;
+    auto ru = engine->newRecoveryUnit();
+    auto rs = engine->makeTemporaryRecordStore(*ru, ident::generateNewInternalIdent(), keyFormat);
     LOGV2_DEBUG(10380301, 1, "Created spill table", "ident"_attr = rs->getIdent());
 
     return std::make_unique<SpillTable>(std::move(ru),
@@ -645,12 +644,14 @@ std::unique_ptr<SpillTable> StorageEngineImpl::makeSpillTable(OperationContext* 
 }
 
 void StorageEngineImpl::dropSpillTable(RecoveryUnit& ru, StringData ident) {
+    auto& engine = _spillEngine ? _spillEngine : _engine;
+
     // TODO (SERVER-100890): Remove this retry loop.
     for (size_t retries = 0;; ++retries) {
-        auto status = _spillEngine->dropIdent(ru,
-                                              ident,
-                                              false, /* identHasSizeInfo */
-                                              nullptr /* onDrop */);
+        auto status = engine->dropIdent(ru,
+                                        ident,
+                                        false, /* identHasSizeInfo */
+                                        nullptr /* onDrop */);
         if (status.isOK()) {
             return;
         }
