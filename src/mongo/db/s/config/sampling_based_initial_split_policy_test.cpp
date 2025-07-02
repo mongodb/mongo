@@ -349,15 +349,15 @@ TEST_F(SamplingBasedSplitPolicyTest, SamplingSucceedsWithLimitedMemoryForSortOpe
 
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1));
     const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
+    auto mockSource = DocumentSourceMock::createForTest(
+        {"{_id: 20, a: 4}", "{_id: 30, a: 3}", "{_id: 40, a: 2}", "{_id: 50, a: 1}"}, expCtx());
     auto pipelineDocSource =
         SamplingBasedSplitPolicy::makePipelineDocumentSource_forTest(operationContext(),
+                                                                     mockSource,
                                                                      kTestAggregateNss,
                                                                      shardKeyPattern,
                                                                      numInitialChunks,
                                                                      numSamplesPerChunk);
-    auto mockSource = DocumentSourceMock::createForTest(
-        {"{_id: 20, a: 4}", "{_id: 30, a: 3}", "{_id: 40, a: 2}", "{_id: 50, a: 1}"}, expCtx());
-    pipelineDocSource->getPipeline_forTest()->addInitialSource(mockSource.get());
     auto next = pipelineDocSource->getNext();
     ASSERT_BSONOBJ_EQ(BSON("a" << 2), next.value());
     next = pipelineDocSource->getNext();

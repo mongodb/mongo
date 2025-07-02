@@ -261,12 +261,11 @@ class SamplingBasedSplitPolicy : public InitialSplitPolicy {
 public:
     using SampleDocumentPipeline = std::unique_ptr<Pipeline, PipelineDeleter>;
 
-    // Interface to faciliate testing
+    // Interface to facilitate testing
     class SampleDocumentSource {
     public:
         virtual ~SampleDocumentSource() {};
         virtual boost::optional<BSONObj> getNext() = 0;
-        virtual Pipeline* getPipeline_forTest() = 0;
     };
 
     // Provides documents from a real Pipeline
@@ -275,12 +274,8 @@ public:
         PipelineDocumentSource() = delete;
         PipelineDocumentSource(SampleDocumentPipeline pipeline, int skip);
         boost::optional<BSONObj> getNext() override;
-        Pipeline* getPipeline_forTest() override {
-            return _pipeline.get();
-        }
 
     private:
-        exec::agg::Pipeline& _getExecPipeline();
         SampleDocumentPipeline _pipeline;
         std::unique_ptr<exec::agg::Pipeline> _execPipeline;
         const int _skip;
@@ -325,6 +320,7 @@ public:
 
     static std::unique_ptr<SampleDocumentSource> makePipelineDocumentSource_forTest(
         OperationContext* opCtx,
+        boost::intrusive_ptr<DocumentSource> initialSource,
         const NamespaceString& ns,
         const ShardKeyPattern& shardKey,
         int numInitialChunks,
@@ -338,6 +334,13 @@ private:
         int numInitialChunks,
         int samplesPerChunk,
         MakePipelineOptions opts = {});
+
+    static SampleDocumentPipeline _makePipeline(OperationContext* opCtx,
+                                                const NamespaceString& ns,
+                                                const ShardKeyPattern& shardKey,
+                                                int numInitialChunks,
+                                                int samplesPerChunk,
+                                                MakePipelineOptions opts = {});
 
     /**
      * Append split points based from the samples taken from the collection.

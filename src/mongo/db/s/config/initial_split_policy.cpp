@@ -860,15 +860,18 @@ void SamplingBasedSplitPolicy::_appendSplitPointsFromSample(BSONObjSet* splitPoi
 }
 
 std::unique_ptr<SamplingBasedSplitPolicy::SampleDocumentSource>
-SamplingBasedSplitPolicy::makePipelineDocumentSource_forTest(OperationContext* opCtx,
-                                                             const NamespaceString& ns,
-                                                             const ShardKeyPattern& shardKey,
-                                                             int numInitialChunks,
-                                                             int samplesPerChunk) {
+SamplingBasedSplitPolicy::makePipelineDocumentSource_forTest(
+    OperationContext* opCtx,
+    boost::intrusive_ptr<DocumentSource> initialSource,
+    const NamespaceString& ns,
+    const ShardKeyPattern& shardKey,
+    int numInitialChunks,
+    int samplesPerChunk) {
     MakePipelineOptions opts;
     opts.attachCursorSource = false;
-    return _makePipelineDocumentSource(
-        opCtx, ns, shardKey, numInitialChunks, samplesPerChunk, std::move(opts));
+    auto pipeline = _makePipeline(opCtx, ns, shardKey, numInitialChunks, samplesPerChunk, opts);
+    pipeline->addInitialSource(initialSource);
+    return std::make_unique<PipelineDocumentSource>(std::move(pipeline), samplesPerChunk - 1);
 }
 
 std::unique_ptr<SamplingBasedSplitPolicy::SampleDocumentSource>
@@ -878,6 +881,17 @@ SamplingBasedSplitPolicy::_makePipelineDocumentSource(OperationContext* opCtx,
                                                       int numInitialChunks,
                                                       int samplesPerChunk,
                                                       MakePipelineOptions opts) {
+    auto pipeline = _makePipeline(opCtx, ns, shardKey, numInitialChunks, samplesPerChunk, opts);
+    return std::make_unique<PipelineDocumentSource>(std::move(pipeline), samplesPerChunk - 1);
+}
+
+SamplingBasedSplitPolicy::SampleDocumentPipeline SamplingBasedSplitPolicy::_makePipeline(
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    const ShardKeyPattern& shardKey,
+    int numInitialChunks,
+    int samplesPerChunk,
+    MakePipelineOptions opts) {
     auto rawPipeline = createRawPipeline(shardKey, numInitialChunks, samplesPerChunk);
     ResolvedNamespaceMap resolvedNamespaces;
     resolvedNamespaces[ns] = {ns, std::vector<BSONObj>{}};
@@ -906,30 +920,24 @@ SamplingBasedSplitPolicy::_makePipelineDocumentSource(OperationContext* opCtx,
                       .bypassDocumentValidation(true)
                       .tmpDir(storageGlobalParams.dbpath + "/_tmp")
                       .build();
-    return std::make_unique<PipelineDocumentSource>(
-        Pipeline::makePipeline(rawPipeline, expCtx, opts), samplesPerChunk - 1);
+    return Pipeline::makePipeline(rawPipeline, expCtx, opts);
 }
 
 SamplingBasedSplitPolicy::PipelineDocumentSource::PipelineDocumentSource(
     SampleDocumentPipeline pipeline, int skip)
-    : _pipeline(std::move(pipeline)), _skip(skip) {}
-
-exec::agg::Pipeline& SamplingBasedSplitPolicy::PipelineDocumentSource::_getExecPipeline() {
-    if (!_execPipeline) {
-        _execPipeline = exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
-    }
-    return *_execPipeline;
-}
+    : _pipeline(std::move(pipeline)),
+      _execPipeline{exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext())},
+      _skip(skip) {}
 
 boost::optional<BSONObj> SamplingBasedSplitPolicy::PipelineDocumentSource::getNext() {
-    auto val = _getExecPipeline().getNext();
+    auto val = _execPipeline->getNext();
 
     if (!val) {
         return boost::none;
     }
 
     for (int skippedSamples = 0; skippedSamples < _skip; skippedSamples++) {
-        auto newVal = _getExecPipeline().getNext();
+        auto newVal = _execPipeline->getNext();
 
         if (!newVal) {
             // If there are not enough samples, just select the last sample.
