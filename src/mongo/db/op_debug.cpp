@@ -450,6 +450,13 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
     }
 
+    const auto& admCtx = ExecutionAdmissionContext::get(opCtx);
+    if (admCtx.getDelinquentAcquisitions() > 0) {
+        BSONObjBuilder sub;
+        appendDelinquentInfo(opCtx, sub);
+        pAttrs->add("delinquencyInfo", sub.obj());
+    }
+
     // Extract admission and execution control queueing stats from AdmissionContext stored on opCtx
     TicketHolderQueueStats queueingStats(opCtx);
     pAttrs->add("queues", queueingStats.toBson());
@@ -736,6 +743,13 @@ void OpDebug::appendUserInfo(const CurOp& c,
     allUsers.doneFast();
 
     builder.append("user", name ? name->getDisplayName() : "");
+}
+
+void OpDebug::appendDelinquentInfo(OperationContext* opCtx, BSONObjBuilder& bob) {
+    const auto& admCtx = ExecutionAdmissionContext::get(opCtx);
+    bob.append("totalDelinquentAcquisitions", admCtx.getDelinquentAcquisitions());
+    bob.append("totalAcquisitionDelinquencyMillis", admCtx.getTotalAcquisitionDelinquencyMillis());
+    bob.append("maxAcquisitionDelinquencyMillis", admCtx.getMaxAcquisitionDelinquencyMillis());
 }
 
 std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requestedFields,

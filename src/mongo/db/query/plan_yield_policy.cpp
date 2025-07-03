@@ -47,6 +47,10 @@
 
 namespace mongo {
 
+namespace {
+MONGO_FAIL_POINT_DEFINE(setPreYieldWait);
+}  // namespace
+
 PlanYieldPolicy::PlanYieldPolicy(OperationContext* opCtx,
                                  YieldPolicy policy,
                                  ClockSource* cs,
@@ -124,6 +128,14 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                                          RestoreContext::RestoreType restoreType,
                                          const std::function<void()>& afterSnapshotAbandonFn) {
     invariant(opCtx);
+    setPreYieldWait.executeIf(
+        [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); },
+        [&](const BSONObj& config) {
+            if (config.hasField("comment") && opCtx->getComment()) {
+                return opCtx->getComment()->String() == config.getStringField("comment");
+            }
+            return false;
+        });
 
     // After we finish yielding (or in any early return), call resetTimer() to prevent yielding
     // again right away. We delay the resetTimer() call so that the clock doesn't start ticking

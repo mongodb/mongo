@@ -8,98 +8,38 @@
  * uses fail points to force operations to be overdue. This test should not be run on extremely
  * slow builds (e.g. code coverage, sanitizers), but is designed to be resistant to variations on
  * operation time for normal builds.
+ *
+ * This file also tests the operations that have long-duration ticket acquisitions (so called
+ * delinquent) are reporting the delinquent stats correctly.
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {findMatchingLogLine, getMatchingLoglinesCount} from "jstests/libs/log.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-function assertNoOverdueOps(serverStatus) {
-    const operationMetrics = serverStatus.metrics.operation;
-    assert.eq(operationMetrics.overdueInterruptOps, 0, operationMetrics);
-    assert.eq(operationMetrics.overdueInterruptChecks, 0, operationMetrics);
-    assert.eq(operationMetrics.overdueInterruptTotalMillis, 0, operationMetrics);
-    assert.eq(operationMetrics.overdueInterruptApproxMaxMillis, 0, operationMetrics);
+// The failpoint will wait for this long before yielding for every iteration.
+const waitPerIterationMs = 200;
+// This is how long we consider an operation as delinquent.
+const delinquentIntervalMs = waitPerIterationMs - 20;
+const findComment = "delinquent_ops.js-COMMENT";
+
+function assertDelinquentStats(metrics, count, msg) {
+    if (count > 0) {
+        assert(metrics, msg);
+        assert.gte(metrics.totalDelinquentAcquisitions, count, metrics);
+        assert.gte(metrics.totalAcquisitionDelinquencyMillis, waitPerIterationMs * count, metrics);
+        assert.gte(metrics.maxAcquisitionDelinquencyMillis, waitPerIterationMs, metrics);
+    } else if (metrics) {
+        assert.eq(metrics.totalDelinquentAcquisitions, 0);
+        assert.eq(metrics.totalAcquisitionDelinquencyMillis, 0);
+        assert.eq(metrics.maxAcquisitionDelinquencyMillis, 0);
+    }
 }
 
-function runTest(conn, failPointName) {
-    const db = conn.getDB("test");
-    const adminDB = db.getSiblingDB("admin");
-
-    const isMongos = FixtureHelpers.isMongos(db);
-
-    // After startup, we check that there were no operations marked overdue, using the extremely
-    // high threshold that was configured earlier.
-    {
-        const serverStatus = db.serverStatus();
-        const operationMetrics = serverStatus.metrics.operation;
-        assert.gte(operationMetrics.totalInterruptChecks, 0, operationMetrics);
-
-        assertNoOverdueOps(serverStatus);
-    }
-
-    // Run a ping() command that we don't expect to be overdue.
-    {
-        const pingResult = adminDB.runCommand({ping: 1});
-        assert.commandWorked(pingResult, "Ping command failed");
-
-        const serverStatus = db.serverStatus();
-        const operationMetrics = serverStatus.metrics.operation;
-
-        assert.gte(operationMetrics.totalInterruptChecks, 0, operationMetrics);
-
-        assertNoOverdueOps(serverStatus);
-
-        // TODO SERVER-104009: Once we have per-command information, we can also make an assertion
-        // about the ping command not being overdue.
-        const pingMetrics = serverStatus.metrics.commands.ping;
-        assert.gte(pingMetrics.total, 1);
-    }
-
-    {
-        // Now we run an operation that hangs and is overdue in checking for interrupt.
-
-        if (!isMongos) {
-            assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
-        }
-        // Before running the operation, reduce our threshold to 30ms. An operation that hangs for
-        // 100ms should get marked overdue.
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, overdueInterruptCheckIntervalMillis: 30}));
-        const kSleepTimeMillis = 100;
-
-        // Collect the number of overdue operations before running the op that we force to be
-        // overdue.
-        const previousOperationMetrics = db.serverStatus().metrics.operation;
-
-        // Insert some data for the query to spin on.
-        assert.commandWorked(db.testColl.insert([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}]));
-
-        // We enable the failpoint, then in a parallel shell run a find() command that will hang.
-        const failPoint = configureFailPoint(conn, failPointName);
-        const joinShell = startParallelShell(function() {
-            assert.eq(db.testColl.find().itcount(), 4);
-        }, conn.port);
-        jsTestLog("Waiting for fail point to be hit");
-        failPoint.wait();
-        jsTestLog("Sleeping while operation is blocked on failpoint");
-        sleep(kSleepTimeMillis);
-        jsTestLog("Disabling failpoint and waiting for shell");
-        failPoint.off();
-        joinShell();
-
-        // Ensure that serverStatus indicates a find() was run.
-        const serverStatus = db.serverStatus();
-        const findMetrics = serverStatus.metrics.commands["find"];
-        assert.gte(findMetrics.total, 1);
-
-        const operationMetrics = serverStatus.metrics.operation;
-
-        // Our hanging find() command should have bumped the counter. We cannot guarantee that any
-        // other operations were _not_ overdue, so we simply assert that the number of
-        // overdue ops has strictly increased.
+function assertOverdueOps(operationMetrics, previousOperationMetrics) {
+    if (previousOperationMetrics) {
         function errorString() {
             return "Operation metrics before overdue op: " + tojson(previousOperationMetrics) +
                 " Most recent operation metrics " + tojson(operationMetrics);
@@ -116,33 +56,185 @@ function runTest(conn, failPointName) {
         assert.gt(operationMetrics.overdueInterruptTotalMillis,
                   previousOperationMetrics.overdueInterruptTotalMillis,
                   errorString);
-        assert.gte(
-            operationMetrics.overdueInterruptApproxMaxMillis, kSleepTimeMillis / 2, errorString);
-
-        // TODO SERVER-104009: Once we have per-command information, we can make a stronger
-        // assertion about the find() command being overdue.
+        assert.gte(operationMetrics.overdueInterruptApproxMaxMillis,
+                   previousOperationMetrics.overdueInterruptApproxMaxMillis,
+                   errorString);
+    } else {
+        assert.gte(operationMetrics.totalInterruptChecks, 0, operationMetrics);
+        assert.eq(operationMetrics.overdueInterruptOps, 0, operationMetrics);
+        assert.eq(operationMetrics.overdueInterruptChecks, 0, operationMetrics);
+        assert.eq(operationMetrics.overdueInterruptTotalMillis, 0, operationMetrics);
+        assert.eq(operationMetrics.overdueInterruptApproxMaxMillis, 0, operationMetrics);
     }
 }
 
-// We start the server with a very high threshold. This is to avoid any internal operations which
-// are considered overdue from polluting the overdue counters.  This test only focuses on the
-// mechanism by which overdueness is determined and reported, and does not aim to enforce that all
-// (or some fraction) of operations check for interrupt on time.
+function testDelinquencyOnRouter(routerDb) {
+    // Before running the operation, reduce our threshold so that an operation that hangs for
+    // 200ms should get marked overdue.
+    assert.commandWorked(routerDb.adminCommand(
+        {setParameter: 1, overdueInterruptCheckIntervalMillis: delinquentIntervalMs}));
+
+    // Collect the number of overdue operations before running the op that we force to be
+    // overdue.
+    const previousOperationMetrics = routerDb.serverStatus().metrics.operation;
+
+    // Configure a failpoint to ensure the find() command hangs for a while and considered
+    // delinquent.
+    const failPoint = configureFailPoint(routerDb,
+                                         "waitInFindBeforeMakingBatch",
+                                         {sleepFor: waitPerIterationMs, comment: findComment});
+
+    assert.eq(routerDb.testColl.find().comment(findComment).itcount(), 4);
+
+    // Ensure that serverStatus indicates a find() was run.Add commentMore actions
+    {
+        const serverStatus = routerDb.serverStatus();
+        const findMetrics = serverStatus.metrics.commands["find"];
+        assert.gte(findMetrics.total, 2);
+    }
+
+    const serverStatus = routerDb.serverStatus();
+    assertOverdueOps(serverStatus.metrics.operation, previousOperationMetrics);
+
+    failPoint.off();
+}
+
+function testDelinquencyOnShard(routerDb, shardDb) {
+    // Before running the operation, reduce our threshold so that an operation that hangs for
+    // 200ms should get marked overdue.
+    assert.commandWorked(shardDb.adminCommand(
+        {setParameter: 1, overdueInterruptCheckIntervalMillis: delinquentIntervalMs}));
+
+    // Collect the number of overdue operations before running the op that we force to be
+    // overdue.
+    const previousOperationMetrics = shardDb.serverStatus().metrics.operation;
+
+    // Configure a failpoint to wait some time before yielding, so that the ticket hold by find()
+    // command is considered delinquent.
+    const failPoint = configureFailPoint(
+        shardDb, "setPreYieldWait", {waitForMillis: waitPerIterationMs, comment: findComment});
+
+    // Run the find() command in a parallel shell to retrieve the $currentOp information.
+    const joinShell = startParallelShell(
+        funWithArgs(function(dbName, findComment) {
+            assert.eq(db.getSiblingDB(dbName).testColl.find().comment(findComment).itcount(), 4);
+        }, routerDb.getName(), findComment), routerDb.getMongo().port);
+
+    failPoint.wait({timesEntered: 3});
+    const curOp = shardDb.currentOp(
+        {"command.comment": findComment, "command.find": "testColl", "active": true});
+    joinShell();
+
+    // Ensure that serverStatus indicates a find() was run.Add commentMore actions
+    {
+        const serverStatus = routerDb.serverStatus();
+        const findMetrics = serverStatus.metrics.commands["find"];
+        assert.gte(findMetrics.total, 1);
+    }
+
+    // Check that the currentOp information has the expected delinquent information, the failpoint
+    // was hit for 3rd time, that means we had at least 2 delinquent acquisitions (the 3rd ticket
+    // not released yet).
+    {
+        assert(
+            curOp.inprog.length === 1,
+            "Expected to find exactly one active find() command with the comment " + findComment);
+        assertDelinquentStats(curOp.inprog[0].delinquencyInfo, 2, curOp.inprog[0]);
+    }
+
+    // After the find() command, we check that the serverStatus has the delinquent stats
+    // updated correctly. The find() command should have acquired the ticket 4 times, and each
+    // acquisition should have been delinquent, since we configured the failpoint to wait for
+    // 'waitPerIterationMs' milliseconds before yielding.
+    {
+        const serverStatus = shardDb.serverStatus();
+        assert.gte(serverStatus.metrics.commands["find"].total, 1);
+        assertDelinquentStats(
+            serverStatus.queues.execution.read.normalPriority, 4, serverStatus.metrics);
+    }
+
+    // Now examine the log for this find() command and ensure it has information
+    // about the delinquent acquisitions checks.
+    {
+        const globalLog = assert.commandWorked(shardDb.adminCommand({getLog: "global"}));
+        const line = findMatchingLogLine(globalLog.log, {msg: "Slow query", comment: findComment});
+        jsTestLog("Found log line " + tojson(line));
+        assert(line, globalLog);
+
+        const parsedLine = JSON.parse(line);
+        const delinquencyInfo = parsedLine.attr.delinquencyInfo;
+        assertDelinquentStats(delinquencyInfo, 4, line);
+    }
+
+    {
+        const serverStatus = shardDb.serverStatus();
+        assertOverdueOps(serverStatus.metrics.operation, previousOperationMetrics);
+    }
+
+    failPoint.off();
+}
+
+// routerDb is the database on the router (mongos) when the cluster is sharded, otherwise it is the
+// same as shardDb.
+function runTest(routerDb, shardDb) {
+    // After startup, we check that there were no operations marked delinquent, using the extremely
+    // high threshold for delinquency that was configured earlier.
+    {
+        const shardStatus = shardDb.serverStatus();
+        assertDelinquentStats(shardStatus.queues.execution.read.normalPriority, 0, shardStatus);
+        assertOverdueOps(shardStatus.metrics.operation, null);
+
+        const routerStatus = routerDb.serverStatus();
+        assertOverdueOps(routerStatus.metrics.operation, null);
+    }
+
+    // Run a ping() command that we don't expect to be overdue.Add commentMore actions
+    {
+        const pingResult = routerDb.getSiblingDB('admin').runCommand({ping: 1});
+        assert.commandWorked(pingResult, "Ping command failed");
+
+        const serverStatus = routerDb.serverStatus();
+        assertOverdueOps(serverStatus.metrics.operation, null);
+
+        // TODO SERVER-104009: Once we have per-command information, we can also make an assertion
+        // about the ping command not being overdue.
+        const pingMetrics = serverStatus.metrics.commands.ping;
+        assert.gte(pingMetrics.total, 1);
+    }
+
+    assert.commandWorked(routerDb.testColl.insert([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}]));
+
+    testDelinquencyOnShard(routerDb, shardDb);
+    if (routerDb !== shardDb) {
+        // If the router and shard are different, we also test the delinquency on the router.
+        testDelinquencyOnRouter(routerDb);
+    }
+}
+
+// We start the server with a high threshold for delinquency. This is to avoid any internal
+// operations which are considered delinquent from polluting the delinquency counters.  This test
+// only focuses on the mechanism by which delinquency is determined and reported, and does not aim
+// to enforce that all (or some fraction) of operations are not delinquent.
 const startupParameters = {
-    overdueInterruptCheckIntervalMillis: 100 * 1000
+    featureFlagRecordDelinquentMetrics: true,
+    delinquentAcquisitionIntervalMillis: delinquentIntervalMs,
+    overdueInterruptCheckIntervalMillis: delinquentIntervalMs * 100,
 };
 
 {
     let conn = MongoRunner.runMongod({setParameter: startupParameters});
+    const db = conn.getDB(jsTestName());
 
     // Don't run this test on slow builds, as it can be racey.
-    if (isSlowBuild(conn.getDB("test"))) {
+    if (isSlowBuild(db)) {
         jsTestLog("Aborting test since it's running on a slow build");
         MongoRunner.stopMongod(conn);
         quit();
     }
 
-    runTest(conn, "setYieldAllLocksHang");
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
+
+    runTest(db, db);
     MongoRunner.stopMongod(conn);
 }
 
@@ -153,8 +245,9 @@ const startupParameters = {
         mongos: 1,
         mongosOptions: {setParameter: startupParameters}
     });
-    // Use a different failpoint in the sharded version, since the mongos does not have a
-    // setYieldAlllocksHang failpoint.
-    runTest(st.s, "waitInFindBeforeMakingBatch");
+
+    assert.commandWorked(
+        st.shard0.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
+    runTest(st.s.getDB(jsTestName()), st.shard0.getDB(jsTestName()));
     st.stop();
 }

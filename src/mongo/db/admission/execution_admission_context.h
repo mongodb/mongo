@@ -43,6 +43,18 @@ public:
     ExecutionAdmissionContext(const ExecutionAdmissionContext& other);
     ExecutionAdmissionContext& operator=(const ExecutionAdmissionContext& other);
 
+    int32_t getDelinquentAcquisitions() const {
+        return _delinquentAcquisitions.loadRelaxed();
+    }
+
+    int64_t getTotalAcquisitionDelinquencyMillis() const {
+        return _totalAcquisitionDelinquencyMillis.loadRelaxed();
+    }
+
+    int64_t getMaxAcquisitionDelinquencyMillis() const {
+        return _maxAcquisitionDelinquencyMillis.loadRelaxed();
+    }
+
     void recordDelinquentAcquisition(int64_t delay) {
         _delinquentAcquisitions.fetchAndAddRelaxed(1);
         _totalAcquisitionDelinquencyMillis.fetchAndAddRelaxed(delay);

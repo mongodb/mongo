@@ -45,6 +45,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop_bson_helpers.h"
+#include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/service_context.h"
@@ -56,6 +57,7 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/platform/random.h"
 #include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/transport/service_executor.h"
@@ -656,6 +658,7 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
     const auto executionTimeMillis =
         durationCount<Milliseconds>(*_debug.additiveMetrics.executionTime);
 
+    // We do one last check and update counters for overdue interrupt here.
     opCtx->updateOverdueInterruptCheckCounters();
     if (opCtx->hadOverdueInterruptCheck()) {
         reportOverdueOpStats(*opCtx);
@@ -1004,6 +1007,14 @@ void CurOp::reportState(BSONObjBuilder* builder,
         builder->append("waitForWriteConcernDurationMillis",
                         durationCount<Milliseconds>(elapsedTimeTotal));
     }
+
+    const auto& admCtx = ExecutionAdmissionContext::get(opCtx);
+    if (admCtx.getDelinquentAcquisitions() > 0) {
+        BSONObjBuilder sub(builder->subobjStart("delinquencyInfo"));
+        OpDebug::appendDelinquentInfo(opCtx, sub);
+    }
+
+
     populateCurrentOpQueueStats(opCtx, _tickSource, builder);
 }
 

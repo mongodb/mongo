@@ -527,6 +527,33 @@ TEST(CurOpTest, ReportStateIncludesMemoryStatsIfNonZero) {
     }
 }
 
+TEST(CurOpTest, ReportStateIncludesDelinquentStatsIfNonZero) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curOp = CurOp::get(*opCtx);
+
+    // If the delinquent stats are zero, they are *not* included in the state.
+    {
+        BSONObjBuilder bob;
+        curOp->reportState(&bob, SerializationContext{});
+        BSONObj state = bob.obj();
+        ASSERT_FALSE(state.hasField("delinquencyInfo"));
+    }
+
+    // If the delinquent stats are not zero, they *are* included in the state.
+    {
+        ExecutionAdmissionContext::get(opCtx.get()).recordDelinquentAcquisition(20);
+        ExecutionAdmissionContext::get(opCtx.get()).recordDelinquentAcquisition(10);
+        BSONObjBuilder bob;
+        curOp->reportState(&bob, SerializationContext{});
+        BSONObj state = bob.obj();
+        ASSERT_TRUE(state.hasField("delinquencyInfo"));
+        ASSERT_EQ(state["delinquencyInfo"]["totalDelinquentAcquisitions"].Int(), 2);
+        ASSERT_EQ(state["delinquencyInfo"]["totalAcquisitionDelinquencyMillis"].Long(), 30);
+        ASSERT_EQ(state["delinquencyInfo"]["maxAcquisitionDelinquencyMillis"].Long(), 20);
+    }
+}
+
 TEST(CurOpTest, ShouldNotReportFailpointMsgIfNotSet) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();

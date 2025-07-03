@@ -69,8 +69,11 @@ void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
 
             const bool shouldCheckForInterrupt = data["shouldCheckForInterrupt"].booleanSafe();
             const bool shouldContinueOnInterrupt = data["shouldContinueOnInterrupt"].booleanSafe();
+            const Milliseconds sleepForMs = data.hasField("sleepFor")
+                ? Milliseconds(data["sleepFor"].numberInt())
+                : Milliseconds(10);
             while (MONGO_unlikely(failPoint->shouldFail())) {
-                sleepFor(Milliseconds(10));
+                sleepFor(sleepForMs);
                 if (whileWaiting) {
                     whileWaiting();
                 }
@@ -87,10 +90,16 @@ void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
                 } else if (shouldCheckForInterrupt) {
                     opCtx->checkForInterrupt();
                 }
+                if (data.hasField("sleepFor")) {
+                    break;
+                }
             }
             updateCurOpFailPointMsg(opCtx, origCurOpFailpointMsg);
         },
         [&](const BSONObj& data) {
+            if (data.hasField("comment") && opCtx->getComment()) {
+                return opCtx->getComment()->String() == data.getStringField("comment");
+            }
             const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"_sd);
             return nss.isEmpty() || fpNss.isEmpty() || fpNss == nss;
         });
