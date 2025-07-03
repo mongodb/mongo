@@ -1,10 +1,7 @@
 
 /**
  * Tests behavior that is common to all rate limiters.
- * @tags: [
- *    requires_fcv_80,
- *    featureFlagIngressRateLimiting,
- * ]
+ * @tags: [requires_fcv_80]
  */
 
 const testBurstCapacityIncrease = () => {
