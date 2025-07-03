@@ -267,10 +267,25 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "collection_pre_conditions_util",
+    srcs = [
+        "collection_pre_conditions_util.cpp",
+    ],
+    hdrs = [
+        "collection_pre_conditions_util.h",
+    ],
+    deps = [
+        ":catalog_helper",
+        "//src/mongo/db:server_base",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "db_timeseries_test",
     srcs = [
         "bucket_compression_test.cpp",
+        "collection_pre_conditions_util_test.cpp",
         "timeseries_collmod_test.cpp",
         "timeseries_dotted_path_support_test.cpp",
         "timeseries_extended_range_test.cpp",
@@ -285,6 +300,7 @@ mongo_cc_unit_test(
     ],
     deps = [
         ":bucket_compression",
+        ":collection_pre_conditions_util",
         ":timeseries_conversion_util",
         ":timeseries_extended_range",
         ":timeseries_options",
