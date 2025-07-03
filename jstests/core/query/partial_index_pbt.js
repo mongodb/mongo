@@ -59,7 +59,7 @@ const workloadModel =
           indexes: fc.array(getIndexModel({allowPartialIndexes: false, allowSparse: false}),
                             {minLength: 0, maxLength: 15, size: '+2'}),
           pipelines: fc.array(getAggPipelineModel(),
-                              {minLength: numQueriesPerRun, maxLength: numQueriesPerRun})
+                              {minLength: 1, maxLength: numQueriesPerRun, size: '+2'})
       }).map(({partialFilterPredShape, docs, indexes, pipelines}) => {
         // The predicate model generates a family of predicates of the same shape, with different
         // parameter options at the leaf nodes. For all indexes, we use the first predicate from the
