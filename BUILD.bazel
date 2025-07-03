@@ -410,6 +410,18 @@ mongo_install(
     ],
 )
 
+# This sets up targets for install-extensions and archive-extensions.
+# This target must be built with --shared_archive.
+mongo_install(
+    name = "extensions",
+    # All extensions that may be loaded in jstests should be built here. Extensions
+    # that are built only for unit tests should be omitted.
+    srcs = [
+        "//src/mongo/db/extension/test_examples:foo_extension",
+    ],
+    package_extract_name = "/",
+)
+
 # Pre-built binaries downloaded from an archive-dist-test task.
 filegroup(
     name = "installed-dist-test",
