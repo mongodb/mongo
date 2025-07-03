@@ -965,6 +965,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:primary_only_service",
         "//src/mongo/db/repl:replica_set_aware_service",
         "//src/mongo/db/repl:wait_for_majority_service",
+        "//src/mongo/db/session:kill_sessions_local",
         "//src/mongo/db/session:session_catalog_mongod",
         "//src/mongo/db/timeseries/bucket_catalog",
         "//src/mongo/db/transaction",

@@ -85,6 +85,12 @@ TEST(IsTransientTransactionErrorTest, StaleDbVersionIsTransient) {
         ErrorCodes::StaleDbVersion, false /* hasWriteConcernError */, false /* isCommitOrAbort */));
 }
 
+TEST(IsTransientTransactionErrorTest, InterruptedDueToReshardingCriticalSectionIsTransient) {
+    ASSERT_TRUE(isTransientTransactionError(ErrorCodes::InterruptedDueToReshardingCriticalSection,
+                                            false /* hasWriteConcernError */,
+                                            false /* isCommitOrAbort */));
+}
+
 TEST(IsTransientTransactionErrorTest, NetworkErrorsAreTransientBeforeCommit) {
     ASSERT_TRUE(isTransientTransactionError(ErrorCodes::HostUnreachable,
                                             false /* hasWriteConcernError */,

@@ -478,3 +478,15 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+
+    reshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites:
+        description: >-
+            Controls whether a resharding donor should abort in-progress unprepared transactions
+            after transitioning to the "preparing-to-block-writes" state. Aborting unprepared
+            transactions helps prevent the donor from not being to acquire the critical section
+            within the critical section timeout when there are long-running transactions.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites
+        default: true
+        redact: false

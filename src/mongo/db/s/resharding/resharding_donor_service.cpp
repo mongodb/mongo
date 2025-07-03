@@ -65,6 +65,8 @@
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/session/kill_sessions_local.h"
+#include "mongo/db/session/session_killer.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -837,6 +839,25 @@ void ReshardingDonorService::DonorStateMachine::
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         ensureFulfilledPromise(lk, _critSecWasAcquired);
         return;
+    }
+
+    if (resharding::gReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites.load()) {
+        // Unless explicitly opted out, abort any unprepared transactions that may be running on the
+        // donor shard. This helps prevent the donor from not being to acquire the critical section
+        // within the critical section timeout when there are long-running transactions.
+        //
+        // TODO (SERVER-106990): Abort unprepared transactions after enqueuing the collection lock
+        // request instead.
+        // Until we do SERVER-106990, this is best-effort only since a new transaction may start
+        // between this step and the step for acquiring the critical section. Please note that
+        // InterruptedDueToReshardingCriticalSection is a transient error code so any aborted
+        // transactions would get retried by the driver.
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+
+        SessionKiller::Matcher matcherAllSessions(
+            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx.get())});
+        killSessionsAbortUnpreparedTransactions(
+            opCtx.get(), matcherAllSessions, ErrorCodes::InterruptedDueToReshardingCriticalSection);
     }
 
     {
