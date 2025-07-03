@@ -29,7 +29,6 @@ const testBurstCapacityIncrease = () => {
                 ingressRequestAdmissionRatePerSec: refreshRate,
                 ingressRequestAdmissionBurstCapacitySecs: initialBurstCapacitySecs,
                 ingressRequestRateLimiterEnabled: true,
-                featureFlagIngressRateLimiting: 1,
             },
             burstCapacityParameterName: "ingressRequestAdmissionBurstCapacitySecs",
             serverStatusSection: (conn) =>

@@ -28,7 +28,6 @@ export const kRateLimiterExemptAppName = "testRateLimiter";
  */
 export const kConfigLogsAndFailPointsForRateLimiterTests = {
     logComponentVerbosity: tojson({command: 2}),
-    featureFlagIngressRateLimiting: 1,
     "failpoint.ingressRequestRateLimiterFractionalRateOverride":
         tojson({mode: "alwaysOn", data: {rate: kSlowestRefreshRateSecs}}),
     "failpoint.skipRateLimiterForTestClient":

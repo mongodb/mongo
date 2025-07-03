@@ -180,7 +180,7 @@ feature_flags:
     featureFlagIngressRateLimiting:
         description: "Limit the rate of operation going through ingress admission"
         cpp_varname: gFeatureFlagIngressRateLimiting
-        default: false
+        default: true
         fcv_gated: false
     featureFlagMandatoryAuthzChecks:
         description: "Feature flag to enable mandatory authorization checks on command and agg stages"

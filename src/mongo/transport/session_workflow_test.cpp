@@ -777,8 +777,6 @@ private:
 
     static constexpr double kVerySlowRate = 5e-6;
 
-    RAIIServerParameterControllerForTest _featureEnabled{"featureFlagIngressRateLimiting", true};
-
     unittest::MinimumLoggedSeverityGuard _logSeverityGuard{logv2::LogComponent::kDefault,
                                                            logv2::LogSeverity::Debug(4)};
 
