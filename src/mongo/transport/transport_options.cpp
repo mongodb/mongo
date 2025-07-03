@@ -78,7 +78,7 @@ Status forEachSessionManager(Callback&& updateFunc) try {
 Status onUpdateEstablishmentRefreshRate(int32_t newValue) {
     return forEachSessionManager([newValue](SessionManager* sm) {
         sm->getSessionEstablishmentRateLimiter().updateRateParameters(
-            newValue, newValue * gIngressConnectionEstablishmentBurstCapacitySecs.load());
+            newValue, gIngressConnectionEstablishmentBurstCapacitySecs.load());
     });
 }
 
