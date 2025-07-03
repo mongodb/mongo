@@ -1,0 +1,11 @@
+- name: sharded_cluster_fixture_options
+  value:
+    executor:
+      fixture:
+        inject_catalog_metadata:
+          admin_db: True
+
+- name: exclude_injected_catalog_metadata_tag
+  value:
+    exclude_with_any_tags:
+      - injected_catalog_metadata_incompatible

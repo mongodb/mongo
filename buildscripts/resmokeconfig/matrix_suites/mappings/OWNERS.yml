@@ -59,6 +59,9 @@ filters:
   - "update_fuzzer*":
     approvers:
       - 10gen/query-execution-write-exec
+  - "*injected_catalog_metadata*":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "*ingress_request_rate_limiter*":
     approvers:
       - 10gen/server-workload-scheduling

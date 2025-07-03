@@ -10,6 +10,7 @@ import yaml
 
 from buildscripts.resmokelib.testing.fixtures import _builder, external, interface
 from buildscripts.resmokelib.utils.sharded_cluster_util import (
+    inject_catalog_metadata_on_the_csrs,
     refresh_logical_session_cache_with_retry,
 )
 
@@ -47,6 +48,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         random_migrations=False,
         launch_mongot=False,
         set_cluster_parameter=None,
+        inject_catalog_metadata=None,
     ):
         """Initialize ShardedClusterFixture with different options for the cluster processes.
 
@@ -98,6 +100,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         self.embedded_router_mode = embedded_router
         self.replica_endpoint_mode = replica_set_endpoint
         self.set_cluster_parameter = set_cluster_parameter
+        self.inject_catalog_metadata = inject_catalog_metadata
 
         # Options for roles - shardsvr, configsvr.
         self.configsvr_options = self.fixturelib.make_historic(
@@ -314,6 +317,10 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         if self.set_cluster_parameter:
             self.run_set_cluster_parameter()
+
+        if self.inject_catalog_metadata:
+            csrs_client = interface.build_client(self.configsvr, self.auth_options)
+            inject_catalog_metadata_on_the_csrs(csrs_client, self.inject_catalog_metadata)
 
         self.is_ready = True
 

@@ -2409,6 +2409,19 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
+    name: sharding_jscore_passthrough_with_injected_catalog_metadata_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "sharding",
+        "jscore",
+        "common",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
     name: unsplittable_collections_created_on_any_shard_jscore_passthrough_viewless_timeseries_gen
     # TODO (SERVER-101590): Remove this temporary suite.
     tags:
