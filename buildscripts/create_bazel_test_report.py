@@ -25,7 +25,7 @@ class Report(TypedDict):
     results: List[Result]
 
 
-def main(testlog_dir: str, silent_fail: bool = False):
+def main(testlog_dir: str):
     """Create an report.json for Evergreen from bazel test logs."""
 
     if not get_expansion("create_bazel_test_report"):
@@ -41,7 +41,7 @@ def main(testlog_dir: str, silent_fail: bool = False):
         test_file = testcase.attrib["name"]
 
         if testcase.find("error") is not None:
-            status = "silentfail" if silent_fail else "fail"
+            status = "fail"
         else:
             status = "pass"
 

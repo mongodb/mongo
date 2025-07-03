@@ -26,11 +26,5 @@ BAZEL_BINARY=bazel
 # Print command being run to file that can be uploaded
 echo "python buildscripts/install_bazel.py" > bazel-invocation.txt
 
-# TODO(SERVER-99431): Remove when bazel test timeouts are under control
-set +e
-
-echo "       bazel coverage ${args} ${target}" >> bazel-invocation.txt
-# use eval since some flags have quotes-in-quotes that are otherwise misintepreted
-eval $BAZEL_BINARY coverage ${args} ${target}
-
-exit 0
+echo "  bazel coverage ${args} ${target}" >> bazel-invocation.txt
+$BAZEL_BINARY coverage ${args} ${target}
