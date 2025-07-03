@@ -13,7 +13,7 @@ mongo_path = pathlib.Path(__file__).parents[1]
 sys.path.append(str(mongo_path))
 from buildscripts.util.expansions import get_expansion
 
-DB_CONTRIB_TOOL_VERSION = "v1.1.0"
+DB_CONTRIB_TOOL_VERSION = "v1.1.4"
 RELEASE_URL = (
     f"https://mdb-build-public.s3.amazonaws.com/db-contrib-tool-binaries/{DB_CONTRIB_TOOL_VERSION}/"
 )
