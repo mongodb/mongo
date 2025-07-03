@@ -1827,11 +1827,16 @@ void restoreTransactionResourcesToOperationContext(
             try {
                 return restoreFn();
             } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
-                if (ex->getCriticalSectionSignal()) {
+                if (ex->getCriticalSectionSignal() && !opCtx->isRetryableWrite()) {
                     // If we encountered a critical section, then yield, wait for the critical
                     // section to finish and then we'll resume the write from the point we had left.
                     // We do this to prevent large multi-writes from repeatedly failing due to
                     // StaleConfig and exhausting the mongos retry attempts. Yield the locks.
+                    //
+                    // We don't do this in case we are executing a retryable write, since doing that
+                    // means holding the session checked in while we wait, which can lead to
+                    // deadlocks. Also retryable writes will safely be retried by a higher layer in
+                    // case of StaleConfig.
                     Locker::LockSnapshot lockSnapshot;
                     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
                     shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);

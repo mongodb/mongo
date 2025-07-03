@@ -74,6 +74,7 @@
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -1813,6 +1814,117 @@ TEST_F(ShardRoleTest, RestoreWithShardVersionIgnored) {
                                                   std::move(yieldedTransactionResources));
     ASSERT_TRUE(
         shard_role_details::getLocker(operationContext())->isCollectionLockedForMode(nss, MODE_IX));
+}
+
+TEST_F(ShardRoleTest, RestoreForWriteJoinsCriticalSectionWhenNotRetryableWrite) {
+    const auto nss = nssShardedCollection1;
+    const BSONObj criticalSectionReason = BSON("reason" << 1);
+
+    unittest::Barrier barrier(2);
+    AtomicWord<bool> restoreCompleted{false};
+
+    stdx::thread parallelThread([&] {
+        ThreadClient client(operationContext()->getService());
+        auto newUniqueOpCtx = client->makeOperationContext();
+        auto newOpCtx = newUniqueOpCtx.get();
+
+        PlacementConcern placementConcern{{}, ShardVersionFactory::make(ChunkVersion::IGNORED())};
+        const auto acquisition = acquireCollection(
+            newOpCtx,
+            {nss, placementConcern, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
+            MODE_IX);
+        ASSERT_TRUE(acquisition.exists());
+
+        // Yield the resources
+        auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(newOpCtx);
+        shard_role_details::getRecoveryUnit(newOpCtx)->abandonSnapshot();
+
+        // Activate the critical section
+        {
+            AutoGetCollection coll(newOpCtx, nssShardedCollection1, MODE_X);
+            const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                newOpCtx, nssShardedCollection1);
+            csr->enterCriticalSectionCatchUpPhase(criticalSectionReason);
+            csr->enterCriticalSectionCommitPhase(criticalSectionReason);
+        }
+
+        barrier.countDownAndWait();
+
+        // Restore the resources
+        ASSERT_DOES_NOT_THROW(restoreTransactionResourcesToOperationContext(
+            newOpCtx, std::move(yieldedTransactionResources)));
+
+        restoreCompleted.store(true);
+    });
+
+    // Wait for parallelThread to have yielded and activated the critical section.
+    barrier.countDownAndWait();
+
+    // Wait a bit for parallelThread. It should not have finished restore yet, because it should be
+    // blocked waiting for the critical section to be released.
+    auto sleepMillis = 50;
+    sleepFor(mongo::Milliseconds{sleepMillis});
+    ASSERT_FALSE(restoreCompleted.load());
+
+    // Release the critical section.
+    {
+        AutoGetCollection coll(operationContext(), nssShardedCollection1, MODE_X);
+        const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+            operationContext(), nssShardedCollection1);
+        csr->exitCriticalSection(criticalSectionReason);
+    }
+
+    // Now parallel thread should be able to restore and finish.
+    parallelThread.join();
+    ASSERT_TRUE(restoreCompleted.load());
+}
+
+TEST_F(ShardRoleTest, RestoreForWriteDoesNotJoinCriticalSectionWhenRetryableWrite) {
+    auto opCtx = operationContext();
+
+    // Setup opCtx state simulating a retryable write.
+    opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+    opCtx->setTxnNumber(0);
+
+    const auto nss = nssShardedCollection1;
+    PlacementConcern placementConcern{{}, shardVersionShardedCollection1};
+    const auto acquisition = acquireCollection(
+        operationContext(),
+        {nss, placementConcern, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
+        MODE_IX);
+    ASSERT_TRUE(acquisition.exists());
+
+    // Yield the resources
+    auto yieldedTransactionResources =
+        yieldTransactionResourcesFromOperationContext(operationContext());
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+
+    // Activate the critical section
+    const BSONObj criticalSectionReason = BSON("reason" << 1);
+    {
+        AutoGetCollection coll(operationContext(), nssShardedCollection1, MODE_X);
+        const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+            operationContext(), nssShardedCollection1);
+        csr->enterCriticalSectionCatchUpPhase(criticalSectionReason);
+        csr->enterCriticalSectionCommitPhase(criticalSectionReason);
+    }
+
+    ON_BLOCK_EXIT([&] {
+        AutoGetCollection coll(operationContext(), nssShardedCollection1, MODE_X);
+        const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+            operationContext(), nssShardedCollection1);
+        csr->exitCriticalSection(criticalSectionReason);
+    });
+
+    // Restore the resources
+    ASSERT_THROWS_WITH_CHECK(restoreTransactionResourcesToOperationContext(
+                                 operationContext(), std::move(yieldedTransactionResources)),
+                             ExceptionFor<ErrorCodes::StaleConfig>,
+                             [&](const DBException& ex) {
+                                 const auto exInfo = ex.extraInfo<StaleConfigInfo>();
+                                 ASSERT_EQ(nssShardedCollection1, exInfo->getNss());
+                                 ASSERT_TRUE(exInfo->getCriticalSectionSignal().is_initialized());
+                             });
 }
 
 void ShardRoleTest::testRestoreFailsIfCollectionBecomesCreated(
