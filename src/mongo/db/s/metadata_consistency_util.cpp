@@ -61,6 +61,7 @@
 #include "mongo/db/scoped_read_concern.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/storage/snapshot.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/grid.h"
@@ -272,9 +273,9 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
         }
         return boost::none;
     }();
+
     if ((localTimeseriesOptions && catalogTimeseriesOptions &&
-         SimpleBSONObjComparator::kInstance.evaluate(localTimeseriesOptions->toBSON() !=
-                                                     catalogTimeseriesOptions->toBSON())) ||
+         !timeseries::optionsAreEqual(*localTimeseriesOptions, *catalogTimeseriesOptions)) ||
         catalogTimeseriesOptions.has_value() != localTimeseriesOptions.has_value()) {
         inconsistencies.emplace_back(makeOptionsMismatchInconsistencyBetweenShardAndConfig(
             nss,
