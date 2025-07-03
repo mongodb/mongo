@@ -499,6 +499,10 @@ bool JS::ErrorReportBuilder::init(JSContext* cx,
     // unrooted, we must root our exception object, if any.
     exnObject = &exnStack.exception().toObject();
     reportp = ErrorFromException(cx, exnObject);
+
+    if (reportp && reportp->isMuted) {
+      sniffingBehavior = SniffingBehavior::NoSideEffects;
+    }
   }
 
   // Be careful not to invoke ToString if we've already successfully extracted

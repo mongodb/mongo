@@ -174,6 +174,7 @@ class DebuggerObject : public NativeObject {
   bool isScriptedProxy() const;
   bool isPromise() const;
   bool isError() const;
+  bool isMutedError(JSContext* cx) const;
 
   bool name(JSContext* cx, JS::MutableHandle<JSAtom*> result) const;
   bool displayName(JSContext* cx, JS::MutableHandle<JSAtom*> result) const;
