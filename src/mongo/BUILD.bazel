@@ -655,7 +655,7 @@ filegroup(
         "//src/mongo/db/query:hint_parser.h",
         "//src/mongo/db/query:index_bounds.h",
         "//src/mongo/db/query:index_hint.h",
-        "//src/mongo/db/query:interval.h",
+        "//src/mongo/db/query/compiler/physical_model/interval:interval.h",
         "//src/mongo/db/query:lru_key_value.h",
         "//src/mongo/db/query:partitioned_cache.h",
         "//src/mongo/db/query:query_feature_flags_gen",

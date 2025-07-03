@@ -33,9 +33,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/db/query/interval.h"
 #include "mongo/unittest/unittest.h"
 
 #include <vector>

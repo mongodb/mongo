@@ -34,12 +34,12 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/expression_geo_index_mapping.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_bounds_builder_test_fixture.h"
 #include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/interval.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/unittest/unittest.h"
 

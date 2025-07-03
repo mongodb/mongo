@@ -33,9 +33,9 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/expression_geo_index_mapping.h"
 #include "mongo/db/query/index_bounds_builder_test_fixture.h"
-#include "mongo/db/query/interval.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/time_support.h"
 

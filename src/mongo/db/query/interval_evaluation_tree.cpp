@@ -39,8 +39,8 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/matcher/expression_type.h"
+#include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/db/query/interval.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

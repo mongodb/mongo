@@ -36,9 +36,9 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/interval.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
 
 #include <string>

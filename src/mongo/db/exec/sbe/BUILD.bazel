@@ -273,7 +273,7 @@ mongo_cc_library(
         "//src/mongo/db/exec:scoped_timer",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/index:preallocated_container_pool",
-        "//src/mongo/db/query:query_index_bounds",
+        "//src/mongo/db/query/compiler/physical_model/interval",
         "//src/mongo/db/storage:index_entry_comparison",
     ],
 )

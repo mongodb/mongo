@@ -80,17 +80,16 @@ mongo_cc_library(
         "index_bounds.cpp",
         "index_entry.cpp",
         "index_tag.cpp",
-        "interval.cpp",
     ],
     hdrs = [
         "index_bounds.h",
         "index_entry.h",
         "index_tag.h",
-        "interval.h",
     ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:query_expressions",
+        "//src/mongo/db/query/compiler/physical_model/interval",
     ],
 )
 
@@ -876,7 +875,6 @@ mongo_cc_unit_test(
     name = "query_test",
     srcs = [
         "interval_evaluation_tree_test.cpp",
-        "interval_test.cpp",
         "lru_key_value_test.cpp",
         "map_reduce_output_format_test.cpp",
         "plan_explainer_test.cpp",

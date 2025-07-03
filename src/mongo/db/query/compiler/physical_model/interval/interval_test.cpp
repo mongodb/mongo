@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/interval.h"
+#include "mongo/db/query/compiler/physical_model/interval/interval.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"

@@ -2303,6 +2303,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/collation/**/* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/query/collation/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/query/compiler/physical_model/interval/OWNERS.yml
+/src/mongo/db/query/compiler/physical_model/interval/**/* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/compiler/physical_model/interval/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/query/cost_based_ranker/OWNERS.yml
 /src/mongo/db/query/cost_based_ranker/**/* @10gen/query-optimization-cost-based-ranker @svc-auto-approve-bot
 /src/mongo/db/query/cost_based_ranker/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
