@@ -238,7 +238,11 @@ Value DocumentSourceFacet::serialize(const SerializationOptions& opts) const {
 
     for (auto&& facet : _facets) {
         if (opts.isSerializingForExplain()) {
-            auto explain = mergeExplains(*facet.pipeline, facet.getExecPipeline(), opts);
+            bool canAddExecPipelineExplain =
+                opts.verbosity >= ExplainOptions::Verbosity::kExecStats && facet.execPipeline;
+            auto explain = canAddExecPipelineExplain
+                ? mergeExplains(*facet.pipeline, facet.getExecPipeline(), opts)
+                : facet.pipeline->writeExplainOps(opts);
             serialized[opts.serializeFieldPathFromString(facet.name)] = Value(explain);
         } else {
             serialized[opts.serializeFieldPathFromString(facet.name)] =

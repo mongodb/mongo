@@ -167,6 +167,9 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
 
         Timer fetchTimer;
         if (_pipeline) {
+            tassert(10703100,
+                    "expecting '_execPipeline' to be initialized when '_pipeline' is initialized",
+                    _execPipeline);
             _execPipeline->reattachToOperationContext(opCtx.get());
         } else {
             auto pipeline = makePipeline(opCtx.get(), MongoProcessInterface::create(opCtx.get()));
