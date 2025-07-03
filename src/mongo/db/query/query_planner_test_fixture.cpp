@@ -369,6 +369,9 @@ void QueryPlannerTest::runQueryFull(
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
     cq->setSbeCompatible(markQueriesSbeCompatible);
+    if (markQueriesSbeCompatible) {
+        cq->parameterize();
+    }
     cq->setForceGenerateRecordId(forceRecordId);
 
     auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, params);

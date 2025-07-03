@@ -1528,6 +1528,8 @@ attemptToGetSlotBasedExecutor(
     // SBE-compatible query using SBE, even if the query uses features that are not on in SBE by
     // default. Either way, try to construct an SBE plan executor.
     if (canUseRegularSbe || sbeFull) {
+        canonicalQuery->parameterize();
+
         // Create the SBE prepare execution helper and initialize the params for the planner. If
         // planning results in any 'QuerySolution' which cannot be handled by the SBE stage builder,
         // then we will fall back to the classic engine.

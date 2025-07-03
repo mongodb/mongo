@@ -169,6 +169,27 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::makeForSubplanner(
     return {std::move(cq)};
 }
 
+void CanonicalQuery::parameterize() {
+    // Perform auto-parameterization only if the query is SBE-compatible and caching is enabled.
+    if (_expCtx->sbeCompatibility != SbeCompatibility::notCompatible &&
+        !internalQueryDisablePlanCache.load()) {
+        const bool hasNoTextNodes =
+            !QueryPlannerCommon::hasNode(_root.get(), MatchExpression::TEXT);
+        if (hasNoTextNodes) {
+            // When the SBE plan cache is enabled, we auto-parameterize queries in the hopes of
+            // caching a parameterized plan. Here we add parameter markers to the appropriate match
+            // expression leaf nodes.
+            _inputParamIdToExpressionMap =
+                MatchExpression::parameterize(_root.get(), loadMaxParameterCount());
+        } else {
+            LOGV2_DEBUG(6579310,
+                        5,
+                        "The query was not auto-parameterized since its match expression tree "
+                        "contains TEXT nodes");
+        }
+    }
+}
+
 Status CanonicalQuery::init(boost::intrusive_ptr<ExpressionContext> expCtx,
                             std::unique_ptr<ParsedFindCommand> parsedFind,
                             std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline,
@@ -220,24 +241,6 @@ Status CanonicalQuery::init(boost::intrusive_ptr<ExpressionContext> expCtx,
     _pipeline = std::move(pipeline);
     _isCountLike = isCountLike;
 
-    // Perform auto-parameterization only if the query is SBE-compatible and caching is enabled.
-    if (expCtx->sbeCompatibility != SbeCompatibility::notCompatible &&
-        !internalQueryDisablePlanCache.load()) {
-        const bool hasNoTextNodes =
-            !QueryPlannerCommon::hasNode(_root.get(), MatchExpression::TEXT);
-        if (hasNoTextNodes) {
-            // When the SBE plan cache is enabled, we auto-parameterize queries in the hopes of
-            // caching a parameterized plan. Here we add parameter markers to the appropriate match
-            // expression leaf nodes.
-            _inputParamIdToExpressionMap =
-                MatchExpression::parameterize(_root.get(), loadMaxParameterCount());
-        } else {
-            LOGV2_DEBUG(6579310,
-                        5,
-                        "The query was not auto-parameterized since its match expression tree "
-                        "contains TEXT nodes");
-        }
-    }
     // The tree must always be valid after normalization.
     dassert(parsed_find_command::isValid(_root.get(), *_findCommand).isOK());
     if (auto status = isValidNormalized(_root.get()); !status.isOK()) {

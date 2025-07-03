@@ -496,14 +496,22 @@ TEST(CanonicalQueryTest, InvalidSortOrdersFailToCanonicalize) {
 }
 
 TEST(CanonicalQueryTest, DoNotParameterizeTextExpressions) {
+    // We never parameterize unless SBE is enabled.
+    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
+
     auto cq =
         canonicalize("{$text: {$search: \"Hello World!\"}}",
                      MatchExpressionParser::kDefaultSpecialFeatures | MatchExpressionParser::kText);
+    cq->parameterize();
     ASSERT_FALSE(cq->isParameterized());
 }
 
 TEST(CanonicalQueryTest, DoParameterizeRegularExpressions) {
+    // SBE must be enabled in order to generate SBE plan cache keys.
+    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
+
     auto cq = canonicalize("{a: 1, b: {$lt: 5}}");
+    cq->parameterize();
     ASSERT_TRUE(cq->isParameterized());
 }
 }  // namespace

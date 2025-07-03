@@ -212,6 +212,8 @@ public:
         return _sbeCompatible;
     }
 
+    void parameterize();
+
     bool isParameterized() const {
         return !_inputParamIdToExpressionMap.empty();
     }

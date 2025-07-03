@@ -179,6 +179,7 @@ protected:
                                                    isCountLike,
                                                    needsMerge));
         cq->setSbeCompatible(true);
+        cq->parameterize();
         const auto key = canonical_query_encoder::encodeSBE(*cq);
         gctx.outStream() << key << std::endl;
     }
