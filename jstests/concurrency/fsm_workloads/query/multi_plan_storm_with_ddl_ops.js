@@ -28,6 +28,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                     ErrorCodes.LockTimeout,
                     ErrorCodes.ExceededTimeLimit,
                     ErrorCodes.StaleConfig,
+                    // DDL operations complicate creating snapshots which leads to this type of
+                    // error, but the rate limiter itself does not modify data and therefore doesn't
+                    // cause this error.
+                    ErrorCodes.MigrationConflict
                 ];
                 assert.contains(e.code, allowedCodes);
             }
