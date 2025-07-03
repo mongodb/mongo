@@ -151,11 +151,6 @@ function check5(validateLogs, shouldCorrupt) {
     }
 }
 
-const versionSpecificSetup = {
-    "4.4": {setup: setup4, corrupt: corrupt4, validate: check4},
-    "5.0": {setup: setup5, corrupt: corrupt5, validate: check5},
-};
-
 function getUri(conn, collection = "collect", indexName = "_id_") {
     let coll = conn.getDB("test").getCollection(collection);
     const uri = getUriForIndex(coll, indexName);
@@ -192,16 +187,9 @@ function testVersion(binVersion, fcv, shouldCorrupt) {
     const port = conn.port;
     setupCommon(testDB1);
 
-    if (versionSpecificSetup[binVersion]) {
-        versionSpecificSetup[binVersion].setup(testDB1);
-    }
-
     if (shouldCorrupt) {
         let toTruncate = [];
         toTruncate.push(getUri(conn));
-        if (versionSpecificSetup[binVersion]) {
-            toTruncate = toTruncate.concat(versionSpecificSetup[binVersion].corrupt(conn));
-        }
         jsTestLog(toTruncate);
         MongoRunner.stopMongod(conn, null, {skipValidation: true});
         corruptUris(conn.dbpath, toTruncate);
@@ -220,10 +208,6 @@ function testVersion(binVersion, fcv, shouldCorrupt) {
                            .map(line => JSON.parse(line.split("|").slice(1).join("|")));
 
     checkCommon(validateLogs, shouldCorrupt);
-
-    if (versionSpecificSetup[binVersion]) {
-        versionSpecificSetup[binVersion].validate(validateLogs, shouldCorrupt);
-    }
 }
 
 for (let i = 0; i < allLtsVersions.length; i++) {

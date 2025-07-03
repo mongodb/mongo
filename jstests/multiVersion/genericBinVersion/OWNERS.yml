@@ -6,9 +6,6 @@ filters:
   - "keystring_index.js":
     approvers:
       - 10gen/query-execution-write-exec
-  - "timeseries_collection_mixed_type.js":
-    approvers:
-      - 10gen/query-integration-timeseries
   - "example_fcv_upgrade_downgrade_test.js":
     approvers:
       - 10gen/server-fcv

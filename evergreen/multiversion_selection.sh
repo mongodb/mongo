@@ -33,6 +33,10 @@ if [[ -n "${multiversion_last_continuous_variant}" ]]; then
   last_continuous_arg=""
 fi
 
+if [ ! -z "${multiversion_platform_50_or_later}" ]; then
+  platform="${multiversion_platform_50_or_later}"
+fi
+
 base_command="db-contrib-tool setup-repro-env -sb"
 evergreen_args="--installDir /data/install \
   --linkDir /data/multiversion \
@@ -41,27 +45,8 @@ evergreen_args="--installDir /data/install \
   --evgVersionsFile multiversion-downloads.json"
 local_args="--edition $edition \
   --debug \
-  5.0.28"
-
-remote_invocation="${base_command} ${evergreen_args} ${local_args}"
-eval "${remote_invocation}"
-echo "Verbatim db-contrib-tool invocation: ${remote_invocation}"
-
-local_invocation="${base_command} ${local_args}"
-
-if [ ! -z "${multiversion_platform_50_or_later}" ]; then
-  platform="${multiversion_platform_50_or_later}"
-fi
-
-evergreen_args="--installDir /data/install \
-  --linkDir /data/multiversion \
-  --platform $platform \
-  --architecture $architecture \
-  --evgVersionsFile multiversion-downloads.json"
-local_args="--edition $edition \
-  --debug \
   ${last_lts_arg} \
-  ${last_continuous_arg} 5.0 6.0 7.0"
+  ${last_continuous_arg} 6.0 7.0"
 
 remote_invocation="${base_command} ${evergreen_args} ${local_args}"
 eval "${remote_invocation}"

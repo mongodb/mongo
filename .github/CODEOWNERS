@@ -882,7 +882,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/OWNERS.yml
 /jstests/multiVersion/genericBinVersion/**/*query_stats* @10gen/query-integration-observability @svc-auto-approve-bot
 /jstests/multiVersion/genericBinVersion/**/keystring_index.js @10gen/query-execution-write-exec @svc-auto-approve-bot
-/jstests/multiVersion/genericBinVersion/**/timeseries_collection_mixed_type.js @10gen/query-integration-timeseries @svc-auto-approve-bot
 /jstests/multiVersion/genericBinVersion/**/example_fcv_upgrade_downgrade_test.js @10gen/server-fcv @svc-auto-approve-bot
 /jstests/multiVersion/genericBinVersion/**/minor_version* @10gen/server-fcv @svc-auto-approve-bot
 /jstests/multiVersion/genericBinVersion/**/mixed_replica_set_with_latest_primary.js @10gen/server-fcv @svc-auto-approve-bot
