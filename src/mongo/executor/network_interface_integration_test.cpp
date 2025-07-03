@@ -87,6 +87,7 @@
 #include <memory>
 #include <mutex>
 #include <ostream>
+#include <sstream>  // TODO?
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -103,6 +104,17 @@
 
 namespace mongo {
 namespace executor {
+
+// for assertion error messages
+// "{.sent=1, .canceled=0, ...}"
+std::ostream& operator<<(std::ostream& out, const NetworkInterface::Counters& counters) {
+#define PRINT(FIELD) "." #FIELD "=" << counters.FIELD
+    return out << "NetworkInterface::Counters{" << PRINT(sent) << ", " << PRINT(canceled) << ", "
+               << PRINT(timedOut) << ", " << PRINT(failed) << ", " << PRINT(failedRemotely)
+               << ", " PRINT(succeeded) << "}";
+#undef PRINT
+}
+
 namespace {
 
 bool pingCommandMissing(const RemoteCommandResponse& result) {
@@ -139,40 +151,72 @@ TEST_F(NetworkInterfaceIntegrationFixture, PingWithoutStartup) {
     ASSERT(fut.get(interruptible()).isOK());
 }
 
+struct ExpectedCounters {
+    boost::optional<uint64_t> sent;
+    boost::optional<uint64_t> canceled;
+    boost::optional<uint64_t> timedOut;
+    boost::optional<uint64_t> failed;
+    boost::optional<uint64_t> failedRemotely;
+    boost::optional<uint64_t> succeeded;
+};
+
+// Compares the non-null fields of `expected` with the corresponding fields of `actual`, for
+// assertions.
+bool operator==(const NetworkInterface::Counters& actual, const ExpectedCounters& expected) {
+#define MATCH(FIELD) (!expected.FIELD.has_value() || actual.FIELD == *expected.FIELD)
+    return MATCH(sent) && MATCH(canceled) && MATCH(timedOut) && MATCH(failed) &&
+        MATCH(failedRemotely) && MATCH(succeeded);
+#undef MATCH
+}
+
+// for assertion error messages:
+// "{.sent=1, .canceled=0, ...}"
+std::ostream& operator<<(std::ostream& out, const ExpectedCounters& expected) {
+    bool first = true;
+#define PRINT(FIELD)                              \
+    if (expected.FIELD.has_value()) {             \
+        if (first) {                              \
+            first = false;                        \
+        } else {                                  \
+            out << ", ";                          \
+        }                                         \
+        out << "." #FIELD "=" << *expected.FIELD; \
+    }
+    out << "ExpectedCounters{";
+    PRINT(sent)
+    PRINT(canceled)
+    PRINT(timedOut)
+    PRINT(failed)
+    PRINT(failedRemotely)
+    PRINT(succeeded)
+    out << "}";
+    return out;
+#undef PRINT
+}
+
 class NetworkInterfaceTest : public NetworkInterfaceIntegrationFixture {
 public:
     constexpr static Milliseconds kNoTimeout = RemoteCommandRequest::kNoTimeout;
-    constexpr static Milliseconds kMaxWait = Milliseconds(Minutes(1));
+    constexpr static Milliseconds kMaxWait = Minutes(1);
 
-    void assertNumOps(uint64_t canceled, uint64_t timedOut, uint64_t failed, uint64_t succeeded) {
-        auto counters = net().getCounters();
-        ASSERT_EQ(canceled, counters.canceled);
-        ASSERT_EQ(timedOut, counters.timedOut);
-        ASSERT_EQ(failed, counters.failed);
-        ASSERT_EQ(succeeded, counters.succeeded);
+    void assertNumOps(const ExpectedCounters& expected) {
+        ASSERT_EQ(net().getCounters(), expected);
     }
 
-    void assertNumOpsSoon(uint64_t canceled,
-                          uint64_t timedOut,
-                          uint64_t failed,
-                          uint64_t succeeded,
+    void assertNumOpsSoon(const ExpectedCounters& expected,
                           Milliseconds timeout,
                           long long period = 100) {
         ClockSource::StopWatch stopwatch;
         NetworkInterface::Counters counters;
         while (stopwatch.elapsed() < timeout) {
             counters = net().getCounters();
-            if (counters.canceled == canceled && counters.timedOut == timedOut &&
-                counters.failed == failed && counters.succeeded == succeeded) {
+            if (counters == expected) {
                 break;
             }
             sleepmillis(period);
         }
 
-        ASSERT_EQ(canceled, counters.canceled);
-        ASSERT_EQ(timedOut, counters.timedOut);
-        ASSERT_EQ(failed, counters.failed);
-        ASSERT_EQ(succeeded, counters.succeeded);
+        ASSERT_EQ(counters, expected);
     }
 
     void setUp() override {
@@ -369,7 +413,7 @@ using NetworkInterfaceTestWithoutBaton = NetworkInterfaceTest;
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelMissingOperation) {
     // This is just a sanity check, this action should have no effect.
     cancelCommand(makeCallbackHandle());
-    assertNumOps(0u, 0u, 0u, 0u);
+    assertNumOps({.canceled = 0u, .timedOut = 0u, .failed = 0u, .succeeded = 0u});
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelLocally) {
@@ -408,7 +452,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelLocally) {
     ASSERT_EQ(ErrorCodes::CallbackCanceled, result.status);
     ASSERT(result.elapsed);
 
-    assertNumOps(1u, 0u, 0u, 0u);
+    assertNumOps({.canceled = 1u, .timedOut = 0u, .failed = 0u, .succeeded = 0u});
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotely) {
@@ -464,7 +508,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotely) {
 
     // We have one canceled operation (echo), and two other succeeded operations
     // on top of the currentOp operations (configureFailPoint and _killOperations).
-    assertNumOps(1u, 0u, 0u, 2u + numCurrentOpRan);
+    assertNumOps({.canceled = 1u, .timedOut = 0u, .failed = 0u, .succeeded = 2u + numCurrentOpRan});
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
@@ -526,7 +570,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
 
     // We have one canceled operation (echo), one timedout operation (_killOperations),
     // and one succeeded operation on top of the currentOp operations (configureFailPoint).
-    assertNumOps(1u, 1u, 0u, 1u + numCurrentOpRan);
+    assertNumOps({.canceled = 1u, .timedOut = 1u, .failed = 0u, .succeeded = 1u + numCurrentOpRan});
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelBeforeConnection) {
@@ -555,7 +599,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelBeforeConnection) {
     auto result = pf.future.get();
     ASSERT_EQ(ErrorCodes::CallbackCanceled, result.status);
     ASSERT(result.elapsed);
-    assertNumOps(1u, 0u, 0u, 0u);
+    assertNumOps({.canceled = 1u, .timedOut = 0u, .failed = 0u, .succeeded = 0u});
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, LateCancel) {
@@ -571,7 +615,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, LateCancel) {
 
     ASSERT_OK(result.status);
     ASSERT(result.elapsed);
-    assertNumOps(0u, 0u, 0u, 1u);
+    assertNumOps({.canceled = 0u, .timedOut = 0u, .failed = 0u, .succeeded = 1u});
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ConnectionErrorDropsSingleConnection) {
@@ -615,7 +659,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, TimeoutDuringConnectionHands
 
     ASSERT_EQ(ErrorCodes::HostUnreachable, result.status);
     // No timeouts are counted as a result of HostUnreachable being returned.
-    assertNumOps(0u, 0u, 1u, 0u);
+    assertNumOps({.canceled = 0u, .timedOut = 0u, .failed = 1u, .succeeded = 0u});
 }
 
 void NetworkInterfaceTest::runAcquireConnectionTimeoutTest(
@@ -636,7 +680,7 @@ void NetworkInterfaceTest::runAcquireConnectionTimeoutTest(
     auto expectedCode =
         customCode.value_or(ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit);
     ASSERT_EQ(expectedCode, result.status);
-    assertNumOps(0u, 1u, 0u, 0u);
+    assertNumOps({.canceled = 0u, .timedOut = 1u, .failed = 0u, .succeeded = 0u});
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, TimeoutWaitingToAcquireConnection) {
@@ -659,7 +703,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, TimeoutGeneralNetworkInterfa
     auto result = deferred.get(interruptible());
 
     ASSERT_EQ(ErrorCodes::NetworkInterfaceExceededTimeLimit, result.status);
-    assertNumOpsSoon(0u, 1u, 0u, 2u, kMaxWait);
+    assertNumOpsSoon({.canceled = 0u, .timedOut = 1u, .failed = 0u, .succeeded = 2u}, kMaxWait);
 }
 
 /**
@@ -699,19 +743,21 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, NoCustomCodeRequestTimeoutHi
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeout) {
-    auto fpGuard = configureFailCommand("ping", {}, Milliseconds(30000));
+    auto fpGuard = configureFailCommand("ping", {}, Milliseconds(30'000));
 
     // Kick off operation
     auto cb = makeCallbackHandle();
     auto request = makeTestCommand(
-        Milliseconds{1000}, BSON("ping" << 1), nullptr, false, ErrorCodes::MaxTimeMSExpired);
+        Milliseconds{3'000}, BSON("ping" << 1), nullptr, false, ErrorCodes::MaxTimeMSExpired);
     auto deferred = runCommand(cb, request);
 
     auto result = deferred.get(interruptible());
     ASSERT_EQ(ErrorCodes::MaxTimeMSExpired, result.status);
     ASSERT(result.elapsed);
     ASSERT_EQ(result.target, fixture().getServers().front());
-    assertNumOpsSoon(0u, 1u, 0u, 1u, kMaxWait);
+    // The "ping" will have timed out on the client side, and then because of that a
+    // "_killOperations" command will be sent to the server, and that will succeed.
+    assertNumOpsSoon({.canceled = 0u, .timedOut = 1u, .failed = 0u, .succeeded = 1u}, kMaxWait);
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineSooner) {
@@ -755,7 +801,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
 
     // Sleep has timed out but _killOperations may still be running. We can't use
     // waitForCommandToStop since there is no guarantee when _killOperations starts.
-    assertNumOpsSoon(0u, 1u, 0u, 1u, kMaxWait);
+    assertNumOpsSoon({.canceled = 0u, .timedOut = 1u, .failed = 0u, .succeeded = 1u}, kMaxWait);
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
@@ -800,7 +846,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
 
     // Sleep has timed out but _killOperations may still be running. We can't use
     // waitForCommandToStop since there is no guarantee when _killOperations starts.
-    assertNumOpsSoon(0u, 1u, 0u, 1u, kMaxWait);
+    assertNumOpsSoon({.canceled = 0u, .timedOut = 1u, .failed = 0u, .succeeded = 1u}, kMaxWait);
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, StartCommand) {
@@ -821,7 +867,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, StartCommand) {
     ASSERT_EQ("admin"_sd, cmdObj.getStringField("$db"));
     ASSERT_FALSE(cmdObj["clientOperationKey"].eoo());
     ASSERT_EQ(1, res.data.getIntField("ok"));
-    assertNumOps(0u, 0u, 0u, 1u);
+    assertNumOps({.canceled = 0u, .timedOut = 0u, .failed = 0u, .succeeded = 1u});
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, FireAndForget) {
@@ -866,7 +912,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, FireAndForget) {
     uassertStatusOK(result.status);
     ASSERT_EQ(0, result.data.getIntField("ok"));
     ASSERT_EQ(ErrorCodes::CommandFailed, result.data.getIntField("code"));
-    assertNumOps(0u, 0u, 0u, 5u);
+    assertNumOps({.canceled = 0u, .timedOut = 0u, .failed = 0u, .succeeded = 5u});
 }
 
 TEST_F(NetworkInterfaceTest, SetAlarm) {
@@ -1131,7 +1177,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ConnectionErrorAssociatedWit
 
     ASSERT_EQ(ErrorCodes::HostUnreachable, result.status);
     ASSERT_EQ(result.target, fixture().getServers().front());
-    assertNumOps(0u, 0u, 1u, 0u);
+    assertNumOps({.canceled = 0u, .timedOut = 0u, .failed = 1u, .succeeded = 0u});
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ShutdownBeforeSendRequest) {
@@ -1189,7 +1235,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ShutdownBeforeSendRequest) {
     // Since shutdown has completed, this future should be ready very soon if not immediately.
     ASSERT_EQ(getWithTimeout(pf.future, *opCtx, Seconds(1)).status, ErrorCodes::ShutdownInProgress);
 
-    assertNumOps(1u, 0u, 0u, 0u);
+    assertNumOps({.canceled = 1u, .timedOut = 0u, .failed = 0u, .succeeded = 0u});
 
     ConnectionPoolStats stats;
     net().appendConnectionStats(&stats);
@@ -1238,7 +1284,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ShutdownAfterSendRequest) {
     // Since shutdown has completed, this future should be ready very soon if not immediately.
     ASSERT_EQ(getWithTimeout(pf.future, *opCtx, Seconds(1)).status, ErrorCodes::ShutdownInProgress);
 
-    assertNumOps(1u, 0u, 0u, 0u);
+    assertNumOps({.canceled = 1u, .timedOut = 0u, .failed = 0u, .succeeded = 0u});
 
     assertConnectionStats(
         getFactory(),
@@ -1336,7 +1382,7 @@ TEST_F(NetworkInterfaceTestWithHelloHook,
     // Verify that the ping op is counted as a success.
     auto res = deferred.get(interruptible());
     ASSERT(res.elapsed);
-    assertNumOps(0u, 0u, 0u, 1u);
+    assertNumOps({.canceled = 0u, .timedOut = 0u, .failed = 0u, .succeeded = 1u});
 }
 
 class NetworkInterfaceInternalClientTest : public NetworkInterfaceTestWithHelloHook {
@@ -1371,7 +1417,7 @@ TEST_F(NetworkInterfaceInternalClientTest,
     // Verify that the ping op is counted as a success.
     auto res = deferred.get();
     ASSERT(res.elapsed);
-    assertNumOps(0u, 0u, 0u, 1u);
+    assertNumOps({.canceled = 0u, .timedOut = 0u, .failed = 0u, .succeeded = 1u});
 }
 
 class NetworkInterfaceTestWithHangingHook : public NetworkInterfaceTestWithConnectHook {
