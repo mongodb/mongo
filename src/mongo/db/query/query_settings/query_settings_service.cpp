@@ -512,7 +512,8 @@ public:
 
     void setQuerySettingsClusterParameter(
         OperationContext* opCtx,
-        const QueryShapeConfigurationsWithTimestamp& config) const override {
+        const QueryShapeConfigurationsWithTimestamp& config,
+        boost::optional<LogicalTime> newClusterParameterTime) const override {
         MONGO_UNREACHABLE_TASSERT(10397900);
     }
 
@@ -541,7 +542,9 @@ public:
     }
 
     void deleteQueryShapeRepresentativeQuery(
-        OperationContext* opCtx, const query_shape::QueryShapeHash& queryShapeHash) const override {
+        OperationContext* opCtx,
+        const query_shape::QueryShapeHash& queryShapeHash,
+        LogicalTime latestClusterParameterTime) const override {
         MONGO_UNIMPLEMENTED_TASSERT(10445105);
     }
 
@@ -578,7 +581,9 @@ public:
     }
 
     void setQuerySettingsClusterParameter(
-        OperationContext* opCtx, const QueryShapeConfigurationsWithTimestamp& config) const final {
+        OperationContext* opCtx,
+        const QueryShapeConfigurationsWithTimestamp& config,
+        boost::optional<LogicalTime> newClusterParameterTime = boost::none) const final {
         try {
             if (MONGO_unlikely(throwConflictingOperationInProgressOnQuerySettingsSetClusterParameter
                                    .shouldFail())) {
@@ -587,8 +592,12 @@ public:
             }
 
             auto request = makeQuerySettingsClusterParameter(config);
+            auto newClusterParameterTimeAsTs = newClusterParameterTime
+                ? boost::optional<Timestamp>(newClusterParameterTime->asTimestamp())
+                : boost::none;
             tassert(10445106, "setClusterParameter must be provided", _setClusterParameterFn);
-            _setClusterParameterFn(opCtx, request, boost::none, config.clusterParameterTime);
+            _setClusterParameterFn(
+                opCtx, request, newClusterParameterTimeAsTs, config.clusterParameterTime);
         } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
             uasserted(ErrorCodes::BSONObjectTooLarge,
                       str::stream() << "cannot modify query settings: the total size exceeds "
@@ -744,14 +753,18 @@ public:
     }
 
     void deleteQueryShapeRepresentativeQuery(
-        OperationContext* opCtx, const query_shape::QueryShapeHash& queryShapeHash) const override {
+        OperationContext* opCtx,
+        const query_shape::QueryShapeHash& queryShapeHash,
+        LogicalTime latestClusterParameterTime) const override {
         const auto& nss = NamespaceString::kQueryShapeRepresentativeQueriesNamespace;
         DBDirectClient client(opCtx);
         try {
-            client.remove(nss,
-                          BSON("_id" << queryShapeHash.toHexString()),
-                          false /* removeMany */,
-                          defaultMajorityWriteConcern().toBSON());
+            BSONObj predicate =
+                BSON("_id" << queryShapeHash.toHexString()
+                           << QueryShapeRepresentativeQuery::kLastModifiedTimeFieldName
+                           << BSON("$lte" << latestClusterParameterTime.asTimestamp()));
+            client.remove(
+                nss, predicate, false /* removeMany */, defaultMajorityWriteConcern().toBSON());
         } catch (const DBException& ex) {
             LOGV2_DEBUG(10445111,
                         1,

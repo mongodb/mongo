@@ -181,9 +181,13 @@ public:
     /**
      * Creates the corresponding 'querySettings' cluster parameter value out of the 'config' and
      * issues the setClusterParameter command.
+     * 'querySettings' cluster parameter will set its cluster time to 'newClusterParameterTime'. If
+     * not specified setClusterParameter module will come up with the new cluster time.
      */
     virtual void setQuerySettingsClusterParameter(
-        OperationContext* opCtx, const QueryShapeConfigurationsWithTimestamp& config) const = 0;
+        OperationContext* opCtx,
+        const QueryShapeConfigurationsWithTimestamp& config,
+        boost::optional<LogicalTime> newClusterParameterTime = boost::none) const = 0;
 
     /**
      * Creates 'queryShapeRepresentativeQueries' collection locally. Throws an exception in case of
@@ -224,9 +228,13 @@ public:
     /**
      * Deletes the 'representativeQuery' from the 'queryShapeRepresentativeQueries' collection by
      * 'queryShapeHash' locally via DBDirectClient. Catches all DBExceptions on failed delete.
+     * Deletes only those representative queries that have 'lastModifiedTime' field less than or
+     * equal to 'latestClusterParameterTime'.
      */
     virtual void deleteQueryShapeRepresentativeQuery(
-        OperationContext* opCtx, const query_shape::QueryShapeHash& queryShapeHash) const = 0;
+        OperationContext* opCtx,
+        const query_shape::QueryShapeHash& queryShapeHash,
+        LogicalTime latestClusterParameterTime) const = 0;
 
     /**
      * Validates that 'querySettings' do not have:

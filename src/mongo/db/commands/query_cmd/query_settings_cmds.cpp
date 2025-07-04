@@ -36,6 +36,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/version/releases.h"
@@ -52,6 +53,7 @@ using QueryShapeHashQueryInstanceOptPair =
 
 MONGO_FAIL_POINT_DEFINE(querySettingsPlanCacheInvalidation);
 MONGO_FAIL_POINT_DEFINE(pauseAfterReadingQuerySettingsConfigurationParameter);
+MONGO_FAIL_POINT_DEFINE(pauseAfterCallingSetClusterParameterInQuerySettingsCommands);
 
 enum class QuerySettingsCmdType { kSet, kRemove };
 
@@ -134,6 +136,16 @@ void readModifyWriteQuerySettingsConfigOption(
     auto queryShapeConfigurations =
         querySettingsService.getAllQueryShapeConfigurations(dbName.tenantId());
 
+    // Generate a new cluster parameter time that will be used when settings new version of
+    // 'querySettings' cluster parameter. This cluster time will be assigned to the corresponding
+    // representative query as well.
+    LogicalTime newQuerySettingsParameterClusterTime = [&]() {
+        auto vt = VectorClock::get(opCtx)->getTime();
+        auto clusterTime = vt.clusterTime();
+        dassert(clusterTime > queryShapeConfigurations.clusterParameterTime);
+        return clusterTime;
+    }();
+
     // Modify the query settings array (append, replace, or remove).
     modify(queryShapeConfigurations.queryShapeConfigurations);
 
@@ -156,8 +168,7 @@ void readModifyWriteQuerySettingsConfigOption(
                 {QueryShapeRepresentativeQuery(
                     /* queryShapeHash */ queryShapeHashQueryInstanceOptPair.first,
                     /* representativeQuery */ *queryShapeHashQueryInstanceOptPair.second,
-                    // TODO SERVER-105686 Avoid removing in-progress representative queries.
-                    /* lastModifiedTime */ LogicalTime())});
+                    newQuerySettingsParameterClusterTime)});
         }
     }
 
@@ -187,13 +198,29 @@ void readModifyWriteQuerySettingsConfigOption(
     }
 
     // Run "setClusterParameter" command with the new value of the 'querySettings' cluster-wide
-    // parameter.
-    querySettingsService.setQuerySettingsClusterParameter(opCtx, queryShapeConfigurations);
+    // parameter and 'newQuerySettingsParameterClusterTime' cluster time.
+    querySettingsService.setQuerySettingsClusterParameter(
+        opCtx, queryShapeConfigurations, newQuerySettingsParameterClusterTime);
+
+    // Hang in between setClusterParameter and representative query removal.
+    if (MONGO_unlikely(pauseAfterCallingSetClusterParameterInQuerySettingsCommands.shouldFail(
+            [&](const BSONObj& failPointConfiguration) {
+                auto cmdTypeString = failPointConfiguration.firstElement().String();
+                auto cmdTypeToHangOn = cmdTypeString == "set" ? QuerySettingsCmdType::kSet
+                                                              : QuerySettingsCmdType::kRemove;
+                return CmdType == cmdTypeToHangOn;
+            }))) {
+        pauseAfterCallingSetClusterParameterInQuerySettingsCommands.pauseWhileSet(opCtx);
+    }
 
     // Remove QueryShapeRepresentativeQuery from the corresponding collection if present.
     if constexpr (CmdType == QuerySettingsCmdType::kRemove) {
+        // deleteQueryShapeRepresentativeQuery() must only delete representative queries at the
+        // cluster parameter time of 'querySettings' cluster parameter that it observes.
         querySettingsService.deleteQueryShapeRepresentativeQuery(
-            opCtx, queryShapeHashQueryInstanceOptPair.first);
+            opCtx,
+            queryShapeHashQueryInstanceOptPair.first,
+            queryShapeConfigurations.clusterParameterTime);
     }
 
     // Clears the SBE plan cache if 'querySettingsPlanCacheInvalidation' fail-point is set. Used in
