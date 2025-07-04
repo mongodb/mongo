@@ -204,8 +204,11 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         auto resultArray = exhaustPipelineIntoBSONArray(exec);
 
         if (expCtx->getExplain()) {
+            auto pipelineExec = dynamic_cast<PlanExecutorPipeline*>(exec.get());
+            tassert(
+                10610100, "The plan executor is not of type 'PlanExecutorPipeline'", pipelineExec);
             Explain::explainPipeline(
-                exec.get(), false /* executePipeline  */, *expCtx->getExplain(), cmd, &result);
+                pipelineExec, false /* executePipeline  */, *expCtx->getExplain(), cmd, &result);
         }
 
         PlanSummaryStats planSummaryStats;

@@ -148,7 +148,7 @@ public:
      *
      * The 'command' parameter represents the command object that is being explained.
      */
-    static void explainPipeline(PlanExecutor* exec,
+    static void explainPipeline(PlanExecutorPipeline* pipelineExec,
                                 bool executePipeline,
                                 ExplainOptions::Verbosity verbosity,
                                 const BSONObj& command,

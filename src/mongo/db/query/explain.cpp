@@ -388,16 +388,13 @@ void Explain::explainStages(PlanExecutor* exec,
     explain_common::appendIfRoom(command, "command", out);
 }
 
-void Explain::explainPipeline(PlanExecutor* exec,
+void Explain::explainPipeline(PlanExecutorPipeline* pipelineExec,
                               bool executePipeline,
                               ExplainOptions::Verbosity verbosity,
                               const BSONObj& command,
                               BSONObjBuilder* out) {
-    invariant(exec);
-    invariant(out);
-
-    auto pipelineExec = dynamic_cast<PlanExecutorPipeline*>(exec);
     invariant(pipelineExec);
+    invariant(out);
 
     // If we need execution stats, this runs the plan in order to gather the stats.
     if (verbosity >= ExplainOptions::Verbosity::kExecStats && executePipeline) {
@@ -410,14 +407,14 @@ void Explain::explainPipeline(PlanExecutor* exec,
     out->appendElements(explainVersionToBson(explainer.getVersion()));
     *out << "stages" << Value(pipelineExec->writeExplainOps(verbosity));
 
-    explain_common::generateQueryShapeHash(exec->getOpCtx(), out);
-    explain_common::generateMaxUsedMemBytes(exec->getOpCtx(), out);
+    explain_common::generateQueryShapeHash(pipelineExec->getOpCtx(), out);
+    explain_common::generateMaxUsedMemBytes(pipelineExec->getOpCtx(), out);
     explain_common::generateServerInfo(out);
 
-    auto* cq = exec->getCanonicalQuery();
-    const auto& expCtx = cq
-        ? cq->getExpCtx()
-        : ExpressionContext::makeBlankExpressionContext(exec->getOpCtx(), exec->nss());
+    auto* cq = pipelineExec->getCanonicalQuery();
+    const auto& expCtx = cq ? cq->getExpCtx()
+                            : ExpressionContext::makeBlankExpressionContext(
+                                  pipelineExec->getOpCtx(), pipelineExec->nss());
     explain_common::generateServerParameters(expCtx, out);
     explain_common::appendIfRoom(command, "command", out);
 }
