@@ -253,3 +253,10 @@ feature_flags:
         cpp_varname: gFeatureFlagExtensionsAPI
         default: false
         fcv_gated: false
+
+    featureFlagMqlJsEngineGap:
+        description: "Feature flag to enable MQL features that cover common use cases for server side Javascript"
+        cpp_varname: gFeatureFlagMqlJsEngineGap
+        default: true
+        version: 8.2
+        fcv_gated: true
