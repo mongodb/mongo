@@ -8,7 +8,6 @@
  *   requires_capped,
  *   # Sharded collections can't be capped.
  *   assumes_unsharded_collection,
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 

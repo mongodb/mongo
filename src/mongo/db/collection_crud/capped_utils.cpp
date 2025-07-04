@@ -110,6 +110,10 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
             "Cannot convert an encrypted collection to a capped collection",
             !fromCollection->getCollectionOptions().encryptedFieldConfig);
 
+    uassert(ErrorCodes::IllegalOperation,
+            "Cannot convert a timeseries collection to a capped collection",
+            !fromCollection->isTimeseriesCollection());
+
     uassert(ErrorCodes::NamespaceExists,
             str::stream() << "cloneCollectionAsCapped failed - destination collection "
                           << toNss.toStringForErrorMsg() << " already exists. source collection: "
