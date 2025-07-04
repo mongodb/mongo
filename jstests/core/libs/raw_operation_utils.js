@@ -9,12 +9,8 @@ export const kIsRawOperationSupported = raw.isRawOperationSupported(db);
 
 export const kRawOperationFieldName = raw.kRawOperationFieldName;
 export const kRawOperationSpec = raw.getRawOperationSpec(db);
+export const createRawTimeseriesIndex = raw.createRawTimeseriesIndex;
 
 export function getTimeseriesCollForRawOps(coll) {
     return raw.getTimeseriesCollForRawOps(db, coll);
-}
-
-export function createRawTimeseriesIndex(coll, spec, options, commitQuorum, cmdArgs) {
-    return getTimeseriesCollForRawOps(coll).createIndex(
-        spec, options, commitQuorum, {...kRawOperationSpec, ...cmdArgs});
 }

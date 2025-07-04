@@ -91,7 +91,12 @@ DBCollection.prototype.help = function() {
     print("\tdb." + shortName + ".find(...).limit(n)");
     print("\tdb." + shortName + ".find(...).skip(n)");
     print("\tdb." + shortName + ".find(...).sort(...)");
-    print("\tdb." + shortName + ".findOne([query], [fields], [options], [readConcern])");
+    print(
+        "\tdb." + shortName +
+        ".findOne([filter], [projection], [options], [readConcern], [collation], [rawData]) - find one matching document.");
+    print(
+        "\tdb." + shortName +
+        ".findOneWithRawData([filter]) - find one matching document and return its raw representation if available");
     print(
         "\tdb." + shortName +
         ".findOneAndDelete( filter, <optional params> ) - delete first matching document, optional parameters are: projection, sort, maxTimeMS");
@@ -104,6 +109,9 @@ DBCollection.prototype.help = function() {
     print("\tdb." + shortName + ".getDB() get DB object associated with collection");
     print("\tdb." + shortName + ".getPlanCache() get query plan cache associated with collection");
     print("\tdb." + shortName + ".getIndexes()");
+    print(
+        "\tdb." + shortName +
+        ".getIndexKeys([options]) - retrieve keys of indexes that are associated with the the collection");
     print("\tdb." + shortName + ".insert(obj)");
     print(
         "\tdb." + shortName +
@@ -265,6 +273,15 @@ DBCollection.prototype.find = function(filter, projection, limit, skip, batchSiz
     }
 
     return cursor;
+};
+
+DBCollection.prototype.findOneWithRawData = function(filter) {
+    return this.findOne(filter,
+                        null /* projection */,
+                        null /* options */,
+                        null /* readConcern */,
+                        null /* collation */,
+                        true /* rawData */);
 };
 
 DBCollection.prototype.findOne = function(
@@ -844,10 +861,8 @@ DBCollection.prototype.getIndexes = function(params) {
 DBCollection.prototype.getIndices = DBCollection.prototype.getIndexes;
 DBCollection.prototype.getIndexSpecs = DBCollection.prototype.getIndexes;
 
-DBCollection.prototype.getIndexKeys = function() {
-    return this.getIndexes().map(function(i) {
-        return i.key;
-    });
+DBCollection.prototype.getIndexKeys = function(options = {}) {
+    return this.getIndexes(options).map(i => i.key);
 };
 
 DBCollection.prototype.hashAllDocs = function() {

@@ -7,6 +7,11 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesBucketsColl,
+    getTimeseriesCollForDDLOps
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 Random.setRandomSeed();
@@ -65,7 +70,7 @@ function runTest(getShardKey, performChunkSplit) {
     const shardKey = getShardKey(1, 1);
     assert.commandWorked(coll.createIndex(shardKey));
     assert.commandWorked(mongos.adminCommand({
-        shardCollection: `${dbName}.${collName}`,
+        shardCollection: coll.getFullName(),
         key: shardKey,
     }));
 
@@ -86,45 +91,53 @@ function runTest(getShardKey, performChunkSplit) {
         }
 
         assert.commandWorked(mongos.adminCommand(
-            {split: `${dbName}.system.buckets.${collName}`, middle: splitPoint}));
+            {split: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(), middle: splitPoint}));
 
         // Ensure that currently both chunks reside on the primary shard.
-        let counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
+        let counts = st.chunkCounts(collName, dbName);
         const primaryShard = st.getPrimaryShard(dbName);
         assert.eq(2, counts[primaryShard.shardName], counts);
 
         // Move one of the chunks into the second shard.
         const otherShard = st.getOther(primaryShard);
         assert.commandWorked(mongos.adminCommand({
-            movechunk: `${dbName}.system.buckets.${collName}`,
+            movechunk: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(),
             find: splitPoint,
             to: otherShard.name,
             _waitForDelete: true
         }));
 
         // Ensure that each shard owns one chunk.
-        counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
+        counts = st.chunkCounts(collName, dbName);
         assert.eq(1, counts[primaryShard.shardName], counts);
         assert.eq(1, counts[otherShard.shardName], counts);
     }
 
-    // Confirm it's illegal to directly drop the ticket-series buckets collection.
-    assert.commandFailedWithCode(mainDB.runCommand({drop: `system.buckets.${collName}`}),
-                                 ErrorCodes.IllegalOperation);
-    ensureCollectionExists(collName, mainDB);
-    ensureCollectionExists(`system.buckets.${collName}`, mainDB);
+    // TODO SERVER-101784 remove this check once only viewless timeseries exist.
+    // TODO SERVER-107138 update once drop on the buckets namespace fails on FCV 9.0.
+    if (!areViewlessTimeseriesEnabled(mainDB)) {
+        // Confirm it's illegal to directly drop the time-series buckets collection.
+        assert.commandFailedWithCode(mainDB.runCommand({drop: getTimeseriesBucketsColl(collName)}),
+                                     ErrorCodes.IllegalOperation);
+        ensureCollectionExists(collName, mainDB);
+        ensureCollectionExists(getTimeseriesBucketsColl(collName), mainDB);
+    }
 
     // Drop the time-series collection.
     assert(coll.drop());
 
-    // Ensure that both time-series view and time-series buckets collections do not exist according
-    // to mongos and both shards.
+    // Ensure that the time-series collection doesn't exist according to mongos and shards.
     ensureCollectionDoesNotExist(collName);
-    ensureCollectionDoesNotExist(`system.buckets.${collName}`);
 
-    // Ensure that the time-series buckets collection gets deleted from the config database as well.
-    assert.eq([],
-              configDB.collections.find({_id: `${dbName}.system.buckets.${collName}`}).toArray());
+    // TODO SERVER-101784 remove this check once only viewless timeseries exist.
+    // Ensure that the time-series buckets collection doesn't exist according to mongos and shards.
+    ensureCollectionDoesNotExist(getTimeseriesBucketsColl(collName));
+
+    // Ensure that the time-series collection gets deleted from the config database.
+    assert.eq(
+        [],
+        configDB.collections.find({_id: getTimeseriesCollForDDLOps(mainDB, coll).getFullName()})
+            .toArray());
 }
 
 try {

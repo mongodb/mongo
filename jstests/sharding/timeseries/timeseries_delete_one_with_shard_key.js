@@ -5,6 +5,7 @@
  * ]
  */
 
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
@@ -14,8 +15,6 @@ const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 //
 const dbName = 'testDB';
 const collName = 'weather';
-const bucketCollName = `system.buckets.${collName}`;
-const bucketCollFullName = `${dbName}.${bucketCollName}`;
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
 const primary = st.shard0;
@@ -83,19 +82,21 @@ const data = [
 
     // Shard 0 : 2 Corks, 2 Dublins
     // Shard 1 : 2 Dublins, 2 Galways
-    assert.commandWorked(
-        st.s.adminCommand({split: bucketCollFullName, middle: {"meta.shardNumber": 1}}));
+    assert.commandWorked(st.s.adminCommand({
+        split: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
+        middle: {"meta.shardNumber": 1}
+    }));
 
     // Move chunks to the other shard.
     assert.commandWorked(st.s.adminCommand({
-        movechunk: bucketCollFullName,
+        movechunk: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
         find: {"meta.shardNumber": 1},
         to: otherShard.shardName,
         _waitForDelete: true
     }));
 
     // Ensures that each shard owns one chunk.
-    const counts = st.chunkCounts(bucketCollName, dbName);
+    const counts = st.chunkCounts(collName, dbName);
     assert.eq(1, counts[primary.shardName], counts);
     assert.eq(1, counts[otherShard.shardName], counts);
 }

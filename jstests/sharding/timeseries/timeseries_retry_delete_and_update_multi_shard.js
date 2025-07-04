@@ -9,6 +9,7 @@
  * ]
  */
 
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {
     runTimeseriesRetryDeleteAndUpdateTest
 } from "jstests/libs/collection_write_path/timeseries_retry_delete_and_update.js";
@@ -21,14 +22,14 @@ const st = new ShardingTest({
 runTimeseriesRetryDeleteAndUpdateTest(
     st.s,
     function(db, coll, metaFieldName) {
-        const bucketsColl = db["system.buckets." + coll.getName()];
         assert.commandWorked(
             db.adminCommand({shardCollection: coll.getFullName(), key: {[metaFieldName]: 1}}));
-        assert.commandWorked(st.splitAt(bucketsColl.getFullName(), {meta: "B"}));
         assert.commandWorked(
-            st.moveChunk(bucketsColl.getFullName(), {meta: "A"}, st.shard0.shardName));
-        assert.commandWorked(
-            st.moveChunk(bucketsColl.getFullName(), {meta: "C"}, st.shard1.shardName));
+            st.splitAt(getTimeseriesCollForDDLOps(db, coll).getFullName(), {meta: "B"}));
+        assert.commandWorked(st.moveChunk(
+            getTimeseriesCollForDDLOps(db, coll).getFullName(), {meta: "A"}, st.shard0.shardName));
+        assert.commandWorked(st.moveChunk(
+            getTimeseriesCollForDDLOps(db, coll).getFullName(), {meta: "C"}, st.shard1.shardName));
     },
     function(db, retriedCommandsCount, statementsRetried) {
         const transactionsServerStatusShard0 =

@@ -7,6 +7,10 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {
+    getTimeseriesBucketsColl,
+    getTimeseriesCollForDDLOps
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 Random.setRandomSeed();
@@ -188,33 +192,37 @@ function runTest(collConfig, reqConfig, insert) {
     assert.commandWorked(insert(coll, documents));
 
     // Manually split the data into two chunks.
-    assert.commandWorked(mongos.adminCommand(
-        {split: `${dbName}.system.buckets.${collName}`, middle: collConfig.splitPoint}));
+    assert.commandWorked(mongos.adminCommand({
+        split: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(),
+        middle: collConfig.splitPoint
+    }));
 
     // Ensure that currently both chunks reside on the primary shard.
-    let counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
+    let counts = st.chunkCounts(collName, dbName);
     const primaryShard = st.getPrimaryShard(dbName);
     assert.eq(2, counts[primaryShard.shardName], counts);
 
     // Move one of the chunks into the second shard.
     const otherShard = st.getOther(primaryShard);
     assert.commandWorked(mongos.adminCommand({
-        movechunk: `${dbName}.system.buckets.${collName}`,
+        movechunk: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(),
         find: collConfig.splitPoint,
         to: otherShard.name,
         _waitForDelete: true
     }));
 
     // Ensure that each shard owns one chunk.
-    counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
+    counts = st.chunkCounts(collName, dbName);
     assert.eq(1, counts[primaryShard.shardName], counts);
     assert.eq(1, counts[otherShard.shardName], counts);
 
+    // TODO SERVER-101784: Get rid of checks involving the `isTimeseriesNamespace` parameter,
+    // when the the parameter is fully removed from the codebase.
     const isBulkOperation = !reqConfig.deleteQuery;
     if (!isBulkOperation) {
         // The 'isTimeseriesNamespace' parameter is not allowed on mongos.
         const failingDeleteCommand = {
-            delete: `system.buckets.${collName}`,
+            delete: getTimeseriesBucketsColl(collName),
             deletes: [
                 {
                     q: reqConfig.deleteQuery,

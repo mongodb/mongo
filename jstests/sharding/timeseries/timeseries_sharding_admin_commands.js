@@ -6,6 +6,10 @@
  * ]
  */
 
+import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesCollForDDLOps
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -15,16 +19,16 @@ const dbName = 'testDB';
 const collName = 'testColl';
 const timeField = 'time';
 const metaField = 'meta';
-const viewNss = `${dbName}.${collName}`;
-const bucketNss = `${dbName}.system.buckets.${collName}`;
+const collNss = `${dbName}.${collName}`;
 const controlTimeField = `control.min.${timeField}`;
 const numDocsInserted = 20;
 const zone = 'Z';
 assert.commandWorked(mongo.s0.adminCommand({enableSharding: dbName}));
 assert.commandWorked(mongo.s0.adminCommand({addShardToZone: mongo.shard0.shardName, zone: zone}));
+const db = mongo.s0.getDB(dbName);
+const coll = db.getCollection(collName);
 
 function createTimeSeriesColl({index, shardKey}) {
-    const db = mongo.s0.getDB(dbName);
     assert.commandWorked(
         db.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
     assert.commandWorked(db[collName].createIndex(index));
@@ -33,17 +37,11 @@ function createTimeSeriesColl({index, shardKey}) {
     }
     if (shardKey) {
         assert.commandWorked(mongo.s0.adminCommand({
-            shardCollection: viewNss,
+            shardCollection: collNss,
             key: shardKey,
             timeseries: {timeField: timeField, metaField: metaField}
         }));
     }
-}
-
-function dropTimeSeriesColl() {
-    const db = mongo.s0.getDB(dbName);
-    const coll = db.getCollection(collName);
-    assert(coll.drop());
 }
 
 // Check the zone range against the extended range saved in config.tags collection.
@@ -148,13 +146,18 @@ const zoneShardingTestCases = [
         jsTest.log(`Running test case, updating zones before sharding: ${tojsononeline(testCase)}`);
         const {shardKey, index, min, max, worksWhenUpdatingZoneKeyRangeBeforeSharding} = testCase;
         createTimeSeriesColl({index: index});
-        assert.commandWorked(
-            mongo.s0.adminCommand({updateZoneKeyRange: bucketNss, min: min, max: max, zone: zone}));
-        const tag = mongo.s0.getDB('config').tags.findOne({ns: bucketNss});
+        assert.commandWorked(mongo.s0.adminCommand({
+            updateZoneKeyRange: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+            min: min,
+            max: max,
+            zone: zone
+        }));
+        const tag = mongo.s0.getDB('config').tags.findOne(
+            {ns: getTimeseriesCollForDDLOps(db, coll).getFullName()});
         assertRangeMatch(tag.min, min);
         assertRangeMatch(tag.max, max);
         const result = mongo.s0.adminCommand({
-            shardCollection: viewNss,
+            shardCollection: collNss,
             key: shardKey,
             timeseries: {timeField: timeField, metaField: metaField}
         });
@@ -163,10 +166,17 @@ const zoneShardingTestCases = [
         } else {
             assert.commandFailedWithCode(result, ErrorCodes.InvalidOptions);
         }
-        assert.commandWorked(
-            mongo.s0.adminCommand({updateZoneKeyRange: bucketNss, min: min, max: max, zone: null}));
-        assert.eq(0, mongo.s0.getDB('config').tags.find({ns: bucketNss}).count());
-        dropTimeSeriesColl();
+        assert.commandWorked(mongo.s0.adminCommand({
+            updateZoneKeyRange: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+            min: min,
+            max: max,
+            zone: null
+        }));
+        assert.eq(0,
+                  mongo.s0.getDB('config')
+                      .tags.find({ns: getTimeseriesCollForDDLOps(db, coll).getFullName()})
+                      .count());
+        assert(coll.drop());
     }
 })();
 
@@ -177,81 +187,110 @@ const zoneShardingTestCases = [
         jsTest.log(`Running test case, updating zones after sharding: ${tojsononeline(testCase)}`);
         const {shardKey, index, min, max, worksWhenUpdatingZoneKeyRangeAfterSharding} = testCase;
         createTimeSeriesColl({index: index, shardKey: shardKey});
-        const result =
-            mongo.s0.adminCommand({updateZoneKeyRange: bucketNss, min: min, max: max, zone: zone});
+        const result = mongo.s0.adminCommand({
+            updateZoneKeyRange: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+            min: min,
+            max: max,
+            zone: zone
+        });
         if (worksWhenUpdatingZoneKeyRangeAfterSharding) {
             assert.commandWorked(result);
-            const tag = mongo.s0.getDB('config').tags.findOne({ns: bucketNss});
+            const tag = mongo.s0.getDB('config').tags.findOne(
+                {ns: getTimeseriesCollForDDLOps(db, coll).getFullName()});
             assertRangeMatch(tag.min, min);
             assertRangeMatch(tag.max, max);
-            assert.commandWorked(mongo.s0.adminCommand(
-                {updateZoneKeyRange: bucketNss, min: min, max: max, zone: null}));
-            assert.eq(0, mongo.s0.getDB('config').tags.find({ns: bucketNss}).count());
+            assert.commandWorked(mongo.s0.adminCommand({
+                updateZoneKeyRange: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+                min: min,
+                max: max,
+                zone: null
+            }));
+            assert.eq(0,
+                      mongo.s0.getDB('config')
+                          .tags.find({ns: getTimeseriesCollForDDLOps(db, coll).getFullName()})
+                          .count());
         } else {
             assert.commandFailedWithCode(result, ErrorCodes.InvalidOptions);
         }
-        dropTimeSeriesColl();
+        assert(coll.drop());
     }
 })();
 
-// Check shardingState commands returns the expected collection info about buckets & view nss.
+// Check shardingState commands returns the expected collection info.
 (function checkShardingStateCommand() {
     createTimeSeriesColl(
         {index: {[metaField]: 1, [timeField]: 1}, shardKey: {[metaField]: 1, [timeField]: 1}});
     assert.commandWorked(
-        mongo.getPrimaryShard(dbName).adminCommand({_flushRoutingTableCacheUpdates: viewNss}));
-    assert.commandWorked(
-        mongo.getPrimaryShard(dbName).adminCommand({_flushRoutingTableCacheUpdates: bucketNss}));
+        mongo.getPrimaryShard(dbName).adminCommand({_flushRoutingTableCacheUpdates: collNss}));
+    if (!areViewlessTimeseriesEnabled(mongo.s.getDB(dbName))) {
+        assert.commandWorked(mongo.getPrimaryShard(dbName).adminCommand(
+            {_flushRoutingTableCacheUpdates: getTimeseriesCollForDDLOps(db, coll).getFullName()}));
+    }
     const shardingStateRes = mongo.getPrimaryShard(dbName).adminCommand({shardingState: 1});
     const shardingStateColls = shardingStateRes.versions;
-    const bucketNssIsSharded =
-        (bucketNss in shardingStateColls &&
-         timestampCmp(shardingStateColls[bucketNss]["placementVersion"], Timestamp(0, 0)) !== 0);
-    const viewNssIsSharded =
-        (viewNss in shardingStateColls &&
-         timestampCmp(shardingStateColls[viewNss]["placementVersion"], Timestamp(0, 0)) !== 0);
-    assert(bucketNssIsSharded && !viewNssIsSharded);
-    dropTimeSeriesColl();
+
+    const isNssSharded = nss =>
+        (nss in shardingStateColls &&
+         timestampCmp(shardingStateColls[nss]["placementVersion"], Timestamp(0, 0)) !== 0);
+
+    // TODO SERVER-101784 Simplify these checks once only viewless timeseries exist.
+    // Note: for legacy timeseries `collNssIsSharded` corresponds to the view.
+    const collNssIsSharded = isNssSharded(collNss);
+    const bucketNssIsSharded = isNssSharded(getTimeseriesCollForDDLOps(db, coll).getFullName());
+    if (areViewlessTimeseriesEnabled(mongo.s.getDB(dbName))) {
+        assert(!bucketNssIsSharded && collNssIsSharded);
+    } else {
+        assert(bucketNssIsSharded && !collNssIsSharded);
+    }
+    assert(coll.drop());
 })();
 
 // Check reshardCollection commands are disabled for time-series collection.
 (function checkReshardCollectionCommand() {
     if (!FeatureFlagUtil.isPresentAndEnabled(mongo.s.getDB('admin'), 'ReshardingForTimeseries')) {
         createTimeSeriesColl({index: {[metaField]: 1, [timeField]: 1}, shardKey: {[metaField]: 1}});
-        // Command is not supported on the time-series view namespace.
         assert.commandFailedWithCode(
             mongo.s0.adminCommand(
-                {reshardCollection: viewNss, key: {[metaField]: 1, [controlTimeField]: 1}}),
+                {reshardCollection: collNss, key: {[metaField]: 1, [controlTimeField]: 1}}),
             [ErrorCodes.NotImplemented, ErrorCodes.IllegalOperation]);
-        assert.commandFailedWithCode(
-            mongo.s0.adminCommand(
-                {reshardCollection: bucketNss, key: {[metaField]: 1, [controlTimeField]: 1}}),
-            [ErrorCodes.NotImplemented, ErrorCodes.IllegalOperation]);
-        dropTimeSeriesColl();
+        // TODO SERVER-106178 Ensure that resharding fails when issued on the buckets
+        // collection on FCV 9.0.
+        if (!areViewlessTimeseriesEnabled(mongo.s.getDB(dbName))) {
+            assert.commandFailedWithCode(mongo.s0.adminCommand({
+                reshardCollection: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+                key: {[metaField]: 1, [controlTimeField]: 1}
+            }),
+                                         [ErrorCodes.NotImplemented, ErrorCodes.IllegalOperation]);
+        }
+        assert(coll.drop());
     } else {
         jsTestLog(`Skipping resharding for timeseries not implemented test.`);
     }
 })();
 
-// Check checkShardingIndex works for the correct key pattern on the bucket namespace,
-// but not on the view namespace or in correct key pattern.
+// Check checkShardingIndex works for the correct key pattern and fails for an incorrect one.
 (function checkCheckShardingIndexCommand() {
     createTimeSeriesColl(
         {index: {[metaField]: 1, [timeField]: 1}, shardKey: {[metaField]: 1, [timeField]: 1}});
     const primaryShard = mongo.getPrimaryShard(dbName);
-    assert.commandWorked(primaryShard.getDB(dbName).runCommand(
-        {checkShardingIndex: bucketNss, keyPattern: {[metaField]: 1, [controlTimeField]: 1}}));
-    assert.commandFailedWithCode(
-        primaryShard.getDB(dbName).runCommand(
-            {checkShardingIndex: viewNss, keyPattern: {[metaField]: 1, [controlTimeField]: 1}}),
-        ErrorCodes.CommandNotSupportedOnView);
-    assert.commandFailed(primaryShard.getDB(dbName).runCommand(
-        {checkShardingIndex: bucketNss, keyPattern: {[controlTimeField]: 1}}));
-    dropTimeSeriesColl();
+    assert.commandWorked(primaryShard.getDB(dbName).runCommand({
+        checkShardingIndex: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+        keyPattern: {[metaField]: 1, [controlTimeField]: 1}
+    }));
+    assert.commandFailed(primaryShard.getDB(dbName).runCommand({
+        checkShardingIndex: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+        keyPattern: {[controlTimeField]: 1}
+    }));
+    if (!areViewlessTimeseriesEnabled(mongo.s.getDB(dbName))) {
+        assert.commandFailedWithCode(
+            primaryShard.getDB(dbName).runCommand(
+                {checkShardingIndex: collNss, keyPattern: {[metaField]: 1, [controlTimeField]: 1}}),
+            ErrorCodes.CommandNotSupportedOnView);
+    }
+    assert(coll.drop());
 })();
 
-// Check we can split/move/merge chunks between shards through bucket namespace but not view
-// namespace.
+// Check we can split/move/merge chunks between shards.
 (function checkSplitMoveMergeChunksCommand() {
     createTimeSeriesColl(
         {index: {[metaField]: 1, [timeField]: 1}, shardKey: {[metaField]: 1, [timeField]: 1}});
@@ -261,56 +300,73 @@ const zoneShardingTestCases = [
     const splitChunk = {[metaField]: numDocsInserted / 2, [controlTimeField]: MinKey};
     const maxChunk = {[metaField]: MaxKey, [controlTimeField]: MaxKey};
     function checkChunkCount(expectedCounts) {
-        const counts = mongo.chunkCounts(`system.buckets.${collName}`, dbName);
+        const counts = mongo.chunkCounts(collName, dbName);
         assert.docEq(expectedCounts, counts);
     }
-    // Command is not supported on the time-series view namespace.
-    assert.commandFailedWithCode(mongo.s.adminCommand({split: viewNss, middle: splitChunk}),
-                                 ErrorCodes.NamespaceNotSharded);
-    assert.commandFailedWithCode(
-        mongo.s.adminCommand(
-            {moveChunk: viewNss, find: splitChunk, to: otherShard.name, _waitForDelete: true}),
-        ErrorCodes.NamespaceNotSharded);
-    assert.commandFailedWithCode(
-        mongo.s.adminCommand({mergeChunks: viewNss, bounds: [minChunk, maxChunk]}),
-        ErrorCodes.NamespaceNotSharded);
+    // TODO SERVER-106896 Consider re-enabling the assertions below.
+    if (!areViewlessTimeseriesEnabled(mongo.s.getDB(dbName))) {
+        // Command is not supported on the time-series view namespace.
+        assert.commandFailedWithCode(mongo.s.adminCommand({split: collNss, middle: splitChunk}),
+                                     ErrorCodes.NamespaceNotSharded);
+        assert.commandFailedWithCode(
+            mongo.s.adminCommand(
+                {moveChunk: collNss, find: splitChunk, to: otherShard.name, _waitForDelete: true}),
+            ErrorCodes.NamespaceNotSharded);
+        assert.commandFailedWithCode(
+            mongo.s.adminCommand({mergeChunks: collNss, bounds: [minChunk, maxChunk]}),
+            ErrorCodes.NamespaceNotSharded);
+    }
 
-    assert.commandWorked(mongo.s.adminCommand({split: bucketNss, middle: splitChunk}));
+    assert.commandWorked(mongo.s.adminCommand(
+        {split: getTimeseriesCollForDDLOps(db, coll).getFullName(), middle: splitChunk}));
     checkChunkCount({[primaryShard.shardName]: 2, [otherShard.shardName]: 0});
-    assert.commandWorked(mongo.s.adminCommand(
-        {moveChunk: bucketNss, find: splitChunk, to: otherShard.name, _waitForDelete: true}));
+    assert.commandWorked(mongo.s.adminCommand({
+        moveChunk: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+        find: splitChunk,
+        to: otherShard.name,
+        _waitForDelete: true
+    }));
     checkChunkCount({[primaryShard.shardName]: 1, [otherShard.shardName]: 1});
-    assert.commandWorked(mongo.s.adminCommand(
-        {moveChunk: bucketNss, find: minChunk, to: otherShard.name, _waitForDelete: true}));
+    assert.commandWorked(mongo.s.adminCommand({
+        moveChunk: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+        find: minChunk,
+        to: otherShard.name,
+        _waitForDelete: true
+    }));
     checkChunkCount({[primaryShard.shardName]: 0, [otherShard.shardName]: 2});
-    assert.commandWorked(
-        mongo.s.adminCommand({mergeChunks: bucketNss, bounds: [minChunk, maxChunk]}));
+    assert.commandWorked(mongo.s.adminCommand({
+        mergeChunks: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+        bounds: [minChunk, maxChunk]
+    }));
     checkChunkCount({[primaryShard.shardName]: 0, [otherShard.shardName]: 1});
-    dropTimeSeriesColl();
+    assert(coll.drop());
 })();
 
 // Can add control.min.time as the last shard key component on the timeseries collection.
 (function checkRefineCollectionShardKeyCommand() {
     createTimeSeriesColl({index: {[metaField]: 1, [timeField]: 1}, shardKey: {[metaField]: 1}});
     assert.commandWorked(mongo.s0.adminCommand(
-        {refineCollectionShardKey: viewNss, key: {[metaField]: 1, [controlTimeField]: 1}}));
-    assert.commandWorked(mongo.s0.adminCommand(
-        {refineCollectionShardKey: bucketNss, key: {[metaField]: 1, [controlTimeField]: 1}}));
-    const coll = mongo.s0.getDB(dbName)[collName];
+        {refineCollectionShardKey: collNss, key: {[metaField]: 1, [controlTimeField]: 1}}));
+    if (!areViewlessTimeseriesEnabled(mongo.s.getDB(dbName))) {
+        assert.commandWorked(mongo.s0.adminCommand({
+            refineCollectionShardKey: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+            key: {[metaField]: 1, [controlTimeField]: 1}
+        }));
+    }
     for (let i = 0; i < numDocsInserted; i++) {
         assert.commandWorked(coll.insert({[metaField]: i, [timeField]: ISODate()}));
     }
     assert.eq(numDocsInserted * 2, coll.find({}).count());
-    dropTimeSeriesColl();
+    assert(coll.drop());
 })();
 
-// Check clearJumboFlag command can clear bucket chunk jumbo flag on bucket namespace but not view
-// namespace.
+// Check clearJumboFlag command can clear chunk jumbo flag.
 (function checkClearJumboFlagCommand() {
     createTimeSeriesColl(
         {index: {[metaField]: 1, [timeField]: 1}, shardKey: {[metaField]: 1, [timeField]: 1}});
     const configDB = mongo.s0.getDB('config');
-    const collDoc = configDB.collections.findOne({_id: bucketNss});
+    const collDoc =
+        configDB.collections.findOne({_id: getTimeseriesCollForDDLOps(db, coll).getFullName()});
     let chunkDoc = configDB.chunks.findOne({uuid: collDoc.uuid});
     assert.retryNoExcept(() => {
         assert.commandWorked(configDB.chunks.update({_id: chunkDoc._id}, {$set: {jumbo: true}}));
@@ -318,15 +374,20 @@ const zoneShardingTestCases = [
     }, "Setting jumbo flag update failed on config server", 10);
     chunkDoc = configDB.chunks.findOne({_id: chunkDoc._id});
     assert(chunkDoc.jumbo);
-    assert.commandWorked(
-        mongo.s.adminCommand({clearJumboFlag: bucketNss, bounds: [chunkDoc.min, chunkDoc.max]}));
+    assert.commandWorked(mongo.s.adminCommand({
+        clearJumboFlag: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+        bounds: [chunkDoc.min, chunkDoc.max]
+    }));
     chunkDoc = configDB.chunks.findOne({_id: chunkDoc._id});
     assert(!chunkDoc.jumbo);
-    // Command is not supported on the time-series view namespace.
-    assert.commandFailedWithCode(
-        mongo.s.adminCommand({clearJumboFlag: viewNss, bounds: [chunkDoc.min, chunkDoc.max]}),
-        ErrorCodes.NamespaceNotSharded);
-    dropTimeSeriesColl();
+    // TODO SERVER-106896 Consider re-enabling the assertion below.
+    if (!areViewlessTimeseriesEnabled(mongo.s.getDB(dbName))) {
+        // Command is not supported on the time-series view namespace.
+        assert.commandFailedWithCode(
+            mongo.s.adminCommand({clearJumboFlag: collNss, bounds: [chunkDoc.min, chunkDoc.max]}),
+            ErrorCodes.NamespaceNotSharded);
+    }
+    assert(coll.drop());
 })();
 
 mongo.stop();

@@ -5,8 +5,10 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = 'testDB';
@@ -14,8 +16,6 @@ const collName = 'testColl';
 const timeField = 'tm';
 const metaField = 'mt';
 const indexName = 'index';
-const viewNss = `${dbName}.${collName}`;
-const bucketNss = `${dbName}.system.buckets.${collName}`;
 const controlTimeField = `control.min.${timeField}`;
 
 function runBasicTest() {
@@ -45,7 +45,7 @@ function runBasicTest() {
     // Shard the time-series collection.
     assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
     assert.commandWorked(mongos.adminCommand({
-        shardCollection: viewNss,
+        shardCollection: `${dbName}.${collName}`,
         key: {[metaField]: 1},
     }));
 
@@ -56,9 +56,10 @@ function runBasicTest() {
 
     // Granularity update works for sharded time-series collection, when we're using DDL
     // coordinator logic.
-    const getGranularity = () => db.getSiblingDB('config')
-                                     .collections.findOne({_id: bucketNss})
-                                     .timeseriesFields.granularity;
+    const getGranularity = () =>
+        db.getSiblingDB('config')
+            .collections.findOne({_id: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`})
+            .timeseriesFields.granularity;
     assert.eq(getGranularity(), 'minutes');
     assert.commandWorked(db.runCommand({collMod: collName, timeseries: {granularity: 'hours'}}));
     assert.eq(getGranularity(), 'hours');
@@ -88,24 +89,32 @@ function runReadAfterWriteTest() {
         collName,
         {timeseries: {timeField: timeField, metaField: metaField, granularity: 'seconds'}}));
     assert.commandWorked(mongos0.adminCommand({
-        shardCollection: viewNss,
+        shardCollection: `${dbName}.${collName}`,
         key: {[timeField]: 1},
     }));
 
     // Minkey --- 2022-01-01 09:00:00 --- MaxKey
     //       shard0                  shard1
     const splitChunk = {[controlTimeField]: ISODate('2022-01-01 09:00:00')};
-    assert.commandWorked(mongos0.adminCommand({split: bucketNss, middle: splitChunk}));
     assert.commandWorked(mongos0.adminCommand(
-        {moveChunk: bucketNss, find: splitChunk, to: shard1.name, _waitForDelete: true}));
+        {split: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`, middle: splitChunk}));
+    assert.commandWorked(mongos0.adminCommand({
+        moveChunk: `${dbName}.${getTimeseriesCollForDDLOps(db, collName)}`,
+        find: splitChunk,
+        to: shard1.name,
+        _waitForDelete: true
+    }));
 
     function assertDocumentOnShard(shard, _id) {
-        const buckets =
-            shard.getDB(dbName).getCollection(`system.buckets.${collName}`).find().toArray();
+        const shardDb = shard.getDB(dbName);
+        const buckets = getTimeseriesCollForRawOps(shardDb, shardDb.getCollection(collName))
+                            .find()
+                            .rawData()
+                            .toArray();
 
-        // If we are writing to time-series collections using the compressed format, the data fields
-        // will be compressed. We need to decompress the buckets on the shard in order to inspect
-        // the data._id field.
+        // If we are writing to time-series collections using the compressed format, the data
+        // fields will be compressed. We need to decompress the buckets on the shard in order to
+        // inspect the data._id field.
         buckets.forEach(bucket => {
             TimeseriesTest.decompressBucket(bucket);
         });

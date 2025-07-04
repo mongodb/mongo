@@ -56,6 +56,10 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesCollForDDLOps
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const numShards = 2;
@@ -67,8 +71,6 @@ const mongosDB = st.s.getDB(dbName);
 const mongosColl = mongosDB.getCollection(collName);
 const timeField = 'tm';
 const metaField = 'mt';
-const viewNs = `${dbName}.${collName}`;
-const bucketNs = `${dbName}.system.buckets.${collName}`;
 const emptyCollName = 'testEmptyColl';
 
 // Create a timeseries collection.
@@ -107,7 +109,7 @@ assert.docEq(clusterCollStatsResult.timeseries,
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(mongosColl.createIndex({[metaField]: 1}));
 assert.commandWorked(st.s.adminCommand({
-    shardCollection: viewNs,
+    shardCollection: mongosColl.getFullName(),
     key: {[metaField]: 1},
 }));
 
@@ -128,15 +130,20 @@ TimeseriesTest.checkBucketReopeningsFailedCounters(clusterCollStatsResult.timese
 const splitPoint = {
     meta: numberDoc / numShards
 };
-assert.commandWorked(st.s.adminCommand({split: bucketNs, middle: splitPoint}));
+assert.commandWorked(st.s.adminCommand(
+    {split: getTimeseriesCollForDDLOps(mongosDB, mongosColl).getFullName(), middle: splitPoint}));
 // Ensure that currently both chunks reside on the primary shard.
-let counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
+let counts = st.chunkCounts(collName, dbName);
 assert.eq(numShards, counts[primaryShard.shardName]);
 // Move one of the chunks into the second shard.
-assert.commandWorked(st.s.adminCommand(
-    {movechunk: bucketNs, find: splitPoint, to: otherShard.name, _waitForDelete: true}));
+assert.commandWorked(st.s.adminCommand({
+    movechunk: getTimeseriesCollForDDLOps(mongosDB, mongosColl).getFullName(),
+    find: splitPoint,
+    to: otherShard.name,
+    _waitForDelete: true
+}));
 // Ensure that each shard owns one chunk.
-counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
+counts = st.chunkCounts(collName, dbName);
 assert.eq(1, counts[primaryShard.shardName], counts);
 assert.eq(1, counts[otherShard.shardName], counts);
 
@@ -154,7 +161,11 @@ function checkAllFieldsAreInResult(result) {
 }
 
 function assertTimeseriesAggregationCorrectness(total, shards) {
-    assert(shards.every(x => x.bucketNs === total.bucketNs));
+    // TODO SERVER-106617: review if checking for the bucketsNs should be re-enabled for viewless
+    // timeseries.
+    if (!areViewlessTimeseriesEnabled(mongosDB)) {
+        assert(shards.every(x => x.bucketsNs === total.bucketsNs));
+    }
     assert.eq(total.bucketCount,
               shards.map(x => x.bucketCount).reduce((x, y) => x + y, 0 /* initial value */));
     assert.eq(total.avgBucketSize,

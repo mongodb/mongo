@@ -79,6 +79,16 @@ export function getTimeseriesCollForRawOps(db, coll) {
 }
 
 /**
+ * Helper function to create an index directly on the raw timeseries buckets.
+ */
+export function createRawTimeseriesIndex(coll, spec, options, commitQuorum, cmdArgs) {
+    return getTimeseriesCollForRawOps(coll.getDB(), coll).createIndex(spec, options, commitQuorum, {
+        ...getRawOperationSpec(coll.getDB()),
+        ...cmdArgs
+    });
+}
+
+/**
  * Override the rawData function on the DBQuery object so that it becomes a no-op on versions where
  * rawData parameter is not supported (< 9.0)
  *

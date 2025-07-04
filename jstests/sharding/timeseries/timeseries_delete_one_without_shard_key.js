@@ -5,6 +5,8 @@
  * ]
  */
 
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
@@ -123,37 +125,40 @@ const setUpShardedTimeseriesCollection = function(collName) {
     }
 
     assert.commandWorked(testColl.insertMany(data, {ordered: false}));
-    const bucketCollName = `system.buckets.${collName}`;
-    const bucketCollFullName = `${dbName}.${bucketCollName}`;
 
     // Shard 0 :   2 Corks   |   2 Dublins   |   1 New York City
     // Shard 1 :   2 Dublins |   2 Galways   |   2 New York Citys
-    assert.commandWorked(st.s.adminCommand({split: bucketCollFullName, middle: splitObject}));
+    assert.commandWorked(st.s.adminCommand(
+        {split: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(), middle: splitObject}));
 
     // Move chunks to the other shard.
     assert.commandWorked(st.s.adminCommand({
-        movechunk: bucketCollFullName,
+        movechunk: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
         find: splitObject,
         to: otherShard.shardName,
         _waitForDelete: true
     }));
 
     // Ensures that each shard owns one chunk.
-    const counts = st.chunkCounts(bucketCollName, dbName);
+    const counts = st.chunkCounts(collName, dbName);
     assert.eq(1, counts[primary.shardName], counts);
     assert.eq(1, counts[otherShard.shardName], counts);
 
     // Ensure there is at least one bucket document on each shard.
-    const numDocsOnPrimaryDB = primaryDB[bucketCollName].find({}).toArray();
-    const numDocsOnOtherDB = otherDB[bucketCollName].find({}).toArray();
-    assert.gt(numDocsOnPrimaryDB.length,
+    const numBucketDocsOnPrimaryDB =
+        primaryDB[getTimeseriesCollForRawOps(testDB, collName)].find({}).rawData().toArray();
+    const numBucketDocsOnOtherDB =
+        otherDB[getTimeseriesCollForRawOps(testDB, collName)].find({}).rawData().toArray();
+    assert.gt(numBucketDocsOnPrimaryDB.length,
               1,
-              `Documents on primaryDB: ${tojson(numDocsOnPrimaryDB)} Documents on otherDB: ${
-                  tojson(numDocsOnOtherDB)}`);
-    assert.gt(numDocsOnOtherDB.length,
+              `Bucket documents on primaryDB: ${
+                  tojson(numBucketDocsOnPrimaryDB)} Bucket documents on otherDB: ${
+                  tojson(numBucketDocsOnOtherDB)}`);
+    assert.gt(numBucketDocsOnOtherDB.length,
               1,
-              `Documents on primaryDB: ${tojson(numDocsOnPrimaryDB)} Documents on otherDB: ${
-                  tojson(numDocsOnOtherDB)}`);
+              `Bucket documents on primaryDB: ${
+                  tojson(numBucketDocsOnPrimaryDB)} Bucket documents on otherDB: ${
+                  tojson(numBucketDocsOnOtherDB)}`);
 };
 
 let numOfDeletedMeasurements = 0;
@@ -200,12 +205,12 @@ const runTests = function(collName) {
     // We expect 'deleteOne' with an empty predicate to succeed.
     runDeleteOneWithQuery(collName, {}, 1);
 
-    // Verify the expected number of documents exist.
+    // Verify that the expected number of measurements exist.
     const originalCount = data.length;
-    const remainingDocuments = testDB[collName].find({}).toArray();
+    const remainingMeasurements = testDB[collName].find({}).toArray();
     assert.eq(originalCount - numOfDeletedMeasurements,
-              remainingDocuments.length,
-              "Remaining Documents: " + tojson(remainingDocuments));
+              remainingMeasurements.length,
+              "Remaining Measurements: " + tojson(remainingMeasurements));
 };
 
 // Run tests on a collection with a metaField specified upon creation.

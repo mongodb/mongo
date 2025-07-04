@@ -6,6 +6,12 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesBucketsColl,
+    getTimeseriesCollForDDLOps
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 Random.setRandomSeed();
@@ -38,8 +44,11 @@ function generateBatch(size) {
 }
 
 function verifyBucketsOnShard(shard, expectedBuckets) {
-    const buckets =
-        shard.getDB(dbName).getCollection(`system.buckets.${collName}`).find({}).toArray();
+    const shardDB = shard.getDB(dbName);
+    const buckets = getTimeseriesCollForRawOps(shardDB, shardDB.getCollection(collName))
+                        .find()
+                        .rawData()
+                        .toArray();
     assert.eq(buckets.length, expectedBuckets.length, tojson(buckets));
 
     const usedBucketIds = new Set();
@@ -66,15 +75,17 @@ function runTest(getShardKey, insert) {
         collName, {timeseries: {timeField: timeField, metaField: metaField}}));
     const coll = mainDB.getCollection(collName);
 
+    // TODO SERVER-101784: Get rid of checks involving the `isTimeseriesNamespace` parameter,
+    // when the the parameter is fully removed from the codebase.
     // The 'isTimeseriesNamespace' parameter is not allowed on mongos.
     assert.commandFailedWithCode(mainDB.runCommand({
-        insert: `system.buckets.${collName}`,
+        insert: getTimeseriesBucketsColl(collName),
         documents: [{[timeField]: ISODate()}],
         isTimeseriesNamespace: true
     }),
                                  [5916401, 7934201]);
-
-    // On a mongod node, 'isTimeseriesNamespace' can only be used on time-series buckets namespace.
+    // On a mongod node, 'isTimeseriesNamespace' can only be used on time-series
+    // buckets namespace.
     assert.commandFailedWithCode(
         st.shard0.getDB(dbName).runCommand(
             {insert: collName, documents: [{[timeField]: ISODate()}], isTimeseriesNamespace: true}),
@@ -103,25 +114,25 @@ function runTest(getShardKey, insert) {
         splitPoint[`control.min.${timeField}`] = firstBatch[splitIndex][timeField];
     }
 
-    assert.commandWorked(
-        mongos.adminCommand({split: `${dbName}.system.buckets.${collName}`, middle: splitPoint}));
+    assert.commandWorked(mongos.adminCommand(
+        {split: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(), middle: splitPoint}));
 
     // Ensure that currently both chunks reside on the primary shard.
-    let counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
+    let counts = st.chunkCounts(collName, dbName);
     const primaryShard = st.getPrimaryShard(dbName);
     assert.eq(2, counts[primaryShard.shardName], counts);
 
     // Move one of the chunks into the second shard.
     const otherShard = st.getOther(primaryShard);
     assert.commandWorked(mongos.adminCommand({
-        movechunk: `${dbName}.system.buckets.${collName}`,
+        movechunk: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(),
         find: splitPoint,
         to: otherShard.name,
         _waitForDelete: true
     }));
 
     // Ensure that each shard owns one chunk.
-    counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
+    counts = st.chunkCounts(collName, dbName);
     assert.eq(1, counts[primaryShard.shardName], counts);
     assert.eq(1, counts[otherShard.shardName], counts);
 

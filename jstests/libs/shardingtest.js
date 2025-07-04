@@ -1,3 +1,4 @@
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -437,6 +438,12 @@ export class ShardingTest {
 
     chunkCounts(collName, dbName) {
         dbName = dbName || "test";
+
+        var sDB = this.s.getDB(dbName);
+        var sColl = sDB.getCollection(collName);
+        if (sColl.getMetadata()?.type === 'timeseries') {
+            collName = getTimeseriesCollForDDLOps(sDB, sColl).getName();
+        }
 
         var x = {};
         this.config.shards.find().forEach(function(z) {

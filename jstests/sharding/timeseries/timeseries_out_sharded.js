@@ -10,6 +10,11 @@
  * ]
  */
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
+import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesBucketsColl,
+    getTimeseriesCollForDDLOps
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const numHosts = 10;
@@ -19,8 +24,6 @@ const numIterations = 20;
 const st = new ShardingTest({shards: 2});
 const dbName = jsTestName();
 const testDB = st.s.getDB(dbName);
-const targetCollName = "out_time";
-const bucketCollFullName = `${dbName}.system.buckets.in`;
 assert.commandWorked(testDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 let [inColl, observerInColl] =
@@ -29,9 +32,12 @@ let [inColl, observerInColl] =
 // Split the data over 2 shards. The test data has tags uniformly distributed from 1-10, so for half
 // the data to be on each shard, we will split at tags = 5.
 testDB.adminCommand({shardCollection: inColl.getFullName(), key: {'tags': 1}});
-assert.commandWorked(st.s.adminCommand({split: bucketCollFullName, middle: {'meta': splitPoint}}));
 assert.commandWorked(st.s.adminCommand({
-    movechunk: bucketCollFullName,
+    split: getTimeseriesCollForDDLOps(testDB, inColl).getFullName(),
+    middle: {'meta': splitPoint}
+}));
+assert.commandWorked(st.s.adminCommand({
+    movechunk: getTimeseriesCollForDDLOps(testDB, inColl).getFullName(),
     find: {'meta': splitPoint},
     to: st.shard1.shardName,
     _waitForDelete: true
@@ -81,16 +87,27 @@ function runOutAndCompareResults({
         const actualOptions = collections[0]["options"]["timeseries"];
         validateCollectionOptions({expected: expectedTSOptions, actual: actualOptions});
 
-        // Make sure we have both the buckets collection and the view on the timeseries collection.
-        const bucketsColl = assert.commandWorked(outputDB.runCommand(
-            {listCollections: 1, filter: {name: "system.buckets." + outColl.getName()}}));
-        assert.eq(1, bucketsColl.cursor.firstBatch.length);
+        // TODO SERVER-101784 remove these checks once only viewless timeseries exist.
+        const bucketsCollCount = assert
+                                     .commandWorked(outputDB.runCommand({
+                                         listCollections: 1,
+                                         filter: {name: getTimeseriesBucketsColl(outColl.getName())}
+                                     }))
+                                     .cursor.firstBatch.length;
+        const viewCount = outputDB.getCollection("system.views")
+                              .find({viewOn: getTimeseriesBucketsColl(outColl.getName())})
+                              .toArray()
+                              .length;
+        if (areViewlessTimeseriesEnabled(testDB)) {
+            // Make sure that neither the buckets collection, nor the view get created.
+            assert.eq(0, bucketsCollCount);
+            assert.eq(0, viewCount);
+        } else {
+            // Make sure we have both the buckets collection and the view.
+            assert.eq(1, bucketsCollCount);
+            assert.eq(1, viewCount);
+        }
 
-        assert.eq(1,
-                  outputDB.getCollection("system.views")
-                      .find({viewOn: "system.buckets." + outColl.getName()})
-                      .toArray()
-                      .length);
     } else {
         // Make sure the output collection is not a timeseries collection.
         assert(

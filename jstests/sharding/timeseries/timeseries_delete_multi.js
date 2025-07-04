@@ -7,6 +7,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 Random.setRandomSeed();
@@ -242,25 +243,27 @@ function prepareShardedTimeseriesCollection(collConfig, insertFn) {
     assert.commandWorked(insertFn(coll, documents));
 
     // Manually splits the data into two chunks.
-    assert.commandWorked(mongos.adminCommand(
-        {split: `${dbName}.system.buckets.${collName}`, middle: collConfig.splitPoint}));
+    assert.commandWorked(mongos.adminCommand({
+        split: getTimeseriesCollForDDLOps(testDB, coll).getFullName(),
+        middle: collConfig.splitPoint
+    }));
 
     // Ensures that currently both chunks reside on the primary shard.
-    let counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
+    let counts = st.chunkCounts(collName, dbName);
     const primaryShard = st.getPrimaryShard(dbName);
     assert.eq(2, counts[primaryShard.shardName], counts);
 
     // Moves one of the chunks into the second shard.
     const otherShard = st.getOther(primaryShard);
     assert.commandWorked(mongos.adminCommand({
-        movechunk: `${dbName}.system.buckets.${collName}`,
+        movechunk: getTimeseriesCollForDDLOps(testDB, coll).getFullName(),
         find: collConfig.splitPoint,
         to: otherShard.name,
         _waitForDelete: true
     }));
 
     // Ensures that each shard owns one chunk.
-    counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
+    counts = st.chunkCounts(collName, dbName);
     assert.eq(1, counts[primaryShard.shardName], counts);
     assert.eq(1, counts[otherShard.shardName], counts);
 

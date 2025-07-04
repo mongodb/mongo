@@ -8,13 +8,14 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 Random.setRandomSeed();
 
 const dbName = 'testDB';
 const collName = 'testColl';
-const bucketsCollName = 'system.buckets.' + collName;
 const timeField = 'time';
 const metaField = 'hostid';
 const testTimestamp = ISODate();
@@ -50,12 +51,13 @@ function runTest({shardKey, cmdObj}) {
     // Move one of the chunks into the second shard. Note that we can only do this if the meta field
     // is part of the shard key.
     const middle = shardKeyHasMetaField ? {meta: 1} : {"meta.a": 1};
-    assert.commandWorked(mongos0.adminCommand({split: `${dbName}.${bucketsCollName}`, middle}));
+    assert.commandWorked(mongos0.adminCommand(
+        {split: `${dbName}.${getTimeseriesCollForDDLOps(mongos0, collName)}`, middle}));
 
     const primaryShard = st.getPrimaryShard(dbName);
     const otherShard = st.getOther(primaryShard);
     assert.commandWorked(mongos0.adminCommand({
-        movechunk: `${dbName}.${bucketsCollName}`,
+        movechunk: `${dbName}.${getTimeseriesCollForDDLOps(mongos0, collName)}`,
         find: middle,
         to: otherShard.name,
         _waitForDelete: true
@@ -75,7 +77,7 @@ function runTest({shardKey, cmdObj}) {
 }
 
 /**
- * Commands on the view namespace.
+ * Commands on the timeseries measurements.
  */
 runTest({
     shardKey: {[metaField]: 1},
@@ -112,33 +114,48 @@ runTest({shardKey: {[metaField]: 1}, cmdObj: {aggregate: collName, pipeline: [],
 runTest({shardKey: {[metaField]: 1}, cmdObj: {collStats: collName}});
 
 /**
- * On system.buckets namespace
+ * Commands on the raw buckets
  */
 runTest({
     shardKey: {[metaField]: 1},
     cmdObj: {
-        createIndexes: bucketsCollName,
+        createIndexes: getTimeseriesCollForRawOps(mongos0, collName),
         indexes: [{key: {[timeField]: 1}, name: "index_on_time"}],
+        ...getRawOperationSpec(mongos0)
     }
 });
-
-runTest({shardKey: {[metaField]: 1}, cmdObj: {listIndexes: bucketsCollName}});
 
 runTest({
     shardKey: {[metaField]: 1},
     cmdObj: {
-        dropIndexes: bucketsCollName,
+        listIndexes: getTimeseriesCollForRawOps(mongos0, collName),
+        ...getRawOperationSpec(mongos0)
+    }
+});
+
+runTest({
+    shardKey: {[metaField]: 1},
+    cmdObj: {
+        dropIndexes: getTimeseriesCollForRawOps(mongos0, collName),
         index: "*",
+        ...getRawOperationSpec(mongos0)
     }
 });
-
-runTest(
-    {shardKey: {[metaField]: 1}, cmdObj: {aggregate: bucketsCollName, pipeline: [], cursor: {}}});
 
 runTest({
     shardKey: {[metaField]: 1},
     cmdObj: {
-        insert: bucketsCollName,
+        aggregate: getTimeseriesCollForRawOps(mongos0, collName),
+        pipeline: [],
+        cursor: {},
+        ...getRawOperationSpec(mongos0)
+    }
+});
+
+runTest({
+    shardKey: {[metaField]: 1},
+    cmdObj: {
+        insert: getTimeseriesCollForRawOps(mongos0, collName),
         documents: [{
             _id: ObjectId(),
             control: {
@@ -147,7 +164,8 @@ runTest({
                 version: TimeseriesTest.BucketVersion.kUncompressed
             },
             data: {[timeField]: {0: testTimestamp}},
-        }]
+        }],
+        ...getRawOperationSpec(mongos0)
     }
 });
 
@@ -167,12 +185,13 @@ runTest({
 runTest({
     shardKey: {[metaField + ".a"]: 1},
     cmdObj: {
-        update: bucketsCollName,
+        update: getTimeseriesCollForRawOps(mongos0, collName),
         updates: [{
             q: {["meta.a"]: 1},
             u: {$inc: {["meta.b"]: -1}},
             multi: true,
-        }]
+        }],
+        ...getRawOperationSpec(mongos0)
     }
 });
 
@@ -191,11 +210,12 @@ runTest({
 runTest({
     shardKey: {[metaField]: 1},
     cmdObj: {
-        delete: bucketsCollName,
+        delete: getTimeseriesCollForRawOps(mongos0, collName),
         deletes: [{
             q: {meta: 0},
             limit: 0,
         }],
+        ...getRawOperationSpec(mongos0)
     }
 });
 

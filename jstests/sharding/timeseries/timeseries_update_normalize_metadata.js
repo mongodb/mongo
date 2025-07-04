@@ -10,22 +10,24 @@
  * ]
  */
 
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
 
 const db = st.s0.getDB(jsTestName());
 const coll = db.coll;
-const bucketsColl = db.system.buckets.coll;
 
 assert.commandWorked(
     db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
 assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {m: 1}}));
-assert.commandWorked(st.splitAt(bucketsColl.getFullName(), {meta: {a: 5, b: 5}}));
 assert.commandWorked(
-    st.moveChunk(bucketsColl.getFullName(), {meta: {a: 0, b: 0}}, st.shard0.shardName));
-assert.commandWorked(
-    st.moveChunk(bucketsColl.getFullName(), {meta: {a: 10, b: 10}}, st.shard1.shardName));
+    st.splitAt(getTimeseriesCollForDDLOps(db, coll).getFullName(), {meta: {a: 5, b: 5}}));
+assert.commandWorked(st.moveChunk(
+    getTimeseriesCollForDDLOps(db, coll).getFullName(), {meta: {a: 0, b: 0}}, st.shard0.shardName));
+assert.commandWorked(st.moveChunk(getTimeseriesCollForDDLOps(db, coll).getFullName(),
+                                  {meta: {a: 10, b: 10}},
+                                  st.shard1.shardName));
 
 assert.commandWorked(
     coll.insert({_id: 0, t: ISODate("2023-01-01T12:00:00.000Z"), m: {a: 1, b: 1}}));

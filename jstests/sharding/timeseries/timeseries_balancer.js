@@ -9,6 +9,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 Random.setRandomSeed();
@@ -64,7 +65,7 @@ function runTest(shardKey) {
     assert.commandWorked(bulk.execute());
 
     assert.commandWorked(mongos.adminCommand({
-        shardCollection: `${dbName}.${collName}`,
+        shardCollection: coll.getFullName(),
         key: shardKey,
     }));
     st.awaitBalancerRound();
@@ -74,7 +75,7 @@ function runTest(shardKey) {
     const otherShard = st.getOther(primaryShard);
     assert.soon(
         () => {
-            const counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
+            const counts = st.chunkCounts(collName, dbName);
             return counts[primaryShard.shardName] >= 1 && counts[otherShard.shardName] >= 1;
         },
         () => {

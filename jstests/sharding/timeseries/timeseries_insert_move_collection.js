@@ -1,6 +1,6 @@
 /**
- * Verifies that timeseries inserts perform a ShardVersion check before inspecting the existance of
- * the buckets collection, with the mongos refreshing if a mismatch is found.
+ * Verifies that timeseries inserts perform a ShardVersion check before inspecting the existence of
+ * the raw bucket documents, with the mongos refreshing if a mismatch is found.
  *
  * @tags: [
  *   requires_timeseries,

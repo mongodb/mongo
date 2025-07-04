@@ -10,9 +10,11 @@
  *   uses_change_streams,
  * ]
  */
+
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Asserts that there is no change stream event.
@@ -30,24 +32,22 @@ function assertNoChanges(csCursor) {
 
 const dbName = "ts_change_stream_no_orphans";
 const collName = 'ts';
-const sysCollName = 'system.buckets.' + collName;
-const collNS = dbName + '.' + collName;
-const sysCollNS = dbName + '.' + sysCollName;
+const collNS = `${dbName}.${collName}`;
 const timeseriesOpt = {
     timeField: "time",
     metaField: "tag",
 };
 
-function validateBucketsCollectionSharded({shardKey}) {
-    const configColls = st.s.getDB('config').collections;
-    const output = configColls
+function validateCollectionSharded({shardKey}) {
+    const configDB = st.s.getDB('config');
+    const output = configDB.collections
                        .find({
-                           _id: sysCollNS,
+                           _id: `${dbName}.${getTimeseriesCollForDDLOps(configDB, collName)}`,
                            key: shardKey,
                            timeseriesFields: {$exists: true},
                        })
                        .toArray();
-    assert.eq(output.length, 1, configColls.find().toArray());
+    assert.eq(output.length, 1, configDB.collections.find().toArray());
     assert.eq(output[0].timeseriesFields.timeField, timeseriesOpt.timeField, output[0]);
     assert.eq(output[0].timeseriesFields.metaField, timeseriesOpt.metaField, output[0]);
 }
@@ -66,8 +66,8 @@ const st = new ShardingTest({
 // first shard after the chunks have been moved to the second shard.
 let suspendRangeDeletionShard0 = configureFailPoint(st.shard0, 'suspendRangeDeletion');
 
-// Creates a shard collection with buckets having both a key field and a non-key field. The key
-// is the metaField of the timeseries collection.
+// Creates a sharded timeseries collection having both a key field and a non-key field.
+// The key is the metaField of the timeseries collection.
 jsTest.log(`Shard a timeseries collection: ${collNS} with shard key: {tag: 1}`);
 assert.commandWorked(
     st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
@@ -75,8 +75,8 @@ const db = st.s.getDB(dbName);
 db[collName].drop();
 assert.commandWorked(db.createCollection(collName, {timeseries: timeseriesOpt}));
 assert.commandWorked(st.s.adminCommand({shardCollection: collNS, key: {tag: 1}}));
-// The meta field name on the system.buckets collection is 'meta' and hence the shardKey is 'meta'.
-validateBucketsCollectionSharded({shardKey: {meta: 1}});
+// The meta field name on the raw buckets is 'meta' and hence the shardKey is 'meta'.
+validateCollectionSharded({shardKey: {meta: 1}});
 
 const mongosColl = st.s.getCollection(collNS);
 assert.commandWorked(mongosColl.insert({_id: 0, tag: -1, time: ISODate(), f: 20}));
@@ -90,20 +90,24 @@ assert.commandWorked(mongosColl.insert({_id: 7, tag: 2, time: ISODate(), f: 50})
 assert.commandWorked(mongosColl.insert({_id: 8, tag: 3, time: ISODate(), f: 60}));  // Test case 1
 
 // Moves the chunk to the second shard leaving orphaned buckets on the first shard. The orphaned
-// buckets are not deleted because the range deletion is suspended and they are buckets with tag =
-// [0, 3].
-//
-// Note: system admin commands such as 'split' and 'moveChunk' should run on the 'system.buckets'
-// collection unlike the 'shardCollection' command.
-assert.commandWorked(st.s.adminCommand({split: sysCollNS, middle: {meta: 0}}));
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: sysCollNS, find: {meta: 0}, to: st.shard1.shardName}));
+// buckets are not deleted because the range deletion is suspended and they are buckets with
+// tag = [0, 3].
+assert.commandWorked(st.s.adminCommand(
+    {split: getTimeseriesCollForDDLOps(db, mongosColl).getFullName(), middle: {meta: 0}}));
+assert.commandWorked(st.s.adminCommand({
+    moveChunk: getTimeseriesCollForDDLOps(db, mongosColl).getFullName(),
+    find: {meta: 0},
+    to: st.shard1.shardName
+}));
 
 // Sets up a change stream on the mongos database to receive real-time events on any data changes.
 //
 // Note: the change stream is on the database because watching the change stream events on the
-// system.buckets collection is not allowed.
+// raw buckets is not allowed.
 const mongosDbChangeStream = db.watch([], {showSystemEvents: true});
+
+const shard0DB = st.shard0.getDB(dbName);
+const shard0Coll = shard0DB.getCollection(collName);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Test case 1: Direct operations to shard on orphaned buckets
@@ -112,15 +116,15 @@ const mongosDbChangeStream = db.watch([], {showSystemEvents: true});
 (function testDirectDeleteToShardOnOrphanedBuckets() {
     jsTest.log('A direct delete to a shard of an orphaned bucket does not generate a delete event');
 
-    // Sends a direct delete to first shard on a measurement on an orphaned bucket.
-    assert.commandWorked(st.shard0.getCollection(collNS).remove({f: 60}));
+    // Sends a direct delete to the first shard on a measurement in an orphaned bucket.
+    assert.commandWorked(shard0Coll.remove({f: 60}));
 
     // No event is generated on the database change stream.
     assertNoChanges(mongosDbChangeStream);
 
     // The entire orphaned bucket on the first shard has been removed with meta == 3 because the
     // measurement with {f: 60} was the only one in the bucket.
-    assert.eq(null, st.shard0.getCollection(sysCollNS).findOne({meta: 3}));
+    assert.eq(null, getTimeseriesCollForRawOps(shard0DB, shard0Coll).findOneWithRawData({meta: 3}));
 
     // But the measurement with {f: 60} still exists on the second shard and show up in the
     // cluster find.
@@ -131,7 +135,7 @@ const mongosDbChangeStream = db.watch([], {showSystemEvents: true});
     jsTest.log('A direct delete to a shard of multi-documents does not generate delete events');
 
     // Sends a direct delete to the first shard on measurements on an orphaned bucket.
-    assert.commandWorked(st.shard0.getCollection(collNS).remove({f: 30}));
+    assert.commandWorked(shard0Coll.remove({f: 30}));
 
     // No event is generated on the database change stream.
     assertNoChanges(mongosDbChangeStream);
@@ -139,7 +143,8 @@ const mongosDbChangeStream = db.watch([], {showSystemEvents: true});
     // The orphaned bucket on the first shard have been updated since two measurements ({f: 30})
     // has been removed from the bucket and only the measurement with {_id: 4, f: 40} stays in
     // the bucket.
-    const actualBucket = st.shard0.getCollection(sysCollNS).findOne({meta: 0});
+    const actualBucket =
+        getTimeseriesCollForRawOps(shard0DB, shard0Coll).findOneWithRawData({meta: 0});
 
     TimeseriesTest.decompressBucket(actualBucket);
 
@@ -178,7 +183,8 @@ const mongosDbChangeStream = db.watch([], {showSystemEvents: true});
 
     // The orphaned bucket on the first shard have not been updated, unlike the mongos collection.
     assert.eq(null, mongosColl.findOne({_id: 4}), mongosColl.find().toArray());
-    const shard0Bucket = st.shard0.getCollection(sysCollNS).findOne({meta: 0});
+    const shard0Bucket =
+        getTimeseriesCollForRawOps(shard0DB, shard0Coll).findOneWithRawData({meta: 0});
 
     TimeseriesTest.decompressBucket(shard0Bucket);
 
@@ -198,7 +204,7 @@ const mongosDbChangeStream = db.watch([], {showSystemEvents: true});
     assert.commandWorked(mongosColl.remove({f: 50}));
 
     // The documents are hosted by the second shard and a bucket delete event is notified because
-    // the all measurements are deleted from the bucket. The first shard still hosts the orphaned
+    // all measurements are deleted from the bucket. The first shard still hosts the orphaned
     // documents but no additional event must be notified.
     assert.soon(() => mongosDbChangeStream.hasNext(), 'A delete event of a bucket is expected');
     const change = mongosDbChangeStream.next();
@@ -208,7 +214,8 @@ const mongosDbChangeStream = db.watch([], {showSystemEvents: true});
     // The orphaned bucket on first shard have not been removed, unlike the mongos collection.
     assert.eq(null, mongosColl.findOne({_id: 6}), mongosColl.find().toArray());
     assert.eq(null, mongosColl.findOne({_id: 7}), mongosColl.find().toArray());
-    const shard0Bucket = st.shard0.getCollection(sysCollNS).findOne({meta: 2});
+    const shard0Bucket =
+        getTimeseriesCollForRawOps(shard0DB, shard0Coll).findOneWithRawData({meta: 2});
     TimeseriesTest.decompressBucket(shard0Bucket);
     assert.eq(2, shard0Bucket.meta, shard0Bucket);
     assert.eq(6, shard0Bucket.control.min._id, shard0Bucket);

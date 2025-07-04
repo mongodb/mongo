@@ -6,6 +6,8 @@
  * ]
  */
 
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 Random.setRandomSeed();
@@ -39,11 +41,7 @@ function makeDocument(metaValue, timeValue) {
 }
 
 function getDocumentsFromShard(shard, id) {
-    return shard.getDB(dbName)
-        .getCollection(`system.buckets.${collName}`)
-        .aggregate(
-            [{$_unpackBucket: {timeField: timeField, metaField: metaField}}, {$match: {_id: id}}])
-        .toArray();
+    return shard.getDB(dbName).getCollection(collName).aggregate([{$match: {_id: id}}]).toArray();
 }
 
 function runTest() {
@@ -68,25 +66,25 @@ function runTest() {
 
     // Manually split the data into two chunks.
     const splitPoint = {[`control.min.${timeField}`]: ISODate("2000-01-01T10:30")};
-    assert.commandWorked(
-        mongos.adminCommand({split: `${dbName}.system.buckets.${collName}`, middle: splitPoint}));
+    assert.commandWorked(mongos.adminCommand(
+        {split: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(), middle: splitPoint}));
 
     // Ensure that currently both chunks reside on the primary shard.
-    let counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
+    let counts = st.chunkCounts(collName, dbName);
     const primaryShard = st.getPrimaryShard(dbName);
     assert.eq(2, counts[primaryShard.shardName], counts);
 
     // Move one of the chunks into the second shard.
     const otherShard = st.getOther(primaryShard);
     assert.commandWorked(mongos.adminCommand({
-        movechunk: `${dbName}.system.buckets.${collName}`,
+        movechunk: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(),
         find: splitPoint,
         to: otherShard.name,
         _waitForDelete: true
     }));
 
     // Ensure that each shard owns one chunk.
-    counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
+    counts = st.chunkCounts(collName, dbName);
     assert.eq(1, counts[primaryShard.shardName], counts);
     assert.eq(1, counts[otherShard.shardName], counts);
 

@@ -5,6 +5,7 @@
  * ]
  */
 
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
@@ -15,8 +16,6 @@ const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 
 const dbName = 'testDB';
 const collName = 'weather';
-const bucketCollName = `system.buckets.${collName}`;
-const bucketCollFullName = `${dbName}.${bucketCollName}`;
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
@@ -124,17 +123,20 @@ function testUpdateRouting({updates, nModified, shardsTargetedCount}) {
 
 (function defineChunks() {
     function splitAndMove(city, minTime, destination) {
-        assert.commandWorked(st.s.adminCommand(
-            {split: bucketCollFullName, middle: {"meta.city": city, 'control.min.time': minTime}}));
         assert.commandWorked(st.s.adminCommand({
-            movechunk: bucketCollFullName,
+            split: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
+            middle: {"meta.city": city, 'control.min.time': minTime}
+        }));
+        assert.commandWorked(st.s.adminCommand({
+            movechunk: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
             find: {"meta.city": city, 'control.min.time': minTime},
             to: destination.shardName,
             _waitForDelete: true
         }));
     }
 
-    // Place the Dublin buckets on the primary and split the other buckets across both shards.
+    // Place the 'Dublin' measurements on the primary and split the other
+    // measurements across both shards.
     splitAndMove("Galway", ISODate("2021-05-18T08:00:00.000Z"), otherShard);
     splitAndMove("Dublin", MinKey, primary);
     splitAndMove("Cork", ISODate("2021-05-18T09:00:00.000Z"), otherShard);

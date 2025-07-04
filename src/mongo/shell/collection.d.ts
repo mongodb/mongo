@@ -15,6 +15,8 @@ declare class DBCollection {
     getMongo(): Mongo
     getDB(): DB
     find(filter, projection, limit, skip, batchSize, options)
+    findOne(filter, projection, options, readConcern, collation, rawData)
+    findOneWithRawData(filter)
     insert(obj, options)
     remove(t, justOne)
     update(query, updateSpec, upsert, multi)
@@ -29,7 +31,7 @@ declare class DBCollection {
     validate(options)
     getShardVersion()
     getIndexes(params)
-    getIndexKeys()
+    getIndexKeys(options = {})
     hashAllDocs()
     dropIndex(index)
     hideIndex(index)
