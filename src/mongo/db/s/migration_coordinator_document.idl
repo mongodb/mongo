@@ -65,7 +65,7 @@ structs:
     migrationCoordinatorDocument:
         description: "Represents an in-progress migration on the migration donor."
         generate_comparison_operators: false
-        strict: true
+        strict: false
         fields:
             _id:
                 type: uuid
