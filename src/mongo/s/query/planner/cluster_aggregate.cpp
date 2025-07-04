@@ -502,6 +502,18 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     return pipeline;
 }
 
+// TODO SERVER-106876 remove the following function
+void resetRawDataFromRequest(OperationContext* const opCtx, AggregateCommandRequest& request) {
+    // After rewriting the pipeline for timeseries collections we explicitely set rawData = true in
+    // order to signal shards that they should not attempt to rewrite the pipeline again.
+    //
+    // In case the operation fails and get retried on the router, the same operation context
+    // will be re-used. Thus we need to reset the rawData flag attached to the operation
+    // context to the value of the rawData flag on the incoming request before retrying the
+    // operation.
+    isRawDataOperation(opCtx) = request.getRawData().value_or(false);
+}
+
 void rewritePipelineIfTimeseries(OperationContext* const opCtx,
                                  AggregateCommandRequest& request,
                                  const CollectionRoutingInfo& cri) {
@@ -517,6 +529,8 @@ void rewritePipelineIfTimeseries(OperationContext* const opCtx,
             // The query has been rewritten to something that should run directly against the bucket
             // collection. Set this flag to indicate to the shard that the query's target has
             // changed to avoid incorrect rewrites in the shard role.
+            //
+            // TODO SERVER-106876 remove manipulation of rawData flag in this function.
             isRawDataOperation(opCtx) = true;
         }
     }
@@ -946,6 +960,9 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             routingCtx->validateOnContextEnd();
         }
     }
+
+    // TODO SERVER-106876 stop manipualting rawData in this function
+    resetRawDataFromRequest(opCtx, request);
 
     return status;
 }
