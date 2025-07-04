@@ -373,6 +373,7 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --release=True
+      evergreen_remote_exec: on
     run_on:
       - amazon2023.3-arm64-xlarge
     tasks:
