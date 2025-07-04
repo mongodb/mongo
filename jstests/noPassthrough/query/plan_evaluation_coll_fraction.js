@@ -10,12 +10,15 @@ const db = conn.getDB(dbName);
 
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: true}));
 // To avoid needing a huge collection to see the effects of the collFraction limit kick in.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 10}));
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 1}));
+// Ensure total coll fraction is always used in this test instead of the per-plan limit.
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryPlanEvaluationCollFraction: 1}));
 
 const coll = db.getCollection(collName);
 coll.drop();
 
-const numDocs = 10000;
+const numDocs = 10;
 const bulkOp = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < numDocs; i++) {
     bulkOp.insert({
@@ -82,21 +85,35 @@ const query = {
     selective: {$lt: 0}
 };
 
-function getOptimizationTimeMillis(collFraction) {
+// Reports which multi-planner stopping condition metric increased after running a query
+// with the given 'collFraction' setting.
+function getStoppingCondition(collFraction) {
     assert.commandWorked(db.adminCommand(
         {setParameter: 1, internalQueryPlanTotalEvaluationCollFraction: collFraction}));
 
-    const explain = coll.find(query).explain();
-    return explain.queryPlanner.optimizationTimeMillis;
+    const before = db.serverStatus().metrics.query.multiPlanner.stoppingCondition;
+    coll.find(query).explain();
+    const after = db.serverStatus().metrics.query.multiPlanner.stoppingCondition;
+    return {
+        hitEof: after.hitEof - before.hitEof,
+        hitResultsLimit: after.hitResultsLimit - before.hitResultsLimit,
+        hitWorksLimit: after.hitWorksLimit - before.hitWorksLimit,
+    };
 }
 
-// Set a really low limit so that we get a guaranteed difference even with a small collection.
-const optimizationTimeWithLimit = getOptimizationTimeMillis(0.2);
-// Pick some arbitrarily high ceiling that the multiplanner will never hit.
-const optimizationTimeWithoutLimit = getOptimizationTimeMillis(1000.0);
+// We hit the works limit with a low total coll fraction.
+assert.docEq(getStoppingCondition(0.1), {
+    hitEof: 0,
+    hitResultsLimit: 0,
+    hitWorksLimit: 1,
+});
 
-// Optimization time with limit is around 5-10x faster in reality. We relax that assertion to 2x to
-// reduce flakiness.
-assert.gt(optimizationTimeWithoutLimit, optimizationTimeWithLimit * 2);
+// With a higher coll fraction, multiplanning continues until the first plan
+// scans the whole index.
+assert.docEq(getStoppingCondition(20.0), {
+    hitEof: 1,
+    hitResultsLimit: 0,
+    hitWorksLimit: 0,
+});
 
 MongoRunner.stopMongod(conn);
