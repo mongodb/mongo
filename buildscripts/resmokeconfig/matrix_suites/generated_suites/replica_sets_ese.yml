@@ -17,8 +17,7 @@ executor:
 matrix_suite: true
 selector:
   exclude_files: null
-  exclude_with_any_tags:
-    - does_not_support_encrypted_storage_engine
+  exclude_with_any_tags: []
   roots:
     - jstests/replsets/*.js
     - jstests/replsets/**/*.js

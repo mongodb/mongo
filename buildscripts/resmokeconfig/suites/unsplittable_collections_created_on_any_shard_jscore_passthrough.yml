@@ -55,7 +55,6 @@ selector:
     # system.js stored functions only work for collections that live on the db-primary shard (SERVER-83269)
     - requires_system_dot_js_stored_functions
     - assumes_no_track_upon_creation
-    - creates_unspittable_collections_on_specific_shards
 
 executor:
   archive:

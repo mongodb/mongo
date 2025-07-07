@@ -50,7 +50,6 @@ selector:
     - jstests/core/query/sort/sortk.js
     - jstests/core/query/sort/sorth.js
   exclude_with_any_tags:
-    - does_not_support_encrypted_storage_engine
     - does_not_support_repeated_reads
     - requires_profiling
     - does_not_support_multiplanning_single_solutions

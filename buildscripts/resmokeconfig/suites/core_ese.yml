@@ -15,8 +15,6 @@ selector:
     # Query settings are not supported on standalone.
     - jstests/core/query/query_settings/**/*.js
 
-  exclude_with_any_tags:
-    - does_not_support_encrypted_storage_engine
 executor:
   archive:
     hooks:

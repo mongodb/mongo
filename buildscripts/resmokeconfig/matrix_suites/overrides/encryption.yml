@@ -35,5 +35,4 @@
 
 - name: excluded_files
   value:
-    exclude_with_any_tags:
-      - does_not_support_encrypted_storage_engine
+    exclude_with_any_tags: []

@@ -22,8 +22,7 @@ matrix_suite: true
 selector:
   exclude_files:
     - jstests/sharding/**/libs/**/*.js
-  exclude_with_any_tags:
-    - does_not_support_encrypted_storage_engine
+  exclude_with_any_tags: []
   roots:
     - jstests/sharding/**/*.js
 test_kind: js_test
