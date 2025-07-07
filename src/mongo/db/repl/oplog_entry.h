@@ -73,6 +73,16 @@ namespace repl {
 constexpr auto kInitiatingSetMsg = "initiating set"_sd;
 
 /**
+ * Field name of the newPrimaryMsg within the 'o' field in the new term no-op oplog entry.
+ */
+constexpr StringData kNewPrimaryMsgField = "msg"_sd;
+
+/**
+ * Message string passed in the new term no-op oplog entry after a primary has stepped up.
+ */
+constexpr StringData kNewPrimaryMsg = "new primary"_sd;
+
+/**
  * A parsed DurableReplOperation along with information about the operation that should only exist
  * in-memory.
  *
@@ -619,6 +629,11 @@ public:
     bool isSingleOplogEntryTransactionWithCommand() const;
 
     /**
+     * Returns whether the oplog entry represents the new Primary Noop Entry.
+     */
+    bool isNewPrimaryNoop() const;
+
+    /**
      * Returns true if the oplog entry is for a CRUD operation.
      */
     static bool isCrudOpType(OpTypeEnum opType);
@@ -800,6 +815,7 @@ public:
     bool isTerminalApplyOps() const;
     bool isSingleOplogEntryTransaction() const;
     bool isSingleOplogEntryTransactionWithCommand() const;
+    bool isNewPrimaryNoop() const;
 
     /**
      * Returns whether this oplog entry contains a DDL operation. Used to determine whether to

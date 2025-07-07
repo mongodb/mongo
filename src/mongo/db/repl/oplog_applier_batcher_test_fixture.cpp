@@ -256,6 +256,33 @@ OplogEntry makeDBCheckBatchEntry(int t, const NamespaceString& nss, boost::optio
 }
 
 /**
+ * Generates a New Primary batch oplog entry with the given number used for the timestamp.
+ */
+OplogEntry makeNewPrimaryBatchEntry(int t) {
+    BSONObj oField = BSON(kNewPrimaryMsgField << kNewPrimaryMsg);
+    return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
+                              OpTypeEnum::kNoop,           // op type
+                              {},                          // namespace
+                              boost::none,                 // uuid
+                              boost::none,                 // fromMigrate
+                              boost::none,                 // checkExistenceForDiffInsert
+                              boost::none,                 // versionContext
+                              OplogEntry::kOplogVersion,   // version
+                              oField,                      // o
+                              boost::none,                 // o2
+                              {},                          // sessionInfo
+                              boost::none,                 // upsert
+                              Date_t() + Seconds(t),       // wall clock time
+                              {},                          // statement ids
+                              boost::none,    // optime of previous write within same transaction
+                              boost::none,    // pre-image optime
+                              boost::none,    // post-image optime
+                              boost::none,    // ShardId of resharding recipient
+                              boost::none,    // _id
+                              boost::none)};  // needsRetryImage
+}
+
+/**
  * Generates an update oplog entry with the given number used for the timestamp, and the given
  * pre- and post- image optimes.
  */

@@ -46,7 +46,6 @@
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
@@ -266,6 +265,13 @@ OplogApplierBatcher::BatchAction OplogApplierBatcher::_getBatchActionForEntry(
         return batchStats.commitOrAbortOps > 0 ? OplogApplierBatcher::BatchAction::kStartNewBatch
                                                : OplogApplierBatcher::BatchAction::kContinueBatch;
     };
+
+    // We split the batch on the new Primary entry to ensure there is not record ID reuse within
+    // a batch. It can be batched with any subsequent oplog that is batchable as the only
+    // possibility of record ID reuse in between a new Primary start.
+    if (entry.isNewPrimaryNoop()) {
+        return OplogApplierBatcher::BatchAction::kStartNewBatch;
+    }
 
     if (!entry.isCommand()) {
         return entry.getNss().mustBeAppliedInOwnOplogBatch()

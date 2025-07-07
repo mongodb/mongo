@@ -1024,11 +1024,7 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
         // No-ops should never fail application, since there's nothing to do.
         invariant(status);
 
-        auto opObj = op->getObject();
-        if (opObj.hasField(ReplicationCoordinator::newPrimaryMsgField) &&
-            opObj.getField(ReplicationCoordinator::newPrimaryMsgField).str() ==
-                ReplicationCoordinator::newPrimaryMsg) {
-
+        if (op->isNewPrimaryNoop()) {
             ReplicationMetrics::get(opCtx).setParticipantNewTermDates(op->getWallClockTime(),
                                                                       applyStartTime);
         }

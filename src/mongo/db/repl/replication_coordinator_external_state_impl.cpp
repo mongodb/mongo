@@ -648,9 +648,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
             AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
             WriteUnitOfWork wuow(opCtx);
             opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
-                opCtx,
-                BSON(ReplicationCoordinator::newPrimaryMsgField
-                     << ReplicationCoordinator::newPrimaryMsg));
+                opCtx, BSON(kNewPrimaryMsgField << kNewPrimaryMsg));
             wuow.commit();
         });
     // As far as the storage system is concerned, we're still secondary here, and will be until we

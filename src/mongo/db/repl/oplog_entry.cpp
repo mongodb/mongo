@@ -504,6 +504,15 @@ bool DurableOplogEntry::isSingleOplogEntryTransactionWithCommand() const {
     return false;
 }
 
+bool DurableOplogEntry::isNewPrimaryNoop() const {
+    if (getOpType() == OpTypeEnum::kNoop &&
+        getObject().getStringField(kNewPrimaryMsgField) == kNewPrimaryMsg) {
+        return true;
+    }
+
+    return false;
+}
+
 bool DurableOplogEntry::isIndexCommandType() const {
     return getOpType() == OpTypeEnum::kCommand &&
         ((getCommandType() == CommandTypeEnum::kCreateIndexes) ||
@@ -782,6 +791,10 @@ bool OplogEntry::isSingleOplogEntryTransaction() const {
 
 bool OplogEntry::isSingleOplogEntryTransactionWithCommand() const {
     return _entry.isSingleOplogEntryTransactionWithCommand();
+}
+
+bool OplogEntry::isNewPrimaryNoop() const {
+    return _entry.isNewPrimaryNoop();
 }
 
 bool OplogEntry::shouldLogAsDDLOperation() const {

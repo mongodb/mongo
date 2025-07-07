@@ -335,6 +335,78 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsDBCheckWithCrudOps) {
     ASSERT_EQUALS(srcOps[8], batch[0]);
 }
 
+TEST_F(OplogApplierTest, GetNextApplierBatchGroupsNewPrimary) {
+    std::vector<OplogEntry> srcOps;
+    auto nss = NamespaceString::createNamespaceString_forTest(dbName, "bar");
+    srcOps.push_back(makeInsertOplogEntry(1, nss));
+
+    // The New Primary oplog shouldn't be batched with any preceding oplog, but it can be batched
+    // with any subsequent oplog that is batchable.
+    srcOps.push_back(makeNewPrimaryBatchEntry(2));
+    srcOps.push_back(makeApplyOpsOplogEntry(3, false /* prepare */));
+    srcOps.push_back(makeInsertOplogEntry(4, nss));
+    srcOps.push_back(makeApplyOpsOplogEntry(5, true /* prepare */));
+
+    // The New Primary oplog shouldn't be batched with the previous New Primary oplog.
+    srcOps.push_back(makeNewPrimaryBatchEntry(6));
+    srcOps.push_back(makeInsertOplogEntry(7, nss));
+
+    // New Primary oplog shouldn't be batched with a prepared commit that follows it as prepared
+    // commit must start a new batch.
+    srcOps.push_back(makeCommitTransactionOplogEntry(8, dbName, true /* prepared */));
+
+    // New Primary oplog shouldn't be batched with a prepared commit that precedes it.
+    srcOps.push_back(makeNewPrimaryBatchEntry(9));
+
+    // New Primary oplog shouldn't be batched with a DBCCheck that follows it as DBCheck
+    // must start a new batch.
+    srcOps.push_back(makeDBCheckBatchEntry(10, nss));
+
+    // New Primary oplog shouldn't be batched with a DBCheck that precedes it.
+    srcOps.push_back(makeNewPrimaryBatchEntry(11));
+
+    _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
+
+    // 1st batch: [insert]
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
+    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[0], batch[0]);
+
+    // 2nd batch: [New Primary, Unprepared ApplyOps, Insert, Prepared ApplyOps]
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
+    ASSERT_EQUALS(4U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[1], batch[0]);
+    ASSERT_EQUALS(srcOps[2], batch[1]);
+    ASSERT_EQUALS(srcOps[3], batch[2]);
+    ASSERT_EQUALS(srcOps[4], batch[3]);
+
+    // 3rd batch:  [New Primary, Insert]
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
+    ASSERT_EQUALS(2U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[5], batch[0]);
+    ASSERT_EQUALS(srcOps[6], batch[1]);
+
+    // 4th batch: [Commit]
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
+    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[7], batch[0]);
+
+    // 5th batch: [New Primary]
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
+    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[8], batch[0]);
+
+    // 6th batch: [Dbcheck]
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
+    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[9], batch[0]);
+
+    // 7th batch: [New Primary]
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
+    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
+    ASSERT_EQUALS(srcOps[10], batch[0]);
+}
+
 TEST_F(OplogApplierTest, GetNextApplierBatchChecksBatchLimitsForNumberOfOperations) {
     std::vector<OplogEntry> srcOps;
     srcOps.push_back(
