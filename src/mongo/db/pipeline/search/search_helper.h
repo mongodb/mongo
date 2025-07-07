@@ -57,6 +57,7 @@ extern FailPoint searchReturnEofImmediately;
 namespace search_helpers {
 
 static constexpr StringData kViewFieldName = "view"_sd;
+static constexpr StringData kProtocolStoredFieldsName = "storedSource"_sd;
 
 /**
  * Consult mongot to get planning information for sharded search queries, used to configure the
@@ -208,6 +209,17 @@ void validateViewNotSetByUser(boost::intrusive_ptr<ExpressionContext> expCtx, co
  */
 void validateMongotIndexedViewsFF(boost::intrusive_ptr<ExpressionContext> expCtx,
                                   const std::vector<BSONObj>& effectivePipeline);
+
+/**
+ * This function promotes the fields in storedSource to root if applicable, otherwise adds an
+ * internalSearchMongotRemote stage to the desugared pipeline.
+ */
+void promoteStoredSourceOrAddIdLookup(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    std::list<boost::intrusive_ptr<DocumentSource>>& desugaredPipeline,
+    bool isStoredSource,
+    long long limit,
+    boost::optional<SearchQueryViewSpec> view);
 
 }  // namespace search_helpers
 }  // namespace mongo

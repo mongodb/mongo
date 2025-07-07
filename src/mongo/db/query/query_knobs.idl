@@ -101,6 +101,17 @@ structs:
                     gt: 0.0
                     lte: 1.0
 
+    InternalVectorSearchStoredSource:
+        description: "A specification for the 'internalVectorSearchStoredSource' cluster-wide configuration parameter type."
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            enabled:
+                description: "Whether $vectorSearch supports 'returnStoredSource: true' or not."
+                type: bool
+                default: false
+
 server_parameters:
     #
     # multi-plan ranking
@@ -1682,6 +1693,15 @@ server_parameters:
         redact: false
         validator:
             gte: 1
+
+    internalVectorSearchStoredSource:
+        description: >-
+            Controls whether $vectorSearch supports returnStoredSource: true as an option.
+        set_at: cluster
+        cpp_varname: internalVectorSearchStoredSource
+        cpp_vartype: InternalVectorSearchStoredSource
+        redact: false
+        omit_in_ftdc: false
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

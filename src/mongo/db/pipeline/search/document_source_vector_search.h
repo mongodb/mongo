@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/search/internal_search_mongot_remote_spec_gen.h"
 #include "mongo/executor/task_executor_cursor.h"
 
@@ -48,6 +49,7 @@ public:
     static constexpr StringData kIndexFieldName = "index"_sd;
     static constexpr StringData kNumCandidatesFieldName = "numCandidates"_sd;
     static constexpr StringData kViewFieldName = "view"_sd;
+    static constexpr StringData kReturnStoredSourceFieldName = "returnStoredSource"_sd;
 
     DocumentSourceVectorSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                std::shared_ptr<executor::TaskExecutor> taskExecutor,
@@ -60,6 +62,20 @@ public:
 
     const char* getSourceName() const override {
         return kStageName.data();
+    }
+
+    bool isStoredSource() const {
+        // If the user specifies storedSource: true and the knob is off, we will not error and
+        // simply return false.
+        bool isVectorSearchStoredSourceEnabled =
+            ServerParameterSet::getClusterParameterSet()
+                ->get<ClusterParameterWithStorage<InternalVectorSearchStoredSource>>(
+                    "internalVectorSearchStoredSource")
+                ->getValue(pExpCtx->getNamespaceString().tenantId())
+                .getEnabled();
+        return isVectorSearchStoredSourceEnabled
+            ? _originalSpec.getBoolField(kReturnStoredSourceFieldName)
+            : false;
     }
 
     static const Id& id;
@@ -109,7 +125,9 @@ public:
                                      UnionRequirement::kNotAllowed,
                                      ChangeStreamRequirement::kDenylist);
         constraints.unionRequirement = UnionRequirement::kAllowed;
-        constraints.noFieldModifications = true;
+        if (!isStoredSource()) {
+            constraints.noFieldModifications = true;
+        }
         constraints.setConstraintsForNoInputSources();
         return constraints;
     }

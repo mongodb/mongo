@@ -219,9 +219,10 @@ export function mongotCommandForVectorSearchQuery({
     index = null,
     filter = null,
     explain = null,
+    returnStoredSource = null,
     collName,
     dbName,
-    collectionUUID
+    collectionUUID,
 }) {
     assert.eq(arguments.length, 1, "Expected one argument to mongotCommandForVectorSearchQuery()");
     let cmd = {
@@ -247,6 +248,10 @@ export function mongotCommandForVectorSearchQuery({
 
     if (explain) {
         cmd.explain = explain;
+    }
+
+    if (returnStoredSource !== null) {
+        cmd.returnStoredSource = returnStoredSource;
     }
 
     return cmd;

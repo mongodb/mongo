@@ -261,15 +261,12 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::desugar() {
     std::list<intrusive_ptr<DocumentSource>> desugaredPipeline = {
         make_intrusive<DocumentSourceVectorSearch>(pExpCtx, executor, _originalSpec.getOwned())};
 
-    auto shardFilterer = DocumentSourceInternalShardFilter::buildIfNecessary(pExpCtx);
-    auto idLookupStage = make_intrusive<DocumentSourceInternalSearchIdLookUp>(
+    search_helpers::promoteStoredSourceOrAddIdLookup(
         pExpCtx,
+        desugaredPipeline,
+        isStoredSource(),
         _limit.value_or(0),
-        buildExecShardFilterPolicy(shardFilterer),
         search_helpers::getViewFromBSONObj(_originalSpec));
-    desugaredPipeline.insert(std::next(desugaredPipeline.begin()), idLookupStage);
-    if (shardFilterer)
-        desugaredPipeline.push_back(std::move(shardFilterer));
 
     return desugaredPipeline;
 }

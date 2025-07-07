@@ -4,6 +4,9 @@
  * views.
  *
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
+ *
+ * TODO SERVER-106939: Run $vectorSearch with and without storedSource.
+ *
  */
 import {
     actionMoviesViewPipeline,

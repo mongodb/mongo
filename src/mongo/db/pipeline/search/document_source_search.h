@@ -51,7 +51,6 @@ namespace mongo {
 class DocumentSourceSearch final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$search"_sd;
-    static constexpr StringData kProtocolStoredFieldsName = "storedSource"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
