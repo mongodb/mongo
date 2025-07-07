@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/ce/exact/exact_cardinality.h"
 #include "mongo/db/query/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/index_entry.h"
@@ -143,7 +144,8 @@ public:
     static StatusWith<CostBasedRankerResult> planWithCostBasedRanking(
         const CanonicalQuery& query,
         const QueryPlannerParams& params,
-        const ce::SamplingEstimator* samplingEstimator);
+        const ce::SamplingEstimator* samplingEstimator,
+        const ce::ExactCardinalityEstimator* exactCardinality);
 
     /**
      * Generates and returns a query solution, given data retrieved from the plan cache.
@@ -171,7 +173,8 @@ public:
         const CollectionPtr& collection,
         const CanonicalQuery& query,
         const QueryPlannerParams& params,
-        const ce::SamplingEstimator* samplingEstimator);
+        const ce::SamplingEstimator* samplingEstimator,
+        const ce::ExactCardinalityEstimator* exactCardinality);
 
     /**
      * Generates and returns the index tag tree that will be inserted into the plan cache. This data

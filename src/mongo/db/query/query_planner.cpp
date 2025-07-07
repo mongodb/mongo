@@ -64,6 +64,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/ce/exact/exact_cardinality.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/cost_based_ranker/cardinality_estimator.h"
@@ -1604,7 +1605,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedRanking(
     const CanonicalQuery& query,
     const QueryPlannerParams& params,
-    const ce::SamplingEstimator* samplingEstimator) {
+    const ce::SamplingEstimator* samplingEstimator,
+    const ce::ExactCardinalityEstimator* exactCardinality) {
     using namespace cost_based_ranker;
 
     auto statusWithMultiPlanSolns = QueryPlanner::plan(query, params);
@@ -1632,7 +1634,9 @@ StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedR
     CostEstimate bestCost = maxCost;
     std::unique_ptr<QuerySolution> bestSoln;
     for (auto&& soln : allSoln) {
-        auto ceRes = cardEstimator.estimatePlan(*soln);
+        auto ceRes = cbrMode == QueryPlanRankerModeEnum::kExactCE
+            ? exactCardinality->calculateExactCardinality(*soln, estimates)
+            : cardEstimator.estimatePlan(*soln);
         if (!ceRes.isOK()) {
             // This plan's cardinality cannot be estimated.
             if (cbrMode == QueryPlanRankerModeEnum::kAutomaticCE ||
@@ -1995,7 +1999,8 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
     const CollectionPtr& collection,
     const CanonicalQuery& query,
     const QueryPlannerParams& params,
-    const ce::SamplingEstimator* samplingEstimator) {
+    const ce::SamplingEstimator* samplingEstimator,
+    const ce::ExactCardinalityEstimator* exactCardinality) {
     invariant(query.getPrimaryMatchExpression()->matchType() == MatchExpression::OR);
     invariant(query.getPrimaryMatchExpression()->numChildren(),
               "Cannot plan subqueries for an $or with no children");
@@ -2062,7 +2067,7 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
             auto cbrMode = params.planRankerMode;
             if (cbrMode != QueryPlanRankerModeEnum::kMultiPlanning) {
                 auto statusWithCBRSolns = QueryPlanner::planWithCostBasedRanking(
-                    *branchResult->canonicalQuery, params, samplingEstimator);
+                    *branchResult->canonicalQuery, params, samplingEstimator, exactCardinality);
                 if (!statusWithCBRSolns.isOK()) {
                     str::stream ss;
                     ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString()

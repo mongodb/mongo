@@ -58,6 +58,8 @@ enums:
         type: string
         values:
             kAutomaticCE: "automaticCE"
+            # This mode is for testing purposes only, it is not meant to be efficient at all.
+            kExactCE: "exactCE"
             kHistogramCE: "histogramCE"
             kSamplingCE: "samplingCE"
             kHeuristicCE: "heuristicCE"

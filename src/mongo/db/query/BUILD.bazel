@@ -525,6 +525,7 @@ mongo_cc_library(
         ":query_index_bounds",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/query/ce/exact:exact_cardinality_interface",
         "//src/mongo/db/query/collation:collator_factory_icu",
         "//src/mongo/db/query/cost_based_ranker:cardinality_estimator",
         "//src/mongo/db/query/cost_based_ranker:cost_estimator",

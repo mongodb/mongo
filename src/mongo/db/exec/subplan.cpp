@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/ce/exact/exact_cardinality_impl.h"
 #include "mongo/db/query/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/find_command.h"
@@ -204,6 +205,7 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
 
     auto rankerMode = _query->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode();
     std::unique_ptr<ce::SamplingEstimator> samplingEstimator{nullptr};
+    std::unique_ptr<ce::ExactCardinalityEstimator> exactCardinality{nullptr};
     if (rankerMode == QueryPlanRankerModeEnum::kSamplingCE ||
         rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
         using namespace cost_based_ranker;
@@ -227,15 +229,18 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
             _query->getExpCtx()->getQueryKnobConfiguration().getConfidenceInterval(),
             samplingMarginOfError.load(),
             internalQueryNumChunksForChunkBasedSampling.load());
+    } else if (rankerMode == QueryPlanRankerModeEnum::kExactCE) {
+        exactCardinality = std::make_unique<ce::ExactCardinalityImpl>(
+            collectionPtr(), *_query, expCtx()->getOperationContext());
     }
-
     // Plan each branch of the $or.
     auto subplanningStatus = QueryPlanner::planSubqueries(expCtx()->getOperationContext(),
                                                           getSolutionCachedData,
                                                           collectionPtr(),
                                                           *_query,
                                                           plannerParams,
-                                                          samplingEstimator.get());
+                                                          samplingEstimator.get(),
+                                                          exactCardinality.get());
     if (!subplanningStatus.isOK()) {
         return choosePlanWholeQuery(
             plannerParams, yieldPolicy, shouldConstructClassicExecutableTree);

@@ -232,8 +232,8 @@ public:
                 .planRankerMode = QueryPlanRankerModeEnum::kSamplingCE,
             },
         };
-        auto statusWithCBRSolns =
-            QueryPlanner::planWithCostBasedRanking(*cq, plannerParams, samplingEstimator.get());
+        auto statusWithCBRSolns = QueryPlanner::planWithCostBasedRanking(
+            *cq, plannerParams, samplingEstimator.get(), nullptr);
         ASSERT(statusWithCBRSolns.isOK());
         auto solutions = std::move(statusWithCBRSolns.getValue().solutions);
         ASSERT(solutions.size() == 1);

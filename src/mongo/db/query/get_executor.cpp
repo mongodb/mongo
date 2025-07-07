@@ -29,6 +29,8 @@
 
 #include "mongo/db/query/get_executor.h"
 
+#include "mongo/db/query/ce/exact/exact_cardinality.h"
+#include "mongo/db/query/ce/exact/exact_cardinality_impl.h"
 #include "mongo/db/query/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/ce/sampling/sampling_estimator_impl.h"
 
@@ -458,6 +460,7 @@ public:
         if (rankerMode != QueryPlanRankerModeEnum::kMultiPlanning) {
             using namespace cost_based_ranker;
             std::unique_ptr<ce::SamplingEstimator> samplingEstimator{nullptr};
+            std::unique_ptr<ce::ExactCardinalityEstimator> exactCardinality{nullptr};
             if (rankerMode == QueryPlanRankerModeEnum::kSamplingCE ||
                 rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
                 auto samplingMode = _cq->getExpCtx()
@@ -476,10 +479,13 @@ public:
                     _cq->getExpCtx()->getQueryKnobConfiguration().getConfidenceInterval(),
                     samplingMarginOfError.load(),
                     internalQueryNumChunksForChunkBasedSampling.load());
+            } else if (rankerMode == QueryPlanRankerModeEnum::kExactCE) {
+                exactCardinality = std::make_unique<ce::ExactCardinalityImpl>(
+                    getCollections().getMainCollection(), *_cq, _opCtx);
             }
 
             auto statusWithCBRSolns = QueryPlanner::planWithCostBasedRanking(
-                *_cq, *_plannerParams, samplingEstimator.get());
+                *_cq, *_plannerParams, samplingEstimator.get(), exactCardinality.get());
             if (!statusWithCBRSolns.isOK()) {
                 return statusWithCBRSolns.getStatus();
             }
