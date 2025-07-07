@@ -543,15 +543,13 @@ bool WiredTigerKVEngineBase::_wtHasUri(WiredTigerSession& session, const std::st
     return c->search(c) == 0;
 }
 
-std::vector<std::string> WiredTigerKVEngineBase::_wtGetAllIdents(
-    WiredTigerRecoveryUnit& wtRu) const {
+std::vector<std::string> WiredTigerKVEngineBase::_wtGetAllIdents(WiredTigerSession& session) const {
     std::vector<std::string> all;
-    int ret;
     // No need for a metadata:create cursor, since it gathers extra information and is slower.
+    WT_CURSOR* c = nullptr;
+    auto ret = session.open_cursor("metadata:", nullptr, nullptr, &c);
+    uassertStatusOK(wtRCToStatus(ret, session));
 
-    auto cursorParams = getWiredTigerCursorParams(wtRu, WiredTigerUtil::kMetadataTableId);
-    WiredTigerCursor cursor(std::move(cursorParams), "metadata:", *wtRu.getSession());
-    WT_CURSOR* c = cursor.get();
     if (!c)
         return all;
 
@@ -2140,7 +2138,7 @@ bool WiredTigerKVEngine::hasIdent(RecoveryUnit& ru, StringData ident) const {
 
 std::vector<std::string> WiredTigerKVEngine::getAllIdents(RecoveryUnit& ru) const {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
-    return _wtGetAllIdents(wtRu);
+    return _wtGetAllIdents(*wtRu.getSession());
 }
 
 boost::optional<boost::filesystem::path> WiredTigerKVEngine::getDataFilePathForIdent(

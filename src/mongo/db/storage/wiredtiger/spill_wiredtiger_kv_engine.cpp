@@ -152,8 +152,14 @@ std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::makeTemporaryRecordStore(
 }
 
 int64_t SpillWiredTigerKVEngine::storageSize(RecoveryUnit& ru) {
-    WiredTigerSession session(_connection.get());
-    auto idents = getAllIdents(ru);
+    auto permit = tryGetStatsCollectionPermit();
+    if (!permit) {
+        return 0;
+    }
+
+    WiredTigerEventHandler eventHandler;
+    auto session = WiredTigerUtil::getStatisticsSession(*this, *permit, eventHandler);
+    auto idents = _wtGetAllIdents(*session);
 
     return std::accumulate(idents.begin(),
                            idents.end(),
@@ -161,7 +167,7 @@ int64_t SpillWiredTigerKVEngine::storageSize(RecoveryUnit& ru) {
                            [&session](int64_t storageSize, const std::string& ident) {
                                return storageSize +
                                    WiredTigerUtil::getIdentSize(
-                                          session, WiredTigerUtil::buildTableUri(ident));
+                                          *session, WiredTigerUtil::buildTableUri(ident));
                            });
 }
 
@@ -177,7 +183,7 @@ int64_t SpillWiredTigerKVEngine::getIdentSize(RecoveryUnit& ru, StringData ident
 
 std::vector<std::string> SpillWiredTigerKVEngine::getAllIdents(RecoveryUnit& ru) const {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
-    return _wtGetAllIdents(wtRu);
+    return _wtGetAllIdents(*wtRu.getSession());
 }
 
 Status SpillWiredTigerKVEngine::dropIdent(RecoveryUnit& ru,

@@ -93,21 +93,33 @@ bool SpillWiredTigerServerStatusSection::includeByDefault() const {
  */
 BSONObj SpillWiredTigerServerStatusSection::generateSection(
     OperationContext* opCtx, const BSONElement& configElement) const {
-    int verbosity = configElement.isNumber() ? configElement.safeNumberInt() : 1;
-    if (verbosity == 0) {
-        return BSONObj{};
-    }
-
     SpillWiredTigerKVEngine* engine = checked_cast<SpillWiredTigerKVEngine*>(
         opCtx->getServiceContext()->getStorageEngine()->getSpillEngine());
     BSONObjBuilder bob;
-    if (verbosity == 1) {
-        if (!WiredTigerUtil::collectConnectionStatistics(engine, bob, fieldsToInclude)) {
-            LOGV2_DEBUG(10641700, 2, "WiredTiger is not ready to collect statistics.");
+
+    bob.append("storageSize", [engine] {
+        try {
+            return engine->storageSize(*engine->newRecoveryUnit());
+        } catch (const DBException&) {
+            return int64_t{0};
         }
-    } else {
-        if (!WiredTigerUtil::collectConnectionStatistics(engine, bob)) {
-            LOGV2_DEBUG(10641701, 2, "WiredTiger is not ready to collect statistics.");
+    }());
+
+    int verbosity = configElement.isNumber() ? configElement.safeNumberInt() : 1;
+    switch (verbosity) {
+        case 0:
+            break;
+        case 1: {
+            if (!WiredTigerUtil::collectConnectionStatistics(*engine, bob, fieldsToInclude)) {
+                LOGV2_DEBUG(10641700, 2, "Spill WiredTiger is not ready to collect statistics.");
+            }
+            break;
+        }
+        case 2: {
+            if (!WiredTigerUtil::collectConnectionStatistics(*engine, bob)) {
+                LOGV2_DEBUG(10641701, 2, "Spill WiredTiger is not ready to collect statistics.");
+            }
+            break;
         }
     }
     return bob.obj();
