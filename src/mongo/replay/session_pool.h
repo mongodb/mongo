@@ -34,6 +34,7 @@
 #include "mongo/util/functional.h"
 
 #include <chrono>
+#include <exception>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -52,10 +53,10 @@ public:
      * Session pool can accommodate N sessions.
      * This is not supposed to be a thread pool implementation for providing best performance. But
      * the aim is to simulate mongodb sessions, so the number of threads can be very high, depending
-     * on the simulation. In general for each session there will be a thread. Each thread can only
+     * on the simulation. In general for each session there will be one thread. Each thread can only
      * read/process messages associated to its session.
      */
-    SessionPool(size_t size);
+    SessionPool(size_t size = 1);
     ~SessionPool();
 
     /*
@@ -68,6 +69,15 @@ public:
         -> mongo::stdx::future<typename std::invoke_result_t<F, Args...>> {
         using namespace mongo;
         using ReturnType = typename std::invoke_result_t<F, Args...>;
+
+        uassert(ErrorCodes::ReplayClientSessionSimulationError,
+                "Cannot submit work to a stopped session pool",
+                !_stop.load());
+        uassert(ErrorCodes::ReplayClientSessionSimulationError,
+                "The session pool has only one active session and it has recorded fatal errors, no "
+                "more tasks can be submitted.",
+                _sessionPoolSize.load() != 1 || !_hasRecordedErrors.load());
+
         stdx::packaged_task<void()> task(
             [f = std::forward<F>(f), ... args = std::forward<Args>(args)]() mutable {
                 std::invoke(f, args...);
@@ -75,23 +85,50 @@ public:
         stdx::future<ReturnType> result = task.get_future();
         {
             stdx::unique_lock<stdx::mutex> lock(_queueMutex);
-            // Don't allow new tasks once the pool is stopped
-            if (_stop.load()) {
-                throw std::runtime_error("SessionPool is stopped, cannot enqueue new tasks!");
-            }
             _tasks.emplace(Task(std::move(task)));
         }
-        _condition.notify_one();  // Notify one "session" about new tasks
+        // notify all the threads that are listening on this condition variable. There should be
+        // only one thread per session. So notify_one should suffice here, but for testing purposes
+        // we need to be sure that all the working threads are awaken once a new task is submitted.
+        _condition.notify_all();
         return result;
     }
 
+    bool containsExecutionErrors() const {
+        return _hasRecordedErrors.load();
+    }
+
+    std::vector<std::exception_ptr> getExecutionErrors();
+
 private:
+    /**
+     * Add a new worker into the session pool. This function is not thread safe and can only be
+     * invoked by the constructor of the pool
+     */
+    void addWorker();
+    /**
+     * Execute a unit of work added to the session pool via submit. Return false when the pool has
+     * ended and there is no more work to do.
+     */
+    bool executeTask();
+    /**
+     * Record a possible error encountered during task execution (eg std::bad_alloc or such)
+     */
+    void recordError(std::exception_ptr);
+
     // TODO SERVER-106046 will address the possibility to have multiple dead threads in case of
     // multiple recordings.
+
+    AtomicWord<size_t> _sessionPoolSize;  ///< Store total size of the pool
+
     std::vector<stdx::thread> _workers;   ///< Worker threads
     std::queue<Task> _tasks;              ///< The task queue
     stdx::mutex _queueMutex;              ///< Synchronizes access to the task queue
     stdx::condition_variable _condition;  ///< Used for thread synchronization
     AtomicWord<bool> _stop;               ///< Indicates whether the pool is stopping
+
+    stdx::mutex _errorMutex;                  ///< Synchronizes access to the error vector
+    std::vector<std::exception_ptr> _errors;  ///< List of errors recorded during execution
+    AtomicWord<bool> _hasRecordedErrors;  ///< Indicates whether the pool has recorded errors or not
 };
 }  // namespace mongo

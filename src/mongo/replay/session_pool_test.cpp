@@ -44,6 +44,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <exception>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -97,43 +98,75 @@ public:
         }
     }
 
-    void submitToSessionPool(SessionPool&& sessionPool,
-                             std::vector<std::unique_ptr<ReplayCommandExecutor>>&& execs,
-                             std::vector<synchronized_value<BSONObj>>& outs) {
-        ASSERT_TRUE(execs.size() == outs.size());
-        const size_t N = execs.size();
-        ASSERT_TRUE(N > 0);
+    template <typename Callable>
+    void submitToSessionPool(SessionPool& sessionPool, size_t nSessions, Callable callable) {
         std::vector<stdx::future<void>> futures;
-        auto funct = [this, &execs, &outs](size_t i) {
-            sessionExecTask(std::move(execs[i]), outs[i]);
-        };
-        for (size_t i = 0; i < N; i++) {
-            auto task = sessionPool.submit(funct, i);
+        for (size_t i = 0; i < nSessions; i++) {
+            auto task = sessionPool.submit(callable, i);
             futures.push_back(std::move(task));
         }
         for (auto& f : futures) {
-            f.get();
+            try {
+                f.get();
+            } catch (...) {
+                _errors.push_back(std::current_exception());
+            }
         }
+    }
+
+    bool hasTaskErrors() const {
+        return !_errors.empty();
+    }
+
+    std::vector<std::exception_ptr> getTaskErrors() const {
+        return _errors;
     }
 
 private:
     Commands _commands;
     ReplayTestServer _server;
     std::string _jsonStr;
+    std::vector<std::exception_ptr> _errors;
 };
 
 TEST_F(SessionPoolTest, SubmitQueryOneSession) {
     auto executor = std::make_unique<ReplayCommandExecutor>();
     executor->connect(getServerConnectionString());
     ASSERT_TRUE(executor->isConnected());
-    SessionPool sessionPool(1);
+    SessionPool sessionPool;
     std::vector<std::unique_ptr<ReplayCommandExecutor>> executors;
     std::vector<synchronized_value<BSONObj>> outputs(1);
     executors.push_back(std::move(executor));
-    submitToSessionPool(std::move(sessionPool), std::move(executors), outputs);
+    auto callable = [this, &executors, &outputs](size_t i) {
+        sessionExecTask(std::move(executors[i]), outputs[i]);
+    };
+    constexpr size_t totalNumberOfSessions = 1;
+    submitToSessionPool(sessionPool, totalNumberOfSessions, callable);
     auto& resp = outputs.back();
+    ASSERT_FALSE(hasTaskErrors());
     ASSERT_FALSE(resp->isEmptyPrototype());
     ASSERT_TRUE(checkServerResponse(*resp));
+    ASSERT_FALSE(sessionPool.containsExecutionErrors());
+}
+
+TEST_F(SessionPoolTest, SubmitTaskThatIsCrashingAndVerifyCorrectShutdown) {
+    constexpr size_t N = 10;
+    SessionPool sessionPool(N);
+    std::vector<synchronized_value<bool>> outs(N);
+    for (auto&& out : outs) {
+        ASSERT_FALSE(*out);
+    }
+    auto callable = [this, &outs](size_t i) {
+        outs[i] = true;
+        throw std::runtime_error("Fake error.");
+    };
+    submitToSessionPool(sessionPool, N, callable);
+    ASSERT_TRUE(hasTaskErrors());
+    ASSERT_EQ(10, getTaskErrors().size());
+    for (auto&& out : outs) {
+        ASSERT_TRUE(*out);  // verify that all the 10 workers have been called.
+    }
+    ASSERT_FALSE(sessionPool.containsExecutionErrors());
 }
 
 TEST_F(SessionPoolTest, SubmitQueryMultipleSessions) {
@@ -149,11 +182,16 @@ TEST_F(SessionPoolTest, SubmitQueryMultipleSessions) {
     }
     std::vector<synchronized_value<BSONObj>> outputs(N);
     SessionPool sessionPool(N);
-    submitToSessionPool(std::move(sessionPool), std::move(executors), outputs);
+    auto callable = [this, &executors, &outputs](size_t i) {
+        sessionExecTask(std::move(executors[i]), outputs[i]);
+    };
+    submitToSessionPool(sessionPool, N, callable);
+    ASSERT_FALSE(hasTaskErrors());
     for (auto&& out : outputs) {
         ASSERT_FALSE(out->isEmptyPrototype());
         ASSERT_TRUE(checkServerResponse(*out));
     }
+    ASSERT_FALSE(sessionPool.containsExecutionErrors());
 }
 
 }  // namespace mongo

@@ -72,7 +72,7 @@ void ReplayCommandExecutor::connect(StringData uri) {
 void ReplayCommandExecutor::reset() {
     // When a session is closed, the connection itself can be reused. This method reset the
     // connection.
-    uassert(ErrorCodes::InternalError, "MongoR is not connected", isConnected());
+    uassert(ErrorCodes::ReplayClientNotConnected, "MongoR is not connected", isConnected());
     _dbConnection->reset();
     _dbConnection.reset(nullptr);
 }

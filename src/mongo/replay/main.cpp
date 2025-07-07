@@ -62,6 +62,21 @@ stdx::mutex m;
 constexpr size_t MAX_PRODUCERS = 1;
 constexpr size_t MAX_CONSUMERS = 4;
 
+template <typename Future>
+void handleResponse(Future&& fut) {
+    try {
+        // During the task execution some errors could occur. In this case we catch the error and
+        // terminate.
+        fut.get();
+    } catch (const DBException& ex) {
+        tassert(ErrorCodes::ReplayClientInternalError, ex.what(), false);
+    } catch (const std::exception& ex) {
+        tassert(ErrorCodes::ReplayClientInternalError, ex.what(), false);
+    } catch (...) {
+        tassert(ErrorCodes::ReplayClientInternalError, "Unknown error type encountered", false);
+    }
+}
+
 void simpleTask(ReplayCommandExecutor& replayCommandExecutor,
                 const std::vector<BSONObj>& bsonCommands) {
 
@@ -101,7 +116,7 @@ void threadExecutionFunction(const ReplayOptions& replayOptions) {
             }
 
             for (auto& f : futures) {
-                f.get();
+                handleResponse(std::move(f));
             }
         }
 
