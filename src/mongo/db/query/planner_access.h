@@ -38,6 +38,7 @@
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
+#include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/record_id_range.h"
@@ -126,9 +127,12 @@ public:
     /**
      * Return a plan that uses the provided index as a proxy for a collection scan.
      */
-    static std::unique_ptr<QuerySolutionNode> scanWholeIndex(const IndexEntry& index,
-                                                             const CanonicalQuery& query,
-                                                             int direction = 1);
+    static std::unique_ptr<QuerySolutionNode> scanWholeIndex(
+        const IndexEntry& index,
+        const CanonicalQuery& query,
+        const QueryPlannerIXSelect::QueryContext& queryContext,
+        const QueryPlannerParams& params,
+        int direction = 1);
 
     /**
      * Return a plan that scans the provided index from [startKey to endKey).
@@ -532,6 +536,13 @@ private:
      * Implements handleFilter(...) for OR queries.
      */
     static void handleFilterOr(ScanBuildingState* scanState);
+
+    static std::unique_ptr<QuerySolutionNode> pushdownFilterToFullIxscan(
+        std::unique_ptr<MatchExpression> filter,
+        std::unique_ptr<IndexScanNode> isn,
+        const IndexEntry& index,
+        const QueryPlannerIXSelect::QueryContext& queryContext,
+        const QueryPlannerParams& params);
 };
 
 }  // namespace mongo

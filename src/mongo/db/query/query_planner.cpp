@@ -539,13 +539,14 @@ std::unique_ptr<QuerySolution> buildVirtScanSoln(const std::vector<BSONArray>& d
 std::unique_ptr<QuerySolution> buildWholeIXSoln(
     const IndexEntry& index,
     const CanonicalQuery& query,
+    const QueryPlannerIXSelect::QueryContext& queryContext,
     const QueryPlannerParams& params,
     const boost::optional<int>& direction = boost::none) {
     tassert(6499400,
             "Cannot pass both an explicit direction and a traversal preference",
             !(direction.has_value() && params.traversalPreference));
-    std::unique_ptr<QuerySolutionNode> solnRoot(
-        QueryPlannerAccess::scanWholeIndex(index, query, direction.value_or(1)));
+    std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::scanWholeIndex(
+        index, query, queryContext, params, direction.value_or(1)));
     return QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
 }
 
@@ -709,8 +710,11 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
 
     if (SolutionCacheData::WHOLE_IXSCAN_SOLN == solnCacheData.solnType) {
         // The solution can be constructed by a scan over the entire index.
-        auto soln = buildWholeIXSoln(
-            *solnCacheData.tree->entry, query, params, solnCacheData.wholeIXSolnDir);
+        auto soln = buildWholeIXSoln(*solnCacheData.tree->entry,
+                                     query,
+                                     {.collator = query.getCollator()},
+                                     params,
+                                     solnCacheData.wholeIXSolnDir);
         if (!soln) {
             return Status(ErrorCodes::NoQueryExecutionPlans,
                           "plan cache error: soln that uses index to provide sort");
@@ -1353,7 +1357,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             "hint"_attr = redact(hintedIndexBson->toString()));
 
         // Return hinted index solution if found.
-        if (auto soln = buildWholeIXSoln(relevantIndices.front(), query, params)) {
+        if (auto soln = buildWholeIXSoln(relevantIndices.front(), query, queryContext, params)) {
             LOGV2_DEBUG(20980, 5, "Planner: outputting soln that uses hinted index as scan");
             return singleSolution(std::move(soln));
         }
@@ -1428,7 +1432,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
                     LOGV2_DEBUG(
                         20981, 5, "Planner: outputting soln that uses index to provide sort");
-                    auto soln = buildWholeIXSoln(fullIndexList[i], query, params, direction);
+                    auto soln =
+                        buildWholeIXSoln(fullIndexList[i], query, queryContext, params, direction);
                     // If the solution was created to satisfy a sort requirement for distinct scan,
                     // ensure we have a distinct scan plan.
                     if (soln && (providesSort || soln->hasNode(STAGE_DISTINCT_SCAN))) {
@@ -1468,6 +1473,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             auto soln = buildWholeIXSoln(
                 index,
                 query,
+                queryContext,
                 // TODO SERVER-87683 Investigate why empty parameters are used instead of 'params'.
                 QueryPlannerParams{
                     QueryPlannerParams::ArgsForTest{},

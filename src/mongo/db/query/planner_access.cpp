@@ -27,17 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/planner_access.h"
 
-#include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/util/assert_util.h"
-
-#include <memory>
-
-#include <s2cellid.h>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -60,18 +51,21 @@
 #include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/eof_node_type.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/indexability.h"
-#include "mongo/db/query/planner_access.h"
+#include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/record_id_range.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
@@ -80,14 +74,21 @@
 #include "mongo/db/storage/key_format.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <memory>
 #include <set>
 #include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
+
+#include <s2cellid.h>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -2079,9 +2080,144 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
     return nullptr;
 }
 
-std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(const IndexEntry& index,
-                                                                      const CanonicalQuery& query,
-                                                                      int direction) {
+/**
+ * Removes branches from a match expression tree that cannot be satisfied by any index.
+ *
+ * This function traverses the expression tree and removes any child expressions that:
+ * - Have no associated RelevantTag (meaning they cannot be satisfied by any index).
+ * - Have an empty RelevantTag (both notFirst and first sets are empty).
+ * - Are not AND expressions (except for tagged expressions).
+ *
+ * Only AND expressions are preserved and recursively processed, as they can be safely split. Other
+ * logical expressions (OR, NOR) are currently removed but could be optimized in the future (see
+ * TODO comments for follow up tickets to close the gap).
+ *
+ * Example 1:
+ * Input tree:  AND
+ *             /   \
+ *    {indexed}    {unindexed}
+ * Output tree: AND
+ *             /
+ *    {indexed}
+ *
+ * Example 2:
+ * Input tree:  AND
+ *            /  |  \
+ *   {indexed} AND  {unindexed}
+ *           /   \
+ * {unindexed}  {indexed}
+ *
+ * Output tree: AND
+ *            /  \
+ *   {indexed}   AND
+ *                \
+ *             {indexed}
+ *
+ * Example 3:
+ * Input tree:  AND
+ *            /  |  \
+ *   {indexed} OR  {unindexed}
+ *          /   \
+ *  {indexed} {unindexed}
+ *
+ * Output tree: AND
+ *            /
+ *   {indexed}
+ *
+ * Note that the OR branch and all its children are removed since OR expressions
+ * cannot be safely split and are currently not optimized.
+ *
+ * @param tree Pointer to the root of the match expression tree to be pruned.
+ */
+void pruneUnindexedChildren(MatchExpression* tree) {
+    auto childVector = tree->getChildVector();
+    for (auto it = childVector->begin(); it != childVector->end();) {
+        auto child = it->get();
+        auto rt = static_cast<RelevantTag*>(child->getTag());
+        if (rt) {
+            if (rt->notFirst.empty() && rt->first.empty()) {
+                it = childVector->erase(it);
+            } else {
+                ++it;
+            }
+        } else {
+            switch (child->matchType()) {
+                // Only recurse if it is an AND expression, other expressions are TODO.
+                case MatchExpression::AND:
+                    pruneUnindexedChildren(child);
+                    ++it;
+                    break;
+                default:
+                    // TODO SERVER-103592 optimize also OR expressions.
+                    // TODO SERVER-103593 optimize also NOR expressions.
+                    // Cannot recurse. Prune.
+                    it = childVector->erase(it);
+                    break;
+            }
+        }
+    }
+}
+
+/**
+ * Removes children from AND expressions that have already been indexed, as indicated by their
+ * RelevantTag. This function modifies the expression tree in-place by removing nodes that have
+ * either first or notFirst fields set in their RelevantTag, indicating they were already considered
+ * for index usage.
+ *
+ * @param tree Pointer to the root of the match expression tree to be pruned.
+ *
+ * Example 1:
+ * Input:  AND
+ *        /  \
+ *  {unindexed} {indexed}
+ * Output: AND
+ *         |
+ *    {unindexed}
+ *
+ * Example 2:
+ * Input:         AND
+ *            /    |      \
+ * {unindexed} {indexed} {unindexed}
+ * Output:   AND
+ *        /      \
+ * {unindexed} {unindexed}
+ *
+ * Example 3:
+ * Input:      OR
+ *            /  \
+ *         AND   {unindexed}
+ *        /  \
+ * {unindexed} {indexed}
+ * Output:     Same (OR node remains unchanged since function only processes AND nodes).
+ */
+void pruneIndexedChildren(MatchExpression* tree) {
+    // TODO SERVER-103592 optimize also OR expressions.
+    // TODO SERVER-103593 optimize also NOR expressions.
+    if (tree->matchType() == MatchExpression::AND) {
+        auto childVector = tree->getChildVector();
+        for (auto it = childVector->begin(); it != childVector->end();) {
+            auto child = it->get();
+            auto rt = static_cast<RelevantTag*>(child->getTag());
+            if (rt) {
+                if (!rt->notFirst.empty() || !rt->first.empty()) {
+                    it = childVector->erase(it);
+                    continue;
+                }
+            } else {
+                pruneIndexedChildren(child);
+            }
+            ++it;
+        }
+    }
+}
+
+std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(
+    const IndexEntry& index,
+    const CanonicalQuery& query,
+    const QueryPlannerIXSelect::QueryContext& queryContext,
+    const QueryPlannerParams& params,
+    int direction) {
+
     std::unique_ptr<QuerySolutionNode> solnRoot;
 
     // Build an ixscan over the id index, use it, and return it.
@@ -2102,12 +2238,128 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(const Inde
     if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
         solnRoot = std::move(isn);
     } else {
-        // TODO: We may not need to do the fetch if the predicates in root are covered.  But
-        // for now it's safe (though *maybe* slower).
+        if (feature_flags::gFeatureFlagPushdownFilterToIXScanWhenUsingIndexForSort.checkEnabled()) {
+            solnRoot = pushdownFilterToFullIxscan(
+                std::move(filter), std::move(isn), index, queryContext, params);
+        } else {
+            LOGV2_DEBUG(1276902,
+                        5,
+                        "Not optimizing full IXSCAN as disabled by feature flag",
+                        "query"_attr = filter->debugString(),
+                        "index"_attr = index.toString());
+            // TODO: We may not need to do the fetch if the predicates in root are covered.  But
+            // for now it's safe (though *maybe* slower).
+            unique_ptr<FetchNode> fetch = std::make_unique<FetchNode>();
+            fetch->filter = std::move(filter);
+            fetch->children.push_back(std::move(isn));
+            solnRoot = std::move(fetch);
+        }
+    }
+
+    return solnRoot;
+}
+
+/**
+ * Attempts to optimize query execution by pushing down parts of the filter predicate into a full
+ * index scan (IXSCAN) when possible. This can reduce the number of documents that need to be
+ * fetched from the collection by applying filter predicates at the index scan stage rather than at
+ * the fetch stage.
+ *
+ * The function analyzes the provided filter and determines which predicates can be evaluated using
+ * the index. These predicates are pushed down to the IXSCAN node. Any remaining predicates that
+ * cannot be evaluated by the index are attached to a FETCH node above the IXSCAN.
+ *
+ * The optimization is currently skipped for timeseries collections, hashed indexes, and multikey
+ * indexes. Only certain filter types (leaf, AND, NOT) are considered for optimization. Future work
+ * (see TODOs) will expand support to OR and NOR expressions.
+ *
+ * @param filter
+ *      The root of the filter expression tree to be analyzed and potentially pushed down.
+ *      Ownership is transferred to this function.
+ * @param isn
+ *      The IndexScanNode representing the full index scan. Ownership is transferred to this
+ * function.
+ * @param index
+ *      The IndexEntry describing the index being scanned.
+ * @param queryContext
+ *      Contextual information about the query for index selection.
+ * @param params
+ *      Query planner parameters, including collection statistics and other planning options.
+ *
+ * @return
+ *      A unique_ptr to the root QuerySolutionNode of the optimized query plan. This will be either:
+ *          - A FetchNode (with any remaining filter) above the IndexScanNode (with pushed-down
+ * filter), or
+ *          - The IndexScanNode itself if all predicates were pushed down.
+ */
+std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::pushdownFilterToFullIxscan(
+    std::unique_ptr<MatchExpression> filter,
+    std::unique_ptr<IndexScanNode> isn,
+    const IndexEntry& index,
+    const QueryPlannerIXSelect::QueryContext& queryContext,
+    const QueryPlannerParams& params) {
+    std::unique_ptr<QuerySolutionNode> solnRoot;
+    // TODO SERVER-103594. Do not skip the optimization for timeseries.
+    // TODO SERVER-103595. Do not skip the optimization for hashed indexes.
+    // TODO SERVER-103596. Do not skip the optimization for multkey indexes.
+    if (index.type == IndexType::INDEX_BTREE && !index.multikey &&
+        !params.mainCollectionInfo.stats.isTimeseries &&
+        (filter->getCategory() == ComparisonMatchExpression::MatchCategory::kLeaf ||
+         filter->matchType() == MatchExpression::AND || filter->matchType() == MatchExpression::NOT)
+        // TODO SERVER-103592 optimize also OR expressions.
+        // TODO SERVER-103593 optimize also NOR expressions.
+    ) {
+        QueryPlannerIXSelect::rateIndices(filter.get(), "", {index}, queryContext);
+        QueryPlannerIXSelect::stripInvalidAssignments(filter.get(), {index});
+        if (logv2::shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(5))) {
+            LOGV2_DEBUG(1276900,
+                        5,
+                        "Checking if full IXSCAN can be optimized",
+                        "query"_attr = redact(filter->debugString()),
+                        "index"_attr = redact(index.toString()));
+        }
+
+        // To simplify predicates selection logic we wrap the whole filter into single AND
+        // expression.
+        std::unique_ptr<MatchExpression> filterForIndexedPredicates = filter->clone();
+        if (filterForIndexedPredicates->matchType() != MatchExpression::AND) {
+            filterForIndexedPredicates =
+                std::make_unique<AndMatchExpression>(std::move(filterForIndexedPredicates));
+        }
+        std::unique_ptr<MatchExpression> filterForNotIndexedPredicates = filter->clone();
+        if (filterForNotIndexedPredicates->matchType() != MatchExpression::AND) {
+            filterForNotIndexedPredicates =
+                std::make_unique<AndMatchExpression>(std::move(filterForNotIndexedPredicates));
+        }
+        pruneUnindexedChildren(filterForIndexedPredicates.get());
+        filterForIndexedPredicates =
+            MatchExpression::optimize(std::move(filterForIndexedPredicates));
+        filterForIndexedPredicates->resetTag();
+
+        pruneIndexedChildren(filterForNotIndexedPredicates.get());
+        auto query = filter->clone();
+        filter = MatchExpression::optimize(std::move(filterForNotIndexedPredicates));
+        filter->resetTag();
+
+        if (!filterForIndexedPredicates->isTriviallyTrue()) {
+            LOGV2_DEBUG(1276901,
+                        5,
+                        "Adding filter to full IXSCAN stage",
+                        "query"_attr = redact(query->debugString()),
+                        "index"_attr = redact(index.toString()),
+                        "IXScanfilter"_attr = redact(filterForIndexedPredicates->debugString()),
+                        "fetchFilter"_attr = redact(filter->debugString()));
+            isn->filter = std::move(filterForIndexedPredicates);
+        }
+    }
+
+    if (!filter->isTriviallyTrue()) {
         unique_ptr<FetchNode> fetch = std::make_unique<FetchNode>();
         fetch->filter = std::move(filter);
         fetch->children.push_back(std::move(isn));
         solnRoot = std::move(fetch);
+    } else {
+        solnRoot = std::move(isn);
     }
 
     return solnRoot;

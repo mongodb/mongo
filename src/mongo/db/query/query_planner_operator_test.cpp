@@ -155,22 +155,6 @@ TEST_F(QueryPlannerTest, CoveredWhenQueryOnNonMultikeyDottedPath) {
         "{ixscan: {pattern: {a: 1, 'b.c': 1}}}}}}}");
 }
 
-TEST_F(QueryPlannerTest, MustFetchWhenFilterNonEmptyButMissingLeadingField) {
-    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
-    addIndex(BSON("a" << 1 << "b" << 1));
-
-    runQueryAsCommand(
-        fromjson("{find: 'testns', filter: {b: {$gt: 0}}, projection: {a: 1, _id: 0}, "
-                 "sort: {a: 1}}"));
-
-    assertNumSolutions(1U);
-
-    // A 'fetch' is required because we're not willing to push the {b: {$gt: 0}} predicate into
-    // bounds without a predicate on the leading field.
-    assertSolutionExists(
-        "{proj: {spec: {a: 1, _id: 0}, node: {fetch: {node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}");
-}
-
 TEST_F(QueryPlannerTest, MustFetchWhenIndexKeyRequiredtoCoverProjectIsMultikey) {
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     // 'b' is multikey.
