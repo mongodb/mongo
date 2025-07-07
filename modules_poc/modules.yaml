@@ -622,9 +622,11 @@ routing_and_topology:
     - src/mongo/s/request_types/add_shard*
 
     - src/mongo/db/s/remove_shard*
+    - src/mongo/db/s/config/configsvr_start_shard_draining_command.cpp
     - src/mongo/db/s/config/configsvr_remove_shard*
     - src/mongo/db/s/config/remove_shard_command_helpers*
     - src/mongo/s/commands/*remove_shard*
+    - src/mongo/s/commands/cluster_start_shard_draining_cmd.cpp
     - src/mongo/s/request_types/remove_shard*
 
     - src/mongo/db/s/complete_promotion_to_sharded_cluster_coordinator*

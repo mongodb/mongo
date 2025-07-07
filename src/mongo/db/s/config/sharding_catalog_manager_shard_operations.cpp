@@ -765,7 +765,7 @@ boost::optional<RemoveShardProgress> ShardingCatalogManager::checkPreconditionsA
         NamespaceString::kConfigsvrShardsNamespace,
         BSON(ShardType::name() << NE << shardName << ShardType::draining.ne(true)));
     uassert(ErrorCodes::IllegalOperation,
-            "Operation not allowed because it would remove the last shard",
+            "Operation not allowed because it would drain the last shard",
             countOtherNotDrainingShards > 0);
 
     // Ensure there are no non-empty zones that only belong to this shard
@@ -773,9 +773,8 @@ boost::optional<RemoveShardProgress> ShardingCatalogManager::checkPreconditionsA
         auto isRequiredByZone = uassertStatusOK(
             _isShardRequiredByZoneStillInUse(opCtx, kConfigReadSelector, shardName, zoneName));
         uassert(ErrorCodes::ZoneStillInUse,
-                str::stream()
-                    << "Operation not allowed because it would remove the only shard for zone "
-                    << zoneName << " which has a chunk range is associated with it",
+                str::stream() << "Operation not allowed because there is no other shard in zone "
+                              << zoneName << " to drain to.",
                 !isRequiredByZone);
     }
 
@@ -808,7 +807,7 @@ boost::optional<RemoveShardProgress> ShardingCatalogManager::checkPreconditionsA
                 BSON("$set" << BSON(ShardType::draining(true))),
                 false,
                 ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter()),
-            "error starting removeShard");
+            "error starting shard draining");
 
         return RemoveShardProgress{ShardDrainingStateEnum::kStarted};
     }

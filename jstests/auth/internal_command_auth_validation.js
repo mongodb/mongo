@@ -284,6 +284,10 @@ const internalCommandsMap = {
         testname: "_configsvrSetUserWriteBlockMode",
         command: {_configsvrSetUserWriteBlockMode: 1, global: true},
     },
+    _configsvrStartShardDraining: {
+        testname: "_configsvrStartShardDraining",
+        command: {_configsvrStartShardDraining: shard0name, startShardDraining: shard0name},
+    },
     _configsvrTransitionFromDedicatedConfigServer: {
         testname: "_configsvrTransitionFromDedicatedConfigServer",
         command: {_configsvrTransitionFromDedicatedConfigServer: 1},

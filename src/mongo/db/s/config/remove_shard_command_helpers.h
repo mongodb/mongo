@@ -44,5 +44,10 @@ namespace topology_change_helpers {
  */
 RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId);
 
+/**
+ * Starts the draining process.
+ */
+boost::optional<RemoveShardProgress> startShardDraining(OperationContext* opCtx,
+                                                        const ShardId& shardId);
 }  // namespace topology_change_helpers
 }  // namespace mongo

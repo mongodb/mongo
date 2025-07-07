@@ -330,6 +330,7 @@ mongo_cc_library(
         "cluster_remove_shard_from_zone_cmd.cpp",
         "cluster_split_cmd.cpp",
         "cluster_split_vector_cmd.cpp",
+        "cluster_start_shard_draining_cmd.cpp",
         "cluster_update_zone_key_range_cmd.cpp",
         "cluster_user_management_commands.cpp",
     ],

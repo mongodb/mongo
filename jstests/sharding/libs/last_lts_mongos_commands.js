@@ -18,4 +18,5 @@ export const commandsAddedToMongosSinceLastLTS = [
     "getTrafficRecordingStatus",
     "startTrafficRecording",
     "stopTrafficRecording",
+    "startShardDraining",
 ];

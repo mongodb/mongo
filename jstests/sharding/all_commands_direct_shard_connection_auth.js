@@ -65,6 +65,7 @@ const allCommands = {
     _configsvrSetAllowMigrations: {skip: isAnInternalCommand},
     _configsvrSetClusterParameter: {skip: isAnInternalCommand},
     _configsvrSetUserWriteBlockMode: {skip: isAnInternalCommand},
+    _configsvrStartShardDraining: {skip: isAnInternalCommand},
     _configsvrTransitionFromDedicatedConfigServer: {skip: isAnInternalCommand},
     _configsvrTransitionToDedicatedConfigServer: {skip: isAnInternalCommand},
     _configsvrUpdateZoneKeyRange: {skip: isAnInternalCommand},
@@ -1131,6 +1132,7 @@ const allCommands = {
     splitVector: {skip: isAnInternalCommand},
     startRecordingTraffic: {skip: "Renamed to startTrafficRecording"},
     stopRecordingTraffic: {skip: "Renamed to stopTrafficRecording"},
+    startShardDraining: {skip: requiresMongoS},
     startTrafficRecording: {
         // Skipping command because it requires an actual file path for recording traffic to.
         skip: "requires an actual file path to record traffic to",

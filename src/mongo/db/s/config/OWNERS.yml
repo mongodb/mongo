@@ -102,3 +102,6 @@ filters:
   - "sampling_based_initial_split_policy_test.cpp":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "configsvr_start_shard_draining_command.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing

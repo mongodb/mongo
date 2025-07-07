@@ -177,3 +177,6 @@ filters:
   - "cluster_query_settings_cmds.cpp":
     approvers:
       - 10gen/query-execution-query-settings
+  - "cluster_start_shard_draining_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing

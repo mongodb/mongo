@@ -98,18 +98,10 @@ RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId)
     const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
     while (true) {
         try {
-            {
-                DDLLockManager::ScopedCollectionDDLLock ddlLock(
-                    opCtx,
-                    NamespaceString::kConfigsvrShardsNamespace,
-                    "startDraining",
-                    LockMode::MODE_X);
-
-                if (auto drainingStatus =
-                        shardingCatalogManager->checkPreconditionsAndStartDrain(opCtx, shardId)) {
-                    return *drainingStatus;
-                }
+            if (auto drainingStatus = topology_change_helpers::startShardDraining(opCtx, shardId)) {
+                return *drainingStatus;
             }
+
             if (auto drainingStatus =
                     shardingCatalogManager->checkDrainingProgress(opCtx, shardId)) {
                 return *drainingStatus;
@@ -154,6 +146,16 @@ RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId)
                     opCtx, DDLCoordinatorTypeEnum::kRemoveShardCommit);
         }
     }
+}
+
+boost::optional<RemoveShardProgress> startShardDraining(OperationContext* opCtx,
+                                                        const ShardId& shardId) {
+    const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
+
+    DDLLockManager::ScopedCollectionDDLLock ddlLock(
+        opCtx, NamespaceString::kConfigsvrShardsNamespace, "startShardDraining", LockMode::MODE_X);
+
+    return shardingCatalogManager->checkPreconditionsAndStartDrain(opCtx, shardId);
 }
 
 }  // namespace topology_change_helpers

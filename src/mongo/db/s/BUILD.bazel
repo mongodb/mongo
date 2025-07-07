@@ -1492,6 +1492,7 @@ mongo_cc_library(
         "//src/mongo/db/s/config:configsvr_set_cluster_parameter_command.cpp",
         "//src/mongo/db/s/config:configsvr_set_user_write_block_mode_command.cpp",
         "//src/mongo/db/s/config:configsvr_split_chunk_command.cpp",
+        "//src/mongo/db/s/config:configsvr_start_shard_draining_command.cpp",
         "//src/mongo/db/s/config:configsvr_transition_from_dedicated_config_server_command.cpp",
         "//src/mongo/db/s/config:configsvr_transition_to_dedicated_config_server_command.cpp",
         "//src/mongo/db/s/config:configsvr_update_zone_key_range_command.cpp",

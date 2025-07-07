@@ -1356,6 +1356,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/**/addShard* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/custom_write_concern.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/check_metadata* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/sharding/**/start_shard_draining* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/sharding/analyze_shard_key/OWNERS.yml
 /jstests/sharding/analyze_shard_key/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
@@ -2570,6 +2571,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/config/**/configsvr_move_range_command.cpp @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/config/**/*reshard* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/config/**/sampling_based_initial_split_policy_test.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/s/config/**/configsvr_start_shard_draining_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/s/metrics/OWNERS.yml
 /src/mongo/db/s/metrics/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
@@ -2878,6 +2880,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_ftdc_commands.cpp @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_netstat_cmd.cpp @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_query_settings_cmds.cpp @10gen/query-execution-query-settings @svc-auto-approve-bot
+/src/mongo/s/commands/**/cluster_start_shard_draining_cmd.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/s/commands/commit_quorum/OWNERS.yml
 /src/mongo/s/commands/commit_quorum/**/* @10gen/server-index-builds @svc-auto-approve-bot

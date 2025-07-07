@@ -756,6 +756,7 @@ let testCases = {
     getTrafficRecordingStatus: {skip: "executes locally on targeted node"},
     startRecordingTraffic: {skip: "Renamed to startTrafficRecording"},
     stopRecordingTraffic: {skip: "Renamed to stopTrafficRecording"},
+    startShardDraining: {skip: "not on a user database"},
     startTrafficRecording: {skip: "executes locally on mongos (not sent to any remote node)"},
     startSession: {skip: "executes locally on mongos (not sent to any remote node)"},
     stopTrafficRecording: {skip: "executes locally on mongos (not sent to any remote node)"},

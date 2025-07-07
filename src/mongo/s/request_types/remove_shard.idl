@@ -100,3 +100,25 @@ commands:
         strict: false
         chained_structs:
             RemoveShardRequestBase: RemoveShardRequestBase
+
+    startShardDraining:
+        command_name: startShardDraining
+        description: "The public startShardDraining command on mongos"
+        cpp_name: StartShardDraining
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false
+        chained_structs:
+            RemoveShardRequestBase: RemoveShardRequestBase
+
+    _configsvrStartShardDraining:
+        command_name: _configsvrStartShardDraining
+        description: "The internal startShardDraining command on config server"
+        cpp_name: ConfigSvrStartShardDraining
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false
+        chained_structs:
+            RemoveShardRequestBase: RemoveShardRequestBase

@@ -389,6 +389,7 @@ let testCases = {
     splitVector: {skip: "primary only"},
     startRecordingTraffic: {skip: "Renamed to startTrafficRecording"},
     stopRecordingTraffic: {skip: "Renamed to stopTrafficRecording"},
+    startShardDraining: {skip: "primary only"},
     startTrafficRecording: {skip: "does not return user data"},
     startSession: {skip: "does not return user data"},
     stopTrafficRecording: {skip: "does not return user data"},

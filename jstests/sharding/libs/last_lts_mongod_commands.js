@@ -22,4 +22,5 @@ export const commandsRemovedFromMongodSinceLastLTS = [
 // test defined without always existing on the mongod being used.
 export const commandsAddedToMongodSinceLastLTS = [
     "releaseMemory",
+    "_configsvrStartShardDraining",
 ];
