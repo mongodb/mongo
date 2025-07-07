@@ -86,6 +86,12 @@
 namespace mongo {
 namespace {
 
+#if __has_feature(address_sanitizer)
+constexpr bool kMemLeakAllowed = false;
+#else
+constexpr bool kMemLeakAllowed = true;
+#endif
+
 class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
     WiredTigerKVHarnessHelper(ServiceContext* svcCtx, bool forRepair = false)
@@ -102,11 +108,11 @@ public:
     }
 
     ~WiredTigerKVHarnessHelper() override {
-        getWiredTigerKVEngine()->cleanShutdown();
+        getWiredTigerKVEngine()->cleanShutdown(kMemLeakAllowed);
     }
 
     KVEngine* restartEngine() override {
-        getEngine()->cleanShutdown();
+        getEngine()->cleanShutdown(kMemLeakAllowed);
         _svcCtx->clearStorageEngine();
         _svcCtx->setStorageEngine(makeEngine());
         getEngine()->notifyStorageStartupRecoveryComplete();
@@ -762,7 +768,7 @@ MONGO_INITIALIZER(RegisterKVHarnessFactory)(InitializerContext*) {
 TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdown) {
     auto* engine = _helper.getWiredTigerKVEngine();
     ASSERT(engine->getWtConnReadyStatus_UNSAFE());
-    engine->cleanShutdown();
+    engine->cleanShutdown(kMemLeakAllowed);
     ASSERT(!engine->getWtConnReadyStatus_UNSAFE());
 }
 
@@ -775,7 +781,7 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerSingleActivityBeforeShutdown) {
     engine->releaseSectionActivityPermit_UNSAFE();
     ASSERT_EQ(engine->getActiveSections(), 0);
     ASSERT(engine->getWtConnReadyStatus_UNSAFE());
-    engine->cleanShutdown();
+    engine->cleanShutdown(kMemLeakAllowed);
     ASSERT(!engine->getWtConnReadyStatus_UNSAFE());
 }
 
@@ -790,7 +796,7 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerSingleActivityBeforeShutdownRAII) {
     }
     ASSERT_EQ(engine->getActiveSections(), 0);
     ASSERT(engine->getWtConnReadyStatus_UNSAFE());
-    engine->cleanShutdown();
+    engine->cleanShutdown(kMemLeakAllowed);
     ASSERT(!engine->getWtConnReadyStatus_UNSAFE());
 }
 
@@ -812,14 +818,14 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerMultipleActivitiesBeforeShutdownRAII) 
     }
     ASSERT_EQ(engine->getActiveSections(), 0);
     ASSERT(engine->getWtConnReadyStatus_UNSAFE());
-    engine->cleanShutdown();
+    engine->cleanShutdown(kMemLeakAllowed);
     ASSERT(!engine->getWtConnReadyStatus_UNSAFE());
 }
 
 TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivity) {
     auto* engine = _helper.getWiredTigerKVEngine();
     ASSERT(engine->getWtConnReadyStatus_UNSAFE());
-    engine->cleanShutdown();
+    engine->cleanShutdown(kMemLeakAllowed);
     ASSERT(!engine->tryGetSectionActivityPermit());
     ASSERT_EQ(engine->getActiveSections(), 0);
     ASSERT(!engine->getWtConnReadyStatus_UNSAFE());
@@ -828,7 +834,7 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivity) {
 TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivityRAII) {
     auto* engine = _helper.getWiredTigerKVEngine();
     ASSERT(engine->getWtConnReadyStatus_UNSAFE());
-    engine->cleanShutdown();
+    engine->cleanShutdown(kMemLeakAllowed);
     ASSERT(!engine->getSectionActivityPermit_UNSAFE());
     ASSERT_EQ(engine->getActiveSections(), 0);
     ASSERT(!engine->getWtConnReadyStatus_UNSAFE());
@@ -840,7 +846,7 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivityRelease) {
     ASSERT(engine->getSectionActivityPermit_UNSAFE());
     ASSERT(engine->getWtConnReadyStatus_UNSAFE());
     ASSERT_EQ(engine->getActiveSections(), 1);
-    stdx::thread shudownThread([&]() { engine->cleanShutdown(); });
+    stdx::thread shudownThread([&]() { engine->cleanShutdown(kMemLeakAllowed); });
     ASSERT_EQ(engine->getActiveSections(), 1);
     while (engine->getWtConnReadyStatus_UNSAFE()) {
         stdx::this_thread::yield();
@@ -858,7 +864,7 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivityReleaseRAII
         auto permit = engine->tryGetSectionActivityPermit();
         ASSERT(engine->getWtConnReadyStatus_UNSAFE());
         ASSERT_EQ(engine->getActiveSections(), 1);
-        stdx::thread shudownThread([&]() { engine->cleanShutdown(); });
+        stdx::thread shudownThread([&]() { engine->cleanShutdown(kMemLeakAllowed); });
         ASSERT_EQ(engine->getActiveSections(), 1);
         while (engine->getWtConnReadyStatus_UNSAFE()) {
             stdx::this_thread::yield();

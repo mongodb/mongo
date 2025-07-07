@@ -94,7 +94,7 @@ int runDbTests(int argc, char** argv) {
         if (!serviceContext->getStorageEngine())
             return;
 
-        shutdownGlobalStorageEngineCleanly(serviceContext);
+        shutdownGlobalStorageEngineCleanly(serviceContext, true /* memLeakAllowed */);
     });
 
     ThreadClient tc("testsuite", serviceContext->getService());

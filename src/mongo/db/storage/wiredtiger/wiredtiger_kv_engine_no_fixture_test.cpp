@@ -186,8 +186,8 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
     ASSERT(conn) << fmt::format("failed to open connection to source folder {}", home.path());
 
     // Open a session.
-    WiredTigerSession session(conn);
-    ASSERT(session.getSession()) << "failed to create session with config isolation=snapshot";
+    auto session = std::make_unique<WiredTigerSession>(conn);
+    ASSERT(session->getSession()) << "failed to create session with config isolation=snapshot";
 
     // Create a table without logging.
     auto oldForceDisableTableLogging = storageGlobalParams.forceDisableTableLogging;
@@ -363,6 +363,14 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
         ASSERT_EQ(kvEngine->getOldestTimestamp(), ts)
             << fmt::format("failed to set oldest timestamp to {} (hex: {:x})", tsInc, tsInc);
     }
+
+    session.reset();
+#if __has_feature(address_sanitizer)
+    constexpr bool memLeakAllowed = false;
+#else
+    constexpr bool memLeakAllowed = true;
+#endif
+    kvEngine->cleanShutdown(memLeakAllowed);
 
     // TODO(SERVER-72907): implement test-only function for evict cursor in KVEngine interface
     // porting the rest of the test.

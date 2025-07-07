@@ -656,7 +656,12 @@ public:
     }
 
     void tearDown() override {
-        _storageEngine->cleanShutdown(getServiceContext());
+#if __has_feature(address_sanitizer)
+        constexpr bool memLeakAllowed = false;
+#else
+        constexpr bool memLeakAllowed = true;
+#endif
+        _storageEngine->cleanShutdown(getServiceContext(), memLeakAllowed);
         _storageEngine.reset();
 
         ServiceContextTest::tearDown();

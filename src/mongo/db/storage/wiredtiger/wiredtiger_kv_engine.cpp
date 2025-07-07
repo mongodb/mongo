@@ -60,10 +60,6 @@
 #include "mongo/util/uuid.h"
 #include "mongo/util/version/releases.h"
 
-#ifdef _WIN32
-#define NVALGRIND
-#endif
-
 #include <absl/container/node_hash_map.h>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -73,7 +69,6 @@
 #include <boost/none_t.hpp>
 #include <boost/optional.hpp>
 #include <fmt/format.h>
-#include <valgrind/valgrind.h>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -151,7 +146,6 @@ MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForImportCollection);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForImportIndex);
 MONGO_FAIL_POINT_DEFINE(WTRollbackToStableReturnOnEBUSY);
 MONGO_FAIL_POINT_DEFINE(hangBeforeUnrecoverableRollbackError);
-MONGO_FAIL_POINT_DEFINE(WTDisableFastShutDown);
 MONGO_FAIL_POINT_DEFINE(WTFailImportSortedDataInterface);
 
 const std::string kPinOldestTimestampAtStartupName = "_wt_startup";
@@ -634,9 +628,8 @@ WiredTigerKVEngine::~WiredTigerKVEngine() {
     // storage engine again in this same process.
     ServerParameterSet::getNodeParameterSet()->remove("wiredTigerEngineRuntimeConfig");
 
-    cleanShutdown();
-
-    _sessionCache.reset(nullptr);
+    bool memLeakAllowed = true;
+    cleanShutdown(memLeakAllowed);
 }
 
 void WiredTigerKVEngine::notifyStorageStartupRecoveryComplete() {
@@ -777,7 +770,7 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
                         "details"_attr = wtRCToStatus(ret, nullptr).reason());
 }
 
-void WiredTigerKVEngine::cleanShutdown() {
+void WiredTigerKVEngine::cleanShutdown(bool memLeakAllowed) {
     LOGV2(22317, "WiredTigerKVEngine shutting down");
 
     if (!_conn) {
@@ -808,20 +801,9 @@ void WiredTigerKVEngine::cleanShutdown() {
     // released sessions will skip flushing the size storer.
     _sizeStorer.reset();
 
-    // We want WiredTiger to leak memory for faster shutdown except when we are running tools to
-    // look for memory leaks.
-    bool leak_memory = !kAddressSanitizerEnabled;
     std::string closeConfig = "";
 
-    if (RUNNING_ON_VALGRIND) {  // NOLINT
-        leak_memory = false;
-    }
-
-    if (MONGO_unlikely(WTDisableFastShutDown.shouldFail())) {
-        leak_memory = false;
-    }
-
-    if (leak_memory) {
+    if (memLeakAllowed) {
         closeConfig = "leak_memory=true,";
     }
 

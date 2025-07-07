@@ -362,7 +362,7 @@ public:
 
     std::vector<std::string> getAllIdents(OperationContext* opCtx) const override;
 
-    void cleanShutdown() override;
+    void cleanShutdown(bool memLeakAllowed) override;
 
     SnapshotManager* getSnapshotManager() const final {
         return &_sessionCache->snapshotManager();

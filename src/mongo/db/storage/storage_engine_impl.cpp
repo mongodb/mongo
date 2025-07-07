@@ -30,6 +30,10 @@
 
 #include "mongo/db/storage/storage_engine_impl.h"
 
+#ifdef _WIN32
+#define NVALGRIND
+#endif
+
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <algorithm>
@@ -40,6 +44,7 @@
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <valgrind/valgrind.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -905,7 +910,7 @@ std::string StorageEngineImpl::getFilesystemPathForDb(const DatabaseName& dbName
     return _catalog->getFilesystemPathForDb(dbName);
 }
 
-void StorageEngineImpl::cleanShutdown(ServiceContext* svcCtx) {
+void StorageEngineImpl::cleanShutdown(ServiceContext* svcCtx, bool memLeakAllowed) {
     _timestampMonitor.reset();
 
     CollectionCatalog::write(svcCtx, [svcCtx](CollectionCatalog& catalog) {
@@ -916,7 +921,13 @@ void StorageEngineImpl::cleanShutdown(ServiceContext* svcCtx) {
     _catalog.reset();
     _catalogRecordStore.reset();
 
-    _engine->cleanShutdown();
+#if __has_feature(address_sanitizer)
+    memLeakAllowed = false;
+#endif
+    if (RUNNING_ON_VALGRIND) {  // NOLINT
+        memLeakAllowed = false;
+    }
+    _engine->cleanShutdown(memLeakAllowed);
     // intentionally not deleting _engine
 }
 

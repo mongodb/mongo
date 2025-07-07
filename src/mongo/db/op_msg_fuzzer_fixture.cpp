@@ -160,7 +160,7 @@ OpMsgFuzzerFixture::~OpMsgFuzzerFixture() {
         databaseHolder->closeAll(opCtx.get());
     }
 
-    shutdownGlobalStorageEngineCleanly(_serviceContext);
+    shutdownGlobalStorageEngineCleanly(_serviceContext, true /* memLeakAllowed */);
 }
 
 int OpMsgFuzzerFixture::testOneInput(const char* Data, size_t Size) {
