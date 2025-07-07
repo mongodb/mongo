@@ -85,11 +85,7 @@ Milliseconds interruptCheckPeriod() {
 }  // namespace
 
 OperationContext::OperationContext(Client* client, OperationId opId)
-    : _client(client),
-      _opId(opId),
-      _interruptCheckWindowStartTime(getServiceContext()->getFastClockSource()->now()),
-      _elapsedTime(client ? client->getServiceContext()->getTickSource()
-                          : globalSystemTickSource()) {}
+    : _client(client), _opId(opId) {}
 
 OperationContext::~OperationContext() {
     releaseOperationKey();
@@ -116,7 +112,7 @@ Microseconds OperationContext::computeMaxTimeFromDeadline(Date_t when) {
     if (when == Date_t::max()) {
         maxTime = Microseconds::max();
     } else {
-        maxTime = when - getServiceContext()->getFastClockSource()->now();
+        maxTime = when - fastClockSource().now();
         if (maxTime < Microseconds::zero()) {
             maxTime = Microseconds::zero();
         }
@@ -136,10 +132,10 @@ void OperationContext::setDeadlineAfterNowBy(Microseconds maxTime, ErrorCodes::E
     if (maxTime == Microseconds::max()) {
         when = Date_t::max();
     } else {
-        auto clock = getServiceContext()->getFastClockSource();
-        when = clock->now();
+        auto& clock = fastClockSource();
+        when = clock.now();
         if (maxTime > Microseconds::zero()) {
-            when += clock->getPrecision() + maxTime;
+            when += clock.getPrecision() + maxTime;
         }
     }
     setDeadlineAndMaxTime(when, maxTime, timeoutError);
@@ -156,7 +152,7 @@ bool OperationContext::hasDeadlineExpired() const {
         return true;
     }
 
-    const auto now = getServiceContext()->getFastClockSource()->now();
+    const auto now = fastClockSource().now();
     return now >= getDeadline();
 }
 
@@ -169,8 +165,7 @@ Milliseconds OperationContext::getRemainingMaxTimeMillis() const {
         return Milliseconds::max();
     }
 
-    return std::max(Milliseconds{0},
-                    getDeadline() - getServiceContext()->getFastClockSource()->now());
+    return std::max(Milliseconds{0}, getDeadline() - fastClockSource().now());
 }
 
 Microseconds OperationContext::getRemainingMaxTimeMicros() const {
@@ -195,8 +190,8 @@ void OperationContext::restoreMaxTimeMS() {
     if (maxTime == Microseconds::max()) {
         _deadline = Date_t::max();
     } else {
-        auto clock = getServiceContext()->getFastClockSource();
-        _deadline = clock->now() + clock->getPrecision() + maxTime - _elapsedTime.elapsed();
+        auto& clock = fastClockSource();
+        _deadline = clock.now() + clock.getPrecision() + maxTime - _elapsedTime.elapsed();
     }
     _maxTime = maxTime;
 }
@@ -273,8 +268,7 @@ Status OperationContext::checkForInterruptNoAssert() noexcept {
 }
 
 void OperationContext::updateOverdueInterruptCheckCounters() {
-    ClockSource* clockSource = getServiceContext()->getFastClockSource();
-    const Date_t now = clockSource->now();
+    const Date_t now = fastClockSource().now();
     const Date_t prevStart = std::exchange(_interruptCheckWindowStartTime, now);
 
     if (_ignoreInterrupts || isWaitingForConditionOrInterrupt()) {
@@ -309,7 +303,7 @@ void OperationContext::_schedulePeriodicClientConnectedCheck() {
 }
 
 Status OperationContext::_checkClientConnected() {
-    const auto now = getServiceContext()->getFastClockSource()->now();
+    const auto now = fastClockSource().now();
 
     if (now > _lastClientCheck + Milliseconds(500)) {
         _lastClientCheck = now;
@@ -410,9 +404,7 @@ void OperationContext::markKilled(ErrorCodes::Error killCode) {
     // only prior to the store to _killCode.
     {
         auto setIfZero = TickSource::Tick(0);
-        auto tickSource =
-            _client ? _client->getServiceContext()->getTickSource() : globalSystemTickSource();
-        auto ticks = tickSource->getTicks();
+        auto ticks = tickSource().getTicks();
         if (!ticks) {
             ticks = TickSource::Tick(-1);
         }
@@ -441,7 +433,7 @@ void OperationContext::markKillOnClientDisconnect() {
     }
 
     if (auto session = getClient()->session()) {
-        _lastClientCheck = getServiceContext()->getFastClockSource()->now();
+        _lastClientCheck = fastClockSource().now();
 
         _markKillOnClientDisconnect = true;
 

@@ -50,6 +50,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -57,6 +58,7 @@
 #include "mongo/util/interruptible.h"
 #include "mongo/util/lockable_adapter.h"
 #include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -199,20 +201,15 @@ public:
     void updateOverdueInterruptCheckCounters();
 
     /**
-     * Returns the service context under which this operation context runs, or nullptr if there is
-     * no such service context.
+     * Returns the service context under which this operation context runs.
      */
     ServiceContext* getServiceContext() const {
-        if (!_client) {
-            return nullptr;
-        }
-
         return _client->getServiceContext();
     }
 
     /** Returns the Service under which this operation operates. */
     Service* getService() const {
-        return _client ? _client->getService() : nullptr;
+        return _client->getService();
     }
 
     /**
@@ -797,7 +794,7 @@ public:
 
                 // For purposes of tracking overdue interrupts, act as if the moment we left
                 // the ignore state was the last check for interrupt.
-                _interruptCheckWindowStartTime = getServiceContext()->getFastClockSource()->now();
+                _interruptCheckWindowStartTime = fastClockSource().now();
             });
             // Ignore interrupts until the callback completes.
             {
@@ -812,6 +809,19 @@ public:
             checkForInterrupt();
             throw;
         }
+    }
+
+    /**
+     * The following return the `FastClockSource` and `TickSource` instances that were available at
+     * the time of creating this `opCtx`. Using the following ensures we use the same source for
+     * timing during the lifetime of an `opCtx`, and we save on the cost of acquiring a reference to
+     * the clock/tick source.
+     */
+    ClockSource& fastClockSource() const {
+        return *_fastClockSource;
+    }
+    TickSource& tickSource() const {
+        return *_tickSource;
     }
 
 private:
@@ -908,6 +918,9 @@ private:
 
     Client* const _client;
 
+    ClockSource* const _fastClockSource = getServiceContext()->getFastClockSource();
+    TickSource* const _tickSource = getServiceContext()->getTickSource();
+
     const OperationId _opId;
     boost::optional<OperationKey> _opKey;
 
@@ -938,7 +951,7 @@ private:
     // The start time of this interrupt check window. This can be the time of the last call to
     // checkForInterrupt(), the time the operation was created, or the time at which the operation
     // stopped ignoring interrupts.
-    Date_t _interruptCheckWindowStartTime;
+    Date_t _interruptCheckWindowStartTime{_fastClockSource->now()};
 
     OverdueInterruptCheckStats _overdueInterruptCheckStats;
 
@@ -980,7 +993,7 @@ private:
     bool _usesDefaultMaxTimeMS = false;
 
     // Timer counting the elapsed time since the construction of this OperationContext.
-    Timer _elapsedTime;
+    Timer _elapsedTime{_tickSource};
 
     bool _writesAreReplicated = true;
     bool _shouldIncrementLatencyStats = true;
