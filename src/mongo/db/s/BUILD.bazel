@@ -1415,6 +1415,7 @@ mongo_cc_library(
         "shardsvr_drop_database_command.cpp",
         "shardsvr_drop_database_participant_command.cpp",
         "shardsvr_drop_indexes_command.cpp",
+        "shardsvr_drop_indexes_participant_command.cpp",
         "shardsvr_fetch_coll_metadata_command.cpp",
         "shardsvr_get_stats_for_balancing_command.cpp",
         "shardsvr_join_ddl_coordinators_command.cpp",

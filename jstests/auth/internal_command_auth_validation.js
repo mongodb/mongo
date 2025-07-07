@@ -547,6 +547,14 @@ const internalCommandsMap = {
             collectionUUID: UUID(),
         },
     },
+    _shardsvrDropIndexesParticipant: {
+        testname: "_shardsvrDropIndexesParticipant",
+        command: {
+            _shardsvrDropIndexesParticipant: "x.y",
+            index: "*",
+            collectionUUID: UUID(),
+        },
+    },
     _shardsvrCreateCollectionParticipant: {
         testname: "_shardsvrCreateCollectionParticipant",
         command: {

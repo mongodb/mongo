@@ -171,6 +171,7 @@ let testCases = {
     _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern: {skip: "internal command"},
     _shardsvrDropCollectionParticipant: {skip: "internal command"},
     _shardsvrDropIndexes: {skip: "internal command"},
+    _shardsvrDropIndexesParticipant: {skip: "internal command"},
     _shardsvrDropDatabase: {skip: "internal command"},
     _shardsvrDropDatabaseParticipant: {skip: "internal command"},
     _shardsvrEndMigrationBlockingOperation: {skip: "internal command"},

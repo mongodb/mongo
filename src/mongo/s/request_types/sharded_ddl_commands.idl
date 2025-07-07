@@ -650,6 +650,16 @@ commands:
         chained_structs:
             DropIndexesRequest: DropIndexesRequest
 
+    _shardsvrDropIndexesParticipant:
+        description: "Internal command sent to participant shards to drop indexes of a collection"
+        command_name: _shardsvrDropIndexesParticipant
+        cpp_name: ShardsvrDropIndexesParticipant
+        namespace: concatenate_with_db
+        api_version: ""
+        strict: false
+        chained_structs:
+            DropIndexesRequest: DropIndexesRequest
+
     _configsvrCreateDatabase:
         description: "The internal createDatabase command on the config server"
         api_version: ""

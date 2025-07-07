@@ -103,6 +103,7 @@ const allCommands = {
     _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern: {skip: isNotAUserDataRead},
     _shardsvrDropCollectionParticipant: {skip: isPrimaryOnly},
     _shardsvrDropIndexes: {skip: isAnInternalCommand},
+    _shardsvrDropIndexesParticipant: {skip: isAnInternalCommand},
     _shardsvrCreateCollectionParticipant: {skip: isPrimaryOnly},
     _shardsvrGetStatsForBalancing: {skip: isPrimaryOnly},
     _shardsvrCheckCanConnectToConfigServer: {skip: isPrimaryOnly},

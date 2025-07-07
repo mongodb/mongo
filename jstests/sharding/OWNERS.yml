@@ -3,6 +3,9 @@ filters:
   - "auto_split_vector_basic.js":
     approvers:
       - 10gen/server-cluster-scalability
+  - "drop_indexes_participant.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "*fsync_lock*":
     approvers:
       - 10gen/server-cluster-scalability
@@ -14,6 +17,10 @@ filters:
       - 10gen/server-cluster-scalability
   - "move_primary_clone.js":
     approvers:
+      - 10gen/server-cluster-scalability
+  - "/OWNERS.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing
       - 10gen/server-cluster-scalability
   - "proxy_protocol_connect.js":
     approvers:
