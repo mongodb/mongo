@@ -281,6 +281,7 @@ MONGOJS_CPP_JSFILES = [
     "db.js",
     "db_global.js",
     "explain_query.js",
+    "explain_query_global.js",
     "explainable.js",
     "explainable_global.js",
     "mongo.js",

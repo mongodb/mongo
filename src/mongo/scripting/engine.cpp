@@ -360,6 +360,7 @@ extern const JSFile crud_api;
 extern const JSFile db;
 extern const JSFile db_global;
 extern const JSFile explain_query;
+extern const JSFile explain_query_global;
 extern const JSFile explainable;
 extern const JSFile explainable_global;
 extern const JSFile mongo;
@@ -377,12 +378,14 @@ void Scope::execCoreFiles() {
     execSetup(JSFiles::bulk_api);
     execSetup(JSFiles::check_log);
     execSetup(JSFiles::db);
+    execSetup(JSFiles::explain_query);
     execSetup(JSFiles::explainable);
 
     // globals
     execSetup(JSFiles::bulk_api_global);
     execSetup(JSFiles::check_log_global);
     execSetup(JSFiles::db_global);
+    execSetup(JSFiles::explain_query_global);
     execSetup(JSFiles::explainable_global);
 
     // scripts
@@ -395,7 +398,6 @@ void Scope::execCoreFiles() {
     execSetup(JSFiles::error_codes);
     execSetup(JSFiles::collection);
     execSetup(JSFiles::crud_api);
-    execSetup(JSFiles::explain_query);
 }
 
 void Scope::execPrelude() {
