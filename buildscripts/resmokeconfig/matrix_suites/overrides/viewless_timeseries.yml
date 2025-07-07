@@ -95,7 +95,6 @@
         - jstests/noPassthrough/timeseries/create/timeseries_block_compressor_options.js
         - jstests/noPassthrough/timeseries/create/timeseries_server_parameters.js
         - jstests/noPassthrough/timeseries/create/timeseries_startup.js
-        - jstests/noPassthrough/timeseries/create/timeseries_writes_check_buckets_coll_is_valid.js
         - jstests/noPassthrough/timeseries/data_integrity/intermediate_data_consistency_checks_skips.js
         - jstests/noPassthrough/timeseries/data_integrity/timeseries_insert_compression_failure.js
         - jstests/noPassthrough/timeseries/data_integrity/timeseries_insert_decompression_failure.js
