@@ -37,6 +37,136 @@
       roots:
         - jstests/concurrency/fsm_workloads/**/*timeseries*/**/*.js
         - jstests/concurrency/fsm_workloads/**/*timeseries*.js
+- name: all_jscore_timeseries_tests_selector
+  value:
+    selector:
+      exclude_files: null
+      roots:
+        - jstests/core/timeseries/**/*.js
+        - jstests/core/catalog/agg_internal_list_collections_stage.js
+        - jstests/core/catalog/agg_list_cluster_catalog.js
+        - jstests/core/catalog/agg_list_cluster_catalog_sharding_fields.js
+        - jstests/core/catalog/agg_list_cluster_catalog_with_match.js
+        - jstests/core/catalog/list_catalog.js
+        - jstests/core/catalog/list_catalog_stage_consistency.js
+- name: only_validated_jscore_timeseries_tests_selector
+  value:
+    selector:
+      exclude_files: null
+      roots:
+        - jstests/core/catalog/agg_internal_list_collections_stage.js
+        - jstests/core/catalog/agg_list_cluster_catalog.js
+        - jstests/core/catalog/agg_list_cluster_catalog_sharding_fields.js
+        - jstests/core/catalog/agg_list_cluster_catalog_with_match.js
+        - jstests/core/catalog/list_catalog.js
+        - jstests/core/catalog/list_catalog_stage_consistency.js
+        - jstests/core/timeseries/ddl/bucket_granularity.js
+        - jstests/core/timeseries/ddl/bucket_span_and_rounding_seconds.js
+        - jstests/core/timeseries/ddl/bucket_timestamp_rounding.js
+        - jstests/core/timeseries/ddl/timeseries_bucket_index.js
+        - jstests/core/timeseries/ddl/timeseries_collation.js
+        - jstests/core/timeseries/ddl/timeseries_collection_uuid.js
+        - jstests/core/timeseries/ddl/timeseries_collmod.js
+        - jstests/core/timeseries/ddl/timeseries_compact.js
+        - jstests/core/timeseries/ddl/timeseries_create.js
+        - jstests/core/timeseries/ddl/timeseries_create_collection.js
+        - jstests/core/timeseries/ddl/timeseries_expire_collmod.js
+        - jstests/core/timeseries/ddl/timeseries_field_parsed_as_bson.js
+        - jstests/core/timeseries/ddl/timeseries_id_index.js
+        - jstests/core/timeseries/ddl/timeseries_index.js
+        - jstests/core/timeseries/ddl/timeseries_index_build_failure.js
+        - jstests/core/timeseries/ddl/timeseries_index_collation.js
+        - jstests/core/timeseries/ddl/timeseries_index_partial.js
+        - jstests/core/timeseries/ddl/timeseries_index_spec.js
+        - jstests/core/timeseries/ddl/timeseries_index_spec_with_originalSpec.js
+        - jstests/core/timeseries/ddl/timeseries_index_stats.js
+        - jstests/core/timeseries/ddl/timeseries_index_ttl_partial.js
+        - jstests/core/timeseries/ddl/timeseries_index_use.js
+        - jstests/core/timeseries/ddl/timeseries_list_catalog.js
+        - jstests/core/timeseries/ddl/timeseries_list_collections.js
+        - jstests/core/timeseries/ddl/timeseries_list_collections_filter_name.js
+        - jstests/core/timeseries/ddl/timeseries_list_collections_rawdata.js
+        - jstests/core/timeseries/ddl/timeseries_metric_index_2dsphere.js
+        - jstests/core/timeseries/ddl/timeseries_metric_index_ascending_descending.js
+        - jstests/core/timeseries/ddl/timeseries_metric_index_compound.js
+        - jstests/core/timeseries/ddl/timeseries_metric_index_hashed.js
+        - jstests/core/timeseries/ddl/timeseries_metric_index_wildcard.js
+        - jstests/core/timeseries/ddl/timeseries_nondefault_collation.js
+        - jstests/core/timeseries/ddl/timeseries_sparse_index.js
+        - jstests/core/timeseries/ddl/timeseries_special_indexes_metadata.js
+        - jstests/core/timeseries/geo/partialFilterExpression_with_internalBucketGeoWithin.js
+        - jstests/core/timeseries/geo/timeseries_geonear.js
+        - jstests/core/timeseries/geo/timeseries_geonear_edge_case_measurements.js
+        - jstests/core/timeseries/geo/timeseries_geonear_measurements.js
+        - jstests/core/timeseries/geo/timeseries_geonear_mindistance_and_maxdistance.js
+        - jstests/core/timeseries/geo/timeseries_geonear_random_measurements.js
+        - jstests/core/timeseries/geo/timeseries_internal_bucket_geo_within.js
+        - jstests/core/timeseries/libs/geo.js
+        - jstests/core/timeseries/libs/timeseries.js
+        - jstests/core/timeseries/libs/timeseries_agg_helpers.js
+        - jstests/core/timeseries/libs/timeseries_groupby_reorder_helpers.js
+        - jstests/core/timeseries/libs/timeseries_sort_util.js
+        - jstests/core/timeseries/libs/timeseries_writes_util.js
+        - jstests/core/timeseries/libs/viewless_timeseries_util.js
+        - jstests/core/timeseries/query/bucket_unpacking_with_compound_sort_on_point_queries.js
+        - jstests/core/timeseries/query/bucket_unpacking_with_limit.js
+        - jstests/core/timeseries/query/bucket_unpacking_with_sort.js
+        - jstests/core/timeseries/query/bucket_unpacking_with_sort_negative.js
+        - jstests/core/timeseries/query/bucket_unpacking_with_sort_on_multiple_fields_point_queries.js
+        - jstests/core/timeseries/query/bucket_unpacking_with_sort_on_single_field_point_queries.js
+        - jstests/core/timeseries/query/bucket_unpacking_with_sort_with_collation.js
+        - jstests/core/timeseries/query/bucket_unpacking_with_sort_with_geo.js
+        - jstests/core/timeseries/query/timeseries_block_explain.js
+        - jstests/core/timeseries/query/timeseries_bucket_level_filter.js
+        - jstests/core/timeseries/query/timeseries_buckets_query_explain.js
+        - jstests/core/timeseries/query/timeseries_cursor_batches.js
+        - jstests/core/timeseries/query/timeseries_explicit_unpack_bucket.js
+        - jstests/core/timeseries/query/timeseries_filter_extended_range.js
+        - jstests/core/timeseries/query/timeseries_find.js
+        - jstests/core/timeseries/query/timeseries_groupby_reorder.js
+        - jstests/core/timeseries/query/timeseries_groupby_reorder_expr.js
+        - jstests/core/timeseries/query/timeseries_hint.js
+        - jstests/core/timeseries/query/timeseries_homogeneous_top_bottom.js
+        - jstests/core/timeseries/query/timeseries_id_range.js
+        - jstests/core/timeseries/query/timeseries_insert_normalize_metadata.js
+        - jstests/core/timeseries/query/timeseries_internal_bounded_sort.js
+        - jstests/core/timeseries/query/timeseries_internal_bounded_sort_compound.js
+        - jstests/core/timeseries/query/timeseries_internal_bounded_sort_compound_mixed_types.js
+        - jstests/core/timeseries/query/timeseries_internal_bounded_sort_overflow.js
+        - jstests/core/timeseries/query/timeseries_internal_bounded_sort_release_memory.js
+        - jstests/core/timeseries/query/timeseries_ixscan_clusteredidxscan_union.js
+        - jstests/core/timeseries/query/timeseries_lastpoint.js
+        - jstests/core/timeseries/query/timeseries_lastpoint_common_sort_key.js
+        - jstests/core/timeseries/query/timeseries_lookup_extended_range.js
+        - jstests/core/timeseries/query/timeseries_match_pushdown.js
+        - jstests/core/timeseries/query/timeseries_match_pushdown_with_project.js
+        - jstests/core/timeseries/query/timeseries_merge.js
+        - jstests/core/timeseries/query/timeseries_partial_index_opt.js
+        - jstests/core/timeseries/query/timeseries_predicates.js
+        - jstests/core/timeseries/query/timeseries_project.js
+        - jstests/core/timeseries/query/timeseries_project_pushdown.js
+        - jstests/core/timeseries/query/timeseries_raw_data_getmore.js
+        - jstests/core/timeseries/query/timeseries_raw_data_internal_getmore.js
+        - jstests/core/timeseries/query/timeseries_raw_data_queries.js
+        - jstests/core/timeseries/query/timeseries_shadowing_meta_project_pushdown.js
+        - jstests/core/timeseries/query/timeseries_show_record_id.js
+        - jstests/core/timeseries/query/timeseries_streaming_group.js
+        - jstests/core/timeseries/query/timeseries_top_k_sort_optimization.js
+        - jstests/core/timeseries/write/basic.js
+        - jstests/core/timeseries/write/timeseries_bucket_limit_count.js
+        - jstests/core/timeseries/write/timeseries_bucket_limit_time_range.js
+        - jstests/core/timeseries/write/timeseries_bucket_manual_removal.js
+        - jstests/core/timeseries/write/timeseries_buckets_write_explain.js
+        - jstests/core/timeseries/write/timeseries_insert.js
+        - jstests/core/timeseries/write/timeseries_insert_compresses_bucket.js
+        - jstests/core/timeseries/write/timeseries_insert_mixed_schema_bucket.js
+        - jstests/core/timeseries/write/timeseries_metadata.js
+        - jstests/core/timeseries/write/timeseries_min_max.js
+        - jstests/core/timeseries/write/timeseries_out_of_order.js
+        - jstests/core/timeseries/write/timeseries_reopened_bucket_insert.js
+        - jstests/core/timeseries/write/timeseries_simple.js
+        - jstests/core/timeseries/write/timeseries_sparse.js
+        - jstests/core/timeseries/write/timeseries_update_mixed_schema_bucket.js
 - name: all_sharding_timeseries_tests_selector
   value:
     selector:
@@ -89,6 +219,7 @@
         - jstests/noPassthrough/query/change_streams/change_streams_timeseries_shard_collection_event.js
         - jstests/noPassthrough/query/timeseries/bucket_unpacking_with_sort_granularity_change.js
         - jstests/noPassthrough/query/timeseries/timeseries_validate_mixed_schema_bucket.js
+        - jstests/noPassthrough/query/timeseries/timeseries_validate_mixed_schema_bucket_legacy_flag.js
         - jstests/noPassthrough/timeseries/bucket_reopening/timeseries_direct_remove_reopen.js
         - jstests/noPassthrough/timeseries/bucket_reopening/timeseries_reopen_uncompressed_bucket_for_compression.js
         - jstests/noPassthrough/timeseries/create/initial_sync_recreate_timeseries_collection.js
@@ -100,6 +231,8 @@
         - jstests/noPassthrough/timeseries/data_integrity/timeseries_insert_decompression_failure.js
         - jstests/noPassthrough/timeseries/data_integrity/timeseries_partial_compressed_bucket.js
         - jstests/noPassthrough/timeseries/extended_range/timeseries_bucket_spanning_epoch.js
+        - jstests/noPassthrough/timeseries/extended_range/timeseries_extended_range_rollback.js
+        - jstests/noPassthrough/timeseries/extended_range/timeseries_extended_range_startup.js
         - jstests/noPassthrough/timeseries/index_builds/hybrid_index_timeseries.js
         - jstests/noPassthrough/timeseries/index_builds/resumable_timeseries_index_build_collection_scan_phase.js
         - jstests/noPassthrough/timeseries/index_builds/timeseries_create_index_option_defaults.js
@@ -118,12 +251,14 @@
         - jstests/noPassthrough/timeseries/stats/timeseries_collStats.js
         - jstests/noPassthrough/timeseries/stats/timeseries_latency_stats.js
         - jstests/noPassthrough/timeseries/stats/timeseries_serverStatus.js
+        - jstests/noPassthrough/timeseries/stats/timeseries_server_status_state_management.js
         - jstests/noPassthrough/timeseries/timeseries_buckets_oplog_update.js
         - jstests/noPassthrough/timeseries/timeseries_resharding_disabled.js
         - jstests/noPassthrough/timeseries/timeseries_write_concurrent_collection_replace.js
         - jstests/noPassthrough/timeseries/ttl/timeseries_expire.js
         - jstests/noPassthrough/timeseries/ttl/timeseries_expires_with_partial_index.js
         - jstests/noPassthrough/timeseries/ttl/timeseries_ttl.js
+        - jstests/noPassthrough/timeseries/updates_deletes/timeseries_direct_update.js
         - jstests/noPassthrough/timeseries/updates_deletes/timeseries_updates_create_compressed_buckets.js
         - jstests/noPassthrough/timeseries/validate/validate_compressed_bucket_with_time_out_of_order.js
         - jstests/noPassthrough/timeseries/validate/validate_timeseries_bucket_max_span.js
@@ -148,6 +283,7 @@
         - jstests/noPassthrough/timeseries/write/timeseries_insert_after_cycle_primary.js
         - jstests/noPassthrough/timeseries/write/timeseries_insert_after_failed_insert.js
         - jstests/noPassthrough/timeseries/write/timeseries_insert_invalid_timefield.js
+        - jstests/noPassthrough/timeseries/write/timeseries_insert_rollback.js
         - jstests/noPassthrough/timeseries/write/timeseries_insert_ordered_false.js
         - jstests/noPassthrough/timeseries/write/timeseries_insert_ordered_true.js
         - jstests/noPassthrough/timeseries/write/timeseries_large_measurements.js

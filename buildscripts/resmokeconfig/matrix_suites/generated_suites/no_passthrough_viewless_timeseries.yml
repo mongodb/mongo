@@ -48,6 +48,7 @@ selector:
     - jstests/noPassthrough/query/change_streams/change_streams_timeseries_shard_collection_event.js
     - jstests/noPassthrough/query/timeseries/bucket_unpacking_with_sort_granularity_change.js
     - jstests/noPassthrough/query/timeseries/timeseries_validate_mixed_schema_bucket.js
+    - jstests/noPassthrough/query/timeseries/timeseries_validate_mixed_schema_bucket_legacy_flag.js
     - jstests/noPassthrough/timeseries/bucket_reopening/timeseries_direct_remove_reopen.js
     - jstests/noPassthrough/timeseries/bucket_reopening/timeseries_reopen_uncompressed_bucket_for_compression.js
     - jstests/noPassthrough/timeseries/create/initial_sync_recreate_timeseries_collection.js
@@ -59,6 +60,8 @@ selector:
     - jstests/noPassthrough/timeseries/data_integrity/timeseries_insert_decompression_failure.js
     - jstests/noPassthrough/timeseries/data_integrity/timeseries_partial_compressed_bucket.js
     - jstests/noPassthrough/timeseries/extended_range/timeseries_bucket_spanning_epoch.js
+    - jstests/noPassthrough/timeseries/extended_range/timeseries_extended_range_rollback.js
+    - jstests/noPassthrough/timeseries/extended_range/timeseries_extended_range_startup.js
     - jstests/noPassthrough/timeseries/index_builds/hybrid_index_timeseries.js
     - jstests/noPassthrough/timeseries/index_builds/resumable_timeseries_index_build_collection_scan_phase.js
     - jstests/noPassthrough/timeseries/index_builds/timeseries_create_index_option_defaults.js
@@ -77,12 +80,14 @@ selector:
     - jstests/noPassthrough/timeseries/stats/timeseries_collStats.js
     - jstests/noPassthrough/timeseries/stats/timeseries_latency_stats.js
     - jstests/noPassthrough/timeseries/stats/timeseries_serverStatus.js
+    - jstests/noPassthrough/timeseries/stats/timeseries_server_status_state_management.js
     - jstests/noPassthrough/timeseries/timeseries_buckets_oplog_update.js
     - jstests/noPassthrough/timeseries/timeseries_resharding_disabled.js
     - jstests/noPassthrough/timeseries/timeseries_write_concurrent_collection_replace.js
     - jstests/noPassthrough/timeseries/ttl/timeseries_expire.js
     - jstests/noPassthrough/timeseries/ttl/timeseries_expires_with_partial_index.js
     - jstests/noPassthrough/timeseries/ttl/timeseries_ttl.js
+    - jstests/noPassthrough/timeseries/updates_deletes/timeseries_direct_update.js
     - jstests/noPassthrough/timeseries/updates_deletes/timeseries_updates_create_compressed_buckets.js
     - jstests/noPassthrough/timeseries/validate/validate_compressed_bucket_with_time_out_of_order.js
     - jstests/noPassthrough/timeseries/validate/validate_timeseries_bucket_max_span.js
@@ -107,6 +112,7 @@ selector:
     - jstests/noPassthrough/timeseries/write/timeseries_insert_after_cycle_primary.js
     - jstests/noPassthrough/timeseries/write/timeseries_insert_after_failed_insert.js
     - jstests/noPassthrough/timeseries/write/timeseries_insert_invalid_timefield.js
+    - jstests/noPassthrough/timeseries/write/timeseries_insert_rollback.js
     - jstests/noPassthrough/timeseries/write/timeseries_insert_ordered_false.js
     - jstests/noPassthrough/timeseries/write/timeseries_insert_ordered_true.js
     - jstests/noPassthrough/timeseries/write/timeseries_large_measurements.js

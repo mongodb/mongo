@@ -94,8 +94,11 @@ assert.eq(buckets[2].control.min[timeFieldName], times[2]);
 assert.eq(buckets[2].control.max[timeFieldName], times[2]);
 assert(!buckets[2].control.hasOwnProperty("closed"));
 
+// TODO(SERVER-106641) - Re-enable this once update path is fixed for viewless Timeseries
+
 // Make sure that closed buckets are skipped by updates and deletes.
-if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesSupport")) {
+if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesSupport") &&
+    FeatureFlagUtil.isPresentAndDisabled(testDB, "CreateViewlessTimeseriesCollections")) {
     // The first two buckets containing documents 0 and 1 are closed, so we can only update the
     // third document in the last bucket.
     const result = assert.commandWorked(coll.updateMany({}, {$set: {newField: 123}}));
@@ -105,7 +108,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesSupport")) {
                  coll.find({newField: 123}, {newField: 0}).toArray(),
                  `Expected exactly one document to be updated. ${coll.find().toArray()}`);
 }
-if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesDeletesSupport")) {
+
+// TODO(SERVER-106444) - Re-enable this once delete path is fixed for viewless Timeseries
+if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesDeletesSupport") &&
+    FeatureFlagUtil.isPresentAndDisabled(testDB, "CreateViewlessTimeseriesCollections")) {
     // The first two buckets containing documents 0 and 1 are closed, so we can only delete the
     // third document from the last bucket. Use a filter on 'f' so this is treated as a non-batched
     // multi delete.
@@ -122,5 +128,4 @@ if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesDeletesSupport")) {
                  coll.find().sort({_id: 1}).toArray(),
                  `Expected exactly one document to be deleted. ${coll.find().toArray()}`);
 }
-
 MongoRunner.stopMongod(conn);

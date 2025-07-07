@@ -30,9 +30,11 @@
 #include "mongo/db/timeseries/timeseries_op_observer.h"
 
 #include "mongo/bson/bsonelement.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
@@ -60,9 +62,8 @@ void TimeSeriesOpObserver::onInserts(OperationContext* opCtx,
                                      std::vector<bool> fromMigrate,
                                      bool defaultFromMigrate,
                                      OpStateAccumulator* opAccumulator) {
-    const auto& nss = coll->ns();
-
-    if (!nss.isTimeseriesBucketsCollection()) {
+    const auto& options = coll->getTimeseriesOptions();
+    if (!options.has_value()) {
         return;
     }
 
@@ -73,30 +74,22 @@ void TimeSeriesOpObserver::onInserts(OperationContext* opCtx,
     // DOES need to be -- that will cause correctness issues). Additionally, if the user tried
     // to insert measurements with dates outside the standard range, chances are they will do so
     // again, and we will have only set the flag a little early.
-    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX));
-    // Hold reference to the catalog for collection lookup without locks to be safe.
-    auto catalog = CollectionCatalog::get(opCtx);
-    auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, nss);
-    tassert(6905201, "Could not find collection for write", bucketsColl);
-    auto timeSeriesOptions = bucketsColl->getTimeseriesOptions();
-    if (timeSeriesOptions.has_value()) {
-        if (auto currentSetting = bucketsColl->getRequiresTimeseriesExtendedRangeSupport();
-            !currentSetting &&
-            timeseries::bucketsHaveDateOutsideStandardRange(
-                timeSeriesOptions.value(), first, last)) {
-            bucketsColl->setRequiresTimeseriesExtendedRangeSupport(opCtx);
-        }
+
+    tassert(6905201, "Could not find collection for write", coll);
+    if (auto currentSetting = coll->getRequiresTimeseriesExtendedRangeSupport(); !currentSetting &&
+        timeseries::bucketsHaveDateOutsideStandardRange(options.value(), first, last)) {
+        coll->setRequiresTimeseriesExtendedRangeSupport(opCtx);
     }
 
+    const auto& tsColl = coll.get();
     uassert(ErrorCodes::CannotInsertTimeseriesBucketsWithMixedSchema,
             "Cannot write time-series bucket containing mixed schema data, please run collMod "
             "with timeseriesBucketsMayHaveMixedSchemaData and retry your insert",
             !opCtx->isEnforcingConstraints() ||
-                bucketsColl->getTimeseriesMixedSchemaBucketsState()
-                    .canStoreMixedSchemaBucketsSafely() ||
-                std::none_of(first, last, [bucketsColl](auto&& insert) {
+                tsColl->getTimeseriesMixedSchemaBucketsState().canStoreMixedSchemaBucketsSafely() ||
+                std::none_of(first, last, [tsColl](auto&& insert) {
                     auto mixedSchema =
-                        bucketsColl->doesTimeseriesBucketsDocContainMixedSchemaData(insert.doc);
+                        tsColl->doesTimeseriesBucketsDocContainMixedSchemaData(insert.doc);
                     return mixedSchema.isOK() && mixedSchema.getValue();
                 }));
 }
@@ -104,7 +97,7 @@ void TimeSeriesOpObserver::onInserts(OperationContext* opCtx,
 void TimeSeriesOpObserver::onUpdate(OperationContext* opCtx,
                                     const OplogUpdateEntryArgs& args,
                                     OpStateAccumulator* opAccumulator) {
-    auto options = args.coll->getTimeseriesOptions();
+    const auto& options = args.coll->getTimeseriesOptions();
     if (!options.has_value()) {
         return;
     }
@@ -148,7 +141,7 @@ void TimeSeriesOpObserver::onDelete(OperationContext* opCtx,
                                     const OplogDeleteEntryArgs& args,
                                     OpStateAccumulator* opAccumulator) {
 
-    auto options = coll->getTimeseriesOptions();
+    const auto& options = coll->getTimeseriesOptions();
     if (!options.has_value()) {
         return;
     }
@@ -168,24 +161,14 @@ repl::OpTime TimeSeriesOpObserver::onDropCollection(OperationContext* opCtx,
                                                     const UUID& uuid,
                                                     std::uint64_t numRecords,
                                                     bool markFromMigrate) {
-    if (collectionName.isTimeseriesBucketsCollection()) {
-        auto& bucketCatalog =
-            timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
-        timeseries::bucket_catalog::drop(bucketCatalog, uuid);
-    }
-
+    auto& bucketCatalog =
+        timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
+    timeseries::bucket_catalog::drop(bucketCatalog, uuid);
     return {};
 }
 
 void TimeSeriesOpObserver::onReplicationRollback(OperationContext* opCtx,
                                                  const RollbackObserverInfo& rbInfo) {
-    if (!std::any_of(
-            rbInfo.rollbackNamespaces.begin(),
-            rbInfo.rollbackNamespaces.end(),
-            [](const NamespaceString& ns) { return ns.isTimeseriesBucketsCollection(); })) {
-        return;
-    }
-
     auto& bucketCatalog =
         timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
     tracking::vector<UUID> clearedCollectionUUIDs = tracking::make_vector<UUID>(
