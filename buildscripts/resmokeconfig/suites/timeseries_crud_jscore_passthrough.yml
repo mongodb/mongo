@@ -274,6 +274,7 @@ selector:
     - jstests/core/query/count/count2.js
     # Known unclear issues with distinct.
     - jstests/core/query/distinct/distinct_semantics.js
+    - jstests/core/query/distinct/distinct_collator.js
     # TODO(SERVER-85335): Try to include this test(s).
     - jstests/core/query/project/projection_meta_index_key.js
     - jstests/core/query/sort/sortl.js

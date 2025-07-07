@@ -18,3 +18,6 @@ filters:
   - "generated_suites/*ingress_request_rate_limiter*":
     approvers:
       - 10gen/server-workload-scheduling
+  - "generated_suites/bulk_write_*":
+    approvers:
+      - 10gen/query-execution-router

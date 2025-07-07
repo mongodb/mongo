@@ -251,13 +251,29 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
 }
 
 void CanonicalQuery::setCollator(std::unique_ptr<CollatorInterface> collator) {
-    auto collatorRaw = collator.get();
-    // We must give the ExpressionContext the same collator.
-    _expCtx->setCollator(std::move(collator));
+    // Some MatchExpression implementations may refer to their previously set collator when
+    // 'setCollator()' or '_doSetCollator()' is called on them. They compare the new collator with
+    // the previously set collator for equality or equivalence, which means that they may
+    // dereference the previous collator pointer. The previous collator pointer is the one owned by
+    // the 'ExpressionContext', so we must keep this pointer valid until all MatchExpression
+    // implementations have finished their `setCollator()` work.
 
-    // The collator associated with the match expression tree is now invalid, since we have reset
-    // the collator owned by the ExpressionContext.
-    _primaryMatchExpression->setCollator(collatorRaw);
+    // Store the previous collator in a local variable that outlives the calls to 'setCollator' on
+    // the MatchExpression implementations.
+    [[maybe_unused]] auto oldCollator = _expCtx->getCollatorShared();
+
+    // Perform replacement of collator pointers while old collator pointer is still valid.
+    {
+        auto collatorRaw = collator.get();
+
+        // Update the expression context with the new collator.
+        _expCtx->setCollator(std::move(collator));
+
+        // The match expression must reference the same collator as the expression context and must
+        // not maintain a pointer to the old collator stored in expression context, which will be
+        // deleted when 'oldCollator' goes out of scope.
+        _primaryMatchExpression->setCollator(collatorRaw);
+    }
 }
 
 void CanonicalQuery::serializeToBson(BSONObjBuilder* out) const {

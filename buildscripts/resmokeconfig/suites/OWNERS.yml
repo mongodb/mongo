@@ -147,3 +147,6 @@ filters:
   - "query_correctness_query_shape_hash_stability_generated_test.yml":
     approvers:
       - 10gen/query-execution-query-settings
+  - "timeseries_crud_jscore_passthrough.yml":
+    approvers:
+      - 10gen/query-integration-timeseries
