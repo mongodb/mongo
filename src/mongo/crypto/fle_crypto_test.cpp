@@ -1745,7 +1745,8 @@ TEST(FLE_EDC, ServerSide_Equality_Payloads_V2) {
     auto edcTwiceDerived =
         FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(edcDataCounterkey);
 
-    auto tag = EDCServerCollection::generateTag(edcTwiceDerived, 123456);
+    HmacContext hmacCtx;
+    auto tag = EDCServerCollection::generateTag(&hmacCtx, edcTwiceDerived, 123456);
 
     FLE2IndexedEqualityEncryptedValueV2 serverPayload(iupayload, tag, 123456);
 
@@ -2041,7 +2042,8 @@ TEST(FLE_EDC, ServerSide_Range_Payloads_V2) {
     auto edcTwiceDerived =
         FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(edcDataCounterkey);
 
-    auto tag = EDCServerCollection::generateTag(edcTwiceDerived, 123456);
+    HmacContext hmacCtx;
+    auto tag = EDCServerCollection::generateTag(&hmacCtx, edcTwiceDerived, 123456);
 
     std::vector<PrfBlock> tags;
     tags.push_back(tag);

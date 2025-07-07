@@ -2103,128 +2103,152 @@ std::vector<uint8_t> FLEUtil::vectorFromCDR(ConstDataRange cdr) {
 
 CollectionsLevel1Token FLELevel1TokenGenerator::generateCollectionsLevel1Token(
     FLEIndexKey indexKey) {
-    return FLEUtil::prf(hmacKey(indexKey.data), kLevel1Collection);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, hmacKey(indexKey.data), kLevel1Collection);
 }
 
 ServerTokenDerivationLevel1Token FLELevel1TokenGenerator::generateServerTokenDerivationLevel1Token(
     FLEIndexKey indexKey) {
-    return FLEUtil::prf(hmacKey(indexKey.data), kLevel1ServerTokenDerivation);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, hmacKey(indexKey.data), kLevel1ServerTokenDerivation);
 }
 
 ServerDataEncryptionLevel1Token FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(
     FLEIndexKey indexKey) {
-    return FLEUtil::prf(hmacKey(indexKey.data), kLevelServerDataEncryption);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, hmacKey(indexKey.data), kLevelServerDataEncryption);
 }
 
 
 EDCToken FLECollectionTokenGenerator::generateEDCToken(CollectionsLevel1Token token) {
-    return FLEUtil::prf(token.data, kEDC);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kEDC);
 }
 
 ESCToken FLECollectionTokenGenerator::generateESCToken(CollectionsLevel1Token token) {
-    return FLEUtil::prf(token.data, kESC);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kESC);
 }
 
 ECCToken FLECollectionTokenGenerator::generateECCToken(CollectionsLevel1Token token) {
-    return FLEUtil::prf(token.data, kECC);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kECC);
 }
 
 ECOCToken FLECollectionTokenGenerator::generateECOCToken(CollectionsLevel1Token token) {
-    return FLEUtil::prf(token.data, kECOC);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kECOC);
 }
 
 
 EDCDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(
     EDCToken token, ConstDataRange value) {
-    return FLEUtil::prf(token.data, value);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, value);
 }
 
 ESCDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(
     ESCToken token, ConstDataRange value) {
-    return FLEUtil::prf(token.data, value);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, value);
 }
 
 ECCDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(
     ECCToken token, ConstDataRange value) {
-    return FLEUtil::prf(token.data, value);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, value);
 }
 
 ServerDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateServerDerivedFromDataToken(
     ServerTokenDerivationLevel1Token token, ConstDataRange value) {
-    return FLEUtil::prf(token.data, value);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, value);
 }
 
 EDCDerivedFromDataTokenAndContentionFactorToken
 FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
     generateEDCDerivedFromDataTokenAndContentionFactorToken(EDCDerivedFromDataToken token,
                                                             FLECounter counter) {
-    return FLEUtil::prf(token.data, counter);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, counter);
 }
 
 ESCDerivedFromDataTokenAndContentionFactorToken
 FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
     generateESCDerivedFromDataTokenAndContentionFactorToken(ESCDerivedFromDataToken token,
                                                             FLECounter counter) {
-    return FLEUtil::prf(token.data, counter);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, counter);
 }
 
 ECCDerivedFromDataTokenAndContentionFactorToken
 FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
     generateECCDerivedFromDataTokenAndContentionFactorToken(ECCDerivedFromDataToken token,
                                                             FLECounter counter) {
-    return FLEUtil::prf(token.data, counter);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, counter);
 }
 
 
 EDCTwiceDerivedToken FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(
     EDCDerivedFromDataTokenAndContentionFactorToken token) {
-    return FLEUtil::prf(token.data, kTwiceDerivedTokenFromEDC);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kTwiceDerivedTokenFromEDC);
 }
 
 ESCTwiceDerivedTagToken FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(
     ESCDerivedFromDataTokenAndContentionFactorToken token) {
-    return FLEUtil::prf(token.data, kTwiceDerivedTokenFromESCTag);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kTwiceDerivedTokenFromESCTag);
 }
 
 ESCTwiceDerivedValueToken FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(
     ESCDerivedFromDataTokenAndContentionFactorToken token) {
-    return FLEUtil::prf(token.data, kTwiceDerivedTokenFromESCValue);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kTwiceDerivedTokenFromESCValue);
 }
 
 ECCTwiceDerivedTagToken FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedTagToken(
     ECCDerivedFromDataTokenAndContentionFactorToken token) {
-    return FLEUtil::prf(token.data, kTwiceDerivedTokenFromECCTag);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kTwiceDerivedTokenFromECCTag);
 }
 
 ECCTwiceDerivedValueToken FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedValueToken(
     ECCDerivedFromDataTokenAndContentionFactorToken token) {
-    return FLEUtil::prf(token.data, kTwiceDerivedTokenFromECCValue);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kTwiceDerivedTokenFromECCValue);
 }
 
 ServerCountAndContentionFactorEncryptionToken
 FLEServerMetadataEncryptionTokenGenerator::generateServerCountAndContentionFactorEncryptionToken(
     ServerDerivedFromDataToken token) {
-    return FLEUtil::prf(token.data, kServerCountAndContentionFactorEncryption);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kServerCountAndContentionFactorEncryption);
 }
 
 ServerZerosEncryptionToken
 FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(
     ServerDerivedFromDataToken token) {
-    return FLEUtil::prf(token.data, kServerZerosEncryption);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kServerZerosEncryption);
 }
 
 AnchorPaddingRootToken FLEAnchorPaddingGenerator::generateAnchorPaddingRootToken(ESCToken token) {
-    return FLEUtil::prf(token.data, ConstDataRange(kAnchorPaddingTokenDVal));
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, ConstDataRange(kAnchorPaddingTokenDVal));
 }
 
 AnchorPaddingKeyToken FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingKeyToken(
     AnchorPaddingRootToken token) {
-    return FLEUtil::prf(token.data, kAnchorPaddingKeyToken);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kAnchorPaddingKeyToken);
 }
 
 AnchorPaddingValueToken FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingValueToken(
     AnchorPaddingRootToken token) {
-    return FLEUtil::prf(token.data, kAnchorPaddingValueToken);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kAnchorPaddingValueToken);
 }
 
 StatusWith<EncryptedStateCollectionTokens> EncryptedStateCollectionTokens::decryptAndParse(
@@ -2403,7 +2427,8 @@ PrfBlock ESCCollection::generateId(const ESCTwiceDerivedTagToken& tagToken,
 
 PrfBlock ESCCollection::generateNonAnchorId(const ESCTwiceDerivedTagToken& tagToken,
                                             uint64_t cpos) {
-    return FLEUtil::prf(tagToken.data, cpos);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, tagToken.toCDR(), cpos);
 }
 
 template <class TagToken, class ValueToken>
@@ -3802,8 +3827,10 @@ std::vector<EDCServerPayloadInfo> EDCServerCollection::getEncryptedFieldInfo(BSO
     return fields;
 }
 
-PrfBlock EDCServerCollection::generateTag(EDCTwiceDerivedToken edcTwiceDerived, FLECounter count) {
-    return FLEUtil::prf(edcTwiceDerived.toCDR(), count);
+PrfBlock EDCServerCollection::generateTag(HmacContext* obj,
+                                          EDCTwiceDerivedToken edcTwiceDerived,
+                                          FLECounter count) {
+    return FLEUtil::prf(obj, edcTwiceDerived.toCDR(), count);
 }
 
 PrfBlock EDCServerCollection::generateTag(const EDCServerPayloadInfo& payload) {
@@ -3812,7 +3839,8 @@ PrfBlock EDCServerCollection::generateTag(const EDCServerPayloadInfo& payload) {
     auto edcTwiceDerived = FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(token);
     dassert(payload.isRangePayload() == false);
     dassert(payload.counts.size() == 1);
-    return generateTag(edcTwiceDerived, payload.counts[0]);
+    HmacContext obj;
+    return generateTag(&obj, edcTwiceDerived, payload.counts[0]);
 }
 
 std::vector<PrfBlock> EDCServerCollection::generateTags(const EDCServerPayloadInfo& rangePayload) {
@@ -3830,11 +3858,13 @@ std::vector<PrfBlock> EDCServerCollection::generateTags(const EDCServerPayloadIn
     std::vector<PrfBlock> tags;
     tags.reserve(edgeTokenSets.size());
 
+    HmacContext obj;
     for (size_t i = 0; i < edgeTokenSets.size(); i++) {
         auto edcTwiceDerived = FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(
             FLETokenFromCDR<FLETokenType::EDCDerivedFromDataTokenAndContentionFactorToken>(
                 edgeTokenSets[i].getEdcDerivedToken()));
-        tags.push_back(EDCServerCollection::generateTag(edcTwiceDerived, rangePayload.counts[i]));
+        tags.push_back(
+            EDCServerCollection::generateTag(&obj, edcTwiceDerived, rangePayload.counts[i]));
     }
     return tags;
 }
@@ -4709,19 +4739,19 @@ PrfBlock FLEUtil::blockToArray(const SHA256Block& block) {
     return data;
 }
 
-PrfBlock FLEUtil::prf(ConstDataRange key, ConstDataRange cdr) {
+PrfBlock FLEUtil::prf(HmacContext* hmacCtx, ConstDataRange key, ConstDataRange cdr) {
     uassert(6378002, "Invalid key length", key.length() == crypto::sym256KeySize);
 
     SHA256Block block;
-    SHA256Block::computeHmac(key.data<uint8_t>(), key.length(), {cdr}, &block);
+    SHA256Block::computeHmacWithCtx(hmacCtx, key.data<uint8_t>(), key.length(), {cdr}, &block);
     return blockToArray(block);
 }
 
-PrfBlock FLEUtil::prf(ConstDataRange key, uint64_t value) {
+PrfBlock FLEUtil::prf(HmacContext* hmacCtx, ConstDataRange key, uint64_t value) {
     std::array<char, sizeof(uint64_t)> bufValue;
     DataView(bufValue.data()).write<LittleEndian<uint64_t>>(value);
 
-    return prf(key, bufValue);
+    return prf(hmacCtx, key, bufValue);
 }
 
 void FLEUtil::checkEFCForECC(const EncryptedFieldConfig& efc) {

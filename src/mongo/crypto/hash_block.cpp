@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,41 +27,46 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <cstddef>
-#include <cstdint>
-#include <initializer_list>
-
-#include "mongo/base/data_range.h"
-#include "mongo/base/string_data.h"
 #include "mongo/crypto/hash_block.h"
-#include "mongo/util/make_array_type.h"
 
 namespace mongo {
+#if defined(MONGO_CONFIG_SSL) && MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL && \
+    OPENSSL_VERSION_NUMBER < 0x10100000L
+namespace {
+HMAC_CTX* HMAC_CTX_new() {
+    void* ctx = OPENSSL_malloc(sizeof(HMAC_CTX));
 
-/**
- * A Traits type for adapting HashBlock to sha256 hashes.
- */
-struct SHA256BlockTraits {
-    using HashType = MakeArrayType<std::uint8_t, 32, SHA256BlockTraits>;
+    if (ctx != NULL) {
+        memset(ctx, 0, sizeof(HMAC_CTX));
+    }
+    return static_cast<HMAC_CTX*>(ctx);
+}
 
-    static constexpr StringData name = "SHA256Block"_sd;
+void HMAC_CTX_free(HMAC_CTX* ctx) {
+    HMAC_CTX_cleanup(ctx);
+    OPENSSL_free(ctx);
+}
 
-    static void computeHash(std::initializer_list<ConstDataRange> input, HashType* output);
+int HMAC_CTX_reset(HMAC_CTX* ctx) {
+    HMAC_CTX_init(ctx);
+    return 1;
+}
+}  // namespace
+#endif
+#if defined(MONGO_CONFIG_SSL) && (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL)
+HmacContext::HmacContext() {
+    hmac_ctx = HMAC_CTX_new();
+};
+HmacContext::~HmacContext() {
+    HMAC_CTX_free(hmac_ctx);
+}
 
-    static void computeHmac(const uint8_t* key,
-                            size_t keyLen,
-                            std::initializer_list<ConstDataRange> input,
-                            HashType* output);
-
-    static void computeHmacWithCtx(HmacContext* ctx,
-                                   const uint8_t* key,
-                                   size_t keyLen,
-                                   std::initializer_list<ConstDataRange> input,
-                                   HashType* output);
+int HmacContext::reset() {
+    return HMAC_CTX_reset(hmac_ctx);
 };
 
-using SHA256Block = HashBlock<SHA256BlockTraits>;
-
+HMAC_CTX* HmacContext::get() {
+    return hmac_ctx;
+}
+#endif
 }  // namespace mongo

@@ -60,6 +60,7 @@
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_stats.h"
 #include "mongo/crypto/fle_stats_gen.h"
+#include "mongo/crypto/hash_block.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/crypto/symmetric_key.h"
@@ -1315,9 +1316,10 @@ public:
      *
      * HMAC(EDCTwiceDerivedToken, count)
      */
-    static PrfBlock generateTag(EDCTwiceDerivedToken edcTwiceDerived, FLECounter count);
+    static PrfBlock generateTag(HmacContext* obj,
+                                EDCTwiceDerivedToken edcTwiceDerived,
+                                FLECounter count);
     static PrfBlock generateTag(const EDCServerPayloadInfo& payload);
-    static PrfBlock generateTag(const FLEEdgeToken& token, FLECounter count);
     static std::vector<PrfBlock> generateTags(const EDCServerPayloadInfo& rangePayload);
 
     /**
@@ -1602,9 +1604,9 @@ public:
     /**
      * Compute HMAC-SHA-256
      */
-    static PrfBlock prf(ConstDataRange key, ConstDataRange cdr);
+    static PrfBlock prf(HmacContext* hmacCtx, ConstDataRange key, ConstDataRange cdr);
 
-    static PrfBlock prf(ConstDataRange key, uint64_t value);
+    static PrfBlock prf(HmacContext* hmacCtx, ConstDataRange key, uint64_t value);
 
     static void checkEFCForECC(const EncryptedFieldConfig& efc);
 
