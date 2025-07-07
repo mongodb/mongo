@@ -572,6 +572,7 @@ executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::_stepDownStart()
 void ReplicationCoordinatorImpl::_stepDownFinish(
     const executor::TaskExecutor::CallbackArgs& cbData,
     const executor::TaskExecutor::EventHandle& finishedEvent) {
+    const Date_t startStepDownTime = _replExecutor->now();
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
@@ -597,13 +598,20 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     // kill all write operations which are no longer safe to run on step down. Also, operations that
     // have taken global lock in S mode and operations blocked on prepare conflict will be killed to
     // avoid 3-way deadlock between read, prepared transaction and step down thread.
+    const Date_t startTimeAcquireRSTL = _replExecutor->now();
     AutoGetRstlForStepUpStepDown arsd(
         this, opCtx.get(), ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);
+    const Date_t endTimeAcquireRSTL = _replExecutor->now();
+    LOGV2(962665,
+          "Acquired RSTL during stepDown",
+          "timeToAcquire"_attr = (endTimeAcquireRSTL - startTimeAcquireRSTL));
+    const Date_t startTimeKillConflictingOperations = _replExecutor->now();
     boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
     if (gFeatureFlagIntentRegistration.isEnabled()) {
         rstg.emplace(_killConflictingOperations(
             rss::consensus::IntentRegistry::InterruptionType::StepDown, opCtx.get()));
     }
+    const Date_t endTimeKillConflictingOperations = _replExecutor->now();
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     // This node has already stepped down due to reconfig. So, signal anyone who is waiting on the
@@ -616,10 +624,10 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     // We need to release the mutex before yielding locks for prepared transactions, which might
     // check out sessions, to avoid deadlocks with checked-out sessions accessing this mutex.
     lk.unlock();
-
+    const Date_t startTimeYieldLocksInvalidateSessions = _replExecutor->now();
     yieldLocksForPreparedTransactions(opCtx.get());
     invalidateSessionsForStepdown(opCtx.get());
-
+    const Date_t endTimeYieldLocksInvalidateSessions = _replExecutor->now();
     lk.lock();
 
     // Clear the node's election candidate metrics since it is no longer primary.
@@ -629,7 +637,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
 
     // Update _canAcceptNonLocalWrites.
     _updateWriteAbilityFromTopologyCoordinator(lk, opCtx.get());
-
+    const Date_t startTimeUpdateMemberState = _replExecutor->now();
     const auto action = _updateMemberStateFromTopologyCoordinator(lk);
     if (_pendingTermUpdateDuringStepDown) {
         TopologyCoordinator::UpdateTermResult result;
@@ -641,7 +649,17 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     }
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
+    const Date_t endTimeUpdateMemberState = _replExecutor->now();
     _replExecutor->signalEvent(finishedEvent);
+    const Date_t endStepDownTime = _replExecutor->now();
+    LOGV2(962664,
+          "Stepdown succeeded",
+          "totalTime"_attr = (endStepDownTime - startStepDownTime),
+          "killOpsTime"_attr =
+              (endTimeKillConflictingOperations - startTimeKillConflictingOperations),
+          "updateMemberStateTime"_attr = (endTimeUpdateMemberState - startTimeUpdateMemberState),
+          "yieldLocksTime"_attr =
+              (endTimeYieldLocksInvalidateSessions - startTimeYieldLocksInvalidateSessions));
 }
 
 bool ReplicationCoordinatorImpl::_shouldStepDownOnReconfig(WithLock,
@@ -912,9 +930,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
             return;
         }
     }
-
+    const Date_t startTime = _replExecutor->now();
     auto opCtx = cc().makeOperationContext();
-
     boost::optional<AutoGetRstlForStepUpStepDown> arsd;
     boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
     stdx::unique_lock<stdx::mutex> lk(_mutex);
@@ -922,16 +939,25 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     if (_shouldStepDownOnReconfig(lk, newConfig, myIndex)) {
         _topCoord->prepareForUnconditionalStepDown();
         lk.unlock();
-
+        const Date_t startTimeAcquireRSTL = _replExecutor->now();
         // Primary node will be either unelectable or removed after the configuration change.
         // So, finish the reconfig under RSTL, so that the step down occurs safely.
         arsd.emplace(
             this, opCtx.get(), ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);
+        const Date_t endTimeAcquireRSTL = _replExecutor->now();
+        LOGV2(962668,
+              "Acquired RSTL for stepDown",
+              "totalTimeToAcquire"_attr = (endTimeAcquireRSTL - startTimeAcquireRSTL));
+        const Date_t startTimeKillConflictingOperations = _replExecutor->now();
         if (gFeatureFlagIntentRegistration.isEnabled()) {
             rstg.emplace(_killConflictingOperations(
                 rss::consensus::IntentRegistry::InterruptionType::StepDown, opCtx.get()));
         }
-
+        const Date_t endTimeKillConflictingOperations = _replExecutor->now();
+        LOGV2(962669,
+              "killConflictingOperations in stepDown completed",
+              "totalTime"_attr =
+                  (endTimeKillConflictingOperations - startTimeKillConflictingOperations));
         lk.lock();
         if (_topCoord->isSteppingDownUnconditionally()) {
             invariant(shard_role_details::getLocker(opCtx.get())->isRSTLExclusive());
@@ -941,10 +967,15 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
             // might check out sessions, to avoid deadlocks with checked-out sessions accessing
             // this mutex.
             lk.unlock();
-
+            const Date_t startTimeYieldLocksInvalidateSessions = _replExecutor->now();
             yieldLocksForPreparedTransactions(opCtx.get());
             invalidateSessionsForStepdown(opCtx.get());
-
+            const Date_t endTimeYieldLocksInvalidateSessions = _replExecutor->now();
+            LOGV2(9626610,
+                  "Yielding locks for prepared transactions and invalidating sessions for stepDown "
+                  "completed",
+                  "totalTime"_attr = (endTimeYieldLocksInvalidateSessions -
+                                      startTimeYieldLocksInvalidateSessions));
             lk.lock();
 
             // Clear the node's election candidate metrics since it is no longer primary.
@@ -959,7 +990,12 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
             // liveness timeout. And, no new election can happen as we have already set our
             // ReplicationCoordinatorImpl::_rsConfigState state to "kConfigReconfiguring" which
             // prevents new elections from happening. So, its safe to release the RSTL lock.
+            const Date_t startTimeReleaseRSTL = _replExecutor->now();
             arsd.reset();
+            const Date_t endTimeReleaseRSTL = _replExecutor->now();
+            LOGV2(9626617,
+                  "Released RSTL during stepDown",
+                  "timeToRelease"_attr = (endTimeReleaseRSTL - startTimeReleaseRSTL));
         }
     }
 
@@ -994,7 +1030,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     // If we do not have an index, we should pass -1 as our index to avoid falsely adding ourself to
     // the data structures inside of the TopologyCoordinator.
     const int myIndexValue = myIndex.getStatus().isOK() ? myIndex.getValue() : -1;
-
+    const Date_t startTimeUpdateMemberState = _replExecutor->now();
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig(lk, opCtx.get(), newConfig, myIndexValue);
 
@@ -1004,11 +1040,17 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     }
     ReplicaSetAwareServiceRegistry::get(_service).onSetCurrentConfig(opCtx.get());
     _performPostMemberStateUpdateAction(action);
+    const Date_t endTimeUpdateMemberState = _replExecutor->now();
     if (MONGO_unlikely(waitForPostActionCompleteInHbReconfig.shouldFail())) {
         // Used in tests that wait for the post member state update action to complete.
         // eg. Closing connections upon being removed.
         LOGV2(5286701, "waitForPostActionCompleteInHbReconfig failpoint enabled");
     }
+    const Date_t endTime = _replExecutor->now();
+    LOGV2(9626611,
+          "Heartbeat Reconfig succeeded",
+          "totalTime"_attr = (endTime - startTime),
+          "updateMemberStateTime"_attr = (endTimeUpdateMemberState - startTimeUpdateMemberState));
 }
 
 void ReplicationCoordinatorImpl::_trackHeartbeatHandle(

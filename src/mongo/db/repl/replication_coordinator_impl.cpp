@@ -3878,6 +3878,7 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
                                                         const ReplSetConfig& newConfig,
                                                         const bool isForceReconfig,
                                                         int myIndex) {
+    const Date_t startTime = _replExecutor->now();
     // Do not conduct an election during a reconfig, as the node may not be electable post-reconfig.
     executor::TaskExecutor::EventHandle electionFinishedEvent;
     {
@@ -3903,12 +3904,22 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
         lk.unlock();
         // Primary node won't be electable or removed after the configuration change.
         // So, finish the reconfig under RSTL, so that the step down occurs safely.
+        const Date_t startTimeAcquireRSTL = _replExecutor->now();
         arsd.emplace(this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);
+        const Date_t endTimeAcquireRSTL = _replExecutor->now();
+        LOGV2(9626612,
+              "Acquired RSTL for stepDown",
+              "totalTimeToAcquire"_attr = (endTimeAcquireRSTL - startTimeAcquireRSTL));
+        const Date_t startTimeKillConflictingOperations = _replExecutor->now();
         if (gFeatureFlagIntentRegistration.isEnabled()) {
             rstg.emplace(_killConflictingOperations(
                 rss::consensus::IntentRegistry::InterruptionType::StepDown, opCtx));
         }
-
+        const Date_t endTimeKillConflictingOperations = _replExecutor->now();
+        LOGV2(9626613,
+              "killConflictingOperations in stepDown completed",
+              "totalTime"_attr =
+                  (endTimeKillConflictingOperations - startTimeKillConflictingOperations));
         lk.lock();
         if (_topCoord->isSteppingDownUnconditionally()) {
             invariant(shard_role_details::getLocker(opCtx)->isRSTLExclusive());
@@ -3917,10 +3928,15 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
             // might check out sessions, to avoid deadlocks with checked-out sessions accessing
             // this mutex.
             lk.unlock();
-
+            const Date_t startTimeYieldLocksInvalidateSessions = _replExecutor->now();
             yieldLocksForPreparedTransactions(opCtx);
             invalidateSessionsForStepdown(opCtx);
-
+            const Date_t endTimeYieldLocksInvalidateSessions = _replExecutor->now();
+            LOGV2(9626614,
+                  "Yielding locks for prepared transactions and invalidating sessions for stepDown "
+                  "completed",
+                  "totalTime"_attr = (endTimeYieldLocksInvalidateSessions -
+                                      startTimeYieldLocksInvalidateSessions));
             lk.lock();
 
             // Clear the node's election candidate metrics since it is no longer primary.
@@ -3936,7 +3952,12 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
             // prevents new elections from happening. So, its safe to release the RSTL lock.
             lk.unlock();
             rstg.reset();
+            const Date_t startTimeReleaseRSTL = _replExecutor->now();
             arsd.reset();
+            const Date_t endTimeReleaseRSTL = _replExecutor->now();
+            LOGV2(9626615,
+                  "Released RSTL during stepDown",
+                  "timeToRelease"_attr = (endTimeReleaseRSTL - startTimeReleaseRSTL));
             lk.lock();
         }
     }
@@ -3946,6 +3967,7 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
     invariant(_rsConfig.unsafePeek().isInitialized());
 
     const ReplSetConfig oldConfig = _rsConfig.unsafePeek();
+    const Date_t startTimeUpdateMemberState = _replExecutor->now();
     const PostMemberStateUpdateAction action = _setCurrentRSConfig(lk, opCtx, newConfig, myIndex);
 
     // Record the latest committed optime in the current config atomically with the new config
@@ -3973,6 +3995,12 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
     lk.unlock();
     ReplicaSetAwareServiceRegistry::get(_service).onSetCurrentConfig(opCtx);
     _performPostMemberStateUpdateAction(action);
+    const Date_t endTimeUpdateMemberState = _replExecutor->now();
+    const Date_t endTime = _replExecutor->now();
+    LOGV2(9626616,
+          "ReplSetReconfig succeeded",
+          "totalTime"_attr = (endTime - startTime),
+          "updateMemberStateTime"_attr = (endTimeUpdateMemberState - startTimeUpdateMemberState));
 }
 
 Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx,
