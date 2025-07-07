@@ -117,6 +117,9 @@ const Hours kLongFutureTimeout(8);
 const StatusWith<BSONObj> kNoSuchTransaction =
     BSON("ok" << 0 << "code" << ErrorCodes::NoSuchTransaction << "errmsg"
               << "No such transaction exists");
+const StatusWith<BSONObj> kAPIMismatchError =
+    BSON("ok" << 0 << "code" << ErrorCodes::APIMismatchError << "errmsg"
+              << "API parameter mismatch...");
 const StatusWith<BSONObj> kOk = BSON("ok" << 1);
 const Timestamp kDummyPrepareTimestamp = Timestamp(1, 1);
 const std::vector<NamespaceString> kDummyAffectedNamespaces = {
@@ -190,6 +193,12 @@ protected:
     void assertPrepareSentAndRespondWithSuccess(const Timestamp& timestamp) {
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                         makePrepareOkResponse(timestamp, kDummyAffectedNamespaces),
+                                        defaultMajorityWriteConcernDoNotUse());
+    }
+
+    void assertPrepareSentAndRespondWithAPIMismatchError() {
+        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
+                                        kAPIMismatchError,
                                         defaultMajorityWriteConcernDoNotUse());
     }
 
@@ -346,7 +355,7 @@ TEST_F(TransactionCoordinatorDriverTest,
 }
 
 TEST_F(TransactionCoordinatorDriverTest,
-       SendDecisionToParticipantShardInterpretsVoteToAbortAsSuccess) {
+       SendDecisionToParticipantShardInterpretsTwoPhaseDecisionAckErrorAsSuccess) {
     txn::AsyncWorkScheduler aws(getServiceContext());
     Future<void> future =
         txn::sendDecisionToShard(getServiceContext(),
@@ -359,6 +368,30 @@ TEST_F(TransactionCoordinatorDriverTest,
     assertPrepareSentAndRespondWithNoSuchTransaction();
 
     future.get();
+}
+
+TEST_F(TransactionCoordinatorDriverTest,
+       SendDecisionToParticipantShardInterpretsVoteToAbortErrorsAsFailure) {
+    txn::AsyncWorkScheduler aws(getServiceContext());
+    Future<void> future =
+        txn::sendDecisionToShard(getServiceContext(),
+                                 aws,
+                                 _lsid,
+                                 _txnNumberAndRetryCounter,
+                                 kTwoShardIdList[0],
+                                 makeDummyPrepareCommand(_lsid, _txnNumberAndRetryCounter));
+
+    // Ensure that the APIMismatchError (VoteAbortError category) is not interpreted as a success.
+    // This allows it to be retried indefinitely, like any other error, even though such errors are
+    // unexpected at this stage. Consequently, shutting down the coordinator will consistently
+    // determine that the scheduler has not succeeded, leading to the retrial process failing with a
+    // TransactionCoordinatorSteppingDown error.
+    assertPrepareSentAndRespondWithAPIMismatchError();
+    sleepmillis(10);
+    aws.shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "Shutdown for test"});
+    advanceClockAndExecuteScheduledTasks();
+    ASSERT_THROWS_CODE(
+        future.get(), AssertionException, ErrorCodes::TransactionCoordinatorSteppingDown);
 }
 
 TEST_F(TransactionCoordinatorDriverTest,
