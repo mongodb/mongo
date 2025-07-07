@@ -78,12 +78,6 @@ public:
         }
     }
 
-    /**
-     * Mark an unrecoverable error has occurred, for ordered batcher this means no further batches
-     * should be produced.
-     */
-    virtual void markUnrecoverableError() = 0;
-
 protected:
     WriteOpProducer& _producer;
     WriteOpAnalyzer& _analyzer;
@@ -96,11 +90,6 @@ public:
 
     boost::optional<WriteBatch> getNextBatch(OperationContext* opCtx,
                                              const RoutingContext& routingCtx) override;
-
-    void markUnrecoverableError() override;
-
-private:
-    bool unrecoverableError{false};
 };
 
 class UnorderedWriteOpBatcher : public WriteOpBatcher {
@@ -110,8 +99,6 @@ public:
 
     boost::optional<WriteBatch> getNextBatch(OperationContext* opCtx,
                                              const RoutingContext& routingCtx) override;
-
-    void markUnrecoverableError() override {};
 };
 
 }  // namespace unified_write_executor

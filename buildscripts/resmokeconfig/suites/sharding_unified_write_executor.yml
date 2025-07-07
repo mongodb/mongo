@@ -12,12 +12,10 @@ selector:
     # - jstests/sharding/applyOps_multiple_namespaces.js
     # - jstests/sharding/chunk_migration_with_bulk_write.js
     # - jstests/sharding/database_versioning_all_commands.js
-    - jstests/sharding/mongos_writes_wait_for_write_concern_sharded.js
-    # TODO SERVER-104120: Write without shard key support
+    # - jstests/sharding/mongos_writes_wait_for_write_concern_sharded.js
     # - jstests/sharding/mongos_writes_wait_for_write_concern_sharded_addl_crud_ops.js
-    # TODO SERVER-104139: Timeseries collection support
     # - jstests/sharding/mongos_writes_wait_for_write_concern_timeseries.js
-    - jstests/sharding/mongos_writes_wait_for_write_concern_unsharded.js
+    # - jstests/sharding/mongos_writes_wait_for_write_concern_unsharded.js
     # - jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
     # - jstests/sharding/query/bulk_write_size_limit.js
     # - jstests/sharding/query/let_rand.js

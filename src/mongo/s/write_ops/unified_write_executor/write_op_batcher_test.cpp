@@ -370,31 +370,6 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest,
     ASSERT_FALSE(batch3.has_value());
 }
 
-TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherStopsOnUnrecoverableError) {
-    BulkWriteCommandRequest request(
-        {BulkWriteInsertOp(0, BSONObj()), BulkWriteInsertOp(1, BSONObj())},
-        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
-    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
-
-    MockWriteOpAnalyzer analyzer({
-        {0, {kSingleShard, {nss0Shard0}}},
-        {1, {kSingleShard, {nss1Shard1}}},
-    });
-
-    auto routingCtx = RoutingContext::createSynthetic({});
-    auto batcher = OrderedWriteOpBatcher(producer, analyzer);
-
-    // Output batches: [0], <stop>
-    auto batch1 = batcher.getNextBatch(nullptr /* opCtx */, *routingCtx);
-    ASSERT_TRUE(batch1.has_value());
-    assertSingleShardSimpleWriteBatch(*batch1, {0}, {nss0Shard0});
-
-    batcher.markUnrecoverableError();
-
-    auto batch2 = batcher.getNextBatch(nullptr /* opCtx */, *routingCtx);
-    ASSERT_FALSE(batch2.has_value());
-}
-
 TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,
        UnorderedBatcherBatchesSingleShardOpsTargetingDifferentShardsInOneBatch) {
     BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSONObj()),
@@ -600,43 +575,6 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,
     ASSERT_FALSE(optBatch3.has_value());
 }
 
-TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherDoesNotStopOnUnrecoverableError) {
-    BulkWriteCommandRequest request(
-        {
-            BulkWriteInsertOp(0, BSONObj()),
-            BulkWriteInsertOp(1, BSONObj()),
-            BulkWriteInsertOp(0, BSONObj()),
-        },
-        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
-    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
-
-    MockWriteOpAnalyzer analyzer({
-        {0, {kSingleShard, {nss0Shard0}}},
-        {1, {kSingleShard, {nss1Shard0}}},
-        {2, {kSingleShard, {nss0Shard0VersionIgnored}}},
-    });
-
-    auto routingCtx = RoutingContext::createSynthetic({});
-    auto batcher = UnorderedWriteOpBatcher(producer, analyzer);
-
-    // Output batches: [0, 1], [2]
-    SimpleWriteBatch::ShardRequest shardRequest1{{{nss0, nss0Shard0}, {nss1, nss1Shard0}},
-                                                 {WriteOp(request, 0), WriteOp(request, 1)}};
-    SimpleWriteBatch expectedBatch1{{{shardId0, shardRequest1}}};
-    auto batch1 = batcher.getNextBatch(nullptr /* opCtx */, *routingCtx);
-    ASSERT_TRUE(batch1.has_value());
-    assertUnorderedSingleShardSimpleWriteBatch(*batch1, expectedBatch1);
-
-    shardRequest1 =
-        SimpleWriteBatch::ShardRequest{{{nss0, nss0Shard0VersionIgnored}}, {WriteOp(request, 2)}};
-    SimpleWriteBatch expectedBatch2{{{shardId0, shardRequest1}}};
-    auto batch2 = batcher.getNextBatch(nullptr /* opCtx */, *routingCtx);
-    ASSERT_TRUE(batch2.has_value());
-    assertUnorderedSingleShardSimpleWriteBatch(*batch2, expectedBatch2);
-
-    auto batch3 = batcher.getNextBatch(nullptr /* opCtx */, *routingCtx);
-    ASSERT_FALSE(batch3.has_value());
-}
 
 }  // namespace
 }  // namespace unified_write_executor

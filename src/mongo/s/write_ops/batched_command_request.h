@@ -99,8 +99,6 @@ public:
 
     const NamespaceString& getNS() const;
 
-    bool getOrdered() const;
-
     bool getBypassDocumentValidation() const;
 
     bool hasEncryptionInformation() const;

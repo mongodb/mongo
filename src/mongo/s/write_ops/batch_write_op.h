@@ -43,7 +43,6 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
 #include "mongo/s/write_ops/pause_migrations_during_multi_updates_enablement.h"
-#include "mongo/s/write_ops/wc_error.h"
 #include "mongo/s/write_ops/write_op.h"
 #include "mongo/stdx/unordered_map.h"
 
@@ -77,6 +76,21 @@ struct ShardError {
 
     ShardEndpoint endpoint;
     write_ops::WriteError error;
+};
+
+/**
+ * Simple struct for storing a write concern error with an endpoint.
+ *
+ * Certain types of errors are not stored in WriteOps or must be returned to a caller.
+ */
+struct ShardWCError {
+    ShardWCError(const ShardId& shardName, const WriteConcernErrorDetail& error)
+        : shardName(shardName) {
+        error.cloneTo(&this->error);
+    }
+
+    ShardId shardName;
+    WriteConcernErrorDetail error;
 };
 
 using TargetedBatchMap = std::map<ShardId, std::unique_ptr<TargetedWriteBatch>>;
@@ -297,6 +311,10 @@ private:
 
 typedef std::function<const NSTargeter&(const WriteOp& writeOp)> GetTargeterFn;
 typedef std::function<int(const WriteOp& writeOp, ShardId& shard)> GetWriteSizeFn;
+
+// Utility function to merge write concern errors received from various shards.
+boost::optional<WriteConcernErrorDetail> mergeWriteConcernErrors(
+    const std::vector<ShardWCError>& wcErrors);
 
 // Utility function to add the actualCollection field into a WriteError if it does not already
 // exist, contacting the primary shard if it needs to.

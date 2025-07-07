@@ -151,6 +151,26 @@ bool hasTransientTransactionError(const BatchedCommandResponse& response) {
     return iter != errorLabels.end();
 }
 
+/*
+ * Provides the write concern with which child batches have to be internally submitted.
+ */
+boost::optional<WriteConcernOptions> getWriteConcernForChildBatch(OperationContext* opCtx) {
+    // Per-operation write concern is not supported in transactions.
+    if (TransactionRouter::get(opCtx)) {
+        return boost::none;
+    }
+
+    // Retrieve the WC specified by the remote client; in case of "fire and forget" request, the WC
+    // needs to be upgraded to "w: 1" for the sharding protocol to correctly handle internal
+    // writeErrors.
+    auto wc = opCtx->getWriteConcern();
+    if (!wc.requiresWriteAcknowledgement()) {
+        wc.w = 1;
+    }
+
+    return wc;
+}
+
 // Helper to parse all of the childBatches and construct the proper requests to send using the
 // AsyncRequestSender.
 std::vector<AsyncRequestsSender::Request> constructARSRequestsToSend(
@@ -162,7 +182,7 @@ std::vector<AsyncRequestsSender::Request> constructARSRequestsToSend(
     BatchWriteOp& batchOp,
     boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) {
     std::vector<AsyncRequestsSender::Request> requests;
-    const auto wcForChildBatch = getWriteConcernForShardRequest(opCtx);
+    const auto wcForChildBatch = getWriteConcernForChildBatch(opCtx);
     // Get as many batches as we can at once
     for (auto&& childBatch : childBatches) {
         auto nextBatch = std::move(childBatch.second);
@@ -542,7 +562,7 @@ void executeTwoPhaseWrite(OperationContext* opCtx,
             *targetedWriteBatch, targeter, allowShardKeyUpdatesWithoutFullShardKeyInQuery);
         BSONObjBuilder requestBuilder;
         shardBatchRequest.serialize(&requestBuilder);
-        if (const auto wcForChildBatch = getWriteConcernForShardRequest(opCtx)) {
+        if (const auto wcForChildBatch = getWriteConcernForChildBatch(opCtx)) {
             requestBuilder.append(WriteConcernOptions::kWriteConcernField,
                                   wcForChildBatch->toBSON());
         }

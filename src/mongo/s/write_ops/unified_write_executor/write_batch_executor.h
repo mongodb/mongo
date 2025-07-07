@@ -49,14 +49,10 @@ using WriteBatchResponse = std::map<ShardId, ShardResponse>;
 
 class WriteBatchExecutor {
 public:
-    WriteBatchExecutor(const WriteOpContext& context) : _context(context) {}
-
     WriteBatchResponse execute(OperationContext* opCtx, const WriteBatch& batch);
 
 private:
     WriteBatchResponse _execute(OperationContext* opCtx, const SimpleWriteBatch& batch);
-
-    const WriteOpContext& _context;
 };
 
 }  // namespace unified_write_executor

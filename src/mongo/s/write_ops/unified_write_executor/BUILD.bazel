@@ -34,7 +34,6 @@ mongo_cc_library(
         "//src/mongo/s:sharding_collection_routing_info_targeter",
         "//src/mongo/s:sharding_router_api",
         "//src/mongo/s/write_ops:batch_write_types",
-        "//src/mongo/s/write_ops:wc_error",
     ],
 )
 

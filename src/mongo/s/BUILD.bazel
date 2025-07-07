@@ -781,7 +781,6 @@ mongo_cc_library(
         "//src/mongo/executor:inline_executor",
         "//src/mongo/s/query/planner:cluster_find",
         "//src/mongo/s/write_ops:batch_write_types",
-        "//src/mongo/s/write_ops:wc_error",
         "//src/mongo/s/write_ops/unified_write_executor",
     ],
 )

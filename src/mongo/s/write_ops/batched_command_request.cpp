@@ -93,10 +93,6 @@ BatchedCommandRequest BatchedCommandRequest::parseDelete(const OpMsgRequest& req
     return constructBatchedCommandRequest<DeleteOp>(request);
 }
 
-bool BatchedCommandRequest::getOrdered() const {
-    return _visit([](auto&& op) -> decltype(auto) { return op.getOrdered(); });
-}
-
 bool BatchedCommandRequest::getBypassDocumentValidation() const {
     return _visit([](auto&& op) -> decltype(auto) { return op.getBypassDocumentValidation(); });
 }

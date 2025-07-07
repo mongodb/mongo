@@ -48,7 +48,6 @@ namespace mongo {
 class WriteConcernErrorDetail {
 public:
     WriteConcernErrorDetail();
-    WriteConcernErrorDetail(Status status);
 
     /** Copies all the fields present in 'this' to 'other'. */
     void cloneTo(WriteConcernErrorDetail* other) const;

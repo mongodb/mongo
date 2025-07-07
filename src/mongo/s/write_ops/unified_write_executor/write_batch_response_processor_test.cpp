@@ -208,21 +208,19 @@ TEST_F(WriteBatchResponseProcessorTest, CreateCollection) {
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
     WriteBatchResponseProcessor processor;
-    auto result = processor.onWriteBatchResponse({{shard1Name,
-                                                   Response{
-                                                       rcr1,
-                                                       {op1, op2},
-                                                   }}});
-    // No unrecoverable error.
-    ASSERT_FALSE(result.unrecoverableError);
+    auto [incomplete, created] = processor.onWriteBatchResponse({{shard1Name,
+                                                                  Response{
+                                                                      rcr1,
+                                                                      {op1, op2},
+                                                                  }}});
     // One incomplete returned (op2).
-    ASSERT_EQ(result.opsToRetry.size(), 1);
-    ASSERT_EQ(result.opsToRetry[0].getNss(), nss2);
-    ASSERT_EQ(result.opsToRetry[0].getId(), 1);
+    ASSERT_EQ(incomplete.size(), 1);
+    ASSERT_EQ(incomplete[0].getNss(), nss2);
+    ASSERT_EQ(incomplete[0].getId(), 1);
 
     // Assert nss2 was flagged for creation.
-    ASSERT_EQ(result.collsToCreate.size(), 1);
-    ASSERT(result.collsToCreate.contains(nss2));
+    ASSERT_EQ(created.size(), 1);
+    ASSERT(created.contains(nss2));
 
     // Confirm so far we've only processed one error. Copy the processor since generating a
     // response consumes the results array.
@@ -248,10 +246,10 @@ TEST_F(WriteBatchResponseProcessorTest, CreateCollection) {
 
     RemoteCommandResponse rcr2(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
-    result = processor.onWriteBatchResponse({{shard1Name, Response{rcr2, {op2}}}});
-    ASSERT_FALSE(result.unrecoverableError);
-    ASSERT(result.opsToRetry.empty());
-    ASSERT(result.collsToCreate.empty());
+    std::tie(incomplete, created) =
+        processor.onWriteBatchResponse({{shard1Name, Response{rcr2, {op2}}}});
+    ASSERT(incomplete.empty());
+    ASSERT(created.empty());
     clientReply = processor.generateClientResponse<BulkWriteCommandReply>();
 
     // Assert we have both ops completed now.
@@ -282,21 +280,19 @@ TEST_F(WriteBatchResponseProcessorTest, SingleReplyItemForBatchOfThree) {
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
     WriteBatchResponseProcessor processor;
-    auto result = processor.onWriteBatchResponse({{shard1Name,
-                                                   Response{
-                                                       rcr1,
-                                                       {op1, op2, op3},
-                                                   }}});
-    // No unrecoverable error.
-    ASSERT_FALSE(result.unrecoverableError);
+    auto [incomplete, created] = processor.onWriteBatchResponse({{shard1Name,
+                                                                  Response{
+                                                                      rcr1,
+                                                                      {op1, op2, op3},
+                                                                  }}});
     // Assert all ops were returned for retry even though there was only one item in the reply.
-    ASSERT_EQ(result.opsToRetry.size(), 3);
-    ASSERT_EQ(result.opsToRetry[0].getId(), 0);
-    ASSERT_EQ(result.opsToRetry[1].getId(), 1);
-    ASSERT_EQ(result.opsToRetry[2].getId(), 2);
+    ASSERT_EQ(incomplete.size(), 3);
+    ASSERT_EQ(incomplete[0].getId(), 0);
+    ASSERT_EQ(incomplete[1].getId(), 1);
+    ASSERT_EQ(incomplete[2].getId(), 2);
     // Assert nss1 was flagged for creation.
-    ASSERT_EQ(result.collsToCreate.size(), 1);
-    ASSERT(result.collsToCreate.contains(nss1));
+    ASSERT_EQ(created.size(), 1);
+    ASSERT(created.contains(nss1));
 
     // Assert the generated response is as expected.
     auto response = processor.generateClientResponse<BulkWriteCommandReply>();
@@ -351,28 +347,26 @@ TEST_F(WriteBatchResponseProcessorTest, TwoShardMixedNamespaceExistence) {
     RemoteCommandResponse rcr2(host2, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
     WriteBatchResponseProcessor processor;
-    auto result = processor.onWriteBatchResponse({{shard1Name,
-                                                   Response{
-                                                       rcr1,
-                                                       {op1, op2, op3},
-                                                   }},
-                                                  {shard2Name,
-                                                   Response{
-                                                       rcr2,
-                                                       {op4, op5, op6},
-                                                   }}});
-    // No unrecoverable error.
-    ASSERT_FALSE(result.unrecoverableError);
+    auto [incomplete, created] = processor.onWriteBatchResponse({{shard1Name,
+                                                                  Response{
+                                                                      rcr1,
+                                                                      {op1, op2, op3},
+                                                                  }},
+                                                                 {shard2Name,
+                                                                  Response{
+                                                                      rcr2,
+                                                                      {op4, op5, op6},
+                                                                  }}});
     // Assert all the errors were returned for retry.
-    ASSERT_EQ(result.opsToRetry.size(), 4);
-    ASSERT_EQ(result.opsToRetry[0].getId(), 1);
-    ASSERT_EQ(result.opsToRetry[1].getId(), 2);
-    ASSERT_EQ(result.opsToRetry[2].getId(), 4);
-    ASSERT_EQ(result.opsToRetry[3].getId(), 5);
+    ASSERT_EQ(incomplete.size(), 4);
+    ASSERT_EQ(incomplete[0].getId(), 1);
+    ASSERT_EQ(incomplete[1].getId(), 2);
+    ASSERT_EQ(incomplete[2].getId(), 4);
+    ASSERT_EQ(incomplete[3].getId(), 5);
     // Assert nss2 and nss3 were flagged for creation.
-    ASSERT_EQ(result.collsToCreate.size(), 2);
-    ASSERT(result.collsToCreate.contains(nss2));
-    ASSERT(result.collsToCreate.contains(nss3));
+    ASSERT_EQ(created.size(), 2);
+    ASSERT(created.contains(nss2));
+    ASSERT(created.contains(nss3));
 }
 
 TEST_F(WriteBatchResponseProcessorTest, IdxsCorrectlyRewrittenInReplyItems) {
@@ -425,7 +419,7 @@ TEST_F(WriteBatchResponseProcessorTest, IdxsCorrectlyRewrittenInReplyItems) {
     RemoteCommandResponse rcr2(host1, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
     WriteBatchResponseProcessor processor;
-    auto result = processor.onWriteBatchResponse({
+    auto [incomplete, created] = processor.onWriteBatchResponse({
         {shard2Name,
          Response{
              rcr2,
@@ -437,14 +431,12 @@ TEST_F(WriteBatchResponseProcessorTest, IdxsCorrectlyRewrittenInReplyItems) {
              {op6, op1, op2},
          }},
     });
-    // Recoverable error.
-    ASSERT_TRUE(result.unrecoverableError);
     // Assert all the errors were returned for retry.
-    ASSERT_EQ(result.opsToRetry.size(), 1);
-    ASSERT_EQ(result.opsToRetry[0].getId(), 0);
+    ASSERT_EQ(incomplete.size(), 1);
+    ASSERT_EQ(incomplete[0].getId(), 0);
     // Assert nss2 was flagged for creation.
-    ASSERT_EQ(result.collsToCreate.size(), 1);
-    ASSERT(result.collsToCreate.contains(nss1));
+    ASSERT_EQ(created.size(), 1);
+    ASSERT(created.contains(nss1));
 
     auto clientReply = processor.generateClientResponse<BulkWriteCommandReply>();
     ASSERT_EQ(clientReply.getNErrors(), 3);
@@ -466,132 +458,5 @@ TEST_F(WriteBatchResponseProcessorTest, IdxsCorrectlyRewrittenInReplyItems) {
     ASSERT_EQ(batch[4].getStatus().code(), ErrorCodes::BadValue);
 }
 
-TEST_F(WriteBatchResponseProcessorTest, ProcessesSingleWriteConcernError) {
-    // shard1: {code: ok, firstBatch: [{code: ok, originalId: 0, id: 0}, writeConcernError: {}]}
-    // shard2: {code: ok, firstBatch: [{code: ok, originalId: 1, id: 0}, writeConcernError: {}]}
-    auto request = BulkWriteCommandRequest(
-        {
-            BulkWriteInsertOp(0, BSON("_id" << 1)),
-            BulkWriteInsertOp(1, BSON("_id" << 2)),
-        },
-        {NamespaceInfoEntry(nss1), NamespaceInfoEntry(nss2)});
-    // Original id to shard request Id/status map.
-    WriteOp op1(request, 0);  // shard1, id: 0, OK
-    WriteOp op2(request, 1);  // shard2, id: 2, OK
-
-    auto reply1 = makeReply();
-    reply1.setNInserted(1);
-    reply1.setCursor(
-        BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, nss1));
-    const auto reply1WcErrorMsg = "WriteConcernTimeout";
-    reply1.setWriteConcernError(
-        BulkWriteWriteConcernError(ErrorCodes::WriteConcernTimeout, reply1WcErrorMsg));
-    RemoteCommandResponse rcr1(host2, setTopLevelOK(reply1.toBSON()), Microseconds{0}, false);
-
-    auto reply2 = makeReply();
-    reply2.setNInserted(1);
-    reply2.setCursor(
-        BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, nss1));
-    RemoteCommandResponse rcr2(host1, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
-
-    WriteBatchResponseProcessor processor;
-    auto result = processor.onWriteBatchResponse({
-        {shard1Name,
-         Response{
-             rcr1,
-             {op2},
-         }},
-        {shard2Name,
-         Response{
-             rcr2,
-             {op1},
-         }},
-    });
-    ASSERT_FALSE(result.unrecoverableError);
-    ASSERT_EQ(result.opsToRetry.size(), 0);
-    ASSERT_EQ(result.collsToCreate.size(), 0);
-
-    auto clientReply = processor.generateClientResponse<BulkWriteCommandReply>();
-    ASSERT_EQ(clientReply.getNErrors(), 0);
-    ASSERT_EQ(clientReply.getNInserted(), 2);
-    auto batch = clientReply.getCursor().getFirstBatch();
-    ASSERT_EQ(batch.size(), 2);
-    ASSERT_EQ(batch[0].getIdx(), 0);
-    ASSERT_EQ(batch[0].getStatus().code(), ErrorCodes::OK);
-    ASSERT_EQ(batch[1].getIdx(), 1);
-    ASSERT_EQ(batch[1].getStatus().code(), ErrorCodes::OK);
-
-    // Check write concern errors
-    auto wcError = clientReply.getWriteConcernError();
-    ASSERT_TRUE(wcError.has_value());
-    ASSERT_EQ(wcError->getCode(), ErrorCodes::WriteConcernTimeout);
-    ASSERT_TRUE(wcError->getErrmsg().find(reply1WcErrorMsg) != std::string::npos);
-}
-
-TEST_F(WriteBatchResponseProcessorTest, ProcessesMultipleWriteConcernErrors) {
-    // shard1: {code: ok, firstBatch: [{code: ok, originalId: 0, id: 0}, writeConcernError: {}]}
-    // shard2: {code: ok, firstBatch: [{code: ok, originalId: 1, id: 0}, writeConcernError: {}]}
-    auto request = BulkWriteCommandRequest(
-        {
-            BulkWriteInsertOp(0, BSON("_id" << 1)),
-            BulkWriteInsertOp(1, BSON("_id" << 2)),
-        },
-        {NamespaceInfoEntry(nss1), NamespaceInfoEntry(nss2)});
-    // Original id to shard request Id/status map.
-    WriteOp op1(request, 0);  // shard1, id: 0, OK
-    WriteOp op2(request, 1);  // shard2, id: 1, OK
-
-    auto reply1 = makeReply();
-    reply1.setNInserted(1);
-    reply1.setCursor(
-        BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, nss1));
-    const auto reply1WcErrorMsg = "WriteConcernTimeout";
-    reply1.setWriteConcernError(
-        BulkWriteWriteConcernError(ErrorCodes::WriteConcernTimeout, "WriteConcernTimeout"));
-    RemoteCommandResponse rcr1(host2, setTopLevelOK(reply1.toBSON()), Microseconds{0}, false);
-
-    auto reply2 = makeReply();
-    reply2.setNInserted(1);
-    reply2.setCursor(
-        BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, nss1));
-    const auto reply2WcErrorMsg = "NotWritablePrimary";
-    reply2.setWriteConcernError(
-        BulkWriteWriteConcernError(ErrorCodes::NotWritablePrimary, "NotWritablePrimary"));
-    RemoteCommandResponse rcr2(host1, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
-
-    WriteBatchResponseProcessor processor;
-    auto result = processor.onWriteBatchResponse({
-        {shard1Name,
-         Response{
-             rcr1,
-             {op2},
-         }},
-        {shard2Name,
-         Response{
-             rcr2,
-             {op1},
-         }},
-    });
-    ASSERT_FALSE(result.unrecoverableError);
-    ASSERT_EQ(result.opsToRetry.size(), 0);
-    ASSERT_EQ(result.collsToCreate.size(), 0);
-
-    auto clientReply = processor.generateClientResponse<BulkWriteCommandReply>();
-    ASSERT_EQ(clientReply.getNErrors(), 0);
-    ASSERT_EQ(clientReply.getNInserted(), 2);
-    auto batch = clientReply.getCursor().getFirstBatch();
-    ASSERT_EQ(batch.size(), 2);
-    ASSERT_EQ(batch[0].getIdx(), 0);
-    ASSERT_EQ(batch[0].getStatus().code(), ErrorCodes::OK);
-    ASSERT_EQ(batch[1].getIdx(), 1);
-    ASSERT_EQ(batch[1].getStatus().code(), ErrorCodes::OK);
-
-    // Check merged write concern errors
-    auto wcError = clientReply.getWriteConcernError();
-    ASSERT_TRUE(wcError.has_value());
-    ASSERT_EQ(wcError->getCode(), ErrorCodes::WriteConcernTimeout);
-    ASSERT_TRUE(wcError->getErrmsg().find(reply1WcErrorMsg) != std::string::npos);
-    ASSERT_TRUE(wcError->getErrmsg().find(reply2WcErrorMsg) != std::string::npos);
-}
 }  // namespace
 }  // namespace mongo::unified_write_executor

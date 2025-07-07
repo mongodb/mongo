@@ -47,27 +47,6 @@ enum WriteType {
 
 using WriteOpId = size_t;
 
-class WriteOpContext {
-public:
-    WriteOpContext(const BulkWriteCommandRequest& request)
-        : _bulkWriteRequest(&request), _batchedRequest(nullptr) {}
-    WriteOpContext(const BatchedCommandRequest& request)
-        : _bulkWriteRequest(nullptr), _batchedRequest(&request) {}
-
-    bool getOrdered() const {
-        if (_bulkWriteRequest) {
-            return _bulkWriteRequest->getOrdered();
-        } else {
-            return _batchedRequest->getOrdered();
-        }
-    }
-
-private:
-    // TODO SERVER-104262 refactor the WriteOp implementation to not use raw pointers
-    const BulkWriteCommandRequest* _bulkWriteRequest{nullptr};
-    const BatchedCommandRequest* _batchedRequest{nullptr};
-};
-
 class WriteOp {
 public:
     WriteOp(const BulkWriteCommandRequest& request, int index)

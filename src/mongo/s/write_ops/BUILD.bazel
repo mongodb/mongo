@@ -37,19 +37,3 @@ mongo_cc_library(
         "//src/mongo/s:common_s",  # TODO(SERVER-93876): Remove.
     ],
 )
-
-mongo_cc_library(
-    name = "wc_error",
-    srcs = [
-        "wc_error.cpp",
-    ],
-    hdrs = [
-        "wc_error.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo:core_headers_library",
-        "//src/mongo/rpc:command_status",
-        "//src/mongo/s:sharding_router_api",
-    ],
-)

@@ -39,7 +39,6 @@ namespace mongo {
 namespace unified_write_executor {
 
 BulkWriteCommandReply bulkWrite(OperationContext* opCtx, const BulkWriteCommandRequest& request) {
-    WriteOpContext context(request);
     MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
     WriteOpAnalyzer analyzer;
     std::unique_ptr<WriteOpBatcher> batcher{nullptr};
@@ -48,7 +47,7 @@ BulkWriteCommandReply bulkWrite(OperationContext* opCtx, const BulkWriteCommandR
     } else {
         batcher = std::make_unique<UnorderedWriteOpBatcher>(producer, analyzer);
     }
-    WriteBatchExecutor executor(context);
+    WriteBatchExecutor executor;
     WriteBatchResponseProcessor processor;
     WriteBatchScheduler scheduler(*batcher, executor, processor);
 
