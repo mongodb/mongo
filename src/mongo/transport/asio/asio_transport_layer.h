@@ -359,6 +359,10 @@ private:
     // Tracks the cumulative time the listener spends between accepting incoming connections to
     // handing them off to dedicated connection threads.
     AtomicWord<Microseconds> _listenerProcessingTime;
+
+    // Tracks the number of connections that are dropped by the client before the server gets to
+    // process them (e.g. perform TLS handshake).
+    Counter64 _discardedDueToClientDisconnect;
 };
 
 }  // namespace transport

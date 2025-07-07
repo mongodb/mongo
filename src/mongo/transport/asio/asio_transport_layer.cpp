@@ -97,6 +97,25 @@ using TcpInfoOption = SocketOption<IPPROTO_TCP, TCP_INFO, tcp_info>;
 #endif  // __linux__
 
 const Seconds kSessionShutdownTimeout{10};
+
+bool shouldDiscardSocketDueToLostConnectivity(AsioSession::GenericSocket& peerSocket) {
+#ifdef __linux__
+    if (gPessimisticConnectivityCheckForAcceptedConnections.load()) {
+        auto swEvents = pollASIOSocket(peerSocket, POLLRDHUP | POLLHUP, Milliseconds::zero());
+        if (MONGO_unlikely(!swEvents.isOK())) {
+            const auto err = swEvents.getStatus();
+            if (err.code() != ErrorCodes::NetworkTimeout) {
+                LOGV2_DEBUG(10158100, 3, "Error checking socket connectivity", "error"_attr = err);
+                return true;
+            }
+        } else if (MONGO_unlikely(swEvents.getValue() & (POLLRDHUP | POLLHUP))) {
+            LOGV2_DEBUG(10158101, 3, "Client has closed the socket before server reading from it");
+            return true;
+        }
+    }
+#endif  // __linux__
+    return false;
+}
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerAsyncConnectTimesOut);
@@ -1150,6 +1169,7 @@ void AsioTransportLayer::appendStatsForFTDC(BSONObjBuilder& bob) const {
             record->address.toString(), record->backlogQueueDepth.load());
     }
     queueDepthsArrayBuilder.done();
+    bob.append("connsDiscardedDueToClientDisconnect", _discardedDueToClientDisconnect.get());
 }
 
 void AsioTransportLayer::_runListener() noexcept {
@@ -1336,6 +1356,12 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
                   "Error accepting new connection on local endpoint",
                   "localEndpoint"_attr = endpointToHostAndPort(acceptor.local_endpoint()),
                   "error"_attr = ec.message());
+            _acceptConnection(acceptor);
+            return;
+        }
+
+        if (MONGO_unlikely(shouldDiscardSocketDueToLostConnectivity(peerSocket))) {
+            _discardedDueToClientDisconnect.incrementRelaxed();
             _acceptConnection(acceptor);
             return;
         }
