@@ -46,24 +46,16 @@ void HMAC_CTX_free(HMAC_CTX* ctx) {
     HMAC_CTX_cleanup(ctx);
     OPENSSL_free(ctx);
 }
-
-int HMAC_CTX_reset(HMAC_CTX* ctx) {
-    HMAC_CTX_init(ctx);
-    return 1;
-}
 }  // namespace
 #endif
 #if defined(MONGO_CONFIG_SSL) && (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL)
 HmacContext::HmacContext() {
     hmac_ctx = HMAC_CTX_new();
 };
+
 HmacContext::~HmacContext() {
     HMAC_CTX_free(hmac_ctx);
 }
-
-int HmacContext::reset() {
-    return HMAC_CTX_reset(hmac_ctx);
-};
 
 HMAC_CTX* HmacContext::get() {
     return hmac_ctx;

@@ -259,6 +259,8 @@ protected:
     TestKeyVault _keyVault;
 
     EncryptedStateCollectionsNamespaces _namespaces;
+
+    HmacContext hmacCtx;
 };
 
 void FleCompactTest::setUp() {
@@ -314,7 +316,8 @@ void FleCompactTest::assertDocumentCounts(uint64_t edc, uint64_t esc, uint64_t e
 void FleCompactTest::assertESCNonAnchorDocument(BSONObj obj, bool exists, uint64_t cpos) {
     auto tokens = getTestESCTokens(obj);
     auto doc = _queryImpl->getById(
-        _namespaces.escNss, ESCCollection::generateNonAnchorId(tokens.twiceDerivedTag, cpos));
+        _namespaces.escNss,
+        ESCCollection::generateNonAnchorId(&hmacCtx, tokens.twiceDerivedTag, cpos));
     ASSERT_EQ(doc.isEmpty(), !exists);
     ASSERT(!doc.hasField("value"_sd));
 }
@@ -322,8 +325,8 @@ void FleCompactTest::assertESCNonAnchorDocument(BSONObj obj, bool exists, uint64
 void FleCompactTest::assertESCAnchorDocument(
     BSONObj obj, bool exists, uint64_t apos, uint64_t cpos, bool nullAnchor) {
     auto tokens = getTestESCTokens(obj);
-    auto id = nullAnchor ? ESCCollection::generateNullAnchorId(tokens.twiceDerivedTag)
-                         : ESCCollection::generateAnchorId(tokens.twiceDerivedTag, apos);
+    auto id = nullAnchor ? ESCCollection::generateNullAnchorId(&hmacCtx, tokens.twiceDerivedTag)
+                         : ESCCollection::generateAnchorId(&hmacCtx, tokens.twiceDerivedTag, apos);
     auto doc = _queryImpl->getById(_namespaces.escNss, id);
     ASSERT_EQ(doc.isEmpty(), !exists);
 
@@ -495,7 +498,8 @@ void FleCompactTest::doInsertAndCompactCycles(StringData fieldName,
         for (const auto& [value, state] : values) {
             auto testPair = BSON(fieldName << value);
             auto ecocDoc = generateTestECOCDocumentV2(testPair);
-            compactOneFieldValuePairV2(_queryImpl.get(), ecocDoc, _namespaces.escNss, &escStats);
+            compactOneFieldValuePairV2(
+                _queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, &escStats);
         }
     }
 }
@@ -545,10 +549,10 @@ TEST_F(FleCompactTest, CompactValueV2_NoNonAnchors) {
     // Compact an empty ESC; assert an error is thrown because compact should not be called
     // if there are no ESC entries that correspond to the ECOC document.
     // Note: this tests compact where EmuBinary returns (cpos = 0, apos = 0)
-    ASSERT_THROWS_CODE(
-        compactOneFieldValuePairV2(_queryImpl.get(), ecocDoc, _namespaces.escNss, &escStats),
-        DBException,
-        7666502);
+    ASSERT_THROWS_CODE(compactOneFieldValuePairV2(
+                           _queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, &escStats),
+                       DBException,
+                       7666502);
     assertDocumentCounts(0, 0, 0);
 }
 
@@ -602,17 +606,18 @@ void FleCompactTest::testCompactValueV2_NoNullAnchors(const Value& value,
 
     // Compact ESC which should only have non-anchors
     // Note: this tests compact where EmuBinary returns (cpos > 0, apos = 0)
-    compactOneFieldValuePairV2(_queryImpl.get(), ecocDoc, _namespaces.escNss, &escStats);
+    compactOneFieldValuePairV2(_queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, &escStats);
     ++escCount;
     assertDocumentCounts(edcCount, escCount, ecocCount);
     assertESCAnchorDocument(testPair, true, 1, 15);
 
     // Compact ESC which should now have a fresh anchor and stale non-anchors
     // Note: this tests compact where EmuBinary returns (cpos = null, apos > 0)
-    compactOneFieldValuePairV2(_queryImpl.get(), ecocDoc, _namespaces.escNss, &escStats);
+    compactOneFieldValuePairV2(_queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, &escStats);
     assertDocumentCounts(edcCount, escCount, ecocCount);
     if (isRange) {
         compactOneRangeFieldPad(_queryImpl.get(),
+                                &hmacCtx,
                                 _namespaces.escNss,
                                 "rangeField"_sd,
                                 BSONType::NumberLong,
@@ -640,10 +645,11 @@ void FleCompactTest::testCompactValueV2_NoNullAnchors(const Value& value,
 
     // Compact ESC which should now have fresh anchors and fresh non-anchors
     // Note: this tests compact where EmuBinary returns (cpos > 0, apos > 0)
-    compactOneFieldValuePairV2(_queryImpl.get(), ecocDoc, _namespaces.escNss, &escStats);
+    compactOneFieldValuePairV2(_queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, &escStats);
     ++escCount;
     if (isRange) {
         compactOneRangeFieldPad(_queryImpl.get(),
+                                &hmacCtx,
                                 _namespaces.escNss,
                                 "rangeField"_sd,
                                 BSONType::NumberLong,
@@ -706,13 +712,14 @@ void FleCompactTest::testCompactValueV2_WithNullAnchor(const Value& value,
 
     // Run cleanup on ESC to insert the null anchor
     anchorsToDelete = cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
+        _queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
     escCount++;
     ASSERT(anchorsToDelete.empty());
     assertDocumentCounts(edcCount, escCount, ecocCount);
     assertESCNullAnchorDocument(testPair, true, 0 /*apos*/, 5 /*cpos*/);
     logCounts(_queryImpl, _namespaces);
     anchorsToDelete = cleanupOneFieldValuePair(_queryImpl.get(),
+                                               &hmacCtx,
                                                ecocDoc,
                                                _namespaces.escNss,
                                                anchorLimit,
@@ -722,9 +729,10 @@ void FleCompactTest::testCompactValueV2_WithNullAnchor(const Value& value,
 
     // Compact ESC which now contains the null anchor + stale non-anchors; assert no change
     // Note: this tests compact where EmuBinary returns (cpos = null, apos = null)
-    compactOneFieldValuePairV2(_queryImpl.get(), ecocDoc, _namespaces.escNss, &escStats);
+    compactOneFieldValuePairV2(_queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, &escStats);
     assertDocumentCounts(edcCount, escCount, ecocCount);
     anchorsToDelete = cleanupOneFieldValuePair(_queryImpl.get(),
+                                               &hmacCtx,
                                                ecocDoc,
                                                _namespaces.escNss,
                                                anchorLimit,
@@ -742,11 +750,12 @@ void FleCompactTest::testCompactValueV2_WithNullAnchor(const Value& value,
 
     // Compact ESC which now has non-anchors + null anchor; assert anchor is inserted with apos=1
     // Note: this tests compact where EmuBinary returns (cpos > 0, apos = null)
-    compactOneFieldValuePairV2(_queryImpl.get(), ecocDoc, _namespaces.escNss, &escStats);
+    compactOneFieldValuePairV2(_queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, &escStats);
     escCount++;
     assertDocumentCounts(edcCount, escCount, ecocCount);
     assertESCAnchorDocument(testPair, true, 1, edcCount);
     anchorsToDelete = cleanupOneFieldValuePair(_queryImpl.get(),
+                                               &hmacCtx,
                                                ecocDoc,
                                                _namespaces.escNss,
                                                anchorLimit,
@@ -803,7 +812,8 @@ TEST_F(FleCompactTest, RandomESCNonAnchorDeletions) {
     int counter = 0;
     for (uint64_t i = 1; i <= deleteCount; i++) {
         auto doc = _queryImpl->getById(
-            _namespaces.escNss, ESCCollection::generateNonAnchorId(tokens.twiceDerivedTag, i));
+            _namespaces.escNss,
+            ESCCollection::generateNonAnchorId(&hmacCtx, tokens.twiceDerivedTag, i));
         if (!doc.isEmpty()) {
             counter++;
         }
@@ -823,14 +833,16 @@ TEST_F(FleCompactTest, CleanupValueV2_EmptyESC) {
     // Cleanup an empty ESC; assert an error is thrown because cleanup should not be called
     // if there are no ESC entries that correspond to the ECOC document.
     // Note: this tests cleanup where EmuBinary returns (cpos = 0, apos = 0)
-    ASSERT_THROWS_CODE(cleanupOneFieldValuePair(
-                           _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats),
-                       DBException,
-                       7618816);
+    ASSERT_THROWS_CODE(
+        cleanupOneFieldValuePair(
+            _queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, anchorLimit, &escStats),
+        DBException,
+        7618816);
     assertDocumentCounts(0, 0, 0);
 
     // Padding cleanup should quietly exit with a no-op.
     auto anchorsToDelete = cleanupOneFieldValuePair(_queryImpl.get(),
+                                                    &hmacCtx,
                                                     ecocDoc,
                                                     _namespaces.escNss,
                                                     anchorLimit,
@@ -867,7 +879,7 @@ TEST_F(FleCompactTest, CleanupValue_NullAnchorHasLatestApos_NoAnchors) {
 
     // Run cleanup on empty ESC to insert the null anchor with (apos = 0, cpos = 5)
     anchorsToDelete = cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
+        _queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
     escCount++;
     ASSERT(anchorsToDelete.empty());
     assertDocumentCounts(edcCount, escCount, ecocCount);
@@ -875,7 +887,7 @@ TEST_F(FleCompactTest, CleanupValue_NullAnchorHasLatestApos_NoAnchors) {
 
     // Run cleanup again; (tests emuBinary apos = null, cpos = null)
     anchorsToDelete = cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
+        _queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
     ASSERT(anchorsToDelete.empty());
     assertDocumentCounts(edcCount, escCount, ecocCount);
 
@@ -891,7 +903,7 @@ TEST_F(FleCompactTest, CleanupValue_NullAnchorHasLatestApos_NoAnchors) {
 
     // Run cleanup again; (tests emuBinary apos = null, cpos > 0)
     anchorsToDelete = cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
+        _queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
     ASSERT(anchorsToDelete.empty());
     assertDocumentCounts(edcCount, escCount, ecocCount);
 
@@ -925,7 +937,7 @@ TEST_F(FleCompactTest, CleanupValue_NullAnchorHasLatestApos_WithAnchors) {
 
     // Run cleanup to insert the null anchor
     anchorsToDelete = cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
+        _queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
     escCount++;  // null anchor inserted
     ASSERT_EQ(numAnchors, anchorsToDelete.size());
     assertDocumentCounts(edcCount, escCount, ecocCount);
@@ -933,7 +945,7 @@ TEST_F(FleCompactTest, CleanupValue_NullAnchorHasLatestApos_WithAnchors) {
 
     // Run cleanup again; (tests emuBinary apos = null, cpos = null)
     anchorsToDelete = cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
+        _queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
     assertDocumentCounts(edcCount, escCount, ecocCount);
     ASSERT(anchorsToDelete.empty());
 
@@ -949,7 +961,7 @@ TEST_F(FleCompactTest, CleanupValue_NullAnchorHasLatestApos_WithAnchors) {
 
     // Run cleanup again; (tests emuBinary apos = null, cpos > 0)
     anchorsToDelete = cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
+        _queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
     assertDocumentCounts(edcCount, escCount, ecocCount);
     ASSERT(anchorsToDelete.empty());
 
@@ -983,7 +995,7 @@ TEST_F(FleCompactTest, CleanupValue_NoAnchorsExist) {
 
     // Cleanup ESC with new non-anchors; (tests emuBinary apos = 0, cpos > 0)
     anchorsToDelete = cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
+        _queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
     escCount++;  // null anchor inserted
     ASSERT(anchorsToDelete.empty());
     assertDocumentCounts(edcCount, escCount, ecocCount);
@@ -1019,7 +1031,7 @@ TEST_F(FleCompactTest, CleanupValue_NewAnchorsExist) {
     // Run cleanup; (tests emuBinary apos > 0, cpos = null)
     // Assert null doc is inserted & has the latest apos & cpos
     anchorsToDelete = cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
+        _queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
     escCount++;  // null anchor inserted
     escDeletesCount = numAnchors;
     ASSERT_EQ(escDeletesCount, anchorsToDelete.size());
@@ -1040,7 +1052,7 @@ TEST_F(FleCompactTest, CleanupValue_NewAnchorsExist) {
     // Run cleanup; (tests emuBinary apos > 0, cpos > 0)
     // Assert null doc is updated with the latest apos & cpos
     anchorsToDelete = cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
+        _queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
     ASSERT_EQ(escDeletesCount, anchorsToDelete.size());
     assertDocumentCounts(edcCount, escCount, ecocCount);
     assertESCNullAnchorDocument(testPair, true, numAnchors, edcCount);
@@ -1055,6 +1067,7 @@ TEST_F(FleCompactTest, InjectSomeAnchorPadding) {
     // Expect numPads := gamma * (pathLength * uniqueLeaves - uniqueTokens)
     // numPads := 0.42 * (8 * 1 - 5) => 0.42 * 3 => 1.26 => 2 pads {1, 2}
     compactOneRangeFieldPad(_queryImpl.get(),
+                            &hmacCtx,
                             _namespaces.escNss,
                             "a.b.c"_sd,
                             BSONType::NumberInt,
@@ -1077,6 +1090,7 @@ TEST_F(FleCompactTest, InjectManyAnchorPadding) {
     // Expect numPads := gamma * (pathLength * uniqueLeaves - uniqueTokens)
     // numPads := 1.0 * (8 * 5 - 25) => 40 - 25 => 15.0 => 15 pads {1..15}
     compactOneRangeFieldPad(_queryImpl.get(),
+                            &hmacCtx,
                             _namespaces.escNss,
                             "a.b.c"_sd,
                             BSONType::NumberLong,
@@ -1103,6 +1117,7 @@ TEST_F(FleCompactTest, InjectAnchorPaddingOverBatchWriteLimit) {
     const auto uniqueTokens = 5;
     auto numPads = edges * uniqueLeaves - uniqueTokens;
     compactOneRangeFieldPad(_queryImpl.get(),
+                            &hmacCtx,
                             _namespaces.escNss,
                             "a.b.c",
                             BSONType::NumberLong,
@@ -1119,6 +1134,7 @@ TEST_F(FleCompactTest, InjectAnchorPaddingOverBatchWriteLimit) {
     // Test with max batch size of 0
     numPads *= 2;
     compactOneRangeFieldPad(_queryImpl.get(),
+                            &hmacCtx,
                             _namespaces.escNss,
                             "a.b.c",
                             BSONType::NumberLong,

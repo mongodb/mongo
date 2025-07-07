@@ -59,6 +59,7 @@
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_stats_gen.h"
 #include "mongo/crypto/fle_tags.h"
+#include "mongo/crypto/hash_block.h"
 #include "mongo/crypto/symmetric_key.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
@@ -294,6 +295,8 @@ protected:
         NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.esc");
     NamespaceString _ecocNs =
         NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.ecoc");
+
+    HmacContext hmacCtx;
 };
 
 void FleCrudTest::setUp() {
@@ -806,7 +809,9 @@ TEST_F(FleCrudTest, InsertOne) {
     assertECOCDocumentCountByField("encrypted", 1);
 
     ASSERT_FALSE(
-        _queryImpl->getById(_escNs, ESCCollection::generateNonAnchorId(getTestESCToken(element), 1))
+        _queryImpl
+            ->getById(_escNs,
+                      ESCCollection::generateNonAnchorId(&hmacCtx, getTestESCToken(element), 1))
             .isEmpty());
 }
 
@@ -833,9 +838,11 @@ TEST_F(FleCrudTest, InsertTwoSame) {
 
     auto escTagToken = getTestESCToken(element);
     ASSERT_FALSE(
-        _queryImpl->getById(_escNs, ESCCollection::generateNonAnchorId(escTagToken, 1)).isEmpty());
+        _queryImpl->getById(_escNs, ESCCollection::generateNonAnchorId(&hmacCtx, escTagToken, 1))
+            .isEmpty());
     ASSERT_FALSE(
-        _queryImpl->getById(_escNs, ESCCollection::generateNonAnchorId(escTagToken, 2)).isEmpty());
+        _queryImpl->getById(_escNs, ESCCollection::generateNonAnchorId(&hmacCtx, escTagToken, 2))
+            .isEmpty());
 }
 
 // Insert two documents with different values
@@ -854,14 +861,16 @@ TEST_F(FleCrudTest, InsertTwoDifferent) {
     ASSERT_FALSE(
         _queryImpl
             ->getById(_escNs,
-                      ESCCollection::generateNonAnchorId(getTestESCToken(BSON("encrypted"
+                      ESCCollection::generateNonAnchorId(&hmacCtx,
+                                                         getTestESCToken(BSON("encrypted"
                                                                               << "secret")),
                                                          1))
             .isEmpty());
     ASSERT_FALSE(
         _queryImpl
             ->getById(_escNs,
-                      ESCCollection::generateNonAnchorId(getTestESCToken(BSON("encrypted"
+                      ESCCollection::generateNonAnchorId(&hmacCtx,
+                                                         getTestESCToken(BSON("encrypted"
                                                                               << "topsecret")),
                                                          1))
             .isEmpty());
@@ -883,13 +892,14 @@ TEST_F(FleCrudTest, Insert100Fields) {
 
         assertECOCDocumentCountByField(fieldName, 1);
 
-        ASSERT_FALSE(
-            _queryImpl
-                ->getById(
-                    _escNs,
-                    ESCCollection::generateNonAnchorId(
-                        getTestESCToken(fieldName, valueGenerator(fieldNameFromInt(field), 0)), 1))
-                .isEmpty());
+        ASSERT_FALSE(_queryImpl
+                         ->getById(_escNs,
+                                   ESCCollection::generateNonAnchorId(
+                                       &hmacCtx,
+                                       getTestESCToken(fieldName,
+                                                       valueGenerator(fieldNameFromInt(field), 0)),
+                                       1))
+                         .isEmpty());
     }
 }
 
@@ -921,6 +931,7 @@ TEST_F(FleCrudTest, Insert20Fields50Rows) {
                 _queryImpl
                     ->getById(_escNs,
                               ESCCollection::generateNonAnchorId(
+                                  &hmacCtx,
                                   getTestESCToken(fieldName,
                                                   valueGenerator(fieldNameFromInt(field), row)),
                                   count))
@@ -1032,7 +1043,9 @@ TEST_F(FleCrudTest, InsertAndDeleteOne) {
     assertDocumentCounts(1, 1, 1);
 
     ASSERT_FALSE(
-        _queryImpl->getById(_escNs, ESCCollection::generateNonAnchorId(getTestESCToken(element), 1))
+        _queryImpl
+            ->getById(_escNs,
+                      ESCCollection::generateNonAnchorId(&hmacCtx, getTestESCToken(element), 1))
             .isEmpty());
 
     doSingleDelete(1, Fle2AlgorithmInt::kEquality);
@@ -1068,7 +1081,9 @@ TEST_F(FleCrudTest, InsertTwoSameAndDeleteTwo) {
     assertDocumentCounts(2, 2, 2);
 
     ASSERT_FALSE(
-        _queryImpl->getById(_escNs, ESCCollection::generateNonAnchorId(getTestESCToken(element), 1))
+        _queryImpl
+            ->getById(_escNs,
+                      ESCCollection::generateNonAnchorId(&hmacCtx, getTestESCToken(element), 1))
             .isEmpty());
 
     doSingleDelete(2, Fle2AlgorithmInt::kEquality);
