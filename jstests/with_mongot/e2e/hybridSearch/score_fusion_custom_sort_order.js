@@ -1,7 +1,8 @@
 /**
  * Stress tests the cases where a sort order is interesting, and so the score computation needs to
  * be careful. For example, when $search produces a sorted order, or when a sub-pipeline specifies a
- * $sort.
+ * $sort. We manually observe returned results and see that they clearly relate to the input
+ * pipeline criteria specified, then codify the results as an ordered list of document ids.
  * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_81 ]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";

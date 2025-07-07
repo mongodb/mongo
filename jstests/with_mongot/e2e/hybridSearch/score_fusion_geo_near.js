@@ -1,10 +1,9 @@
 /*
- * Tests hybrid search with the rank fusion using the $rankFusion stage and more than 2 input
- * pipelines. We manually observe returned results and see that they clearly relate to the input
+ * Tests hybrid search with score fusion using the $scoreFusion stage with $search and $geoNear
+ * inputs. We manually observe returned results and see that they clearly relate to the input
  * pipeline criteria specified, then codify the results as an ordered list of document ids.
- * @tags: [ featureFlagRankFusionFull, requires_fcv_81 ]
+ * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_81 ]
  */
-
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {getRentalData, getRentalSearchIndexSpec} from "jstests/with_mongot/e2e_lib/data/rentals.js";
 import {
@@ -13,7 +12,7 @@ import {
     datasets,
 } from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
-const collName = "search_rank_fusion";
+const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
 
@@ -22,14 +21,16 @@ assert.commandWorked(coll.insertMany(getRentalData()));
 // Index is blocking by default so that the query is only run after index has been made.
 createSearchIndex(coll, getRentalSearchIndexSpec());
 
-const limit = 20;
+assert.commandWorked(coll.createIndex({"address.location.coordinates": "2d"}));
 
-let testQuery = [
+const limit = 10;
+
+const testQuery = [
     {
-        $rankFusion: {
+        $scoreFusion: {
             input: {
                 pipelines: {
-                    searchone: [
+                    search: [
                         {
                             $search: {
                                 index: getRentalSearchIndexSpec().name,
@@ -46,40 +47,24 @@ let testQuery = [
                         },
                         {$limit: limit}
                     ],
-                    match: [
+                    geonear: [
                         {
-                            $match: {
-                                number_of_reviews: {
-                                    $gte: 25,
-                                },
+                            $geoNear: {
+                                near: [-73.97713, 40.68675],
                             }
                         },
-                        {$sort: {"review_score": -1}},
+                        {$score: {score: {$meta: "geoNearDistance"}, normalization: "none"}},
                         {$limit: limit}
                     ],
-                    searchtwo: [
-                        {
-                            $search: {
-                                index: getRentalSearchIndexSpec().name,
-                                text: {
-                                    query: "kitchen",
-                                    path: ["space", "description"],
-                                },
-                            }
-                        },
-                        {$limit: limit}
-                    ],
-                }
+                },
+                normalization: "none"
             }
         },
     },
-    {$limit: limit}
+    {$limit: limit},
 ];
 
-let results = coll.aggregate(testQuery).toArray();
-
-let expectedResultIds =
-    [21, 41, 24, 14, 13, 15, 28, 44, 47, 26, 40, 1, 11, 31, 42, 22, 2, 6, 20, 25];
+const results = coll.aggregate(testQuery).toArray();
+const expectedResultIds = [2, 41, 13, 40, 18, 28, 26, 24, 47, 38];
 assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.RENTALS), results);
-
 dropSearchIndex(coll, {name: getRentalSearchIndexSpec().name});
