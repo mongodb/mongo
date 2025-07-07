@@ -657,7 +657,8 @@ Status FilteringMetadataCache::_refreshDbMetadata(OperationContext* opCtx,
         dbName,
         MODE_IX,
         Date_t::max(),
-        Lock::DBLockSkipOptions{false, false, false, rss::consensus::IntentRegistry::Intent::Read});
+        Lock::DBLockSkipOptions{
+            false, false, false, rss::consensus::IntentRegistry::Intent::LocalWrite});
     auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
     if (!cancellationToken.isCanceled()) {
         if (swDbMetadata.isOK()) {
