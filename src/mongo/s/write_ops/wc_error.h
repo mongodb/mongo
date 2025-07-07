@@ -29,35 +29,34 @@
 
 #pragma once
 
-#include "mongo/s/multi_statement_transaction_requests_sender.h"
-#include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
-
-#include <boost/optional.hpp>
+#include "mongo/db/shard_id.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/rpc/write_concern_error_detail.h"
 
 namespace mongo {
-namespace unified_write_executor {
 
-struct ShardResponse {
-    StatusWith<executor::RemoteCommandResponse> swResponse;
-    // Ops referencing the original command from the client in the order they were specified in the
-    // command to the shard. The items in this array should appear in the order you would see them
-    // in the reply item's of a bulk write so that response.ops[replyItem.getIdx()] shound return
-    // the corresponding WriteOp from the original command from the client.
-    std::vector<WriteOp> ops;
-};
-using WriteBatchResponse = std::map<ShardId, ShardResponse>;
+/**
+ * Simple struct for storing a write concern error with an endpoint.
+ */
+struct ShardWCError {
+    ShardWCError(const ShardId& shardName, const WriteConcernErrorDetail& error)
+        : shardName(shardName) {
+        error.cloneTo(&this->error);
+    }
 
-class WriteBatchExecutor {
-public:
-    WriteBatchExecutor(const WriteOpContext& context) : _context(context) {}
-
-    WriteBatchResponse execute(OperationContext* opCtx, const WriteBatch& batch);
-
-private:
-    WriteBatchResponse _execute(OperationContext* opCtx, const SimpleWriteBatch& batch);
-
-    const WriteOpContext& _context;
+    ShardId shardName;
+    WriteConcernErrorDetail error;
 };
 
-}  // namespace unified_write_executor
+/**
+ * Utility function to merge write concern errors received from various shards.
+ */
+boost::optional<WriteConcernErrorDetail> mergeWriteConcernErrors(
+    const std::vector<ShardWCError>& wcErrors);
+
+/*
+ * Generate the write concern with which shard requests have to be internally sent.
+ */
+boost::optional<WriteConcernOptions> getWriteConcernForShardRequest(OperationContext* opCtx);
+
 }  // namespace mongo

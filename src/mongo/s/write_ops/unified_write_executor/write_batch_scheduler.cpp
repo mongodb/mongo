@@ -49,12 +49,15 @@ void WriteBatchScheduler::run(OperationContext* opCtx, const std::set<NamespaceS
         }
 
         auto response = _executor.execute(opCtx, *batch);
-        auto [opsToRetry, collsToCreate] = _processor.onWriteBatchResponse(response);
-        if (!opsToRetry.empty()) {
-            _batcher.markOpReprocess(opsToRetry);
+        auto result = _processor.onWriteBatchResponse(response);
+        if (result.unrecoverableError) {
+            _batcher.markUnrecoverableError();
         }
-        if (!collsToCreate.empty()) {
-            for (auto& [nss, _] : collsToCreate) {
+        if (!result.opsToRetry.empty()) {
+            _batcher.markOpReprocess(result.opsToRetry);
+        }
+        if (!result.collsToCreate.empty()) {
+            for (auto& [nss, _] : result.collsToCreate) {
                 cluster::createCollectionWithRouterLoop(opCtx, nss);
             }
         }

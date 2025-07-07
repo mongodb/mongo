@@ -30,12 +30,12 @@
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 
 #include "mongo/s/grid.h"
+#include "mongo/s/write_ops/wc_error.h"
 
 #include <boost/optional.hpp>
 
 namespace mongo {
 namespace unified_write_executor {
-
 WriteBatchResponse WriteBatchExecutor::execute(OperationContext* opCtx, const WriteBatch& batch) {
     return std::visit(OverloadedVisitor{[&](const auto& batchData) {
                           return _execute(opCtx, batchData);
@@ -78,10 +78,13 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         }
 
         auto bulkRequest = BulkWriteCommandRequest(std::move(bulkOps), std::move(nsInfos));
+        bulkRequest.setOrdered(_context.getOrdered());
         BSONObjBuilder builder;
         bulkRequest.serialize(&builder);
         logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &builder);
-        builder.append(WriteConcernOptions::kWriteConcernField, opCtx->getWriteConcern().toBSON());
+        if (auto writeConcern = getWriteConcernForShardRequest(opCtx); writeConcern) {
+            builder.append(WriteConcernOptions::kWriteConcernField, writeConcern->toBSON());
+        }
         requestsToSent.emplace_back(shardId, builder.obj());
     }
 

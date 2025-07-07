@@ -27,37 +27,48 @@
  *    it in the license file.
  */
 
-#pragma once
 
-#include "mongo/s/multi_statement_transaction_requests_sender.h"
-#include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
+#include "mongo/s/write_ops/wc_error.h"
 
-#include <boost/optional.hpp>
+#include "mongo/s/transaction_router.h"
 
 namespace mongo {
-namespace unified_write_executor {
+boost::optional<WriteConcernErrorDetail> mergeWriteConcernErrors(
+    const std::vector<ShardWCError>& wcErrors) {
+    if (!wcErrors.size())
+        return boost::none;
 
-struct ShardResponse {
-    StatusWith<executor::RemoteCommandResponse> swResponse;
-    // Ops referencing the original command from the client in the order they were specified in the
-    // command to the shard. The items in this array should appear in the order you would see them
-    // in the reply item's of a bulk write so that response.ops[replyItem.getIdx()] shound return
-    // the corresponding WriteOp from the original command from the client.
-    std::vector<WriteOp> ops;
-};
-using WriteBatchResponse = std::map<ShardId, ShardResponse>;
+    StringBuilder msg;
+    auto errCode = wcErrors.front().error.toStatus().code();
+    if (wcErrors.size() != 1) {
+        msg << "Multiple errors reported :: ";
+    }
 
-class WriteBatchExecutor {
-public:
-    WriteBatchExecutor(const WriteOpContext& context) : _context(context) {}
+    for (auto it = wcErrors.begin(); it != wcErrors.end(); ++it) {
+        if (it != wcErrors.begin()) {
+            msg << " :: and :: ";
+        }
 
-    WriteBatchResponse execute(OperationContext* opCtx, const WriteBatch& batch);
+        msg << it->error.toString() << " at " << it->shardName;
+    }
 
-private:
-    WriteBatchResponse _execute(OperationContext* opCtx, const SimpleWriteBatch& batch);
+    return boost::make_optional<WriteConcernErrorDetail>(Status(errCode, msg.str()));
+}
 
-    const WriteOpContext& _context;
-};
+boost::optional<WriteConcernOptions> getWriteConcernForShardRequest(OperationContext* opCtx) {
+    // Per-operation write concern is not supported in transactions.
+    if (TransactionRouter::get(opCtx)) {
+        return boost::none;
+    }
 
-}  // namespace unified_write_executor
+    // Retrieve the WC specified by the remote client; in case of "fire and forget" request, the WC
+    // needs to be upgraded to "w: 1" for the sharding protocol to correctly handle internal
+    // writeErrors.
+    auto wc = opCtx->getWriteConcern();
+    if (!wc.requiresWriteAcknowledgement()) {
+        wc.w = 1;
+    }
+
+    return boost::make_optional(std::move(wc));
+}
 }  // namespace mongo

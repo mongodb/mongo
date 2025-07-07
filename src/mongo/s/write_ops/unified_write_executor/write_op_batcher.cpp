@@ -38,6 +38,9 @@ namespace unified_write_executor {
 
 boost::optional<WriteBatch> OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
                                                                 const RoutingContext& routingCtx) {
+    if (unrecoverableError) {
+        return boost::none;
+    }
     auto writeOp = _producer.peekNext();
     if (!writeOp) {
         return boost::none;
@@ -102,6 +105,10 @@ boost::optional<WriteBatch> OrderedWriteOpBatcher::getNextBatch(OperationContext
             MONGO_UNREACHABLE;
         }
     }
+}
+
+void OrderedWriteOpBatcher::markUnrecoverableError() {
+    unrecoverableError = true;
 }
 
 namespace {

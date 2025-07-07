@@ -51,6 +51,11 @@ WriteConcernErrorDetail::WriteConcernErrorDetail() {
     clear();
 }
 
+WriteConcernErrorDetail::WriteConcernErrorDetail(Status status) {
+    clear();
+    setStatus(std::move(status));
+}
+
 bool WriteConcernErrorDetail::isValid(string* errMsg) const {
     // This object only makes sense when the status isn't OK
     if (_status.isOK()) {

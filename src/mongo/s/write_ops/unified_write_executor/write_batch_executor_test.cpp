@@ -46,6 +46,10 @@ public:
     const ShardId shardId1 = ShardId("shard1");
     const ShardId shardId2 = ShardId("shard2");
 
+    const NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("test", "coll0");
+    const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("test", "coll1");
+    const NamespaceString nss2 = NamespaceString::createNamespaceString_forTest("test", "coll2");
+
     void setUp() override {
         ShardingTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(HostAndPort("config", 12345));
@@ -88,47 +92,53 @@ public:
                                 boost::optional<LogicalSessionId> expectedLsid,
                                 boost::optional<TxnNumber> expectedTxnNumber,
                                 boost::optional<const WriteConcernOptions&> expectedWriteConcern) {
-        ASSERT_EQ(cmdObj.getField("bulkWrite").number(), 1);
+        BSONObjBuilder builder;
+        builder.appendElements(cmdObj);
+        // The serialized command object does not have '$db' field, which is required for parsing.
+        builder.append(BulkWriteCommandRequest::kDbNameFieldName,
+                       DatabaseName::kAdmin.toString_forTest());
+        BulkWriteCommandRequest bulkWrite =
+            BulkWriteCommandRequest::parse(IDLParserContext("bulkWrite"), builder.obj());
 
-        auto ops = cmdObj.getField("ops").Array();
-        ASSERT_EQ(ops.size(), expectedOps.size());
-        for (size_t i = 0; i < ops.size(); i++) {
-            ASSERT_BSONOBJ_EQ(ops[i].Obj(), expectedOps[i]);
+        ASSERT_EQ(bulkWrite.getOps().size(), expectedOps.size());
+        for (size_t i = 0; i < bulkWrite.getOps().size(); i++) {
+            ASSERT_BSONOBJ_EQ(BulkWriteCRUDOp(bulkWrite.getOps()[i]).toBSON(), expectedOps[i]);
         }
 
-        auto nsInfos = cmdObj.getField("nsInfo").Array();
-        ASSERT_EQ(nsInfos.size(), expectedNsInfos.size());
-        for (size_t i = 0; i < nsInfos.size(); i++) {
-            auto nsInfo = nsInfos[i].Obj();
-            ASSERT_EQ(nsInfo.getField("ns").String(),
-                      expectedNsInfos[i].getNs().toString_forTest());
+        ASSERT_EQ(bulkWrite.getNsInfo().size(), expectedNsInfos.size());
+        for (size_t i = 0; i < bulkWrite.getNsInfo().size(); i++) {
+            const auto& nsInfo = bulkWrite.getNsInfo()[i];
+            ASSERT_EQ(nsInfo.getNs(), expectedNsInfos[i].getNs());
             if (expectedNsInfos[i].getDatabaseVersion()) {
-                ASSERT_EQ(*expectedNsInfos[i].getDatabaseVersion(),
-                          DatabaseVersion(nsInfo.getField("databaseVersion").Obj()));
+                ASSERT_EQ(*expectedNsInfos[i].getDatabaseVersion(), *nsInfo.getDatabaseVersion());
             }
             if (expectedNsInfos[i].getShardVersion()) {
-                ASSERT_EQ(*expectedNsInfos[i].getShardVersion(),
-                          ShardVersion::parse(nsInfo.getField("shardVersion")));
+                ASSERT_EQ(*expectedNsInfos[i].getShardVersion(), *nsInfo.getShardVersion());
             }
         }
 
         if (expectedLsid) {
-            ASSERT_BSONOBJ_EQ(expectedLsid->toBSON(), cmdObj.getField("lsid").Obj());
+            ASSERT_BSONOBJ_EQ(expectedLsid->toBSON(), bulkWrite.getLsid()->toBSON());
         }
         if (expectedTxnNumber) {
-            ASSERT_EQ(*expectedTxnNumber, cmdObj.getField("txnNumber").number());
+            ASSERT_EQ(*expectedTxnNumber, *bulkWrite.getTxnNumber());
         }
         if (expectedWriteConcern) {
-            ASSERT_BSONOBJ_EQ(expectedWriteConcern->toBSON(),
-                              cmdObj.getField("writeConcern").Obj());
+            ASSERT_EQ(*expectedWriteConcern, *bulkWrite.getWriteConcern());
         }
     }
 };
 
 TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
-    const NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("test", "coll0");
-    const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("test", "coll1");
-    const NamespaceString nss2 = NamespaceString::createNamespaceString_forTest("test", "coll2");
+    const DatabaseVersion nss1DbVersion(UUID::gen(), Timestamp(1, 0));
+    const ShardEndpoint nss1Shard1(shardId1, ShardVersion::UNSHARDED(), nss1DbVersion);
+    const ShardVersion nss2ShardVersion1 = ShardVersionFactory::make(
+        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(1, 0)}, CollectionPlacement(1, 0)));
+    const ShardVersion nss2ShardVersion2 = ShardVersionFactory::make(
+        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(2, 0)}, CollectionPlacement(1, 0)));
+    const ShardEndpoint nss2Shard1(shardId2, nss2ShardVersion1, boost::none);
+    const ShardEndpoint nss2Shard2(shardId2, nss2ShardVersion2, boost::none);
+
     // We create a bulkRequest with three ops, the insert op and the delete op run against
     // the same namespace nss1, and the update op runs against nss2. nss0 is skipped here to test
     // the namespace index is remapped correctly in the generated request. The nsIndex [1, 2, 1]
@@ -140,15 +150,8 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
              2, BSON("a" << 1), write_ops::UpdateModification(BSON("$set" << BSON("b" << 1)))),
          BulkWriteDeleteOp(1, BSON("a" << 2))},
         {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1), NamespaceInfoEntry(nss2)});
+    WriteOpContext context(bulkRequest);
 
-    const DatabaseVersion nss1DbVersion(UUID::gen(), Timestamp(1, 0));
-    const ShardEndpoint nss1Shard1(shardId1, ShardVersion::UNSHARDED(), nss1DbVersion);
-    const ShardVersion nss2ShardVersion1 = ShardVersionFactory::make(
-        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(1, 0)}, CollectionPlacement(1, 0)));
-    const ShardVersion nss2ShardVersion2 = ShardVersionFactory::make(
-        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(2, 0)}, CollectionPlacement(1, 0)));
-    const ShardEndpoint nss2Shard1(shardId2, nss2ShardVersion1, boost::none);
-    const ShardEndpoint nss2Shard2(shardId2, nss2ShardVersion2, boost::none);
     auto batch = SimpleWriteBatch{{
         {shardId1,
          {
@@ -173,7 +176,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
     operationContext()->setTxnNumber(txnNumber);
 
     auto future = launchAsync([&]() {
-        WriteBatchExecutor executor;
+        WriteBatchExecutor executor(context);
         auto responses = executor.execute(operationContext(), batch);
         std::set<ShardId> expectedShardIds{shardId1, shardId2};
         ASSERT_EQ(2, responses.size());

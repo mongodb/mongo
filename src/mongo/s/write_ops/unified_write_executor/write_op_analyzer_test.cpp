@@ -341,13 +341,13 @@ TEST_F(WriteOpAnalyzerTest, SingleShardRangeUpdateManys) {
     auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
-    ASSERT_EQ(BatchType::kMultiShard, analysis.type);
+    ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
     analysis = analyzer.analyze(operationContext(), *rtx, op2);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
-    ASSERT_EQ(BatchType::kMultiShard, analysis.type);
+    ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     rtx->onRequestSentForNss(nss);
 }
@@ -431,14 +431,14 @@ TEST_F(WriteOpAnalyzerTest, SingleShardRangeDeleteManys) {
     auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
-    ASSERT_EQ(BatchType::kMultiShard, analysis.type);
+    ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
     analysis = analyzer.analyze(operationContext(), *rtx, op2);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     // TODO SERVER-103780 this should be changed with 2 phase write support.
-    ASSERT_EQ(BatchType::kMultiShard, analysis.type);
+    ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     rtx->onRequestSentForNss(nss);
 }
