@@ -88,12 +88,11 @@ metrics it receives into those it includes in its response.
 ### Rate Limiting
 
 Whether or not query stats will be recorded for a specific query execution depends on a Rate
-Limiter, which limits the number of recordings per second based on the server parameter
-[internalQueryStatsRateLimit](#server-parameters). The goal of the rate limiter is to minimize
-impact to overall system performance through restricting excessive traffic. If a query is run but
-the rate limit has been reached, the query will still execute as expected but query stats will not
-be updated in the query stats store. Our rate limiter uses the sliding window algorithm; see details
-[here](rate_limiting.h#82-87).
+Limiter, which limits the number of recordings based on the [server parameters](#server-parameters). The goal of the rate limiter
+is to minimize impact to overall system performance through restricting traffic. Our rate limiter provides two algorithms:
+Window-based policy and sample-based policy. Window-based policy limits the number of recordings per second, whereas sample-based
+policy limits the fraction of queries to be recorded. If a query is run but the rate limiter decides not to record it, the query
+will still execute as expected but query stats will not be updated in the query stats store. See details [here](rate_limiting.h).
 
 ### Explain
 
@@ -264,6 +263,19 @@ following way:
   - The rate limit is an integer which imposes a maximum number of recordings per second. Default is
     0 which has the effect of disabling query stats collection. Setting the parameter to -1 means
     there will be no rate limit.
+
+- `internalQueryStatsSampleRate`:
+
+  - The sample rate is a floating-point number between 0.0 and 1.0, representing the fraction of
+    queries for which stats will be recorded.
+    - `0.0` - No query stats are recorded via sampling (0%).
+    - `1.0` - All queries are recorded (100%).
+  - When both `internalQueryStatsSampleRate` and `internalQueryStatsRateLimit` are set to non-zero
+    values, the sampling-based policy (`internalQueryStatsSampleRate`) takes precedence over the
+    window-based rate limiter.
+  - The default value is `0`. When set to `0`, sampling-based rate limiting is disabled and query
+    stats rate limiting falls back to the window-based policy controlled by
+    `internalQueryStatsRateLimit`.
 
 - `logComponentVerbosity.queryStats`:
   - Controls the logging behavior for query stats. See [Logging](#logging) for details.
