@@ -912,7 +912,11 @@ error_codes:
 
   - {code: 452, name: ReleaseMemoryShardError}
 
-  - {code: 453, name: InterruptedDueToReshardingCriticalSection}
+  - {
+      code: 453,
+      name: InterruptedDueToReshardingCriticalSection,
+      categories: [Interruption, RetriableError],
+    }
 
   # Error codes 4000-8999 are reserved.
 

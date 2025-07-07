@@ -302,7 +302,6 @@ bool isTransientTransactionError(ErrorCodes::Error code,
         case ErrorCodes::PreparedTransactionInProgress:
         case ErrorCodes::ShardCannotRefreshDueToLocksHeld:
         case ErrorCodes::StaleDbVersion:
-        case ErrorCodes::InterruptedDueToReshardingCriticalSection:
             return true;
         default:
             isTransient = false;

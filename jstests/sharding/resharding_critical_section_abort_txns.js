@@ -1,7 +1,9 @@
 /**
  * Tests that upon transitioning to "preparing-to-block-writes" state, resharding donors abort
- * unprepared transactions but not prepared transactions, and that the abort has
- * InterruptedDueToReshardingCriticalSection error code with TransientTransactionError label.
+ * unprepared transactions but not prepared transactions and that:
+ * - The abort error code is InterruptedDueToReshardingCriticalSection.
+ * - The response has RetryableWriteError label if the in-progress command is commitTransaction or
+ *   abortTransaction. Otherwise, it has TransientTransactionError label.
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -49,6 +51,16 @@ function makeCommitTxnCmdObj(lsid, txnNumber, prepareRes) {
     return cmdObj;
 }
 
+function makeAbortTxnCmdObj(lsid, txnNumber) {
+    return {
+        abortTransaction: 1,
+        lsid: lsid,
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+        writeConcern: {w: "majority"},
+    };
+}
+
 function runInsertCmdInTxn(mongosHost, dbName, collName, lsidIdString, txnNumber, docs) {
     const mongos = new Mongo(mongosHost);
     const lsid = {id: UUID(lsidIdString)};
@@ -77,10 +89,42 @@ function runUpdateCmdInTxn(mongosHost, dbName, collName, lsidIdString, txnNumber
     return mongos.getDB(dbName).runCommand(cmdObj);
 }
 
-function assertInterruptedDueToReshardingCriticalSection(res) {
+function runCommitTxnCmd(mongosHost, lsidIdString, txnNumber) {
+    const mongos = new Mongo(mongosHost);
+    const lsid = {id: UUID(lsidIdString)};
+    const cmdObj = {
+        commitTransaction: 1,
+        lsid: lsid,
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+        writeConcern: {w: "majority"},
+    };
+    return mongos.adminCommand(cmdObj);
+}
+
+function runAbortTxnCmd(mongosHost, lsidIdString, txnNumber) {
+    const mongos = new Mongo(mongosHost);
+    const lsid = {id: UUID(lsidIdString)};
+    const cmdObj = {
+        abortTransaction: 1,
+        lsid: lsid,
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+        writeConcern: {w: "majority"},
+    };
+    return mongos.adminCommand(cmdObj);
+}
+
+function assertInterruptedWithTransientTransactionErrorLabel(res) {
     assert.commandFailedWithCode(res, ErrorCodes.InterruptedDueToReshardingCriticalSection);
     assert(res.hasOwnProperty("errorLabels"), res);
     assert.eq(res.errorLabels, ["TransientTransactionError"], res);
+}
+
+function assertInterruptedWithRetryableWriteErrorLabel(res) {
+    assert.commandFailedWithCode(res, ErrorCodes.InterruptedDueToReshardingCriticalSection);
+    assert(res.hasOwnProperty("errorLabels"), res);
+    assert.eq(res.errorLabels, ["RetryableWriteError"], res);
 }
 
 const st = new ShardingTest({shards: 2});
@@ -101,6 +145,10 @@ assert.commandWorked(configPrimary.adminCommand({
 assert.commandWorked(
     st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
+/**
+ * Tests transitioning to "preparing-to-block-writes" state while there are unprepared transactions
+ * that have checked the session back in.
+ */
 function testPreparingToBlockWritesWhileSessionCheckedIn(testOptions) {
     jsTest.log(
         "Testing preparing to block writes while the transaction has checked the session back in " +
@@ -224,14 +272,15 @@ function testPreparingToBlockWritesWhileSessionCheckedIn(testOptions) {
 }
 
 /**
- * Tests that upon transitioning to "preparing-to-block-writes" state, resharding donors abort
- * unprepared transactions if 'reshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites' and
- * the abort has InterruptedDueToReshardingCriticalSection error code with TransientTransactionError
- * label.
+ * Tests transitioning to "preparing-to-block-writes" state while there are unprepared transactions
+ * that have checked out the session to run commands other than commitTransaction and
+ * abortTransaction. Sets 'reshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites' to true.
+ * Verifies that the donor aborts the transaction with InterruptedDueToReshardingCriticalSection
+ * error code and the response has TransientTransactionError label.
  */
-function testPreparingToBlockWritesWhileSessionCheckedOut() {
-    jsTest.log(
-        "Testing preparing to block writes while the transaction has checked out the session");
+function testPreparingToBlockWritesWhileSessionCheckedOutNonCommitOrAbort() {
+    jsTest.log("Testing preparing to block writes while the transaction has checked out the " +
+               "session to run non-commitTransaction command");
     testNum++;
     const collName0 = "testColl0_" + testNum;
     const collName1 = "testColl1_" + testNum;
@@ -302,8 +351,8 @@ function testPreparingToBlockWritesWhileSessionCheckedOut() {
     jsTest.log("Verifying that both transactions got aborted");
     const txnRes0 = txnThread0.returnData();
     const txnRes1 = txnThread1.returnData();
-    assertInterruptedDueToReshardingCriticalSection(txnRes0);
-    assertInterruptedDueToReshardingCriticalSection(txnRes1);
+    assertInterruptedWithTransientTransactionErrorLabel(txnRes0);
+    assertInterruptedWithTransientTransactionErrorLabel(txnRes1);
 
     assert.commandFailedWithCode(shard1Primary.adminCommand(makeCommitTxnCmdObj(lsid0, txnNumber0)),
                                  ErrorCodes.NoSuchTransaction);
@@ -315,6 +364,104 @@ function testPreparingToBlockWritesWhileSessionCheckedOut() {
 
     insertFp.off();
     updateFp.off();
+}
+
+/**
+ * Tests transitioning to "preparing-to-block-writes" state while there are unprepared transactions
+ * that have checked out the session to run commitTransaction and abortTransaction commands. Sets
+ * 'reshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites' to true. Verifies that the
+ * donor aborts the transaction with InterruptedDueToReshardingCriticalSection error code and the
+ * response has RetryableWriteError label.
+ */
+function testPreparingToBlockWritesWhileSessionCheckedOutCommitOrAbort() {
+    jsTest.log("Testing preparing to block writes while the transaction has checked out the " +
+               "session to run commitTransaction and abortTransaction command");
+    testNum++;
+    const collName0 = "testColl0_" + testNum;
+    const collName1 = "testColl1_" + testNum;
+    const ns0 = dbName + "." + collName0;
+    const ns1 = dbName + "." + collName1;
+
+    const testColl0 = testDB.getCollection(collName0);
+    assert.commandWorked(testColl0.insert({x: 0}));
+
+    const testColl1 = testDB.getCollection(collName1);
+    assert.commandWorked(testColl1.insert({x: 0}));
+
+    // By design, the primary shard is included as a recipient regardless of whether it is the shard
+    // the collection is moving to. To make the moveCollection operation later in the test not have
+    // a donor shard that also acts as a recipient, which would complicate the test, move
+    // collection0 and also collection1 to shard1 (non-primary shard). That way, the moveCollection
+    // operation will have shard1 as the donor and shard0 as the recipient.
+    assert.commandWorked(st.s.adminCommand({moveCollection: ns0, toShard: st.shard1.shardName}));
+    assert.commandWorked(st.s.adminCommand({moveCollection: ns1, toShard: st.shard1.shardName}));
+
+    let beforeBlockingFp =
+        configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeBlockingWrites");
+
+    let moveCollThread = new Thread(runMoveCollection, st.s.host, ns0, st.shard0.shardName);
+    moveCollThread.start();
+
+    jsTest.log("Waiting for moveCollection to be about to enter the critical section");
+    beforeBlockingFp.wait();
+
+    jsTest.log("Starting a transaction on the donor shard involving the collection being moved");
+    const lsid0 = {id: UUID()};
+    const txnNumber0 = 15;
+    assert.commandWorked(
+        testDB.runCommand(makeInsertCmdObj(collName0, lsid0, txnNumber0, [{x: 1}])));
+
+    jsTest.log("Starting a transaction on the donor shard involving the other collection");
+    const lsid1 = {id: UUID()};
+    const txnNumber1 = 25;
+    assert.commandWorked(
+        testDB.runCommand(makeInsertCmdObj(collName1, lsid1, txnNumber1, [{x: 1}])));
+
+    jsTest.log(
+        "Starting to commit the transaction on the donor shard involving the collection being moved");
+    jsTest.log(
+        "Starting to abort the transaction on the donor shard involving the other collection");
+    let commitTxnFp = configureFailPoint(
+        shard1Primary, "hangBeforeCommitingTxn", {uuid: lsid0.id, shouldCheckForInterrupt: true});
+    let abortTxnFp =
+        configureFailPoint(shard1Primary, "hangBeforeAbortingTxn", {shouldCheckForInterrupt: true});
+
+    let txnThread0 = new Thread(
+        runCommitTxnCmd, shard1Primary.host, extractUUIDFromObject(lsid0.id), txnNumber0);
+    txnThread0.start();
+    let txnThread1 =
+        new Thread(runAbortTxnCmd, shard1Primary.host, extractUUIDFromObject(lsid1.id), txnNumber1);
+    txnThread1.start();
+
+    jsTest.log("Waiting for commitTransaction to block");
+    commitTxnFp.wait();
+    jsTest.log("Waiting for abortTransaction to block");
+    abortTxnFp.wait();
+
+    jsTest.log("Unpausing moveCollection");
+    beforeBlockingFp.off();
+
+    // Upon transitioning to the "preparing-to-block-writes" state, shard1 should abort both
+    // transactions, and the moveCollection operation should run to completion successfully.
+    const moveCollRes = moveCollThread.returnData();
+    assert.commandWorked(moveCollRes);
+
+    jsTest.log("Verifying that both transactions got aborted");
+    const txnRes0 = txnThread0.returnData();
+    const txnRes1 = txnThread1.returnData();
+    assertInterruptedWithRetryableWriteErrorLabel(txnRes0);
+    assertInterruptedWithRetryableWriteErrorLabel(txnRes1);
+
+    assert.commandFailedWithCode(shard1Primary.adminCommand(makeCommitTxnCmdObj(lsid0, txnNumber0)),
+                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(shard1Primary.adminCommand(makeAbortTxnCmdObj(lsid1, txnNumber1)),
+                                 ErrorCodes.NoSuchTransaction);
+
+    assert.eq(testColl0.find({x: 1}).itcount(), 0);
+    assert.eq(testColl1.find({x: 1}).itcount(), 0);
+
+    commitTxnFp.off();
+    abortTxnFp.off();
 }
 
 // Test that upon transitioning to "preparing-to-block-writes" state:
@@ -338,10 +485,16 @@ testPreparingToBlockWritesWhileSessionCheckedIn({
     expectAbort: false,
 });
 
-// Test that the abort has InterruptedDueToReshardingCriticalSection error code with
-// TransientTransactionError label. Only run the test below against unprepared transactions when
+// Only run the cases below against unprepared transactions and with
 // 'reshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites' is enabled since we already
 // verified above that donors don't abort transactions in the other cases.
-testPreparingToBlockWritesWhileSessionCheckedOut();
+
+// Test that if the in-progress command is not commitTransaction or abortTransaction, the response
+// has TransientTransactionError label.
+testPreparingToBlockWritesWhileSessionCheckedOutNonCommitOrAbort();
+
+// Test that if the in-progress command is commitTransaction or abortTransaction, the response has
+// RetryableWriteError label.
+testPreparingToBlockWritesWhileSessionCheckedOutCommitOrAbort();
 
 st.stop();
