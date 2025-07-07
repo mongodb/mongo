@@ -40,7 +40,7 @@ configs:
         short_name: grpcPort
         arg_vartype: Int
         cpp_varname: serverGlobalParams.grpcPort
-        validator: {gte: 1}
+        validator: {gte: 1, lte: 65535}
         # Default is defined in mongo/db/server_options.h
         # default: 27021
     "net.grpc.serverMaxThreads":
