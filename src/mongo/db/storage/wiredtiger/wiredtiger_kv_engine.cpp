@@ -69,6 +69,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_repair_observer.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_cache_pressure_monitor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
@@ -174,29 +175,6 @@ bool allowUntimestampedWrites(bool inStandaloneMode, bool shouldRecoverFromOplog
 
     return false;
 }
-
-auto getStatisticValue(WiredTigerSession& session, int statKey) {
-    auto statResult =
-        WiredTigerUtil::getStatisticsValue(session, "statistics:", "statistics=(fast)", statKey);
-    uassertStatusOK(statResult.getStatus());
-    return statResult.getValue();
-}
-
-// TODO: SERVER-105782 Move these metrics to a separate cache pressure tracking class.
-auto& cachePressureObservedCacheWaitTime =
-    *MetricBuilder<Atomic64Metric>("cachePressure.observedCacheWaitTime");
-
-auto& cachePressureWaitTimeThreshold =
-    *MetricBuilder<Atomic64Metric>("cachePressure.waitTimeThreshold");
-
-auto& cachePressureWaitTimeThresholdExceeded =
-    *MetricBuilder<Atomic64Metric>("cachePressure.waitTimeThresholdExceeded");
-
-auto& cachePressureCacheUpdatesThreshold =
-    *MetricBuilder<Atomic64Metric>("cachePressure.cacheUpdatesThreshold");
-
-auto& cachePressureCacheDirtyThreshold =
-    *MetricBuilder<Atomic64Metric>("cachePressure.cacheDirtyThreshold");
 
 }  // namespace
 
@@ -661,6 +639,9 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 
     _sessionSweeper = std::make_unique<WiredTigerSessionSweeper>(_connection.get());
     _sessionSweeper->go();
+
+    _cachePressureMonitor = std::make_unique<WiredTigerCachePressureMonitor>(
+        *this, clockSource, _wtConfig.evictionDirtyTriggerMB, _wtConfig.evictionUpdatesTriggerMB);
 
     // Until the Replication layer installs a real callback, prevent truncating the oplog.
     setOldestActiveTransactionTimestampCallback(
@@ -2942,129 +2923,14 @@ KeyFormat WiredTigerKVEngine::getKeyFormat(RecoveryUnit& ru, StringData ident) c
     return wtTableConfig.find("key_format=u") != string::npos ? KeyFormat::String : KeyFormat::Long;
 }
 
-bool WiredTigerKVEngine::_windowTrackingStorageAppWaitTimeAndWriteLoad(WiredTigerSession& session,
-                                                                       int concurrentWriteOuts,
-                                                                       int concurrentReadOuts) {
-
-    CachePressureStats cur{
-        .cacheWaitUsecs = getStatisticValue(session, WT_STAT_CONN_APPLICATION_CACHE_TIME),
-        .txnsCommittedCount = getStatisticValue(session, WT_STAT_CONN_TXN_COMMIT),
-        .timestamp = globalSystemTickSource()->getTicks(),
-    };
-
-    // These metrics are cumulative so we will calculate based on their last seen value.
-    int64_t cacheWaitTimeUsecs = cur.cacheWaitUsecs - _lastStats.cacheWaitUsecs;
-    int64_t wtTxnCommittedCount = cur.txnsCommittedCount - _lastStats.txnsCommittedCount;
-    int64_t usBetweenStats = (cur.timestamp - _lastStats.timestamp) /
-        (globalSystemTickSource()->getTicksPerSecond() / 1000000);
-
-    bool isFirstIteration = _lastStats.timestamp == 0;
-    _lastStats = cur;
-
-    // If this is the first iteration, we return false;
-    if (isFirstIteration) {
-        return false;
-    }
-
-    // Compute the exponentially decaying moving average from the current tickets.
-    int64_t currentTickets = concurrentReadOuts + concurrentWriteOuts;
-    double edmaAlpha = gCachePressureExponentiallyDecayingMovingAverageAlphaValue.load();
-    _totalTicketsEDMA = (edmaAlpha * currentTickets) + ((1.0 - edmaAlpha) * _totalTicketsEDMA);
-    int64_t totalTickets =
-        std::max(static_cast<int64_t>(std::round(_totalTicketsEDMA)), int64_t(1));
-
-    int64_t expectedThreadTime = totalTickets * usBetweenStats;
-    int64_t waitTimeThreshold =
-        gCachePressureEvictionStallThresholdProportion.load() * expectedThreadTime;
-    bool perThreadWaitTimeExceedsThreshold = cacheWaitTimeUsecs > waitTimeThreshold;
-
-    bool notEnoughTransactionsCommitted = (wtTxnCommittedCount == 0);
-
-    cachePressureObservedCacheWaitTime.set(cacheWaitTimeUsecs);
-    cachePressureWaitTimeThreshold.set(waitTimeThreshold);
-    cachePressureWaitTimeThresholdExceeded.set(perThreadWaitTimeExceedsThreshold);
-
-    LOGV2_DEBUG(10181701,
-                2,
-                "Cache pressure calculation statistics -- wait time",
-                "cache wait time average"_attr = cacheWaitTimeUsecs,
-                "total wt transactions committed: "_attr = wtTxnCommittedCount,
-                "total write and read tickets: "_attr = totalTickets,
-                "wait time threshold: "_attr = waitTimeThreshold,
-                "wait time threshold exceeded: "_attr = perThreadWaitTimeExceedsThreshold);
-
-    if (!perThreadWaitTimeExceedsThreshold || !notEnoughTransactionsCommitted) {
-        _lastGoodputObservedTimestamp = _clockSource->now();
-        return false;
-    }
-
-    // Once the metrics are true over configured window, we have met the threshold. The window
-    // will help us achieve more consistent results.
-    if ((_clockSource->now() - _lastGoodputObservedTimestamp) >
-        Seconds(gCachePressureEvictionStallDetectionWindowSeconds.load())) {
-        return true;
-    }
-    return false;
-}
-
-bool WiredTigerKVEngine::_storageCacheRatioReachesEvictionTrigger(WiredTigerSession& session) {
-    auto cacheBytesUpdates = getStatisticValue(session, WT_STAT_CONN_CACHE_BYTES_UPDATES);
-    auto cacheBytesDirty = getStatisticValue(session, WT_STAT_CONN_CACHE_BYTES_DIRTY);
-    double cacheBytesMax = getStatisticValue(session, WT_STAT_CONN_CACHE_BYTES_MAX);
-
-    double evictDirtyTrigger = _wtConfig.evictionDirtyTriggerMB
-        ? (_wtConfig.evictionDirtyTriggerMB * 1024 * 1024) / cacheBytesMax
-        : 0.20;
-
-    double evictUpdatesTrigger = _wtConfig.evictionUpdatesTriggerMB
-        ? (_wtConfig.evictionUpdatesTriggerMB * 1024 * 1024) / cacheBytesMax
-        : evictDirtyTrigger / 2.0;
-
-    // Check to see if the cache has reached unhealthy update and dirty cache ratios.
-    bool cacheUpdatesThreshold = ((cacheBytesUpdates / cacheBytesMax) > evictUpdatesTrigger);
-    bool cacheDirtyThreshold = ((cacheBytesDirty / cacheBytesMax) > evictDirtyTrigger);
-
-    cachePressureCacheUpdatesThreshold.set(cacheUpdatesThreshold);
-    cachePressureCacheDirtyThreshold.set(cacheDirtyThreshold);
-
-    LOGV2_DEBUG(10181702,
-                2,
-                "Cache pressure calculation statistics -- cache load",
-                "cacheBytesUpdates:"_attr = cacheBytesUpdates,
-                "cacheBytesDirty:"_attr = cacheBytesDirty,
-                "cacheBytesMax:"_attr = cacheBytesMax,
-                "cacheBytesDirtyThreshold: "_attr = cacheDirtyThreshold,
-                "cacheBytesUpdatesThreshold: "_attr = cacheUpdatesThreshold);
-
-    if (cacheDirtyThreshold || cacheUpdatesThreshold) {
-        return true;
-    }
-    return false;
-}
-
 bool WiredTigerKVEngine::underCachePressure(int concurrentWriteOuts, int concurrentReadOuts) {
-    // Get a permit to access the WiredTiger Statistics.
-    boost::optional<StatsCollectionPermit> permit = tryGetStatsCollectionPermit();
+    auto permit = tryGetStatsCollectionPermit();
     if (!permit) {
-        return false;
+        return false;  // Skip cache pressure evaluation if the permit isn't available.
     }
-    WiredTigerSession session(&getConnection(), *permit);
-
-    bool threadPressureResult = _windowTrackingStorageAppWaitTimeAndWriteLoad(
-        session, concurrentWriteOuts, concurrentReadOuts);
-    bool cacheRatioResult = _storageCacheRatioReachesEvictionTrigger(session);
-
-    LOGV2_DEBUG(10181703,
-                2,
-                "Cache pressure calculation statistics -- results",
-                "threadPressureResult: "_attr = threadPressureResult,
-                "cacheRatioResult: "_attr = cacheRatioResult);
-    if (threadPressureResult && cacheRatioResult) {
-        return true;
-    }
-    return false;
+    return _cachePressureMonitor->isUnderCachePressure(
+        *permit, concurrentWriteOuts, concurrentReadOuts);
 }
-
 BSONObj WiredTigerKVEngine::getSanitizedStorageOptionsForSecondaryReplication(
     const BSONObj& options) const {
 

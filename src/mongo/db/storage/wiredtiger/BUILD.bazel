@@ -46,6 +46,7 @@ mongo_cc_library(
     srcs = [
         "spill_wiredtiger_kv_engine.cpp",
         "wiredtiger_begin_transaction_block.cpp",
+        "wiredtiger_cache_pressure_monitor.cpp",
         "wiredtiger_compiled_configuration.cpp",
         "wiredtiger_connection.cpp",
         "wiredtiger_cursor.cpp",
@@ -71,6 +72,7 @@ mongo_cc_library(
     hdrs = [
         "spill_wiredtiger_kv_engine.h",
         "wiredtiger_begin_transaction_block.h",
+        "wiredtiger_cache_pressure_monitor.h",
         "wiredtiger_compiled_configuration.h",
         "wiredtiger_connection.h",
         "wiredtiger_cursor.h",

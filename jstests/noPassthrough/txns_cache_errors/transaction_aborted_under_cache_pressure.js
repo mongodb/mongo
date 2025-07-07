@@ -8,7 +8,7 @@ import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Temporarily disable test until the thread is more deterministic
-// TODO: SERVER-105782
+// TODO: SERVER-102762
 quit();
 
 // Shrink the WiredTiger cache so we can easily fill it up
