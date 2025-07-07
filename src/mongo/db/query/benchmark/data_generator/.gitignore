@@ -2,3 +2,5 @@ __pycache__
 dump
 venv
 *.schema
+out/
+commands.sh
