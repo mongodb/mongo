@@ -79,7 +79,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
                              RepairMode repairMode,
                              const AdditionalOptions& additionalOptions,
                              bool logDiagnostics)
-    : _validateLock(isBackground()
+    : _validateLock(isBackground(mode)
                         ? boost::none
                         : boost::optional<Lock::SharedLock>{obtainSharedValidationLock(opCtx)}),
       _globalLock(opCtx, isBackground(mode) ? MODE_IS : MODE_IX),
