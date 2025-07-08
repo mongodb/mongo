@@ -126,7 +126,7 @@ std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) c
     std::vector<Value> execArray;
     execArray.reserve(_stages.size());
     for (auto&& stage : _stages) {
-        auto stats = stage->getCommonStats();
+        auto& stats = stage->getCommonStats();
         MutableDocument doc;
         auto nReturned = static_cast<long long>(stats.advanced);
         doc.addField("nReturned", Value(nReturned));
