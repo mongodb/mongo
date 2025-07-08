@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "releases.tpl.h":
+    approvers:
+      - 10gen/server-programmability
+  - "releases.yml":
+    approvers:
+      - 10gen/server-release
