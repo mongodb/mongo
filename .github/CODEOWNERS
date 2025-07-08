@@ -283,6 +283,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/generate_clang_tidy_report.py @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/generate_evergreen_bazelrc.sh @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/generate_custom_build_promotion_expansions.sh @10gen/devprod-build @svc-auto-approve-bot
+/evergreen/upload_custom_build_to_cloud_dev.sh @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/package* @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/validate_compile_commands.py @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/packager_crypt_py_run.sh @10gen/devprod-build @svc-auto-approve-bot

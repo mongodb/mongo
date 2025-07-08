@@ -18,12 +18,15 @@ promote_build_id=$(cat task_data.json | jq -r ".build_id")
 promote_build_variant=$(cat task_data.json | jq -r ".build_variant")
 promote_revision=$(cat task_data.json | jq -r ".revision")
 
+artifact_address="https://internal-downloads.mongodb.com/server-custom-builds/${promote_project_id}/${promote_version_id}/${promote_build_variant}/mongo-${promote_build_id}.tgz"
+
 cat << EOT > ./promote-expansions.yml
 promote_project_id: "$promote_project_id"
 promote_version_id: "$promote_version_id"
 promote_build_id: "$promote_build_id"
 promote_build_variant: "$promote_build_variant"
 promote_revision: "$promote_revision"
+promote_cdn_address: "$artifact_address"
 EOT
 
 echo ".................."
@@ -31,8 +34,6 @@ echo "promote expansions"
 echo ".................."
 
 cat ./promote-expansions.yml
-
-artifact_address="https://internal-downloads.mongodb.com/server-custom-builds/${promote_project_id}/${promote_version_id}/${promote_build_variant}/mongo-${promote_build_id}.tgz"
 
 echo ""
 echo "The artifact will be accessible at '$artifact_address'"

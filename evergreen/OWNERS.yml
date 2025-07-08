@@ -21,6 +21,9 @@ filters:
   - "generate_custom_build_promotion_expansions.sh":
     approvers:
       - 10gen/devprod-build
+  - "upload_custom_build_to_cloud_dev.sh":
+    approvers:
+      - 10gen/devprod-build
   - "/package*":
     approvers:
       - 10gen/devprod-build

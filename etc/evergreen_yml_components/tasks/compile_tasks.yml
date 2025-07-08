@@ -869,6 +869,18 @@ tasks:
           file: promote-expansions.yml
       - func: "f_expansions_write"
       - command: s3.get
+        display_name: "fetch promote version expansions"
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          remote_file: ${promote_project_id}/${promote_version_id}/version_expansions.yml
+          bucket: mciuploads
+          local_file: src/promote-version-expansions.yml
+      - command: expansions.update
+        params:
+          file: src/promote-version-expansions.yml
+      - func: "f_expansions_write"
+      - command: s3.get
         display_name: "fetch dist tarball for promotion"
         params:
           aws_key: ${aws_key}
@@ -885,6 +897,19 @@ tasks:
           local_file: src/mongo-binaries.tgz
           content_type: application/gzip
           skip_existing: true
+      - command: subprocess.exec
+        params:
+          binary: bash
+          env:
+            PROMOTE_TO_CLOUD_DEV: ${promote_to_cloud_dev}
+            PROMOTE_BUILD_VARIANT: ${promote_build_variant}
+            PROMOTE_MONGO_VERSION: ${version}
+            PROMOTE_REVISION: ${promote_revision}
+            PROMOTE_CDN_ADDRESS: ${promote_cdn_address}
+            CLOUD_DEV_API_PUBLIC_KEY: ${cloud_dev_api_public_key}
+            CLOUD_DEV_API_PRIVATE_KEY: ${cloud_dev_api_private_key}
+          args:
+            - "./src/evergreen/upload_custom_build_to_cloud_dev.sh"
 
   - name: crypt_push
     run_on: rhel8.7-small
