@@ -43,8 +43,56 @@ public:
 
 
     MemoryUsageTracker _tracker;
-    SimpleMemoryUsageTracker _funcTracker;
+    SimpleMemoryUsageTracker& _funcTracker;
 };
+
+TEST_F(MemoryUsageTrackerTest, FreshMemoryUsageTrackerInitializedCorrectly) {
+    _tracker.add(50LL);
+
+    MemoryUsageTracker freshMemoryUsageTracker = _tracker.makeFreshMemoryUsageTracker();
+
+    ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
+    ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
+
+    ASSERT_EQ(freshMemoryUsageTracker.currentMemoryBytes(), 0);
+    ASSERT_EQ(freshMemoryUsageTracker.maxMemoryBytes(), 0);
+    ASSERT_EQ(freshMemoryUsageTracker.maxAllowedMemoryUsageBytes(),
+              _tracker.maxAllowedMemoryUsageBytes());
+}
+
+TEST_F(MemoryUsageTrackerTest, FreshSimpleMemoryUsageTrackerInitializedCorrectly) {
+    _funcTracker.add(50LL);
+
+    SimpleMemoryUsageTracker freshSimpleMemoryUsageTracker =
+        _funcTracker.makeFreshSimpleMemoryUsageTracker();
+
+    ASSERT_EQ(_funcTracker.currentMemoryBytes(), 50LL);
+    ASSERT_EQ(_funcTracker.maxMemoryBytes(), 50LL);
+
+    ASSERT_EQ(freshSimpleMemoryUsageTracker.currentMemoryBytes(), 0);
+    ASSERT_EQ(freshSimpleMemoryUsageTracker.maxMemoryBytes(), 0);
+    ASSERT_EQ(freshSimpleMemoryUsageTracker.maxAllowedMemoryUsageBytes(),
+              _funcTracker.maxAllowedMemoryUsageBytes());
+}
+
+TEST_F(MemoryUsageTrackerTest, FreshMemoryUsageTrackerCopiesBaseCorrectly) {
+    SimpleMemoryUsageTracker memTrackerA =
+        SimpleMemoryUsageTracker(nullptr, _tracker.maxAllowedMemoryUsageBytes());
+    MemoryUsageTracker memTrackerB = MemoryUsageTracker(&memTrackerA, false, kDefaultMax);
+    MemoryUsageTracker memTrackerC = memTrackerB.makeFreshMemoryUsageTracker();
+
+    memTrackerB.add(50LL);
+    memTrackerC.add(50LL);
+
+    ASSERT_EQ(memTrackerA.currentMemoryBytes(), 100LL);
+    ASSERT_EQ(memTrackerA.maxMemoryBytes(), 100LL);
+
+    ASSERT_EQ(memTrackerB.currentMemoryBytes(), 50LL);
+    ASSERT_EQ(memTrackerB.maxMemoryBytes(), 50LL);
+
+    ASSERT_EQ(memTrackerC.currentMemoryBytes(), 50LL);
+    ASSERT_EQ(memTrackerC.maxMemoryBytes(), 50LL);
+}
 
 TEST_F(MemoryUsageTrackerTest, SetFunctionUsageUpdatesGlobal) {
     _tracker.add(50LL);

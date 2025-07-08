@@ -51,6 +51,12 @@ namespace mongo {
  */
 class SimpleMemoryUsageTracker {
 public:
+    SimpleMemoryUsageTracker(const SimpleMemoryUsageTracker&) = delete;
+    SimpleMemoryUsageTracker operator=(const SimpleMemoryUsageTracker&) = delete;
+
+    SimpleMemoryUsageTracker(SimpleMemoryUsageTracker&&) = default;
+    SimpleMemoryUsageTracker& operator=(SimpleMemoryUsageTracker&&) = default;
+
     SimpleMemoryUsageTracker(SimpleMemoryUsageTracker* base, int64_t maxAllowedMemoryUsageBytes)
         : _base(base), _maxAllowedMemoryUsageBytes(maxAllowedMemoryUsageBytes) {}
 
@@ -97,6 +103,20 @@ public:
         return _maxAllowedMemoryUsageBytes;
     }
 
+    /**
+     * Returns a new SimpleMemoryUsageTracker. The copy constructor for this class is purposefully
+     * deleted - use this method instead. Note that the members _maxMemoryBytes and
+     * _currentMemoryBytes will be initialized to zero.
+     */
+    SimpleMemoryUsageTracker makeFreshSimpleMemoryUsageTracker() const {
+        SimpleMemoryUsageTracker memTracker =
+            SimpleMemoryUsageTracker{_base, maxAllowedMemoryUsageBytes()};
+        memTracker.setDoExtraBookkeeping(_doExtraBookkeeping);
+        return memTracker;
+    }
+
+    friend class MemoryUsageTracker;
+
 protected:
     /**
      * Provide an extra function that is called whenever add() is invoked. Let it be set via this
@@ -141,6 +161,12 @@ private:
  */
 class MemoryUsageTracker {
 public:
+    MemoryUsageTracker(const MemoryUsageTracker&) = delete;
+    MemoryUsageTracker operator=(const MemoryUsageTracker&) = delete;
+
+    MemoryUsageTracker(MemoryUsageTracker&&) = default;
+    MemoryUsageTracker& operator=(MemoryUsageTracker&&) = default;
+
     MemoryUsageTracker(SimpleMemoryUsageTracker* baseParent,
                        bool allowDiskUse = false,
                        int64_t maxMemoryUsageBytes = 0)
@@ -223,13 +249,23 @@ public:
         return _baseTracker.maxAllowedMemoryUsageBytes();
     }
 
+    /**
+     * Returns a new MemoryUsageTracker. The copy constructor for this class is purposefully
+     * deleted - use this method instead. Note that the function memory tracker table will be
+     * initialized as empty.
+     */
+    MemoryUsageTracker makeFreshMemoryUsageTracker() const {
+        return MemoryUsageTracker(_baseTracker._base, allowDiskUse(), maxAllowedMemoryUsageBytes());
+    }
+
 private:
     static absl::string_view _key(StringData s) {
         return {s.data(), s.size()};
     }
 
     bool _allowDiskUse;
-    // Tracks current memory used.
+    // Tracks current memory used. This tracker rolls up memory usage from all trackers in the
+    // function memory tracker table.
     SimpleMemoryUsageTracker _baseTracker;
     // Tracks memory consumption per function using the output field name as a key.
     stdx::unordered_map<std::string, SimpleMemoryUsageTracker> _functionMemoryTracker;

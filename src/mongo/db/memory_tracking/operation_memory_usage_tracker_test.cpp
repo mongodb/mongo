@@ -66,7 +66,7 @@ private:
     DocumentSourceTrackingMock(std::deque<GetNextResult> results,
                                const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                Tracker tracker)
-        : DocumentSourceMock{std::move(results), expCtx}, _tracker{tracker} {}
+        : DocumentSourceMock{std::move(results), expCtx}, _tracker{std::move(tracker)} {}
 
     Tracker _tracker;
 };

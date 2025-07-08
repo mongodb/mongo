@@ -204,7 +204,8 @@ private:
 
     void updateStorageSizeStat();
 
-    mutable SimpleMemoryUsageTracker _memTracker;
+    // The pipeline stage using this class owns this memory tracker; this class only references it.
+    SimpleMemoryUsageTracker& _memTracker;
     ExpressionContext* _expCtx;
 
     ValueFlatUnorderedMap<MemoryUsageTokenWith<Document>> _memMap =
