@@ -244,3 +244,8 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagDropIndexesDDLCoordinator
         default: false
         fcv_gated: true
+    featureFlagEnableRSTransitionToEmbeddedCSRS:
+        description: "Enable the transitioning from a replica set to a sharded cluster with an embedded config server"
+        cpp_varname: feature_flags::gFeatureFlagEnableReplicasetTransitionToCSRS
+        default: false
+        fcv_gated: true
