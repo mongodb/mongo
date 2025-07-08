@@ -175,3 +175,15 @@ function runFeatureFlagMultiversionTest(featureFlag, testFunc) {
         testFunc(lastContinuousFCV);
     }
 }
+
+export {
+    binVersionToFCV,
+    checkFCV,
+    isFCVEqual,
+    lastContinuousFCV,
+    lastLTSFCV,
+    latestFCV,
+    numVersionsSinceLastLTS,
+    removeFCVDocument,
+    runFeatureFlagMultiversionTest
+};

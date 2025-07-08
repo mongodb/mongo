@@ -72,7 +72,7 @@ export default [
                 // src/mongo/shell/explainable.d.ts
                 Explainable: true,
 
-                // src/mongo/shell/feature_compatibility_version.d.ts
+                // src/mongo/shell/feature_compatibility_version_global.js
                 binVersionToFCV: true,
                 checkFCV: true,
                 isFCVEqual: true,
@@ -82,7 +82,6 @@ export default [
                 numVersionsSinceLastLTS: true,
                 removeFCVDocument: true,
                 runFeatureFlagMultiversionTest: true,
-                targetFCV: true,
 
                 // src/mongo/shell/query.d.ts
                 DBQuery: true,

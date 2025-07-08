@@ -318,6 +318,7 @@ MONGO_SERVER_CPP_JS_FILES = [
     "data_consistency_checker.js",
     "data_consistency_checker_global.js",
     "feature_compatibility_version.js",
+    "feature_compatibility_version_global.js",
     "keyvault.js",
     "servers.js",
     "servers_misc.js",
