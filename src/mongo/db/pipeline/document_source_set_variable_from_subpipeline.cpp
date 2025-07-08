@@ -133,6 +133,11 @@ DocumentSource::GetNextResult DocumentSourceSetVariableFromSubPipeline::doGetNex
         tassert(6448002,
                 "Expected to have already attached a cursor source to the pipeline",
                 !_subPipeline->peekFront()->constraints().requiresInputDocSource);
+        tassert(10713600,
+                "Cannot create an execution pipeline when it already exists",
+                !_subExecPipeline);
+        _subExecPipeline =
+            exec::agg::buildPipeline(_subPipeline->getSources(), _subPipeline->getContext());
         auto nextSubPipelineInput = _subExecPipeline->getNext();
         uassert(625296,
                 "No document returned from $SetVariableFromSubPipeline subpipeline",
