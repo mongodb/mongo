@@ -630,14 +630,6 @@ functions:
         - key: create_bazel_test_report
           value: "true"
 
-  "set bazel test silent fail": &set_bazel_test_silent_fail
-    command: expansions.update
-    display_name: "set bazel test silent fail"
-    params:
-      updates:
-        - key: bazel_test_silent_fail
-          value: "--silent-fail"
-
   ### Set expansion macros used in each task.
   "set task expansion macros": &set_task_expansion_macros
     command: expansions.update
@@ -1623,7 +1615,6 @@ functions:
     - *f_expansions_write
     - *enable_bazel_test_report_creation
     - *f_expansions_write
-    - *set_bazel_test_silent_fail # TODO SERVER-99431 Remove once bazel coverage timeouts are under control.
     - *f_expansions_write
     - *bazel_coverage_sh
 
@@ -2871,7 +2862,6 @@ functions:
         - "src/evergreen/run_python_script.sh"
         - "buildscripts/create_bazel_test_report.py"
         - "bazel-testlogs/"
-        - "${bazel_test_silent_fail}"
 
   "attach report":
     command: attach.results
