@@ -12,13 +12,15 @@ function getShowRecordIdsCursor(node, dbName, replicatedCollName) {
 export function validateShowRecordIdReplicatesAcrossNodes(nodes, dbName, replicatedCollName) {
     assert(nodes.length !== 0, `Method only applies when there is more than 1 node to compare`);
     const node0 = nodes[0];
-    const node0Cursor = getShowRecordIdsCursor(node0, dbName, replicatedCollName);
     for (let i = 1; i < nodes.length; i++) {
+        const node0Cursor = getShowRecordIdsCursor(node0, dbName, replicatedCollName);
+        assert(node0Cursor.hasNext(), `Expected to validate non-empty results`);
+
         const curNode = nodes[i];
         const curNodeCursor = getShowRecordIdsCursor(curNode, dbName, replicatedCollName);
         assert(curNodeCursor.hasNext(), `Expected to validate non-empty results`);
-        const actualDiff = DataConsistencyChecker.getDiff(node0Cursor, curNodeCursor);
 
+        const actualDiff = DataConsistencyChecker.getDiff(node0Cursor, curNodeCursor);
         assert.eq({docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []},
                   actualDiff,
                   `Expected RecordIds to match between node ${node0.host} and node ${
