@@ -131,6 +131,11 @@ BSONObj getSearchIndexManagerResponse(OperationContext* opCtx,
                                       boost::optional<SearchQueryViewSpec> view) {
     // Create the RemoteCommandRequest.
     auto request = createManageSearchIndexRemoteCommandRequest(opCtx, nss, uuid, userCmd, view);
+    // Validate that combined size of RemoteCommandRequest cmdObj and metadata do not exceed
+    // internal BSONObj size limit.
+    int requestSizeLimit = BSONObjMaxInternalSize - request.metadata.objsize();
+    uassertStatusOK(request.cmdObj.validateBSONObjSize(requestSizeLimit)
+                        .addContext("Creating RemoteCommandRequest failed"));
     auto [promise, future] = makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
     auto promisePtr = std::make_shared<Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
         std::move(promise));

@@ -93,7 +93,7 @@ static_assert(BufferMaxSize < (1 << 27));
 /**
  * This is the maximum size of a buffer needed for storing a BSON object in a response message.
  */
-const int kOpMsgReplyBSONBufferMaxSize = BSONObjMaxUserSize + (64 * 1024);
+const int kOpMsgReplyBSONBufferMaxSize = BSONObjMaxUserSize * 2 + 64 * 1024;
 
 namespace allocator_aware {
 template <class Allocator = std::allocator<void>>

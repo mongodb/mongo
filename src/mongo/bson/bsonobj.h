@@ -501,7 +501,7 @@ public:
         static_assert(Traits::MaxSize > 0 && Traits::MaxSize <= std::numeric_limits<int>::max(),
                       "BSONObj maximum size must be within possible limits");
         int x = objsize();
-        return x > 0 && x <= Traits::MaxSize;
+        return x > 0 && x <= BufferMaxSize;
     }
 
     /**
@@ -707,6 +707,14 @@ public:
 
     ConstDataRange asDataRange() const {
         return ConstDataRange(objdata(), objsize());
+    }
+
+    Status validateBSONObjSize(int maxSize = BSONObjMaxInternalSize) const {
+        if (objsize() > maxSize) {
+            return Status{ErrorCodes::BSONObjectTooLarge,
+                          fmt::format("Size {} exceeds maximum {}", objsize(), maxSize)};
+        }
+        return Status::OK();
     }
 
 private:

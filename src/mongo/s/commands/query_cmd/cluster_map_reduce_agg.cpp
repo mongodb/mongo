@@ -298,6 +298,8 @@ bool _runMapReduceInRoutingContext(OperationContext* opCtx,
                 bab.append(elem.embeddedObject());
             return bab.arr();
         }();
+        uassertStatusOK(
+            exhaustedResults.validateBSONObjSize().addContext("mapReduce command failed"));
         map_reduce_output_format::appendInlineResponse(std::move(exhaustedResults), &result);
     } else {
         map_reduce_output_format::appendOutResponse(parsedMr.getOutOptions().getDatabaseName(),

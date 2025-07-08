@@ -70,12 +70,8 @@ function tests(conn, isStandalone) {
         }
         if (idLen >= minIdErrorLen) {
             assert.commandFailedWithCode(res, ErrorCodes.BadValue);
-        } else if (isStandalone) {
-            assert.commandWorked(res);
         } else {
-            // The _id field is copied for oplog entries on replset and sharded clusters (see
-            // SERVER-61891, SERVER-96086).
-            assert.commandFailedWithCode(res, ErrorCodes.BSONObjectTooLarge);
+            assert.commandWorked(res);
         }
         const explainResult = testDb.c.explain().remove({});
         const stage = explainResult.queryPlanner.winningPlan.stage;

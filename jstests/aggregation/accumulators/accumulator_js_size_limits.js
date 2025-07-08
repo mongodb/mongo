@@ -38,7 +38,7 @@ let res = runExample(1, {
     },
     lang: 'js',
 });
-assert.commandFailedWithCode(res, [10334]);
+assert.commandFailedWithCode(res, [16493, 10334]);
 
 // Accumulator tries to return BSON larger than 16MB from JS.
 assert(coll.drop());
@@ -60,7 +60,7 @@ res = runExample(1, {
     },
     lang: 'js',
 });
-assert.commandFailedWithCode(res, [17260]);
+assert.commandFailedWithCode(res, [17260, 10334]);
 
 // Accumulator state and argument together exceed max BSON size.
 assert(coll.drop());

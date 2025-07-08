@@ -238,7 +238,8 @@ bool runAggregationMapReduce(OperationContext* opCtx,
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             CurOp::get(opCtx)->setNS(lk, parsedMr.getNamespace());
         }
-
+        uassertStatusOK(
+            result.asTempObj().validateBSONObjSize().addContext("mapReduce command failed"));
         return true;
     } catch (DBException& e) {
         uassert(ErrorCodes::CommandNotSupportedOnView,

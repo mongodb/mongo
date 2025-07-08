@@ -186,9 +186,10 @@ TEST(OpMsgReplyBuilder, MessageOverBSONSizeLimit) {
 
     {
         // 'builder' is an unowned BSONObjBuilder and thus does none of its own size checking,
-        // allowing us to grow the OpMsgReplyBuilder past the bson object size limit.
+        // allowing us to grow the OpMsgReplyBuilder past kOpMsgReplyBSONBufferMaxSize (32MB +
+        // 64KB).
         auto builder = r.getBodyBuilder();
-        for (auto i = 0; i < 2; i++) {
+        for (auto i = 0; i < 3; i++) {
             builder.append("field" + std::to_string(i), bigStr);
         }
     }

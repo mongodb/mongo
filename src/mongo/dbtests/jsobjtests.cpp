@@ -1749,7 +1749,7 @@ public:
             char* crap = (char*)mongoMalloc(x.objsize());
             memcpy(crap, x.objdata(), x.objsize());
             int* foo = (int*)crap;
-            foo[0] = 123123123;
+            foo[0] = 1'231'231'231;
             int state = 0;
             try {
                 BSONObj y(crap);

@@ -92,7 +92,9 @@ template <typename BSONTraits = BSONObj::DefaultSizeTrait, bool EnsureUniquePref
 BSONObj documentToBsonWithPaths(const Document& input, const OrderedPathSet& paths) {
     BSONObjBuilder outputBuilder;
     documentToBsonWithPaths<EnsureUniquePrefixes>(input, paths, &outputBuilder);
-    return outputBuilder.obj<BSONTraits>();
+    BSONObj docBSONObj = outputBuilder.obj<BSONTraits>();
+    Document::validateDocumentBSONSize(docBSONObj, BSONTraits::MaxSize);
+    return docBSONObj;
 }
 
 /**

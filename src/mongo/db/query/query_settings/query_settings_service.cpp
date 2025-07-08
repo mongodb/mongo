@@ -426,7 +426,8 @@ SetClusterParameter makeQuerySettingsClusterParameter(
     for (const auto& item : config.queryShapeConfigurations) {
         arrayBuilder.append(item.toBSON());
     }
-    arrayBuilder.done();
+    uassertStatusOK(arrayBuilder.done().validateBSONObjSize().addContext(
+        "Setting query settings cluster parameter failed"));
     SetClusterParameter request(BSON(getQuerySettingsClusterParameterName() << bob.done()));
     request.setDbName(DatabaseName::kConfig);
     return request;

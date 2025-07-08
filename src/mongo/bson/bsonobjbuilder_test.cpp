@@ -496,7 +496,7 @@ TEST(BSONObjBuilderTest, SizeChecks) {
     // Large buffers cause an exception to be thrown.
     ASSERT_THROWS_CODE(
         [&] {
-            auto largeBuffer = generateBuffer(17 * 1024 * 1024);
+            auto largeBuffer = generateBuffer(126 * 1024 * 1024);
             BSONObj obj(largeBuffer.data(), BSONObj::LargeSizeTrait{});
 
             BSONObjBuilder builder;
@@ -505,32 +505,6 @@ TEST(BSONObjBuilderTest, SizeChecks) {
         }(),
         DBException,
         ErrorCodes::BSONObjectTooLarge);
-
-
-    // Assert that the max size can be increased by passing BSONObj a tag type.
-    {
-        auto largeBuffer = generateBuffer(17 * 1024 * 1024);
-        BSONObj obj(largeBuffer.data(), BSONObj::LargeSizeTrait{});
-
-        BSONObjBuilder builder;
-        builder.append("a", obj);
-        BSONObj finalObj = builder.obj<BSONObj::LargeSizeTrait>();
-    }
-
-    // But a size is in fact being enforced.
-    {
-        auto largeBuffer = generateBuffer(50 * 1024 * 1024);
-        BSONObj obj(largeBuffer.data(), BSONObj::LargeSizeTrait{});
-        BSONObjBuilder builder;
-        ASSERT_THROWS(
-            [&]() {
-                for (StringData character : {"a", "b", "c"}) {
-                    builder.append(character, obj);
-                }
-                BSONObj finalObj = builder.obj<BSONObj::LargeSizeTrait>();
-            }(),
-            DBException);
-    }
 }
 
 TEST(BSONObjBuilderTest, UniqueBuilderNoop) {

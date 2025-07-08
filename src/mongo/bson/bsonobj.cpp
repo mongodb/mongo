@@ -246,7 +246,9 @@ BSONObj BSONObj::redact(RedactLevel level,
     try {
         BSONObjBuilder builder;
         redactor()(builder, *this, /*appendMask=*/true, level, fieldNameRedactor);
-        return builder.obj();
+        BSONObj obj = builder.obj();
+        uassertStatusOK(obj.validateBSONObjSize().addContext("Redacted object exceeds size limit"));
+        return obj;
     } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
     }
 

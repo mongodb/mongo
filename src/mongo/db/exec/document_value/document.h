@@ -310,6 +310,15 @@ public:
     }
 
     /**
+     * Validates that the size of the document as a BSON object does not exceed maxSize limit, and
+     * throws BSONObjectTooLarge otherwise.
+     */
+    static void validateDocumentBSONSize(const BSONObj& docBSONObj, int maxSize) {
+        uassertStatusOK(
+            docBSONObj.validateBSONObjSize(maxSize).addContext("Serializing Document failed"));
+    }
+
+    /**
      * Serializes this document to the BSONObj under construction in 'builder'. Metadata is not
      * included. Throws a AssertionException if 'recursionLevel' exceeds the maximum allowable
      * depth.
@@ -324,7 +333,9 @@ public:
 
         BSONObjBuilder bb;
         toBson(&bb);
-        return bb.obj<BSONTraits>();
+        BSONObj docBSONObj = bb.obj<BSONTraits>();
+        validateDocumentBSONSize(docBSONObj, BSONTraits::MaxSize);
+        return docBSONObj;
     }
 
     /**
@@ -349,7 +360,9 @@ public:
 
         BSONObjBuilder bb;
         toBsonWithMetaData(&bb);
-        return bb.obj<BSONTraits>();
+        BSONObj docBSONObj = bb.obj<BSONTraits>();
+        validateDocumentBSONSize(docBSONObj, BSONTraits::MaxSize);
+        return docBSONObj;
     }
 
     /**

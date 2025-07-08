@@ -502,7 +502,10 @@ BSONObj InitialSyncer::_getInitialSyncProgress(WithLock lk) const {
                 dbsBuilder.doneFast();
             }
         }
-        return bob.obj();
+        BSONObj bobObj = bob.obj();
+        uassertStatusOK(bobObj.validateBSONObjSize().addContext(
+            "Building initial sync progress object failed."));
+        return bobObj;
     } catch (const DBException& e) {
         LOGV2(21161, "Error creating initial sync progress object", "error"_attr = e.toString());
     }

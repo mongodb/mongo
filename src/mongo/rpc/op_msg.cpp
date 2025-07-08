@@ -182,6 +182,8 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
                 uassert(40430, "Multiple body sections in message", !haveBody);
                 haveBody = true;
                 msg.body = sectionsBuf.read<Validated<BSONObj>>();
+                uassertStatusOK(msg.body.validateBSONObjSize(kOpMsgReplyBSONBufferMaxSize)
+                                    .addContext("Parsing opMsg body failed"));
                 break;
             }
 
@@ -205,7 +207,13 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
 
                 msg.sequences.push_back({std::string{name}});
                 while (!seqBuf.atEof()) {
-                    msg.sequences.back().objs.push_back(seqBuf.read<Validated<BSONObj>>());
+                    auto obj = seqBuf.read<Validated<BSONObj>>();
+                    // For document sequences, each document must be within the 16MB document limit.
+                    // See the OP_MSG documentation for further details on the size limits:
+                    // https://github.com/mongodb/specifications/blob/master/source/message/OP_MSG.md#sections.
+                    uassertStatusOK(msg.body.validateBSONObjSize().addContext(
+                        "Parsing opMsg DocSequence failed"));
+                    msg.sequences.back().objs.push_back(obj);
                 }
                 break;
             }
@@ -437,10 +445,10 @@ AtomicWord<bool> OpMsgBuilder::disableDupeFieldCheck_forTest{false};
 Message OpMsgBuilder::finish() {
     const auto size = _buf.len();
     uassert(ErrorCodes::BSONObjectTooLarge,
-            str::stream() << "BSON size limit hit while building Message. Size: " << size << " (0x"
-                          << unsignedHex(size) << "); maxSize: " << BSONObjMaxInternalSize << "("
-                          << (BSONObjMaxInternalSize / (1024 * 1024)) << "MB)",
-            size <= BSONObjMaxInternalSize);
+            fmt::format("Building Message failed. Size {} exceeds maximum {}",
+                        size,
+                        kOpMsgReplyBSONBufferMaxSize),
+            size < kOpMsgReplyBSONBufferMaxSize);
 
     return finishWithoutSizeChecking();
 }

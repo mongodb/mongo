@@ -119,15 +119,12 @@ void TransactionOperations::packTransactionStatementsForApplyOps(
         stmt.extractPrePostImageForTransaction(imageToWrite);
     }
     try {
-        // BSONArrayBuilder will throw a BSONObjectTooLarge exception if we exceeded the max BSON
-        // size.
-        opsArray.done();
-    } catch (const AssertionException& e) {
-        // Change the error code to TransactionTooLarge if it is BSONObjectTooLarge.
-        uassert(ErrorCodes::TransactionTooLarge,
-                e.reason(),
-                e.code() != ErrorCodes::BSONObjectTooLarge);
-        throw;
+        // If the BSONArrayBuilder exceeds the max BSON size, throw TransactionTooLarge.
+        uassertStatusOK(opsArray.done().validateBSONObjSize().addContext(
+            "Packing transaction statements failed."));
+    } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>& e) {
+        // Change BSONObjectTooLarge => TransactionTooLarge.
+        uasserted(ErrorCodes::TransactionTooLarge, e.reason());
     }
 }
 

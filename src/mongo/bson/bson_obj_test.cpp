@@ -782,7 +782,7 @@ TEST(BSONObj, sizeChecks) {
     // Large buffers cause an exception to be thrown.
     ASSERT_THROWS_CODE(
         [&] {
-            auto largeBuffer = generateBuffer(17 * 1024 * 1024);
+            auto largeBuffer = generateBuffer(126 * 1024 * 1024);
             BSONObj obj(largeBuffer.data());
         }(),
         DBException,

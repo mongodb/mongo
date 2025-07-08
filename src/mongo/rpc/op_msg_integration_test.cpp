@@ -1320,16 +1320,13 @@ TEST(OpMsg, ServerHandlesReallyLargeMessagesGracefully) {
                                                      BSON("buildInfo" << 1)))
             ->getCommandReply();
     ASSERT_OK(getStatusFromCommandResult(buildInfo));
-    const auto maxBSONObjSizeFromServer =
-        static_cast<size_t>(buildInfo["maxBsonObjectSize"].Number());
-    const std::string bigData(maxBSONObjSizeFromServer * 2, ' ');
-
+    const std::string bigData(kOpMsgReplyBSONBufferMaxSize + (1024), ' ');
     BSONObjBuilder bob;
     bob << "ismaster" << 1 << "ignoredField" << bigData << "$db"
         << "admin";
     OpMsgRequest request;
     request.body = bob.obj<BSONObj::LargeSizeTrait>();
-    ASSERT_GT(request.body.objsize(), BSONObjMaxInternalSize);
+    ASSERT_GT(request.body.objsize(), kOpMsgReplyBSONBufferMaxSize);
     auto requestMsg = request.serializeWithoutSizeChecking();
 
     Message replyMsg = conn->call(requestMsg);
