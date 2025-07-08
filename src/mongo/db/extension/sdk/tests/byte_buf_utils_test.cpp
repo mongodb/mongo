@@ -33,9 +33,18 @@
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
+#include <vector>
 
 namespace mongo::extension::sdk {
 namespace {
+
+std::vector<char> generateBuffer(int32_t size) {
+    std::vector<char> buffer(size);
+    DataRange bufferRange(&buffer.front(), &buffer.back());
+    ASSERT_OK(bufferRange.writeNoThrow(LittleEndian<int32_t>(size)));
+
+    return buffer;
+}
 
 TEST(ByteBufUtilsTest, BsonObjFromByteViewValidInput) {
     // Create a valid BSON object in byte array form
@@ -63,25 +72,23 @@ DEATH_TEST(ByteBufUtilsTest, BsonObjFromByteView_InvalidInput_MalformedLength, "
 }
 
 DEATH_TEST(ByteBufUtilsTest, BsonObjFromByteView_InvalidInput_LengthExceedsBufferSize, "10596405") {
-    const char invalidLengthBsonData[] = {0x20, 0x00, 0x00, 0x00,  // Document claims to be 32 bytes
-                                          0x02, 'f',  'i',  'e',  'l', 'd', '\0', 0x05,
-                                          0x00, 0x00, 0x00, 'v',  'a', 'l', 'u',  '\0'};
+    const auto validBSON = BSON("field" << "value");
+    const auto objSize = validBSON.objsize();
+    DataRange bufferRange(const_cast<char*>(validBSON.objdata()), objSize);
+    ASSERT_TRUE(objSize >= 0);
+    // Mutate document to report incorrect size of 32.
+    ASSERT_OK(bufferRange.writeNoThrow(LittleEndian<int32_t>(32)));
     MongoExtensionByteView view{
-        reinterpret_cast<const uint8_t*>(invalidLengthBsonData),
-        16};  // Only 16 bytes in buffer, while document length states 32 bytes.
+        reinterpret_cast<const uint8_t*>(validBSON.objdata()),
+        static_cast<size_t>(
+            objSize)};  // Only 16 bytes in buffer, while document length states 32 bytes.
 
     [[maybe_unused]] auto bsonObj = bsonObjFromByteView(view);
 }
 
 TEST(ByteBufUtilsTest, BsonObjFromByteView_ValidInput_MinimumLength) {
-    const char minBsonData[] = {
-        0x05,
-        0x00,
-        0x00,
-        0x00,  // Minimum BSON length
-        0x00   // End of document
-    };
-    MongoExtensionByteView view{reinterpret_cast<const uint8_t*>(minBsonData),
+    auto smallBsonBuffer = generateBuffer(BSONObj::kMinBSONLength);
+    MongoExtensionByteView view{reinterpret_cast<const uint8_t*>(smallBsonBuffer.data()),
                                 BSONObj::kMinBSONLength};
 
     auto bsonObj = bsonObjFromByteView(view);
@@ -94,12 +101,11 @@ DEATH_TEST(ByteBufUtilsTest, BsonObjFromByteView_InvalidInput_Empty, "10596405")
 }
 
 TEST(ByteBufUtilsTest, BsonObjFromByteView_ValidInput_LargeDocument) {
-    const size_t largeBsonSize = 1024;
-    char largeBsonData[largeBsonSize] = {0};  // Initialize a large BSON buffer
-    *reinterpret_cast<size_t*>(largeBsonData) = largeBsonSize;
-    largeBsonData[largeBsonSize - 1] = 0x00;  // End of document signature
+    const int32_t largeBsonSize = 15 * 1024 * 1024;
+    auto largeBsonBuffer = generateBuffer(largeBsonSize);
 
-    MongoExtensionByteView view{reinterpret_cast<const uint8_t*>(largeBsonData), largeBsonSize};
+    MongoExtensionByteView view{reinterpret_cast<const uint8_t*>(largeBsonBuffer.data()),
+                                largeBsonSize};
 
     auto bsonObj = bsonObjFromByteView(view);
     ASSERT_TRUE(bsonObj.isValid());
