@@ -87,7 +87,7 @@ rules:
           - assigned_to_jira_team_devprod_evergreen_app
           - assigned_to_jira_team_devprod_evergreen_ui
           - assigned_to_jira_team_devprod_performance_infrastructure
-          - assigned_to_jira_team_devprod_performance_analysis
+          - assigned_to_jira_team_devprod_last_mile
           - assigned_to_jira_team_devprod_release_infrastructure
           - assigned_to_jira_team_devprod_runtime_environments
           - assigned_to_jira_team_devprod_services_integrations

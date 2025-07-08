@@ -2128,7 +2128,7 @@ tasks:
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
-    tags: ["assigned_to_jira_team_devprod_performance_analysis", "auxiliary"]
+    tags: ["assigned_to_jira_team_devprod_last_mile", "auxiliary"]
     commands:
       - command: manifest.load
       - func: "git get shallow project"
