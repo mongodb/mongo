@@ -230,7 +230,7 @@ assertSetParameterSucceeds("internalLookupStageIntermediateDocumentMaxSizeBytes"
                            bsonObjMaxInternalSize);
 
 assertSetParameterSucceeds("internalInsertMaxBatchSize", 11);
-assertSetParameterFails("internalInsertMaxBatchSize", 0);
+assertSetParameterSucceeds("internalInsertMaxBatchSize", 0);
 assertSetParameterFails("internalInsertMaxBatchSize", -1);
 
 assertSetParameterSucceeds("internalDocumentSourceCursorBatchSizeBytes", 11);
