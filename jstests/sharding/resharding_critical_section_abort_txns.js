@@ -173,6 +173,12 @@ function testPreparingToBlockWritesWhileSessionCheckedIn(testOptions) {
     assert.commandWorked(st.s.adminCommand({moveCollection: ns0, toShard: st.shard1.shardName}));
     assert.commandWorked(st.s.adminCommand({moveCollection: ns1, toShard: st.shard1.shardName}));
 
+    // Perform a find command against both collections after the moveCollection operations above so
+    // that the writes in the transactions below do not need to refresh the sharding metadata which
+    // can lead to ExceededTimeLimit errors on slow machines.
+    assert.eq(testColl0.find().itcount(), 1);
+    assert.eq(testColl1.find().itcount(), 1);
+
     let setParameterRes;
     if (!testOptions.enableAbortUnpreparedTxns) {
         // 'reshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites' defaults to true. So
@@ -301,6 +307,12 @@ function testPreparingToBlockWritesWhileSessionCheckedOutNonCommitOrAbort() {
     assert.commandWorked(st.s.adminCommand({moveCollection: ns0, toShard: st.shard1.shardName}));
     assert.commandWorked(st.s.adminCommand({moveCollection: ns1, toShard: st.shard1.shardName}));
 
+    // Perform a find command against both collections after the moveCollection operations above so
+    // that the writes in the transactions below do not need to refresh the sharding metadata which
+    // can lead to ExceededTimeLimit errors on slow machines.
+    assert.eq(testColl0.find().itcount(), 1);
+    assert.eq(testColl1.find().itcount(), 1);
+
     let beforeBlockingFp =
         configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeBlockingWrites");
     let insertFp = configureFailPoint(
@@ -395,6 +407,12 @@ function testPreparingToBlockWritesWhileSessionCheckedOutCommitOrAbort() {
     // operation will have shard1 as the donor and shard0 as the recipient.
     assert.commandWorked(st.s.adminCommand({moveCollection: ns0, toShard: st.shard1.shardName}));
     assert.commandWorked(st.s.adminCommand({moveCollection: ns1, toShard: st.shard1.shardName}));
+
+    // Perform a find command against both collections after the moveCollection operations above so
+    // that the writes in the transactions below do not need to refresh the sharding metadata which
+    // can lead to ExceededTimeLimit errors on slow machines.
+    assert.eq(testColl0.find().itcount(), 1);
+    assert.eq(testColl1.find().itcount(), 1);
 
     let beforeBlockingFp =
         configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeBlockingWrites");
