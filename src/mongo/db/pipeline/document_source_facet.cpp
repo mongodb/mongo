@@ -270,13 +270,45 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::optimize() {
 
 void DocumentSourceFacet::detachFromOperationContext() {
     for (auto&& facet : _facets) {
-        facet.getExecPipeline().detachFromOperationContext();
+        if (facet.execPipeline) {
+            facet.execPipeline->detachFromOperationContext();
+        }
+        if (facet.pipeline) {
+            facet.pipeline->detachFromOperationContext();
+        }
+    }
+}
+
+void DocumentSourceFacet::detachSourceFromOperationContext() {
+    for (auto&& facet : _facets) {
+        if (facet.execPipeline) {
+            facet.execPipeline->detachFromOperationContext();
+        }
+        if (facet.pipeline) {
+            facet.pipeline->detachFromOperationContext();
+        }
     }
 }
 
 void DocumentSourceFacet::reattachToOperationContext(OperationContext* opCtx) {
     for (auto&& facet : _facets) {
-        facet.getExecPipeline().reattachToOperationContext(opCtx);
+        if (facet.execPipeline) {
+            facet.execPipeline->reattachToOperationContext(opCtx);
+        }
+        if (facet.pipeline) {
+            facet.pipeline->reattachToOperationContext(opCtx);
+        }
+    }
+}
+
+void DocumentSourceFacet::reattachSourceToOperationContext(OperationContext* opCtx) {
+    for (auto&& facet : _facets) {
+        if (facet.execPipeline) {
+            facet.execPipeline->reattachToOperationContext(opCtx);
+        }
+        if (facet.pipeline) {
+            facet.pipeline->reattachToOperationContext(opCtx);
+        }
     }
 }
 
@@ -284,6 +316,13 @@ bool DocumentSourceFacet::validateOperationContext(const OperationContext* opCtx
     return getContext()->getOperationContext() == opCtx &&
         std::all_of(_facets.begin(), _facets.end(), [opCtx](const auto& f) {
                return f.getExecPipeline().validateOperationContext(opCtx);
+           });
+}
+
+bool DocumentSourceFacet::validateSourceOperationContext(const OperationContext* opCtx) const {
+    return getExpCtx()->getOperationContext() == opCtx &&
+        std::all_of(_facets.begin(), _facets.end(), [opCtx](const auto& f) {
+               return f.pipeline->validateOperationContext(opCtx);
            });
 }
 

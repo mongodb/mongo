@@ -278,7 +278,11 @@ protected:
                     HostAndPort donorHost,
                     size_t batchSize) {
         execPipeline.reattachToOperationContext(opCtx);
-        ON_BLOCK_EXIT([&execPipeline] { execPipeline.detachFromOperationContext(); });
+        pipeline.reattachToOperationContext(opCtx);
+        ON_BLOCK_EXIT([&pipeline, &execPipeline] {
+            execPipeline.detachFromOperationContext();
+            pipeline.detachFromOperationContext();
+        });
         _advanceResumeToken(batchSize);
 
         std::vector<InsertStatement> batch;

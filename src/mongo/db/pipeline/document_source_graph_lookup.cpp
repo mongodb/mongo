@@ -771,12 +771,27 @@ void DocumentSourceGraphLookUp::detachFromOperationContext() {
     _fromExpCtx->setOperationContext(nullptr);
 }
 
+void DocumentSourceGraphLookUp::detachSourceFromOperationContext() {
+    _fromExpCtx->setOperationContext(nullptr);
+}
+
 void DocumentSourceGraphLookUp::reattachToOperationContext(OperationContext* opCtx) {
     _fromExpCtx->setOperationContext(opCtx);
 }
 
+void DocumentSourceGraphLookUp::reattachSourceToOperationContext(OperationContext* opCtx) {
+    _fromExpCtx->setOperationContext(opCtx);
+}
+
+
 bool DocumentSourceGraphLookUp::validateOperationContext(const OperationContext* opCtx) const {
     return getContext()->getOperationContext() == opCtx &&
+        _fromExpCtx->getOperationContext() == opCtx;
+}
+
+bool DocumentSourceGraphLookUp::validateSourceOperationContext(
+    const OperationContext* opCtx) const {
+    return getExpCtx()->getOperationContext() == opCtx &&
         _fromExpCtx->getOperationContext() == opCtx;
 }
 

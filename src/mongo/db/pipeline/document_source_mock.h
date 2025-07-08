@@ -116,7 +116,15 @@ public:
         isDetachedFromOpCtx = false;
     }
 
+    void reattachSourceToOperationContext(OperationContext* opCtx) override {
+        isDetachedFromOpCtx = false;
+    }
+
     void detachFromOperationContext() override {
+        isDetachedFromOpCtx = true;
+    }
+
+    void detachSourceFromOperationContext() override {
         isDetachedFromOpCtx = true;
     }
 

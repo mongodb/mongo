@@ -171,7 +171,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingTxnCloner::_restartPipeline
 boost::optional<SessionTxnRecord> ReshardingTxnCloner::_getNextRecord(
     OperationContext* opCtx, Pipeline& pipeline, exec::agg::Pipeline& execPipeline) {
     execPipeline.reattachToOperationContext(opCtx);
-    ON_BLOCK_EXIT([&execPipeline] { execPipeline.detachFromOperationContext(); });
+    pipeline.reattachToOperationContext(opCtx);
+    ON_BLOCK_EXIT([&pipeline, &execPipeline] {
+        execPipeline.detachFromOperationContext();
+        pipeline.detachFromOperationContext();
+    });
 
     // The BlockingResultsMerger underlying by the $mergeCursors stage records how long the
     // recipient spent waiting for documents from the donor shard. It doing so requires the CurOp to
@@ -264,6 +268,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
                        chainCtx->execPipeline = exec::agg::buildPipeline(
                            chainCtx->pipeline->getSources(), chainCtx->pipeline->getContext());
                        chainCtx->execPipeline->detachFromOperationContext();
+                       chainCtx->pipeline->detachFromOperationContext();
                        chainCtx->donorRecord = boost::none;
                    }
 

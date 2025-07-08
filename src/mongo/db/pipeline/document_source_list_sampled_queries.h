@@ -160,7 +160,9 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     void detachFromOperationContext() final;
+    void detachSourceFromOperationContext() final;
     void reattachToOperationContext(OperationContext* opCtx) final;
+    void reattachSourceToOperationContext(OperationContext* opCtx) final;
 
 private:
     DocumentSourceListSampledQueries(const boost::intrusive_ptr<ExpressionContext>& expCtx)

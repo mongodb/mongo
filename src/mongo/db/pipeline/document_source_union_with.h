@@ -167,9 +167,15 @@ public:
 
     void detachFromOperationContext() final;
 
+    void detachSourceFromOperationContext() final;
+
     void reattachToOperationContext(OperationContext* opCtx) final;
 
+    void reattachSourceToOperationContext(OperationContext* opCtx) final;
+
     bool validateOperationContext(const OperationContext* opCtx) const final;
+
+    bool validateSourceOperationContext(const OperationContext* opCtx) const final;
 
     bool usedDisk() const final;
 

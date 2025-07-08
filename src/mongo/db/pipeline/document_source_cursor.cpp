@@ -366,7 +366,20 @@ void DocumentSourceCursor::detachFromOperationContext() {
     }
 }
 
+void DocumentSourceCursor::detachSourceFromOperationContext() {
+    // Only detach the underlying executor if it hasn't been detached already.
+    if (_exec && _exec->getOpCtx()) {
+        _exec->detachFromOperationContext();
+    }
+}
+
 void DocumentSourceCursor::reattachToOperationContext(OperationContext* opCtx) {
+    if (_exec) {
+        _exec->reattachToOperationContext(opCtx);
+    }
+}
+
+void DocumentSourceCursor::reattachSourceToOperationContext(OperationContext* opCtx) {
     if (_exec) {
         _exec->reattachToOperationContext(opCtx);
     }

@@ -119,7 +119,9 @@ public:
     }
 
     void detachFromOperationContext() final;
-    void reattachToOperationContext(OperationContext*) final;
+    void detachSourceFromOperationContext() final;
+    void reattachToOperationContext(OperationContext* opCtx) final;
+    void reattachSourceToOperationContext(OperationContext* opCtx) final;
 
     /**
      * Serializes this stage to be sent to perform the merging on a different host.

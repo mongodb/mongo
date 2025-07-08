@@ -153,19 +153,76 @@ void DocumentSourceSetVariableFromSubPipeline::addSubPipelineInitialSource(
 }
 
 void DocumentSourceSetVariableFromSubPipeline::detachFromOperationContext() {
-    if (_subPipeline) {
+    // We have an execution pipeline we're going to execute across multiple commands, so we need to
+    // detach it from the operation context when it goes out of scope.
+    if (_subExecPipeline) {
         _subExecPipeline->detachFromOperationContext();
+    }
+    // Some methods require pipeline to have a valid operation context. Normally, a pipeline and the
+    // corresponding execution pipeline share the same expression context containing a pointer to
+    // the operation context, but it might not be the case anymore when a pipeline is cloned with
+    // another expression context.
+    if (_subPipeline) {
+        _subPipeline->detachFromOperationContext();
+    }
+}
+
+void DocumentSourceSetVariableFromSubPipeline::detachSourceFromOperationContext() {
+    // We have an execution pipeline we're going to execute across multiple commands, so we need to
+    // detach it from the operation context when it goes out of scope.
+    if (_subExecPipeline) {
+        _subExecPipeline->detachFromOperationContext();
+    }
+    // Some methods require pipeline to have a valid operation context. Normally, a pipeline and the
+    // corresponding execution pipeline share the same expression context containing a pointer to
+    // the operation context, but it might not be the case anymore when a pipeline is cloned with
+    // another expression context.
+    if (_subPipeline) {
+        _subPipeline->detachFromOperationContext();
     }
 }
 
 void DocumentSourceSetVariableFromSubPipeline::reattachToOperationContext(OperationContext* opCtx) {
-    _subExecPipeline->reattachToOperationContext(opCtx);
+    // We have an execution pipeline we're going to execute across multiple commands, so we need to
+    // propagate the new operation context to the pipeline stages.
+    if (_subExecPipeline) {
+        _subExecPipeline->reattachToOperationContext(opCtx);
+    }
+    // Some methods require pipeline to have a valid operation context. Normally, a pipeline and the
+    // corresponding execution pipeline share the same expression context containing a pointer to
+    // the operation context, but it might not be the case anymore when a pipeline is cloned with
+    // another expression context.
+    if (_subPipeline) {
+        _subPipeline->reattachToOperationContext(opCtx);
+    }
+}
+
+void DocumentSourceSetVariableFromSubPipeline::reattachSourceToOperationContext(
+    OperationContext* opCtx) {
+    // We have an execution pipeline we're going to execute across multiple commands, so we need to
+    // propagate the new operation context to the pipeline stages.
+    if (_subExecPipeline) {
+        _subExecPipeline->reattachToOperationContext(opCtx);
+    }
+    // Some methods require pipeline to have a valid operation context. Normally, a pipeline and the
+    // corresponding execution pipeline share the same expression context containing a pointer to
+    // the operation context, but it might not be the case anymore when a pipeline is cloned with
+    // another expression context.
+    if (_subPipeline) {
+        _subPipeline->reattachToOperationContext(opCtx);
+    }
 }
 
 bool DocumentSourceSetVariableFromSubPipeline::validateOperationContext(
     const OperationContext* opCtx) const {
     return getContext()->getOperationContext() == opCtx &&
-        (!_subPipeline || _subExecPipeline->validateOperationContext(opCtx));
+        (!_subExecPipeline || _subExecPipeline->validateOperationContext(opCtx));
+}
+
+bool DocumentSourceSetVariableFromSubPipeline::validateSourceOperationContext(
+    const OperationContext* opCtx) const {
+    return getExpCtx()->getOperationContext() == opCtx &&
+        (!_subPipeline || _subPipeline->validateOperationContext(opCtx));
 }
 
 }  // namespace mongo

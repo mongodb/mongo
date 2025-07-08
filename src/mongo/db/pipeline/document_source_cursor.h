@@ -146,7 +146,11 @@ public:
 
     void detachFromOperationContext() final;
 
+    void detachSourceFromOperationContext() final;
+
     void reattachToOperationContext(OperationContext* opCtx) final;
+
+    void reattachSourceToOperationContext(OperationContext* opCtx) final;
 
     Timestamp getLatestOplogTimestamp() const {
         return _latestOplogTimestamp;

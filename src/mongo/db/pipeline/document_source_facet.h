@@ -190,8 +190,11 @@ public:
     // The following are overridden just to forward calls to sub-pipelines.
     void addInvolvedCollections(stdx::unordered_set<NamespaceString>* involvedNssSet) const final;
     void detachFromOperationContext() final;
+    void detachSourceFromOperationContext() final;
     void reattachToOperationContext(OperationContext* opCtx) final;
+    void reattachSourceToOperationContext(OperationContext* opCtx) final;
     bool validateOperationContext(const OperationContext* opCtx) const final;
+    bool validateSourceOperationContext(const OperationContext* opCtx) const final;
     StageConstraints constraints(PipelineSplitState pipeState) const final;
     bool usedDisk() const final;
     const SpecificStats* getSpecificStats() const final {

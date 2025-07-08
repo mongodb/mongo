@@ -204,12 +204,25 @@ void PlanExecutorSBE::restoreState(const RestoreContext& context) {
 }
 
 void PlanExecutorSBE::detachFromOperationContext() {
-    invariant(_opCtx);
+    if (_opCtx == nullptr) {
+        // This early exit allows the executor to be 'detached' twice without consequences during
+        // SPM-4106.
+        // TODO SERVER-104225: Change this early exit back to 'invariant(_opCtx)' once
+        // 'DocumentSourceCursor' is split into QO and QE components.
+        return;
+    }
     _root->detachFromOperationContext();
     _opCtx = nullptr;
 }
 
 void PlanExecutorSBE::reattachToOperationContext(OperationContext* opCtx) {
+    if (_opCtx == opCtx) {
+        // This early exit allows the executor to be 're-attached' to the same 'opCtx' twice without
+        // consequences during SPM-4106.
+        // TODO SERVER-104225: Remove this early exit once 'DocumentSourceCursor' is split into QO
+        // and QE components.
+        return;
+    }
     invariant(!_opCtx);
     _root->attachToOperationContext(opCtx);
     _opCtx = opCtx;

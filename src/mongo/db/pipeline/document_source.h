@@ -705,6 +705,18 @@ public:
         return nullptr;
     }
 
+    virtual void detachSourceFromOperationContext() {}
+
+    virtual void reattachSourceToOperationContext(OperationContext* opCtx) {}
+
+    /**
+     * Validate that all operation contexts associated with this document source, including any
+     * subpipelines, match the argument.
+     */
+    virtual bool validateSourceOperationContext(const OperationContext* opCtx) const {
+        return _expCtx->getOperationContext() == opCtx;
+    }
+
 protected:
     DocumentSource(StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 

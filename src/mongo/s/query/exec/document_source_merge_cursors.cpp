@@ -205,7 +205,20 @@ void DocumentSourceMergeCursors::detachFromOperationContext() {
     }
 }
 
+void DocumentSourceMergeCursors::detachSourceFromOperationContext() {
+    if (_blockingResultsMerger) {
+        _blockingResultsMerger->detachFromOperationContext();
+    }
+}
+
+
 void DocumentSourceMergeCursors::reattachToOperationContext(OperationContext* opCtx) {
+    if (_blockingResultsMerger) {
+        _blockingResultsMerger->reattachToOperationContext(opCtx);
+    }
+}
+
+void DocumentSourceMergeCursors::reattachSourceToOperationContext(OperationContext* opCtx) {
     if (_blockingResultsMerger) {
         _blockingResultsMerger->reattachToOperationContext(opCtx);
     }

@@ -112,10 +112,12 @@ public:
 
     void detachFromOperationContext() override {
         _execPipeline->detachFromOperationContext();
+        _pipeline->detachFromOperationContext();
     }
 
     void reattachToOperationContext(OperationContext* opCtx) override {
         _execPipeline->reattachToOperationContext(opCtx);
+        _pipeline->reattachToOperationContext(opCtx);
     }
 
     ExecState getNext(BSONObj* objOut, RecordId* recordIdOut) override;

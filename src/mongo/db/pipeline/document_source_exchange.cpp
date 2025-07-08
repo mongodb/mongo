@@ -162,6 +162,7 @@ Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter>
     }
 
     _execPipeline->detachFromOperationContext();
+    _pipeline->detachFromOperationContext();
 }
 
 std::vector<std::string> Exchange::extractBoundaries(
@@ -317,6 +318,7 @@ DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx,
                 _loadingThreadId = consumerId;
 
                 _execPipeline->reattachToOperationContext(opCtx);
+                _pipeline->reattachToOperationContext(opCtx);
 
                 // This will return when some exchange buffer is full and we cannot make any forward
                 // progress anymore.
@@ -330,6 +332,7 @@ DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx,
                 }
 
                 _execPipeline->detachFromOperationContext();
+                _pipeline->detachFromOperationContext();
 
                 // The loading cannot continue until the consumer with the full buffer consumes some
                 // documents.

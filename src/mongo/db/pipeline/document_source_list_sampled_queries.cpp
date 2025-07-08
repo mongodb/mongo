@@ -114,13 +114,41 @@ DocumentSource::GetNextResult DocumentSourceListSampledQueries::doGetNext() {
 
 void DocumentSourceListSampledQueries::detachFromOperationContext() {
     if (_pipeline) {
+        tassert(10713700,
+                "expecting '_execPipeline' to be initialized when '_pipeline' is initialized",
+                _execPipeline);
         _execPipeline->detachFromOperationContext();
+        _pipeline->detachFromOperationContext();
+    }
+}
+
+void DocumentSourceListSampledQueries::detachSourceFromOperationContext() {
+    if (_pipeline) {
+        tassert(10713701,
+                "expecting '_execPipeline' to be initialized when '_pipeline' is initialized",
+                _execPipeline);
+        _execPipeline->detachFromOperationContext();
+        _pipeline->detachFromOperationContext();
     }
 }
 
 void DocumentSourceListSampledQueries::reattachToOperationContext(OperationContext* opCtx) {
     if (_pipeline) {
+        tassert(10713702,
+                "expecting '_execPipeline' to be initialized when '_pipeline' is initialized",
+                _execPipeline);
         _execPipeline->reattachToOperationContext(opCtx);
+        _pipeline->reattachToOperationContext(opCtx);
+    }
+}
+
+void DocumentSourceListSampledQueries::reattachSourceToOperationContext(OperationContext* opCtx) {
+    if (_pipeline) {
+        tassert(10713703,
+                "expecting '_execPipeline' to be initialized when '_pipeline' is initialized",
+                _execPipeline);
+        _execPipeline->reattachToOperationContext(opCtx);
+        _pipeline->reattachToOperationContext(opCtx);
     }
 }
 

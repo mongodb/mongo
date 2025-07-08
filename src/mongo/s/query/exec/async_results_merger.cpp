@@ -243,6 +243,14 @@ bool AsyncResultsMerger::ready() {
 void AsyncResultsMerger::detachFromOperationContext() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
+    if (_opCtx == nullptr) {
+        // This early exit allows 'AsyncResultMerger' to be 'detached' twice without consequences
+        // during SPM-4106.
+        // TODO SERVER-105614: Remove this early exit once 'DocumentSourceMergeCursors' is split
+        // into QO and QE components.
+        return;
+    }
+
     // Before we're done detaching we do a last attempt to process any additional responses
     // received. This ensures that the only possible state for ARM to have unprocessed responses is
     // when it's been stashed between cursor checkouts or after it's been marked as killed.
@@ -259,6 +267,14 @@ void AsyncResultsMerger::detachFromOperationContext() {
 
 void AsyncResultsMerger::reattachToOperationContext(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    if (_opCtx == opCtx) {
+        // This early exit allows 'AsyncResultMerger' to be 're-attached' to the same 'opCtx' twice
+        // without consequences during SPM-4106.
+        // TODO SERVER-105614: Remove this early exit once 'DocumentSourceMergeCursors' is split
+        // into QO and QE components.
+        return;
+    }
     invariant(!_opCtx);
     _opCtx = opCtx;
 }

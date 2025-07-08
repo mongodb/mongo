@@ -578,55 +578,74 @@ void DocumentSourceUnionWith::addVariableRefs(std::set<Variables::Id>* refs) con
     }
 }
 
-namespace {
-void setPipelineOperationContext(OperationContext* opCtx,
-                                 Pipeline& pipeline,
-                                 std::function<void(OperationContext*, exec::agg::Stage&)> fn) {
-    pipeline.getContext()->setOperationContext(opCtx);
-    for (auto&& source : pipeline.getSources()) {
-        if (auto stage = boost::dynamic_pointer_cast<exec::agg::Stage>(source)) {
-            fn(opCtx, *stage);
-        }
-    }
-}
-}  // namespace
-
-void DocumentSourceUnionWith::detachFromOperationContext() {
-    // We have a pipeline we're going to be executing across multiple calls to getNext(), so we
-    // use Pipeline::detachFromOperationContext() to take care of updating the Pipeline's
-    // ExpressionContext.
+void DocumentSourceUnionWith::detachSourceFromOperationContext() {
+    // We have an execution pipeline we're going to execute across multiple commands, so we need to
+    // detach it from the operation context when it goes out of scope.
     if (_execPipeline) {
         _execPipeline->detachFromOperationContext();
-    } else if (_pipeline) {
-        // If '_execPipeline' was not yet initialized we still need to call detach on all stages to
-        // make sure that they don't use an invalid operation context.
-        // TODO SERVER-106560: Remove the following line when it is not necessary anymore.
-        setPipelineOperationContext(
-            nullptr, *_pipeline, [](OperationContext*, exec::agg::Stage& stage) {
-                stage.detachFromOperationContext();
-            });
+    }
+    // Some methods require pipeline to have a valid operation context. Normally, a pipeline and the
+    // corresponding execution pipeline share the same expression context containing a pointer to
+    // the operation context, but it might not be the case anymore when a pipeline is cloned with
+    // another expression context.
+    if (_pipeline) {
+        _pipeline->detachFromOperationContext();
+    }
+}
+
+void DocumentSourceUnionWith::detachFromOperationContext() {
+    // We have an execution pipeline we're going to execute across multiple commands, so we need to
+    // detach it from the operation context when it goes out of scope.
+    if (_execPipeline) {
+        _execPipeline->detachFromOperationContext();
+    }
+    // Some methods require pipeline to have a valid operation context. Normally, a pipeline and the
+    // corresponding execution pipeline share the same expression context containing a pointer to
+    // the operation context, but it might not be the case anymore when a pipeline is cloned with
+    // another expression context.
+    if (_pipeline) {
+        _pipeline->detachFromOperationContext();
+    }
+}
+
+void DocumentSourceUnionWith::reattachSourceToOperationContext(OperationContext* opCtx) {
+    // We have an execution pipeline we're going to execute across multiple commands, so we need to
+    // propagate the new operation context to the pipeline stages.
+    if (_execPipeline) {
+        _execPipeline->reattachToOperationContext(opCtx);
+    }
+    // Some methods require pipeline to have a valid operation context. Normally, a pipeline and the
+    // corresponding execution pipeline share the same expression context containing a pointer to
+    // the operation context, but it might not be the case anymore when a pipeline is cloned with
+    // another expression context.
+    if (_pipeline) {
+        _pipeline->reattachToOperationContext(opCtx);
     }
 }
 
 void DocumentSourceUnionWith::reattachToOperationContext(OperationContext* opCtx) {
-    // We have a pipeline we're going to be executing across multiple calls to getNext(), so we
-    // use Pipeline::reattachToOperationContext() to take care of updating the Pipeline's
-    // ExpressionContext.
+    // We have an execution pipeline we're going to execute across multiple commands, so we need to
+    // propagate the new operation context to the pipeline stages.
     if (_execPipeline) {
         _execPipeline->reattachToOperationContext(opCtx);
-    } else if (_pipeline) {
-        // If '_execPipeline' was not yet initialized we still need to call re-attach on all stages.
-        // TODO SERVER-106560: Remove the following line when it is not necessary anymore.
-        setPipelineOperationContext(
-            opCtx, *_pipeline, [](OperationContext* opCtx, exec::agg::Stage& stage) {
-                stage.reattachToOperationContext(opCtx);
-            });
+    }
+    // Some methods require pipeline to have a valid operation context. Normally, a pipeline and the
+    // corresponding execution pipeline share the same expression context containing a pointer to
+    // the operation context, but it might not be the case anymore when a pipeline is cloned with
+    // another expression context.
+    if (_pipeline) {
+        _pipeline->reattachToOperationContext(opCtx);
     }
 }
 
 bool DocumentSourceUnionWith::validateOperationContext(const OperationContext* opCtx) const {
     return getContext()->getOperationContext() == opCtx &&
         (!_execPipeline || _execPipeline->validateOperationContext(opCtx));
+}
+
+bool DocumentSourceUnionWith::validateSourceOperationContext(const OperationContext* opCtx) const {
+    return getContext()->getOperationContext() == opCtx &&
+        (!_pipeline || _pipeline->validateOperationContext(opCtx));
 }
 
 void DocumentSourceUnionWith::addInvolvedCollections(

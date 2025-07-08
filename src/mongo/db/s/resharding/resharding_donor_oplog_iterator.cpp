@@ -171,6 +171,7 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
                     "expecting '_execPipeline' to be initialized when '_pipeline' is initialized",
                     _execPipeline);
             _execPipeline->reattachToOperationContext(opCtx.get());
+            _pipeline->reattachToOperationContext(opCtx.get());
         } else {
             auto pipeline = makePipeline(opCtx.get(), MongoProcessInterface::create(opCtx.get()));
             _pipeline = pipeline->getContext()
@@ -193,6 +194,7 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
                 batch.pop_back();
             } else {
                 _execPipeline->detachFromOperationContext();
+                _pipeline->detachFromOperationContext();
                 guard.dismiss();
             }
         }

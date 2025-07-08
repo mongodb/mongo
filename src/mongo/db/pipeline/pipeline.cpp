@@ -1003,4 +1003,37 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipelineFromViewDefinit
 
     return Pipeline::makePipeline(resolvedPipeline, subPipelineExpCtx, opts);
 }
+
+void Pipeline::detachFromOperationContext() {
+    pCtx->setOperationContext(nullptr);
+    for (auto&& source : _sources) {
+        source->detachSourceFromOperationContext();
+    }
+    checkValidOperationContext();
+}
+
+void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
+    pCtx->setOperationContext(opCtx);
+    for (auto&& source : _sources) {
+        source->reattachSourceToOperationContext(opCtx);
+    }
+    checkValidOperationContext();
+}
+
+bool Pipeline::validateOperationContext(const OperationContext* opCtx) const {
+    return std::all_of(_sources.begin(), _sources.end(), [this, opCtx](const auto& source) {
+        // All sources in a pipeline must share its expression context. Subpipelines may have a
+        // different expression context, but must point to the same operation context. Let the
+        // sources validate this themselves since they don't all have the same subpipelines, etc.
+        return source->getExpCtx() == getContext() && source->validateSourceOperationContext(opCtx);
+    });
+}
+
+void Pipeline::checkValidOperationContext() const {
+    tassert(10713712,
+            str::stream()
+                << "All DocumentSources and subpipelines must have the same operation context",
+            validateOperationContext(getContext()->getOperationContext()));
+}
+
 }  // namespace mongo

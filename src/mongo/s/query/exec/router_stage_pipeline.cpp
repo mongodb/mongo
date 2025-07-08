@@ -77,10 +77,12 @@ StatusWith<ClusterQueryResult> RouterStagePipeline::next() {
 
 void RouterStagePipeline::doReattachToOperationContext() {
     _mergeExecPipeline->reattachToOperationContext(getOpCtx());
+    _mergePipeline->reattachToOperationContext(getOpCtx());
 }
 
 void RouterStagePipeline::doDetachFromOperationContext() {
     _mergeExecPipeline->detachFromOperationContext();
+    _mergePipeline->detachFromOperationContext();
 }
 
 void RouterStagePipeline::kill(OperationContext* opCtx) {
