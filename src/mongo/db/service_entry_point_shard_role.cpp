@@ -419,8 +419,7 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
     }
 
     const auto topologyVersion = replCoord->getTopologyVersion();
-    BSONObjBuilder topologyVersionBuilder(commandBodyFieldsBob->subobjStart("topologyVersion"));
-    topologyVersion.serialize(&topologyVersionBuilder);
+    commandBodyFieldsBob->appendElementsUnique(BSON("topologyVersion" << topologyVersion.toBSON()));
 }
 
 void appendAdditionalParticipants(OperationContext* opCtx, BSONObjBuilder* commandBodyFieldsBob) {
