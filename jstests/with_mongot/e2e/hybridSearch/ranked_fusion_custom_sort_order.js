@@ -115,4 +115,209 @@ results = coll.aggregate(testQuery).toArray();
 // Same expected results.
 assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.RENTALS), results);
 
+{
+    // Tests that a sort inside of a $search has equivalent behavior if the sort is outside of the
+    // $search.
+    let innerQuery = [
+        {
+            $rankFusion: {
+                input: {
+                    pipelines: {
+                        searchone: [
+                            {
+                                $search:
+                                    {...baselineSearchSpec, sort: {number_of_reviews: 1, _id: -1}}
+                            },
+                            {$limit: limit}
+                        ]
+                    },
+                },
+            },
+        },
+        {$limit: limit}
+    ];
+
+    let innerResults = coll.aggregate(innerQuery).toArray();
+
+    let outerQuery = [
+        {
+            $rankFusion: {
+                input: {
+                    pipelines: {
+                        searchone: [
+                            {$search: {...baselineSearchSpec}},
+                            {$sort: {number_of_reviews: 1, _id: -1}},
+                            {$limit: limit}
+                        ]
+                    },
+                },
+            },
+        },
+        {$limit: limit}
+    ];
+
+    let outerResults = coll.aggregate(outerQuery).toArray();
+
+    assert.eq(innerResults, outerResults);
+}
+
+{
+    // Tests that a sort inside of a $search has equivalent behavior if the sort is outside of the
+    // $search in a multipipeline scenario.
+    let innerQuery = [
+        {
+            $rankFusion: {
+                input: {
+                    pipelines: {
+                        match: matchPipeline,
+                        searchone: [
+                            {
+                                $search:
+                                    {...baselineSearchSpec, sort: {number_of_reviews: 1, _id: -1}}
+                            },
+                            {$limit: limit}
+                        ]
+                    },
+                },
+            },
+        },
+        {$limit: limit}
+    ];
+
+    let innerResults = coll.aggregate(innerQuery).toArray();
+
+    let outerQuery = [
+        {
+            $rankFusion: {
+                input: {
+                    pipelines: {
+                        match: matchPipeline,
+                        searchone: [
+                            {$search: {...baselineSearchSpec}},
+                            {$sort: {number_of_reviews: 1, _id: -1}},
+                            {$limit: limit}
+                        ]
+                    },
+                },
+            },
+        },
+        {$limit: limit}
+    ];
+
+    let outerResults = coll.aggregate(outerQuery).toArray();
+
+    assert.eq(innerResults, outerResults);
+}
+
+{
+    // Tests that a sort inside of a $search returns different and reasonable results if the sort is
+    // different from outside of the $search. The difference is because the sort order is different,
+    // and therefore, the ranking is different.
+    let innerQuery = [
+        {
+            $rankFusion: {
+                input: {
+                    pipelines: {
+                        searchone: [
+                            {$search: {...baselineSearchSpec, sort: {name: 1, _id: -1}}},
+                            {$limit: limit}
+                        ]
+                    },
+                },
+            },
+        },
+        {$limit: limit}
+    ];
+
+    let innerResults = coll.aggregate(innerQuery).toArray();
+
+    let outerQuery = [
+        {
+            $rankFusion: {
+                input: {
+                    pipelines: {
+                        searchone: [
+                            {$search: {...baselineSearchSpec}},
+                            {$sort: {number_of_reviews: 1, _id: -1}},
+                            {$limit: limit}
+                        ]
+                    },
+                },
+            },
+        },
+        {$limit: limit}
+    ];
+
+    let outerResults = coll.aggregate(outerQuery).toArray();
+
+    let sawDocArrExpectedFuzzyFailure = false;
+    try {
+        assertDocArrExpectedFuzzy(outerResults, innerResults, false, .5);
+    } catch (e) {
+        sawDocArrExpectedFuzzyFailure = true;
+    }
+    assert(sawDocArrExpectedFuzzyFailure, "expected results to be different");
+
+    const innerExpectedResultIds = [47, 42, 41, 40, 38, 31, 28, 26, 24, 23, 21, 18, 14, 13, 11, 2];
+    assertDocArrExpectedFuzzy(buildExpectedResults(innerExpectedResultIds, datasets.RENTALS),
+                              innerResults);
+}
+
+{
+    // Tests that a sort inside of a $search returns different and reasonable results if the sort is
+    // different from outside of the $search in a multipipeline scenario. The difference is because
+    // the sort order is different, and therefore, the ranking is different.
+    let innerQuery = [
+        {
+            $rankFusion: {
+                input: {
+                    pipelines: {
+                        match: matchPipeline,
+                        searchone: [
+                            {$search: {...baselineSearchSpec, sort: {name: 1, _id: -1}}},
+                            {$limit: limit}
+                        ]
+                    },
+                },
+            },
+        },
+        {$limit: limit}
+    ];
+
+    let innerResults = coll.aggregate(innerQuery).toArray();
+
+    let outerQuery = [
+        {
+            $rankFusion: {
+                input: {
+                    pipelines: {
+                        match: matchPipeline,
+                        searchone: [
+                            {$search: {...baselineSearchSpec}},
+                            {$sort: {number_of_reviews: 1, _id: -1}},
+                            {$limit: limit}
+                        ]
+                    },
+                },
+            },
+        },
+        {$limit: limit}
+    ];
+
+    let outerResults = coll.aggregate(outerQuery).toArray();
+
+    let sawDocArrExpectedFuzzyFailure = false;
+    try {
+        assertDocArrExpectedFuzzy(outerResults, innerResults, false, .5);
+    } catch (e) {
+        sawDocArrExpectedFuzzyFailure = true;
+    }
+    assert(sawDocArrExpectedFuzzyFailure, "expected results to be different");
+
+    const innerExpectedResultIds =
+        [47, 41, 28, 21, 40, 24, 14, 11, 6, 20, 42, 15, 38, 31, 44, 26, 30, 23, 48, 18];
+    assertDocArrExpectedFuzzy(buildExpectedResults(innerExpectedResultIds, datasets.RENTALS),
+                              innerResults);
+}
+
 dropSearchIndex(coll, {name: getRentalSearchIndexSpec().name});
