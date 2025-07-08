@@ -29,16 +29,20 @@
 
 #include "mongo/db/query/search/search_index_view_validation.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/expression_function.h"
 #include "mongo/db/query/search/search_query_view_spec_gen.h"
+#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
 
 namespace search_index_view_validation {
+
+static constexpr StringData errorPrefix =
+    "Cannot create or update index as the view definition is incompatible with Atlas Search: "_sd;
 
 namespace {
 
@@ -49,12 +53,14 @@ static const StringDataSet bannedOperators = {"$rand", ExpressionFunction::kExpr
 
 void matchValidator(const BSONObj& stage) {
     uassert(10623001,
-            "$match stage can only contain $expr",
+            str::stream() << errorPrefix << "$match stage can only contain $expr",
             stage.hasField("$expr") && stage.nFields() == 1);
 }
 
 void modificationValidator(const BSONObj& stage) {
-    uassert(10623002, "Modifying _id field is not allowed", !stage.hasField("_id"));
+    uassert(10623002,
+            str::stream() << errorPrefix << "Modifying _id field is not allowed",
+            !stage.hasField("_id"));
 }
 
 void validateHelper(const BSONObj& obj, std::function<void(const BSONElement&)> documentValidator) {
@@ -70,7 +76,7 @@ void validateHelper(const BSONObj& obj, std::function<void(const BSONElement&)> 
 
 void validateOperators(StringData field) {
     uassert(10623003,
-            "Cannot create search index on view containing " + field,
+            str::stream() << errorPrefix << field << " is not allowed",
             !bannedOperators.contains(field));
 }
 
@@ -86,7 +92,9 @@ void validateVariables(StringData value) {
         });
 
     uassert(10623004,
-            "Using variables like $$NOW, $$CLUSTER_TIME, or $$USER_ROLES is not allowed",
+            str::stream()
+                << errorPrefix
+                << "Using variables like $$NOW, $$CLUSTER_TIME, or $$USER_ROLES is not allowed",
             !containsBannedVariable);
 };
 
@@ -96,7 +104,8 @@ void checkForAggregationVariablesOverride(const BSONElement& elem) {
         const auto& varsObject = elem.embeddedObject().getObjectField("vars");
         if (!varsObject.isEmpty()) {
             uassert(10623005,
-                    "Overriding the CURRENT variable is not allowed",
+                    str::stream() << errorPrefix
+                                  << "Overriding the CURRENT variable is not allowed",
                     !varsObject.hasField("CURRENT"));
         }
     }
@@ -113,7 +122,7 @@ std::function<void(const BSONObj&)> getStageValidator(StringData stageName) {
     auto validator = stageValidators.find(stageName);
 
     uassert(10623000,
-            "Cannot create search index on view containing " + stageName,
+            str::stream() << errorPrefix << stageName << " is not allowed",
             validator != stageValidators.end());
 
     return validator->second;

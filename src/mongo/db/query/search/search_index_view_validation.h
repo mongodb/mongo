@@ -38,10 +38,7 @@ namespace search_index_view_validation {
  * Validates that the view's effective pipeline can be used with a search index. The restrictions
  * are as follows:
  *    - Only $addFields ($set) and $match can be used.
- *        - $project is not currently supported by mongot. However, it's likely that this will be
- *         the next supported stage. To prevent future backports, $project is supported on the
- * server but not by mongot.
- *    - $addFields and $project cannot modify _id.
+ *    - $addFields and cannot modify _id.
  *    - $match can only be used with $expr.
  *    - Variables $$NOW, $$CLUSTER_TIME, and $$USER_ROLES cannot be used.
  *    - Operators $rand and $function cannot be used.
