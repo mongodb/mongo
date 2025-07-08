@@ -35,6 +35,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_time.h"
@@ -60,6 +61,11 @@ class VectorClockConfigServerTest : public ConfigServerTestFixture {
 protected:
     VectorClockConfigServerTest()
         : ConfigServerTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
+
+    void createKeysCollection() {
+        DBDirectClient client(operationContext());
+        client.createCollection(NamespaceString::kKeysCollectionNamespace);
+    }
 
     void setUp() override {
         ConfigServerTestFixture::setUp();
@@ -179,6 +185,13 @@ TEST_F(VectorClockConfigServerTest, TickToTopologyTime) {
 }
 
 TEST_F(VectorClockConfigServerTest, GossipOutInternal) {
+    // Create the admin.system.keys collection to prevent a potential race condition with the vector
+    // clock on slower machines. Without this step, the admin.system.keys collection creation
+    // performed in the following enableKeyGenerator operation, updating the vector clock, might
+    // occur before the node has finished gossiping out, resulting in a time mismatch and causing
+    // the test to fail.
+    createKeysCollection();
+
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
 
@@ -208,6 +221,13 @@ TEST_F(VectorClockConfigServerTest, GossipOutInternal) {
 }
 
 TEST_F(VectorClockConfigServerTest, GossipOutExternal) {
+    // Create the admin.system.keys collection to prevent a potential race condition with the vector
+    // clock on slower machines. Without this step, the admin.system.keys collection creation
+    // performed in the following enableKeyGenerator operation, updating the vector clock, might
+    // occur before the node has finished gossiping out, resulting in a time mismatch and causing
+    // the test to fail.
+    createKeysCollection();
+
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
 

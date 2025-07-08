@@ -178,8 +178,6 @@ TEST_F(VectorClockMongoDTest, GossipOutInternal) {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
 
-    LogicalTimeValidator::get(getServiceContext())->enableKeyGenerator(operationContext(), true);
-
     const auto clusterTime = vc->tickClusterTime(1);
 
     BSONObjBuilder bob;
@@ -197,8 +195,6 @@ TEST_F(VectorClockMongoDTest, GossipOutInternal) {
 TEST_F(VectorClockMongoDTest, GossipOutExternal) {
     auto sc = getServiceContext();
     auto vc = VectorClockMutable::get(sc);
-
-    LogicalTimeValidator::get(getServiceContext())->enableKeyGenerator(operationContext(), true);
 
     const auto clusterTime = vc->tickClusterTime(1);
 
