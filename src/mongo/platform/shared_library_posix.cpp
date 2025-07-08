@@ -62,7 +62,7 @@ StatusWith<std::unique_ptr<SharedLibrary>> SharedLibrary::create(
     LOGV2_DEBUG(
         22613, 1, "Loading library: {full_path_c_str}", "full_path_c_str"_attr = full_path.c_str());
 
-    void* handle = dlopen(full_path.c_str(), RTLD_NOW | RTLD_GLOBAL);
+    void* handle = dlopen(full_path.c_str(), RTLD_NOW | RTLD_LOCAL);
     if (handle == nullptr) {
         return Status(ErrorCodes::InternalError,
                       str::stream() << "Load library failed: " << dlerror());
