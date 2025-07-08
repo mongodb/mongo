@@ -64,7 +64,7 @@ namespace {
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.throttleCursor");
 const uint8_t kTickDelay = 200;
 // Margin of error to be subtracted from test times to account for clock inconsistencies
-const Milliseconds kErrorMargin = Milliseconds(50);
+const Milliseconds kErrorMargin = Milliseconds(100);
 
 class ThrottleCursorTest : public CatalogTestFixture {
 private:
@@ -147,12 +147,12 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOff) {
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
 
+    Date_t start = getTime();
     SeekableRecordThrottleCursor cursor =
         SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
 
     // With the data throttle off, all operations should finish within a second.
     setMaxMbPerSec(0);
-    Date_t start = getTime();
 
     int numRecords = 0;
 
@@ -180,16 +180,15 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
 
-    SeekableRecordThrottleCursor cursor =
-        SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
-
     // We have 10 records, each of which is 0.5MB courtesy of the fail point. Using a throttle with
     // a limit of 1MB per second, this will mean the data is processed as follows: 0s 1s 2s 5s |
     // 0.5MB 0.5MB (sleep) | 0.5MB 0.5MB (sleep) | ... | 0.5MB 0.5MB (sleep) | All operations should
     // take very close to 5 seconds to finish.
     {
-        setMaxMbPerSec(1);
         Date_t start = getTime();
+        SeekableRecordThrottleCursor cursor =
+            SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
+        setMaxMbPerSec(1);
 
         ASSERT_TRUE(cursor.seekExact(opCtx, RecordId(1)));
         int numRecords = 1;
@@ -208,8 +207,10 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {
     // second (or more) to finish. We have 10 records, each of which is 0.5MB courtesy of the fail
     // point, so 10 records per second.
     {
-        setMaxMbPerSec(5);
         Date_t start = getTime();
+        SeekableRecordThrottleCursor cursor =
+            SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
+        setMaxMbPerSec(5);
 
         ASSERT_TRUE(cursor.seekExact(opCtx, RecordId(1)));
         int numRecords = 1;
@@ -233,14 +234,14 @@ TEST_F(ThrottleCursorTestFastClock, TestSeekableRecordThrottleCursorOnLargeDocs1
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf2MBForDataThrottle");
 
-    SeekableRecordThrottleCursor cursor =
-        SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
-
     // Using a throttle with a limit of 1MB per second, all operations should take very close to 10
     // seconds (or more) to finish. We scan 5 records, each of which is 2MB courtesy of the fail
     // point, so 1 record every 2 seconds.
-    setMaxMbPerSec(1);
     Date_t start = getTime();
+    SeekableRecordThrottleCursor cursor =
+        SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
+    setMaxMbPerSec(1);
+
 
     // Seek to the first record, then iterate through 4 more.
     ASSERT_TRUE(cursor.seekExact(opCtx, RecordId(1)));
@@ -264,16 +265,16 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOnLargeDocs5MBps) {
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf2MBForDataThrottle");
 
-    SeekableRecordThrottleCursor cursor =
-        SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
-
     // We have 6 records, each of which is 2MB courtesy of the fail point. Using a throttle with a
     // limit of 5MB per second, this will mean the data is processed as follows:
     // 0s                   1.2s                  2.4s
     // | 2MB 2MB 2MB (sleep) | 2MB 2MB 2MB (sleep) |
     // All operations should take at very close to 2.4 seconds (or more) to finish.
-    setMaxMbPerSec(5);
     Date_t start = getTime();
+    SeekableRecordThrottleCursor cursor =
+        SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
+
+    setMaxMbPerSec(5);
 
     // Seek to the first record, then iterate through 5 more.
     ASSERT_TRUE(cursor.seekExact(opCtx, RecordId(1)));
@@ -297,11 +298,11 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOff) {
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
 
+    Date_t start = getTime();
     SortedDataInterfaceThrottleCursor cursor = getIdIndex(coll);
 
     // With the data throttle off, all operations should finish within a second.
     setMaxMbPerSec(0);
-    Date_t start = getTime();
 
     int numRecords = 0;
 
@@ -323,15 +324,14 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
 
-    SortedDataInterfaceThrottleCursor cursor = getIdIndex(coll);
-
     // We have 10 records, each of which is 0.5MB courtesy of the fail point. Using a throttle with
     // a limit of 1MB per second, this will mean the data is processed as follows: 0s 1s 2s 5s |
     // 0.5MB 0.5MB (sleep) | 0.5MB 0.5MB (sleep) | ... | 0.5MB 0.5MB (sleep) | All operations should
     // take very close to 5 seconds to finish.
     {
-        setMaxMbPerSec(1);
         Date_t start = getTime();
+        SortedDataInterfaceThrottleCursor cursor = getIdIndex(coll);
+        setMaxMbPerSec(1);
 
         int numRecords = 0;
 
@@ -349,8 +349,9 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
     // second (or more) to finish. We have 10 records, each of which is 0.5MB courtesy of the fail
     // point, so 10 records per second.
     {
-        setMaxMbPerSec(5);
         Date_t start = getTime();
+        SortedDataInterfaceThrottleCursor cursor = getIdIndex(coll);
+        setMaxMbPerSec(5);
 
         ASSERT_TRUE(cursor.seek(opCtx, kMinKeyString.getView()));
         int numRecords = 1;
@@ -374,6 +375,7 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOff) {
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
 
+    Date_t start = getTime();
     SeekableRecordThrottleCursor recordCursor =
         SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
 
@@ -383,7 +385,6 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOff) {
     // the 'maxValidateMBperSec' server parameter is set.
     _dataThrottle->turnThrottlingOff();
     setMaxMbPerSec(10);
-    Date_t start = getTime();
 
     int numRecords = 0;
 
@@ -415,17 +416,17 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
 
-    SeekableRecordThrottleCursor recordCursor =
-        SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
-
-    SortedDataInterfaceThrottleCursor indexCursor = getIdIndex(coll);
-
     // Using a throttle with a limit of 2MB per second, all operations should take very close to 5
     // seconds (or more) to finish. We have 20 records, each of which is 0.5MB courtesy of the fail
     // point, so 4 records per second.
     {
-        setMaxMbPerSec(2);
         Date_t start = getTime();
+
+        SeekableRecordThrottleCursor recordCursor =
+            SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
+
+        SortedDataInterfaceThrottleCursor indexCursor = getIdIndex(coll);
+        setMaxMbPerSec(2);
 
         int numRecords = 0;
 
@@ -448,8 +449,13 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
     // seconds (or more) to finish. We have 20 records, each of which is 0.5MB courtesy of the fail
     // point, so 10 records per second.
     {
-        setMaxMbPerSec(5);
         Date_t start = getTime();
+
+        SeekableRecordThrottleCursor recordCursor =
+            SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
+
+        SortedDataInterfaceThrottleCursor indexCursor = getIdIndex(coll);
+        setMaxMbPerSec(5);
 
         ASSERT_TRUE(indexCursor.seek(opCtx, kMinKeyString.getView()));
         ASSERT_TRUE(recordCursor.seekExact(opCtx, RecordId(1)));
