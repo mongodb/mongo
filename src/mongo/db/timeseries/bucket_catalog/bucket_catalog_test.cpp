@@ -5110,7 +5110,8 @@ TEST_F(
                                                          batchOfMeasurementsWithSchemaChangeAtEnd,
                                                          curBatchedInsertContextsIndex,
                                                          numMeasurementsInWriteBatchAtEnd,
-                                                         /*numBatchedInsertContexts=*/1);
+                                                         /*numBatchedInsertContexts=*/1,
+                                                         buckets);
 }
 
 TEST_F(
@@ -5304,7 +5305,7 @@ TEST_F(
     std::vector<BSONObj> batchOfMeasurementsWithCachePressure =
         _generateMeasurementsWithRolloverReason(
             {.reason = RolloverReason::kCachePressure, .metaValueType = boost::none});
-    std::vector<size_t> numMeasurementsInWriteBatch{3, 1};
+    std::vector<size_t> numMeasurementsInWriteBatch{2, 2};
     std::vector<size_t> curBatchedInsertContextsIndex{0, 0};
 
     std::vector<std::pair<std::vector<BSONObj>, RolloverReason>> measurementsAndRolloverReason;
@@ -5325,7 +5326,8 @@ TEST_F(
         batchOfMeasurementsWithCachePressure,
         curBatchedInsertContextsIndex,
         numMeasurementsInWriteBatch,
-        /*numBatchedInsertContexts=*/1);
+        /*numBatchedInsertContexts=*/1,
+        buckets);
 
     buckets = _generateBucketsWithMeasurements(_ns1, _uuid1, measurementsAndRolloverReason);
     // Inserting a batch of measurements without meta field values into a collection with a meta
@@ -5336,7 +5338,8 @@ TEST_F(
         batchOfMeasurementsWithCachePressure,
         curBatchedInsertContextsIndex,
         numMeasurementsInWriteBatch,
-        /*numBatchedInsertContexts=*/1);
+        /*numBatchedInsertContexts=*/1,
+        buckets);
 
     // Reset _storageCacheSizeBytes back to a representative value.
     _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes;
