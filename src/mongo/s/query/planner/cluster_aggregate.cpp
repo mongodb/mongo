@@ -588,12 +588,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         request.setIsRankFusion(true);
     }
 
-    // TODO SERVER-103504 Remove once $rankFusion with mongot input pipelines is enabled on views.
-    if (liteParsedPipeline.hasRankFusionStageWithMongotInputPipelines()) {
-        request.setIsRankFusionWithMongotInputPipelines(true);
-    }
-    // Perform some validations on the LiteParsedPipeline and request before continuing with the
-    // aggregation command.
     performValidationChecks(opCtx, request, liteParsedPipeline);
 
     const auto isSharded = [](OperationContext* opCtx, const NamespaceString& nss) {

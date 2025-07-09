@@ -243,14 +243,6 @@ public:
     }
 
     /**
-     * Returns true if this stage has a mongot subpipeline. Currently only used for $rankFusion.
-     * TODO SERVER-103504 Remove once $rankFusion with mongot input pipelines is enabled on views.
-     */
-    virtual bool hasMongotInputPipeline() const {
-        return false;
-    }
-
-    /**
      * Returns true if this stage require knowledge of the collection default collation at parse
      * time, false otherwise. This is useful to know as it could save a network request to discern
      * the collation.

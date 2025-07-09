@@ -250,16 +250,20 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
     const StringData prefixOne,
     const int rankConstant,
     const double weight,
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     const bool includeScoreDetails,
     const bool inputGeneratesScore,
     const bool inputGeneratesScoreDetails,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
+    while (!pipeline->empty()) {
+        outputStages.emplace_back(pipeline->popFront());
+    }
 
-    std::list<boost::intrusive_ptr<DocumentSource>> outputStages = {
-        nestUserDocs(expCtx),
-        setWindowFields(expCtx, fmt::format("{}_rank", prefixOne)),
-        addScoreField(expCtx, prefixOne, rankConstant, weight),
-    };
+    outputStages.emplace_back(nestUserDocs(expCtx));
+    outputStages.emplace_back(setWindowFields(expCtx, fmt::format("{}_rank", prefixOne)));
+    outputStages.emplace_back(addScoreField(expCtx, prefixOne, rankConstant, weight));
+
     if (includeScoreDetails) {
         outputStages.push_back(addInputPipelineScoreDetails(
             expCtx, prefixOne, inputGeneratesScore, inputGeneratesScoreDetails));
@@ -448,23 +452,13 @@ std::unique_ptr<DocumentSourceRankFusion::LiteParsed> DocumentSourceRankFusion::
         spec.fieldName(), nss, std::move(liteParsedPipelines));
 }
 
-std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::createFromBson(
-    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << "The " << kStageName
-                          << " stage specification must be an object, found "
-                          << typeName(elem.type()),
-            elem.type() == BSONType::object);
-
-    // It is currently necessary to annotate on the ExpressionContext that this is a $rankFusion
-    // query. Once desugaring happens, there's no way to identity from the (desugared) pipeline
-    // alone that it came from $rankFusion. We need to know if it came from $rankFusion so we can
-    // reject the query if it is run over a view.
-    // TODO SERVER-101661 Remove this when $rankFusion is enabled on views.
-    pExpCtx->setIsRankFusion();
-
-    auto spec = RankFusionSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
-
+/**
+ * Validate that each pipeline is a valid ranked selection pipeline. Returns a pair of the map of
+ * the input pipeline names to pipeline objects and a map of pipeline names to score paths.
+ */
+std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>
+parseAndValidateRankedSelectionPipelines(const RankFusionSpec& spec,
+                                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     // It's important to use an ordered map here, so that we get stability in the desugaring =>
     // stability in the query shape.
     std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>> inputPipelines;
@@ -486,6 +480,29 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
             !inputPipelines.contains(inputName));
         inputPipelines[inputName] = std::move(pipeline);
     }
+    return inputPipelines;
+}
+
+std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::createFromBson(
+    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "The " << kStageName
+                          << " stage specification must be an object, found "
+                          << typeName(elem.type()),
+            elem.type() == BSONType::object);
+
+    auto spec = RankFusionSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
+
+    auto inputPipelines = parseAndValidateRankedSelectionPipelines(spec, pExpCtx);
+
+    // It is currently necessary to annotate on the ExpressionContext that this is a $rankFusion
+    // query. Once desugaring happens, there's no way to identity from the (desugared) pipeline
+    // alone that it came from $rankFusion. We need to know if it came from $rankFusion so we can
+    // reject the query if it is run over a view.
+
+    // This flag's value is also used to gate an internal client error. See
+    // search_helper::validateViewNotSetByUser(...) for more details.
+    pExpCtx->setIsRankFusion();
 
     StringMap<double> weights;
     // If RankFusionCombinationSpec has no value (no weights specified), no work to do.
@@ -535,13 +552,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
             // First pipeline.
             makeSureSortKeyIsOutput(pipeline->getSources());
 
-
-            while (!pipeline->empty()) {
-                outputStages.push_back(pipeline->popFront());
-            }
             auto firstPipelineStages = buildFirstPipelineStages(name,
                                                                 rankConstant,
                                                                 pipelineWeight,
+                                                                std::move(pipeline),
                                                                 includeScoreDetails,
                                                                 inputGeneratesScore,
                                                                 inputGeneratesScoreDetails,

@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/query/util/string_util.h"
+#include "mongo/util/string_map.h"
 
 #include <fmt/ranges.h>
 
@@ -213,7 +214,7 @@ Status isSelectionPipeline(const std::vector<BSONObj>& bsonPipeline) {
 
 Status isSelectionStage(const BSONObj& bsonStage) {
     // Please keep the following in alphabetical order.
-    static const std::set<StringData> validSelectionStagesForHybridSearch = {
+    static const StringDataSet validSelectionStagesForHybridSearch = {
         DocumentSourceInternalInhibitOptimization::kStageName,
         DocumentSourceLimit::kStageName,
         DocumentSourceMatch::kStageName,
@@ -305,7 +306,7 @@ Status isRankedPipeline(const std::vector<BSONObj>& bsonPipeline) {
     }
 
     // Please keep the following in alphabetical order.
-    static const std::set<StringData> implicitlyRankedStages{
+    static const StringDataSet implicitlyRankedStages{
         DocumentSourceGeoNear::kStageName,
         DocumentSourceRankFusion::kStageName,
         DocumentSourceScoreFusion::kStageName,
@@ -346,7 +347,7 @@ Status isScoredPipeline(const std::vector<BSONObj>& bsonPipeline,
     }
 
     // Please keep the following in alphabetical order.
-    static const std::set<StringData> implicitlyScoredStages{
+    static const StringDataSet implicitlyScoredStages{
         DocumentSourceRankFusion::kStageName,
         DocumentSourceScoreFusion::kStageName,
         DocumentSourceSearch::kStageName,

@@ -364,14 +364,3 @@ commands:
                 cpp_name: isRankFusion
                 type: optionalBool
                 stability: internal
-            # TODO SERVER-103504 Remove this internal flag once $rankFusion works on views with
-            # mongot input pipelines.
-            $_isRankFusionWithMongotInputPipelines:
-                description: >-
-                    Internal usage only. If present, indicates that the pipeline is the 
-                    desugared representation of a user's $rankFusion pipeline that used mongot input
-                    pipelines. This is necessary for guarding that this type of query is not yet
-                    allowed to be run over views.
-                cpp_name: isRankFusionWithMongotInputPipelines
-                type: optionalBool
-                stability: internal

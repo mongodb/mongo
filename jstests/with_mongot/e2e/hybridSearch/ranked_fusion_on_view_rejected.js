@@ -30,12 +30,12 @@ createSearchIndex(coll, {
 
 assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
 
-const matchViewName = "match_view";
+const matchViewName = collName + "_match_view";
 const matchViewPipeline = {
     $match: {a: "foo"}
 };
 
-const geoNearViewName = "geo_near_view";
+const geoNearViewName = collName + "_geo_near_view";
 const geoNearViewPipeline = {
     $geoNear: {near: {type: "Point", coordinates: [0, 0]}, key: "loc", spherical: true}
 };
@@ -51,72 +51,33 @@ const rankFusionPipeline = [{
     }
 }];
 
-const rankFusionPipelineWithSearchFirst = [{
-    $rankFusion: {
-        input: {
-            pipelines: {
-                a: [{$search: {index: searchIndexName, text: {query: "fo", path: "a"}}}],
-                b: [{$sort: {x: 1}}],
-            }
-        }
-    }
-}];
-
-const rankFusionPipelineWithSearchSecond = [{
-    $rankFusion: {
-        input: {
-            pipelines: {
-                a: [{$sort: {x: -1}}],
-                b: [{$search: {index: searchIndexName, text: {query: "fo", path: "a"}}}],
-            }
-        }
-    }
-}];
-
-const rankFusionPipelineOnlyOneVectorSearch = [{
-    $rankFusion: {
-        input: {
-            pipelines: {
-                a: [{
-                    $vectorSearch: {
-                        queryVector: null,
-                        path: "plot_embedding",
-                        exact: true,
-                        index: vectorSearchIndexName,
-                        limit: 10,
-                    }
-                }],
-            }
-        }
-    }
-}];
-
-// TODO SERVER-103504: Move the mongot queries to the allowed test.
 // Create a view with $match.
 assert.commandWorked(db.createView(matchViewName, coll.getName(), [matchViewPipeline]));
 
 // Create a view with $geoNear.
 assert.commandWorked(db.createView(geoNearViewName, coll.getName(), [geoNearViewPipeline]));
 
-// Running a $rankFusion with mongot subpipelines fails if the query is on a view.
-assert.commandFailedWithCode(
-    db.runCommand(
-        {aggregate: matchViewName, pipeline: rankFusionPipelineWithSearchSecond, cursor: {}}),
-    ErrorCodes.OptionNotSupportedOnView);
-assert.commandFailedWithCode(
-    db.runCommand(
-        {aggregate: matchViewName, pipeline: rankFusionPipelineWithSearchFirst, cursor: {}}),
-    ErrorCodes.OptionNotSupportedOnView);
-assert.commandFailedWithCode(
-    db.runCommand(
-        {aggregate: matchViewName, pipeline: rankFusionPipelineOnlyOneVectorSearch, cursor: {}}),
-    ErrorCodes.OptionNotSupportedOnView);
-
 // TODO SERVER-105682: Add tests for $geoNear in the input pipelines.
 // TODO SERVER-105862: Move this test to the allowed test.
 assert.commandFailedWithCode(
     db.runCommand({aggregate: geoNearViewName, pipeline: rankFusionPipeline, cursor: {}}),
     ErrorCodes.OptionNotSupportedOnView);
+
+// Cannot create a search index of the same name on both the view and underlying collection.
+const matchExprViewName = collName + "_match_expr_view";
+const matchExprViewPipeline = {
+    $match: {$expr: {$eq: ["$a", "bar"]}}
+};
+assert.commandWorked(db.createView(matchExprViewName, coll.getName(), [matchExprViewPipeline]));
+const matchExprView = db[matchExprViewName];
+assert.throwsWithCode(
+    () => createSearchIndex(matchExprView,
+                            {name: searchIndexName, definition: {"mappings": {"dynamic": true}}}),
+    ErrorCodes.BadValue);
+assert.throwsWithCode(
+    () => createSearchIndex(
+        matchExprView, {name: vectorSearchIndexName, definition: {"mappings": {"dynamic": true}}}),
+    ErrorCodes.BadValue);
 
 // Now test on a timeseries collection (which is modeled as a view under-the-hood).
 const timeFieldName = "time";
@@ -143,5 +104,5 @@ assert.commandWorked(bulk.execute());
 assert.commandFailedWithCode(
     tsColl.runCommand("aggregate", {pipeline: rankFusionPipeline, cursor: {}}),
     ErrorCodes.OptionNotSupportedOnView);
-
 dropSearchIndex(coll, {name: searchIndexName});
+dropSearchIndex(coll, {name: vectorSearchIndexName});

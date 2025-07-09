@@ -1371,6 +1371,7 @@ public:
     ExpressionContextBuilder& view(
         boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>>);
     ExpressionContextBuilder& originalNs(NamespaceString);
+    ExpressionContextBuilder& isRankFusion(bool);
 
     /**
      * Add kSessionTransactionsTableNamespace, and kRsOplogNamespace

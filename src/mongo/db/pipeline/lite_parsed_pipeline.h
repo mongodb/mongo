@@ -172,15 +172,6 @@ public:
             return spec->isRankFusionStage();
         });
     }
-    /**
-     * Returns true if the pipeline has a $rankFusion stage with a mongot input pipeline.
-     * TODO SERVER-103504 Remove once $rankFusion with mongot input pipelines is enabled on views.
-     */
-    bool hasRankFusionStageWithMongotInputPipelines() const {
-        return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
-            return (spec->isRankFusionStage() && spec->hasMongotInputPipeline());
-        });
-    }
 
     /**
      * Returns true iff the pipeline has a $score stage.

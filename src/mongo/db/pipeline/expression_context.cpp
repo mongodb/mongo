@@ -373,6 +373,11 @@ ExpressionContextBuilder& ExpressionContextBuilder::originalNs(NamespaceString o
     return *this;
 }
 
+ExpressionContextBuilder& ExpressionContextBuilder::isRankFusion(bool isRankFusion) {
+    params.isRankFusion = isRankFusion;
+    return *this;
+}
+
 ExpressionContextBuilder& ExpressionContextBuilder::withReplicationResolvedNamespaces() {
     ResolvedNamespaceMap resolvedNamespaces;
 
@@ -644,6 +649,7 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
             // an incorrect namespace, e.g.
             // db.collA.aggregate([$unionWith: {coll: collB, pipeline: <rankFusionCollB>}]);
             .originalNs(std::move(ns))
+            .isRankFusion(_params.isRankFusion)
             .build();
 
     if (_collator.getIgnore()) {

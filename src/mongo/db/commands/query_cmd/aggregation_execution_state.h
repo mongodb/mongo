@@ -205,13 +205,6 @@ public:
             _aggReqDerivatives->liteParsedPipeline.hasRankFusionStage();
     }
 
-    // TODO SERVER-103504 Remove once $rankFusion with mongot input pipelines is enabled on views.
-    virtual bool isRankFusionPipelineWithMongotInputPipelines() const {
-        // Use the original request as we want this assert to work during/after view resolution.
-        return _aggReqDerivatives->request.getIsRankFusionWithMongotInputPipelines() ||
-            _aggReqDerivatives->liteParsedPipeline.hasRankFusionStageWithMongotInputPipelines();
-    }
-
     /**
      * True iff aggregation starts with a $collStats stage.
      */
@@ -449,14 +442,6 @@ public:
         // Use the original request as we want this assert to work during/after view resolution.
         return _originalAggReqDerivatives->request.getIsRankFusion() ||
             _originalAggReqDerivatives->liteParsedPipeline.hasRankFusionStage();
-    }
-
-    // TODO SERVER-103504 Remove once $rankFusion with mongot input pipelines is enabled on views.
-    bool isRankFusionPipelineWithMongotInputPipelines() const override {
-        // Use the original request as we want this assert to work during/after view resolution.
-        return _originalAggReqDerivatives->request.getIsRankFusionWithMongotInputPipelines() ||
-            _originalAggReqDerivatives->liteParsedPipeline
-                .hasRankFusionStageWithMongotInputPipelines();
     }
 
 private:

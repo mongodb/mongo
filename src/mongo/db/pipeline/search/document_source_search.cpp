@@ -114,7 +114,8 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
     // the owned is owned, which is why we call specObj.getOwned().
     InternalSearchMongotRemoteSpec spec =
         specObj.hasField(InternalSearchMongotRemoteSpec::kMongotQueryFieldName)
-        ? InternalSearchMongotRemoteSpec::parse(IDLParserContext(kStageName), specObj)
+        ? InternalSearchMongotRemoteSpec::parseOwned(IDLParserContext(kStageName),
+                                                     specObj.getOwned())
         : InternalSearchMongotRemoteSpec(specObj.getOwned());
 
     // If there is no view on the spec, check the expression context for one. getViewFromExpCtx will

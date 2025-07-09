@@ -93,18 +93,7 @@ public:
         };
 
         bool isSearchStage() const final {
-            return true;
-        }
-
-        // TODO SERVER-103504 Remove once $rankFusion with mongot input pipelines is enabled on
-        // views.
-        bool hasMongotInputPipeline() const final {
-            for (auto& pipeline : this->_pipelines) {
-                if (pipeline.hasSearchStage()) {
-                    return true;
-                }
-            }
-            return false;
+            return _pipelines[0].hasSearchStage();
         }
 
         bool isRankFusionStage() const final {

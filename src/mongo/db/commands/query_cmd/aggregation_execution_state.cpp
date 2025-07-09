@@ -457,11 +457,6 @@ void AggExState::performValidationChecks() {
     auto request = getRequest();
     auto& liteParsedPipeline = _aggReqDerivatives->liteParsedPipeline;
 
-    // TODO SERVER-103504 Remove once $rankFusion with mongot input pipelines is enabled on views.
-    uassert(ErrorCodes::OptionNotSupportedOnView,
-            "Cannot use mongot input pipelines inside of a $rankFusion running on a view",
-            !(isRankFusionPipelineWithMongotInputPipelines() && isView()));
-
     liteParsedPipeline.validate(_opCtx);
     aggregation_request_helper::validateRequestForAPIVersion(_opCtx, request);
     aggregation_request_helper::validateRequestFromClusterQueryWithoutShardKey(request);

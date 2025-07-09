@@ -344,9 +344,9 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
     const StringData inputPipelineOneName,
     const ScoreFusionNormalizationEnum normalization,
     const double weight,
+    const std::unique_ptr<Pipeline, PipelineDeleter>& firstInputPipeline,
     const bool includeScoreDetails,
     const bool inputGeneratesScoreDetails,
-    const std::unique_ptr<Pipeline, PipelineDeleter>& firstInputPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
 
@@ -760,9 +760,9 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
             auto firstPipelineStages = buildFirstPipelineStages(inputPipelineName,
                                                                 normalization,
                                                                 pipelineWeight,
+                                                                std::move(inputPipelineStages),
                                                                 includeScoreDetails,
                                                                 inputGeneratesScoreDetails,
-                                                                inputPipelineStages,
                                                                 pExpCtx);
             outputStages.splice(outputStages.end(), std::move(firstPipelineStages));
         } else {
@@ -771,7 +771,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
             auto unionWithStage = buildUnionWithPipelineStage(inputPipelineName,
                                                               normalization,
                                                               pipelineWeight,
-                                                              inputPipelineStages,
+                                                              std::move(inputPipelineStages),
                                                               includeScoreDetails,
                                                               inputGeneratesScoreDetails,
                                                               pExpCtx);
@@ -802,6 +802,6 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScoreFusion::creat
     auto spec = ScoreFusionSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
 
     const auto& inputPipelines = parseAndValidateScoredSelectionPipelines(spec, pExpCtx);
-    return constructDesugaredOutput(spec, inputPipelines, pExpCtx);
+    return constructDesugaredOutput(spec, std::move(inputPipelines), pExpCtx);
 }
 }  // namespace mongo

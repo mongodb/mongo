@@ -646,7 +646,17 @@ boost::optional<SearchQueryViewSpec> getViewFromBSONObj(const BSONObj& spec) {
 }
 
 void validateViewNotSetByUser(boost::intrusive_ptr<ExpressionContext> expCtx, const BSONObj& spec) {
-    if (spec.hasField(kViewFieldName)) {
+    // During $rankFusion parsing, if there's more than 1 mongot input pipeline, a view key will be
+    // injected during the parsing of that mongot stage (ex: $search, $vectorSearch, $searchMeta).
+    // Since $rankFusion passes the serialized version of the parsed pipeline to a
+    // DocumentSource::UnionWith(..) constructor, that serialized pipeline eventually gets reparsed.
+    // Because the view key already exists in the pipeline and the internal client flag is not set,
+    // this internal client error gets thrown.
+
+    // To avoid that, the isRankFusion flag is only set after the initial parsing of the
+    // user-provided $rankFusion pipeline and its value is checked here to avoid throwing an
+    // internal client error.
+    if (spec.hasField(kViewFieldName) && !expCtx->isRankFusion()) {
         assertAllowedInternalIfRequired(
             expCtx->getOperationContext(), kViewFieldName, AllowedWithClientType::kInternal);
     }

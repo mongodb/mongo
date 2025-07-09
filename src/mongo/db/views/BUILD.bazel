@@ -38,6 +38,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/agg:exec_pipeline.h",
         "//src/mongo/db/exec/agg:pipeline_builder.h",
         "//src/mongo/db/pipeline:document_source_limit.h",
+        "//src/mongo/db/pipeline:document_source_rank_fusion.h",
         "//src/mongo/db/pipeline:document_source_set_variable_from_subpipeline.h",
         "//src/mongo/db/pipeline/search:document_source_internal_search_id_lookup.h",
         "//src/mongo/db/pipeline/search:document_source_internal_search_mongot_remote.h",

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/pipeline/document_source_rank_fusion.h"
 #include "mongo/db/pipeline/search/document_source_list_search_indexes.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_search_meta.h"
@@ -40,12 +41,36 @@ namespace mongo {
 
 namespace search_helper_bson_obj {
 
+/**
+ * Checks that the pipeline isn't empty and if the first stage in the pipeline is a mongot stage
+ * (either $search, $vectorSearch, $searchMeta, $listSearchIndexes, or $rankFusion).
+ */
 inline bool isMongotPipeline(const std::vector<BSONObj> pipeline) {
+    // Note that the $rankFusion stage is syntactic sugar. When desugared, the first stage in its
+    // first pipeline in the $rankFusion query (ex: $rankFusion: {
+    //    input: {
+    //        pipelines: {
+    //            searchPipeline: [
+    //                { $search: {...} },
+    //                { $sort: {author: 1} }
+    //            ]
+    //        }
+    //    }
+    //}) will become the first stage in the final desugared ouput. Thus, there is an extra recursive
+    // call to check for this.
     if (pipeline.size() >= 1 &&
         (pipeline[0][DocumentSourceSearch::kStageName] ||
          pipeline[0][DocumentSourceVectorSearch::kStageName] ||
          pipeline[0][DocumentSourceSearchMeta::kStageName] ||
-         pipeline[0][DocumentSourceListSearchIndexes::kStageName])) {
+         pipeline[0][DocumentSourceListSearchIndexes::kStageName] ||
+         (pipeline[0][DocumentSourceRankFusion::kStageName] &&
+          isMongotPipeline(std::vector<BSONObj>{
+              pipeline[0][DocumentSourceRankFusion::kStageName][RankFusionSpec::kInputFieldName]
+                      [RankFusionInputSpec::kPipelinesFieldName]
+                          .Obj()
+                          .firstElement()
+                          .Array()[0]
+                          .Obj()})))) {
         return true;
     }
     return false;
