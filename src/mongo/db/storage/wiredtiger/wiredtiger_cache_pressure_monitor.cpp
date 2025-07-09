@@ -134,6 +134,10 @@ bool WiredTigerCachePressureMonitor::_windowTrackingStorageAppWaitTimeAndWriteLo
 
     bool notEnoughTransactionsCommitted = (txnsCommittedCount == 0);
 
+    cachePressureObservedCacheWaitTime.set(cacheWaitTimeUsecs);
+    cachePressureWaitTimeThreshold.set(waitTimeThreshold);
+    cachePressureWaitTimeThresholdExceeded.set(perThreadWaitTimeExceedsThreshold);
+
     LOGV2_DEBUG(10181701,
                 2,
                 "Cache pressure calculation statistics -- wait time",
@@ -173,6 +177,9 @@ bool WiredTigerCachePressureMonitor::_trackCacheRatioEvictionTrigger(WiredTigerS
     // Check to see if the cache has reached unhealthy update and dirty cache ratios.
     bool cacheUpdatesThresholdExceeded = (cacheBytesUpdates / cacheBytesMax > evictUpdatesTrigger);
     bool cacheDirtyThresholdExceeded = (cacheBytesDirty / cacheBytesMax > evictDirtyTrigger);
+
+    cachePressureCacheUpdatesThreshold.set(cacheUpdatesThresholdExceeded);
+    cachePressureCacheDirtyThreshold.set(cacheDirtyThresholdExceeded);
 
     LOGV2_DEBUG(10181702,
                 2,
