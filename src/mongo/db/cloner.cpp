@@ -133,11 +133,11 @@ struct DefaultClonerImpl::BatchHandler {
                                              PlacementConcern::kPretendUnsharded,
                                              repl::ReadConcernArgs::get(opCtx),
                                              AcquisitionPrerequisites::kWrite),
-                MODE_IX);
+                MODE_X);
         };
 
         boost::optional<Lock::DBLock> dbLock;
-        dbLock.emplace(opCtx, _dbName, MODE_X);
+        dbLock.emplace(opCtx, _dbName, MODE_IX);
         uassert(ErrorCodes::NotWritablePrimary,
                 str::stream() << "Not primary while cloning collection "
                               << nss.toStringForErrorMsg(),
@@ -185,7 +185,7 @@ struct DefaultClonerImpl::BatchHandler {
 
                 CurOp::get(opCtx)->yielded();
 
-                dbLock.emplace(opCtx, _dbName, MODE_X);
+                dbLock.emplace(opCtx, _dbName, MODE_IX);
 
                 // Check if everything is still all right.
                 if (opCtx->writesAreReplicated()) {
@@ -389,9 +389,8 @@ Status DefaultClonerImpl::_createCollectionsForDb(
     const DatabaseName& dbName) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->openDb(opCtx, dbName);
-    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_X));
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_IX));
 
-    auto catalog = CollectionCatalog::get(opCtx);
     auto collCount = 0;
     for (auto&& params : createCollectionParams) {
         if (MONGO_unlikely(movePrimaryFailPoint.shouldFail()) && collCount > 0) {
@@ -403,32 +402,30 @@ Status DefaultClonerImpl::_createCollectionsForDb(
         optionsBuilder.appendElements(params.collectionInfo["options"].Obj());
 
         const auto nss = NamespaceStringUtil::deserialize(dbName, params.collectionName);
+        auto collection =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest(nss,
+                                                           PlacementConcern::kPretendUnsharded,
+                                                           repl::ReadConcernArgs::get(opCtx),
+                                                           AcquisitionPrerequisites::kWrite),
+                              MODE_IX);
+        if (collection.exists()) {
+            if (!params.trackedColls) {
+                // If the collection is unsharded then we want to fail when a collection we're
+                // trying to create already exists.
+                return Status(ErrorCodes::NamespaceExists,
+                              str::stream() << "unsharded collection with same namespace "
+                                            << nss.toStringForErrorMsg() << " already exists.");
+            }
 
-        uassertStatusOK(userAllowedCreateNS(opCtx, nss));
-        Status status = writeConflictRetry(opCtx, "createCollection", nss, [&] {
-            opCtx->checkForInterrupt();
-            WriteUnitOfWork wunit(opCtx);
-
-            const Collection* collection = catalog->lookupCollectionByNamespace(opCtx, nss);
-            if (collection) {
-                if (!params.trackedColls) {
-                    // If the collection is unsharded then we want to fail when a collection
-                    // we're trying to create already exists.
-                    return Status(ErrorCodes::NamespaceExists,
-                                  str::stream() << "unsharded collection with same namespace "
-                                                << nss.toStringForErrorMsg() << " already exists.");
-                }
-
-                // If the collection is sharded and a collection with the same name already
-                // exists on the target, we check if the existing collection's UUID matches
-                // that of the one we're trying to create. If it does, we treat the create
-                // as a no-op; if it doesn't match, we return an error.
-                const auto& existingOpts = collection->getCollectionOptions();
-                const UUID clonedUUID =
-                    uassertStatusOK(UUID::parse(params.collectionInfo["info"]["uuid"]));
-                if (clonedUUID == existingOpts.uuid)
-                    return Status::OK();
-
+            // If the collection is sharded and a collection with the same name already exists on
+            // the target, we check if the existing collection's UUID matches that of the one we're
+            // trying to create. If it does, we treat the create as a no-op; if it doesn't match, we
+            // return an error.
+            const auto& existingOpts = collection.getCollectionPtr()->getCollectionOptions();
+            const UUID clonedUUID =
+                uassertStatusOK(UUID::parse(params.collectionInfo["info"]["uuid"]));
+            if (clonedUUID != existingOpts.uuid) {
                 return Status(ErrorCodes::InvalidOptions,
                               str::stream()
                                   << "sharded collection with same namespace "
@@ -436,41 +433,46 @@ Status DefaultClonerImpl::_createCollectionsForDb(
                                   << " already exists, but UUIDs don't match. Existing UUID is "
                                   << existingOpts.uuid << " and new UUID is " << clonedUUID);
             }
+        } else {
+            uassertStatusOK(userAllowedCreateNS(opCtx, nss));
+            Status status = writeConflictRetry(opCtx, "createCollection", nss, [&] {
+                opCtx->checkForInterrupt();
+                WriteUnitOfWork wunit(opCtx);
 
-            // If the collection does not already exist and is tracked, we create a new collection
-            // on the target shard with the UUID of the original collection and copy the options and
-            // secondary indexes. If the collection does not already exist and is untracked, we
-            // create a new collection with its own UUID and copy the options and secondary indexes
-            // of the original collection.
-
-            if (params.trackedColls) {
-                optionsBuilder.append(params.collectionInfo["info"]["uuid"]);
-            }
-
-            const bool createDefaultIndexes = true;
-            auto options = optionsBuilder.obj();
-
-            CollectionOptions collectionOptions = uassertStatusOK(
-                CollectionOptions::parse(options, CollectionOptions::ParseKind::parseForStorage));
-
-            {
-                OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                    unsafeCreateCollection(opCtx,
-                                           /* forceCSRAsUnknownAfterCollectionCreation */ true);
-                Status createStatus = db->userCreateNS(
-                    opCtx, nss, collectionOptions, createDefaultIndexes, params.idIndexSpec);
-                if (!createStatus.isOK()) {
-                    return createStatus;
+                // If the collection does not already exist and is tracked, we create a new
+                // collection on the target shard with the UUID of the original collection and copy
+                // the options and secondary indexes. If the collection does not already exist and
+                // is untracked, we create a new collection with its own UUID and copy the options
+                // and secondary indexes of the original collection.
+                if (params.trackedColls) {
+                    optionsBuilder.append(params.collectionInfo["info"]["uuid"]);
                 }
+
+                const bool createDefaultIndexes = true;
+                auto options = optionsBuilder.obj();
+
+                CollectionOptions collectionOptions = uassertStatusOK(CollectionOptions::parse(
+                    options, CollectionOptions::ParseKind::parseForStorage));
+
+                {
+                    OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+                        unsafeCreateCollection(opCtx,
+                                               /* forceCSRAsUnknownAfterCollectionCreation */ true);
+                    Status createStatus = db->userCreateNS(
+                        opCtx, nss, collectionOptions, createDefaultIndexes, params.idIndexSpec);
+                    if (!createStatus.isOK()) {
+                        return createStatus;
+                    }
+                }
+
+                wunit.commit();
+                return Status::OK();
+            });
+
+            // Break early if one of the creations fails.
+            if (!status.isOK()) {
+                return status;
             }
-
-            wunit.commit();
-            return Status::OK();
-        });
-
-        // Break early if one of the creations fails.
-        if (!status.isOK()) {
-            return status;
         }
     }
 
@@ -588,7 +590,7 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
     }
 
     {
-        Lock::DBLock dbXLock(opCtx, dbName, MODE_X);
+        Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
         uassert(ErrorCodes::NotWritablePrimary,
                 str::stream() << "Not primary while cloning database "
                               << dbName.toStringForErrorMsg()
@@ -615,11 +617,23 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
 
             const auto nss = NamespaceStringUtil::deserialize(dbName, params.collectionName);
 
-
-            _copyIndexes(opCtx,
-                         nss,
-                         params.collectionInfo["options"].Obj(),
-                         collectionIndexSpecs[params.collectionName]);
+            {
+                auto collLock = acquireCollection(
+                    opCtx,
+                    CollectionAcquisitionRequest(nss,
+                                                 PlacementConcern::kPretendUnsharded,
+                                                 repl::ReadConcernArgs::get(opCtx),
+                                                 AcquisitionPrerequisites::kWrite),
+                    MODE_X);
+                uassert(10659000,
+                        str::stream() << "Collection " << nss.toStringForErrorMsg()
+                                      << " must be empty before copying indexes",
+                        collLock.getCollectionPtr()->isEmpty(opCtx));
+                _copyIndexes(opCtx,
+                             nss,
+                             params.collectionInfo["options"].Obj(),
+                             collectionIndexSpecs[params.collectionName]);
+            }
         }
     }
 
