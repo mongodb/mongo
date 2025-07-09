@@ -54,7 +54,6 @@ enums:
             kRoutingTableMissingMinKey: "RoutingTableMissingMinKey"
             kRoutingTableRangeGap: "RoutingTableRangeGap"
             kRoutingTableRangeOverlap: "RoutingTableRangeOverlap"
-            kShardMissingCollectionRoutingInfo: "ShardMissingCollectionRoutingInfo"
             kZonesRangeOverlap: "ZonesRangeOverlap"
             kTrackedUnshardedCollectionHasMultipleChunks: "TrackedUnshardedCollectionHasMultipleChunks"
             kTrackedUnshardedCollectionHasInvalidKey: "TrackedUnshardedCollectionHasInvalidKey"
@@ -63,6 +62,7 @@ enums:
             kMissingDatabaseMetadataInShardCatalog: "MissingDatabaseMetadataInShardCatalog"
             kMissingDatabaseMetadataInShardCatalogCache: "MissingDatabaseMetadataInShardCatalogCache"
             kMisplacedDatabaseMetadataInShardCatalog: "MisplacedDatabaseMetadataInShardCatalog"
+            kShardCatalogCacheCollectionMetadataMismatch: "ShardCatalogCacheCollectionMetadataMismatch"
 
     MetadataInconsistencyDescription:
         description: "Description of each metadata inconsistency."
@@ -84,7 +84,6 @@ enums:
             kRoutingTableMissingMinKey: "Routing table has a gap because first chunk does not start from MinKey"
             kRoutingTableRangeGap: "Found a gap between two consecutive chunks"
             kRoutingTableRangeOverlap: "Found two overlapping consecutive chunks"
-            kShardMissingCollectionRoutingInfo: "Shard is missing routing information for the collection"
             kZonesRangeOverlap: "Found two overlapping zones"
             kTrackedUnshardedCollectionHasMultipleChunks: "Found tracked unsharded collection with more than one chunks"
             kTrackedUnshardedCollectionHasInvalidKey: "Found tracked unsharded collection with invalid shard-key"
@@ -93,6 +92,7 @@ enums:
             kMissingDatabaseMetadataInShardCatalog: "Found database metadata in the global catalog but not in the shard catalog or not in a consistent state"
             kMissingDatabaseMetadataInShardCatalogCache: "Found database metadata in the global catalog but not in shard catalog cache"
             kMisplacedDatabaseMetadataInShardCatalog: "Found some database metadata in the shard catalog that is not owned by this shard"
+            kShardCatalogCacheCollectionMetadataMismatch: "Found inconsistencies between collection information in the global catalog and the shard catalog cache"
 
     MetadataConsistencyCommandLevel:
         description: "Level mode of the metadata consistency command."
@@ -355,21 +355,6 @@ structs:
                 type: uuid
                 description: "The UUID of the collection."
 
-    ShardMissingCollectionRoutingInfoDetails:
-        description: "Details about shard that thinks collection is unsharded."
-        strict: false
-        fields:
-            namespace:
-                cpp_name: nss
-                type: namespacestring
-                description: "The namespace of the collection."
-            collectionUUID:
-                type: uuid
-                description: "The UUID of the collection."
-            shard:
-                type: shard_id
-                description: "The shard with wrong collection timestamp."
-
     ZonesRangeOverlapDetails:
         description: "Details about a zones range overlap inconsistency."
         strict: false
@@ -511,6 +496,21 @@ structs:
             shardIdInShardCatalog:
                 description: "The shard that the shard catalog thinks is the primary shard for the database."
                 type: shard_id
+
+    ShardCatalogCacheCollectionMetadataMismatchDetails:
+        description: "Details about mismatched collection information between the shard catalog cache and the global catalog"
+        strict: false
+        fields:
+            namespace:
+                cpp_name: nss
+                type: namespacestring
+                description: "The namespace of the collection."
+            collectionUUID:
+                type: uuid
+                description: "The UUID of the collection."
+            details:
+                type: array<object>
+                description: "A list of the different mismatched information between the two locations."
 
     MetadataInconsistencyItem:
         description: "Object representing a single metadata inconsistency found in a specific shard"

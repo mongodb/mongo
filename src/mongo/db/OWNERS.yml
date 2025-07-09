@@ -64,6 +64,9 @@ filters:
   - "max_time.*":
     approvers:
       - 10gen/server-networking-and-observability
+  - "metadata_consistency*":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "mongod.cpp":
     approvers:
       - 10gen/server-programmability

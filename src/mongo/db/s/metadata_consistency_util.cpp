@@ -122,6 +122,56 @@ void logMetadataInconsistency(const MetadataInconsistencyItem& inconsistencyItem
                   "inconsistency"_attr = inconsistencyItem);
 }
 
+void _checkCollectionFilteringInformation(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          const ShardId& shardId,
+                                          const CollectionPtr& localColl,
+                                          bool expectTracked,
+                                          std::vector<MetadataInconsistencyItem>& inconsistencies) {
+    constexpr StringData kShardsFieldName = "shards"_sd;
+    constexpr StringData kMetadataFieldName = "metadata"_sd;
+    constexpr StringData kTrackedFieldName = "tracked"_sd;
+    const auto configShardId = Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId();
+
+    const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
+    auto optCollDescr = scopedCsr->getCurrentMetadataIfKnown();
+
+    // Metadata can always be unknown, so this is not an inconsistency.
+    if (!optCollDescr) {
+        return;
+    }
+
+    // If the critical section is taken, then we might have incorrect local metadata and that is
+    // okay as it should be updated before leaving the critical section.
+    auto criticalSectionSignal =
+        scopedCsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
+    if (criticalSectionSignal) {
+        LOGV2_DEBUG(9302301,
+                    1,
+                    "Skipping checking collection  since the critical section is acquired",
+                    logAttrs(nss));
+        return;
+    }
+
+    if ((expectTracked && !optCollDescr->hasRoutingTable()) ||
+        (!expectTracked && optCollDescr->hasRoutingTable())) {
+        // This shard's filtering information regarding whether or not the collection is tracked is
+        // inconsistent with that of the config server.
+        // The collection is tracked by the config server in the global catalog. This shard has
+        // the collection locally but it is missing the filtering information.
+        inconsistencies.emplace_back(metadata_consistency_util::makeInconsistency(
+            MetadataInconsistencyTypeEnum::kShardCatalogCacheCollectionMetadataMismatch,
+            ShardCatalogCacheCollectionMetadataMismatchDetails{
+                nss,
+                localColl->uuid(),
+                {BSON(kMetadataFieldName
+                      << BSON(kTrackedFieldName << optCollDescr->hasRoutingTable())
+                      << kShardsFieldName << BSON_ARRAY(shardId)),
+                 BSON(kMetadataFieldName << BSON(kTrackedFieldName << expectTracked)
+                                         << kShardsFieldName << BSON_ARRAY(configShardId))}}));
+    }
+}
+
 void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         const ShardId& shardId,
@@ -197,11 +247,12 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
     }
 
     if (!optCollDescr->hasRoutingTable()) {
-        // The collection is tracked by the config server in the sharding catalog. This shard has
-        // the collection locally but it is missing the routing informations
-        inconsistencies.emplace_back(metadata_consistency_util::makeInconsistency(
-            MetadataInconsistencyTypeEnum::kShardMissingCollectionRoutingInfo,
-            ShardMissingCollectionRoutingInfoDetails{localColl->ns(), localColl->uuid(), shardId}));
+        LOGV2_DEBUG(9302300,
+                    1,
+                    "Ignoring index inconsistencies because collection metadata is incorrect",
+                    logAttrs(nss),
+                    logAttrs(nss),
+                    "inconsistencies"_attr = tmpInconsistencies);
         return;
     }
 
@@ -297,6 +348,14 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
                  << (catalogColl.getDefaultCollation()))));
     }
 
+    // Check that the metadata type locally is compatible with the type of collection on the config
+    // server.
+    if (catalogUUID == localUUID) {
+        _checkCollectionFilteringInformation(
+            opCtx, nss, shardId, localColl, true /* expectTracked */, inconsistencies);
+    }
+
+
     // Check shardKey index inconsistencies.
     // Skip the check in case of unsplittable collections as we don't strictly require an index on
     // the shard key for unsplittable collections.
@@ -309,6 +368,26 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
                                            localColl,
                                            inconsistencies,
                                            checkRangeDeletionIndexes);
+    }
+
+    return inconsistencies;
+}
+
+std::vector<MetadataInconsistencyItem> _checkLocalInconsistencies(OperationContext* opCtx,
+                                                                  const NamespaceString& nss,
+                                                                  const ShardId& currentShard,
+                                                                  const ShardId& primaryShard,
+                                                                  const CollectionPtr& localColl) {
+    std::vector<MetadataInconsistencyItem> inconsistencies;
+
+    if (currentShard != primaryShard) {
+        inconsistencies.emplace_back(makeInconsistency(
+            MetadataInconsistencyTypeEnum::kMisplacedCollection,
+            MisplacedCollectionDetails{
+                nss, currentShard, localColl->uuid(), getNumDocs(opCtx, localColl.get())}));
+    } else {
+        _checkCollectionFilteringInformation(
+            opCtx, nss, currentShard, localColl, false /* expectTracked */, inconsistencies);
     }
 
     return inconsistencies;
@@ -724,31 +803,29 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
             // Case where we have found a local collection that is not in the sharding catalog.
             const auto& nss = localNss;
 
-            if (!nss.isShardLocalNamespace() && shardId != primaryShardId) {
-                inconsistencies.emplace_back(makeInconsistency(
-                    MetadataInconsistencyTypeEnum::kMisplacedCollection,
-                    MisplacedCollectionDetails{
-                        nss, shardId, localColl->uuid(), getNumDocs(opCtx, localColl.get())}));
+            if (!localNss.isShardLocalNamespace()) {
+                auto localInconsistencies =
+                    _checkLocalInconsistencies(opCtx, nss, shardId, primaryShardId, localColl);
+                inconsistencies.insert(inconsistencies.end(),
+                                       std::make_move_iterator(localInconsistencies.begin()),
+                                       std::make_move_iterator(localInconsistencies.end()));
             }
             itLocalCollections++;
         }
     }
 
-    if (shardId != primaryShardId) {
-        // Case where we have found more local collections than in the sharding catalog. It is a
-        // hidden unsharded collection inconsistency if we are not the db primary shard.
-        while (itLocalCollections != localCatalogCollections.end()) {
-            const auto localColl = itLocalCollections->get();
-            if (!localColl->ns().isShardLocalNamespace()) {
-                inconsistencies.emplace_back(
-                    makeInconsistency(MetadataInconsistencyTypeEnum::kMisplacedCollection,
-                                      MisplacedCollectionDetails{localColl->ns(),
-                                                                 shardId,
-                                                                 localColl->uuid(),
-                                                                 getNumDocs(opCtx, localColl)}));
-            }
-            itLocalCollections++;
+    while (itLocalCollections != localCatalogCollections.end()) {
+        const auto& localColl = *itLocalCollections;
+        const auto& localNss = localColl->ns();
+
+        if (!localNss.isShardLocalNamespace()) {
+            auto localInconsistencies =
+                _checkLocalInconsistencies(opCtx, localNss, shardId, primaryShardId, localColl);
+            inconsistencies.insert(inconsistencies.end(),
+                                   std::make_move_iterator(localInconsistencies.begin()),
+                                   std::make_move_iterator(localInconsistencies.end()));
         }
+        itLocalCollections++;
     }
 
     while (itCatalogCollections != shardingCatalogCollections.end()) {

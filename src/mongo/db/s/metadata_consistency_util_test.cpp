@@ -41,6 +41,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/collation/collator_factory_icu.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_runtime.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_options.h"
@@ -211,6 +212,33 @@ protected:
             inconsistencies.begin(), inconsistencies.end(), [](const auto& inconsistency) {
                 return inconsistency.getType() ==
                     MetadataInconsistencyTypeEnum::kCollectionOptionsMismatch;
+            }));
+    }
+
+    void assertCollectionMetadataMismatchInconsistencyFound(
+        const std::vector<MetadataInconsistencyItem>& inconsistencies,
+        const BSONObj& localMetadata,
+        const BSONObj& configMetadata) {
+        ASSERT_GT(inconsistencies.size(), 0);
+        ASSERT_TRUE(std::any_of(
+            inconsistencies.begin(), inconsistencies.end(), [&](const auto& inconsistency) {
+                if (inconsistency.getType() !=
+                    MetadataInconsistencyTypeEnum::kShardCatalogCacheCollectionMetadataMismatch) {
+                    return false;
+                }
+
+                const auto& allMetadata = inconsistency.getDetails().getField("details").Array();
+                if (std::none_of(allMetadata.begin(), allMetadata.end(), [&](const BSONElement& o) {
+                        return localMetadata.woCompare(o.Obj().getField("metadata").Obj()) == 0;
+                    })) {
+                    return false;
+                }
+                if (std::none_of(allMetadata.begin(), allMetadata.end(), [&](const BSONElement& o) {
+                        return configMetadata.woCompare(o.Obj().getField("metadata").Obj()) == 0;
+                    })) {
+                    return false;
+                }
+                return true;
             }));
     }
 };
@@ -745,6 +773,115 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShard) 
 
     assertOneInconsistencyFound(
         MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalog, inconsistencies);
+}
+
+TEST_F(MetadataConsistencyTest, ShardUntrackedCollectionInconsistencyTest) {
+    OperationContext* opCtx = operationContext();
+
+    CreateCommand cmd(_nss);
+    createLocalCollection(opCtx, cmd);
+
+    const auto localCatalogCollections = getLocalCatalogCollections(opCtx, _nss);
+    ASSERT_EQ(1, localCatalogCollections.size());
+
+    auto configColl = generateCollectionType(_nss, localCatalogCollections[0]->uuid());
+
+    auto inconsistencies = metadata_consistency_util::checkCollectionMetadataConsistency(
+        opCtx,
+        _shardId,
+        _shardId,
+        {configColl},
+        localCatalogCollections,
+        false /*checkRangeDeletionIndexes*/);
+    assertOneInconsistencyFound(
+        MetadataInconsistencyTypeEnum::kShardCatalogCacheCollectionMetadataMismatch,
+        inconsistencies);
+    assertCollectionMetadataMismatchInconsistencyFound(
+        inconsistencies, BSON("tracked" << false), BSON("tracked" << true));
+
+    // Clear the filtering information and check that no inconsistency is reported for unknown
+    // filtering information.
+    {
+        auto scopedCSR = CollectionShardingRuntime::acquireExclusive(opCtx, _nss);
+        scopedCSR->clearFilteringMetadata(opCtx);
+    }
+    inconsistencies = metadata_consistency_util::checkCollectionMetadataConsistency(
+        opCtx,
+        _shardId,
+        _shardId,
+        {configColl},
+        localCatalogCollections,
+        false /*checkRangeDeletionIndexes*/);
+    ASSERT_EQ(0, inconsistencies.size());
+}
+
+TEST_F(MetadataConsistencyTest, ShardTrackedCollectionInconsistencyTest) {
+    OperationContext* opCtx = operationContext();
+
+    CreateCommand cmd(_nss);
+    createLocalCollection(opCtx, cmd);
+
+    const auto localCatalogCollections = getLocalCatalogCollections(opCtx, _nss);
+    ASSERT_EQ(1, localCatalogCollections.size());
+
+    {
+        auto chunk = generateChunk(localCatalogCollections[0]->uuid(),
+                                   _shardId,
+                                   _keyPattern.globalMin(),
+                                   _keyPattern.globalMax(),
+                                   {ChunkHistory(Timestamp(1, 0), _shardId)});
+        auto rt = RoutingTableHistory::makeNew(_nss,
+                                               localCatalogCollections[0]->uuid(),
+                                               _keyPattern,
+                                               false, /* unsplittable */
+                                               nullptr,
+                                               false,
+                                               chunk.getVersion().epoch(),
+                                               chunk.getVersion().getTimestamp(),
+                                               boost::none /* timeseriesFields */,
+                                               boost::none /* resharding Fields */,
+                                               true /* allowMigrations */,
+                                               {chunk});
+
+        const auto version = rt.getVersion();
+        const auto rtHandle = RoutingTableHistoryValueHandle(
+            std::make_shared<RoutingTableHistory>(std::move(rt)),
+            ComparableChunkVersion::makeComparableChunkVersion(version));
+
+        const auto collectionMetadata =
+            CollectionMetadata(ChunkManager(rtHandle, boost::none), _shardId);
+
+        auto scopedCSR = CollectionShardingRuntime::acquireExclusive(opCtx, _nss);
+        scopedCSR->setFilteringMetadata(opCtx, collectionMetadata);
+    }
+
+    auto inconsistencies = metadata_consistency_util::checkCollectionMetadataConsistency(
+        opCtx,
+        _shardId,
+        _shardId,
+        {},
+        localCatalogCollections,
+        false /*checkRangeDeletionIndexes*/);
+    assertOneInconsistencyFound(
+        MetadataInconsistencyTypeEnum::kShardCatalogCacheCollectionMetadataMismatch,
+        inconsistencies);
+    assertCollectionMetadataMismatchInconsistencyFound(
+        inconsistencies, BSON("tracked" << false), BSON("tracked" << true));
+
+    // Clear the filtering information and check that no inconsistency is reported for unknown
+    // filtering information.
+    {
+        auto scopedCSR = CollectionShardingRuntime::acquireExclusive(opCtx, _nss);
+        scopedCSR->clearFilteringMetadata(opCtx);
+    }
+    inconsistencies = metadata_consistency_util::checkCollectionMetadataConsistency(
+        opCtx,
+        _shardId,
+        _shardId,
+        {},
+        localCatalogCollections,
+        false /*checkRangeDeletionIndexes*/);
+    ASSERT_EQ(0, inconsistencies.size());
 }
 
 class MetadataConsistencyRandomRoutingTableTest : public MetadataConsistencyConfigTest {
