@@ -36,6 +36,7 @@
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -1260,9 +1261,10 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                             "loading indexes to validate indexes on temporary resharding collection"_sd,
                             /*expandSimpleCollation*/ false);
 
-                        DBDirectClient client(opCtx.get());
-                        auto tempCollIdxSpecs =
-                            client.getIndexSpecs(_metadata.getTempReshardingNss(), false, 0);
+                        const auto& tempCollIdxSpecs =
+                            listIndexesEmptyListIfMissing(opCtx.get(),
+                                                          _metadata.getTempReshardingNss(),
+                                                          ListIndexesInclude::Nothing);
                         resharding::verifyIndexSpecsMatch(sourceIdxSpecs.cbegin(),
                                                           sourceIdxSpecs.cend(),
                                                           tempCollIdxSpecs.cbegin(),

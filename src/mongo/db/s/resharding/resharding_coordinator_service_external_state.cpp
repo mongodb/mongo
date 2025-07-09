@@ -34,6 +34,7 @@
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/resharding/recipient_resume_document_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
@@ -260,6 +261,13 @@ std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsT
     AggregateCommandRequest aggRequest(nss, pipeline);
     BSONObj hint = BSON("_id" << 1);
     aggRequest.setHint(hint);
+
+    // TODO SERVER-107180 always set rawData once 9.0 becomes last LTS
+    if (gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        aggRequest.setRawData(true);
+    }
 
     aggRequest.setWriteConcern(WriteConcernOptions());
     aggRequest.setReadConcern(repl::ReadConcernArgs::snapshot(LogicalTime(cloneTimestamp)));

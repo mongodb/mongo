@@ -46,6 +46,7 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/getmore_command_gen.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -55,6 +56,7 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/executor/task_executor.h"
@@ -496,6 +498,12 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
                 if (optionalDonorHost) {
                     designatedHostsMap[shardId] = *optionalDonorHost;
                 }
+            }
+
+            if (gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                isRawDataOperation(opCtx) = true;
             }
 
             auto [rawPipeline, expCtx] = makeRawNaturalOrderPipeline(opCtx, mongoProcessInterface);

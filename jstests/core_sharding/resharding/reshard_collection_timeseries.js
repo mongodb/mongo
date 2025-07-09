@@ -9,10 +9,10 @@
  *  assumes_unsharded_collection,
  *  # Creates chunks on specific shards
  *  assumes_stable_shard_list,
- *  does_not_support_viewless_timeseries_yet,
  * ]
  */
 
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 import {ReshardCollectionCmdTest} from "jstests/sharding/libs/reshard_collection_util.js";
 import {createChunks, getShardNames} from "jstests/sharding/libs/sharding_util.js";
@@ -43,9 +43,9 @@ assert.commandWorked(
 CreateShardedCollectionUtil.shardCollectionWithChunks(
     sourceCollection, shardKeyPattern, chunks, collOptions);
 
-const bucketNss = dbName + ".system.buckets.coll";
-let timeseriesCollDoc =
-    mongos.getDB("config").getCollection("collections").findOne({_id: bucketNss});
+let timeseriesCollDoc = mongos.getDB("config").getCollection("collections").findOne({
+    _id: getTimeseriesCollForDDLOps(sourceDB, sourceCollection).getFullName()
+});
 assert.eq(timeseriesCollDoc.timeseriesFields.timeField, timeseriesInfo.timeField);
 assert.eq(timeseriesCollDoc.timeseriesFields.metaField, timeseriesInfo.metaField);
 assert.eq(timeseriesCollDoc.key, {"meta.x": 1});
@@ -84,8 +84,9 @@ reshardCmdTest.assertReshardCollOkWithPreset({
 },
                                              newChunks);
 
-let timeseriesCollDocPostResharding =
-    mongos.getDB("config").getCollection("collections").findOne({_id: bucketNss});
+let timeseriesCollDocPostResharding = mongos.getDB("config").getCollection("collections").findOne({
+    _id: getTimeseriesCollForDDLOps(sourceDB, sourceCollection).getFullName()
+});
 
 // Resharding keeps timeseries fields.
 assert.eq(timeseriesCollDocPostResharding.timeseriesFields.timeField, timeseriesInfo.timeField);

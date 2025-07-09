@@ -2,7 +2,8 @@
  * Util class for testing reshardCollection cmd.
  */
 
-import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
 
 export class ReshardCollectionCmdTest {
@@ -26,6 +27,8 @@ export class ReshardCollectionCmdTest {
             : false;
         this._skipCollectionSetup =
             testConfig.skipCollectionSetup ? testConfig.skipCollectionSetup : false;
+        // TODO SERVER-107180 remove '_timeseries' variable
+        // and all its usages after 9.0 becomes last LTS
         this._timeseries = testConfig.timeseries;
 
         this._shardToRSMap = {};
@@ -44,10 +47,9 @@ export class ReshardCollectionCmdTest {
     }
 
     _getUUIDFromCollectionInfo(dbName, collName) {
-        const uuidObject = getUUIDFromListCollections(
-            this._mongos.getDB(dbName), this._timeseries ? `system.buckets.${collName}` : collName);
-
-        return extractUUIDFromObject(uuidObject);
+        const db = this._mongos.getDB(dbName);
+        const coll = this._timeseries ? getTimeseriesCollForDDLOps(db, db[collName]) : db[collName];
+        return extractUUIDFromObject(coll.getUUID());
     }
 
     _constructTemporaryReshardingCollName(dbName, collName) {
@@ -64,8 +66,10 @@ export class ReshardCollectionCmdTest {
     }
 
     _verifyChunksMatchExpected(numExpectedChunks, presetExpectedChunks) {
-        let collEntry = this._mongos.getDB('config').getCollection('collections').findOne({
-            _id: this._timeseries ? `${this._dbName}.system.buckets.${this._collName}` : this._ns
+        const db = this._mongos.getDB(this._dbName);
+        let collEntry = this._mongos.getDB('config')['collections'].findOne({
+            _id: this._timeseries ? getTimeseriesCollForDDLOps(db, db[this._collName]).getFullName()
+                                  : this._ns
         });
         let chunkQuery = {uuid: collEntry.uuid};
 
@@ -198,8 +202,11 @@ export class ReshardCollectionCmdTest {
     }
 
     _verifyShardKey(expectedShardKey) {
-        const collName = this._timeseries ? "system.buckets." + this._collName : this._collName;
-        const shardKey = this._mongos.getDB(this._dbName)[collName].getShardKey();
+        const db = this._mongos.getDB(this._dbName);
+
+        const coll = this._timeseries ? getTimeseriesCollForDDLOps(db, db[this._collName])
+                                      : db[this._collName];
+        const shardKey = coll.getShardKey();
         assert.eq(shardKey, expectedShardKey);
     }
 

@@ -253,7 +253,7 @@ const zoneShardingTestCases = [
             mongo.s0.adminCommand(
                 {reshardCollection: collNss, key: {[metaField]: 1, [controlTimeField]: 1}}),
             [ErrorCodes.NotImplemented, ErrorCodes.IllegalOperation]);
-        // TODO SERVER-106178 Ensure that resharding fails when issued on the buckets
+        // TODO SERVER-107138 Ensure that resharding fails when issued on the buckets
         // collection on FCV 9.0.
         if (!areViewlessTimeseriesEnabled(mongo.s.getDB(dbName))) {
             assert.commandFailedWithCode(mongo.s0.adminCommand({
