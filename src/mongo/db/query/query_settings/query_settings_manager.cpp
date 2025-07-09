@@ -212,7 +212,7 @@ VersionedQueryShapeConfigurations QuerySettingsManager::getVersionedQueryShapeCo
         return {};
     }
 
-    auto queryShapeHashToQueryShapeConfigurationsMap =
+    const auto& queryShapeHashToQueryShapeConfigurationsMap =
         versionedQueryShapeConfigurationsIt->second.queryShapeHashToQueryShapeConfigurationsMap;
     return VersionedQueryShapeConfigurations{
         .queryShapeHashToQueryShapeConfigurationsMap = queryShapeHashToQueryShapeConfigurationsMap,
