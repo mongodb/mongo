@@ -933,7 +933,7 @@ void CollectionImpl::setRequiresTimeseriesExtendedRangeSupport(OperationContext*
                 "Time-series collection contains dates outside the standard range. Some query "
                 "optimizations may be disabled. Please consider building an index on timeField to "
                 "re-enable them.",
-                "nss"_attr =
+                "namespace"_attr =
                     !isNewTimeseriesWithoutView() ? ns().getTimeseriesViewNamespace() : ns(),
                 "timeField"_attr = _metadata->options.timeseries->getTimeField());
         }

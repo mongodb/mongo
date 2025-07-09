@@ -35,13 +35,13 @@ assert.commandWorked(
 
 // Make sure the collections got flagged properly during the initial write.
 assert(checkLog.checkContainsWithCountJson(
-    primary, 6679402, {"nss": "testDB.standard", "timeField": "time"}, 0));
+    primary, 6679402, {"namespace": "testDB.standard", "timeField": "time"}, 0));
 assert(checkLog.checkContainsWithCountJson(
-    secondary, 6679402, {"nss": "testDB.standard", "timeField": "time"}, 0));
+    secondary, 6679402, {"namespace": "testDB.standard", "timeField": "time"}, 0));
 assert(checkLog.checkContainsWithCountJson(
-    primary, 6679402, {"nss": "testDB.extended", "timeField": "time"}, 1));
+    primary, 6679402, {"namespace": "testDB.extended", "timeField": "time"}, 1));
 assert(checkLog.checkContainsWithCountJson(
-    secondary, 6679402, {"nss": "testDB.extended", "timeField": "time"}, 1));
+    secondary, 6679402, {"namespace": "testDB.extended", "timeField": "time"}, 1));
 
 assert.eq(1, getExtendedRangeCount(primary));
 assert.eq(1, getExtendedRangeCount(secondary));
