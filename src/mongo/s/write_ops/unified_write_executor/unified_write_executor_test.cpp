@@ -258,6 +258,52 @@ TEST_F(UnifiedWriteExecutorTest, BulkWriteImplicitCollectionCreation) {
     future.default_timed_get();
 }
 
+TEST_F(UnifiedWriteExecutorTest, OrderedBulkWriteErrorsAndStops) {
+    const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
+    const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest(dbName, "coll1");
+    const NamespaceString nss2 = NamespaceString::createNamespaceString_forTest(dbName, "coll2");
+    BulkWriteCommandRequest request(
+        {BulkWriteInsertOp(0, BSON("x" << 1)), BulkWriteInsertOp(1, BSON("x" << 2))},
+        {NamespaceInfoEntry(nss1), NamespaceInfoEntry(nss2)});
+    request.setOrdered(true);
+
+    auto future = launchAsync([&]() {
+        auto reply = bulkWrite(operationContext(), request);
+        auto replyItems = reply.getCursor().getFirstBatch();
+        ASSERT_EQ(replyItems.size(), 1);
+        ASSERT_BSONOBJ_EQ(replyItems[0].toBSON(),
+                          BSON("ok" << 0.0 << "idx" << 0 << "code" << ErrorCodes::BadValue
+                                    << "errmsg" << "failed" << "n" << 0));
+        ASSERT_EQ(reply.getNErrors(), 1);
+        ASSERT_EQ(reply.getNInserted(), 0);
+        ASSERT_EQ(reply.getNMatched(), 0);
+        ASSERT_EQ(reply.getNModified(), 0);
+        ASSERT_EQ(reply.getNUpserted(), 0);
+        ASSERT_EQ(reply.getNDeleted(), 0);
+    });
+
+    // Load catalog cache from the config server
+    expectDatabaseRoutingRequest(dbName, shardId1);
+    expectCollectionRoutingRequest(nss1, shardId1);
+    expectCollectionRoutingRequest(nss2, shardId2);
+
+    // First batch, then errors and stops
+    expectBulkWriteShardRequest(
+        {BSON("insert" << 0 << "document" << BSON("x" << 1))} /* opList */,
+        {nss1} /* nssList */,
+        shardId1 /* shardId */,
+        {BSON("ok" << 0.0 << "idx" << 0 << "code" << ErrorCodes::BadValue << "errmsg" << "failed"
+                   << "n" << 0)} /* replyItems */,
+        1 /* nErrors */,
+        0 /* nInserted */,
+        0 /* nMatched */,
+        0 /* nModified */,
+        0 /* nUpserted */,
+        0 /* nDelete */
+    );
+
+    future.default_timed_get();
+}
 }  // namespace
 }  // namespace unified_write_executor
 }  // namespace mongo

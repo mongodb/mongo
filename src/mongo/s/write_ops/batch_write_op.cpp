@@ -222,31 +222,6 @@ int getEncryptionInformationSize(const BatchedCommandRequest& req) {
 
 }  // namespace
 
-boost::optional<WriteConcernErrorDetail> mergeWriteConcernErrors(
-    const std::vector<ShardWCError>& wcErrors) {
-    if (!wcErrors.size())
-        return boost::none;
-
-    StringBuilder msg;
-    auto errCode = wcErrors.front().error.toStatus().code();
-    if (wcErrors.size() != 1) {
-        msg << "Multiple errors reported :: ";
-    }
-
-    for (auto it = wcErrors.begin(); it != wcErrors.end(); ++it) {
-        if (it != wcErrors.begin()) {
-            msg << " :: and :: ";
-        }
-
-        msg << it->error.toString() << " at " << it->shardName;
-    }
-
-    WriteConcernErrorDetail wce;
-    wce.setStatus(Status(errCode, msg.str()));
-
-    return boost::optional<WriteConcernErrorDetail>(wce);
-}
-
 /**
  * Attempts to populate the actualCollection field of a CollectionUUIDMismatch error if it is not
  * populated already, contacting the primary shard if necessary.

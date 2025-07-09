@@ -61,7 +61,7 @@ Analysis WriteOpAnalyzer::analyze(OperationContext* opCtx,
         MONGO_UNREACHABLE;
     }();
     tassert(10346500, "Expected write to affect at least one shard", !shardsAffected.empty());
-    if (shardsAffected.size() == 1 && !op.isMulti()) {
+    if (shardsAffected.size() == 1) {
         return {BatchType::kSingleShard, std::move(shardsAffected)};
     } else {
         return {BatchType::kMultiShard, std::move(shardsAffected)};

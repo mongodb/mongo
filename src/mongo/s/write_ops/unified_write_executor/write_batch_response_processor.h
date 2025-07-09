@@ -32,6 +32,7 @@
 #include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/cluster_ddl.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
+#include "mongo/s/write_ops/wc_error.h"
 
 namespace mongo::unified_write_executor {
 /**
@@ -58,9 +59,14 @@ public:
         stdx::unordered_map<NamespaceString,
                             std::shared_ptr<const mongo::CannotImplicitlyCreateCollectionInfo>>;
     /**
-     * A pair representing ops to be retried and collections to create.
+     * A struct representing data to be returned to the higher level of control flow.
      */
-    using Result = std::pair<std::vector<WriteOp>, CollectionsToCreate>;
+    struct Result {
+        bool unrecoverableError{false};       // Whether an unrecoverable error occurred
+        std::vector<WriteOp> opsToRetry{};    // Ops to be retried due to recoverable errors
+        CollectionsToCreate collsToCreate{};  // Collections to be explicitly created
+    };
+
     /**
      * Process a response from each shard, handle errors, and collect statistics. Returns an
      * array containing ops that did not complete successfully that need to be resent.
@@ -79,7 +85,7 @@ private:
      * Process a response from a shard, handle errors, and collect statistics. Returns an array
      * containing ops that did not complete successfully that need to be resent.
      */
-    Result onShardResponse(const ShardResponse& response);
+    Result onShardResponse(const ShardId& shardId, const ShardResponse& response);
 
     /**
      * Process ReplyItems and pick out any ops that need to be retried.
@@ -101,6 +107,7 @@ private:
     size_t _nUpserted{0};
     size_t _nDeleted{0};
     std::map<WriteOpId, BulkWriteReplyItem> _results;
+    std::vector<ShardWCError> _wcErrors;
 };
 
 }  // namespace mongo::unified_write_executor

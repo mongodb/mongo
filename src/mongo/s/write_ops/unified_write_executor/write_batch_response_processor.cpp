@@ -34,23 +34,24 @@ namespace mongo::unified_write_executor {
 using Result = WriteBatchResponseProcessor::Result;
 
 Result WriteBatchResponseProcessor::onWriteBatchResponse(const WriteBatchResponse& response) {
-    std::vector<WriteOp> toRetry;
-    CollectionsToCreate toCreate;
-    for (const auto& [_, shardResponse] : response) {
-        auto [ops, collectionsToCreate] = onShardResponse(shardResponse);
-        toRetry.insert(toRetry.end(),
-                       std::make_move_iterator(ops.begin()),
-                       std::make_move_iterator(ops.end()));
-        for (auto& [nss, info] : collectionsToCreate) {
-            if (auto it = toCreate.find(nss); it == toCreate.cend()) {
-                toCreate.emplace(nss, std::move(info));
+    Result result;
+    for (const auto& [shardId, shardResponse] : response) {
+        auto shardResult = onShardResponse(shardId, shardResponse);
+        result.unrecoverableError |= shardResult.unrecoverableError;
+        result.opsToRetry.insert(result.opsToRetry.end(),
+                                 std::make_move_iterator(shardResult.opsToRetry.begin()),
+                                 std::make_move_iterator(shardResult.opsToRetry.end()));
+        for (auto& [nss, info] : shardResult.collsToCreate) {
+            if (auto it = result.collsToCreate.find(nss); it == result.collsToCreate.cend()) {
+                result.collsToCreate.emplace(nss, std::move(info));
             }
         }
     }
-    return {std::move(toRetry), std::move(toCreate)};
+    return result;
 }
 
-Result WriteBatchResponseProcessor::onShardResponse(const ShardResponse& response) {
+Result WriteBatchResponseProcessor::onShardResponse(const ShardId& shardId,
+                                                    const ShardResponse& response) {
     // Handle local errors, not from a shardResponse.
     if (!response.swResponse.isOK()) {
         // TODO SERVER-105303 Handle interruption/shutdown.
@@ -88,23 +89,34 @@ Result WriteBatchResponseProcessor::onShardResponse(const ShardResponse& respons
     auto parsedReply = BulkWriteCommandReply::parse(
         IDLParserContext("BulkWriteCommandReply_UnifiedWriteExec"), shardResponse.data);
 
+    // Process write concern error
+    auto wcError = parsedReply.getWriteConcernError();
+    if (wcError) {
+        _wcErrors.push_back(ShardWCError(
+            shardId, {Status(ErrorCodes::Error(wcError->getCode()), wcError->getErrmsg())}));
+    }
+
     _nInserted += parsedReply.getNInserted();
     _nDeleted += parsedReply.getNDeleted();
     _nMatched += parsedReply.getNMatched();
     _nUpserted += parsedReply.getNUpserted();
     _nModified += parsedReply.getNModified();
-    // TODO SERVER-104130 WriteConcern/WriteConcernError support.
     // TODO SERVER-104115 retried stmts.
     // TODO SERVER-104535 cursor support for UnifiedWriteExec.
     const auto& replyItems = parsedReply.getCursor().getFirstBatch();
-    auto [toRetry, collectionsToCreate] = processOpsInReplyItems(ops, replyItems);
-    return {processOpsNotInReplyItems(ops, replyItems, std::move(toRetry)), collectionsToCreate};
+    auto result = processOpsInReplyItems(ops, replyItems);
+    if (!result.unrecoverableError) {
+        result.opsToRetry =
+            processOpsNotInReplyItems(ops, replyItems, std::move(result.opsToRetry));
+    }
+    return result;
 }
 
 Result WriteBatchResponseProcessor::processOpsInReplyItems(
     const std::vector<WriteOp>& ops, const std::vector<BulkWriteReplyItem>& replyItems) {
     std::vector<WriteOp> toRetry;
     CollectionsToCreate collectionsToCreate;
+    bool unrecoverableError = false;
     for (const auto& item : replyItems) {
         // TODO SERVER-104114 support retrying staleness errors.
         // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
@@ -130,13 +142,15 @@ Result WriteBatchResponseProcessor::processOpsInReplyItems(
         } else {
             if (!item.getStatus().isOK()) {
                 _nErrors++;
+                unrecoverableError = true;
             }
             auto [it, _] = _results.emplace(op.getId(), item);
             it->second.setIdx(op.getId());
         }
     }
-    return {std::move(toRetry), collectionsToCreate};
+    return {unrecoverableError, std::move(toRetry), collectionsToCreate};
 }
+
 std::vector<WriteOp> WriteBatchResponseProcessor::processOpsNotInReplyItems(
     const std::vector<WriteOp>& requestedOps,
     const std::vector<BulkWriteReplyItem>& replyItems,
@@ -167,7 +181,8 @@ BulkWriteCommandReply WriteBatchResponseProcessor::generateClientResponse<BulkWr
         // TODO SERVER-104123 Handle multi: true case where we have multiple reply items for the
         // same op id from the original client request.
     }
-    return BulkWriteCommandReply(
+    auto reply = BulkWriteCommandReply(
+        // TODO SERVER-104535 cursor support for UnifiedWriteExec.
         BulkWriteCommandResponseCursor(
             0, std::move(results), NamespaceString::makeBulkWriteNSS(boost::none)),
         _nErrors,
@@ -176,7 +191,14 @@ BulkWriteCommandReply WriteBatchResponseProcessor::generateClientResponse<BulkWr
         _nModified,
         _nUpserted,
         _nDeleted);
-    // TODO SERVER-104535 cursor support for UnifiedWriteExec.
+
+    // Aggregate all the write concern errors from the shards.
+    if (auto totalWcError = mergeWriteConcernErrors(_wcErrors); totalWcError) {
+        reply.setWriteConcernError(BulkWriteWriteConcernError{totalWcError->toStatus().code(),
+                                                              totalWcError->toStatus().reason()});
+    }
+
+    return reply;
 }
 
 }  // namespace mongo::unified_write_executor
