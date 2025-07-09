@@ -20,6 +20,7 @@
  */
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
@@ -122,11 +123,17 @@ export const $config = (function() {
         cluster.shardCollection(db[collName], {'meta.x': 1}, false);
 
         const shards = Object.keys(cluster.getSerializedCluster().shards);
-        const bucketNss = 'system.buckets.' + collName;
-        ChunkHelper.splitChunkAt(db, bucketNss, {'meta.x': 5});
+        ChunkHelper.splitChunkAt(
+            db, getTimeseriesCollForDDLOps(db, db[collName]).getName(), {'meta.x': 5});
 
-        ChunkHelper.moveChunk(db, bucketNss, [{'meta.x': MinKey}, {'meta.x': 5}], shards[0]);
-        ChunkHelper.moveChunk(db, bucketNss, [{'meta.x': 5}, {'meta.x': MaxKey}], shards[1]);
+        ChunkHelper.moveChunk(db,
+                              getTimeseriesCollForDDLOps(db, db[collName]).getName(),
+                              [{'meta.x': MinKey}, {'meta.x': 5}],
+                              shards[0]);
+        ChunkHelper.moveChunk(db,
+                              getTimeseriesCollForDDLOps(db, db[collName]).getName(),
+                              [{'meta.x': 5}, {'meta.x': MaxKey}],
+                              shards[1]);
 
         const bulk = db[collName].initializeUnorderedBulkOp();
         for (let i = 0; i < numInitialDocs; ++i) {

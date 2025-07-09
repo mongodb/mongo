@@ -9,8 +9,6 @@
  *  requires_non_retryable_writes,
  *  does_not_support_transactions,
  *  requires_fcv_51,
- *  # TODO SERVER-104916 review the following tag
- *  does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
@@ -19,6 +17,7 @@ import {
     $config as $baseConfig
 } from 'jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_moveChunk_partitioned.js';
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
@@ -40,8 +39,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     // This should generate documents for a span of one month.
     $config.data.numInitialDocs = 60 * 24 * 30;
     $config.data.numMetaCount = 30;
-
-    $config.data.bucketPrefix = "system.buckets.";
 
     $config.data.metaField = 'm';
     $config.data.timeField = 't';
@@ -80,8 +77,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      */
     $config.states.moveChunk = function moveChunk(db, collName, connCache) {
         const configDB = db.getSiblingDB('config');
-        const ns = db[this.bucketPrefix + collName].getFullName();
-        const chunks = findChunksUtil.findChunksByNs(configDB, ns).toArray();
+        const coll = getTimeseriesCollForDDLOps(db, db[collName]);
+        const chunks = findChunksUtil.findChunksByNs(configDB, coll.getFullName()).toArray();
         const chunkToMove = chunks[this.tid];
         const fromShard = chunkToMove.shard;
 
@@ -94,11 +91,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         });
         const toShard = destinationShards[Random.randInt(destinationShards.length)];
         const waitForDelete = false;
-        ChunkHelper.moveChunk(db,
-                              this.bucketPrefix + collName,
-                              [chunkToMove.min, chunkToMove.max],
-                              toShard,
-                              waitForDelete);
+        ChunkHelper.moveChunk(
+            db, coll.getName(), [chunkToMove.min, chunkToMove.max], toShard, waitForDelete);
     };
 
     $config.states.init = function init(db, collName, connCache) {};
@@ -210,8 +204,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         currentTimeStamp = this.startTime;
         for (let i = 0; i < (this.threadCount - 1); ++i) {
             currentTimeStamp += chunkRange;
-            assert.commandWorked(ChunkHelper.splitChunkAt(
-                db, this.bucketPrefix + collName, {'control.min.t': new Date(currentTimeStamp)}));
+            assert.commandWorked(
+                ChunkHelper.splitChunkAt(db,
+                                         getTimeseriesCollForDDLOps(db, db[collName]).getName(),
+                                         {'control.min.t': new Date(currentTimeStamp)}));
         }
 
         // Create an extra chunk on each shard to make sure multi:true operations return correct
@@ -219,12 +215,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const destinationShards = Object.keys(cluster.getSerializedCluster().shards);
         for (const destinationShard of destinationShards) {
             currentTimeStamp += chunkRange;
-            assert.commandWorked(ChunkHelper.splitChunkAt(
-                db, this.bucketPrefix + collName, {'control.min.t': new Date(currentTimeStamp)}));
+            assert.commandWorked(
+                ChunkHelper.splitChunkAt(db,
+                                         getTimeseriesCollForDDLOps(db, db[collName]).getName(),
+                                         {'control.min.t': new Date(currentTimeStamp)}));
 
             ChunkHelper.moveChunk(
                 db,
-                this.bucketPrefix + collName,
+                getTimeseriesCollForDDLOps(db, db[collName]).getName(),
                 [{'control.min.t': new Date(currentTimeStamp)}, {'control.min.t': MaxKey}],
                 destinationShard,
                 /*waitForDelete=*/ false);
