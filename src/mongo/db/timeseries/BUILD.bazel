@@ -141,7 +141,6 @@ mongo_cc_library(
     deps = [
         "//src/mongo/bson/column",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/collection_crud:capped_visibility",
         "//src/mongo/db/storage:storage_options",
     ],
 )

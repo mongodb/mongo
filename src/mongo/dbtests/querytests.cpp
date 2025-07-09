@@ -114,6 +114,13 @@ void insertOplogDocument(OperationContext* opCtx, Timestamp ts, StringData ns) {
     InsertStatement stmt;
     stmt.doc = doc;
     stmt.oplogSlot = OplogSlot{ts, OplogSlot::kInitialTerm};
+
+    if (coll->needsCappedLock()) {
+        // TODO SERVER-106004: Revisit this when cleaning up code around reserving oplog slots for
+        // inserts into capped collections.
+        Lock::ResourceLock heldUntilEndOfWUOW{
+            opCtx, ResourceId(RESOURCE_METADATA, coll->ns()), MODE_X};
+    }
     auto status = collection_internal::insertDocument(opCtx, *coll, stmt, nullptr);
     if (!status.isOK()) {
         std::cout << "Failed to insert oplog document: " << status.toString() << std::endl;

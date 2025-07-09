@@ -46,7 +46,6 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/virtual_collection_options.h"
-#include "mongo/db/collection_crud/capped_visibility.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -458,31 +457,6 @@ public:
     bool isCappedAndNeedsDelete(OperationContext* opCtx) const final {
         unimplementedTasserted();
         return false;
-    }
-
-    bool usesCappedSnapshots() const final {
-        return false;
-    }
-
-    std::vector<RecordId> reserveCappedRecordIds(OperationContext* opCtx, size_t nIds) const final {
-        unimplementedTasserted();
-        return {};
-    }
-
-    void registerCappedInserts(OperationContext* opCtx,
-                               const RecordId& minRecord,
-                               const RecordId& maxRecord) const final {
-        unimplementedTasserted();
-    }
-
-    CappedVisibilityObserver* getCappedVisibilityObserver() const final {
-        unimplementedTasserted();
-        return nullptr;
-    }
-
-    CappedVisibilitySnapshot takeCappedVisibilitySnapshot() const final {
-        unimplementedTasserted();
-        return {};
     }
 
     /**

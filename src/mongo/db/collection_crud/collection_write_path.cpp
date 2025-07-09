@@ -280,15 +280,6 @@ Status insertDocumentsImpl(OperationContext* opCtx,
     std::vector<Timestamp> timestamps;
     timestamps.reserve(count);
 
-    std::vector<RecordId> cappedRecordIds;
-    // For capped collections requiring capped snapshots, usually RecordIds are reserved and
-    // registered here to handle visibility. If the RecordId is provided by the caller, it is
-    // assumed the caller already reserved and properly registered the inserts in the
-    // CappedVisibilityObserver.
-    if (collection->usesCappedSnapshots() && begin->recordId.isNull()) {
-        cappedRecordIds = collection->reserveCappedRecordIds(opCtx, count);
-    }
-
     size_t i = 0;
     for (auto it = begin; it != end; it++, i++) {
         const auto& doc = it->doc;
@@ -308,8 +299,6 @@ Status insertDocumentsImpl(OperationContext* opCtx,
             // This case would only normally be called in a testing circumstance to avoid
             // automatically generating record ids for capped collections.
             recordId = it->recordId;
-        } else if (cappedRecordIds.size()) {
-            recordId = std::move(cappedRecordIds[i]);
         }
 
         if (MONGO_unlikely(corruptDocumentOnInsert.shouldFail())) {

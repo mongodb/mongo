@@ -47,7 +47,6 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
@@ -2020,29 +2019,6 @@ WiredTigerStandardCappedCursor::WiredTigerStandardCappedCursor(OperationContext*
     : WiredTigerCappedCursorBase(opCtx, ru, rs, forward) {
     init();
     initVisibility();
-}
-
-bool WiredTigerStandardCappedCursor::isVisible(const RecordId& id) {
-    if (!_forward) {
-        return true;
-    }
-    if (_cappedSnapshot && !_cappedSnapshot->isRecordVisible(id)) {
-        return false;
-    }
-    return true;
-}
-
-void WiredTigerStandardCappedCursor::initVisibility() {
-    if (_forward) {
-        // We can't enforce that the caller has initialized the capped snapshot before entering this
-        // function because we need to know, for example, what locks are held. So we expect higher
-        // layers to do so.
-        _cappedSnapshot = CappedSnapshots::get(_opCtx).getSnapshot(_ident);
-    }
-}
-
-void WiredTigerStandardCappedCursor::resetVisibility() {
-    _cappedSnapshot = boost::none;
 }
 
 WiredTigerOplogCursor::WiredTigerOplogCursor(OperationContext* opCtx,

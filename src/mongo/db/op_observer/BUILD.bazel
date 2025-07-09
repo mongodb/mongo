@@ -33,7 +33,6 @@ mongo_cc_library(
         "//src/mongo/db:keypattern.h",
         "//src/mongo/db:yieldable.h",
         "//src/mongo/db/catalog:durable_catalog_entry_metadata.h",
-        "//src/mongo/db/collection_crud:capped_visibility.h",
         "//src/mongo/db/exec:shard_filterer.h",
         "//src/mongo/db/exec:working_set.h",
         "//src/mongo/db/exec:working_set_common.h",

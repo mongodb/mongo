@@ -355,6 +355,12 @@ Status insertDocumentsSingleBatch(OperationContext* opCtx,
     }
 
     WriteUnitOfWork wunit(opCtx);
+    if (collection->get()->needsCappedLock()) {
+        // TODO SERVER-106004: Revisit this when cleaning up code around reserving oplog slots for
+        // inserts into capped collections.
+        Lock::ResourceLock heldUntilEndOfWUOW{
+            opCtx, ResourceId(RESOURCE_METADATA, collection->get()->ns()), MODE_X};
+    }
     OpDebug* const nullOpDebug = nullptr;
     auto status =
         collection_internal::insertDocuments(opCtx, *collection, begin, end, nullOpDebug, false);

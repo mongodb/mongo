@@ -290,28 +290,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool usesCappedSnapshots() const override {
-        return false;
-    }
-
-    std::vector<RecordId> reserveCappedRecordIds(OperationContext* opCtx, size_t nIds) const final {
-        MONGO_UNREACHABLE;
-    }
-
-    void registerCappedInserts(OperationContext* opCtx,
-                               const RecordId& minRecord,
-                               const RecordId& maxRecord) const override {
-        std::abort();
-    }
-
-    CappedVisibilityObserver* getCappedVisibilityObserver() const override {
-        std::abort();
-    }
-
-    CappedVisibilitySnapshot takeCappedVisibilitySnapshot() const override {
-        std::abort();
-    }
-
     long long numRecords(OperationContext* opCtx) const override {
         return 0LL;
     }

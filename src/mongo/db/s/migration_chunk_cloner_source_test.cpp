@@ -55,7 +55,6 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/collection_crud/capped_visibility.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
@@ -481,29 +480,6 @@ public:
 
     bool isCappedAndNeedsDelete(OperationContext* opCtx) const override {
         return _coll->isCappedAndNeedsDelete(opCtx);
-    }
-
-    bool usesCappedSnapshots() const override {
-        return _coll->usesCappedSnapshots();
-    }
-
-    std::vector<RecordId> reserveCappedRecordIds(OperationContext* opCtx,
-                                                 size_t nIds) const override {
-        return _coll->reserveCappedRecordIds(opCtx, nIds);
-    }
-
-    void registerCappedInserts(OperationContext* opCtx,
-                               const RecordId& minRecord,
-                               const RecordId& maxRecord) const override {
-        return _coll->registerCappedInserts(opCtx, minRecord, maxRecord);
-    }
-
-    CappedVisibilityObserver* getCappedVisibilityObserver() const override {
-        return _coll->getCappedVisibilityObserver();
-    }
-
-    CappedVisibilitySnapshot takeCappedVisibilitySnapshot() const override {
-        return _coll->takeCappedVisibilitySnapshot();
     }
 
     bool areRecordIdsReplicated() const override {

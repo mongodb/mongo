@@ -43,7 +43,6 @@
 #include "mongo/db/catalog/durable_catalog_entry_metadata.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/collection_crud/capped_visibility.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/matcher/expression.h"
@@ -492,20 +491,6 @@ public:
     virtual void updateClusteredIndexTTLSetting(OperationContext* opCtx,
                                                 boost::optional<int64_t> expireAfterSeconds) = 0;
 
-    static bool everUsesCappedSnapshots(const NamespaceString& nss) {
-        // The oplog tracks its visibility through support from the storage engine.
-        if (nss.isOplog()) {
-            return false;
-        }
-
-        // Only use the behavior for non-replicated capped collections (which can accept concurrent
-        // writes).
-        if (nss.isReplicated()) {
-            return false;
-        }
-        return true;
-    }
-
     virtual Status updateCappedSize(OperationContext* opCtx,
                                     boost::optional<long long> newCappedSize,
                                     boost::optional<long long> newCappedMax) = 0;
@@ -674,33 +659,6 @@ public:
      * exceeds cappedMaxSize or cappedMaxDocs respectively.
      */
     virtual bool isCappedAndNeedsDelete(OperationContext* opCtx) const = 0;
-
-    /**
-     * When true, this collection uses the CappedSnapshots API to track concurrent writes and safely
-     * handle visibility for readers.
-     */
-    virtual bool usesCappedSnapshots() const = 0;
-
-    virtual std::vector<RecordId> reserveCappedRecordIds(OperationContext* opCtx,
-                                                         size_t nIds) const = 0;
-
-    /**
-     * When we write to a capped collection, we call this so that that the storage engine can manage
-     * the visibility of documents to ensure they are ordered by RecordId.
-     *
-     * Since this is called inside of a WriteUnitOfWork while holding a std::mutex, it is
-     * illegal to acquire any LockManager locks inside of this function.
-     */
-    virtual void registerCappedInserts(OperationContext* opCtx,
-                                       const RecordId& minRecord,
-                                       const RecordId& maxRecord) const = 0;
-    void registerCappedInsert(OperationContext* opCtx, const RecordId& recordId) const {
-        registerCappedInserts(opCtx, recordId, recordId);
-    }
-
-    virtual CappedVisibilityObserver* getCappedVisibilityObserver() const = 0;
-    virtual CappedVisibilitySnapshot takeCappedVisibilitySnapshot() const = 0;
-
 
     //
     // Stats

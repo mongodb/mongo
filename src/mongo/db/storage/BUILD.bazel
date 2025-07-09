@@ -128,21 +128,6 @@ idl_generator(
 )
 
 mongo_cc_library(
-    name = "capped_snapshots",
-    srcs = [
-        "capped_snapshots.cpp",
-    ],
-    hdrs = [
-        "capped_snapshots.h",
-    ],
-    deps = [
-        ":recovery_unit_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo:base",
-        "//src/mongo/db/concurrency:lock_manager",
-    ],
-)
-
-mongo_cc_library(
     name = "storage_file_util",
     srcs = [
         "storage_file_util.cpp",

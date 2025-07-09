@@ -56,7 +56,6 @@
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -89,8 +88,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
-
-MONGO_FAIL_POINT_DEFINE(hangShardRoleAfterEstablishCappedSnapshot);
 
 using TransactionResources = shard_role_details::TransactionResources;
 
@@ -510,24 +507,6 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
     direct_connection_util::checkDirectShardOperationAllowed(opCtx, nss);
 
     return acquisitions;
-}
-
-/*
- * Establish a capped snapshot if necessary on the provided namespace.
- */
-void establishCappedSnapshotIfNeeded(OperationContext* opCtx,
-                                     const std::shared_ptr<const CollectionCatalog>& catalog,
-                                     const NamespaceStringOrUUID& nsOrUUID) {
-    // Avoid the costly lookup if we can determine ahead of time that this collection would never
-    // use capped snapshots.
-    if (nsOrUUID.isNamespaceString() && !Collection::everUsesCappedSnapshots(nsOrUUID.nss())) {
-        return;
-    }
-
-    auto coll = catalog->lookupCollectionByNamespaceOrUUID(opCtx, nsOrUUID);
-    if (coll && coll->usesCappedSnapshots()) {
-        CappedSnapshots::get(opCtx).establish(opCtx, coll);
-    }
 }
 
 bool haveAcquiredConsistentCatalogAndSnapshot(const CollectionCatalog* catalogBeforeSnapshot,
@@ -1131,36 +1110,6 @@ void SnapshotAttempt::changeReadSourceForSecondaryReads() {
 
 void SnapshotAttempt::openStorageSnapshot() {
     invariant(_shouldReadAtLastApplied);
-
-    // If the collection requires capped snapshots (i.e. it is unreplicated, capped, not the
-    // oplog, and not clustered), establish a capped snapshot. This must happen before opening
-    // the storage snapshot to ensure a reader using tailable cursors would not miss any writes.
-    //
-    // It is safe to establish the capped snapshot here, on the Collection object in the latest
-    // version of the catalog, even if establishConsistentCollection is eventually called to
-    // construct a Collection object from the durable catalog because the only way that can be
-    // required for a collection that uses capped snapshots (i.e. a collection that is
-    // unreplicated and capped) is:
-    //  * The present read operation is reading without a timestamp (since unreplicated
-    //  collections don't support timestamped reads), and
-    //  * When opening the storage snapshot (and thus when establishing the capped snapshot),
-    //  there was a DDL operation pending on the namespace or UUID requested for this read (because
-    //  this is the only time we need to construct a Collection object from the durable catalog for
-    //  an untimestamped read).
-    //
-    // Because DDL operations require a collection X lock, there cannot have been any ongoing
-    // concurrent writes to the collection while establishing the capped snapshot. This means
-    // that if there was a capped snapshot, it should not have contained any uncommitted writes,
-    // and so the _lowestUncommittedRecord must be null.
-    //
-    // The exception to the above is collection creation, which only requires an IX lock. Concurrent
-    // readers will have to open a Collection object from the durable catalog, and at that point it
-    // is assumed safe to establish an empty CappedSnapshot (even if the storage snapshot is already
-    // open) and cause a reader's cursor to return no data.
-    for (auto& nssOrUUID : _acquisitionRequests) {
-        establishCappedSnapshotIfNeeded(_opCtx, *_catalogBeforeSnapshot, nssOrUUID);
-    }
-    hangShardRoleAfterEstablishCappedSnapshot.pauseWhileSet(_opCtx);
 
     if (!shard_role_details::getRecoveryUnit(_opCtx)->isActive()) {
         shard_role_details::getRecoveryUnit(_opCtx)->preallocateSnapshot();

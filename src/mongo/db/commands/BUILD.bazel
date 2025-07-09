@@ -626,7 +626,6 @@ mongo_cc_library(
         "//src/mongo/db/catalog:durable_catalog_entry_metadata.h",
         "//src/mongo/db/catalog:historical_catalogid_tracker.h",
         "//src/mongo/db/catalog:views_for_database.h",
-        "//src/mongo/db/collection_crud:capped_visibility.h",
         "//src/mongo/db/exec:eof.h",
         "//src/mongo/db/exec:field_name_bloom_filter.h",
         "//src/mongo/db/exec:plan_stage.h",

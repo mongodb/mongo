@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/collection_crud/capped_visibility.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
@@ -609,17 +608,19 @@ protected:
     /**
      * Initialize any state required to enforce visibility constraints on this cursor.
      */
-    virtual void initVisibility() = 0;
+    virtual void initVisibility() {};
 
     /**
      * Returns true if a RecordId should be visible to this cursor.
      */
-    virtual bool isVisible(const RecordId& id) = 0;
+    virtual bool isVisible(const RecordId& id) {
+        return true;
+    };
 
     /**
      * Reset any visibility state on the cursor.
      */
-    virtual void resetVisibility() = 0;
+    virtual void resetVisibility() {};
 };
 
 /**
@@ -633,14 +634,6 @@ public:
                                    RecoveryUnit& ru,
                                    const WiredTigerRecordStore& rs,
                                    bool forward);
-
-protected:
-    void initVisibility() override;
-    bool isVisible(const RecordId& id) override;
-    void resetVisibility() override;
-
-private:
-    boost::optional<CappedVisibilitySnapshot> _cappedSnapshot;
 };
 
 /**

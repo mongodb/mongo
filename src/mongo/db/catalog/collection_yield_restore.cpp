@@ -33,7 +33,6 @@
 #include "mongo/db/catalog/snapshot_helper.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/direct_connection_util.h"
-#include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 
@@ -99,11 +98,6 @@ ConsistentCollection LockedCollectionYieldRestore::operator()(OperationContext* 
     // the C-style pointer to the Collection.
     if (collection->ns() != _nss) {
         return ConsistentCollection{};
-    }
-
-    // Non-lock-free readers use this path and need to re-establish their capped snapshot.
-    if (collection->usesCappedSnapshots()) {
-        CappedSnapshots::get(opCtx).establish(opCtx, collection);
     }
 
     // Check if this operation is a direct connection and if it is authorized to be one.

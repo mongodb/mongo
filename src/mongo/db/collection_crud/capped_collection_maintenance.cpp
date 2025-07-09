@@ -41,7 +41,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -60,6 +59,8 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 namespace mongo {
 namespace collection_internal {
 namespace {
@@ -75,16 +76,6 @@ public:
             _opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
             lk);
-
-        if (collection->usesCappedSnapshots()) {
-            // As is required by the API, we need to establish the capped visibility snapshot for
-            // this cursor on the new RecoveryUnit. This ensures we don't delete any records that
-            // come sequentially after any uncommitted records, which could mean we aren't actually
-            // deleting the oldest entry as we should. This is mostly a technicality and would only
-            // be an observable problem on capped collections with small limits.
-            CappedSnapshots::get(shard_role_details::getRecoveryUnit(opCtx))
-                .establish(opCtx, collection);
-        }
     }
 
     ~CappedDeleteSideTxn() {

@@ -169,7 +169,6 @@ mongo_cc_library(
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:capped_snapshots",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:exceptions",
         "//src/mongo/db/storage:mdb_catalog",
         "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
@@ -660,7 +659,6 @@ mongo_cc_library(
         "//src/mongo/db:system_index",
         "//src/mongo/db:vector_clock",
         "//src/mongo/db/collection_crud",
-        "//src/mongo/db/collection_crud:capped_visibility",
         "//src/mongo/db/commands:server_status_core",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/index:preallocated_container_pool",
@@ -671,7 +669,6 @@ mongo_cc_library(
         "//src/mongo/db/repl:repl_server_parameters",
         "//src/mongo/db/repl:repl_settings",
         "//src/mongo/db/stats:top",
-        "//src/mongo/db/storage:capped_snapshots",
         "//src/mongo/db/storage:mdb_catalog",
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/db/storage:storage_engine_common",

@@ -55,7 +55,6 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
-#include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction_resources.h"
@@ -84,8 +83,6 @@
 
 namespace mongo {
 namespace {
-
-MONGO_FAIL_POINT_DEFINE(hangAfterEstablishCappedSnapshot);
 
 const boost::optional<int> kDoNotChangeProfilingLevel = boost::none;
 
@@ -156,22 +153,6 @@ boost::optional<std::vector<NamespaceString>> resolveSecondaryNamespacesOrUUIDs(
         return boost::none;
     }
     return std::move(resolvedSecondaryNamespaces);
-}
-
-/*
- * Establish a capped snapshot if necessary on the provided namespace.
- */
-void establishCappedSnapshotIfNeeded(OperationContext* opCtx,
-                                     const std::shared_ptr<const CollectionCatalog>& catalog,
-                                     const NamespaceStringOrUUID& nsOrUUID) {
-    auto coll = catalog->lookupCollectionByNamespaceOrUUID(opCtx, nsOrUUID);
-    if (coll && coll->usesCappedSnapshots()) {
-        CappedSnapshots::get(opCtx).establish(opCtx, coll);
-        if (MONGO_unlikely(hangAfterEstablishCappedSnapshot.shouldFail())) {
-            LOGV2(7996000, "Hanging after establishing capped snapshot");
-            hangAfterEstablishCappedSnapshot.pauseWhileSet(opCtx);
-        }
-    }
 }
 
 bool haveAcquiredConsistentCatalogAndSnapshot(OperationContext* opCtx,
@@ -607,20 +588,6 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
 
         const auto resolvedSecondaryNamespaces = resolveSecondaryNamespacesOrUUIDs(
             opCtx, catalogBeforeSnapshot.get(), secondaryNssOrUUIDsBegin, secondaryNssOrUUIDsEnd);
-
-        // If the collection requires capped snapshots (i.e. it is unreplicated, capped, not the
-        // oplog, and not clustered), establish a capped snapshot. This must happen before opening
-        // the storage snapshot to ensure a reader using tailable cursors would not miss any writes.
-        // See comments in getCollectionFromCatalog for why it is safe to establish the capped
-        // snapshot here, on the Collection object in the latest version of the catalog, even if
-        // openCollection is eventually called to construct a Collection object from the durable
-        // catalog.
-        establishCappedSnapshotIfNeeded(opCtx, catalogBeforeSnapshot, nsOrUUID);
-        if (resolvedSecondaryNamespaces) {
-            for (const auto& secondaryNss : *resolvedSecondaryNamespaces) {
-                establishCappedSnapshotIfNeeded(opCtx, catalogBeforeSnapshot, {secondaryNss});
-            }
-        }
 
         shard_role_details::getRecoveryUnit(opCtx)->preallocateSnapshot();
 

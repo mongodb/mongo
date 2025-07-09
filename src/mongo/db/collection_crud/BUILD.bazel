@@ -27,25 +27,9 @@ mongo_cc_library(
         "//src/mongo/db/op_observer:op_observer_util",
         "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:capped_snapshots",
         "//src/mongo/db/storage:index_entry_comparison",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:record_store_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
-mongo_cc_library(
-    name = "capped_visibility",
-    srcs = [
-        "capped_visibility.cpp",
-    ],
-    hdrs = [
-        "capped_visibility.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db/storage:recovery_unit_base",
-        "//src/mongo/db/storage/key_string",
     ],
 )
 
@@ -54,7 +38,6 @@ mongo_cc_unit_test(
     srcs = [
         "capped_collection_test.cpp",
         "capped_utils_test.cpp",
-        "capped_visibility_test.cpp",
     ],
     tags = [
         "mongo_unittest_first_group",
@@ -63,7 +46,6 @@ mongo_cc_unit_test(
     deps = [
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/catalog:catalog_control",
-        "//src/mongo/db/collection_crud:capped_visibility",
         "//src/mongo/db/repl:oplog",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/repl:storage_interface_impl",
