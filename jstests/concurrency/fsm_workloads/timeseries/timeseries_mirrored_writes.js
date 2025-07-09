@@ -23,7 +23,7 @@ export const $config = (function() {
         metaFieldName: "meta",
         measurementFieldNames: ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"],
         numDevices: 2,
-        maxDocsPerBatch: 10,
+        maxDocsPerBatch: 50,
 
         // Used to generate unique _id's for measurements across multiple threads.
         nextIds: {},

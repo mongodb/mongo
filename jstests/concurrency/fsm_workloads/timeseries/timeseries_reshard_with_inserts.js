@@ -45,7 +45,7 @@ export const $config = (function() {
         return {x: Math.floor(Math.random() * range), y: Math.floor(Math.random() * range)};
     }
 
-    const iterations = 50;
+    const iterations = 100;
     const numInitialDocs = 5000;
     const kMaxReshardingExecutions = 4;
 

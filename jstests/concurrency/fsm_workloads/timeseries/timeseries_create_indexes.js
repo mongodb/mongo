@@ -136,7 +136,7 @@ export const $config = (function() {
 
     return {
         threadCount: 12,
-        iterations: 64,
+        iterations: 1000,
         states: states,
         startState: 'createTimeseriesColl',
         transitions: uniformDistTransitions(states),
