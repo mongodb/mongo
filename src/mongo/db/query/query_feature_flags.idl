@@ -248,6 +248,15 @@ feature_flags:
         default: false
         fcv_gated: true
 
+    featureFlagVectorSimilarityExpressions:
+        description:
+            "Feature flag to enable vector similarity expressions $similarityDotProduct,
+            $similarityCosine, and $similarityEuclidean"
+        cpp_varname: gFeatureFlagVectorSimilarity
+        default: true
+        version: 8.2
+        fcv_gated: true
+
     featureFlagPushdownFilterToIXScanWhenUsingIndexForSort:
         description: "Enables the query planner to push predicates down to the IXScan stage whenever possible in those queries where an index is leveraged to provide sorting"
         cpp_varname: gFeatureFlagPushdownFilterToIXScanWhenUsingIndexForSort

@@ -150,6 +150,13 @@ Value evaluate(const ExpressionSetUnion& expr, const Document& root, Variables* 
 Value evaluate(const ExpressionSlice& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionSize& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionZip& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionSimilarityDotProduct& expr,
+               const Document& root,
+               Variables* variables);
+Value evaluate(const ExpressionSimilarityCosine& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionSimilarityEuclidean& expr,
+               const Document& root,
+               Variables* variables);
 
 Value evaluate(const ExpressionMap& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionReduce& expr, const Document& root, Variables* variables);

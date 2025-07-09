@@ -5111,4 +5111,132 @@ Value ExpressionEncStrNormalizedEq::evaluate(const Document& root, Variables* va
     return exec::expression::evaluate(*this, root, variables);
 }
 
+/* ----------------------- ExpressionVectorSimilarity ---------------------------- */
+
+auto ExpressionVectorSimilarity::_parseInternal(ExpressionContext* const expCtx,
+                                                BSONElement expr,
+                                                const VariablesParseState& vps,
+                                                const std::string& similarityName) {
+
+    struct {
+        bool score{false};
+        std::vector<boost::intrusive_ptr<Expression>> children;
+    } parsed;
+
+    switch (expr.type()) {
+        // Concise syntax - used when only an array of vectors is supplied.
+        case BSONType::array: {
+            for (auto&& vector : expr.Array()) {
+                parsed.children.emplace_back(Expression::parseOperand(expCtx, vector, vps));
+            }
+            break;
+        }
+        // Full syntax - used to specify both vectors and whether to normalize the result.
+        case BSONType::object: {
+            for (auto&& elem : expr.Obj()) {
+                const auto field = elem.fieldNameStringData();
+                if (field == "vectors") {
+                    uassert(10413205,
+                            str::stream() << "vectors must be an array of expressions, but found "
+                                          << typeName(elem.type()),
+                            elem.type() == BSONType::array);
+                    for (auto&& vector : elem.Array()) {
+                        parsed.children.push_back(Expression::parseOperand(expCtx, vector, vps));
+                    }
+                } else if (field == "score") {
+                    uassert(10413206,
+                            str::stream()
+                                << "score must be a boolean, but found " << typeName(expr.type()),
+                            elem.type() == BSONType::boolean);
+                    parsed.score = elem.Bool();
+                } else {
+                    uasserted(10413207,
+                              str::stream() << similarityName
+                                            << " found an unknown argument: " << elem.fieldName());
+                }
+            }
+            break;
+        }
+        default: {
+            uasserted(10413208,
+                      str::stream() << similarityName
+                                    << " only supports an object or array as an argument, but found"
+                                    << typeName(expr.type()));
+        }
+    }
+
+    uassert(10413209,
+            str::stream() << similarityName << " requires exactly two vectors",
+            parsed.children.size() == 2);
+
+    return parsed;
+}
+
+Value ExpressionVectorSimilarity::serialize(const SerializationOptions& options) const {
+    vector<Value> serializedChildren;
+    for (auto&& expr : _children) {
+        serializedChildren.push_back(expr.get()->serialize(options));
+    }
+
+    return Value(DOC(
+        getOpName() << DOC("vectors" << Value(serializedChildren) << "score" << Value(_score))));
+}
+
+/* ----------------------- ExpressionSimilarityDotProduct ---------------------------- */
+
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(similarityDotProduct,
+                                      ExpressionSimilarityDotProduct::parse,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      &feature_flags::gFeatureFlagVectorSimilarity);
+
+intrusive_ptr<Expression> ExpressionSimilarityDotProduct::parse(ExpressionContext* const expCtx,
+                                                                BSONElement expr,
+                                                                const VariablesParseState& vps) {
+    auto [score, children] = _parseInternal(expCtx, expr, vps, kName.data());
+    return new ExpressionSimilarityDotProduct(expCtx, score, std::move(children));
+}
+
+Value ExpressionSimilarityDotProduct::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+
+/* ----------------------- ExpressionSimilarityCosine ---------------------------- */
+
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(similarityCosine,
+                                      ExpressionSimilarityCosine::parse,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      &feature_flags::gFeatureFlagVectorSimilarity);
+
+intrusive_ptr<Expression> ExpressionSimilarityCosine::parse(ExpressionContext* const expCtx,
+                                                            BSONElement expr,
+                                                            const VariablesParseState& vps) {
+    auto [score, children] = _parseInternal(expCtx, expr, vps, kName.data());
+    return new ExpressionSimilarityCosine(expCtx, score, std::move(children));
+}
+
+Value ExpressionSimilarityCosine::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+/* ----------------------- ExpressionSimilarityEuclidean ---------------------------- */
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(similarityEuclidean,
+                                      ExpressionSimilarityEuclidean::parse,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      &feature_flags::gFeatureFlagVectorSimilarity);
+
+intrusive_ptr<Expression> ExpressionSimilarityEuclidean::parse(ExpressionContext* const expCtx,
+                                                               BSONElement expr,
+                                                               const VariablesParseState& vps) {
+    auto [score, children] = _parseInternal(expCtx, expr, vps, kName.data());
+    return new ExpressionSimilarityEuclidean(expCtx, score, std::move(children));
+}
+
+Value ExpressionSimilarityEuclidean::evaluate(const Document& root, Variables* variables) const {
+    return exec::expression::evaluate(*this, root, variables);
+}
+
 }  // namespace mongo

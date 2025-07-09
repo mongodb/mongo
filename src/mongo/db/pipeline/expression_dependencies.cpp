@@ -119,6 +119,9 @@ public:
     void visit(const ExpressionSetIntersection*) override {}
     void visit(const ExpressionSetIsSubset*) override {}
     void visit(const ExpressionSetUnion*) override {}
+    void visit(const ExpressionSimilarityDotProduct*) override {}
+    void visit(const ExpressionSimilarityCosine*) override {}
+    void visit(const ExpressionSimilarityEuclidean*) override {}
     void visit(const ExpressionSize*) override {}
     void visit(const ExpressionReverseArray*) override {}
     void visit(const ExpressionSortArray*) override {}

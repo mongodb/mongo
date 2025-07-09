@@ -326,6 +326,9 @@ public:
     void visit(const ExpressionSetIntersection* expr) final {}
     void visit(const ExpressionSetIsSubset* expr) final {}
     void visit(const ExpressionSetUnion* expr) final {}
+    void visit(const ExpressionSimilarityDotProduct* expr) final {}
+    void visit(const ExpressionSimilarityCosine* expr) final {}
+    void visit(const ExpressionSimilarityEuclidean* expr) final {}
     void visit(const ExpressionSize* expr) final {}
     void visit(const ExpressionReverseArray* expr) final {}
     void visit(const ExpressionSortArray* expr) final {}
@@ -509,6 +512,9 @@ public:
     void visit(const ExpressionSetIntersection* expr) final {}
     void visit(const ExpressionSetIsSubset* expr) final {}
     void visit(const ExpressionSetUnion* expr) final {}
+    void visit(const ExpressionSimilarityDotProduct* expr) final {}
+    void visit(const ExpressionSimilarityCosine* expr) final {}
+    void visit(const ExpressionSimilarityEuclidean* expr) final {}
     void visit(const ExpressionSize* expr) final {}
     void visit(const ExpressionReverseArray* expr) final {}
     void visit(const ExpressionSortArray* expr) final {}
@@ -2593,6 +2599,18 @@ public:
         }
 
         generateSetExpression(expr, SetOperation::Union);
+    }
+
+    void visit(const ExpressionSimilarityDotProduct* expr) final {
+        unsupportedExpression(expr->getOpName());
+    }
+
+    void visit(const ExpressionSimilarityCosine* expr) final {
+        unsupportedExpression(expr->getOpName());
+    }
+
+    void visit(const ExpressionSimilarityEuclidean* expr) final {
+        unsupportedExpression(expr->getOpName());
     }
 
     void visit(const ExpressionSize* expr) final {

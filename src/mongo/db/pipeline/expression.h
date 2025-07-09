@@ -3042,6 +3042,115 @@ public:
     }
 };
 
+class ExpressionVectorSimilarity : public Expression {
+public:
+    ExpressionVectorSimilarity(ExpressionContext* const expCtx,
+                               bool score,
+                               std::vector<boost::intrusive_ptr<Expression>> children)
+        : Expression(expCtx, std::move(children)), _score(score) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
+    virtual const char* getOpName() const = 0;
+    Value evaluate(const Document& root, Variables* variables) const override = 0;
+
+    Value serialize(const SerializationOptions& options = {}) const final;
+
+    bool isScore() const {
+        return _score;
+    }
+
+protected:
+    bool _score;
+    static auto _parseInternal(ExpressionContext* expCtx,
+                               BSONElement expr,
+                               const VariablesParseState& vps,
+                               const std::string& similarityName);
+};
+
+class ExpressionSimilarityDotProduct final : public ExpressionVectorSimilarity {
+public:
+    static constexpr auto kName = "$similarityDotProduct"_sd;
+
+    ExpressionSimilarityDotProduct(ExpressionContext* const expCtx,
+                                   bool score,
+                                   std::vector<boost::intrusive_ptr<Expression>> children)
+        : ExpressionVectorSimilarity(expCtx, score, std::move(children)) {}
+
+    Value evaluate(const Document& root, Variables* variables) const override;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vpsIn);
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    const char* getOpName() const override {
+        return kName.data();
+    }
+};
+
+class ExpressionSimilarityCosine final : public ExpressionVectorSimilarity {
+public:
+    static constexpr auto kName = "$similarityCosine"_sd;
+
+    ExpressionSimilarityCosine(ExpressionContext* const expCtx,
+                               bool score,
+                               std::vector<boost::intrusive_ptr<Expression>> children)
+        : ExpressionVectorSimilarity(expCtx, score, std::move(children)) {}
+
+    Value evaluate(const Document& root, Variables* variables) const override;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vpsIn);
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    const char* getOpName() const override {
+        return kName.data();
+    }
+};
+
+class ExpressionSimilarityEuclidean final : public ExpressionVectorSimilarity {
+public:
+    static constexpr auto kName = "$similarityEuclidean"_sd;
+
+    ExpressionSimilarityEuclidean(ExpressionContext* const expCtx,
+                                  bool score,
+                                  std::vector<boost::intrusive_ptr<Expression>> children)
+        : ExpressionVectorSimilarity(expCtx, score, std::move(children)) {}
+
+    Value evaluate(const Document& root, Variables* variables) const override;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vpsIn);
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    const char* getOpName() const override {
+        return kName.data();
+    }
+};
 
 class ExpressionSize final : public ExpressionFixedArity<ExpressionSize, 1> {
 public:

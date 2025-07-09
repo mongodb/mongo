@@ -100,6 +100,9 @@ class ExpressionSetEquals;
 class ExpressionSetIntersection;
 class ExpressionSetIsSubset;
 class ExpressionSetUnion;
+class ExpressionSimilarityDotProduct;
+class ExpressionSimilarityCosine;
+class ExpressionSimilarityEuclidean;
 class ExpressionSize;
 class ExpressionReverseArray;
 class ExpressionSortArray;
@@ -290,6 +293,11 @@ public:
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSetIntersection>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSetIsSubset>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSetUnion>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst, ExpressionSimilarityDotProduct>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSimilarityCosine>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst, ExpressionSimilarityEuclidean>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSize>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionReverseArray>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSortArray>) = 0;
@@ -492,6 +500,9 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionSetIntersection*) override {}
     void visit(const ExpressionSetIsSubset*) override {}
     void visit(const ExpressionSetUnion*) override {}
+    void visit(const ExpressionSimilarityDotProduct*) override {}
+    void visit(const ExpressionSimilarityCosine*) override {}
+    void visit(const ExpressionSimilarityEuclidean*) override {}
     void visit(const ExpressionSize*) override {}
     void visit(const ExpressionReverseArray*) override {}
     void visit(const ExpressionSortArray*) override {}

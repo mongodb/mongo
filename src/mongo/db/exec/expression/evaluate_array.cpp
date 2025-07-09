@@ -611,6 +611,160 @@ Value evaluate(const ExpressionSetUnion& expr, const Document& root, Variables* 
     return Value(std::vector<Value>(unionedSet.begin(), unionedSet.end()));
 }
 
+namespace {
+/*
+ * Ensure both arguments to a vector similarity algorithm are arrays of numeric values of the same
+ * size.
+ */
+std::pair<std::vector<Value>, std::vector<Value>> validate(const Value& val1,
+                                                           const Value& val2,
+                                                           const std::string& opName) {
+
+    uassert(10413200,
+            str::stream() << "First argument to " << opName
+                          << " must be an array, but is of type: " << typeName(val1.getType()),
+            val1.isArray());
+
+    uassert(10413201,
+            str::stream() << "Second argument to " << opName
+                          << " must be an array, but is of type: " << typeName(val2.getType()),
+            val2.isArray());
+
+    const auto& array1 = val1.getArray();
+    const auto& array2 = val2.getArray();
+
+    uassert(10413202,
+            str::stream() << "Array arguments to " << opName
+                          << " must be the same size, but the first is of size "
+                          << std::to_string(array1.size()) << " and the second is of size "
+                          << std::to_string(array2.size()),
+            array1.size() == array2.size());
+
+    uassert(10413203,
+            str::stream() << "All elements in the first argument to " << opName
+                          << " must be numeric",
+            std::all_of(array1.begin(), array1.end(), [](const auto& e) { return e.numeric(); }));
+
+    uassert(10413204,
+            str::stream() << "All elements in the second argument to " << opName
+                          << " must be numeric",
+            std::all_of(array2.begin(), array2.end(), [](const auto& e) { return e.numeric(); }));
+
+    return {array1, array2};
+}
+
+/*
+ * Calculate the dot product of array1 and array2.
+ */
+double calculateDotProduct(const std::vector<Value>& array1, const std::vector<Value>& array2) {
+    double sum = 0;
+    for (size_t i = 0; i < array1.size(); i++) {
+        sum += array1[i].coerceToDouble() * array2[i].coerceToDouble();
+    }
+
+    return sum;
+}
+
+/*
+ * Calculate the euclidean product of array1 and array2.
+ */
+double calculateEuclideanDistance(const std::vector<Value>& array1,
+                                  const std::vector<Value>& array2) {
+    double sum = 0;
+    for (size_t i = 0; i < array1.size(); i++) {
+        auto difference = array1[i].coerceToDouble() - array2[i].coerceToDouble();
+        sum += std::pow(difference, 2);
+    }
+
+    return std::sqrt(sum);
+}
+
+/*
+ * Calculate the magnitude of a vector.
+ */
+double calculateMagnitude(const std::vector<Value>& vector) {
+    double sum = 0;
+    for (size_t i = 0; i < vector.size(); ++i) {
+        double d = vector[i].coerceToDouble();
+        sum += std::pow(d, 2);
+    }
+    return std::sqrt(sum);
+}
+
+/*
+ * Calculate the cosine similarity of array1 and array2.
+ */
+double calculateCosineSimilarity(const std::vector<Value>& array1,
+                                 const std::vector<Value>& array2) {
+    const auto magnitudeProduct = calculateMagnitude(array1) * calculateMagnitude(array2);
+
+    // Avoid division by zero.
+    if (magnitudeProduct == 0) {
+        return 0;
+    }
+
+    return calculateDotProduct(array1, array2) / magnitudeProduct;
+}
+
+Value evaluateSimilarity(
+    const ExpressionVectorSimilarity& expr,
+    const Document& root,
+    Variables* variables,
+    std::function<double(const std::vector<Value>&, const std::vector<Value>&)> calculateSimilarity,
+    std::function<double(double)> normalize) {
+    const auto& children = expr.getChildren();
+    const Value arrayVal1 = children[0]->evaluate(root, variables);
+    const Value arrayVal2 = children[1]->evaluate(root, variables);
+
+    if (arrayVal1.nullish() || arrayVal2.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    const auto& [array1, array2] = validate(arrayVal1, arrayVal2, expr.getOpName());
+    const auto similarity = calculateSimilarity(array1, array2);
+
+    return Value(expr.isScore() ? normalize(similarity) : similarity);
+}
+
+}  // namespace
+
+Value evaluate(const ExpressionSimilarityDotProduct& expr,
+               const Document& root,
+               Variables* variables) {
+    // Normalize according to the corresponding formula defined in the Atlas documentation at the
+    // link below.
+    // https://www.mongodb.com/docs/atlas/atlas-vector-search/vector-search-stage/#atlas-vector-search-score
+    const auto normalizeDotProduct = [](double dotProduct) {
+        return (1 + dotProduct) / 2;
+    };
+
+    return evaluateSimilarity(expr, root, variables, calculateDotProduct, normalizeDotProduct);
+}
+
+Value evaluate(const ExpressionSimilarityCosine& expr, const Document& root, Variables* variables) {
+    // Normalize according to the corresponding formula defined in the Atlas documentation at the
+    // link below.
+    // https://www.mongodb.com/docs/atlas/atlas-vector-search/vector-search-stage/#atlas-vector-search-score
+    const auto normalizeCosine = [](double cosine) {
+        return (1 + cosine) / 2;
+    };
+
+    return evaluateSimilarity(expr, root, variables, calculateCosineSimilarity, normalizeCosine);
+}
+
+Value evaluate(const ExpressionSimilarityEuclidean& expr,
+               const Document& root,
+               Variables* variables) {
+    // Normalize according to the corresponding formula defined in the Atlas documentation at the
+    // link below.
+    // https://www.mongodb.com/docs/atlas/atlas-vector-search/vector-search-stage/#atlas-vector-search-score
+    const auto normalizeDistance = [](double dist) {
+        return 1 / (1 + dist);
+    };
+
+    return evaluateSimilarity(expr, root, variables, calculateEuclideanDistance, normalizeDistance);
+}
+
 Value evaluate(const ExpressionSlice& expr, const Document& root, Variables* variables) {
     auto& children = expr.getChildren();
     const size_t n = children.size();

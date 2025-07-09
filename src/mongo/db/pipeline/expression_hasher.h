@@ -112,6 +112,9 @@ public:
         kSetIntersection,
         kSetIsSubset,
         kSetUnion,
+        kDotProduct,
+        kCosineSimilarity,
+        kEuclideanDistance,
         kSize,
         kReverseArray,
         kSortArray,
@@ -496,6 +499,18 @@ public:
 
     void visit(const ExpressionSetUnion* expr) final {
         combine(OpType::kSetUnion);
+    }
+
+    void visit(const ExpressionSimilarityDotProduct* expr) final {
+        combine(OpType::kDotProduct);
+    }
+
+    void visit(const ExpressionSimilarityCosine* expr) final {
+        combine(OpType::kCosineSimilarity);
+    }
+
+    void visit(const ExpressionSimilarityEuclidean* expr) final {
+        combine(OpType::kEuclideanDistance);
     }
 
     void visit(const ExpressionSize* expr) final {
