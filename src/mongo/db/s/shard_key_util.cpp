@@ -52,6 +52,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/create_indexes_gen.h"
@@ -393,9 +394,8 @@ void validateShardKeyIsNotEncrypted(OperationContext* opCtx,
 
 std::vector<BSONObj> ValidationBehaviorsShardCollection::loadIndexes(
     const NamespaceString& nss) const {
-    const bool includeBuildUUIDs = false;
-    const int options = 0;
-    std::list<BSONObj> indexes = _localClient->getIndexSpecs(nss, includeBuildUUIDs, options);
+    std::list<BSONObj> indexes =
+        listIndexesEmptyListIfMissing(_opCtx, nss, ListIndexesInclude::Nothing);
     // Convert std::list to a std::vector.
     return std::vector<BSONObj>{std::make_move_iterator(std::begin(indexes)),
                                 std::make_move_iterator(std::end(indexes))};
