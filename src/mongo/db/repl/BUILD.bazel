@@ -1108,6 +1108,19 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "slotted_timestamp_list",
+    srcs = [
+        "slotted_timestamp_list.h",
+    ],
+    hdrs = [
+        "slotted_timestamp_list.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
     name = "replication_auth",
     srcs = [
         "replication_auth.cpp",
@@ -1567,6 +1580,7 @@ mongo_cc_library(
         "replication_process",
         "reporter",
         "scatter_gather",
+        "slotted_timestamp_list",
         "topology_coordinator",
         "//src/mongo/db:common",
         "//src/mongo/db:mongod_options",
@@ -1951,6 +1965,18 @@ mongo_cc_library(
         ":serveronly_repl",
         "//src/mongo:base",
         "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "slotted_timestamp_list_test",
+    srcs = [
+        "slotted_timestamp_list_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/repl:slotted_timestamp_list",
     ],
 )
 
@@ -2363,6 +2389,17 @@ mongo_cc_benchmark(
         ":oplog_application",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/query/stats:stats_test_utils",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "slotted_timestamp_list_bm",
+    srcs = [
+        "slotted_timestamp_list.h",
+        "slotted_timestamp_list_bm.cpp",
+    ],
+    tags = ["repl_bm"],
+    deps = [
     ],
 )
 
