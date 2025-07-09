@@ -571,7 +571,7 @@ bool tryToInsertIntoBucketWithoutRollover(BucketCatalog& catalog,
                                           const TimeseriesOptions& timeseriesOptions,
                                           const StripeNumber& stripeNumber,
                                           ExecutionStatsController& stats,
-                                          uint64_t storageCacheSizeBytes,
+                                          const uint64_t storageCacheSizeBytes,
                                           const StringDataComparator* comparator,
                                           Bucket& bucket,
                                           std::shared_ptr<WriteBatch>& writeBatch) {
@@ -783,16 +783,18 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
     return it->second.oid;
 }
 
-std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(uint64_t storageCacheSizeBytes,
-                                                         uint32_t workloadCardinality) {
-    if (workloadCardinality == 0) {
+std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(const uint64_t storageCacheSizeBytes,
+                                                         const int64_t workloadCardinality) {
+    // Global statistics can transiently be negative.
+    if (workloadCardinality <= 0) {
         return {gTimeseriesBucketMaxSize, INT_MAX};
     }
 
     uint64_t intMax = static_cast<uint64_t>(std::numeric_limits<int32_t>::max());
-    int32_t derivedMaxSize = std::max(
-        static_cast<int32_t>(std::min(storageCacheSizeBytes / (2 * workloadCardinality), intMax)),
-        gTimeseriesBucketMinSize.load());
+    uint64_t dynamicMaxSize =
+        storageCacheSizeBytes / static_cast<uint64_t>(2 * workloadCardinality);
+    int32_t derivedMaxSize = std::max(static_cast<int32_t>(std::min(dynamicMaxSize, intMax)),
+                                      gTimeseriesBucketMinSize.load());
     return {std::min(gTimeseriesBucketMaxSize, derivedMaxSize), derivedMaxSize};
 }
 
@@ -1144,10 +1146,10 @@ void updateRolloverStats(ExecutionStatsController& stats, const RolloverReason r
 RolloverReason determineRolloverReason(const BSONObj& doc,
                                        const TimeseriesOptions& timeseriesOptions,
                                        Bucket& bucket,
-                                       uint32_t numberOfActiveBuckets,
+                                       const int64_t numberOfActiveBuckets,
                                        const Sizes& sizesToBeAdded,
                                        const Date_t& time,
-                                       uint64_t storageCacheSizeBytes,
+                                       const uint64_t storageCacheSizeBytes,
                                        const StringDataComparator* comparator,
                                        ExecutionStatsController& stats) {
     auto bucketTime = bucket.minTime;
@@ -1279,17 +1281,18 @@ void closeArchivedBucket(BucketCatalog& catalog, const BucketId& bucketId) {
     stopTrackingBucketState(catalog.bucketStateRegistry, bucketId);
 }
 
-bool stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,
-                                        const OperationId opId,
-                                        const StringDataComparator* comparator,
-                                        BatchedInsertContext& batch,
-                                        Stripe& stripe,
-                                        WithLock stripeLock,
-                                        uint64_t storageCacheSizeBytes,
-                                        Bucket& eligibleBucket,
-                                        size_t& currentPosition,
-                                        std::shared_ptr<WriteBatch>& writeBatch) {
+StageInsertBatchResult stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,
+                                                          const OperationId opId,
+                                                          const StringDataComparator* comparator,
+                                                          BatchedInsertContext& batch,
+                                                          Stripe& stripe,
+                                                          WithLock stripeLock,
+                                                          uint64_t storageCacheSizeBytes,
+                                                          Bucket& eligibleBucket,
+                                                          size_t& currentPosition,
+                                                          std::shared_ptr<WriteBatch>& writeBatch) {
     invariant(currentPosition < batch.measurementsTimesAndIndices.size());
+    bool anySuccessfulInserts = false;
     while (currentPosition < batch.measurementsTimesAndIndices.size()) {
         if (!tryToInsertIntoBucketWithoutRollover(
                 catalog,
@@ -1303,11 +1306,15 @@ bool stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,
                 storageCacheSizeBytes,
                 comparator,
                 eligibleBucket,
-                writeBatch))
-            return false;
+                writeBatch)) {
+            return anySuccessfulInserts ? StageInsertBatchResult::RolloverNeeded
+                                        : StageInsertBatchResult::NoMeasurementsStaged;
+        }
         ++currentPosition;
+        anySuccessfulInserts = true;
     }
-    return true;
+
+    return StageInsertBatchResult::Success;
 }
 
 void addMeasurementToBatchAndBucket(BucketCatalog& catalog,

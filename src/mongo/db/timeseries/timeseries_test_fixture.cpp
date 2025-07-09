@@ -504,7 +504,7 @@ void TimeseriesTestFixture::_stageInsertOneBatchIntoEligibleBucketHelper(
         *bucket,
         currentPosition,
         writeBatch);
-    ASSERT(successfulInsertion);
+    ASSERT_EQ(successfulInsertion, bucket_catalog::internal::StageInsertBatchResult::Success);
     ASSERT_EQ(currentPosition, batch.measurementsTimesAndIndices.size());
 }
 

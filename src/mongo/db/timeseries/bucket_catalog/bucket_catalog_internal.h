@@ -71,6 +71,12 @@ using BatchedInsertTuple = std::tuple<BSONObj, Date_t, UserBatchIndex>;
 using BucketDocumentValidator =
     std::function<std::pair<Collection::SchemaValidationResult, Status>(const BSONObj&)>;
 
+enum class StageInsertBatchResult {
+    Success,
+    RolloverNeeded,
+    NoMeasurementsStaged,
+};
+
 /**
  * Mode to signal to 'removeBucket' what's happening to the bucket, and how to handle the bucket
  * state change.
@@ -261,7 +267,7 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
  * sizes and the raw value.
  */
 std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(uint64_t storageCacheSizeBytes,
-                                                         uint32_t workloadCardinality);
+                                                         int64_t workloadCardinality);
 
 /**
  * Returns an archived bucket eligible for new insert with 'time'.
@@ -366,7 +372,7 @@ Bucket& allocateBucket(BucketCatalog& catalog,
 RolloverReason determineRolloverReason(const BSONObj& doc,
                                        const TimeseriesOptions& timeseriesOptions,
                                        Bucket& bucket,
-                                       uint32_t numberOfActiveBuckets,
+                                       int64_t numberOfActiveBuckets,
                                        const Sizes& sizesToBeAdded,
                                        const Date_t& time,
                                        uint64_t storageCacheSizeBytes,
@@ -427,16 +433,16 @@ void closeArchivedBucket(BucketCatalog& catalog, const BucketId& bucketId);
  * inserted into the provided bucket, returns true. Otherwise, returns false.
  * Also increments `currentPosition` to one past the index of the last measurement inserted.
  */
-bool stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,
-                                        OperationId opId,
-                                        const StringDataComparator* comparator,
-                                        BatchedInsertContext& batch,
-                                        Stripe& stripe,
-                                        WithLock stripeLock,
-                                        uint64_t storageCacheSizeBytes,
-                                        Bucket& eligibleBucket,
-                                        size_t& currentPosition,
-                                        std::shared_ptr<WriteBatch>& writeBatch);
+StageInsertBatchResult stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,
+                                                          OperationId opId,
+                                                          const StringDataComparator* comparator,
+                                                          BatchedInsertContext& batch,
+                                                          Stripe& stripe,
+                                                          WithLock stripeLock,
+                                                          uint64_t storageCacheSizeBytes,
+                                                          Bucket& eligibleBucket,
+                                                          size_t& currentPosition,
+                                                          std::shared_ptr<WriteBatch>& writeBatch);
 
 /**
  * Given an already-selected 'bucket', inserts the measurement in 'batchedInsertTuple' to the bucket

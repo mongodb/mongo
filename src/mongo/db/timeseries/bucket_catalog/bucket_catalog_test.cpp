@@ -406,16 +406,17 @@ std::shared_ptr<bucket_catalog::WriteBatch> BucketCatalogTest::_insertOneWithout
     size_t currentPosition = 0;
     std::shared_ptr<bucket_catalog::WriteBatch> writeBatch =
         activeBatch(catalog.trackingContexts, bucket, opId, batchedInsertCtx.stripeNumber, stats);
-    ASSERT(bucket_catalog::internal::stageInsertBatchIntoEligibleBucket(catalog,
-                                                                        opId,
-                                                                        collator,
-                                                                        batchedInsertCtx,
-                                                                        stripe,
-                                                                        WithLock::withoutLock(),
-                                                                        _storageCacheSizeBytes,
-                                                                        bucket,
-                                                                        currentPosition,
-                                                                        writeBatch));
+    ASSERT_EQ(bucket_catalog::internal::StageInsertBatchResult::Success,
+              bucket_catalog::internal::stageInsertBatchIntoEligibleBucket(catalog,
+                                                                           opId,
+                                                                           collator,
+                                                                           batchedInsertCtx,
+                                                                           stripe,
+                                                                           WithLock::withoutLock(),
+                                                                           _storageCacheSizeBytes,
+                                                                           bucket,
+                                                                           currentPosition,
+                                                                           writeBatch));
 
     return writeBatch;
 }
@@ -1096,9 +1097,11 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
                            *bucketToInsertInto,
                            RolloverReason::kSchemaChange);
         if (i == (numMeasurementsInWriteBatch.size() - 1)) {
-            ASSERT(successfulInsertion);
+            ASSERT_EQ(successfulInsertion,
+                      bucket_catalog::internal::StageInsertBatchResult::Success);
         } else {
-            ASSERT(!successfulInsertion);
+            ASSERT_NE(successfulInsertion,
+                      bucket_catalog::internal::StageInsertBatchResult::Success);
         }
     }
 }
