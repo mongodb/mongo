@@ -55,8 +55,8 @@ for (let i = 0; i < conf.members.length; i++) {
 }
 reconfig(st.configRS, conf);
 jsTest.log('Partitioning the config server primary from the mongos');
-configPrimary.discardMessagesFrom(st.s, 1.0);
-st.s.discardMessagesFrom(configPrimary, 1.0);
+configPrimary.rejectConnectionsFrom(st.s);
+st.s.rejectConnectionsFrom(configPrimary);
 
 assert.commandWorked(testDB.adminCommand({flushRouterConfig: 1}));
 
@@ -100,7 +100,7 @@ assert.lt(0, configDB.chunks.find().count());
 assert.lt(0, configDB.chunks.aggregate().itcount());
 
 jsTest.log('Remove network partition before tearing down');
-configPrimary.discardMessagesFrom(st.s, 0.0);
-st.s.discardMessagesFrom(configPrimary, 0.0);
+configPrimary.acceptConnectionsFrom(st.s);
+st.s.acceptConnectionsFrom(configPrimary);
 
 st.stop();
