@@ -5,6 +5,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
@@ -600,6 +601,7 @@ export const ResumableIndexBuildTest = class {
         const defaultOptions = {noCleanData: true, setParameter: setParameter};
         upg.start(conn, Object.assign(defaultOptions, options || {}));
         reconnect(conn);
+        upg.waitForState(conn, [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY]);
 
         if (shouldComplete) {
             // Ensure that the index builds were completed upon the node starting back up.
@@ -857,6 +859,7 @@ export const ResumableIndexBuildTest = class {
 
         rst.start(resumeNode, {noCleanData: true});
         reconnect(resumeNode);
+        rst.waitForState(resumeNode, [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY]);
         otherNodeFp.off();
 
         // Ensure that the index build was completed upon the node starting back up.
