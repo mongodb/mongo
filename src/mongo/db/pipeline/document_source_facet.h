@@ -93,28 +93,9 @@ public:
         FacetPipeline(std::string name, std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
             : name(std::move(name)), pipeline(std::move(pipeline)) {}
 
-
-        // TODO SERVER-105370: Remove this lazy 'exec::agg::Pipeline' creation during the
-        // refactoring of this stage.
-        exec::agg::Pipeline& getExecPipeline() {
-            if (!execPipeline) {
-                execPipeline =
-                    exec::agg::buildPipeline(this->pipeline->getSources(), pipeline->getContext());
-            }
-            return *execPipeline;
-        }
-
-        const exec::agg::Pipeline& getExecPipeline() const {
-            if (!execPipeline) {
-                execPipeline =
-                    exec::agg::buildPipeline(this->pipeline->getSources(), pipeline->getContext());
-            }
-            return *execPipeline;
-        }
-
         std::string name;
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
-        mutable std::unique_ptr<exec::agg::Pipeline> execPipeline;
+        std::unique_ptr<exec::agg::Pipeline> execPipeline;
     };
 
     class LiteParsed final : public LiteParsedDocumentSourceNestedPipelines {

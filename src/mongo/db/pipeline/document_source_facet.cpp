@@ -199,6 +199,13 @@ DocumentSource::GetNextResult DocumentSourceFacet::doGetNext() {
         return GetNextResult::makeEOF();
     }
 
+    // Create execution pipeline for each facet (this code is executed only once).
+    for (auto&& facet : _facets) {
+        tassert(10616300, "facet execution pipeline is already initialized", !facet.execPipeline);
+        facet.execPipeline =
+            exec::agg::buildPipeline(facet.pipeline->getSources(), facet.pipeline->getContext());
+    }
+
     const size_t maxBytes = _maxOutputDocSizeBytes;
     auto ensureUnderMemoryLimit = [usedBytes = 0ul, &maxBytes](long long additional) mutable {
         usedBytes += additional;
@@ -213,7 +220,7 @@ DocumentSource::GetNextResult DocumentSourceFacet::doGetNext() {
     while (!allPipelinesEOF) {
         allPipelinesEOF = true;  // Set this to false if any pipeline isn't EOF.
         for (size_t facetId = 0; facetId < _facets.size(); ++facetId) {
-            auto& execPipeline = _facets[facetId].getExecPipeline();
+            auto& execPipeline = *_facets[facetId].execPipeline;
             auto next = execPipeline.getNextResult();
             for (; next.isAdvanced(); next = execPipeline.getNextResult()) {
                 ensureUnderMemoryLimit(next.getDocument().getApproximateSize());
@@ -241,7 +248,7 @@ Value DocumentSourceFacet::serialize(const SerializationOptions& opts) const {
             bool canAddExecPipelineExplain =
                 opts.verbosity >= ExplainOptions::Verbosity::kExecStats && facet.execPipeline;
             auto explain = canAddExecPipelineExplain
-                ? mergeExplains(*facet.pipeline, facet.getExecPipeline(), opts)
+                ? mergeExplains(*facet.pipeline, *facet.execPipeline, opts)
                 : facet.pipeline->writeExplainOps(opts);
             serialized[opts.serializeFieldPathFromString(facet.name)] = Value(explain);
         } else {
@@ -315,7 +322,7 @@ void DocumentSourceFacet::reattachSourceToOperationContext(OperationContext* opC
 bool DocumentSourceFacet::validateOperationContext(const OperationContext* opCtx) const {
     return getContext()->getOperationContext() == opCtx &&
         std::all_of(_facets.begin(), _facets.end(), [opCtx](const auto& f) {
-               return f.getExecPipeline().validateOperationContext(opCtx);
+               return (!f.execPipeline || f.execPipeline->validateOperationContext(opCtx));
            });
 }
 
