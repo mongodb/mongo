@@ -32,17 +32,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/overloaded_visitor.h"
-#include "mongo/util/system_clock_source.h"
 namespace mongo {
-RateLimiter::WindowBasedPolicy::WindowBasedPolicy(RequestCount requestLimit,
-                                                  Milliseconds timePeriod,
-                                                  ClockSource* clockSource)
-    : _clockSource(clockSource != nullptr ? clockSource : SystemClockSource::get()),
-      _requestLimit(requestLimit),
-      _timePeriod(timePeriod),
-      _windowStart(_clockSource->now()),
-      _prevCount(0),
-      _currentCount(0) {}
 
 Date_t RateLimiter::WindowBasedPolicy::tickWindow() {
     Date_t currentTime = _clockSource->now();
@@ -85,27 +75,22 @@ bool RateLimiter::WindowBasedPolicy::handle() {
     return false;
 }
 
-RateLimiter::SampleBasedPolicy::SampleBasedPolicy(SampleRate samplingRate, uint64_t randomSeed)
-    : _prng(randomSeed), _samplingRate(samplingRate) {}
-
 bool RateLimiter::SampleBasedPolicy::handle() {
     SampleRate curRate = _samplingRate.load();
-    return _prng.nextUInt32(kDenominator) < curRate;
+    thread_local PseudoRandom prng{_randomSeed.load()};
+    return prng.nextUInt32(kDenominator) < curRate;
 }
 
 bool RateLimiter::handle() {
-    return std::visit([](auto& arg) { return arg.handle(); }, _policy);
+    if (_mode.load() == RateLimiter::PolicyType::kWindowBasedPolicy) {
+        return _windowPolicy.handle();
+    } else {
+        return _samplePolicy.handle();
+    }
 }
 
-
 RateLimiter::PolicyType RateLimiter::getPolicyType() const {
-    return std::visit(OverloadedVisitor{[&](const WindowBasedPolicy&) {
-                                            return RateLimiter::PolicyType::kWindowBasedPolicy;
-                                        },
-                                        [&](const SampleBasedPolicy&) {
-                                            return RateLimiter::PolicyType::kSampleBasedPolicy;
-                                        }},
-                      _policy);
+    return _mode.load();
 }
 
 int RateLimiter::roundSampleRateToPerThousand(double samplingRate) {

@@ -34,24 +34,28 @@
 namespace mongo {
 
 TEST(RateLimiterTest, SlidingWindowSucceeds) {
-    auto rl = RateLimiter::createWindowBased(1, Hours{1});
+    auto rl = std::make_unique<RateLimiter>();
+    rl->configureWindowBased(1);
     ASSERT_TRUE(rl->handle());
 }
 
 TEST(RateLimiterTest, SlidingWindowFails) {
-    auto rl = RateLimiter::createWindowBased(0, Hours{1});
+    auto rl = std::make_unique<RateLimiter>();
+    rl->configureWindowBased(0);
     ASSERT_FALSE(rl->handle());
 }
 
 TEST(RateLimiterTest, SlidingWindowSucceedsThenFails) {
-    auto rl = RateLimiter::createWindowBased(1, Hours{1});
+    auto rl = std::make_unique<RateLimiter>();
+    rl->configureWindowBased(1);
     ASSERT_TRUE(rl->handle());
     ASSERT_FALSE(rl->handle());
     ASSERT_FALSE(rl->handle());
 }
 
 TEST(RateLimiterTest, SampleBasedSucceeds) {
-    auto rl = RateLimiter::createSampleBased(10 /* 1% */, 0 /* seed */);
+    auto rl = std::make_unique<RateLimiter>();
+    rl->configureSampleBased(10 /* 1% */, 0 /* seed */);
     size_t requestCount = 10000;
     size_t numHandles = 0;
     for (size_t i = 0; i < requestCount; i++) {
@@ -63,18 +67,21 @@ TEST(RateLimiterTest, SampleBasedSucceeds) {
 }
 
 TEST(RateLimiterTest, SampleBasedFails) {
-    auto rl = RateLimiter::createSampleBased(0 /* 0% */, 0 /* seed */);
+    auto rl = std::make_unique<RateLimiter>();
+    rl->configureSampleBased(0 /* 0% */, 0 /* seed */);
     ASSERT_FALSE(rl->handle());
 }
 
 TEST(RateLimiterTest, PolicyGetter) {
     {
-        auto rl = RateLimiter::createWindowBased(100, Hours{1});
+        auto rl = std::make_unique<RateLimiter>();
+        rl->configureWindowBased(100);
         ASSERT_EQ(rl->getSamplingRate(), 100);
         ASSERT_TRUE(rl->getPolicyType() == RateLimiter::PolicyType::kWindowBasedPolicy);
     }
     {
-        auto rl = RateLimiter::createSampleBased(10 /* 1% */, 0 /* seed */);
+        auto rl = std::make_unique<RateLimiter>();
+        rl->configureSampleBased(10 /* 1% */, 0 /* seed */);
         ASSERT_EQ(rl->getSamplingRate(), 10);
         ASSERT_TRUE(rl->getPolicyType() == RateLimiter::PolicyType::kSampleBasedPolicy);
     }
