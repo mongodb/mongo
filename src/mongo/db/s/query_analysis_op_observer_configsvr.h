@@ -34,6 +34,7 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/s/query_analysis_coordinator.h"
 #include "mongo/db/s/query_analysis_op_observer.h"
 #include "mongo/db/session/logical_session_id.h"
 
@@ -45,12 +46,15 @@ namespace analyze_shard_key {
 /**
  * OpObserver for query analysis on the config server.
  */
-class QueryAnalysisOpObserverConfigSvr final : public QueryAnalysisOpObserver {
+class QueryAnalysisOpObserverConfigSvr : public QueryAnalysisOpObserver {
     QueryAnalysisOpObserverConfigSvr(const QueryAnalysisOpObserverConfigSvr&) = delete;
     QueryAnalysisOpObserverConfigSvr& operator=(const QueryAnalysisOpObserverConfigSvr&) = delete;
 
 public:
-    QueryAnalysisOpObserverConfigSvr() = default;
+    QueryAnalysisOpObserverConfigSvr(
+        std::unique_ptr<QueryAnalysisCoordinatorFactory> coordinatorFactory =
+            std::make_unique<QueryAnalysisCoordinatorFactory>())
+        : _coordinatorFactory(std::move(coordinatorFactory)) {}
     ~QueryAnalysisOpObserverConfigSvr() override = default;
 
     NamespaceFilters getNamespaceFilters() const final {
@@ -77,6 +81,14 @@ public:
                   const DocumentKey& documentKey,
                   const OplogDeleteEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) final;
+
+protected:
+    void _onInserts(OperationContext* opCtx, const MongosType& doc);
+    void _onUpdate(OperationContext* opCtx, const MongosType& doc);
+    void _onDelete(OperationContext* opCtx, const MongosType& doc);
+
+private:
+    std::unique_ptr<QueryAnalysisCoordinatorFactory> _coordinatorFactory;
 };
 
 }  // namespace analyze_shard_key

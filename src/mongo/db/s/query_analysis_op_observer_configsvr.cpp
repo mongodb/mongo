@@ -31,7 +31,7 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/s/query_analysis_coordinator.h"
+#include "mongo/db/s/query_analysis_op_observer.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/s/catalog/type_mongos.h"
@@ -64,9 +64,8 @@ void QueryAnalysisOpObserverConfigSvr::onInserts(OperationContext* opCtx,
         for (auto it = begin; it != end; ++it) {
             const auto parsedDoc = uassertStatusOK(MongosType::fromBSON(it->doc));
             shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-                [parsedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
-                    analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerInsert(
-                        parsedDoc);
+                [this, parsedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
+                    _onInserts(opCtx, parsedDoc);
                 });
         }
     }
@@ -82,8 +81,8 @@ void QueryAnalysisOpObserverConfigSvr::onUpdate(OperationContext* opCtx,
     } else if (ns == MongosType::ConfigNS) {
         const auto parsedDoc = uassertStatusOK(MongosType::fromBSON(args.updateArgs->updatedDoc));
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [parsedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
-                analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerUpdate(parsedDoc);
+            [this, parsedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
+                _onUpdate(opCtx, parsedDoc);
             });
     }
 }
@@ -104,9 +103,42 @@ void QueryAnalysisOpObserverConfigSvr::onDelete(OperationContext* opCtx,
         invariant(!doc.isEmpty());
         const auto parsedDoc = uassertStatusOK(MongosType::fromBSON(doc));
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [parsedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
-                analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerDelete(parsedDoc);
+            [this, parsedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
+                _onDelete(opCtx, parsedDoc);
             });
+    }
+}
+
+void QueryAnalysisOpObserverConfigSvr::_onInserts(OperationContext* opCtx, const MongosType& doc) {
+    try {
+        _coordinatorFactory->getQueryAnalysisCoordinator(opCtx)->onSamplerInsert(doc);
+    } catch (const DBException& ex) {
+        LOGV2_ERROR(10690305,
+                    "Failed to insert sampler",
+                    "sampler"_attr = doc,
+                    "error"_attr = ex.toString());
+    }
+}
+
+void QueryAnalysisOpObserverConfigSvr::_onUpdate(OperationContext* opCtx, const MongosType& doc) {
+    try {
+        _coordinatorFactory->getQueryAnalysisCoordinator(opCtx)->onSamplerUpdate(doc);
+    } catch (const DBException& ex) {
+        LOGV2_ERROR(10690306,
+                    "Failed to update sampler",
+                    "sampler"_attr = doc,
+                    "error"_attr = ex.toString());
+    }
+}
+
+void QueryAnalysisOpObserverConfigSvr::_onDelete(OperationContext* opCtx, const MongosType& doc) {
+    try {
+        _coordinatorFactory->getQueryAnalysisCoordinator(opCtx)->onSamplerDelete(doc);
+    } catch (const DBException& ex) {
+        LOGV2_ERROR(10690307,
+                    "Failed to delete sampler",
+                    "sampler"_attr = doc,
+                    "error"_attr = ex.toString());
     }
 }
 }  // namespace analyze_shard_key

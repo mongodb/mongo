@@ -160,7 +160,9 @@ void QueryAnalysisCoordinator::Sampler::resetLastNumQueriesExecutedPerSecond() {
 }
 
 void QueryAnalysisCoordinator::onSamplerInsert(const MongosType& doc) {
-    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+    tassert(10690304,
+            "QueryAnalysisCoordinator should only run if the cluster role is ConfigServer.",
+            serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     if (doc.getPing() < _getMinLastPingTime()) {
@@ -171,7 +173,9 @@ void QueryAnalysisCoordinator::onSamplerInsert(const MongosType& doc) {
 }
 
 void QueryAnalysisCoordinator::onSamplerUpdate(const MongosType& doc) {
-    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+    tassert(10690303,
+            "QueryAnalysisCoordinator should only run if the cluster role is ConfigServer.",
+            serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     auto it = _samplers.find(doc.getName());
@@ -184,11 +188,12 @@ void QueryAnalysisCoordinator::onSamplerUpdate(const MongosType& doc) {
 }
 
 void QueryAnalysisCoordinator::onSamplerDelete(const MongosType& doc) {
-    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+    tassert(10690302,
+            "QueryAnalysisCoordinator should only run if the cluster role is ConfigServer.",
+            serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-    auto erased = _samplers.erase(doc.getName());
-    invariant(erased);
+    _samplers.erase(doc.getName());
 }
 
 void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
@@ -307,7 +312,10 @@ QueryAnalysisCoordinator::getNewConfigurationsForSampler(OperationContext* opCtx
             }
         }
     }
-    invariant(numActiveSamplers > 0);
+    tassert(10690301,
+            str::stream() << "There should be at least one active sampler after '" << samplerName
+                          << "' updated its number of queries executed per second.",
+            numActiveSamplers > 0);
     // If the coordinator doesn't yet have a full view of the query distribution or no samplers
     // have executed any queries, each sampler gets an equal ratio of the sample rates. Otherwise,
     // the ratio is weighted based on the query distribution across samplers.

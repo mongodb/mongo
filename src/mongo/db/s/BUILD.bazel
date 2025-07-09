@@ -1790,6 +1790,7 @@ mongo_cc_unit_test(
         "config_server_op_observer_test.cpp",
         "create_database_util_test.cpp",
         "query_analysis_coordinator_test.cpp",
+        "query_analysis_op_observer_configsvr_test.cpp",
         "sharding_catalog_client_aggregations_test.cpp",
         "sharding_ddl_util_test.cpp",
         "sharding_util_refresh_test.cpp",

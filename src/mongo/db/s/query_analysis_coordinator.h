@@ -123,9 +123,9 @@ public:
      * On a sharded cluster, creates, updates and deletes the sampler for the mongos with the given
      * config.mongos document.
      */
-    void onSamplerInsert(const MongosType& doc);
-    void onSamplerUpdate(const MongosType& doc);
-    void onSamplerDelete(const MongosType& doc);
+    virtual void onSamplerInsert(const MongosType& doc);
+    virtual void onSamplerUpdate(const MongosType& doc);
+    virtual void onSamplerDelete(const MongosType& doc);
 
     /**
      * Given the average number of queries that a sampler executes, returns the new query analyzer
@@ -194,5 +194,13 @@ private:
     StringMap<Sampler> _samplers;
 };
 
+class QueryAnalysisCoordinatorFactory {
+public:
+    QueryAnalysisCoordinatorFactory() = default;
+    virtual ~QueryAnalysisCoordinatorFactory() = default;
+    virtual QueryAnalysisCoordinator* getQueryAnalysisCoordinator(OperationContext* opCtx) {
+        return QueryAnalysisCoordinator::get(opCtx);
+    }
+};
 }  // namespace analyze_shard_key
 }  // namespace mongo
