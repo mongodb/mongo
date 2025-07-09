@@ -4,8 +4,10 @@
 # Exclude some test files and READMEs from the backport approvals
 /etc/backports_required_for_multiversion_tests.yml
 /etc/*.suppressions
-/README.md
-**/README.md
+README.md
 
-# Exclude all the tests under "jstests" directories from backport approvals
-**/jstests/**/*
+# Exclude test-only related files from server-release approvals
+jstests/
+/src/mongo/dbtests/
+/src/mongo/**/*_test.cpp
+/src/mongo/**/*_bm.cpp
