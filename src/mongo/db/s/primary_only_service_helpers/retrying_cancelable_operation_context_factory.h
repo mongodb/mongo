@@ -53,6 +53,14 @@ public:
         return WithAutomaticRetry([this, body]() { return body(_factory); }, _isRetryable);
     }
 
+    // TODO SERVER-104317: Remove this overloading function once SERVER-104317 is done.
+    template <typename BodyCallable>
+    decltype(auto) withAutomaticRetry(BodyCallable&& body,
+                                      RetryabilityPredicate isRetryable) const {
+        return WithAutomaticRetry([this, body]() { return body(_factory); },
+                                  std::move(isRetryable));
+    }
+
 private:
     RetryabilityPredicate _isRetryable;
     const CancelableOperationContextFactory _factory;

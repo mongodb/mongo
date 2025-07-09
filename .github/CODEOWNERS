@@ -2583,6 +2583,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/s/migration_blocking_operation/OWNERS.yml
 /src/mongo/db/s/migration_blocking_operation/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/s/primary_only_service_helpers/OWNERS.yml
+/src/mongo/db/s/primary_only_service_helpers/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/s/query_cmd/OWNERS.yml
 /src/mongo/db/s/query_cmd/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/s/query_cmd/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
