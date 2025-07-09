@@ -37,6 +37,20 @@ imports:
     - "mongo/s/sharding_types.idl"
 
 structs:
+    CollectionSharded:
+        description: "Event describing the details of a committing shardCollection operation."
+        strict: false
+        fields:
+            nss:
+                description: "The namespace of the sharded collection."
+                type: namespacestring
+            uuid:
+                description: "The UUID of the collection."
+                type: uuid
+            request:
+                type: object_owned
+                description: "The user request that originated this event."
+
     CollectionResharded:
         description: "Event describing the details of a committing reshardCollection operation."
         strict: false

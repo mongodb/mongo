@@ -49,9 +49,7 @@ namespace mongo {
  * TODO SERVER-66333: move all other notifyChangeStreams* functions here.
  */
 void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
-                                          const NamespaceString& nss,
-                                          const UUID& uuid,
-                                          BSONObj cmd);
+                                          const CollectionSharded& notification);
 
 /**
  * Writes a no-op oplog entry on movePrimary event.

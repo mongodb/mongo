@@ -99,6 +99,13 @@ public:
                 return;
             }
 
+            if (request().getEventType() == notify_sharding_event::kCollectionSharded) {
+                const auto event = CollectionSharded::parse(
+                    IDLParserContext("_shardsvrNotifyShardingEvent"), request().getDetails());
+                notifyChangeStreamsOnShardCollection(opCtx, event);
+                return;
+            }
+
             if (request().getEventType() == notify_sharding_event::kCollectionResharded) {
                 const auto event = CollectionResharded::parse(
                     IDLParserContext("_shardsvrNotifyShardingEvent"), request().getDetails());

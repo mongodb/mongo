@@ -39,12 +39,13 @@ namespace notify_sharding_event {
 // TODO SERVER-100729 Remove any reference to the deprecated kDatabasesAdded event type
 // once 9.0 becomes LTS.
 static constexpr char kDatabasesAdded[] = "databasesAdded";
+static constexpr char kCollectionSharded[] = "collectionSharded";
 static constexpr char kCollectionResharded[] = "collectionResharded";
 static constexpr char kNamespacePlacementChanged[] = "namespacePlacementChanged";
 
 inline Status validateEventType(const std::string& eventType) {
     if (eventType == kCollectionResharded || eventType == kNamespacePlacementChanged ||
-        eventType == kDatabasesAdded) {
+        eventType == kDatabasesAdded || eventType == kCollectionSharded) {
         return Status::OK();
     }
 

@@ -35,6 +35,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -59,10 +60,9 @@
 namespace mongo {
 
 namespace {
-
-void insertOplogEntry(OperationContext* opCtx,
-                      std::vector<repl::MutableOplogEntry>&& oplogEntries,
-                      StringData opStr) {
+void insertNotificationOplogEntries(OperationContext* opCtx,
+                                    std::vector<repl::MutableOplogEntry>&& oplogEntries,
+                                    StringData opStr) {
     writeConflictRetry(opCtx, opStr, NamespaceString::kRsOplogNamespace, [&] {
         AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
         WriteUnitOfWork wunit(opCtx);
@@ -81,29 +81,28 @@ void insertOplogEntry(OperationContext* opCtx,
 }  // namespace
 
 void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
-                                          const NamespaceString& nss,
-                                          const UUID& uuid,
-                                          BSONObj cmd) {
+                                          const CollectionSharded& notification) {
     BSONObjBuilder cmdBuilder;
     StringData opName("shardCollection");
 
-    const auto nssStr = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
+    const auto nssStr =
+        NamespaceStringUtil::serialize(notification.getNss(), SerializationContext::stateDefault());
     cmdBuilder.append(opName, nssStr);
-    cmdBuilder.appendElements(cmd);
+    cmdBuilder.appendElements(notification.getRequest());
 
     BSONObj fullCmd = cmdBuilder.obj();
 
     repl::MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
-    oplogEntry.setNss(nss);
-    oplogEntry.setUuid(uuid);
-    oplogEntry.setTid(nss.tenantId());
+    oplogEntry.setNss(notification.getNss());
+    oplogEntry.setUuid(notification.getUuid());
+    oplogEntry.setTid(notification.getNss().tenantId());
     oplogEntry.setObject(BSON("msg" << BSON(opName << nssStr)));
     oplogEntry.setObject2(fullCmd);
     oplogEntry.setOpTime(repl::OpTime());
     oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
 
-    insertOplogEntry(opCtx, {std::move(oplogEntry)}, "ShardCollectionWritesOplog");
+    insertNotificationOplogEntries(opCtx, {std::move(oplogEntry)}, "ShardCollectionWritesOplog");
 }
 
 void notifyChangeStreamsOnMovePrimary(OperationContext* opCtx,
@@ -123,7 +122,7 @@ void notifyChangeStreamsOnMovePrimary(OperationContext* opCtx,
     oplogEntry.setOpTime(repl::OpTime());
     oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
 
-    insertOplogEntry(opCtx, {std::move(oplogEntry)}, "MovePrimaryWritesOplog");
+    insertNotificationOplogEntries(opCtx, {std::move(oplogEntry)}, "MovePrimaryWritesOplog");
 }
 
 void notifyChangeStreamsOnReshardCollectionComplete(OperationContext* opCtx,
@@ -192,10 +191,12 @@ void notifyChangeStreamsOnReshardCollectionComplete(OperationContext* opCtx,
         const auto zones =
             uassertStatusOK(catalogClient->getTagsForCollection(opCtx, notification.getNss()));
         auto oplogEntry = buildOpEntry(zones);
-        insertOplogEntry(opCtx, {std::move(oplogEntry)}, "ReshardCollectionWritesOplog");
+        insertNotificationOplogEntries(
+            opCtx, {std::move(oplogEntry)}, "ReshardCollectionWritesOplog");
     } catch (ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
         auto oplogEntry = buildOpEntry({});
-        insertOplogEntry(opCtx, {std::move(oplogEntry)}, "ReshardCollectionWritesOplog");
+        insertNotificationOplogEntries(
+            opCtx, {std::move(oplogEntry)}, "ReshardCollectionWritesOplog");
     }
 }
 
@@ -226,7 +227,8 @@ void notifyChangeStreamsOnNamespacePlacementChanged(OperationContext* opCtx,
     oplogEntry.setOpTime(repl::OpTime());
     oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
 
-    insertOplogEntry(opCtx, {std::move(oplogEntry)}, "NamespacePlacementChangedWritesOplog");
+    insertNotificationOplogEntries(
+        opCtx, {std::move(oplogEntry)}, "NamespacePlacementChangedWritesOplog");
 }
 
 
@@ -240,7 +242,7 @@ void notifyChangeStreamOnEndOfTransaction(OperationContext* opCtx,
         affectedNamespaces,
         repl::OpTime().getTimestamp(),
         opCtx->getServiceContext()->getFastClockSource()->now());
-    insertOplogEntry(opCtx, {std::move(oplogEntry)}, "EndOfTransactionWritesOplog");
+    insertNotificationOplogEntries(opCtx, {std::move(oplogEntry)}, "EndOfTransactionWritesOplog");
 }
 
 void notifyChangeStreamsOnChunkMigrated(OperationContext* opCtx,
@@ -309,7 +311,7 @@ void notifyChangeStreamsOnChunkMigrated(OperationContext* opCtx,
         oplogEntries.push_back(std::move(legacyOplogEntry));
     }
 
-    insertOplogEntry(opCtx, std::move(oplogEntries), "ChunkMigrationWritesOplog");
+    insertNotificationOplogEntries(opCtx, std::move(oplogEntries), "ChunkMigrationWritesOplog");
 }
 
 }  // namespace mongo

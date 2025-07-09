@@ -48,6 +48,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/create_gen.h"
+#include "mongo/db/commands/notify_sharding_event_gen.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
@@ -55,8 +57,10 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/list_collections_gen.h"
 #include "mongo/db/list_indexes_gen.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -1198,6 +1202,17 @@ void createCollectionOnShards(OperationContext* opCtx,
         }
     }
 }
+
+void performNoopWrite(OperationContext* opCtx) {
+    const BSONObj kMsgObj = BSON("msg" << "ShardCollectionCoordinator in execution");
+    writeConflictRetry(opCtx, "writeNoop", NamespaceString::kRsOplogNamespace, [&] {
+        AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
+        WriteUnitOfWork wunit(opCtx);
+        opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(opCtx, kMsgObj);
+        wunit.commit();
+    });
+}
+
 /**
  * Given the appropiate split policy, create the initial chunks.
  */
@@ -1212,9 +1227,9 @@ boost::optional<InitialSplitPolicy::ShardCollectionConfig> createChunks(
         splitPolicy->createFirstChunks(
             opCtx, shardKeyPattern, {*collectionUUID, ShardingState::get(opCtx)->shardId()});
 
-    // There must be at least one chunk.
-    invariant(initialChunks);
-    invariant(!initialChunks->chunks.empty());
+    tassert(10649100,
+            "The initial split policy is expected to produce at least one chunk",
+            initialChunks && !initialChunks->chunks.empty());
 
     return initialChunks;
 }
@@ -1325,34 +1340,13 @@ boost::optional<UUID> createCollectionAndIndexes(
     return *sharding_ddl_util::getCollectionUUID(opCtx, translatedNss);
 }
 
-void generateCommitEventForChangeStreams(OperationContext* opCtx,
-                                         const NamespaceString& translatedNss,
-                                         const UUID& collUUID,
-                                         const ShardsvrCreateCollectionRequest& originalRequest,
-                                         mongo::TranslatedRequestParams& translatedRequestParams) {
-    if (originalRequest.getUnsplittable()) {
-        // Do not generate any event; unsplittable collections cannot appear as sharded ones to
-        // change stream users.
-        return;
-    }
-
-    // Adapt the original user request to the expected format, then generate the event.
-    auto patchedRequest = originalRequest;
-    patchedRequest.setShardKey(translatedRequestParams.getKeyPattern().toBSON());
-    // TODO SERVER-83006: remove deprecated numInitialChunks parameter.
-    // numInitialChunks should not be logged by the change stream (the field has been deprecated,
-    // but it is still kept in the request until it can be safely removed.
-    patchedRequest.setNumInitialChunks(boost::none);
-
-    notifyChangeStreamsOnShardCollection(opCtx, translatedNss, collUUID, patchedRequest.toBSON());
-}
-
 /**
  * Does the following writes:
- * 1. Replaces the config.chunks entries for the new collection.
- * 1. Updates the config.collections entry for the new collection
+ * 1. Replaces the config.chunks entries for the new collection;
+ * 1. Inserts the config.collections entry for the new collection
+      (or updates the existing one, if currently unsplittable);
  * 3. Inserts an entry into config.placementHistory with the sublist of shards that will host
- * one or more chunks of the new collection
+ *    the chunks of the new collection.
  */
 void commit(OperationContext* opCtx,
             const std::shared_ptr<executor::TaskExecutor>& executor,
@@ -1544,9 +1538,11 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
             [this, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 _createCollectionOnParticipants(opCtx, executor);
             }))
-        .then(_buildPhaseHandler(Phase::kCommitOnShardingCatalog,
-                                 [this, executor = executor, anchor = shared_from_this()](
-                                     auto* opCtx) { _commitOnShardingCatalog(opCtx, executor); }))
+        .then(_buildPhaseHandler(
+            Phase::kCommitOnShardingCatalog,
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+                _commitOnShardingCatalog(opCtx, executor, token);
+            }))
         .then(_buildPhaseHandler(Phase::kSetPostCommitMetadata,
                                  [this, executor = executor, anchor = shared_from_this()](
                                      auto* opCtx) { _setPostCommitMetadata(opCtx, executor); }))
@@ -1943,6 +1939,13 @@ void CreateCollectionCoordinator::_createCollectionOnCoordinator(
         _request.getUnsplittable(),
         dataShardForPolicy);
 
+    // The chunks created by the policy will include a version that will later propagate to the
+    // 'collection version' (in config.collections) and the 'DDL commit time' (in
+    // config.placementHistory and placementChanged event).
+    // To honor the commit protocol expected by change stream reader V2, the pre-commit notification
+    // must be strictly less than the timestamp associated to such a version.
+    _notifyChangeStreamReadersOnUpcomingCommit(opCtx, executor, token);
+    performNoopWrite(opCtx);
     _initialChunks = createChunks(opCtx, shardKeyPattern, _uuid, splitPolicy, nss());
 
     // Save on doc the set of shards involved in the chunk distribution
@@ -2075,8 +2078,74 @@ void CreateCollectionCoordinator::_createCollectionOnParticipants(
         _getCollectionOptionsAndIndexes(opCtx, ShardingState::get(opCtx)->shardId()));
 }
 
+void CreateCollectionCoordinator::_notifyChangeStreamReadersOnUpcomingCommit(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
+    if (_request.getUnsplittable()) {
+        // Do not generate any event; this request concerns the creation of an unsplittable
+        // collection.
+        return;
+    }
+
+    // Adapt the original user request to the expected format, then generate the event.
+    auto patchedRequest = _request;
+    patchedRequest.setShardKey(_doc.getTranslatedRequestParams()->getKeyPattern().toBSON());
+    // TODO SERVER-83006: remove deprecated numInitialChunks parameter. numInitialChunks should not
+    // be logged by the change stream (the field has been deprecated, but it is still kept in the
+    // request until it can be safely removed).
+    patchedRequest.setNumInitialChunks(boost::none);
+    tassert(10649101, "Uuid is expected to be already initialized", _uuid.has_value());
+    CollectionSharded notification(nss(), *_uuid, patchedRequest.toBSON());
+
+    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+    const auto supportsPreciseTargeting =
+        feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+    if (primaryShardId == _doc.getOriginalDataShard() || !supportsPreciseTargeting) {
+        // Perform a local call to dispatch the notification through the coordinator.
+        notifyChangeStreamsOnShardCollection(opCtx, notification);
+        return;
+    }
+
+    // This request is targeting a pre-existing unsplittable collection that is located outside the
+    // primary shard. Send a remote command to dispatch the notification.
+    ShardsvrNotifyShardingEventRequest request(notify_sharding_event::kCollectionSharded,
+                                               notification.toBSON());
+    request.setDbName(DatabaseName::kAdmin);
+
+    generic_argument_util::setMajorityWriteConcern(request);
+    const auto osi = getNewSession(opCtx);
+    generic_argument_util::setOperationSessionInfo(request, osi);
+
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrNotifyShardingEventRequest>>(
+        **executor, token, std::move(request));
+    sharding_ddl_util::sendAuthenticatedCommandToShards(
+        opCtx, opts, {_doc.getOriginalDataShard().value()});
+}
+
+void CreateCollectionCoordinator::_notifyChangeStreamReadersOnPlacementChanged(
+    OperationContext* opCtx,
+    const Timestamp& commitTime,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
+    NamespacePlacementChanged notification(nss(), commitTime);
+    const auto& changeStreamsNotifierShardId = _doc.getOriginalDataShard().value();
+    auto buildNewSessionFn = [this](OperationContext* opCtx) {
+        return getNewSession(opCtx);
+    };
+
+    sharding_ddl_util::generatePlacementChangeNotificationOnShard(
+        opCtx, notification, changeStreamsNotifierShardId, buildNewSessionFn, executor, token);
+}
+
+
 void CreateCollectionCoordinator::_commitOnShardingCatalog(
-    OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
     tassert(8728401,
             "Expecting translated request params to not be empty.",
             _doc.getTranslatedRequestParams());
@@ -2092,13 +2161,22 @@ void CreateCollectionCoordinator::_commitOnShardingCatalog(
         // Check if a previous request already created and committed the collection.
         const auto shardKeyPattern =
             ShardKeyPattern(_doc.getTranslatedRequestParams()->getKeyPattern());
-        if (sharding_ddl_util::checkIfCollectionAlreadyTrackedWithOptions(
-                opCtx,
-                nss(),
-                shardKeyPattern.toBSON(),
-                _doc.getTranslatedRequestParams()->getCollation(),
-                _request.getUnique().value_or(false),
-                _request.getUnsplittable().value_or(false))) {
+        if (const auto committedSpecs =
+                sharding_ddl_util::checkIfCollectionAlreadyTrackedWithOptions(
+                    opCtx,
+                    nss(),
+                    shardKeyPattern.toBSON(),
+                    _doc.getTranslatedRequestParams()->getCollation(),
+                    _request.getUnique().value_or(false),
+                    _request.getUnsplittable().value_or(false));
+            committedSpecs.has_value()) {
+
+            const auto commitTime =
+                committedSpecs->getCollectionVersion().placementVersion().getTimestamp();
+            // Ensure that the post-commit notification to change stream readers is emitted at least
+            // once.
+            _notifyChangeStreamReadersOnPlacementChanged(opCtx, commitTime, executor, token);
+
             // Checkpoint configTime in order to preserve causality of operations in case of a
             // stepdown.
             VectorClockMutable::get(opCtx)->waitForDurable().get(opCtx);
@@ -2123,16 +2201,30 @@ void CreateCollectionCoordinator::_commitOnShardingCatalog(
                 _request.getUnsplittable(),
                 dataShardForPolicy,
                 _doc.getShardIds());
+
+            // The chunks created by the policy will include a version that will later propagate to
+            // the 'collection version' (in config.collections) and the 'DDL commit time' (in
+            // config.placementHistory and placementChanged event).
+            // To honor the commit protocol expected by change stream reader V2, the pre-commit
+            // notification must be strictly less than the timestamp associated to such a version.
+            _notifyChangeStreamReadersOnUpcomingCommit(opCtx, executor, token);
+            performNoopWrite(opCtx);
             _initialChunks = createChunks(opCtx, shardKeyPattern, _uuid, splitPolicy, nss());
         } catch (const DBException& ex) {
-            // If there is any error when re-calculating the initial chunk distribution, rollback
-            // the create collection coordinator. If an error happens during this pre-stage,
-            // although we are on a phase that we must always make progress, there is no way to
-            // commit with a corrupted chunk distribution. This situation is triggered by executing
-            // addZone and/or addShard violating the actual set of involved shards or the shard key
-            // selected.
-            triggerCleanup(opCtx, ex.toStatus());
-            MONGO_UNREACHABLE_TASSERT(10083521);
+            const auto& status = ex.toStatus();
+            if (!_isRetriableErrorForDDLCoordinator(status)) {
+                // The error was raised by the logic that re-calculates the initial chunk
+                // distribution, presumably due to the concurrent execution of a addZone and/or
+                // addShard command that added new constraints which are incompatible with the
+                // currently available set of shards or shard key pattern requested. Under such a
+                // scenario, there is no way to correctly complete the operation; since we are
+                // already within a phase where forward progress is expected, explicit clean up has
+                // to be invoked.
+                triggerCleanup(opCtx, ex.toStatus());
+                MONGO_UNREACHABLE_TASSERT(10083521);
+            }
+
+            throw;
         }
     }
 
@@ -2150,6 +2242,8 @@ void CreateCollectionCoordinator::_commitOnShardingCatalog(
            involvedShards,
            *_doc.getTranslatedRequestParams(),
            [this](OperationContext* opCtx) { return getNewSession(opCtx); });
+    const auto& commitTime = _initialChunks->chunks.back().getVersion().getTimestamp();
+    _notifyChangeStreamReadersOnPlacementChanged(opCtx, commitTime, executor, token);
 
     // Checkpoint configTime in order to preserve causality of operations in
     // case of a stepdown.
@@ -2211,10 +2305,6 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
         sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
             opCtx, nss(), {*_doc.getOriginalDataShard()}, **executor, session, true, false, _uuid);
     }
-
-    // Ensure that the change stream event gets emitted at least once.
-    generateCommitEventForChangeStreams(
-        opCtx, nss(), *_uuid, _request, *_doc.getTranslatedRequestParams());
 }
 
 void CreateCollectionCoordinator::_exitCriticalSection(

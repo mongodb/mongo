@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/notify_sharding_event_gen.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbhelpers.h"
@@ -883,10 +884,9 @@ void ReshardingRecipientService::RecipientStateMachine::
         // TODO SERVER-66671: The 'createCollRequest' should include the full contents of the
         // ShardsvrCreateCollectionRequest rather than just the 'shardKey' field.
         const auto createCollRequest = BSON("shardKey" << _metadata.getReshardingKey().toBSON());
-        notifyChangeStreamsOnShardCollection(opCtx.get(),
-                                             _metadata.getTempReshardingNss(),
-                                             _metadata.getReshardingUUID(),
-                                             createCollRequest);
+        CollectionSharded notification(
+            _metadata.getTempReshardingNss(), _metadata.getReshardingUUID(), createCollRequest);
+        notifyChangeStreamsOnShardCollection(opCtx.get(), notification);
 
         if (resharding::gFeatureFlagReshardingVerification.isEnabled(
                 VersionContext::getDecoration(opCtx.get()),

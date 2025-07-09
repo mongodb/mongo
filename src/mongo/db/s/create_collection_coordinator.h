@@ -200,9 +200,10 @@ private:
     void _createCollectionOnParticipants(
         OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
-    // Commits the create collection operation to the sharding catalog within a transaction.
+    // Commits the create collection operation to the global catalog within a transaction.
     void _commitOnShardingCatalog(OperationContext* opCtx,
-                                  const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+                                  const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                  const CancellationToken& token);
 
     // Ensure that the change stream event gets emitted and install the new filtering metadata.
     void _setPostCommitMetadata(OperationContext* opCtx,
@@ -221,6 +222,18 @@ private:
                                       std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                       const CancellationToken& token,
                                       const std::vector<ShardId>& shardIds);
+
+    // Support methods to generate the events required by change stream readers before/after the
+    // commit to the global catalog.
+    void _notifyChangeStreamReadersOnUpcomingCommit(
+        OperationContext* opCtx,
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token);
+    void _notifyChangeStreamReadersOnPlacementChanged(
+        OperationContext* opCtx,
+        const Timestamp& commitTime,
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token);
 
     const mongo::ShardsvrCreateCollectionRequest _request;
 
