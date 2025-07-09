@@ -5,8 +5,6 @@
  *
  * @tags: [
  *   featureFlagChangeStreamPreciseShardTargeting,
- *   # The test verifies the content of the 'create' oplog entry, expecting a regular _id index
- *   expects_explicit_underscore_id_index,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
