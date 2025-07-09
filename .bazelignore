@@ -20,4 +20,8 @@ src/third_party/wiredtiger/dist
 node_modules
 src/mongo/db/modules/jstestfuzz/node_modules
 
+# These can cause issues in rules_lint
+python3-venv
+venv
+
 .ijwb
