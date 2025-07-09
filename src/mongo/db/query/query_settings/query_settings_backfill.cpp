@@ -33,10 +33,13 @@
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_error_info.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo::query_settings {
+
+MONGO_FAIL_POINT_DEFINE(throwBeforeSchedulingBackfillTask);
 
 using query_shape::QueryShapeHash;
 
@@ -184,6 +187,188 @@ ExecutorFuture<std::vector<query_shape::QueryShapeHash>> insertRepresentativeQue
     // Combine all the futures to return a single flattened vector containing all the backfilled
     // query shape hashes.
     return whenAllSucceed(std::move(futures)).thenRunOn(executor).then(flattenVector);
+}
+
+BackfillCoordinator::BackfillCoordinator(OnCompletionHook onCompletionHook)
+    : _state(std::make_unique<BackfillCoordinator::State>()),
+      _onCompletionHook(std::move(onCompletionHook)) {}
+
+bool BackfillCoordinator::shouldBackfill(OperationContext* opCtx, bool hasRepresentativeQuery) {
+    // Nothing to do if the representative query is already present.
+    if (hasRepresentativeQuery) {
+        return false;
+    }
+
+    // We shouldn't attempt the backfill if it's not enabled.
+    return feature_flags::gFeatureFlagPQSBackfill.isEnabledUseLatestFCVWhenUninitialized(
+        VersionContext::getDecoration(opCtx),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+}
+
+void BackfillCoordinator::markForBackfillAndScheduleIfNeeded(
+    OperationContext* opCtx,
+    query_shape::QueryShapeHash queryShapeHash,
+    QueryInstance queryInstance) try {
+    stdx::lock_guard lock{_mutex};
+    constexpr auto onTaskCompletion = [](Status status) {
+        LOGV2_DEBUG(10493705,
+                    2,
+                    "Finished executing the query settings representative query backfill operation",
+                    "status"_attr = status);
+    };
+
+    // Early exit if the shape was already recorded.
+    auto it = _state->buffer.find(queryShapeHash);
+    if (it != _state->buffer.end()) {
+        return;
+    }
+
+    // Check if adding the recorded query would exceeed the buffer size threshold. Schedule an
+    // immediately executing backfill operation to consume the existing buffer if that's the case.
+    auto memoryLimitBytes = internalQuerySettingsBackfillMemoryLimitBytes.load();
+    const std::size_t itemSize = sizeof(queryShapeHash) + queryInstance.objsize();
+    if (itemSize >= memoryLimitBytes - _state->memoryUsedBytes) {
+        auto prevState = std::exchange(_state, std::make_unique<State>());
+        _state->taskScheduled = true;  // The original task is still scheduled.
+        auto executor = makeExecutor(opCtx);
+        ExecutorFuture<void>{executor}
+            .then(unique_function<ExecutorFuture<void>(void)>{
+                [this, executor, state = std::move(prevState)] {
+                    return execute(std::move(state->buffer),
+                                   std::move(state->cancellationSource),
+                                   std::move(executor));
+                }})
+            .getAsync(onTaskCompletion);
+    }
+
+    // Add the hash <-> query pair to the buffer.
+    LOGV2_DEBUG(10493701,
+                2,
+                "Adding the representative query to the query settings backfill buffer",
+                "queryShapeHash"_attr = queryShapeHash,
+                "representativeQuery"_attr = queryInstance);
+    _state->buffer.emplace_hint(it, queryShapeHash, std::move(queryInstance));
+    _state->memoryUsedBytes += itemSize;
+
+    if (MONGO_unlikely(throwBeforeSchedulingBackfillTask.shouldFail())) {
+        uasserted(ErrorCodes::UnknownError, "test exception while recording");
+    }
+
+    // Don't schedule a new backfill operation if there's already one in-flight.
+    if (_state->taskScheduled) {
+        LOGV2_DEBUG(10493702,
+                    2,
+                    "Skipped scheduling a new query settings representative query backfill "
+                    "operation as there is one "
+                    "already in-flight.");
+        return;
+    }
+
+    // Schedule a delayed task to consume the buffer & execute the procedure.
+    const auto duration =
+        duration_cast<Milliseconds>(Seconds(internalQuerySettingsBackfillDelaySeconds.load()));
+    LOGV2_DEBUG(10493703,
+                2,
+                "Scheduling a delayed query settings representative query backfill task",
+                "duration"_attr = duration.toBSON());
+    auto executor = makeExecutor(opCtx);
+    executor->sleepFor(duration, _state->cancellationSource.token())
+        .onError([this](Status status) {
+            LOGV2_WARNING(10493704,
+                          "Encountered an error while waiting for the query settings "
+                          "representative query backfill operation to start",
+                          "status"_attr = status);
+            cancel();
+            uassertStatusOK(status);
+        })
+        .then([this, executor] {
+            auto state = consume();
+            return execute(std::move(state->buffer),
+                           std::move(state->cancellationSource),
+                           std::move(executor));
+        })
+        .getAsync(onTaskCompletion);
+    _state->taskScheduled = true;
+} catch (const DBException& ex) {
+    LOGV2_WARNING(10493706,
+                  "Encountered an error while scheduling the query settings representative query "
+                  "backfill operation",
+                  "status"_attr = ex.toStatus());
+    cancel();
+}
+
+ExecutorFuture<void> BackfillCoordinator::execute(
+    RepresentativeQueryMap buffer,
+    CancellationSource cancellationSource,
+    std::shared_ptr<executor::TaskExecutor> executor) {
+    ServiceContext::UniqueClient client =
+        getGlobalServiceContext()->getService()->makeClient("QuerySettingsBackfillManager");
+    auto opCtxHolder = client->makeOperationContext();
+    auto* opCtx = opCtxHolder.get();
+    const boost::optional<TenantId> tenantId = boost::none;
+    auto&& service = QuerySettingsService::get(opCtx);
+    auto [queryShapeConfigurations, clusterParameterTime] =
+        service.getAllQueryShapeConfigurations(tenantId);
+
+    // Construct the query shape representative query array. Avoid copying over an entry if the
+    // corresponding query shape configuration was removed in the meantime.
+    std::vector<QueryShapeRepresentativeQuery> representativeQueries;
+    representativeQueries.reserve(buffer.size());
+    for (auto&& [queryShapeHash, queryInstance] : buffer) {
+        auto it = std::find_if(queryShapeConfigurations.begin(),
+                               queryShapeConfigurations.end(),
+                               [&](const QueryShapeConfiguration& config) {
+                                   return config.getQueryShapeHash() == queryShapeHash;
+                               });
+        if (it == queryShapeConfigurations.end()) {
+            continue;
+        }
+        representativeQueries.emplace_back(
+            std::move(queryShapeHash), std::move(queryInstance), clusterParameterTime);
+    }
+
+    // Early exit if there are no representative queries left to insert after the cleanup step.
+    if (representativeQueries.size() == 0) {
+        return ExecutorFuture<void>(std::move(executor));
+    }
+
+    // Insert the representative queries and then invoke the '_onCompletionHook' callback on
+    // completion. Transfer the ownership of 'client' and 'opCtxHolder' so they outlive the
+    // insertRepresentativeQueriesToCollection() operation.
+    return insertRepresentativeQueriesToCollection(
+               opCtx, std::move(representativeQueries), std::move(executor))
+        .then([this,
+               clusterParameterTime,
+               tenantId,
+               client = std::move(client),
+               opCtxHolder = std::move(opCtxHolder)](std::vector<QueryShapeHash> hashes) {
+            LOGV2_WARNING(10493707,
+                          "Succesfully inserted the backfilled representative queries",
+                          "hashes"_attr = hashes);
+            _onCompletionHook(std::move(hashes), clusterParameterTime, tenantId);
+        });
+}
+
+ExecutorFuture<std::vector<query_shape::QueryShapeHash>>
+BackfillCoordinator::insertRepresentativeQueriesToCollection(
+    OperationContext* opCtx,
+    std::vector<QueryShapeRepresentativeQuery> representativeQueries,
+    std::shared_ptr<executor::TaskExecutor> executor) {
+    return mongo::query_settings::insertRepresentativeQueriesToCollection(
+        opCtx,
+        std::move(representativeQueries),
+        [this](OperationContext* opCtx) { return makeTargeter(opCtx); },
+        std::move(executor));
+}
+
+void BackfillCoordinator::cancel() {
+    consume()->cancellationSource.cancel();
+}
+
+std::unique_ptr<BackfillCoordinator::State> BackfillCoordinator::consume() {
+    auto newState = std::make_unique<BackfillCoordinator::State>();
+    stdx::lock_guard lk{_mutex};
+    return std::exchange(_state, std::move(newState));
 }
 
 }  // namespace mongo::query_settings

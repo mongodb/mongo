@@ -1704,6 +1704,30 @@ server_parameters:
         cpp_vartype: InternalVectorSearchStoredSource
         redact: false
         omit_in_ftdc: false
+
+    internalQuerySettingsBackfillDelaySeconds:
+        description: >-
+            The time delay in seconds to wait for representative queries to be buffered in between
+            the first recorded query and the backfill operation.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: internalQuerySettingsBackfillDelaySeconds
+        default: 60
+        validator:
+            gt: 0
+        redact: false
+
+    internalQuerySettingsBackfillMemoryLimitBytes:
+        description: >-
+            Controlls the maximum amount of memory that the backfill operation can use while buffering. 
+            Surpasing this limit will cause subsequent queries to be skipped for the current period.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: internalQuerySettingsBackfillMemoryLimitBytes
+        default: 104857600 # 100MB
+        validator:
+            gte: 16777248 # 'BSONObjMaxUserSize' + sizeof(QueryShapeHash)
+        redact: false
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

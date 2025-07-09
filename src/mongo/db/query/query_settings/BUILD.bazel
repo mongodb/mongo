@@ -108,6 +108,7 @@ mongo_cc_unit_test(
     srcs = [
         "index_hints_serialization_test.cpp",
         "query_framework_serialization_test.cpp",
+        "query_settings_backfill_test.cpp",
         "query_settings_cluster_parameter_impl_test.cpp",
         "query_settings_hash_test.cpp",
         "query_settings_manager_test.cpp",
