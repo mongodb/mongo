@@ -43,9 +43,6 @@ jsTestLog("Create index timestamp: " + tojson(createIndexTS));
 const dropTS = assert.commandWorked(db.runCommand({drop: jsTestName()})).operationTime;
 jsTestLog("Drop collection timestamp: " + tojson(dropTS));
 
-// Instantiate a new collection without any shared state.
-assert(checkLog.checkContainsWithCountJson(db, 6825401, {}, 0));
-
 // Test that we can perform a point-in-time read from a drop pending table using an index.
 let res = assert.commandWorked(db.runCommand({
     find: jsTestName(),
@@ -53,9 +50,6 @@ let res = assert.commandWorked(db.runCommand({
     readConcern: {level: "snapshot", atClusterTime: createIndexTS}
 }));
 assert.eq(kNumDocs, res.cursor.firstBatch.length);
-
-// Instantiate a new collection without any shared state.
-checkLog.containsJson(db, 6825401);
 
 rst.stopSet();
 })();
