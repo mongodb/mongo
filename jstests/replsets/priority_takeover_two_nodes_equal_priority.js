@@ -14,7 +14,9 @@ var name = 'priority_takeover_two_nodes_equal_priority';
 var replTest = new ReplSetTest(
     {name: name, nodes: [{rsConfig: {priority: 3}}, {rsConfig: {priority: 3}}, {}]});
 replTest.startSet();
-replTest.initiate();
+// We use the default electionTimeoutMillis to allow a priority takeover to occur in
+// case a lower priority node gets elected.
+replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 jsTestLog("Waiting for one of the high priority nodes to become PRIMARY.");
 var primary;
