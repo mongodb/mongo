@@ -52,7 +52,15 @@ Future<void> OplogWriter::startup() {
                         const executor::TaskExecutor::CallbackArgs& args) mutable noexcept {
         invariant(args.status);
         LOGV2(8543100, "Starting oplog write");
-        _run();
+        try {
+            _run();
+        } catch (DBException& e) {
+            LOGV2(10185800,
+                  "OplogWriter threw a DBException",
+                  "what"_attr = e.what(),
+                  "exception"_attr = e.toString());
+            fasserted(10185801);
+        }
         LOGV2(8543101, "Finished oplog write");
         promise.setWith([] {});
     };

@@ -2207,6 +2207,7 @@ mongo_cc_unit_test(
         "oplog_test.cpp",
         "oplog_writer_batcher_test.cpp",
         "oplog_writer_impl_test.cpp",
+        "oplog_writer_test.cpp",
     ],
     tags = [
         "mongo_unittest_fifth_group",
