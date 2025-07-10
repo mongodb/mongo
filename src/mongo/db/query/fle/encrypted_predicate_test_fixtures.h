@@ -42,48 +42,6 @@
 
 namespace mongo::fle {
 
-/**
- * This helper allows the manual registration of the encTextSearch expressions to add them to the
- * parserMap without guarding it behind a feature flag. This is required for some unit tests.
- * Normally, expressions are added at server startup time via macros and the manual registration is
- * not necessary. However, encTextSearch expressions are gated behind a feature flag
- * (gFeatureFlagQETextSearchPreview) and does not get put into the map as the flag is off by
- * default. Changing the value of the feature flag with RAIIServerParameterControllerForTest() does
- * not solve the issue because the registration logic is not re-hit.
- *
- * TODO SERVER-101213: delete this manual registration of the encTextSearch expressions
- * ($encStrStartsWith, etc.) expression and any callers once the feature flag is enabled.
- */
-inline void registerEncTextSearchExpressions() {
-    try {
-        Expression::registerExpression("$encStrStartsWith",
-                                       ExpressionEncStrStartsWith::parse,
-                                       AllowedWithApiStrict::kNeverInVersion1,
-                                       AllowedWithClientType::kAny,
-                                       nullptr /* featureFlag */);
-        Expression::registerExpression("$encStrEndsWith",
-                                       ExpressionEncStrEndsWith::parse,
-                                       AllowedWithApiStrict::kNeverInVersion1,
-                                       AllowedWithClientType::kAny,
-                                       nullptr /* featureFlag */);
-        Expression::registerExpression("$encStrContains",
-                                       ExpressionEncStrContains::parse,
-                                       AllowedWithApiStrict::kNeverInVersion1,
-                                       AllowedWithClientType::kAny,
-                                       nullptr /* featureFlag */);
-        Expression::registerExpression("$encStrNormalizedEq",
-                                       ExpressionEncStrNormalizedEq::parse,
-                                       AllowedWithApiStrict::kNeverInVersion1,
-                                       AllowedWithClientType::kAny,
-                                       nullptr /* featureFlag */);
-    } catch (...) {
-        // registering encTextSearch expressions will throw if a duplicate registration is
-        // attempted. We catch and ignore this here. This is so that we can add
-        // registerEncTextSearchExpressions() to each test that could require it, so that we don't
-        // rely on the ordering of the tests to ensure the expression is registered.
-    }
-}
-
 using TagMap = std::map<std::pair<StringData, int>, std::vector<PrfBlock>>;
 using StrTagMap = std::map<std::pair<StringData, StringData>, std::vector<PrfBlock>>;
 

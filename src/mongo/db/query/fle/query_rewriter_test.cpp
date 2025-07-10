@@ -417,7 +417,6 @@ public:
     FLEServerRewriteTest() : _mock(nullptr) {}
 
     void setUp() override {
-        fle::registerEncTextSearchExpressions();
         _mock = std::make_unique<MockQueryRewriter>(_expCtx, _mockNss, _mockEscMap);
     }
 
