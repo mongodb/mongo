@@ -264,8 +264,7 @@ std::pair<SbSlot /* keyValueSlot */, SbStage> buildForeignKeysStream(SbSlot inpu
             SbExpr shouldGetField =
                 b.makeBooleanOpTree(abt::Operations::Or,
                                     b.makeFunction("isObject", keyValueSlot),
-                                    b.makeUnaryOp(sbe::EPrimUnary::logicNot,
-                                                  b.makeFunction("isArray", prevKeyValueSlot)));
+                                    b.makeNot(b.makeFunction("isArray", prevKeyValueSlot)));
 
             getFieldFromObject =
                 b.makeIf(std::move(shouldGetField),
@@ -655,9 +654,7 @@ std::pair<SbSlot /* matched docs */, SbStage> buildForeignMatches(SbSlot localKe
 
         if (i > 0) {
             // Ignoring the nulls produced by missing field in array.
-            filter = b.makeIf(b.makeBinaryOp(sbe::EPrimBinary::fillEmpty,
-                                             b.makeFunction("isObject"_sd, lambdaArg.clone()),
-                                             b.makeBoolConstant(true)),
+            filter = b.makeIf(b.makeFillEmptyTrue(b.makeFunction("isObject"_sd, lambdaArg.clone())),
                               std::move(filter),
                               b.makeBoolConstant(false));
         }
@@ -789,18 +786,16 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> buildIndexJoinLookupForeignSid
     //
     // For array values, branches (1) and (2) both produce values. For all other types, only (2)
     // produces a value.
-    auto [arrayBranch, arrayBranchOutSlots] = b.makeProject(
-        b.makeLimitOneCoScanTree(),
-        b.makeBinaryOp(sbe::EPrimBinary::fillEmpty,
-                       b.makeFunction("getElement", singleLocalValueSlot, b.makeInt32Constant(0)),
-                       b.makeConstant(sbe::value::TypeTags::bsonUndefined, 0)));
+    auto [arrayBranch, arrayBranchOutSlots] =
+        b.makeProject(b.makeLimitOneCoScanTree(),
+                      b.makeFillEmptyUndefined(b.makeFunction(
+                          "getElement", singleLocalValueSlot, b.makeInt32Constant(0))));
     SbSlot arrayBranchOutput = arrayBranchOutSlots[0];
 
     auto shouldProduceSeekForArray = b.makeBooleanOpTree(
         abt::Operations::And,
         b.makeFunction("isArray", singleLocalValueSlot),
-        b.makeUnaryOp(sbe::EPrimUnary::logicNot,
-                      b.makeFunction("isMember", arrayBranchOutput, localKeysSetSlot)));
+        b.makeNot(b.makeFunction("isMember", arrayBranchOutput, localKeysSetSlot)));
     arrayBranch = b.makeFilter(std::move(arrayBranch), std::move(shouldProduceSeekForArray));
 
     auto [valueBranch, valueBranchOutSlots] = b.makeProject(
@@ -1228,8 +1223,8 @@ std::pair<SbSlot /*matched docs*/, SbStage> buildHashJoinLookupStage(
         auto [emptyArrayTag, emptyArrayVal] = sbe::value::makeNewArray();
         auto emptyArrayConstant = b.makeConstant(emptyArrayTag, emptyArrayVal);
 
-        SbExpr innerResultProjection = b.makeBinaryOp(
-            sbe::EPrimBinary::fillEmpty, lookupStageOutputSlot, std::move(emptyArrayConstant));
+        SbExpr innerResultProjection =
+            b.makeFillEmpty(lookupStageOutputSlot, std::move(emptyArrayConstant));
 
         auto [resultStage, outSlots] =
             b.makeProject(std::move(hl), std::move(innerResultProjection));

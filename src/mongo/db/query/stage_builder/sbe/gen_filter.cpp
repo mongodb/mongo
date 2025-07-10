@@ -467,7 +467,7 @@ void generateArraySize(MatchExpressionVisitorContext* context,
         auto sizeExpr =
             inputParamSlotId ? SbExpr{SbSlot{*inputParamSlotId}} : b.makeInt32Constant(size);
         return b.makeFillEmptyFalse(
-            b.makeBinaryOp(sbe::EPrimBinary::eq,
+            b.makeBinaryOp(abt::Operations::Eq,
                            b.makeFunction("getArraySize", std::move(inputExpr)),
                            std::move(sizeExpr)));
     };
@@ -482,7 +482,7 @@ void generateArraySize(MatchExpressionVisitorContext* context,
  */
 void generateComparison(MatchExpressionVisitorContext* context,
                         const ComparisonMatchExpression* expr,
-                        sbe::EPrimBinary::Op binaryOp) {
+                        abt::Operations binaryOp) {
     auto makePredicate = [context, expr, binaryOp](SbExpr inputExpr) {
         return generateComparisonExpr(context->state, expr, binaryOp, std::move(inputExpr));
     };
@@ -506,8 +506,8 @@ void generateComparison(MatchExpressionVisitorContext* context,
 
     bool matchesNothing = false;
     if (rhs.type() == BSONType::null &&
-        (binaryOp == sbe::EPrimBinary::eq || binaryOp == sbe::EPrimBinary::lessEq ||
-         binaryOp == sbe::EPrimBinary::greaterEq)) {
+        (binaryOp == abt::Operations::Eq || binaryOp == abt::Operations::Lte ||
+         binaryOp == abt::Operations::Gte)) {
         matchesNothing = true;
     }
 
@@ -868,7 +868,7 @@ public:
     }
 
     void visit(const EqualityMatchExpression* expr) final {
-        generateComparison(_context, expr, sbe::EPrimBinary::eq);
+        generateComparison(_context, expr, abt::Operations::Eq);
     }
 
     void visit(const ExistsMatchExpression* expr) final {
@@ -897,11 +897,11 @@ public:
     }
 
     void visit(const GTEMatchExpression* expr) final {
-        generateComparison(_context, expr, sbe::EPrimBinary::greaterEq);
+        generateComparison(_context, expr, abt::Operations::Gte);
     }
 
     void visit(const GTMatchExpression* expr) final {
-        generateComparison(_context, expr, sbe::EPrimBinary::greater);
+        generateComparison(_context, expr, abt::Operations::Gt);
     }
 
     void visit(const GeoMatchExpression* expr) final {}
@@ -1092,11 +1092,11 @@ public:
     void visit(const InternalSchemaXorMatchExpression* expr) final {}
 
     void visit(const LTEMatchExpression* expr) final {
-        generateComparison(_context, expr, sbe::EPrimBinary::lessEq);
+        generateComparison(_context, expr, abt::Operations::Lte);
     }
 
     void visit(const LTMatchExpression* expr) final {
-        generateComparison(_context, expr, sbe::EPrimBinary::less);
+        generateComparison(_context, expr, abt::Operations::Lt);
     }
 
     void visit(const ModMatchExpression* expr) final {
@@ -1331,7 +1331,7 @@ template <typename BuilderType, typename ExpressionType>
 ExpressionType generateComparisonExpr(BuilderType& b,
                                       sbe::value::TypeTags tag,
                                       sbe::value::Value val,
-                                      sbe::EPrimBinary::Op binaryOp,
+                                      abt::Operations binaryOp,
                                       ExpressionType inputExpr,
                                       ValueExpressionFn<ExpressionType> makeValExpr) {
     // Most commonly the comparison does not do any kind of type conversions (i.e. 12 > "10" does
@@ -1340,34 +1340,34 @@ ExpressionType generateComparisonExpr(BuilderType& b,
     // is one). We can compare any type to MinKey or MaxKey type and expect a true/false answer.
     if (tag == sbe::value::TypeTags::MinKey) {
         switch (binaryOp) {
-            case sbe::EPrimBinary::eq:
-            case sbe::EPrimBinary::neq:
+            case abt::Operations::Eq:
+            case abt::Operations::Neq:
                 break;
-            case sbe::EPrimBinary::greater:
+            case abt::Operations::Gt:
                 return b.makeNot(
                     b.makeFunction("isMinKey", b.makeFillEmptyNull(std::move(inputExpr))));
-            case sbe::EPrimBinary::greaterEq:
+            case abt::Operations::Gte:
                 return b.makeBoolConstant(true);
-            case sbe::EPrimBinary::less:
+            case abt::Operations::Lt:
                 return b.makeBoolConstant(false);
-            case sbe::EPrimBinary::lessEq:
+            case abt::Operations::Lte:
                 return b.makeFunction("isMinKey", b.makeFillEmptyNull(std::move(inputExpr)));
             default:
                 MONGO_UNREACHABLE_TASSERT(8217105);
         }
     } else if (tag == sbe::value::TypeTags::MaxKey) {
         switch (binaryOp) {
-            case sbe::EPrimBinary::eq:
-            case sbe::EPrimBinary::neq:
+            case abt::Operations::Eq:
+            case abt::Operations::Neq:
                 break;
-            case sbe::EPrimBinary::greater:
+            case abt::Operations::Gt:
                 return b.makeBoolConstant(false);
-            case sbe::EPrimBinary::greaterEq:
+            case abt::Operations::Gte:
                 return b.makeFunction("isMaxKey", b.makeFillEmptyNull(std::move(inputExpr)));
-            case sbe::EPrimBinary::less:
+            case abt::Operations::Lt:
                 return b.makeNot(
                     b.makeFunction("isMaxKey", b.makeFillEmptyNull(std::move(inputExpr))));
-            case sbe::EPrimBinary::lessEq:
+            case abt::Operations::Lte:
                 return b.makeBoolConstant(true);
             default:
                 MONGO_UNREACHABLE_TASSERT(8217101);
@@ -1384,19 +1384,19 @@ ExpressionType generateComparisonExpr(BuilderType& b,
     } else if (sbe::value::isNaN(tag, val)) {
         // Construct an expression to perform a NaN check.
         switch (binaryOp) {
-            case sbe::EPrimBinary::eq:
-            case sbe::EPrimBinary::greaterEq:
-            case sbe::EPrimBinary::lessEq:
+            case abt::Operations::Eq:
+            case abt::Operations::Gte:
+            case abt::Operations::Lte:
                 // If 'rhs' is NaN, then return whether the lhs is NaN.
                 return b.makeFillEmptyFalse(b.makeFunction("isNaN", std::move(inputExpr)));
-            case sbe::EPrimBinary::less:
-            case sbe::EPrimBinary::greater:
+            case abt::Operations::Lt:
+            case abt::Operations::Gt:
                 // Always return false for non-equality operators.
                 return b.makeBoolConstant(false);
             default:
                 tasserted(5449400,
-                          str::stream()
-                              << "Could not construct expression for comparison op " << binaryOp);
+                          str::stream() << "Could not construct expression for comparison op "
+                                        << abt::toStringData(binaryOp));
         }
     }
 
@@ -1407,7 +1407,7 @@ ExpressionType generateComparisonExpr(BuilderType& b,
 
 SbExpr generateComparisonExpr(StageBuilderState& state,
                               const ComparisonMatchExpression* expr,
-                              sbe::EPrimBinary::Op binaryOp,
+                              abt::Operations binaryOp,
                               SbExpr inputExpr) {
     SbExprBuilder b(state);
 
@@ -1541,7 +1541,7 @@ SbExpr generateModExpr(StageBuilderState& state, const ModMatchExpression* expr,
         }
     }();
     return b.makeFillEmptyFalse(b.makeBinaryOp(
-        sbe::EPrimBinary::eq,
+        abt::Operations::Eq,
         b.makeFunction("mod"_sd, std::move(truncatedArgument), std::move(divisorExpr)),
         std::move(remainderExpr)));
 }
@@ -1580,7 +1580,7 @@ SbExpr generateRegexExpr(StageBuilderState& state,
     auto resultExpr = b.makeBooleanOpTree(
         abt::Operations::Or,
         b.makeFillEmptyFalse(
-            b.makeBinaryOp(sbe::EPrimBinary::eq, inputExpr.clone(), std::move(bsonRegexExpr))),
+            b.makeBinaryOp(abt::Operations::Eq, inputExpr.clone(), std::move(bsonRegexExpr))),
         b.makeFillEmptyFalse(
             b.makeFunction("regexMatch", std::move(compiledRegexExpr), inputExpr.clone())));
 

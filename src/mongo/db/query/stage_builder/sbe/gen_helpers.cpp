@@ -621,7 +621,7 @@ SortKeysExprs buildSortKeys(StageBuilderState& state,
                 // arbitrary number of sort pattern parts.
                 auto makeIsArrayCheck = [&](const FieldPath& fp) {
                     return b.makeBinaryOp(
-                        sbe::EPrimBinary::cmp3w,
+                        abt::Operations::Cmp3w,
                         generateArrayCheckForSort(state,
                                                   SbExpr{},
                                                   fp,
@@ -640,7 +640,7 @@ SortKeysExprs buildSortKeys(StageBuilderState& state,
                 auto numArraysExpr = b.makeNaryOp(abt::Operations::Add, std::move(args));
 
                 return b.makeBinaryOp(
-                    sbe::EPrimBinary::lessEq, std::move(numArraysExpr), b.makeInt32Constant(1));
+                    abt::Operations::Lte, std::move(numArraysExpr), b.makeInt32Constant(1));
             }
         }();
 

@@ -327,40 +327,41 @@ TEST(TypeCheckerTest, FoldComparisonBetweenBools) {
 
 TEST(TypeCheckerTest, FoldFillEmptyVariable) {
     // Run fillEmpty on a test expression based on a slot variable.
-    auto tree1 = make<BinaryOp>(Operations::FillEmpty,
-                                make<If>(make<BinaryOp>(Operations::Eq,
-                                                        make<Variable>(getABTVariableName(1)),
-                                                        Constant::int32(34)),
-                                         Constant::int64(9),
-                                         Constant::int64(18)),
-                                Constant::null());
+    auto tree1 =
+        make<BinaryOp>(Operations::FillEmpty,
+                       make<If>(make<BinaryOp>(Operations::Eq,
+                                               make<Variable>(SbVar::makeProjectionName(1)),
+                                               Constant::int32(34)),
+                                Constant::int64(9),
+                                Constant::int64(18)),
+                       Constant::null());
     TypeSignature signature = TypeChecker{}.typeCheck(tree1);
     ASSERT_EQ(
         signature.typesMask,
         getTypeSignature(sbe::value::TypeTags::NumberInt64, sbe::value::TypeTags::Null).typesMask);
     // Inject the information that the slot contains a number that cannot be Nothing.
     TypeChecker checker;
-    checker.bind(getABTVariableName(1), TypeSignature::kNumericType);
+    checker.bind(SbVar::makeProjectionName(1), TypeSignature::kNumericType);
     signature = checker.typeCheck(tree1);
     ASSERT_EQ(signature.typesMask, getTypeSignature(sbe::value::TypeTags::NumberInt64).typesMask);
 }
 
 TEST(TypeCheckerTest, FoldTraverseF) {
     // Run traverseF on a slot variable.
-    auto tree1 =
-        make<FunctionCall>("traverseF",
-                           makeSeq(make<Variable>(getABTVariableName(1)),
-                                   make<LambdaAbstraction>(
-                                       getABTLocalVariableName(2, 0),
-                                       make<BinaryOp>(Operations::Gt,
-                                                      make<Variable>(getABTLocalVariableName(2, 0)),
-                                                      Constant::int32(8))),
-                                   Constant::boolean(false)));
+    auto tree1 = make<FunctionCall>(
+        "traverseF",
+        makeSeq(
+            make<Variable>(SbVar::makeProjectionName(1)),
+            make<LambdaAbstraction>(SbVar::makeProjectionName(2, 0),
+                                    make<BinaryOp>(Operations::Gt,
+                                                   make<Variable>(SbVar::makeProjectionName(2, 0)),
+                                                   Constant::int32(8))),
+            Constant::boolean(false)));
     TypeSignature signature = TypeChecker{}.typeCheck(tree1);
     ASSERT_EQ(signature.typesMask, TypeSignature::kAnyScalarType.typesMask);
     // Inject the information that the slot contains a number (and not an array).
     TypeChecker checker;
-    checker.bind(getABTVariableName(1), TypeSignature::kNumericType);
+    checker.bind(SbVar::makeProjectionName(1), TypeSignature::kNumericType);
     signature = checker.typeCheck(tree1);
 
     // The result should be a Let expression having the comparison in its body.
@@ -368,29 +369,29 @@ TEST(TypeCheckerTest, FoldTraverseF) {
     ASSERT_EQ(signature.typesMask, getTypeSignature(sbe::value::TypeTags::Boolean).typesMask);
 
     // Run it on a constant array.
-    auto tree2 =
-        make<FunctionCall>("traverseF",
-                           makeSeq(Constant::array(sbe::value::makeIntOrLong(78)),
-                                   make<LambdaAbstraction>(
-                                       getABTLocalVariableName(2, 0),
-                                       make<BinaryOp>(Operations::Gt,
-                                                      make<Variable>(getABTLocalVariableName(2, 0)),
-                                                      Constant::int32(8))),
-                                   Constant::boolean(false)));
+    auto tree2 = make<FunctionCall>(
+        "traverseF",
+        makeSeq(
+            Constant::array(sbe::value::makeIntOrLong(78)),
+            make<LambdaAbstraction>(SbVar::makeProjectionName(2, 0),
+                                    make<BinaryOp>(Operations::Gt,
+                                                   make<Variable>(SbVar::makeProjectionName(2, 0)),
+                                                   Constant::int32(8))),
+            Constant::boolean(false)));
     signature = TypeChecker{}.typeCheck(tree2);
 
     ASSERT_EQ(signature.typesMask, TypeSignature::kAnyScalarType.typesMask);
 
     // Run it on a constant number.
-    auto tree3 =
-        make<FunctionCall>("traverseF",
-                           makeSeq(Constant::int32(78),
-                                   make<LambdaAbstraction>(
-                                       getABTLocalVariableName(2, 0),
-                                       make<BinaryOp>(Operations::Gt,
-                                                      make<Variable>(getABTLocalVariableName(2, 0)),
-                                                      Constant::int32(8))),
-                                   Constant::boolean(false)));
+    auto tree3 = make<FunctionCall>(
+        "traverseF",
+        makeSeq(
+            Constant::int32(78),
+            make<LambdaAbstraction>(SbVar::makeProjectionName(2, 0),
+                                    make<BinaryOp>(Operations::Gt,
+                                                   make<Variable>(SbVar::makeProjectionName(2, 0)),
+                                                   Constant::int32(8))),
+            Constant::boolean(false)));
     signature = TypeChecker{}.typeCheck(tree3);
 
     // The result should be a Let expression having the comparison in its body.
@@ -400,20 +401,20 @@ TEST(TypeCheckerTest, FoldTraverseF) {
 
 TEST(TypeCheckerTest, FoldTraverseP) {
     // Run traverseP on a slot variable.
-    auto tree1 =
-        make<FunctionCall>("traverseP",
-                           makeSeq(make<Variable>(getABTVariableName(1)),
-                                   make<LambdaAbstraction>(
-                                       getABTLocalVariableName(2, 0),
-                                       make<BinaryOp>(Operations::Mult,
-                                                      make<Variable>(getABTLocalVariableName(2, 0)),
-                                                      Constant::int32(90))),
-                                   Constant::int32(0)));
+    auto tree1 = make<FunctionCall>(
+        "traverseP",
+        makeSeq(
+            make<Variable>(SbVar::makeProjectionName(1)),
+            make<LambdaAbstraction>(SbVar::makeProjectionName(2, 0),
+                                    make<BinaryOp>(Operations::Mult,
+                                                   make<Variable>(SbVar::makeProjectionName(2, 0)),
+                                                   Constant::int32(90))),
+            Constant::int32(0)));
     TypeSignature signature = TypeChecker{}.typeCheck(tree1);
     ASSERT_EQ(signature.typesMask, TypeSignature::kAnyScalarType.typesMask);
     // Inject the information that the slot contains a number (and not an array).
     TypeChecker checker;
-    checker.bind(getABTVariableName(1), TypeSignature::kNumericType);
+    checker.bind(SbVar::makeProjectionName(1), TypeSignature::kNumericType);
     signature = checker.typeCheck(tree1);
 
     // The result should be a Let expression having the multiplication in its body.
@@ -421,29 +422,29 @@ TEST(TypeCheckerTest, FoldTraverseP) {
     ASSERT_EQ(signature.typesMask, TypeSignature::kNumericType.typesMask);
 
     // Run it on a constant array.
-    auto tree2 =
-        make<FunctionCall>("traverseP",
-                           makeSeq(Constant::array(sbe::value::makeIntOrLong(78)),
-                                   make<LambdaAbstraction>(
-                                       getABTLocalVariableName(2, 0),
-                                       make<BinaryOp>(Operations::Mult,
-                                                      make<Variable>(getABTLocalVariableName(2, 0)),
-                                                      Constant::int32(90))),
-                                   Constant::int32(0)));
+    auto tree2 = make<FunctionCall>(
+        "traverseP",
+        makeSeq(
+            Constant::array(sbe::value::makeIntOrLong(78)),
+            make<LambdaAbstraction>(SbVar::makeProjectionName(2, 0),
+                                    make<BinaryOp>(Operations::Mult,
+                                                   make<Variable>(SbVar::makeProjectionName(2, 0)),
+                                                   Constant::int32(90))),
+            Constant::int32(0)));
     signature = TypeChecker{}.typeCheck(tree2);
 
     ASSERT_EQ(signature.typesMask, TypeSignature::kAnyScalarType.typesMask);
 
     // Run it on a constant number.
-    auto tree3 =
-        make<FunctionCall>("traverseP",
-                           makeSeq(Constant::int32(78),
-                                   make<LambdaAbstraction>(
-                                       getABTLocalVariableName(2, 0),
-                                       make<BinaryOp>(Operations::Mult,
-                                                      make<Variable>(getABTLocalVariableName(2, 0)),
-                                                      Constant::int32(90))),
-                                   Constant::int32(0)));
+    auto tree3 = make<FunctionCall>(
+        "traverseP",
+        makeSeq(
+            Constant::int32(78),
+            make<LambdaAbstraction>(SbVar::makeProjectionName(2, 0),
+                                    make<BinaryOp>(Operations::Mult,
+                                                   make<Variable>(SbVar::makeProjectionName(2, 0)),
+                                                   Constant::int32(90))),
+            Constant::int32(0)));
     signature = TypeChecker{}.typeCheck(tree3);
 
     // The result should be a Let expression having the multiplication in its body.

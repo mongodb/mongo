@@ -595,9 +595,9 @@ SbExpr buildFinalizeAvg(const AccumOp& acc,
         // If we've encountered any numeric input, the counter would contain a positive integer.
         // Unlike $sum, when there is no numeric input, $avg should return null.
         auto finalizingExpression =
-            b.makeIf(b.makeBinaryOp(sbe::EPrimBinary::eq, aggSlots[1], b.makeInt64Constant(0)),
+            b.makeIf(b.makeBinaryOp(abt::Operations::Eq, aggSlots[1], b.makeInt64Constant(0)),
                      b.makeNullConstant(),
-                     b.makeBinaryOp(sbe::EPrimBinary::div,
+                     b.makeBinaryOp(abt::Operations::Div,
                                     b.makeFunction("doubleDoubleSumFinalize", aggSlots[0]),
                                     aggSlots[1]));
 
@@ -1050,20 +1050,19 @@ SbExpr::Vector buildInitializeAccumN(const AccumOp& acc,
             b.makeNumericConvert(std::move(maxSizeExpr), sbe::value::TypeTags::NumberInt64));
         auto var = SbVar{frameId, 0};
 
-        auto e =
-            b.makeIf(b.makeBooleanOpTree(
-                         abt::Operations::And,
-                         b.makeFunction("exists", var),
-                         b.makeBinaryOp(sbe::EPrimBinary::greater, var, b.makeInt64Constant(0))),
-                     b.makeFunction("newArray",
-                                    b.makeFunction("newArray"),
-                                    b.makeInt64Constant(0),
-                                    var,
-                                    b.makeInt32Constant(0),
-                                    b.makeInt32Constant(maxAccumulatorBytes),
-                                    std::move(isGroupAccumExpr)),
-                     b.makeFail(ErrorCodes::Error{7548607},
-                                "parameter 'n' must be coercible to a positive 64-bit integer"));
+        auto e = b.makeIf(
+            b.makeBooleanOpTree(abt::Operations::And,
+                                b.makeFunction("exists", var),
+                                b.makeBinaryOp(abt::Operations::Gt, var, b.makeInt64Constant(0))),
+            b.makeFunction("newArray",
+                           b.makeFunction("newArray"),
+                           b.makeInt64Constant(0),
+                           var,
+                           b.makeInt32Constant(0),
+                           b.makeInt32Constant(maxAccumulatorBytes),
+                           std::move(isGroupAccumExpr)),
+            b.makeFail(ErrorCodes::Error{7548607},
+                       "parameter 'n' must be coercible to a positive 64-bit integer"));
 
         auto localBind = b.makeLet(frameId, std::move(binds), std::move(e));
 
@@ -1506,10 +1505,9 @@ SbExpr buildFinalizeDerivative(const AccumOp& acc,
     auto sortByLast = std::move(inputs->sortByLast);
 
     return b.makeIf(
-        b.makeBooleanOpTree(
-            abt::Operations::And,
-            b.makeFunction("exists", slots[0]),
-            b.makeBinaryOp(sbe::EPrimBinary::greater, slots[0], b.makeInt64Constant(0))),
+        b.makeBooleanOpTree(abt::Operations::And,
+                            b.makeFunction("exists", slots[0]),
+                            b.makeBinaryOp(abt::Operations::Gt, slots[0], b.makeInt64Constant(0))),
         b.makeFunction("aggDerivativeFinalize",
                        std::move(unit),
                        std::move(inputFirst),

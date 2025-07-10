@@ -954,7 +954,7 @@ TEST(VectorizerTest, ConvertFilter) {
                      std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
                                     boost::none));
 
-    auto tmpVar = getABTLocalVariableName(7, 0);
+    auto tmpVar = SbVar::makeProjectionName(7, 0);
 
     {
         auto tree1 = make<FunctionCall>(

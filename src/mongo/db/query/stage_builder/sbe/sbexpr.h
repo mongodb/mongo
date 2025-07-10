@@ -95,21 +95,6 @@ private:
     std::variant<IdType, PrefixMapType> _ids;
 };
 
-abt::ProjectionName getABTVariableName(SbSlot s);
-
-abt::ProjectionName getABTVariableName(sbe::value::SlotId slotId);
-
-abt::ProjectionName getABTLocalVariableName(sbe::FrameId frameId, sbe::value::SlotId slotId);
-
-boost::optional<sbe::value::SlotId> getSbeVariableInfo(const abt::ProjectionName& var);
-
-boost::optional<std::pair<sbe::FrameId, sbe::value::SlotId>> getSbeLocalVariableInfo(
-    const abt::ProjectionName& var);
-
-abt::ABT makeABTVariable(SbSlot s);
-
-abt::ABT makeABTVariable(sbe::value::SlotId slotId);
-
 using VariableTypes =
     stdx::unordered_map<abt::ProjectionName, TypeSignature, abt::ProjectionName::Hasher>;
 
@@ -121,13 +106,30 @@ TypeSignature constantFold(abt::ABT& abt,
                            const VariableTypes* slotInfo = nullptr);
 
 /**
+ * This base class is inherited from by the SbSlot, SbLocalVar, SbVar, and SbExpr classes below.
+ * It contains some common type aliases and static methods.
+ */
+class SbBase {
+public:
+    using SlotId = sbe::value::SlotId;
+    using FrameId = sbe::FrameId;
+    using LocalVarInfo = std::pair<int32_t, int32_t>;
+
+    static abt::ProjectionName makeProjectionName(SlotId slotId);
+
+    static abt::ProjectionName makeProjectionName(FrameId frameId, SlotId slotId);
+
+    static abt::ProjectionName makeProjectionName(boost::optional<FrameId> frameId, SlotId slotId) {
+        return frameId ? makeProjectionName(*frameId, slotId) : makeProjectionName(slotId);
+    }
+};
+
+/**
  * The SbSlot struct is used to represent slot variables in the SBE stage builder. "SbSlot" is short
  * for "stage builder slot".
  */
-class SbSlot {
+class SbSlot : public SbBase {
 public:
-    using SlotId = sbe::value::SlotId;
-
     struct Less {
         bool operator()(const SbSlot& lhs, const SbSlot& rhs) const {
             return lhs.getId() < rhs.getId();
@@ -139,6 +141,8 @@ public:
             return lhs.getId() == rhs.getId();
         }
     };
+
+    static boost::optional<SbSlot> fromProjectionName(const abt::ProjectionName& var);
 
     SbSlot() = default;
 
@@ -159,6 +163,10 @@ public:
     }
 
     SbVar toVar() const;
+
+    abt::ProjectionName toProjectionName() const {
+        return makeProjectionName(slotId);
+    }
 
     SlotId getId() const {
         return slotId;
@@ -188,10 +196,9 @@ using SbSlotVector = absl::InlinedVector<SbSlot, 2>;
  * The SbLocalVar class is used to represent local variables in the SBE stage builder. "SbLocalVar"
  * is short for "stage builder local variable".
  */
-class SbLocalVar {
+class SbLocalVar : public SbBase {
 public:
-    using SlotId = sbe::value::SlotId;
-    using FrameId = sbe::FrameId;
+    static boost::optional<SbLocalVar> fromProjectionName(const abt::ProjectionName& var);
 
     SbLocalVar() = default;
 
@@ -214,6 +221,10 @@ public:
     }
 
     SbVar toVar() const;
+
+    abt::ProjectionName toProjectionName() const {
+        return makeProjectionName(_frameId, _slotId);
+    }
 
     FrameId getFrameId() const {
         return _frameId;
@@ -250,10 +261,9 @@ private:
  * An SbVar can be constructed from an EVariable or ProjectionName, and likewise an SbVar can be
  * converted to EVariable or ProjectionName.
  */
-class SbVar {
+class SbVar : public SbBase {
 public:
-    using SlotId = sbe::value::SlotId;
-    using FrameId = sbe::FrameId;
+    static boost::optional<SbVar> fromProjectionName(const abt::ProjectionName& var);
 
     explicit SbVar(SlotId slotId, boost::optional<TypeSignature> typeSig = boost::none)
         : _slotId(slotId), _typeSig(typeSig) {}
@@ -265,8 +275,6 @@ public:
 
     SbVar(const sbe::EVariable& var, boost::optional<TypeSignature> typeSig = boost::none)
         : _frameId(var.getFrameId()), _slotId(var.getSlotId()), _typeSig(typeSig) {}
-
-    SbVar(const abt::ProjectionName& name, boost::optional<TypeSignature> typeSig = boost::none);
 
     SbVar(SbSlot s) : _slotId(s.getId()), _typeSig(s.getTypeSignature()) {}
 
@@ -312,12 +320,8 @@ public:
         return SbLocalVar{*_frameId, _slotId, getTypeSignature()};
     }
 
-    abt::ProjectionName getABTName() const {
-        return _frameId ? getABTLocalVariableName(*_frameId, _slotId) : getABTVariableName(_slotId);
-    }
-
-    operator abt::ProjectionName() const {
-        return getABTName();
+    abt::ProjectionName toProjectionName() const {
+        return makeProjectionName(_frameId, _slotId);
     }
 
     bool hasTypeSignature() const {
@@ -352,14 +356,10 @@ using SbExprPair = std::pair<SbExpr, SbExpr>;
  * The SbExpr class is used to represent expressions in the SBE stage builder. "SbExpr" is short
  * for "stage builder expression".
  */
-class SbExpr {
+class SbExpr : public SbBase {
 public:
     using Vector = std::vector<SbExpr>;
     using CaseValuePair = SbExprPair;
-
-    using SlotId = sbe::value::SlotId;
-    using FrameId = sbe::FrameId;
-    using LocalVarInfo = std::pair<int32_t, int32_t>;
 
     struct Abt {
         abt::ABT ptr;
@@ -664,14 +664,14 @@ struct SbWindow {
 
 inline void addVariableTypesHelper(VariableTypes& varTypes, SbSlot slot) {
     if (auto typeSig = slot.getTypeSignature()) {
-        varTypes[getABTVariableName(slot)] = *typeSig;
+        varTypes[slot.toProjectionName()] = *typeSig;
     }
 }
 
 inline void addVariableTypesHelper(VariableTypes& varTypes, boost::optional<SbSlot> slot) {
     if (slot) {
         if (auto typeSig = slot->getTypeSignature()) {
-            varTypes[getABTVariableName(*slot)] = *typeSig;
+            varTypes[slot->toProjectionName()] = *typeSig;
         }
     }
 }

@@ -253,7 +253,7 @@ SbExpr buildVectorizedExpr(StageBuilderState& state,
         Vectorizer::VariableTypes bindings;
         for (const SbSlot& slot : outputs.getAllSlotsInOrder()) {
             if (auto typeSig = slot.getTypeSignature()) {
-                bindings.emplace(getABTVariableName(slot), std::make_pair(*typeSig, boost::none));
+                bindings.emplace(slot.toProjectionName(), std::make_pair(*typeSig, boost::none));
             }
         }
 

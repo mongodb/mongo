@@ -74,7 +74,7 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> convertBitTestBitPositions(
  */
 SbExpr generateComparisonExpr(StageBuilderState& state,
                               const ComparisonMatchExpression* expr,
-                              sbe::EPrimBinary::Op binaryOp,
+                              abt::Operations binaryOp,
                               SbExpr inputExpr);
 SbExpr generateInExpr(StageBuilderState& state, const InMatchExpression* expr, SbExpr inputExpr);
 SbExpr generateBitTestExpr(StageBuilderState& state,

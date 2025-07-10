@@ -150,6 +150,8 @@ private:
     // Return an expression combining all the active bitmap masks currently in scope.
     abt::ABT generateMaskArg();
 
+    abt::ProjectionName generateLocalVarName();
+
     // Helper method to report unsupported constructs.
     void logUnsupportedConversion(const abt::ABT& node);
 

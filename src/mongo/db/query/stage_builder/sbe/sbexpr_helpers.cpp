@@ -84,52 +84,6 @@ inline std::vector<std::pair<abt::ABT, abt::ABT>> extractABT(std::vector<SbExprP
 
     return abtExprPairs;
 }
-
-inline abt::Operations getOptimizerOp(sbe::EPrimUnary::Op op) {
-    switch (op) {
-        case sbe::EPrimUnary::negate:
-            return abt::Operations::Neg;
-        case sbe::EPrimUnary::logicNot:
-            return abt::Operations::Not;
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-inline abt::Operations getOptimizerOp(sbe::EPrimBinary::Op op) {
-    switch (op) {
-        case sbe::EPrimBinary::eq:
-            return abt::Operations::Eq;
-        case sbe::EPrimBinary::neq:
-            return abt::Operations::Neq;
-        case sbe::EPrimBinary::greater:
-            return abt::Operations::Gt;
-        case sbe::EPrimBinary::greaterEq:
-            return abt::Operations::Gte;
-        case sbe::EPrimBinary::less:
-            return abt::Operations::Lt;
-        case sbe::EPrimBinary::lessEq:
-            return abt::Operations::Lte;
-        case sbe::EPrimBinary::add:
-            return abt::Operations::Add;
-        case sbe::EPrimBinary::sub:
-            return abt::Operations::Sub;
-        case sbe::EPrimBinary::fillEmpty:
-            return abt::Operations::FillEmpty;
-        case sbe::EPrimBinary::logicAnd:
-            return abt::Operations::And;
-        case sbe::EPrimBinary::logicOr:
-            return abt::Operations::Or;
-        case sbe::EPrimBinary::cmp3w:
-            return abt::Operations::Cmp3w;
-        case sbe::EPrimBinary::div:
-            return abt::Operations::Div;
-        case sbe::EPrimBinary::mul:
-            return abt::Operations::Mult;
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
 }  // namespace
 
 sbe::EExpression::Vector SbExprBuilder::lower(SbExpr::Vector& sbExprs,
@@ -208,27 +162,30 @@ std::vector<sbe::WindowStage::Window> SbExprBuilder::lower(std::vector<SbWindow>
 }
 
 SbExpr SbExprBuilder::makeNot(SbExpr e) {
-    return stage_builder::makeNot(extractABT(e));
-}
-
-SbExpr SbExprBuilder::makeUnaryOp(sbe::EPrimUnary::Op unaryOp, SbExpr e) {
-    return stage_builder::makeUnaryOp(getOptimizerOp(unaryOp), extractABT(e));
+    return makeUnaryOp(abt::Operations::Not, std::move(e));
 }
 
 SbExpr SbExprBuilder::makeUnaryOp(abt::Operations unaryOp, SbExpr e) {
-    return stage_builder::makeUnaryOp(unaryOp, extractABT(e));
-}
-
-SbExpr SbExprBuilder::makeBinaryOp(sbe::EPrimBinary::Op binaryOp, SbExpr lhs, SbExpr rhs) {
-    return stage_builder::makeBinaryOp(getOptimizerOp(binaryOp), extractABT(lhs), extractABT(rhs));
+    return abt::make<abt::UnaryOp>(unaryOp, extractABT(e));
 }
 
 SbExpr SbExprBuilder::makeBinaryOp(abt::Operations binaryOp, SbExpr lhs, SbExpr rhs) {
-    return makeBinaryOp(abt_lower::getEPrimBinaryOp(binaryOp), std::move(lhs), std::move(rhs));
+    return abt::make<abt::BinaryOp>(binaryOp, extractABT(lhs), extractABT(rhs));
 }
 
 SbExpr SbExprBuilder::makeNaryOp(abt::Operations naryOp, SbExpr::Vector args) {
-    return stage_builder::makeNaryOp(naryOp, extractABT(args));
+    tassert(10199700, "Expected at least one argument", !args.empty());
+
+    if (feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
+        return abt::make<abt::NaryOp>(naryOp, extractABT(args));
+    } else {
+        return std::accumulate(std::make_move_iterator(args.begin() + 1),
+                               std::make_move_iterator(args.end()),
+                               std::move(args.front()),
+                               [&](auto&& acc, auto&& ex) -> SbExpr {
+                                   return makeBinaryOp(naryOp, std::move(acc), std::move(ex));
+                               });
+    }
 }
 
 SbExpr SbExprBuilder::makeConstant(sbe::value::TypeTags tag, sbe::value::Value val) {
@@ -272,31 +229,50 @@ SbExpr SbExprBuilder::makeUndefinedConstant() {
 }
 
 SbExpr SbExprBuilder::makeFunction(StringData name, SbExpr::Vector args) {
-    return stage_builder::makeABTFunction(name, extractABT(args));
+    return abt::make<abt::FunctionCall>(std::string{name}, extractABT(args));
 }
 
 SbExpr SbExprBuilder::makeIf(SbExpr condExpr, SbExpr thenExpr, SbExpr elseExpr) {
-    return stage_builder::makeIf(extractABT(condExpr), extractABT(thenExpr), extractABT(elseExpr));
+    return abt::make<abt::If>(extractABT(condExpr), extractABT(thenExpr), extractABT(elseExpr));
 }
 
 SbExpr SbExprBuilder::makeLet(sbe::FrameId frameId, SbExpr::Vector binds, SbExpr expr) {
-    return stage_builder::makeLet(frameId, extractABT(binds), extractABT(expr));
+    if (!feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
+        for (size_t idx = binds.size(); idx > 0;) {
+            --idx;
+            expr = abt::make<abt::Let>(
+                SbVar(frameId, idx).toProjectionName(), extractABT(binds[idx]), extractABT(expr));
+        }
+
+        return expr;
+    } else {
+        std::vector<abt::ProjectionName> bindNames;
+        bindNames.reserve(binds.size());
+        for (size_t idx = 0; idx < binds.size(); ++idx) {
+            bindNames.emplace_back(SbVar(frameId, idx).toProjectionName());
+        }
+
+        binds.emplace_back(std::move(expr));
+        return abt::make<abt::MultiLet>(std::move(bindNames), extractABT(binds));
+    }
 }
 
 SbExpr SbExprBuilder::makeLocalLambda(sbe::FrameId frameId, SbExpr expr) {
-    return stage_builder::makeLocalLambda(frameId, extractABT(expr));
+    return abt::make<abt::LambdaAbstraction>(SbVar(frameId, 0).toProjectionName(),
+                                             extractABT(expr));
 }
 
 SbExpr SbExprBuilder::makeNumericConvert(SbExpr expr, sbe::value::TypeTags tag) {
-    return stage_builder::makeNumericConvert(extractABT(expr), tag);
+    return makeFunction(
+        "convert"_sd, std::move(expr), makeInt32Constant(static_cast<int32_t>(tag)));
 }
 
 SbExpr SbExprBuilder::makeFail(ErrorCodes::Error error, StringData errorMessage) {
-    return stage_builder::makeABTFail(error, errorMessage);
+    return makeFunction("fail"_sd, makeInt32Constant(error), makeStrConstant(errorMessage));
 }
 
 SbExpr SbExprBuilder::makeFillEmpty(SbExpr expr, SbExpr altExpr) {
-    return makeBinaryOp(sbe::EPrimBinary::fillEmpty, std::move(expr), std::move(altExpr));
+    return makeBinaryOp(abt::Operations::FillEmpty, std::move(expr), std::move(altExpr));
 }
 
 SbExpr SbExprBuilder::makeFillEmptyFalse(SbExpr expr) {
@@ -316,84 +292,120 @@ SbExpr SbExprBuilder::makeFillEmptyUndefined(SbExpr expr) {
 }
 
 SbExpr SbExprBuilder::makeIfNullExpr(SbExpr::Vector values) {
-    return stage_builder::makeIfNullExpr(extractABT(values), _state.frameIdGenerator);
+    tassert(6987505, "Expected 'values' to be non-empty", values.size() > 0);
+
+    size_t idx = values.size() - 1;
+    auto expr = std::move(values[idx]);
+
+    while (idx > 0) {
+        --idx;
+
+        auto frameId = _state.frameId();
+        SbVar var{frameId, 0};
+
+        expr = makeLet(frameId,
+                       SbExpr::makeSeq(std::move(values[idx])),
+                       makeIf(generateNullMissingOrUndefined(var), std::move(expr), var));
+    }
+
+    return expr;
 }
 
 SbExpr SbExprBuilder::generateNullOrMissing(SbExpr expr) {
-    return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
-                        makeFunction("typeMatch",
-                                     std::move(expr),
-                                     makeInt32Constant(getBSONTypeMask(BSONType::null))),
-                        makeBoolConstant(true));
+    return makeFillEmptyTrue(makeFunction(
+        "typeMatch", std::move(expr), makeInt32Constant(getBSONTypeMask(BSONType::null))));
 }
 
 SbExpr SbExprBuilder::generateNullMissingOrUndefined(SbExpr expr) {
-    return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
-                        makeFunction("typeMatch",
-                                     std::move(expr),
-                                     makeInt32Constant(getBSONTypeMask(BSONType::null) |
-                                                       getBSONTypeMask(BSONType::undefined))),
-                        makeBoolConstant(true));
+    return makeFillEmptyTrue(makeFunction(
+        "typeMatch",
+        std::move(expr),
+        makeInt32Constant(getBSONTypeMask(BSONType::null) | getBSONTypeMask(BSONType::undefined))));
 }
 
 SbExpr SbExprBuilder::generatePositiveCheck(SbExpr expr) {
-    return stage_builder::generateABTPositiveCheck(extractABT(expr));
+    return makeBinaryOp(abt::Operations::Gt, std::move(expr), makeInt32Constant(0));
 }
 
 SbExpr SbExprBuilder::generateNullOrMissing(SbVar var) {
-    return stage_builder::generateABTNullOrMissing(var.getABTName());
+    return makeFillEmptyTrue(
+        makeFunction("typeMatch"_sd, var, makeInt32Constant(getBSONTypeMask(BSONType::null))));
 }
 
 SbExpr SbExprBuilder::generateNullMissingOrUndefined(SbVar var) {
-    return stage_builder::generateABTNullMissingOrUndefined(var.getABTName());
+    return makeFillEmptyTrue(makeFunction(
+        "typeMatch"_sd,
+        var,
+        makeInt32Constant(getBSONTypeMask(BSONType::null) | getBSONTypeMask(BSONType::undefined))));
 }
 
 SbExpr SbExprBuilder::generateNonStringCheck(SbVar var) {
-    return stage_builder::generateABTNonStringCheck(var.getABTName());
+    return makeNot(makeFunction("isString"_sd, var));
 }
 
 SbExpr SbExprBuilder::generateNonTimestampCheck(SbVar var) {
-    return stage_builder::generateABTNonTimestampCheck(var.getABTName());
+    return makeNot(makeFunction("isTimestamp"_sd, var));
 }
 
 SbExpr SbExprBuilder::generateNegativeCheck(SbVar var) {
-    return stage_builder::generateABTNegativeCheck(var.getABTName());
+    return makeBinaryOp(abt::Operations::And,
+                        makeNot(makeFunction("isNaN"_sd, var)),
+                        makeBinaryOp(abt::Operations::Lt, var, makeInt32Constant(0)));
 }
 
 SbExpr SbExprBuilder::generateNonPositiveCheck(SbVar var) {
-    return stage_builder::generateABTNonPositiveCheck(var.getABTName());
+    return makeBinaryOp(abt::Operations::Lte, var, makeInt32Constant(0));
 }
 
 SbExpr SbExprBuilder::generateNonNumericCheck(SbVar var) {
-    return stage_builder::generateABTNonNumericCheck(var.getABTName());
+    return makeNot(makeFunction("isNumber"_sd, var));
 }
 
 SbExpr SbExprBuilder::generateLongLongMinCheck(SbVar var) {
-    return stage_builder::generateABTLongLongMinCheck(var.getABTName());
+    return makeBinaryOp(
+        abt::Operations::And,
+        makeFunction("typeMatch"_sd, var, makeInt32Constant(getBSONTypeMask(BSONType::numberLong))),
+        makeBinaryOp(
+            abt::Operations::Eq, var, makeInt64Constant(std::numeric_limits<int64_t>::min())));
 }
 
 SbExpr SbExprBuilder::generateNonArrayCheck(SbVar var) {
-    return stage_builder::generateABTNonArrayCheck(var.getABTName());
+    return makeNot(makeFunction("isArray"_sd, var));
 }
 
 SbExpr SbExprBuilder::generateNonObjectCheck(SbVar var) {
-    return stage_builder::generateABTNonObjectCheck(var.getABTName());
+    return makeNot(makeFunction("isObject"_sd, var));
 }
 
 SbExpr SbExprBuilder::generateNullishOrNotRepresentableInt32Check(SbVar var) {
-    return stage_builder::generateABTNullishOrNotRepresentableInt32Check(var.getABTName());
+    return makeBinaryOp(
+        abt::Operations::Or,
+        generateNullMissingOrUndefined(var),
+        makeNot(makeFunction("exists"_sd,
+                             makeFunction("convert"_sd,
+                                          var,
+                                          makeInt32Constant(static_cast<int32_t>(
+                                              sbe::value::TypeTags::NumberInt32))))));
 }
 
 SbExpr SbExprBuilder::generateNaNCheck(SbVar var) {
-    return stage_builder::generateABTNaNCheck(var.getABTName());
+    return makeFunction("isNaN"_sd, var);
 }
 
 SbExpr SbExprBuilder::generateInfinityCheck(SbVar var) {
-    return stage_builder::generateABTInfinityCheck(var.getABTName());
+    return makeFunction("isInfinity"_sd, var);
 }
 
 SbExpr SbExprBuilder::generateInvalidRoundPlaceArgCheck(SbVar var) {
-    return stage_builder::generateInvalidRoundPlaceArgCheck(var.getABTName());
+    return makeBooleanOpTree(
+        abt::Operations::Or,
+        SbExpr::makeSeq(
+            // We can perform our numerical test with trunc. trunc will return nothing if we pass a
+            // non-number to it. We return true if the comparison returns nothing, or if
+            // var != trunc(var), indicating this is not a whole number.
+            makeFillEmptyTrue(makeBinaryOp(abt::Operations::Neq, var, makeFunction("trunc", var))),
+            makeBinaryOp(abt::Operations::Lt, var, makeInt32Constant(-20)),
+            makeBinaryOp(abt::Operations::Gt, var, makeInt32Constant(100))));
 }
 
 SbExpr SbExprBuilder::buildMultiBranchConditionalFromCaseValuePairs(

@@ -1476,7 +1476,7 @@ SbExpr SlotBasedStageBuilder::buildLimitSkipSumExpression(
     }
 
     auto sumExpr = b.makeBinaryOp(
-        sbe::EPrimBinary::add,
+        abt::Operations::Add,
         buildLimitSkipAmountExpression(canBeParameterized, *limit, _data->limitSkipSlots.limit),
         buildLimitSkipAmountExpression(canBeParameterized, *skip, _data->limitSkipSlots.skip));
 
@@ -2149,7 +2149,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildOnlyUnwind(
                 /* outer else */
                 b.makeIf(
                     /* inner2 if */ b.makeBinaryOp(
-                        sbe::EPrimBinary::greaterEq, arrayIndexSlot, b.makeInt64Constant(0)),
+                        abt::Operations::Gte, arrayIndexSlot, b.makeInt64Constant(0)),
                     /* inner2 then */ std::move(indexValUnwindValProjExpr),
                     /* inner2 else */ std::move(indexNullUnwindValProjExpr[1])));
     } else {
@@ -4274,7 +4274,7 @@ public:
                                       b.makeConstant(timezoneTag, timezoneVal));
             } else {
                 return b.makeBinaryOp(
-                    sbe::EPrimBinary::add, boundSlot, b.makeConstant(offset.first, offset.second));
+                    abt::Operations::Add, boundSlot, b.makeConstant(offset.first, offset.second));
             }
         };
         auto makeLowBoundExpr = [&](SbSlot boundSlot,
@@ -4283,8 +4283,8 @@ public:
                                         {sbe::value::TypeTags::Nothing, 0},
                                     boost::optional<TimeUnit> unit = boost::none) {
             // Use three way comparison to compare special values like NaN.
-            return b.makeBinaryOp(sbe::EPrimBinary::greaterEq,
-                                  b.makeBinaryOp(sbe::EPrimBinary::cmp3w,
+            return b.makeBinaryOp(abt::Operations::Gte,
+                                  b.makeBinaryOp(abt::Operations::Cmp3w,
                                                  boundTestingSlot,
                                                  makeOffsetBoundExpr(boundSlot, offset, unit)),
                                   b.makeInt32Constant(0));
@@ -4295,8 +4295,8 @@ public:
                                          {sbe::value::TypeTags::Nothing, 0},
                                      boost::optional<TimeUnit> unit = boost::none) {
             // Use three way comparison to compare special values like NaN.
-            return b.makeBinaryOp(sbe::EPrimBinary::lessEq,
-                                  b.makeBinaryOp(sbe::EPrimBinary::cmp3w,
+            return b.makeBinaryOp(abt::Operations::Lte,
+                                  b.makeBinaryOp(abt::Operations::Cmp3w,
                                                  boundTestingSlot,
                                                  makeOffsetBoundExpr(boundSlot, offset, unit)),
                                   b.makeInt32Constant(0));
@@ -4493,8 +4493,7 @@ public:
                                  std::move(finalExpr),
                                  std::move(emptyWindowExpr));
         } else {
-            finalExpr = b.makeBinaryOp(
-                sbe::EPrimBinary::fillEmpty, window.windowExprSlots[0], std::move(emptyWindowExpr));
+            finalExpr = b.makeFillEmpty(window.windowExprSlots[0], std::move(emptyWindowExpr));
         }
 
         return {std::move(stage), std::move(finalExpr)};

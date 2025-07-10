@@ -34,7 +34,6 @@
 #include "mongo/db/exec/sbe/stages/window.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/query/stage_builder/sbe/builder_state.h"
-#include "mongo/db/query/stage_builder/sbe/gen_abt_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 
 namespace mongo::stage_builder {
@@ -153,12 +152,8 @@ public:
 
     SbExpr makeNot(SbExpr e);
 
-    SbExpr makeUnaryOp(sbe::EPrimUnary::Op unaryOp, SbExpr e);
     SbExpr makeUnaryOp(abt::Operations unaryOp, SbExpr e);
-
-    SbExpr makeBinaryOp(sbe::EPrimBinary::Op binaryOp, SbExpr lhs, SbExpr rhs);
     SbExpr makeBinaryOp(abt::Operations binaryOp, SbExpr lhs, SbExpr rhs);
-
     SbExpr makeNaryOp(abt::Operations naryOp, SbExpr::Vector args);
 
     SbExpr makeConstant(sbe::value::TypeTags tag, sbe::value::Value val);
@@ -189,10 +184,33 @@ public:
 
     SbExpr makeFail(ErrorCodes::Error error, StringData errorMessage);
 
+    /**
+     * Check if expression returns Nothing and return 'altExpr' if so. Otherwise, return the
+     * expression.
+     */
     SbExpr makeFillEmpty(SbExpr expr, SbExpr altExpr);
+
+    /**
+     * Check if expression returns Nothing and return boolean false if so. Otherwise, return the
+     * expression.
+     */
     SbExpr makeFillEmptyFalse(SbExpr expr);
+
+    /**
+     * Check if expression returns Nothing and return boolean true if so. Otherwise, return the
+     * expression.
+     */
     SbExpr makeFillEmptyTrue(SbExpr expr);
+
+    /**
+     * Check if expression returns Nothing and return null if so. Otherwise, return the expression.
+     */
     SbExpr makeFillEmptyNull(SbExpr expr);
+
+    /**
+     * Check if expression returns Nothing and return undefined if so. Otherwise, return the
+     * expression.
+     */
     SbExpr makeFillEmptyUndefined(SbExpr expr);
 
     SbExpr makeIfNullExpr(SbExpr::Vector values);
@@ -205,17 +223,38 @@ public:
     SbExpr generateNullMissingOrUndefined(SbVar var);
     SbExpr generateNonStringCheck(SbVar var);
     SbExpr generateNonTimestampCheck(SbVar var);
+
+    /**
+     * Generates an expression that checks if the input expression is negative assuming that it has
+     * already been verified to have numeric type and to not be NaN.
+     */
     SbExpr generateNegativeCheck(SbVar var);
+
     SbExpr generateNonPositiveCheck(SbVar var);
     SbExpr generateNonNumericCheck(SbVar var);
     SbExpr generateLongLongMinCheck(SbVar var);
     SbExpr generateNonArrayCheck(SbVar var);
     SbExpr generateNonObjectCheck(SbVar var);
     SbExpr generateNullishOrNotRepresentableInt32Check(SbVar var);
+
+    /**
+     * Generates an expression that checks if the input expression is NaN _assuming that_ it has
+     * already been verified to be numeric.
+     */
     SbExpr generateNaNCheck(SbVar var);
+
     SbExpr generateInfinityCheck(SbVar var);
+
+    /**
+     * Generates an expression to check the given variable is a number between -20 and 100
+     * inclusive, and is a whole number.
+     */
     SbExpr generateInvalidRoundPlaceArgCheck(SbVar var);
 
+    /**
+     * Convert a list of case/value pairs into a chain of "If" expressions, with the final else
+     * case evaluating to the 'defaultCase' expression.
+     */
     SbExpr buildMultiBranchConditional(SbExpr defaultCase) {
         return defaultCase;
     }
@@ -227,6 +266,10 @@ public:
                       buildMultiBranchConditional(std::forward<Ts>(rest)...));
     }
 
+    /**
+     * Converts a std::vector of case/value pairs into a chain of "If" expressions in the
+     * same manner as the buildMultiBranchConditional() method.
+     */
     SbExpr buildMultiBranchConditionalFromCaseValuePairs(std::vector<SbExprPair> caseValPairs,
                                                          SbExpr defaultVal);
 

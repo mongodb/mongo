@@ -68,7 +68,7 @@ Vectorizer::Tree Vectorizer::vectorize(abt::ABT& node,
                                        boost::optional<SbSlot> externalBitmapSlot) {
     _variableTypes = externalBindings;
     if (externalBitmapSlot) {
-        _activeMasks.push_back(getABTVariableName(*externalBitmapSlot));
+        _activeMasks.push_back(SbVar::makeProjectionName(externalBitmapSlot->getId()));
     }
     auto result = node.visit(*this);
     foldIfNecessary(result, _purpose == Purpose::Filter);
@@ -109,6 +109,10 @@ abt::ABT Vectorizer::generateMaskArg() {
         }
     }
     return std::move(*tree);
+}
+
+abt::ProjectionName Vectorizer::generateLocalVarName() {
+    return SbVar::makeProjectionName(_frameGenerator->generate(), 0);
 }
 
 void Vectorizer::logUnsupportedConversion(const abt::ABT& node) {
@@ -161,11 +165,9 @@ Vectorizer::Tree Vectorizer::vectorizeLogicalOp(abt::Operations opType, Lhs lhsN
         // Treat the result of the left side as the mask to be applied on the right side.
         // This way, the right side can decide whether to skip the processing of the indexes
         // where the left side produced a false result.
-        auto lhsVar = getABTLocalVariableName(_frameGenerator->generate(), 0);
+        auto lhsVar = generateLocalVarName();
 
-        auto mask = opType == abt::Operations::And
-            ? lhsVar
-            : getABTLocalVariableName(_frameGenerator->generate(), 0);
+        auto mask = opType == abt::Operations::And ? lhsVar : generateLocalVarName();
 
         _activeMasks.push_back(mask);
         Tree rhs = rhsNode();
@@ -980,11 +982,11 @@ Vectorizer::Tree Vectorizer::vectorizeCond(Cond condNode, Then thenNode, Else el
 
     if (TypeSignature::kBlockType.isSubset(test.typeSignature)) {
         // The bitmap result of the conditions in the path so far.
-        auto previousConditionBitmapVar = getABTLocalVariableName(_frameGenerator->generate(), 0);
+        auto previousConditionBitmapVar = generateLocalVarName();
         auto previousBitmapExpr = generateMaskArg();
 
         // The `then` side will use all the bitmaps seen so far AND the current bitmap.
-        auto thenBranchBitmapVar = getABTLocalVariableName(_frameGenerator->generate(), 0);
+        auto thenBranchBitmapVar = generateLocalVarName();
         _activeMasks.push_back(thenBranchBitmapVar);
         auto thenBranch = thenNode();
         _activeMasks.pop_back();
@@ -1000,7 +1002,7 @@ Vectorizer::Tree Vectorizer::vectorizeCond(Cond condNode, Then thenNode, Else el
 
         // The `else` side will use all the bitmaps seen so far AND the negation of the current
         // bitmap.
-        auto elseBranchBitmapVar = getABTLocalVariableName(_frameGenerator->generate(), 0);
+        auto elseBranchBitmapVar = generateLocalVarName();
         _activeMasks.push_back(elseBranchBitmapVar);
         auto elseBranch = elseNode();
         _activeMasks.pop_back();

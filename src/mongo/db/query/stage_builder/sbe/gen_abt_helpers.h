@@ -45,36 +45,6 @@
 
 namespace mongo::stage_builder {
 
-/**
- * Creates a boolean expression tree from given collection of leaf expression.
- */
-SbExpr makeBooleanOpTree(abt::Operations logicOp,
-                         std::vector<SbExpr> leaves,
-                         StageBuilderState& state);
-
-template <typename Builder>
-abt::ABT makeBalancedTreeImpl(Builder builder,
-                              std::vector<abt::ABT>& leaves,
-                              size_t from,
-                              size_t until) {
-    invariant(from < until);
-    if (from + 1 == until) {
-        return std::move(leaves[from]);
-    } else {
-        size_t mid = from + (until - from) / 2;
-        auto lhs = makeBalancedTreeImpl(builder, leaves, from, mid);
-        auto rhs = makeBalancedTreeImpl(builder, leaves, mid, until);
-        return builder(std::move(lhs), std::move(rhs));
-    }
-}
-
-template <typename Builder>
-abt::ABT makeBalancedTree(Builder builder, std::vector<abt::ABT> leaves) {
-    return makeBalancedTreeImpl(builder, leaves, 0, leaves.size());
-}
-
-abt::ABT makeBooleanOpTree(abt::Operations logicOp, std::vector<abt::ABT> leaves);
-
 inline auto makeABTFunction(StringData name, abt::ABTVector args) {
     return abt::make<abt::FunctionCall>(std::string{name}, std::move(args));
 }
@@ -94,102 +64,11 @@ inline auto makeABTConstant(StringData str) {
     return makeABTConstant(tag, value);
 }
 
-abt::ABT makeFillEmpty(abt::ABT expr, abt::ABT altExpr);
-
-/**
- * Check if expression returns Nothing and return boolean false if so. Otherwise, return the
- * expression.
- */
-abt::ABT makeFillEmptyFalse(abt::ABT e);
-/**
- * Check if expression returns Nothing and return boolean true if so. Otherwise, return the
- * expression.
- */
-abt::ABT makeFillEmptyTrue(abt::ABT e);
-/**
- * Check if expression returns Nothing and return null if so. Otherwise, return the expression.
- */
-abt::ABT makeFillEmptyNull(abt::ABT e);
-
-abt::ABT makeFillEmptyUndefined(abt::ABT e);
-
-abt::ABT makeNot(abt::ABT e);
-
 abt::ABT makeVariable(abt::ProjectionName var);
 
 abt::ABT makeUnaryOp(abt::Operations unaryOp, abt::ABT operand);
 
 abt::ABT makeBinaryOp(abt::Operations binaryOp, abt::ABT lhs, abt::ABT rhs);
-
-abt::ABT makeNaryOp(abt::Operations naryOp, abt::ABTVector args);
-
-abt::ABT generateABTNullOrMissing(abt::ProjectionName var);
-abt::ABT generateABTNullOrMissing(abt::ABT var);
-
-abt::ABT generateABTNullMissingOrUndefined(abt::ProjectionName var);
-abt::ABT generateABTNullMissingOrUndefined(abt::ABT var);
-
-/**
- * Generates an ABT that checks if the input expression is negative assuming that it has already
- * been verified to have numeric type and to not be NaN.
- */
-abt::ABT generateABTNegativeCheck(abt::ProjectionName var);
-
-abt::ABT generateABTNonPositiveCheck(abt::ProjectionName var);
-abt::ABT generateABTPositiveCheck(abt::ABT var);
-abt::ABT generateABTNonNumericCheck(abt::ProjectionName var);
-abt::ABT generateABTLongLongMinCheck(abt::ProjectionName var);
-abt::ABT generateABTNonArrayCheck(abt::ProjectionName var);
-abt::ABT generateABTNonObjectCheck(abt::ProjectionName var);
-abt::ABT generateABTNonStringCheck(abt::ProjectionName var);
-abt::ABT generateABTNonStringCheck(abt::ABT var);
-abt::ABT generateABTNonTimestampCheck(abt::ProjectionName var);
-abt::ABT generateABTNullishOrNotRepresentableInt32Check(abt::ProjectionName var);
-/**
- * Generates an ABT to check the given variable is a number between -20 and 100 inclusive, and is a
- * whole number.
- */
-abt::ABT generateInvalidRoundPlaceArgCheck(const abt::ProjectionName& var);
-/**
- * Generates an ABT that checks if the input expression is NaN _assuming that_ it has
- * already been verified to be numeric.
- */
-abt::ABT generateABTNaNCheck(abt::ProjectionName var);
-
-abt::ABT generateABTInfinityCheck(abt::ProjectionName var);
-
-/**
- * A pair representing a 1) true/false condition and 2) the value that should be returned if that
- * condition evaluates to true.
- */
-using ABTCaseValuePair = std::pair<abt::ABT, abt::ABT>;
-
-/**
- * Convert a list of CaseValuePairs into a chain of abt::If expressions, with the final else
- * case evaluating to the 'defaultValue' abt::ABT.
- */
-template <typename... Ts>
-abt::ABT buildABTMultiBranchConditional(Ts... cases);
-
-template <typename... Ts>
-abt::ABT buildABTMultiBranchConditional(ABTCaseValuePair headCase, Ts... rest) {
-    return abt::make<abt::If>(std::move(headCase.first),
-                              std::move(headCase.second),
-                              buildABTMultiBranchConditional(std::move(rest)...));
-}
-
-template <>
-abt::ABT buildABTMultiBranchConditional(abt::ABT defaultCase);
-
-/**
- * Converts a std::vector of ABTCaseValuePairs into a chain of abt::If expressions in the
- * same manner as the 'buildABTMultiBranchConditional()' function.
- */
-abt::ABT buildABTMultiBranchConditionalFromCaseValuePairs(
-    std::vector<ABTCaseValuePair> caseValuePairs, abt::ABT defaultValue);
-
-abt::ABT makeIfNullExpr(std::vector<abt::ABT> values,
-                        sbe::value::FrameIdGenerator* frameIdGenerator);
 
 abt::ABT makeIf(abt::ABT condExpr, abt::ABT thenExpr, abt::ABT elseExpr);
 
@@ -198,15 +77,5 @@ abt::ABT makeLet(const abt::ProjectionName& name, abt::ABT bindExpr, abt::ABT ex
 abt::ABT makeLet(std::vector<abt::ProjectionName> bindNames,
                  abt::ABTVector bindExprs,
                  abt::ABT inExpr);
-
-abt::ABT makeLet(sbe::FrameId frameId, abt::ABT bindExpr, abt::ABT expr);
-
-abt::ABT makeLet(sbe::FrameId frameId, abt::ABTVector bindExprs, abt::ABT expr);
-
-abt::ABT makeLocalLambda(sbe::FrameId frameId, abt::ABT expr);
-
-abt::ABT makeNumericConvert(abt::ABT expr, sbe::value::TypeTags tag);
-
-abt::ABT makeABTFail(ErrorCodes::Error error, StringData errorMessage);
 
 }  // namespace mongo::stage_builder
