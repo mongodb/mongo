@@ -58,7 +58,7 @@ public:
      * @param val new timestamp to insert
      * @return const_iterator pointing to the newly inserted timestamp
      */
-    const_iterator insert(Timestamp&& val) {
+    const_iterator insert(const Timestamp& val) {
         // No free slots.
         if (_freeListEnd == _tsList.begin()) {
             auto it = _tsList.insert(_tsList.end(), val);
