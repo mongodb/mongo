@@ -36,7 +36,7 @@ EOF
     --env-file=signing-envfile \
     --rm \
     -v $(pwd):$(pwd) -w $(pwd) \
-    ${garasign_jsign_image} \
+    ${garasign_jsign_image_ecr} \
     /bin/bash -c "$(cat ./jsign_signing_commands.sh)"
 else
   echo "Not signing windows msi due to it being a patch build"

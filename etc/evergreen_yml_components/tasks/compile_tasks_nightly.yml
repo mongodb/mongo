@@ -72,15 +72,7 @@ tasks:
           aws_key_remote: ${repo_aws_key}
           aws_secret_remote: ${repo_aws_secret}
       - func: "f_expansions_write"
-
-      # login to container registry - optional due to patch builds not signing
-      - command: subprocess.exec
-        params:
-          binary: bash
-          silent: true
-          args:
-            - "./src/evergreen/container_registry_login.sh"
-          optional: true
+      - func: "log into devprod container registry"
       # signing windows msi - will not sign in patch build but still pretend it did
       - command: subprocess.exec
         params:
@@ -188,14 +180,7 @@ tasks:
           aws_key_remote: ${repo_aws_key}
           aws_secret_remote: ${repo_aws_secret}
       - func: "f_expansions_write"
-
-      # login to container registry
-      - command: subprocess.exec
-        params:
-          binary: bash
-          silent: true
-          args:
-            - "./src/evergreen/container_registry_login.sh"
+      - func: "log into devprod container registry"
 
       # signing linux artifacts
       - command: subprocess.exec
