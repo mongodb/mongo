@@ -73,10 +73,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::getField(value::TypeTag
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::getField(value::TypeTags objTag,
                                                                   value::Value objValue,
                                                                   StringData fieldStr) {
-    if (objTag == value::TypeTags::Object) {
-        auto [tag, val] = value::getObjectView(objValue)->getField(fieldStr);
-        return {false, tag, val};
-    } else if (objTag == value::TypeTags::bsonObject) {
+    if (MONGO_likely(objTag == value::TypeTags::bsonObject)) {
         auto be = value::bitcastTo<const char*>(objValue);
         const auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
         // Skip document length.
@@ -91,6 +88,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::getField(value::TypeTag
 
             be = bson::advance(be, sv.size());
         }
+    } else if (objTag == value::TypeTags::Object) {
+        auto [tag, val] = value::getObjectView(objValue)->getField(fieldStr);
+        return {false, tag, val};
     }
     return {false, value::TypeTags::Nothing, 0};
 }
