@@ -45,9 +45,6 @@ DeferredDropRecordStore::~DeferredDropRecordStore() {
         return;
     }
     try {
-        // TODO SERVER-81373: Multi-document transactions will cause the log to be spammed with
-        // EBUSY errors. This should ideally be replaced with a recoveryUnit onCommit handler if
-        // within a WUOW.
         _storageEngine->addDropPendingIdent(
             Timestamp::min(), std::make_shared<Ident>(_rs->getIdent()), nullptr);
     } catch (...) {
