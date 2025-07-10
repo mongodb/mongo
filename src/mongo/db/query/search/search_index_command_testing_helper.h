@@ -301,10 +301,11 @@ inline BSONObj createWrappedListSearchIndexesCmd(const NamespaceString& nss,
     BSONObj listSearchIndexes;
     if (idxCmdType.compare(std::string{kCreateCommand}) == 0) {
 
-        auto indexDefinition = CreateSearchIndexesCommand::parse(
-                                   IDLParserContext("createWrappedListSearchIndexesCmd"), newCmdObj)
-                                   .getIndexes()
-                                   .front();
+        IndexDefinition indexDefinition =
+            CreateSearchIndexesCommand::parse(IDLParserContext("createWrappedListSearchIndexesCmd"),
+                                              newCmdObj)
+                .getIndexes()
+                .front();
 
         if (indexDefinition.getName()) {
             listSearchIndexes =

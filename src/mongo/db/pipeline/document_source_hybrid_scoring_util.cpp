@@ -232,7 +232,7 @@ Status isSelectionStage(const BSONObj& bsonStage) {
         return Status(ErrorCodes::Error::InvalidBSON, "Input stages must not be empty.");
     }
 
-    auto fieldName = *bsonStage.getFieldNames<std::set<std::string>>().begin();
+    const auto& fieldName = bsonStage.firstElementFieldNameStringData();
     if (validSelectionStagesForHybridSearch.contains(fieldName)) {
         return Status::OK();
     }
