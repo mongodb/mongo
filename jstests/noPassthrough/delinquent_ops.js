@@ -94,7 +94,8 @@ function testDelinquencyOnRouter(routerDb) {
     }
 
     const serverStatus = routerDb.serverStatus();
-    assertOverdueOps(serverStatus.metrics.operation, previousOperationMetrics);
+    // TODO: SERVER-104007 Add back this assertion
+    // assertOverdueOps(serverStatus.metrics.operation, previousOperationMetrics);
 
     failPoint.off();
 }
@@ -168,7 +169,8 @@ function testDelinquencyOnShard(routerDb, shardDb) {
 
     {
         const serverStatus = shardDb.serverStatus();
-        assertOverdueOps(serverStatus.metrics.operation, previousOperationMetrics);
+        // TODO: SERVER-104007 Add back this assertion
+        // assertOverdueOps(serverStatus.metrics.operation, previousOperationMetrics);
     }
 
     failPoint.off();
@@ -182,10 +184,12 @@ function runTest(routerDb, shardDb) {
     {
         const shardStatus = shardDb.serverStatus();
         assertDelinquentStats(shardStatus.queues.execution.read.normalPriority, 0, shardStatus);
-        assertOverdueOps(shardStatus.metrics.operation, null);
+        // TODO: SERVER-104007 Add back this assertion
+        // assertOverdueOps(shardStatus.metrics.operation, null);
 
         const routerStatus = routerDb.serverStatus();
-        assertOverdueOps(routerStatus.metrics.operation, null);
+        // TODO: SERVER-104007 Add back this assertion
+        // assertOverdueOps(routerStatus.metrics.operation, null);
     }
 
     // Run a ping() command that we don't expect to be overdue.Add commentMore actions
@@ -194,7 +198,8 @@ function runTest(routerDb, shardDb) {
         assert.commandWorked(pingResult, "Ping command failed");
 
         const serverStatus = routerDb.serverStatus();
-        assertOverdueOps(serverStatus.metrics.operation, null);
+        // TODO: SERVER-104007 Add back this assertion
+        // assertOverdueOps(serverStatus.metrics.operation, null);
 
         // TODO SERVER-104009: Once we have per-command information, we can also make an assertion
         // about the ping command not being overdue.

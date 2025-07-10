@@ -78,10 +78,6 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(checkForInterruptFail);
 
 const auto kNoWaiterThread = stdx::thread::id();
-
-Milliseconds interruptCheckPeriod() {
-    return Milliseconds{gOverdueInterruptCheckIntervalMillis.loadRelaxed()};
-}
 }  // namespace
 
 OperationContext::OperationContext(Client* client, OperationId opId)
@@ -218,9 +214,6 @@ bool opShouldFail(Client* client, const BSONObj& failPointInfo) {
 }  // namespace
 
 Status OperationContext::checkForInterruptNoAssert() noexcept {
-    updateOverdueInterruptCheckCounters();
-
-    ++_overdueInterruptCheckStats.totalInterruptChecks;
     if (getClient()->getKilled() && !_isExecutingShutdown) {
         return Status(ErrorCodes::ClientMarkedKilled, "client has been killed");
     }
@@ -265,24 +258,6 @@ Status OperationContext::checkForInterruptNoAssert() noexcept {
     }
 
     return Status::OK();
-}
-
-void OperationContext::updateOverdueInterruptCheckCounters() {
-    const Date_t now = fastClockSource().now();
-    const Date_t prevStart = std::exchange(_interruptCheckWindowStartTime, now);
-
-    if (_ignoreInterrupts || isWaitingForConditionOrInterrupt()) {
-        // If we're ignoring interrupts or we're in an interruptible wait, we update the time of
-        // the last interrupt check, but we do not bump the overdue counters.
-        return;
-    }
-
-    if (auto overdue = (now - prevStart) - interruptCheckPeriod(); overdue > Milliseconds{0}) {
-        auto& stats = _overdueInterruptCheckStats;
-        ++stats.overdueInterruptChecks;
-        stats.overdueAccumulator += overdue;
-        stats.overdueMaxTime = std::max(stats.overdueMaxTime, overdue);
-    }
 }
 
 void OperationContext::_schedulePeriodicClientConnectedCheck() {

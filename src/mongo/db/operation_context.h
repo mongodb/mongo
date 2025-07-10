@@ -140,20 +140,6 @@ class OperationContext final : public OperationContextBase,
     OperationContext& operator=(const OperationContext&) = delete;
 
 public:
-    /**
-     * Used for tracking information about checkForInterrupt() calls that are overdue.
-     * TODO: SERVER-105801 we should consider moving this information up to Interruptible.
-     */
-    struct OverdueInterruptCheckStats {
-        int64_t totalInterruptChecks{0};
-        int64_t overdueInterruptChecks{0};
-
-        // Sum and max time an operation was overdue in checking for interrupts.
-        Milliseconds overdueAccumulator{0};
-        Milliseconds overdueMaxTime{0};
-    };
-
-
     static constexpr auto kDefaultOperationContextTimeoutError = ErrorCodes::ExceededTimeLimit;
 
     /**
@@ -191,14 +177,6 @@ public:
      * Returns Status::OK() unless this operation is in a killed state.
      */
     Status checkForInterruptNoAssert() noexcept override;
-
-    /**
-     * Updates the counters for tracking overdue interrupts. This should not be called except when
-     * an operation is completing and the caller wishes to update the counters so that if the
-     * caller is overdue for an interrupt check at the time the operation completes, it is
-     * recorded.
-     */
-    void updateOverdueInterruptCheckCounters();
 
     /**
      * Returns the service context under which this operation context runs.
@@ -738,14 +716,6 @@ public:
         _killOpsExempt = true;
     }
 
-    const OverdueInterruptCheckStats& overdueInterruptCheckStats() const {
-        return _overdueInterruptCheckStats;
-    }
-
-    bool hadOverdueInterruptCheck() const {
-        return _overdueInterruptCheckStats.overdueInterruptChecks > 0;
-    }
-
     // The query sampling options for operations on this opCtx. 'optIn' makes the operations
     // eligible for query sampling regardless of whether the client is considered as internal by
     // the sampler. 'optOut' does the opposite.
@@ -791,10 +761,6 @@ public:
                 setDeadlineByDate(prevDeadlineState.deadline, prevDeadlineState.error);
                 _hasArtificialDeadline = prevDeadlineState.hasArtificialDeadline;
                 _markKilledIfDeadlineRequires();
-
-                // For purposes of tracking overdue interrupts, act as if the moment we left
-                // the ignore state was the last check for interrupt.
-                _interruptCheckWindowStartTime = fastClockSource().now();
             });
             // Ignore interrupts until the callback completes.
             {
@@ -945,15 +911,6 @@ private:
 
     // When the operation was marked as killed.
     AtomicWord<TickSource::Tick> _killTime{0};
-
-    // Information for tracking overdue checkForInterrupt() calls.
-
-    // The start time of this interrupt check window. This can be the time of the last call to
-    // checkForInterrupt(), the time the operation was created, or the time at which the operation
-    // stopped ignoring interrupts.
-    Date_t _interruptCheckWindowStartTime{_fastClockSource->now()};
-
-    OverdueInterruptCheckStats _overdueInterruptCheckStats;
 
     // Used to cancel all tokens obtained via getCancellationToken() when this OperationContext is
     // killed.
