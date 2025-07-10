@@ -396,6 +396,9 @@ bool Pipeline::aggHasWriteStage(const BSONObj& cmd) {
 }
 
 void Pipeline::dispose(OperationContext* opCtx) {
+    if (_disposed) {
+        return;
+    }
     try {
         pCtx->setOperationContext(opCtx);
 
