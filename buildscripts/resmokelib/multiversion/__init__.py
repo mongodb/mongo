@@ -41,8 +41,8 @@ class MultiversionConfig(BaseModel):
 class MultiversionConfigSubcommand(Subcommand):
     """Subcommand for discovering multiversion configuration."""
 
-    def __init__(self, options: argparse.Namespace) -> None:
-        self.config_file_output = options.config_file_output
+    def __init__(self, options: dict) -> None:
+        self.config_file_output = options["config_file_output"]
 
     def execute(self):
         """Execute the subcommand."""
@@ -100,7 +100,7 @@ class MultiversionPlugin(PluginInterface):
         self,
         subcommand: str,
         parser: argparse.ArgumentParser,
-        parsed_args: argparse.Namespace,
+        parsed_args: dict,
         should_configure_otel=True,
         **kwargs,
     ) -> Optional[Subcommand]:

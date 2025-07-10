@@ -10,6 +10,7 @@ A prototype hang analyzer for Evergreen integration to help investigate test tim
 Supports Linux, MacOS X, and Windows.
 """
 
+import argparse
 import getpass
 import logging
 import os
@@ -33,7 +34,7 @@ from buildscripts.resmokelib.symbolizer import Symbolizer
 class HangAnalyzer(Subcommand):
     """Main class for the hang analyzer subcommand."""
 
-    def __init__(self, options, task_id=None, logger=None, **_kwargs):
+    def __init__(self, options: dict, task_id=None, logger=None, **_kwargs):
         """
         Configure processe lists based on options.
 
@@ -74,7 +75,7 @@ class HangAnalyzer(Subcommand):
         processes = process_list.get_processes(
             self.process_ids,
             self.interesting_processes,
-            self.options.process_match,
+            self.options["process_match"],
             self.root_logger,
         )
         process.teardown_processes(self.root_logger, processes, dump_pids={})
@@ -89,12 +90,12 @@ class HangAnalyzer(Subcommand):
 
         self._log_system_info()
 
-        dumpers = dumper.get_dumpers(self.root_logger, self.options.debugger_output)
+        dumpers = dumper.get_dumpers(self.root_logger, self.options["debugger_output"])
 
         processes = process_list.get_processes(
             self.process_ids,
             self.interesting_processes,
-            self.options.process_match,
+            self.options["process_match"],
             self.root_logger,
         )
 
@@ -120,7 +121,7 @@ class HangAnalyzer(Subcommand):
 
         dump_pids = {}
         # Dump core files of all processes, except python & java.
-        if self.options.dump_core:
+        if self.options["dump_core"]:
             take_core_processes = [
                 pinfo for pinfo in processes if not re.match("^(java|python)", pinfo.name)
             ]
@@ -210,7 +211,7 @@ class HangAnalyzer(Subcommand):
             for pid in pinfo.pidv:
                 try:
                     dumpers.jstack.dump_info(
-                        self.root_logger, self.options.debugger_output, pinfo.name, pid
+                        self.root_logger, self.options["debugger_output"], pinfo.name, pid
                     )
                 except Exception as err:
                     self.root_logger.info("Error encountered when invoking debugger %s", err)
@@ -230,7 +231,7 @@ class HangAnalyzer(Subcommand):
         self.root_logger.info("Done analyzing all processes for hangs")
 
         # Kill and abort processes if "-k" was specified.
-        if self.options.kill_processes:
+        if self.options["kill_processes"]:
             process.teardown_processes(self.root_logger, processes, dump_pids)
         else:
             # Resuming all suspended processes.
@@ -246,19 +247,19 @@ class HangAnalyzer(Subcommand):
             )
 
     def _configure_processes(self):
-        if self.options.debugger_output is None:
-            self.options.debugger_output = ["stdout"]
+        if self.options["debugger_output"] is None:
+            self.options["debugger_output"] = ["stdout"]
 
         # add != "" check to avoid empty process_ids
-        if self.options.process_ids is not None and self.options.process_ids != "":
+        if self.options["process_ids"] is not None and self.options["process_ids"] != "":
             # self.process_ids is an int list of PIDs
-            self.process_ids = [int(pid) for pid in self.options.process_ids.split(",")]
+            self.process_ids = [int(pid) for pid in self.options["process_ids"].split(",")]
 
-        if self.options.process_names is not None:
-            self.interesting_processes = self.options.process_names.split(",")
+        if self.options["process_names"] is not None:
+            self.interesting_processes = self.options["process_names"].split(",")
 
-        if self.options.go_process_names is not None:
-            self.go_processes = self.options.go_process_names.split(",")
+        if self.options["go_process_names"] is not None:
+            self.go_processes = self.options["go_process_names"].split(",")
             self.interesting_processes += self.go_processes
 
     def _setup_logging(self, logger):
@@ -301,16 +302,23 @@ class HangAnalyzer(Subcommand):
     def _check_enough_free_space(self):
         usage_percent = psutil.disk_usage(".").percent
         self.root_logger.info("Current disk usage percent: %s", usage_percent)
-        return usage_percent < self.options.max_disk_usage_percent
+        return usage_percent < self.options["max_disk_usage_percent"]
 
 
 class HangAnalyzerPlugin(PluginInterface):
     """Integration-point for hang-analyzer."""
 
-    def parse(self, subcommand, parser, parsed_args, should_configure_otel=True, **kwargs):
+    def parse(
+        self,
+        subcommand: str,
+        parser: argparse.ArgumentParser,
+        parsed_args: dict,
+        should_configure_otel: bool = True,
+        **kwargs,
+    ):
         """Parse command-line options."""
         if subcommand == "hang-analyzer":
-            return HangAnalyzer(parsed_args, task_id=parsed_args.task_id, **kwargs)
+            return HangAnalyzer(parsed_args, task_id=parsed_args["task_id"], **kwargs)
         return None
 
     def add_subcommand(self, subparsers):

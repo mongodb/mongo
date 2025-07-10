@@ -49,20 +49,20 @@ def get_parser(usage=None):
     return parser
 
 
-def parse(sys_args, usage=None):
+def parse(sys_args, usage=None) -> tuple[argparse.ArgumentParser, dict]:
     """Parse the CLI args."""
 
     parser = get_parser(usage=usage)
     parsed_args = parser.parse_args(sys_args)
 
-    return parser, parsed_args
+    return parser, vars(parsed_args)
 
 
 def parse_command_line(sys_args, usage=None, should_configure_otel=True, **kwargs):
     """Parse the command line arguments passed to resmoke.py and return the subcommand object to execute."""
     parser, parsed_args = parse(sys_args, usage)
 
-    subcommand = parsed_args.command
+    subcommand = parsed_args["command"]
 
     for plugin in _PLUGINS:
         subcommand_obj = plugin.parse(

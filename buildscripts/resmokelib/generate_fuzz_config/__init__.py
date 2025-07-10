@@ -1,5 +1,6 @@
 """Generate mongod.conf and mongos.conf using config fuzzer."""
 
+import argparse
 import os.path
 import shutil
 
@@ -157,7 +158,14 @@ class GenerateFuzzConfigPlugin(PluginInterface):
             help="Disables the fuzzing that sometimes enables the encrypted storage engine.",
         )
 
-    def parse(self, subcommand, parser, parsed_args, should_configure_otel=True, **kwargs):
+    def parse(
+        self,
+        subcommand: str,
+        parser: argparse.ArgumentParser,
+        parsed_args: dict,
+        should_configure_otel: bool = True,
+        **kwargs,
+    ):
         """
         Return the GenerateFuzzConfig subcommand for execution.
 
@@ -171,11 +179,11 @@ class GenerateFuzzConfigPlugin(PluginInterface):
         if subcommand != _COMMAND:
             return None
 
-        config.DISABLE_ENCRYPTION_FUZZING = parsed_args.disable_encryption_fuzzing
+        config.DISABLE_ENCRYPTION_FUZZING = parsed_args["disable_encryption_fuzzing"]
         return GenerateFuzzConfig(
-            parsed_args.template,
-            parsed_args.output,
-            parsed_args.fuzz_mongod_configs,
-            parsed_args.fuzz_mongos_configs,
-            parsed_args.config_fuzz_seed,
+            parsed_args["template"],
+            parsed_args["output"],
+            parsed_args["fuzz_mongod_configs"],
+            parsed_args["fuzz_mongos_configs"],
+            parsed_args["config_fuzz_seed"],
         )

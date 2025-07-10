@@ -366,7 +366,7 @@ class TestParseArgs(unittest.TestCase):
         )
 
         self.assertEqual(
-            args.test_files,
+            args["test_files"],
             [
                 "test_file1.js",
                 "test_file2.js",
@@ -374,7 +374,7 @@ class TestParseArgs(unittest.TestCase):
             ],
         )
         # suites get split up when config.py gets populated
-        self.assertEqual(args.suite_files, "my_suite1,my_suite2")
+        self.assertEqual(args["suite_files"], "my_suite1,my_suite2")
 
     def test_files_in_the_middle(self):
         _, args = parse(
@@ -389,14 +389,14 @@ class TestParseArgs(unittest.TestCase):
         )
 
         self.assertEqual(
-            args.test_files,
+            args["test_files"],
             [
                 "test_file1.js",
                 "test_file2.js",
                 "test_file3.js",
             ],
         )
-        self.assertEqual(args.suite_files, "my_suite1")
+        self.assertEqual(args["suite_files"], "my_suite1")
 
 
 class TestParseCommandLine(unittest.TestCase):

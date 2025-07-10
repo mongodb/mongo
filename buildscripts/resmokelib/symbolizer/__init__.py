@@ -1,5 +1,6 @@
 """Wrapper around mongosym to download everything required."""
 
+import argparse
 import logging
 import os
 import shutil
@@ -290,7 +291,14 @@ class SymbolizerPlugin(PluginInterface):
         )
         mongosymb.make_argument_parser(group)
 
-    def parse(self, subcommand, parser, parsed_args, **kwargs):
+    def parse(
+        self,
+        subcommand: str,
+        parser: argparse.ArgumentParser,
+        parsed_args: dict,
+        should_configure_otel: bool = True,
+        **kwargs,
+    ):
         """
         Return Symbolizer if command is one we recognize.
 
@@ -304,14 +312,14 @@ class SymbolizerPlugin(PluginInterface):
         if subcommand != _COMMAND:
             return None
 
-        task_id = parsed_args.task_id
-        binary_name = parsed_args.binary_name
-        download_symbols_only = parsed_args.download_symbols_only
+        task_id = parsed_args["task_id"]
+        binary_name = parsed_args["binary_name"]
+        download_symbols_only = parsed_args["download_symbols_only"]
 
         return Symbolizer(
             task_id,
             download_symbols_only=download_symbols_only,
             bin_name=binary_name,
             all_args=parsed_args,
-            logger=Symbolizer.setup_logger(parsed_args.debug),
+            logger=Symbolizer.setup_logger(parsed_args["debug"]),
         )

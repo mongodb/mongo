@@ -194,14 +194,12 @@ def main():
     arg_parser.add_argument("api_version", metavar="API_VERSION", help="API Version to check")
     args = arg_parser.parse_args()
 
-    class FakeArgs:
-        """Fake argparse.Namespace-like class to pass arguments to _update_config_vars."""
+    fake_args = {
+        "INSTALL_DIR": args.install_dir,
+        "command": "",
+    }
 
-        def __init__(self):
-            self.INSTALL_DIR = args.install_dir
-            self.command = ""
-
-    configure_resmoke._update_config_vars(arg_parser, FakeArgs())
+    configure_resmoke._update_config_vars(arg_parser, fake_args)
     configure_resmoke._set_logging_config()
 
     # Configure Fixture logging.

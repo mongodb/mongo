@@ -18,20 +18,20 @@ TRACER = trace.get_tracer("resmoke")
 
 
 class CoreAnalyzer(Subcommand):
-    def __init__(self, options: argparse.Namespace, logger: logging.Logger = None):
+    def __init__(self, options: dict, logger: logging.Logger = None):
         self.options = options
-        self.task_id = options.failed_task_id
-        self.execution = options.execution
-        self.gdb_index_cache = options.gdb_index_cache
+        self.task_id = options["failed_task_id"]
+        self.execution = options["execution"]
+        self.gdb_index_cache = options["gdb_index_cache"]
         self.root_logger = self.setup_logging(logger)
         self.extra_otel_options = {}
-        for option in options.otel_extra_data:
+        for option in options["otel_extra_data"]:
             key, val = option.split("=")
             self.extra_otel_options[key] = val
 
     @TRACER.start_as_current_span("core_analyzer.execute")
     def execute(self):
-        base_dir = self.options.working_dir
+        base_dir = self.options["working_dir"]
         current_span = get_default_current_span(
             {"failed_task_id": self.task_id} | self.extra_otel_options
         )
@@ -74,18 +74,18 @@ class CoreAnalyzer(Subcommand):
             core_dump_dir = os.path.join(base_dir, "core-dumps")
             install_dir = os.path.join(base_dir, "install")
         else:  # if a task id was not specified, look for input files on the current machine
-            install_dir = self.options.install_dir or os.path.join(
+            install_dir = self.options["install_dir"] or os.path.join(
                 os.path.curdir, "build", "install"
             )
-            core_dump_dir = self.options.core_dir or os.path.curdir
-            multiversion_dir = self.options.multiversion_dir or os.path.curdir
+            core_dump_dir = self.options["core_dir"] or os.path.curdir
+            multiversion_dir = self.options["multiversion_dir"] or os.path.curdir
 
         analysis_dir = os.path.join(base_dir, "analysis")
         report = dumpers.dbg.analyze_cores(
             core_dump_dir, install_dir, analysis_dir, multiversion_dir, self.gdb_index_cache
         )
 
-        if self.options.generate_report:
+        if self.options["generate_report"]:
             with open("report.json", "w") as file:
                 json.dump(report, file)
 
@@ -107,7 +107,7 @@ class CoreAnalyzerPlugin(PluginInterface):
         self,
         subcommand: str,
         parser: argparse.ArgumentParser,
-        parsed_args: argparse.Namespace,
+        parsed_args: dict,
         should_configure_otel=True,
         **kwargs,
     ) -> Optional[Subcommand]:

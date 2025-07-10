@@ -30,7 +30,7 @@ def get_config_value(attrib, cmd_line_options, config_file_data, required=False,
     return default
 
 
-def read_config_file(config_file):
+def read_config_file(config_file) -> dict:
     """
     Read the yaml config file specified.
 

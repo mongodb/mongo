@@ -37,9 +37,12 @@ BASE_16_TO_INT = 16
 COLLECTOR_ENDPOINT = "otel-collector.prod.corp.mongodb.com:443"
 BAZEL_GENERATED_OFF_FEATURE_FLAGS = "bazel/resmoke/off_feature_flags.txt"
 BAZEL_GENERATED_UNRELEASED_IFR_FEATURE_FLAGS = "bazel/resmoke/unreleased_ifr_feature_flags.txt"
+EVERGREEN_EXPANSIONS_FILE = "../expansions.yml"
 
 
-def validate_and_update_config(parser, args, should_configure_otel=True):
+def validate_and_update_config(
+    parser: argparse.ArgumentParser, args: dict, should_configure_otel: bool = True
+):
     """Validate inputs and update config module."""
 
     _validate_options(parser, args)
@@ -49,39 +52,44 @@ def validate_and_update_config(parser, args, should_configure_otel=True):
     _set_logging_config()
 
 
-def _validate_options(parser, args):
+def process_feature_flag_file(path: str) -> list[str]:
+    with open(path) as fd:
+        return fd.read().split()
+
+
+def _validate_options(parser: argparse.ArgumentParser, args: dict):
     """Do preliminary validation on the options and error on any invalid options."""
 
     if "shell_port" not in args or "shell_conn_string" not in args:
         return
 
-    if args.shell_port is not None and args.shell_conn_string is not None:
+    if args["shell_port"] is not None and args["shell_conn_string"] is not None:
         parser.error("Cannot specify both `shellPort` and `shellConnString`")
 
-    if args.executor_file:
+    if args["executor_file"]:
         parser.error(
             "--executor is superseded by --suites; specify --suites={} {} to run the"
             " test(s) under those suite configuration(s)".format(
-                args.executor_file, " ".join(args.test_files)
+                args["executor_file"], " ".join(args["test_files"])
             )
         )
 
     # The "test_files" positional argument logically overlaps with `--replayFile`. Disallow using both.
-    if args.test_files and args.replay_file:
+    if args["test_files"] and args["replay_file"]:
         parser.error(
             "Cannot use --replayFile with additional test files listed on the command line invocation."
         )
 
-    for f in args.test_files or []:
+    for f in args["test_files"] or []:
         # args.test_files can be a "replay" command or a list of tests files, if it's neither raise an error.
         if not f.startswith("@") and not Path(f).exists():
             parser.error(f"Test file {f} does not exist.")
 
-    if args.shell_seed and (not args.test_files or len(args.test_files) != 1):
+    if args["shell_seed"] and (not args["test_files"] or len(args["test_files"]) != 1):
         parser.error("The --shellSeed argument must be used with only one test.")
 
-    if args.additional_feature_flags_file and not os.path.isfile(
-        args.additional_feature_flags_file
+    if args["additional_feature_flags_file"] and not os.path.isfile(
+        args["additional_feature_flags_file"]
     ):
         parser.error("The specified additional feature flags file does not exist.")
 
@@ -105,13 +113,12 @@ def _validate_options(parser, args):
 
         return errors
 
-    config = vars(args)
-    mongod_set_param_errors = get_set_param_errors(config.get("mongod_set_parameters") or [])
-    mongos_set_param_errors = get_set_param_errors(config.get("mongos_set_parameters") or [])
+    mongod_set_param_errors = get_set_param_errors(args.get("mongod_set_parameters") or [])
+    mongos_set_param_errors = get_set_param_errors(args.get("mongos_set_parameters") or [])
     mongocryptd_set_param_errors = get_set_param_errors(
-        config.get("mongocryptd_set_parameters") or []
+        args.get("mongocryptd_set_parameters") or []
     )
-    mongo_set_param_errors = get_set_param_errors(config.get("mongo_set_parameters") or [])
+    mongo_set_param_errors = get_set_param_errors(args.get("mongo_set_parameters") or [])
     error_msgs = {}
     if mongod_set_param_errors:
         error_msgs["mongodSetParameters"] = mongod_set_param_errors
@@ -124,13 +131,13 @@ def _validate_options(parser, args):
     if error_msgs:
         parser.error(str(error_msgs))
 
-    if (args.shard_count is not None) ^ (args.shard_index is not None):
+    if (args["shard_count"] is not None) ^ (args["shard_index"] is not None):
         parser.error("Must specify both or neither of --shardCount and --shardIndex")
-    if (args.shard_count is not None) and (args.shard_index is not None) and args.jobs:
+    if (args["shard_count"] is not None) and (args["shard_index"] is not None) and args["jobs"]:
         parser.error("Cannot specify --shardCount and --shardIndex in combination with --jobs.")
 
 
-def _validate_config(parser):
+def _validate_config(parser: argparse.ArgumentParser):
     from buildscripts.resmokelib.config_fuzzer_limits import config_fuzzer_params
 
     """Do validation on the config settings and config fuzzer limits."""
@@ -174,7 +181,7 @@ def _validate_config(parser):
         _validate_params_spec(parser, config_fuzzer_params[param_type])
 
 
-def _validate_params_spec(parser, spec):
+def _validate_params_spec(parser: argparse.ArgumentParser, spec: dict):
     valid_fuzz_at_vals = {"startup", "runtime"}
     for key, value in spec.items():
         if "fuzz_at" not in value:
@@ -291,21 +298,21 @@ def _set_up_tracing(
     return success
 
 
-def _update_config_vars(parser, values, should_configure_otel=True):
+def _update_config_vars(
+    parser: argparse.ArgumentParser, values: dict, should_configure_otel: bool = True
+):
     """Update the variables of the config module."""
 
     config = _config.DEFAULTS.copy()
 
-    # Override `config` with values from command line arguments.
-    cmdline_vars = vars(values)
-    for cmdline_key in cmdline_vars:
+    for cmdline_key in values:
         if cmdline_key not in _config.DEFAULTS:
             # Ignore options that don't map to values in config.py
             continue
-        if cmdline_vars[cmdline_key] is not None:
-            config[cmdline_key] = cmdline_vars[cmdline_key]
+        if values[cmdline_key] is not None:
+            config[cmdline_key] = values[cmdline_key]
 
-    if values.command == "run" and os.path.isfile("resmoke.ini"):
+    if values["command"] == "run" and os.path.isfile("resmoke.ini"):
         err = textwrap.dedent("""\
 Support for resmoke.ini has been removed. You must delete
 resmoke.ini and rerun your build to run resmoke. If only one testable
@@ -325,10 +332,6 @@ be invoked as either:
 - {shlex.quote(f"{user_config['install_dir']}/resmoke.py")}
 - buildscripts/resmoke.py --installDir {shlex.quote(user_config["install_dir"])}""")
         raise RuntimeError(err)
-
-    def process_feature_flag_file(path):
-        with open(path) as fd:
-            return fd.read().split()
 
     def set_up_feature_flags():
         # These logging messages start with # becuase the output of this file must produce
@@ -406,7 +409,7 @@ flags in common: {common_set}
     _config.DISABLED_FEATURE_FLAGS = []
     default_disabled_feature_flags = []
     off_feature_flags = []
-    if values.command == "run":
+    if values["command"] == "run":
         (
             _config.ENABLED_FEATURE_FLAGS,
             _config.DISABLED_FEATURE_FLAGS,
@@ -513,7 +516,7 @@ flags in common: {common_set}
         _config.RELEASES_FILE = releases_file
 
     _config.INSTALL_DIR = config.pop("install_dir")
-    if values.command == "run" and _config.INSTALL_DIR is None:
+    if values["command"] == "run" and _config.INSTALL_DIR is None:
         bazel_bin_path = os.path.abspath("bazel-bin/install/bin")
         if os.path.exists(bazel_bin_path):
             _config.INSTALL_DIR = bazel_bin_path
@@ -744,11 +747,11 @@ flags in common: {common_set}
             "evergreen.revision": _config.EVERGREEN_REVISION,
             "evergreen.patch_build": _config.EVERGREEN_PATCH_BUILD,
             "resmoke.cmd.verbatim": " ".join(sys.argv),
-            "resmoke.cmd": values.command,
+            "resmoke.cmd": values["command"],
             "machine.os": sys.platform,
         }
 
-        for arg, value in vars(values).items():
+        for arg, value in values.items():
             if arg != "command" and value is not None:
                 extra_context[f"resmoke.cmd.params.{arg}"] = value
 
@@ -979,24 +982,26 @@ def add_otel_args(parser: argparse.ArgumentParser):
     )
 
 
-def detect_evergreen_config(
-    parsed_args: argparse.Namespace, expansions_file: str = "../expansions.yml"
-):
-    if not os.path.exists(expansions_file):
+def detect_evergreen_config(parsed_args: dict):
+    if not os.path.exists(EVERGREEN_EXPANSIONS_FILE):
         return
 
-    expansions = read_config_file(expansions_file)
+    expansions = read_config_file(EVERGREEN_EXPANSIONS_FILE)
 
-    parsed_args.build_id = expansions.get("build_id", None)
-    parsed_args.distro_id = expansions.get("distro_id", None)
-    parsed_args.execution_number = expansions.get("execution", None)
-    parsed_args.project_name = expansions.get("project", None)
-    parsed_args.git_revision = expansions.get("revision", None)
-    parsed_args.revision_order_id = expansions.get("revision_order_id", None)
-    parsed_args.task_id = expansions.get("task_id", None)
-    parsed_args.task_name = expansions.get("task_name", None)
-    parsed_args.variant_name = expansions.get("build_variant", None)
-    parsed_args.version_id = expansions.get("version_id", None)
-    parsed_args.work_dir = expansions.get("workdir", None)
-    parsed_args.evg_project_config_path = expansions.get("evergreen_config_file_path", None)
-    parsed_args.requester = expansions.get("requester", None)
+    parsed_args.update(
+        {
+            "build_id": expansions.get("build_id", None),
+            "distro_id": expansions.get("distro_id", None),
+            "execution_number": expansions.get("execution", None),
+            "project_name": expansions.get("project", None),
+            "git_revision": expansions.get("revision", None),
+            "revision_order_id": expansions.get("revision_order_id", None),
+            "task_id": expansions.get("task_id", None),
+            "task_name": expansions.get("task_name", None),
+            "variant_name": expansions.get("build_variant", None),
+            "version_id": expansions.get("version_id", None),
+            "work_dir": expansions.get("workdir", None),
+            "evg_project_config_path": expansions.get("evergreen_config_file_path", None),
+            "requester": expansions.get("requester", None),
+        }
+    )
