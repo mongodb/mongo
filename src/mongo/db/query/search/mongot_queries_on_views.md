@@ -1,97 +1,116 @@
-# Mongot Queries on Views
+# `mongot` Queries on Views
 
-Search queries on views behave differently than non-search aggregations on views. For the latter, we essentially resolve the view name and append the view pipeline to the beginning of the request pipeline. Not so simple here.
+##### Definitions
 
-When a request is on a view nss and the user pipeline contains a mongot stage, `idLookup` will apply the view transforms as part of its subpipeline. In this way, the view stages will always be applied directly after `$_internalSearchMongotRemote` and before the remaining stages of the user pipeline. This is to ensure the stages following mongot stage in the user pipeline will receive the modified documents: when `storedSource` is disabled[^1], `idLookup` will retrieve full/unmodified documents during (from the `_id` values returned by mongot), apply the view's data transforms, and pass said transformed documents through the rest of the user pipeline.
+- User pipeline: The aggregation pipeline provided by the user (e.g. `coll.aggregate(<USER PIPELINE>)`).
+- View pipeline/definition: TThe pipeline used to define the view, specifying the transformations on the underlying collection (e.g. `db.createView("viewName", "underlyingCollection", <VIEW PIPELINE>)`).
+- Request pipeline: The pipeline the server ultimately executes, which may be a modified version of the user pipeline due to optimizations or view logic.
+- Search stage: A `$search`, `$vectorSearch`, or `$searchMeta` stage.
+- Effective pipeline: The full pipeline applied to a collection to generate the result set, which includes the resolved view pipeline.
 
-For the purposes of posterity, we're going to lay out how this is implemented for both non-sharded and sharded clusters.
+## Overview
+
+Search queries on views operate differently from standard view queries. Normally, a query on a view simply prepends the view's pipeline to the user's pipeline. This approach doesn't work for search queries, because a search aggregation must begin with two internal stages: `$_internalSearchMongotRemote` and `$_internalSearchIdLookup`. The requirement for the view pipeline to be at the start of the aggregation is therefore in conflict with the requirements of a search query.
+
+To resolve this, the `$_internalSearchIdLookup` stage applies the view's transformations within its own sub-pipeline. This means the view is applied after the `$_internalSearchMongotRemote` stage but before the rest of the user's pipeline. While this technically violates the rule that a view pipeline must come first, it is permitted because `$_internalSearchMongotRemote` does not modify documents; it only retrieves document IDs from `mongot`.
+
+In summary, `$_internalSearchIdLookup` takes unmodified documents from the `_id` values returned by `$_internalSearchMongotRemote`, applies the view's data transforms, and passes said transformed documents through the rest of the user pipeline [^1].
 
 ## Technical Details
 
-As promised, we're going to run through non-sharded and sharded. Though at the beginning, it's the same for both.
+### Non-sharded procedure
 
-User creates a view:
+1. `mongod` receives a query on a view namespace. Since `mongod` has the views' catalog in single node environments, it resolves the view and retrieves the `effectivePipeline` needed to apply the view (see `runAggregateOnView()`).
+2. `mongod` recursively calls `_runAggregate()` on the resolved view.
+3. In `parsePipelineAndRegisterQueryStats()`, we call `search_helpers::checkAndSetViewOnExpCtx()` before parsing the raw BSON obj vector into a `Pipeline`. As implied, this function sets `view` on `expCtx`, making the aggregation context aware that it is operating on a view.
+4. When `parsePipelineAndRegisterQueryStats()` parses the raw BSON obj vector, `createFromBson()` is called on every stage. `createFromBson()` in each of the search stages will first check if there's a view specified on the `DocumentSource`'s spec (there won't be for non-sharded) and calls `search_helpers::getViewFromExpCtx()` to retrieve the view if not. Note that for search queries on _collections_, step 3 will not set the view on `expCtx` (as the aggregation is on a collection, not a view) and therefore `search_helpers::getViewFromExpCtx()` will return `boost::none`. This view is set on the `DocumentSource`'s spec for later use. Additionally, the call to `ResolvedViewAggExState::handleViewHelper()` from `parsePipelineAndRegisterQueryStats()` will skip the step of stitching the view pipeline due to the search stage located within the user pipeline.
+5. When the search stage is desugared, the view is passed to `DocumentSourceInternalSearchIdLookup` to be applied. As for `DocumentSourceInternalMongotRemote`, the spec passed to the constructor will later be used in `mongot_cursor::getRemoteCommandRequestForSearchQuery()` when establishing the cursor and sending a request to `mongot`.
 
+### Sharded procedure
+
+1. `mongos` receives the query on the requested namespace forwards it to all shards.
+2. The shards do not recognize the namespace because it is an unresolved view. They forward the request to the primary shard, which owns the view catalog and can resolve the view.
+3. The primary shard throws a `CommandOnShardedViewNotSupportedOnMongod` exception back to `mongos` with the resolved view info in the exception response.
+4. Same as non-sharded step 3, but in `cluster_aggregate.cpp` instead of `run_aggregate.cpp`.
+5. Same as non-sharded step 4.
+6. When `mongos` serializes the query to perform shard targeting, it serializes the view object directly inside the search stage (see [Serialized Search Stage](#serialized-search-stage)).
+7. The targeted shard performs non-sharded step 4 (sharded step 5) again, but this time we expect the view to exist on the spec object because we serialized it from `mongos`. This step demonstrates why we need to store the view on the spec at all as we cannot rely on the `expCtx` to contain the view in sharded environments.
+8. Same as non-sharded step 5.
+
+### Stored Source
+
+An important caveat to note about this procedure is the case where a user adds `returnStoredSource: true` to their search query. Assuming that the index is set up appropriately to handle this field, returning `storedSource` means that `mongot` will send back the full document to the server, not just a list of `_id`s to lookup. As this implies, there is no need for `$_internalSearchIdLookup` in this situation as `mongot` will have applied the view on its end. Instead, we will just promote the fields in `$storedSource` to root (`DocumentSourceSearch::desugar()`).
+
+If a user specifies `returnStoredSource: false` or doesn't specify `returnStoredSource` at all in their query, the process above remains the same and `$_internalSearchIdLookup` will be added to the pipeline.
+
+## Examples
+
+### Setup
+
+First, the user creates a view on a collection `underlyingSourceCollection`:
+
+```js
+let viewPipeline = [{$addFields: {newField: abc}}];
+let addFieldsView = assert.commandWorked(
+  db.createView("addFieldsView", "underlyingSourceCollection", viewPipeline),
+);
 ```
-let viewPipeline = [{$match: {$expr: {$gt: [{$subtract: ["$stock", "$num_orders"]}, 300]}}}];
-let myMatchView = assert.commandWorked(testDb.createView("myMatchView", "underlyingSourceCollection", viewPipeline));
+
+Next, the user creates a search index `addFieldsIndex` on that view and runs a search query.
+
+```js
+addFieldsView.aggregate([
+  {$search: {index: "addFieldsIndex", exists: {path: "_id"}}},
+  {$project: {_id: 1}},
+]);
 ```
 
-User submits a request on that view:
+### Desugared Pipeline
 
-```
-myMatchView.aggregate([{$search: { index: "matchIndex", exists: {path: "_id"}}},{$project: {_id: 1}}]);
-```
+The server internally transforms the user's aggregation into the following pipeline:
 
-### Non-sharded
-
-1. mongod receives the query on the requested nss (`myMatchView`) which is the view nss. As this is non-sharded, mongod has the views catalog and resolves the view itself.
-2. mongod recursively calls `_runAggregate` on the resolved view.
-3. In `parsePipelineAndRegisterQueryStats()`, we call `search_helpers::checkAndAddResolvedNamespaceForSearch()` before parsing the raw bson obj vector into a Pipeline. This is essential because the search helper will add the resolved view to the expression context.
-4. When `parsePipelineAndRegisterQueryStats()` parses the raw bson obj vector, createFromBson() is called on every stage. When `DocumentSourceSearch::createFromBson()` is called, it will call a helper, `search_helpers::getViewFromBSONObj()`, that [checks the `expCtx` for the view ns](https://github.com/mongodb/mongo/blob/e2a70df2954e20568c8a1c6fa08c6aa7ffee0d39/src/mongo/db/pipeline/search/search_helper.cpp#L680-L685) that was stored in step 3 to determine if the request is on a view or a normal collection. Since the request is indeed on a view, this helper will return a boost::optional pointer to a custom struct, `MongotQueryViewInfo`, that contains the view information.
-5. `DocumentSourceSearch::createFromBson()` will then pass the `MongotQueryViewInfo` obj to the `DocumentSourceSearch` constructor call in order to store the view name + pipeline in a special struct on the `DocumentSourceSearch` object itself.
-6. When `$search` is desugared, it will store the view name + pipeline on the `$_internalSearchMongotRemote`[^2] and the view pipeline on `$_internalSearchIdLookup`. This allows us to pass the view name + pipeline in the request to mongot and it allows the server to run the view pipeline as part of `$_internalSearchIdLookup`'s subpieline. The desugared pipeline becomes roughly:
-
-```
-{
-    $_internalSearchMongotRemote: {
-        mongotQuery: {$search: { index: "matchIndex", exists: {path: "_id"}}}
-        view: {
-            name: "myMatchView",
-            effectivePipeline: [{$match: {$expr: {$gt: [{$subtract: ["$stock", "$num_orders"]}, 300]}}}]
-        }
-        }
-},
-{
-    $_internalSearchIdLookup: {
-        subpipeline: [{
-                $match: "_id"
-            },
-            {
-                $match: {
-                    $expr: {
-                        $gt: [{
-                            $subtract: [$stock, $num_orders]
-                        }, 300]
-                    }
-                }
-            }
-        }]
-},
-{
-    $project: {
-        _id: 1
+```json
+[
+  {
+    "$_internalSearchMongotRemote": {
+      "mongotQuery": {
+        "$search": {"index": "addFieldsIndex", "exists": {"path": "_id"}}
+      },
+      "viewName": "addFieldsView" // Only the viewName is accepted by mongot for queries. For index commands (e.g. createSearchIndex), the entire view object is passed (viewName + viewDefinition).
     }
-}
+  },
+  {
+    "$_internalSearchIdLookup": {
+      "subPipeline": [
+        {
+          "$match": "_id"
+        },
+        {"$addFields": {"newField": "abc"}} // Apply the view after we match by _id.
+      ]
+    }
+  },
+  // Rest of the user pipeline.
+  {
+    "$project": {
+      "_id": 1
+    }
+  }
+]
 ```
 
-### Sharded
+### Serialized Search Stage
 
-1. Mongos receives the query on the requested nss (`myMatchView`) which is the view nss; mongos subsequently serializes the query with the view nss and sends it to all shards.
-2. The shards say "what the heck, idk this nss" and they send it to primary shard which resolves the view using the view catalog it owns.
-3. The shards bump this request back to mongos via throwing a `CommandOnShardedViewNotSupportedOnMongod` expection with the resolved view info from the primary shard
-4. Mongos does not append the view pipeline to the beginning of the request. Mongos retains the `resolvedView` that is passed back from the shards in `ClusterAggregate::runAggregate()` to be able to persist it through `parsePipelineAndRegisterQueryStats`, as the latter creates the `expCtx`, which will temporarily store the view name and pipeline.
-5. Mongos then puts the view name and pipeline on its `expCtx`.
-6. When the raw bson obj vector is parsed into a pipeline and `DocumentSourceSearch::createFromBson` is consequently called, it will call a [helper that check the `expCtx` for the view ns](https://github.com/mongodb/mongo/blob/e2a70df2954e20568c8a1c6fa08c6aa7ffee0d39/src/mongo/db/pipeline/search/search_helper.cpp#L680-L685) that was stored in step 5.
-7. `DocumentSourceSearch::createFromBson()` will then pass this view to the `DocumentSourceSearch` constructor call in order to store the view name + pipeline in a special struct on the `DocumentSourceSearch` object itself.
-8. When mongos serializes the query to perform shard targeting, it serializes the view name and pipeline inside the `$search` stage.
+When `mongos` sends the query to a shard, the view definition is embedded within the $search stage:
 
-```
+```json
 {
-    $search: {
-        index: "matchIndex",
-        exists: {path: "_id"},
-        view: {
-            viewNss: "db.myMatchView",
-            effectivePipeline: [{$match: {$expr: {$gt: [{$subtract: ["$stock", "$num_orders"]}, 300]}}}]
-            }
-        }
+  "$search": {
+    "index": "addFieldsIndex",
+    "exists": {"path": "_id"},
+    "view": {
+      "name": "addFieldsView",
+      "effectivePipeline": [{"$addFields": {"newField": "abc"}}]
+    }
+  }
 }
 ```
-
-9. The targeted shard receives the BSON request from mongos and [if the `$search` spec includes a view object](https://github.com/mongodb/mongo/blob/e2a70df2954e20568c8a1c6fa08c6aa7ffee0d39/src/mongo/db/pipeline/search/search_helper.cpp#L674-L678), `DocumentSourceSearch::createFromBson()` will pass this view to the `DocumentSourceSearch` constructor call in order to store the view name + pipeline in a special struct on the `DocumentSourceSearch` object itself.
-10. When the shard desugars `$search` to <`$_internalSearchMongotRemote`, `$_internalSearchIdLookup`> it will store the view name + pipeline on the former and the view pipeline on the latter. This allows us to pass the view name in the request to mongot and it allows the shard to run the view pipeline as part of `$_internalSearchIdLookup`'s subpieline. The desugared pipeline will look identical to the one presented in `Non-Sharded`
-
-[^1]: For returnStoredSource queries, the documents returned by mongot already include the fields transformed by the view pipeline. As such, mongod doesn't need to apply the view pipeline after `idLookup`.
-
-[^2]: For mongot queries on views, `$_internalSearchMongotRemote` is only required to know the view's nss. However, `DocumentSourceSearchMeta` derives from this class and needs both the view name and the view pipeline. As such, we keep track of the entire view struct.
