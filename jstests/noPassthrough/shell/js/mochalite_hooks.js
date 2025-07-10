@@ -139,6 +139,29 @@ describe("describe", function() {
     });
 });
 
+// these contain no actual tests, so no hooks should ever be run
+describe("contains no tests", function() {
+    const die = () => {
+        throw new Error("This should not run");
+    };
+    before(die);
+    beforeEach(die);
+    afterEach(die);
+    after(die);
+    describe("nested describe", function() {
+        before(die);
+        beforeEach(die);
+        afterEach(die);
+        after(die);
+        describe("doubly-nested describe", function() {
+            before(die);
+            beforeEach(die);
+            afterEach(die);
+            after(die);
+        });
+    });
+});
+
 it("test5", function() {
     log.push("----test5");
 });

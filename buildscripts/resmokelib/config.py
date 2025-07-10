@@ -204,6 +204,8 @@ DEFAULTS = {
     "external_sut": False,
     # Whether or not to signal tests to pause after dataset population.
     "pause_after_populate": None,
+    # Regex to filter mocha-style tests to run.
+    "mocha_grep": None,
 }
 
 _SuiteOptions = collections.namedtuple(

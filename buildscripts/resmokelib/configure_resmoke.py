@@ -822,6 +822,9 @@ flags in common: {common_set}
     # Directory with jstests option
     _config.JSTESTS_DIR = config.pop("jstests_dir")
 
+    # Mocha-style test options
+    _config.MOCHA_GREP = config.pop("mocha_grep")
+
     # Configure evergreen task documentation
     if _config.EVERGREEN_TASK_NAME:
         task_name = utils.get_task_name_without_suffix(

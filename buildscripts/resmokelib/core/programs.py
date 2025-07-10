@@ -485,6 +485,9 @@ def mongo_shell_program(
         '(function() { Timestamp.prototype.toString = function() { throw new Error("Cannot toString timestamps. Consider using timestampCmp() for comparison or tojson(<variable>) for output."); } })()'
     )
 
+    mocha_grep = json.dumps(config.MOCHA_GREP)
+    eval_sb.append(f"globalThis._mocha_grep = {mocha_grep};")
+
     eval_str = "; ".join(eval_sb)
     args.append("--eval")
     args.append(eval_str)

@@ -1073,3 +1073,36 @@ class TestMochaRunner(unittest.TestCase):
 
         # hard assertion halts the runner, does not reach test5
         self.assertNotIn("✔ describe > test5", result.stdout)
+
+    def test_mocha_runner_grep(self):
+        resmoke_args = [
+            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_mocha_runner.yml",
+            "--mochagrep="
+            + "|".join(
+                [
+                    "ana",  # partial match
+                    "tomato",  # match across describe suites
+                    "chicken",  # no match
+                    "^vegetables > spinach$",  # full exact match
+                ]
+            ),
+            "buildscripts/tests/resmoke_end2end/testfiles/mocha/grep_names.js",
+        ]
+
+        result = execute_resmoke(resmoke_args)
+
+        self.assertEqual(result.returncode, 0)
+
+        arr = [
+            "✔ fruits > banana",
+            "✔ fruits > tomato",
+            "✔ vegetables > spinach",
+            "✔ vegetables > tomato",
+        ]
+        for output in arr:
+            self.assertIn(output, result.stdout)
+
+        # verify ordering
+        pattern = r".*".join(arr) + r".*"
+        pattern = re.compile(pattern, re.DOTALL)
+        self.assertRegex(result.stdout, pattern)

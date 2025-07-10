@@ -1716,6 +1716,14 @@ class RunPlugin(PluginInterface):
         )
 
         parser.add_argument(
+            "--mochagrep",
+            dest="mocha_grep",
+            type=str,
+            metavar="REGEX",
+            help="Regex to filter mocha-style tests to run.",
+        )
+
+        parser.add_argument(
             "--noValidateSelectorPaths",
             dest="validate_selector_paths",
             action="store_false",

@@ -120,6 +120,21 @@ class Scope {
         this[hookname].push(fn);
     }
 
+    containsTests() {
+        // returns true if this scope or any nested scope contains tests
+        for (const node of this.content) {
+            if (node instanceof Test) {
+                return true;
+            } else {  // a nested scope (describe block)
+                if (node.containsTests()) {
+                    return true;
+                }
+            }
+        }
+        // no tests found in this scope or nested scopes
+        return false;
+    }
+
     async runHook(hookname) {
         const ctx = this.ctx;
         for (const fn of this[hookname]) {
@@ -131,6 +146,10 @@ class Scope {
      * Run the before-content-after workflow
      */
     async run() {
+        if (!this.containsTests()) {
+            // no tests in this scope or nested scopes, skip running any hooks
+            return;
+        }
         await this.runHook("before");
         for (const node of this.content) {
             if (node instanceof Test) {
@@ -162,6 +181,14 @@ class Scope {
     }
 }
 
+// use grep from global context if available, else match everything
+let GREP = globalThis._mocha_grep ?? ".*";
+try {
+    GREP = new RegExp(GREP);
+} catch (e) {
+    throw new Error(`Failed to create regex from '${GREP}': ${e.message}`);
+}
+
 let currScope = new Scope();
 
 function addTest(title, fn) {
@@ -171,6 +198,10 @@ function addTest(title, fn) {
         [...currScope.title, title],
         fn,
     );
+    if (!GREP.test(test.fullTitle())) {
+        // filtered out by grep expression
+        return;
+    }
     currScope.addContent(test);
 }
 
