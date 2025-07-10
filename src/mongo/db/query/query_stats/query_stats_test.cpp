@@ -69,8 +69,8 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
     ASSERT_EQ(opDebug.queryStatsInfo.disableForSubqueryExecution, false);
 
     // First call to registerRequest() should be rate limited.
-    auto& limiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
-    limiter.configureWindowBased(0);
+    QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext()) =
+        RateLimiter::createWindowBased(0, Seconds{1});
     ASSERT_DOES_NOT_THROW(query_stats::registerRequest(opCtx.get(), nss, [&]() {
         return std::make_unique<query_stats::FindKey>(
             expCtx,
@@ -85,7 +85,8 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
 
     // Second call should not be rate limited.
     QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext())
-        .configureWindowBased(INT_MAX);
+        .get()
+        ->setSamplingRate(INT_MAX);
 
     ASSERT_DOES_NOT_THROW(query_stats::registerRequest(opCtx.get(), nss, [&]() {
         return std::make_unique<query_stats::FindKey>(
@@ -119,8 +120,8 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxDisabledBetween) {
     QueryStatsStoreManager::get(serviceCtx) =
         std::make_unique<QueryStatsStoreManager>(16 * 1024 * 1024, 1);
 
-    auto& limiter = QueryStatsStoreManager::getRateLimiter(serviceCtx);
-    limiter.configureWindowBased(-1);
+    QueryStatsStoreManager::getRateLimiter(serviceCtx) =
+        RateLimiter::createWindowBased(-1, Seconds{1});
 
     {
         auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
@@ -190,8 +191,8 @@ TEST_F(QueryStatsTest, RegisterRequestAbsorbsErrors) {
     auto opCtx = makeOperationContext();
     auto& opDebug = CurOp::get(*opCtx)->debug();
 
-    auto& limiter = QueryStatsStoreManager::getRateLimiter(getServiceContext());
-    limiter.configureWindowBased(-1);
+    QueryStatsStoreManager::getRateLimiter(getServiceContext()) =
+        RateLimiter::createWindowBased(-1, Seconds{1});
 
     // First case - don't treat errors as fatal.
     internalQueryStatsErrorsAreCommandFatal.store(false);
@@ -240,8 +241,8 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
         RAIIServerParameterControllerForTest flagCtrl("featureFlagQueryStats", true);
         RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsSampleRate", 0.042);
         auto& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
-        ASSERT_EQ(rateLimiter.getPolicyType(), RateLimiter::kSampleBasedPolicy);
-        ASSERT_EQ(rateLimiter.getSamplingRate(), 42);
+        ASSERT_EQ(rateLimiter->getPolicyType(), RateLimiter::kSampleBasedPolicy);
+        ASSERT_EQ(rateLimiter->getSamplingRate(), 42);
     }
 
     {  // Test that window-based rate limiting will be elected when sampling rate is set to 0.0
@@ -250,8 +251,8 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
         RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsSampleRate", 0.0);
 
         auto& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
-        ASSERT_EQ(rateLimiter.getPolicyType(), RateLimiter::kWindowBasedPolicy);
-        ASSERT_EQ(rateLimiter.getSamplingRate(), 10);
+        ASSERT_EQ(rateLimiter->getPolicyType(), RateLimiter::kWindowBasedPolicy);
+        ASSERT_EQ(rateLimiter->getSamplingRate(), 10);
     }
 
     {  // Test that sampling-based rate limiting takes precedence over window-based policy when both
@@ -261,8 +262,8 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
         RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsSampleRate", 0.042);
 
         auto& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
-        ASSERT_EQ(rateLimiter.getPolicyType(), RateLimiter::kSampleBasedPolicy);
-        ASSERT_EQ(rateLimiter.getSamplingRate(), 42);
+        ASSERT_EQ(rateLimiter->getPolicyType(), RateLimiter::kSampleBasedPolicy);
+        ASSERT_EQ(rateLimiter->getSamplingRate(), 42);
     }
 
     {  // Test idempotency when both parameters are set but being set in different order.
@@ -271,8 +272,8 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
         RAIIServerParameterControllerForTest rateLimitCtrl("internalQueryStatsRateLimit", 10);
 
         auto& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
-        ASSERT_EQ(rateLimiter.getPolicyType(), RateLimiter::kSampleBasedPolicy);
-        ASSERT_EQ(rateLimiter.getSamplingRate(), 42);
+        ASSERT_EQ(rateLimiter->getPolicyType(), RateLimiter::kSampleBasedPolicy);
+        ASSERT_EQ(rateLimiter->getSamplingRate(), 42);
     }
 
     {  // Test that query stats is disabled when both rate limit and sample rate are set to 0.
@@ -281,9 +282,9 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
         RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsSampleRate", 0.0);
 
         auto& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
-        ASSERT_EQ(rateLimiter.getPolicyType(), RateLimiter::kWindowBasedPolicy);
-        ASSERT_EQ(rateLimiter.getSamplingRate(), 0);
-        ASSERT_FALSE(rateLimiter.handle());
+        ASSERT_EQ(rateLimiter->getPolicyType(), RateLimiter::kWindowBasedPolicy);
+        ASSERT_EQ(rateLimiter->getSamplingRate(), 0);
+        ASSERT_FALSE(rateLimiter->handle());
     }
 }
 

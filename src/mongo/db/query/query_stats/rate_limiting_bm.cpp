@@ -80,8 +80,8 @@ void BM_SlidingWindow(benchmark::State& state) {
     // Initialize the rate limiter only on the first thread to start up.
     if (state.thread_index == 0) {
         clockSource = std::make_unique<SystemClockSource>();
-        rateLimit = std::make_unique<RateLimiter>();
-        rateLimit->configureWindowBased(state.range(0));
+        rateLimit =
+            RateLimiter::createWindowBased(state.range(0), Milliseconds(1), clockSource.get());
     }
 
     // Run the benchmark.
@@ -102,7 +102,7 @@ void BM_SampleBased(benchmark::State& state) {
 
     // Initialize the rate limiter only on the first thread to start up.
     if (state.thread_index == 0) {
-        rateLimit->configureSampleBased(state.range(0), /* random seed */ 17);
+        rateLimit = RateLimiter::createSampleBased(state.range(0), /* random seed */ 17);
     }
 
     // Run the benchmark.
