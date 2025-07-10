@@ -32,7 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/crypto/hash_block.h"
@@ -69,6 +69,7 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -2708,10 +2709,12 @@ TEST_F(OplogFetcherTest, CheckFindCommandIncludesRequestResumeTokenWhenRequested
     oplogFetcher->join();
 }
 
-TEST_F(OplogFetcherTest, BSONObjectTooLargeShutsDownOplogFetcher) {
+DEATH_TEST_REGEX_F(OplogFetcherTest,
+                   BSONObjectTooLargeShutsDownOplogFetcher,
+                   "Fatal assertion.*9995200") {
     // Test that if find command succeeds, and second batch fails
     // because large BSON document and metadata combined exceeds BSON size limit, the oplog fetcher
-    // does not retry and shuts down on error BSONObjectTooLarge.
+    // does not retry, runs into an fassert and crashes the process on error BSONObjectTooLarge.
     ShutdownState shutdownState;
 
     // Create an oplog fetcher with 10 retries to ensure the oplog fetcher shuts down without
@@ -2739,14 +2742,12 @@ TEST_F(OplogFetcherTest, BSONObjectTooLargeShutsDownOplogFetcher) {
     validateLastBatch(true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched());
 
     // Process second batch that throws BSONObjectTooLarge.
-    processSingleRequestResponse(
-        oplogFetcher->getDBClientConnection_forTest(),
-        mongo::Status{mongo::ErrorCodes::BSONObjectTooLarge, "BSONObjectTooLarge"});
+    // Simulate a BSONObjectTooLarge error response to the OplogFetcher.
+    const Status tooLargeError = BSONObj().validateBSONObjSize(BSONObj::kMinBSONLength - 1);
+    processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(), tooLargeError);
 
-    oplogFetcher->join();
-
-    // Assert that the oplog fetcher shuts down with error BSONObjectTooLarge.
-    ASSERT_EQUALS(ErrorCodes::BSONObjectTooLarge, shutdownState.getStatus());
+    // Can't be reached.
+    ASSERT_FALSE(true);
 }
 
 }  // namespace

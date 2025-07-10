@@ -33,7 +33,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -93,6 +93,7 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -2199,6 +2200,44 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherCallbackError) {
 
     initialSyncer->join();
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+}
+
+DEATH_TEST_REGEX_F(InitialSyncerTest,
+                   InitialSyncerCrashesOnBSONObjectTooLargeError,
+                   "Fatal assertion.*9995200") {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+
+    _mock
+        ->expect(
+            BSON("find" << "oplog.rs"),
+            makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+        .times(2);
+
+    // FCV response.
+    _mock
+        ->expect([](auto& request) { return request["find"].str() == "system.version"; },
+                 makeCursorResponse(
+                     0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
+        .times(1);
+
+    // Ensure second lastOplogFetch doesn't happen until we're ready for it.
+    FailPointEnableBlock clonerFailpoint("hangAfterClonerStage", kListDatabasesFailPointData);
+
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+    _mock->runUntilExpectationsSatisfied();
+
+    // Simulate a BSONObjectTooLarge error response to the OplogFetcher.
+    const Status tooLargeError = BSONObj().validateBSONObjSize(BSONObj::kMinBSONLength - 1);
+    ASSERT_EQ(ErrorCodes::BSONObjectTooLarge, tooLargeError.code());
+
+    // The following call will trigger an fassert in the OplogFetcher and crash the process.
+    getOplogFetcher()->simulateResponseError(tooLargeError);
+
+    // Can't be reached.
+    ASSERT_FALSE(true);
 }
 
 TEST_F(InitialSyncerTest,

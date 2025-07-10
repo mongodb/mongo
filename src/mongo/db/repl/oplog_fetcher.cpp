@@ -1092,10 +1092,11 @@ bool OplogFetcher::OplogFetcherRestartDecisionDefault::shouldContinue(OplogFetch
     }
     // If the oplog batch fetched exceeds the size limit, do not attempt to restart.
     else if (status.code() == ErrorCodes::BSONObjectTooLarge) {
-        LOGV2(10033601,
-              "BSON document and metadata fetched by oplog fetcher exceeds the BSON limit",
-              "error"_attr = redact(status));
-        return false;
+        LOGV2_FATAL_CONTINUE(
+            10033601,
+            "BSON document and metadata fetched by oplog fetcher exceeds the BSON limit",
+            "error"_attr = redact(status));
+        fassert(9995200, status);
     }
     if (_numRestarts == _maxRestarts) {
         LOGV2(21274,
