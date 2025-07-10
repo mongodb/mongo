@@ -734,7 +734,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                                requiresCollationForParsingUnshardedAggregate,
                                                resolvedView,
                                                verbosity);
-        auto expCtx = pipeline->getContext();
+        auto pipelineCtx = pipeline->getContext();
 
         // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
         // support querying against encrypted fields.
@@ -750,7 +750,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
         }
 
-        expCtx->initializeReferencedSystemVariables();
+        pipelineCtx->initializeReferencedSystemVariables();
 
         // Optimize the pipeline if:
         // - We have a valid routing table.
@@ -763,7 +763,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         // tracked as unsplittable collections in the sharding catalog.
         if (routingTableIsAvailable || requiresCollationForParsingUnshardedAggregate ||
             hasChangeStream || shouldDoFLERewrite ||
-            expCtx->getNamespaceString().isCollectionlessAggregateNS()) {
+            pipelineCtx->getNamespaceString().isCollectionlessAggregateNS()) {
             pipeline->optimizePipeline();
 
             // Validate the pipeline post-optimization.
@@ -781,7 +781,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             auto searchStage = dynamic_cast<mongo::DocumentSourceSearch*>(pipeline->peekFront());
             searchStage->setDocsNeededBounds(bounds);
         }
-        return {std::move(pipeline), expCtx};
+        return {std::move(pipeline), pipelineCtx};
     }();
 
     // Create an RAII object that prints useful information about the ExpressionContext in the case
