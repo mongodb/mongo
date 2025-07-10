@@ -323,7 +323,7 @@ def add_allowed_unowned_files(output_lines: List[str]) -> None:
     ), "Somehow there were allowed unowned files but a path was not found."
 
     output_lines.append(f"# The following lines are added from {allowed_unowned_files_path}")
-    for file in allowed_unowned_files:
+    for file in sorted(allowed_unowned_files):
         output_lines.append(f"{file}")
     # adds a newline
     output_lines.append("")

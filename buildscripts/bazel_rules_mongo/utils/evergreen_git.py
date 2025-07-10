@@ -94,13 +94,20 @@ def get_diff_revision(expansions_file: str = None, branch: str = None) -> str:
     else:
         expansions = get_expansions(expansions_file)
         if expansions.get("is_patch", None):
-            # patches from the cli have the changes uncommited, but are added to the git index by evergreen
-            # patches from pull requests have the changes in commits
-            # in both cases we can compare against the base commit evergreen exposes as the revision expansion
-            diff_commit = expansions.get("revision")
+            # In github patches, evergreen does not give us the merge-base as the revision
+            # we need to get the merge base ourselves
+            if expansions.get("github_pr_number", None):
+                local_head = repo.head.commit
+                remote_branch_name = expansions.get("branch_name")
+                remote_head = repo.heads[remote_branch_name].commit
+                diff_commit = repo.git.merge_base(local_head.hexsha, remote_head.hexsha)
+            else:
+                # In cli patch builds the revision should already be the merge base
+                diff_commit = expansions.get("revision")
         else:
             # in waterfall runs we just want to compare to the previous commit
             diff_commit = repo.git.execute(["git", "rev-parse", "HEAD^1"])
+        print(f"CI base commit to diff from: {diff_commit}")
 
     assert diff_commit, "ERROR: not able to obtain diff commit"
     return diff_commit
