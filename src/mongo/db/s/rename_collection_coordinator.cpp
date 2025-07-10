@@ -402,11 +402,12 @@ void renameTrackedCollectionStatement(const txn_api::TransactionClient& txnClien
                                       const NamespaceString& newNss,
                                       const boost::optional<UUID>& newTargetCollectionUuid,
                                       const Timestamp& timeInsertion,
+                                      const OID& renamedCollectionEpoch,
                                       int stmtId) {
     auto newCollectionType = oldCollection;
     newCollectionType.setNss(newNss);
     newCollectionType.setTimestamp(timeInsertion);
-    newCollectionType.setEpoch(OID::gen());
+    newCollectionType.setEpoch(renamedCollectionEpoch);
     if (newTargetCollectionUuid.has_value()) {
         newCollectionType.setUuid(newTargetCollectionUuid.get());
     }
@@ -521,6 +522,7 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
                                            const boost::optional<UUID>& droppedTargetUUID,
                                            const boost::optional<UUID>& newTargetCollectionUuid,
                                            const Timestamp& commitTime,
+                                           const OID& renamedCollectionEpoch,
                                            const std::shared_ptr<executor::TaskExecutor>& executor,
                                            const OperationSessionInfo& osi) {
     const auto isFromCollTracked = optFromCollType.has_value();
@@ -547,8 +549,13 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
             // Delete FROM collection.
             deleteTrackedCollectionStatement(txnClient, fromNss, fromUUID, stmtId++);
             // Persist the entry for the renamed collection
-            renameTrackedCollectionStatement(
-                txnClient, *optFromCollType, toNss, newTargetCollectionUuid, commitTime, stmtId++);
+            renameTrackedCollectionStatement(txnClient,
+                                             *optFromCollType,
+                                             toNss,
+                                             newTargetCollectionUuid,
+                                             commitTime,
+                                             renamedCollectionEpoch,
+                                             stmtId++);
             // Log the placement change of FROM.
             upsertPlacementHistoryDocStatement(
                 txnClient, fromNss, fromUUID, commitTime, {} /*shards*/, stmtId++);
@@ -954,6 +961,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 // - The cluster time at which the commit of this operation will be recorded in the
                 //   content of notification events and config.collections/placementHistory
                 //   documents;
+                // - The new epoch for FROM, once renamed to TO.
                 // - The identity of the shard that will notify change stream readers of FROM once
                 //   the operation gets committed.
                 if (!_doc.getCommitTimeInGlobalCatalog()) {
@@ -962,6 +970,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     auto now = VectorClock::get(opCtx)->getTime();
                     auto commitTime = now.clusterTime().asTimestamp();
                     newDoc.setCommitTimeInGlobalCatalog(commitTime);
+                    newDoc.setRenamedCollectionEpoch(OID::gen());
                     auto changeStreamsNotifierForSource =
                         getChangeStreamNotifierShardIdFor(_doc.getSourceUUID().value());
                     LOGV2(10488802,
@@ -1112,12 +1121,24 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     supportsPreciseChangeStreamTargeter(opCtx);
                 const auto commitTime = [&] {
                     if (preciseChangeStreamTargeterEnabled) {
+                        tassert(10723700,
+                                "The commit time must be already present in the recovery document",
+                                _doc.getCommitTimeInGlobalCatalog().has_value());
                         return _doc.getCommitTimeInGlobalCatalog().value();
                     }
 
                     auto now = VectorClock::get(opCtx)->getTime();
                     return now.clusterTime().asTimestamp();
                 }();
+
+                const auto renamedCollectionEpoch = [&] {
+                    if (preciseChangeStreamTargeterEnabled) {
+                        return _doc.getRenamedCollectionEpoch().value();
+                    }
+
+                    return OID::gen();
+                }();
+
                 const auto session = getNewSession(opCtx);
                 renameCollectionMetadataInTransaction(opCtx,
                                                       _doc.getOptTrackedCollInfo(),
@@ -1126,6 +1147,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                                       _doc.getTargetUUID(),
                                                       _doc.getNewTargetCollectionUuid(),
                                                       commitTime,
+                                                      renamedCollectionEpoch,
                                                       **executor,
                                                       session);
 
