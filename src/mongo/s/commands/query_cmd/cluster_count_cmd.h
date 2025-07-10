@@ -272,8 +272,8 @@ public:
 
             shardResponses = scatterGatherVersionedTargetByRoutingTable(
                 expCtx,
-                nss,
                 routingCtx,
+                nss,
                 applyReadWriteConcern(
                     opCtx,
                     this,
@@ -444,8 +444,8 @@ public:
                 try {
                     shardResponses = scatterGatherVersionedTargetByRoutingTable(
                         opCtx,
-                        nss,
                         routingCtx,
+                        nss,
                         explainCmd,
                         ReadPreferenceSetting::get(opCtx),
                         Shard::RetryPolicy::kIdempotent,

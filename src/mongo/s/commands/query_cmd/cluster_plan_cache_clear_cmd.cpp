@@ -125,8 +125,8 @@ bool ClusterPlanCacheClearCmd::run(OperationContext* opCtx,
         opCtx, {nss}, [&](RoutingContext& routingCtx) {
             auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
-                nss,
                 routingCtx,
+                nss,
                 applyReadWriteConcern(
                     opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
                 ReadPreferenceSetting::get(opCtx),

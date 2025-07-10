@@ -136,8 +136,8 @@ public:
                 }();
                 auto response =
                     scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                               nss,
                                                                routingCtx,
+                                                               nss,
                                                                filteredCmdObj,
                                                                ReadPreferenceSetting::get(opCtx),
                                                                Shard::RetryPolicy::kIdempotent,

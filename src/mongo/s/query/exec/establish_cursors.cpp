@@ -89,20 +89,20 @@ constexpr StringData kOperationKeyField = "clientOperationKey"_sd;
 class CursorEstablisher {
 public:
     CursorEstablisher(OperationContext* opCtx,
+                      RoutingContext* routingCtx,
                       std::shared_ptr<executor::TaskExecutor> executor,
                       const NamespaceString& nss,
                       bool allowPartialResults,
                       std::vector<OperationKey> providedOpKeys,
-                      AsyncRequestsSender::ShardHostMap designatedHostsMap,
-                      RoutingContext* routingCtx)
+                      AsyncRequestsSender::ShardHostMap designatedHostsMap)
         : _opCtx(opCtx),
+          _routingCtx(routingCtx),
           _executor{std::move(executor)},
           _nss(nss),
           _allowPartialResults(allowPartialResults),
           _defaultOpKey{UUID::gen()},
           _providedOpKeys(std::move(providedOpKeys)),
-          _designatedHostsMap(std::move(designatedHostsMap)),
-          _routingCtx(routingCtx) {}
+          _designatedHostsMap(std::move(designatedHostsMap)) {}
 
     /**
      * Make a RequestSender and thus send requests.
@@ -157,6 +157,7 @@ private:
     void _prioritizeFailures(Status newError, bool isInterruption);
 
     OperationContext* const _opCtx;
+    RoutingContext* _routingCtx;
     const std::shared_ptr<executor::TaskExecutor> _executor;
     const NamespaceString _nss;
     const bool _allowPartialResults;
@@ -174,7 +175,6 @@ private:
     std::vector<RemoteCursor> _remoteCursors;
     std::vector<HostAndPort> _remotesToClean;
     AsyncRequestsSender::ShardHostMap _designatedHostsMap;
-    RoutingContext* _routingCtx;
 };
 
 void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
@@ -515,12 +515,12 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                                            std::vector<OperationKey> providedOpKeys,
                                            AsyncRequestsSender::ShardHostMap designatedHostsMap) {
     auto establisher = CursorEstablisher(opCtx,
+                                         routingCtx,
                                          executor,
                                          nss,
                                          allowPartialResults,
                                          std::move(providedOpKeys),
-                                         std::move(designatedHostsMap),
-                                         routingCtx);
+                                         std::move(designatedHostsMap));
     establisher.sendRequests(readPref, remotes, retryPolicy);
     establisher.waitForResponses();
     establisher.checkForFailedRequests();

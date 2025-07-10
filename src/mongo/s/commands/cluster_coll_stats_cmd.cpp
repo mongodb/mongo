@@ -282,8 +282,8 @@ public:
                 // of the scaled statistics.
                 auto unscaledShardResults = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
-                    targeter.getNS(),
                     routingCtx,
+                    targeter.getNS(),
                     applyReadWriteConcern(
                         opCtx,
                         this,

@@ -103,8 +103,8 @@ public:
                 opCtx, {nss}, [&](RoutingContext& routingCtx) {
                     auto shardResults = scatterGatherVersionedTargetByRoutingTable(
                         opCtx,
-                        nss,
                         routingCtx,
+                        nss,
                         CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON()),
                         ReadPreferenceSetting::get(opCtx),
                         Shard::RetryPolicy::kIdempotent,

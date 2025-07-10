@@ -500,8 +500,8 @@ void ShardServerProcessInterface::createIndexesOnEmptyCollection(
             auto cmdObj = cmdBuilder.obj();
             auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
-                ns,
                 routingCtx,
+                ns,
                 cmdObj,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kNoRetry,

@@ -108,8 +108,8 @@ public:
             opCtx, {nss}, [&](RoutingContext& routingCtx) {
                 auto results = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
-                    nss,
                     routingCtx,
+                    nss,
                     applyReadWriteConcern(
                         opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
                     ReadPreferenceSetting::get(opCtx),

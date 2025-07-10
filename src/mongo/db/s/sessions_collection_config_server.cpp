@@ -156,8 +156,8 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
                              opCtx, {{nss, cri}}, [&](RoutingContext& routingCtx) {
                                  return scatterGatherVersionedTargetByRoutingTable(
                                      opCtx,
-                                     nss,
                                      routingCtx,
+                                     nss,
                                      SessionsCollection::generateCreateIndexesCmd(),
                                      ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                      Shard::RetryPolicy::kNoRetry,

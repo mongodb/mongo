@@ -127,8 +127,8 @@ public:
             opCtx, {nss}, [&](RoutingContext& routingCtx) {
                 auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
-                    nss,
                     routingCtx,
+                    nss,
                     applyReadWriteConcern(
                         opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
                     ReadPreferenceSetting::get(opCtx),

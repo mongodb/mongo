@@ -130,8 +130,8 @@ public:
                 const auto callShardFn = [&](const BSONObj& cmdObj, const BSONObj& routingQuery) {
                     auto shardResults = scatterGatherVersionedTargetByRoutingTable(
                         opCtx,
-                        nss,
                         routingCtx,
+                        nss,
                         cmdObj,
                         ReadPreferenceSetting::get(opCtx),
                         Shard::RetryPolicy::kIdempotent,

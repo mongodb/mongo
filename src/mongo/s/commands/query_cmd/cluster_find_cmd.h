@@ -306,8 +306,8 @@ public:
 
                         shardResponses = scatterGatherVersionedTargetByRoutingTable(
                             opCtx,
-                            _cmdRequest->getNamespaceOrUUID().nss(),
                             routingCtx,
+                            _cmdRequest->getNamespaceOrUUID().nss(),
                             explainCmd,
                             ReadPreferenceSetting::get(opCtx),
                             Shard::RetryPolicy::kIdempotent,

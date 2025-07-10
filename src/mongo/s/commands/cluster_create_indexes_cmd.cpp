@@ -152,8 +152,8 @@ public:
             targeter.getRoutingCtx(), [&](RoutingContext& routingCtx) {
                 auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
-                    targeter.getNS(),
                     routingCtx,
+                    targeter.getNS(),
                     CommandHelpers::filterCommandRequestForPassthrough(
                         applyReadWriteConcern(opCtx, this, cmdToBeSent)),
                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),

@@ -144,8 +144,8 @@ ClusterGetQueryableEncryptionCountInfoCmd::Invocation::typedRun(OperationContext
             return uassertStatusOK(
                 executeCommandAgainstShardWithMinKeyChunk(
                     opCtx,
-                    nss,
                     routingCtx,
+                    nss,
                     CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON()),
                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                     Shard::RetryPolicy::kIdempotent)

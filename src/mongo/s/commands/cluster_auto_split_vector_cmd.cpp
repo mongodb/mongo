@@ -78,8 +78,8 @@ public:
                     // InvalidOptions as part of the response.
                     auto response = scatterGatherVersionedTargetByRoutingTable(
                                         opCtx,
-                                        nss,
                                         routingCtx,
+                                        nss,
                                         filteredCmdObj,
                                         ReadPreferenceSetting::get(opCtx),
                                         Shard::RetryPolicy::kIdempotent,

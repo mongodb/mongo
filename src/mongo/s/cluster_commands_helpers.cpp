@@ -588,8 +588,8 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigS
 
 std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     OperationContext* opCtx,
-    const NamespaceString& nss,
     RoutingContext& routingCtx,
+    const NamespaceString& nss,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
@@ -607,8 +607,8 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
                                                      letParameters,
                                                      runtimeConstants);
     return scatterGatherVersionedTargetByRoutingTable(expCtx,
-                                                      nss,
                                                       routingCtx,
+                                                      nss,
                                                       cmdObj,
                                                       readPref,
                                                       retryPolicy,
@@ -619,8 +619,8 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
 
 [[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     boost::intrusive_ptr<ExpressionContext> expCtx,
-    const NamespaceString& nss,
     RoutingContext& routingCtx,
+    const NamespaceString& nss,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
@@ -648,8 +648,8 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
 std::vector<AsyncRequestsSender::Response>
 scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
     OperationContext* opCtx,
-    const NamespaceString& nss,
     RoutingContext& routingCtx,
+    const NamespaceString& nss,
     const std::set<ShardId>& shardsToSkip,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
@@ -702,8 +702,8 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimaryOnlyAttachingD
 
 AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
     OperationContext* opCtx,
-    const NamespaceString& nss,
     RoutingContext& routingCtx,
+    const NamespaceString& nss,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy) {

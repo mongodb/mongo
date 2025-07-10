@@ -74,14 +74,14 @@ namespace mongo {
 namespace {
 
 ListIndexesReply cursorCommandPassthroughShardWithMinKeyChunk(OperationContext* opCtx,
-                                                              const NamespaceString& nss,
                                                               RoutingContext& routingCtx,
+                                                              const NamespaceString& nss,
                                                               const BSONObj& cmdObj,
                                                               const PrivilegeVector& privileges) {
     auto response = executeCommandAgainstShardWithMinKeyChunk(
         opCtx,
-        nss,
         routingCtx,
+        nss,
         CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
         ReadPreferenceSetting::get(opCtx),
         Shard::RetryPolicy::kIdempotent);
@@ -166,8 +166,8 @@ public:
 
                     return cursorCommandPassthroughShardWithMinKeyChunk(
                         opCtx,
-                        targeter.getNS(),
                         routingCtx,
+                        targeter.getNS(),
                         cmdToBeSent,
                         {Privilege(ResourcePattern::forExactNamespace(ns()),
                                    ActionType::listIndexes)});

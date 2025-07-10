@@ -582,10 +582,10 @@ bool canUseLocalReadAsCursorSource(OperationContext* opCtx,
 std::unique_ptr<Pipeline, PipelineDeleter> tryAttachCursorSourceForLocalRead(
     OperationContext* opCtx,
     const ExpressionContext& expCtx,
+    RoutingContext& routingCtx,
     std::unique_ptr<Pipeline, PipelineDeleter>& pipelineToTarget,
     const AggregateCommandRequest& aggRequest,
     bool useCollectionDefaultCollator,
-    RoutingContext& routingCtx,
     const ShardId& localShardId) {
     const auto& nss = expCtx.getNamespaceString();
     const auto& targetingCri = routingCtx.getCollectionRoutingInfo(nss);
@@ -1770,10 +1770,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
                 if (auto pipelineWithCursor =
                         tryAttachCursorSourceForLocalRead(opCtx,
                                                           *expCtx,
+                                                          routingCtx,
                                                           pipelineToTarget,
                                                           aggRequest,
                                                           useCollectionDefaultCollator,
-                                                          routingCtx,
                                                           *localShardId)) {
                     return pipelineWithCursor;
                 }
