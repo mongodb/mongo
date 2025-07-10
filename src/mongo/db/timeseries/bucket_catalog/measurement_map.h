@@ -67,8 +67,8 @@ public:
     void initBuilders(BSONObj bucketDataDocWithCompressedBuilders, size_t numMeasurements);
 
     /**
-     * Calls BSONColumnBuilder::intermediate() for all builders and returns combined results.
-     * Updates the compressed size both internally as well as the one passed in.
+     * Calls BSONColumnBuilder::intermediate() for all builders. Updates the compressed size both
+     * internally as well as the one passed in.
      */
     std::vector<std::pair<StringData, BSONColumnBuilder<tracking::Allocator<void>>::BinaryDiff>>
     intermediate(int32_t& compressedSizeDelta);
@@ -80,10 +80,6 @@ public:
 
     size_t numFields() const {
         return _builders.size();
-    }
-
-    bool containsField(StringData fieldName) const {
-        return _builders.find(fieldName) != _builders.end();
     }
 
 private:

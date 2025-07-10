@@ -155,6 +155,11 @@ public:
     // The key (i.e. (namespace, metadata)) for this bucket.
     const BucketKey key;
 
+    // Top-level hashed field names of the measurements that have been inserted into the bucket.
+    // These must be kept, in addition to the copies in measurementMap, so
+    // we can still access them while std::move()ing measurementMap.
+    tracking::StringSet fieldNames;
+
     // Top-level hashed new field names that have not yet been committed into the bucket.
     tracking::StringSet uncommittedFieldNames;
 

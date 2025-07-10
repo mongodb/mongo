@@ -220,44 +220,6 @@ TEST_F(MeasurementMapTest, FillSkipsRemoveFieldWithMeta) {
     invariant(measurementMap.numFields() == 3);
 }
 
-TEST_F(MeasurementMapTest, ContainsField) {
-    // Insert measurement 1.
-    BSONObj m1 =
-        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z"))  // '_timeField'
-                        << "a" << BSON("0" << "1"));                                 // 'a'
-    measurementMap.insertOne(m1, /*metaField=*/boost::none);
-
-    // Insert measurement 2.
-    BSONObj m2 =
-        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:31.000Z"))  // '_timeField'
-                        << "a" << BSON("0" << "5"));                                 // 'a'
-    measurementMap.insertOne(m2, /*metaField=*/boost::none);
-
-    invariant(measurementMap.containsField("a"));
-    invariant(!measurementMap.containsField("b"));
-}
-
-TEST_F(MeasurementMapTest, ContainsFieldDoesNotContainMeta) {
-    // Insert measurement 1.
-    BSONObj m1 =
-        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z"))  // '_timeField'
-                        << _metaField << _metaValue                                  // '_metaField'
-                        << "a" << BSON("0" << "1"));                                 // 'a'
-    measurementMap.insertOne(m1, _metaField);
-
-    // Insert measurement 2.
-    BSONObj m2 =
-        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:31.000Z"))  // '_timeField'
-                        << "a" << BSON("0" << "5")                                   // 'a'
-                        << _metaField << _metaValue);                                // '_metaField'
-
-    measurementMap.insertOne(m2, _metaField);
-
-    invariant(measurementMap.containsField("a"));
-    invariant(!measurementMap.containsField("b"));
-    invariant(!measurementMap.containsField(_metaField));
-}
-
 TEST_F(MeasurementMapTest, InitBuilders) {
     BSONObj bucketDataDoc;
     BSONObjBuilder bucket;
