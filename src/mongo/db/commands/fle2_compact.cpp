@@ -125,6 +125,12 @@ public:
         addInserts(other.getInserted());
         addUpdates(other.getUpdated());
     }
+    void reset() {
+        _stats->setRead(0);
+        _stats->setDeleted(0);
+        _stats->setInserted(0);
+        _stats->setUpdated(0);
+    }
 
 private:
     IDLType* _stats;
@@ -142,6 +148,11 @@ template <>
 void CompactStatsCounter<ECOCStats>::add(const ECOCStats& other) {
     addReads(other.getRead());
     addDeletes(other.getDeleted());
+}
+template <>
+void CompactStatsCounter<ECOCStats>::reset() {
+    _stats->setRead(0);
+    _stats->setDeleted(0);
 }
 
 template <typename T>
@@ -234,8 +245,6 @@ std::shared_ptr<stdx::unordered_set<ECOCCompactionDocumentV2>> readUniqueECOCEnt
     const NamespaceString ecocCompactNss,
     BSONObj compactionTokens,
     ECOCStats* ecocStats) {
-
-    auto innerEcocStats = std::make_shared<ECOCStats>();
     auto uniqueEcocEntries = std::make_shared<stdx::unordered_set<ECOCCompactionDocumentV2>>();
 
     if (MONGO_unlikely(fleCompactOrCleanupFailBeforeECOCRead.shouldFail())) {
@@ -250,16 +259,19 @@ std::shared_ptr<stdx::unordered_set<ECOCCompactionDocumentV2>> readUniqueECOCEnt
     auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
     auto service = opCtx->getService();
 
+    auto txnEcocStats = std::make_shared<ECOCStats>();
     auto swResult = trun->runNoThrow(
         opCtx,
-        [service, sharedBlock, uniqueEcocEntries, innerEcocStats](
+        [service, sharedBlock, uniqueEcocEntries, txnEcocStats](
             const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            // Zero in order to avoid accumulating stats from aborted transactions.
+            CompactStatsCounter<ECOCStats>(txnEcocStats.get()).reset();
             FLEQueryInterfaceImpl queryImpl(txnClient, service);
 
             auto [compactionTokens2, ecocCompactNss2] = *sharedBlock.get();
 
             *uniqueEcocEntries = getUniqueCompactionDocuments(
-                &queryImpl, compactionTokens2, ecocCompactNss2, innerEcocStats.get());
+                &queryImpl, compactionTokens2, ecocCompactNss2, txnEcocStats.get());
 
             return SemiFuture<void>::makeReady();
         });
@@ -268,7 +280,7 @@ std::shared_ptr<stdx::unordered_set<ECOCCompactionDocumentV2>> readUniqueECOCEnt
 
     if (ecocStats) {
         CompactStatsCounter<ECOCStats> ctr(ecocStats);
-        ctr.add(*innerEcocStats);
+        ctr.add(*txnEcocStats);
     }
     return uniqueEcocEntries;
 }
@@ -731,7 +743,8 @@ void processFLECompactV2(OperationContext* opCtx,
                          const EncryptedStateCollectionsNamespaces& namespaces,
                          ECStats* escStats,
                          ECOCStats* ecocStats) {
-    auto innerEscStats = std::make_shared<ECStats>();
+    ECStats innerEscStats;
+    CompactStatsCounter<ECStats> innerEscStatsCtr(&innerEscStats);
 
     /* uniqueEcocEntries corresponds to the set 'C_f' in OST-1 */
     auto uniqueEcocEntries = readUniqueECOCEntriesInTxn(
@@ -837,23 +850,29 @@ void processFLECompactV2(OperationContext* opCtx,
         auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
         auto service = opCtx->getService();
 
+        auto txnEscStats = std::make_shared<ECStats>();
         auto swResult =
             trun->runNoThrow(opCtx,
-                             [service, sharedBlock, innerEscStats](
+                             [service, sharedBlock, txnEscStats](
                                  const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                                 // Zero in order to avoid accumulating stats from aborted
+                                 // transactions.
+                                 CompactStatsCounter<ECStats>(txnEscStats.get()).reset();
                                  HmacContext hmacCtx;
                                  FLEQueryInterfaceImpl queryImpl(txnClient, service);
 
                                  auto [ecocDoc2, escNss] = *sharedBlock.get();
 
                                  compactOneFieldValuePairV2(
-                                     &queryImpl, &hmacCtx, ecocDoc2, escNss, innerEscStats.get());
+                                     &queryImpl, &hmacCtx, ecocDoc2, escNss, txnEscStats.get());
 
                                  return SemiFuture<void>::makeReady();
                              });
 
         uassertStatusOK(swResult);
         uassertStatusOK(swResult.getValue().getEffectiveStatus());
+        // If the transaction was successful, update the stats.
+        innerEscStatsCtr.add(*txnEscStats);
 
         if (MONGO_unlikely(fleCompactFailAfterTransactionCommit.shouldFail())) {
             uasserted(7663001, "Failed due to fleCompactFailAfterTransactionCommit fail point");
@@ -878,12 +897,15 @@ void processFLECompactV2(OperationContext* opCtx,
             auto service = opCtx->getService();
 
             std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
+            auto txnEscStats = std::make_shared<ECStats>();
             uassertStatusOK(
                 uassertStatusOK(
                     trun->runNoThrow(
                         opCtx,
-                        [service, sharedBlock, innerEscStats](
+                        [service, sharedBlock, txnEscStats](
                             const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                            // Zero in order to avoid accumulating stats from aborted transactions.
+                            CompactStatsCounter<ECStats>(txnEscStats.get()).reset();
                             FLEQueryInterfaceImpl queryImpl(txnClient, service);
                             HmacContext hmacCtx;
 
@@ -899,11 +921,13 @@ void processFLECompactV2(OperationContext* opCtx,
                                                     rangeField.uniqueLeaves,
                                                     rangeField.uniqueTokens,
                                                     rangeField.anchorPaddingRootToken.get(),
-                                                    innerEscStats.get());
+                                                    txnEscStats.get());
 
                             return SemiFuture<void>::makeReady();
                         }))
                     .getEffectiveStatus());
+            // If the transaction was successful, update the stats.
+            innerEscStatsCtr.add(*txnEscStats);
         }
     }
 
@@ -915,12 +939,15 @@ void processFLECompactV2(OperationContext* opCtx,
         auto service = opCtx->getService();
 
         std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
+        auto txnEscStats = std::make_shared<ECStats>();
         uassertStatusOK(
             uassertStatusOK(
                 trun->runNoThrow(
                     opCtx,
-                    [service, sharedBlock, innerEscStats](
-                        const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                    [service, sharedBlock, txnEscStats](const txn_api::TransactionClient& txnClient,
+                                                        ExecutorPtr txnExec) {
+                        // Zero in order to avoid accumulating stats from aborted transactions.
+                        CompactStatsCounter<ECStats>(txnEscStats.get()).reset();
                         FLEQueryInterfaceImpl queryImpl(txnClient, service);
                         HmacContext hmacCtx;
 
@@ -932,17 +959,19 @@ void processFLECompactV2(OperationContext* opCtx,
                                                      tsField.totalMsize,
                                                      tsField.uniqueTokens,
                                                      tsField.anchorPaddingRootToken.get(),
-                                                     innerEscStats.get());
+                                                     txnEscStats.get());
 
                         return SemiFuture<void>::makeReady();
                     }))
                 .getEffectiveStatus());
+        // If the transaction was successful, update the stats.
+        innerEscStatsCtr.add(*txnEscStats);
     }
 
     // Update stats
     if (escStats) {
         CompactStatsCounter<ECStats> ctr(escStats);
-        ctr.add(*innerEscStats);
+        ctr.add(innerEscStats);
     }
 }
 
@@ -953,7 +982,8 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
                                            size_t pqMemoryLimit,
                                            ECStats* escStats,
                                            ECOCStats* ecocStats) {
-    auto innerEscStats = std::make_shared<ECStats>();
+    ECStats innerEscStats;
+    CompactStatsCounter<ECStats> innerEscStatsCtr(&innerEscStats);
 
     /* uniqueEcocEntries corresponds to the set 'C_f' in OST-1 */
     auto uniqueEcocEntries = readUniqueECOCEntriesInTxn(
@@ -983,10 +1013,14 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
             (*paddedFieldsToCleanup)[ecocDoc.fieldName] = ecocDoc.anchorPaddingRootToken.get();
         }
 
+        auto txnEscStats = std::make_shared<ECStats>();
         auto swResult =
             trun->runNoThrow(opCtx,
-                             [service, sharedBlock, innerEscStats, anchorsToRemove](
+                             [service, sharedBlock, txnEscStats, anchorsToRemove](
                                  const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                                 // Zero in order to avoid accumulating stats from aborted
+                                 // transactions.
+                                 CompactStatsCounter<ECStats>(txnEscStats.get()).reset();
                                  FLEQueryInterfaceImpl queryImpl(txnClient, service);
                                  HmacContext hmacCtx;
 
@@ -1000,7 +1034,7 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
                                                               ecocDoc2,
                                                               escNss,
                                                               maxAnchors2,
-                                                              innerEscStats.get(),
+                                                              txnEscStats.get(),
                                                               FLECleanupOneMode::kNormal);
 
                                  return SemiFuture<void>::makeReady();
@@ -1008,6 +1042,8 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
 
         uassertStatusOK(swResult);
         uassertStatusOK(swResult.getValue().getEffectiveStatus());
+        // If the transaction was successful, update the stats.
+        innerEscStatsCtr.add(*txnEscStats);
 
         for (auto& anchorId : *anchorsToRemove) {
             pq.emplace(anchorId);
@@ -1026,13 +1062,16 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
                                          std::string{paddedFieldIt.first},
                                          paddedFieldIt.second);
         auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
+        auto txnEscStats = std::make_shared<ECStats>();
         auto result = uassertStatusOK(trun->runNoThrow(
             opCtx,
             [service = opCtx->getService(),
              paddedFieldsToCleanup,
-             innerEscStats,
+             txnEscStats,
              sharedBlock,
              anchorsToRemove](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                // Zero in order to avoid accumulating stats from aborted transactions.
+                CompactStatsCounter<ECStats>(txnEscStats.get()).reset();
                 FLEQueryInterfaceImpl queryImpl(txnClient, service);
                 HmacContext hmacCtx;
 
@@ -1046,12 +1085,14 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
                     anchorPaddingRootToken,
                     escNss,
                     maxAnchors,
-                    innerEscStats.get(),
+                    txnEscStats.get(),
                     FLEQueryInterface::TagQueryType::kPadding);
 
                 return SemiFuture<void>::makeReady();
             }));
         uassertStatusOK(result.getEffectiveStatus());
+        // If the transaction was successful, update the stats.
+        innerEscStatsCtr.add(*txnEscStats);
 
         for (auto& anchorId : *anchorsToRemove) {
             pq.emplace(std::move(anchorId));
@@ -1061,7 +1102,7 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
     // Update stats
     if (escStats) {
         CompactStatsCounter<ECStats> ctr(escStats);
-        ctr.add(*innerEscStats);
+        ctr.add(innerEscStats);
     }
     return pq;
 }
