@@ -140,7 +140,6 @@ boost::optional<TrafficReaderPacket> readPacket(char* buf, int fd) {
     uint64_t date = cdr.readAndAdvance<LittleEndian<uint64_t>>();
     uint64_t order = cdr.readAndAdvance<LittleEndian<uint64_t>>();
     MsgData::ConstView message(cdr.data());
-
     return TrafficReaderPacket{id, session, Date_t::fromMillisSinceEpoch(date), order, message};
 }
 
@@ -170,9 +169,8 @@ void getBSONObjFromPacket(TrafficReaderPacket& packet, BSONObjBuilder* builder) 
     // Trying to re-create the way mongoreplay does this
     {
         BSONObjBuilder seen(builder->subobjStart("seen"));
-        seen.append(
-            "sec",
-            static_cast<int64_t>((packet.date.toMillisSinceEpoch() / 1000) + unixToInternal));
+        seen.append("sec",
+                    static_cast<int64_t>((packet.date.toMillisSinceEpoch()) + unixToInternal));
         seen.append("nsec", static_cast<int32_t>(packet.order));
     }
 

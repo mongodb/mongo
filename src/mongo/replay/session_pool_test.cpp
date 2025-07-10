@@ -34,7 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/replay/raw_op_document.h"
+#include "mongo/replay/rawop_document.h"
 #include "mongo/replay/replay_command.h"
 #include "mongo/replay/replay_command_executor.h"
 #include "mongo/replay/replay_test_server.h"
@@ -93,8 +93,7 @@ public:
         ASSERT_TRUE(executor->isConnected());
         for (const auto& [name, c] : getCommands()) {
             RawOpDocument opDoc{name, c};
-            auto response = executor->runCommand(ReplayCommand{opDoc.getBinaryCommand()});
-            out = response;
+            out = executor->runCommand(ReplayCommand{opDoc.getDocument()});
         }
     }
 

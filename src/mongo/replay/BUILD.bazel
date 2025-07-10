@@ -12,6 +12,7 @@ mongo_cc_library(
         "replay_command.cpp",
         "replay_command_executor.cpp",
         "session_pool.cpp",
+        "session_simulator.cpp",
     ],
     hdrs = [
         "options_handler.h",
@@ -19,6 +20,7 @@ mongo_cc_library(
         "replay_command.h",
         "replay_command_executor.h",
         "session_pool.h",
+        "session_simulator.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -46,13 +48,15 @@ mongo_cc_binary(
 mongo_cc_unit_test(
     name = "mongor-test",
     srcs = [
+        "mini_mock.h",
         "options_handler_test.cpp",
-        "raw_op_document.cpp",
-        "raw_op_document.h",
+        "rawop_document.cpp",
+        "rawop_document.h",
         "replay_command_executor_test.cpp",
         "replay_test_server.cpp",
         "replay_test_server.h",
         "session_pool_test.cpp",
+        "session_simulator_test.cpp",
     ],
     tags = ["mongo_unittest_sixth_group"],
     deps = [

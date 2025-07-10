@@ -42,7 +42,7 @@ inline bool isReplayable(const std::string& commandType) {
     return !commandType.empty() && !forbiddenKeywords.contains(commandType);
 }
 
-std::vector<BSONObj> RecordingReader::parse() const {
+std::vector<BSONObj> RecordingReader::processRecording() const {
 
     // recording format.
     // {

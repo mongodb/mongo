@@ -38,10 +38,10 @@ public:
     explicit RawOpDocument();
     explicit RawOpDocument(const std::string& opType, const BSONObj& body);
     BSONObj getDocument() const;
-    BSONObj getBinaryCommand() const;
     void updateBody(const BSONObj& newBody);
     void updateHeaderField(const std::string& fieldName, int value);
     void updateOpType(const std::string& newOpType);
+    void updateSeenField(const Date_t& time, int64_t nanoseconds = 0);
 
 private:
     /** Represents the `rawop` part. */

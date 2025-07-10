@@ -47,8 +47,7 @@ class ReplayCommand;
  */
 class ReplayCommandExecutor {
 public:
-    /** Initialize the replay executor. This method must always be called. */
-    bool init();
+    ReplayCommandExecutor();
     /*
      * Connect the executor to the server instance passed in the constructor. The connection status
      * is checked and if successful a new client instance is created.
@@ -68,9 +67,6 @@ public:
     BSONObj runCommand(const ReplayCommand&) const;
 
 private:
-    void setup() const;
-    void setupTransportLayer(ServiceContext&) const;
-    void setupWireProtocol(ServiceContext&) const;
     std::unique_ptr<DBClientBase> _dbConnection = nullptr;
 };
 }  // namespace mongo

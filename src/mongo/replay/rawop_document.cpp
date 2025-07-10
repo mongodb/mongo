@@ -26,10 +26,10 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-#include "mongo/replay/raw_op_document.h"
+#include "mongo/replay/rawop_document.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -71,15 +71,11 @@ BSONObj RawOpDocument::getDocument() const {
     return _document;
 }
 
-BSONObj RawOpDocument::getBinaryCommand() const {
-    return getDocument()["rawop"].Obj();
-}
-
 void RawOpDocument::updateBody(const BSONObj& newBody) {
     BSONObjBuilder rawOpBuilder;
     rawOpBuilder.append("header", _rawOp.getObjectField("header"));
     const auto binData = constructWireProtocolBinData(newBody);
-    rawOpBuilder.appendBinData("body", binData.size(), mongo::BinDataGeneral, binData.data());
+    rawOpBuilder.appendBinData("body", binData.size(), BinDataGeneral, binData.data());
     _rawOp = rawOpBuilder.obj();
     updateField("rawop", _rawOp);
 }
@@ -100,7 +96,7 @@ void RawOpDocument::updateHeaderField(const std::string& fieldName, int value) {
     rawOpBuilder.append("header", updatedHeaderBuilder.obj());
     int binDataLen = 0;
     const auto binData = _rawOp.getField("body").binData(binDataLen);
-    rawOpBuilder.appendBinData("body", binDataLen, mongo::BinDataGeneral, binData);
+    rawOpBuilder.appendBinData("body", binDataLen, BinDataGeneral, binData);
     _rawOp = rawOpBuilder.obj();
 
     updateField("rawop", _rawOp);
@@ -110,7 +106,16 @@ void RawOpDocument::updateOpType(const std::string& newOpType) {
     updateField("opType", newOpType);
 }
 
-void RawOpDocument::updateField(const std::string& fieldName, const mongo::BSONObj& newValue) {
+void RawOpDocument::updateSeenField(const Date_t& time, int64_t nanoseconds /* = 0 */) {
+    // total number of seconds
+    constexpr long long unixToInternal =
+        62135596800LL;  // mongodb date are stored using a ref to start of epoch
+    int64_t seconds = time.toMillisSinceEpoch() + unixToInternal;
+    BSONObj updatedSeen = BSON("sec" << seconds << "nsec" << nanoseconds);
+    updateField("seen", updatedSeen);
+}
+
+void RawOpDocument::updateField(const std::string& fieldName, const BSONObj& newValue) {
     BSONObjBuilder builder;
     for (auto& elem : _document) {
         if (elem.fieldName() == fieldName) {
@@ -134,7 +139,7 @@ void RawOpDocument::updateField(const std::string& fieldName, const std::string&
     _document = builder.obj();
 }
 
-std::vector<char> RawOpDocument::constructWireProtocolBinData(const mongo::BSONObj& command) const {
+std::vector<char> RawOpDocument::constructWireProtocolBinData(const BSONObj& command) const {
 
     size_t headerSize = 16;                  // Fixed size for header.
     size_t flagBitsSize = 4;                 // Fixed size for flag bits.

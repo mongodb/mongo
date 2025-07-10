@@ -30,7 +30,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/replay/raw_op_document.h"
+#include "mongo/replay/rawop_document.h"
 #include "mongo/replay/replay_command.h"
 #include "mongo/replay/replay_test_server.h"
 #include "mongo/unittest/unittest.h"
@@ -40,6 +40,19 @@
 #include <string>
 
 namespace mongo {
+
+TEST(ReplayCommandExecutionTest, ReplayCommandReadSameTimestampValueAsWritten) {
+    auto recordingStartTimestamp = Date_t::now();
+    RawOpDocument opDoc{"find",
+                        BSON("find" << "test"
+                                    << "$db"
+                                    << "test")};
+    auto eventTimestamp = recordingStartTimestamp + Seconds(2);
+    opDoc.updateSeenField(eventTimestamp);
+    ReplayCommand command{opDoc.getDocument()};
+    Date_t d = command.fetchRequestTimestamp();
+    ASSERT_TRUE(d == eventTimestamp);
+}
 
 TEST(ReplayCommandExecutionTest, ConnectionTest) {
     ReplayTestServer server;
@@ -53,7 +66,10 @@ TEST(ReplayCommandExecutionTest, ConnectionTest) {
 
 TEST(ReplayCommandExecutionTest, TestFind) {
     BSONObj filter = BSON("name" << "Alice");
-    BSONObj findCommand = BSON("find" << "test" << "$db" << "test" << "filter" << filter);
+    BSONObj findCommand = BSON("find" << "test"
+                                      << "$db"
+                                      << "test"
+                                      << "filter" << filter);
     std::string jsonStr = R"([{  
     "_id": "681cb423980b72695075137f",  
     "name": "Alice",  
@@ -62,7 +78,7 @@ TEST(ReplayCommandExecutionTest, TestFind) {
     ReplayTestServer server{{"find"}, {jsonStr}};
     ReplayCommandExecutor replayCommandExecutor;
     RawOpDocument opDoc{"find", findCommand};
-    ReplayCommand command{opDoc.getBinaryCommand()};
+    ReplayCommand command{opDoc.getDocument()};
     replayCommandExecutor.connect(server.getConnectionString());
     ASSERT_TRUE(replayCommandExecutor.isConnected());
     auto response = replayCommandExecutor.runCommand(command);
@@ -71,8 +87,10 @@ TEST(ReplayCommandExecutionTest, TestFind) {
 
 TEST(ReplayCommandExecutionTest, TestInsert) {
     BSONObj insertDocument = BSON("name" << "Alice");
-    BSONObj insertCommand =
-        BSON("insert" << "test" << "$db" << "test" << "documents" << BSON_ARRAY(insertDocument));
+    BSONObj insertCommand = BSON("insert" << "test"
+                                          << "$db"
+                                          << "test"
+                                          << "documents" << BSON_ARRAY(insertDocument));
     std::string jsonStr = R"({"ok": 1,"n": 1})";
 
     ReplayTestServer server{{"insert"}, {jsonStr}};
@@ -80,7 +98,7 @@ TEST(ReplayCommandExecutionTest, TestInsert) {
     replayCommandExecutor.connect(server.getConnectionString());
     ASSERT_EQUALS(replayCommandExecutor.isConnected(), true);
     RawOpDocument opDoc{"insert", insertCommand};
-    ReplayCommand command{opDoc.getBinaryCommand()};
+    ReplayCommand command{opDoc.getDocument()};
     auto response = replayCommandExecutor.runCommand(command);
     ASSERT_TRUE(server.checkResponse("insert", response));
 }
@@ -92,15 +110,17 @@ TEST(ReplayCommandExecutionTest, TestAggregate) {
         BSON("$project" << BSON("name" << 1 << "name_uppercase" << BSON("$toUpper" << "$name")));
     BSONObj pipeline = BSON("pipeline" << BSON_ARRAY(matchStage << sortStage << projectStage));
     BSONObj aggregationCommand =
-        BSON("aggregate" << "test" << "$db" << "test" << "pipeline"
-                         << BSON_ARRAY(matchStage << sortStage << projectStage) << "cursor"
-                         << BSON("batchSize" << 100));
+        BSON("aggregate" << "test"
+                         << "$db"
+                         << "test"
+                         << "pipeline" << BSON_ARRAY(matchStage << sortStage << projectStage)
+                         << "cursor" << BSON("batchSize" << 100));
     std::string jsonStr = R"([{"name_original": "Alice", "name_uppercase": "ALICE" }])";
 
     ReplayTestServer server{{"aggregate"}, {jsonStr}};
     ReplayCommandExecutor replayCommandExecutor;
     RawOpDocument opDoc{"aggregate", aggregationCommand};
-    ReplayCommand command{opDoc.getBinaryCommand()};
+    ReplayCommand command{opDoc.getDocument()};
     replayCommandExecutor.connect(server.getConnectionString());
     ASSERT_TRUE(replayCommandExecutor.isConnected());
     auto response = replayCommandExecutor.runCommand(command);
@@ -110,14 +130,16 @@ TEST(ReplayCommandExecutionTest, TestAggregate) {
 TEST(ReplayCommandExecutionTest, TestDelete) {
     BSONObj filter = BSON("name" << "Alice");
     BSONObj deleteOp = BSON("q" << filter << "limit" << 1);
-    BSONObj deleteCommand =
-        BSON("delete" << "test" << "$db" << "test" << "deletes" << BSON_ARRAY(deleteOp));
+    BSONObj deleteCommand = BSON("delete" << "test"
+                                          << "$db"
+                                          << "test"
+                                          << "deletes" << BSON_ARRAY(deleteOp));
     std::string jsonStr = R"({"n": 1,"ok": 1})";
 
     ReplayTestServer server{{"delete"}, {jsonStr}};
     ReplayCommandExecutor replayCommandExecutor;
     RawOpDocument opDoc{"delete", deleteCommand};
-    ReplayCommand command{opDoc.getBinaryCommand()};
+    ReplayCommand command{opDoc.getDocument()};
     replayCommandExecutor.connect(server.getConnectionString());
     ASSERT_EQUALS(replayCommandExecutor.isConnected(), true);
     auto response = replayCommandExecutor.runCommand(command);

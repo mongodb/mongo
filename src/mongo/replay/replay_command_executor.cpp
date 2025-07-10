@@ -34,30 +34,17 @@
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/dbclient_session.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/replay/replay_command.h"
-#include "mongo/transport/asio/asio_session_manager.h"
-#include "mongo/transport/asio/asio_transport_layer.h"
-#include "mongo/transport/transport_layer_manager.h"
-#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/periodic_runner_factory.h"
-#include "mongo/util/version.h"
 
 #include <chrono>
 #include <string>
+#include <thread>
 
 namespace mongo {
 
-bool ReplayCommandExecutor::init() {
-    // Run global init stuff. Very important for working.
-    uassertStatusOK(mongo::runGlobalInitializers({}));
-    // Setup client related stuff. Same as mongo shell.
-    setup();
-    return true;
-}
+ReplayCommandExecutor::ReplayCommandExecutor() = default;
 
 void ReplayCommandExecutor::connect(StringData uri) {
     // Connect to mongo d/s instance and keep instance of the connection alive as long as this
@@ -81,13 +68,9 @@ bool ReplayCommandExecutor::isConnected() const {
     return _dbConnection && _dbConnection->isStillConnected();
 }
 
-
 BSONObj ReplayCommandExecutor::runCommand(const ReplayCommand& command) const {
-    OpMsgRequest request;
     uassert(ErrorCodes::ReplayClientNotConnected, "MongoR is not connected", isConnected());
-    uassert(ErrorCodes::ReplayClientFailedToProcessBSON,
-            "Failed to process bson command",
-            command.toRequest(request));
+    OpMsgRequest request = command.fetchMsgRequest();
     try {
         const auto reply = _dbConnection->runCommand(std::move(request));
         return reply->getCommandReply().getOwned();
@@ -98,39 +81,5 @@ BSONObj ReplayCommandExecutor::runCommand(const ReplayCommand& command) const {
     return {};
 }
 
-void ReplayCommandExecutor::setup() const {
-    // If we call this using a mongo shell util, we already have a service context! However, if
-    // we run the client as a standalone binary, we need to do this work ourselves.
-    if (!hasGlobalServiceContext()) {
-        auto serviceContext = ServiceContext::make();
-        setupTransportLayer(*serviceContext);
-        setupWireProtocol(*serviceContext);
-        setGlobalServiceContext(std::move(serviceContext));
-    }
-}
-
-void ReplayCommandExecutor::setupTransportLayer(mongo::ServiceContext& serviceContext) const {
-    // Create transport layer.
-    transport::AsioTransportLayer::Options opts;
-    opts.mode = transport::AsioTransportLayer::Options::kEgress;
-    auto sm = std::make_unique<transport::AsioSessionManager>(&serviceContext);
-    auto tl = std::make_unique<mongo::transport::AsioTransportLayer>(opts, std::move(sm));
-    serviceContext.setTransportLayerManager(
-        std::make_unique<transport::TransportLayerManagerImpl>(std::move(tl)));
-    auto tlPtr = serviceContext.getTransportLayerManager();
-    uassertStatusOK(tlPtr->setup());
-    uassertStatusOK(tlPtr->start());
-}
-
-void ReplayCommandExecutor::setupWireProtocol(mongo::ServiceContext& serviceContext) const {
-    // Setup wire protocol specs
-    WireSpec::Specification spec;
-    spec.incomingInternalClient.minWireVersion = RELEASE_2_4_AND_BEFORE;
-    spec.incomingInternalClient.maxWireVersion = LATEST_WIRE_VERSION;
-    spec.outgoing.minWireVersion = SUPPORTS_OP_MSG;
-    spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
-    spec.isInternalClient = true;
-    WireSpec::getWireSpec(&serviceContext).initialize(std::move(spec));
-}
 
 }  // namespace mongo

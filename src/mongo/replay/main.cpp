@@ -32,19 +32,30 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/traffic_reader.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/replay/options_handler.h"
 #include "mongo/replay/recording_reader.h"
 #include "mongo/replay/replay_command.h"
 #include "mongo/replay/replay_command_executor.h"
 #include "mongo/replay/session_pool.h"
 #include "mongo/rpc/factory.h"
+#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/transport/asio/asio_session_manager.h"
+#include "mongo/transport/asio/asio_transport_layer.h"
+#include "mongo/transport/transport_layer_manager.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
+#include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/signal_handlers.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
+#include "mongo/util/version.h"
 
 #include <cerrno>
 #include <chrono>
@@ -95,12 +106,9 @@ void simpleTask(ReplayCommandExecutor& replayCommandExecutor,
 void threadExecutionFunction(const ReplayOptions& replayOptions) {
     try {
         ReplayCommandExecutor replayCommandExecutor;
-        uassert(ErrorCodes::ReplayClientConfigurationError,
-                "Failed initializing replay command execution.",
-                replayCommandExecutor.init());
 
         RecordingReader reader{replayOptions.recordingPath};
-        const auto commands = reader.parse();
+        const auto commands = reader.processRecording();
 
         if (!commands.empty()) {
             replayCommandExecutor.connect(replayOptions.mongoURI);
@@ -126,6 +134,7 @@ void threadExecutionFunction(const ReplayOptions& replayOptions) {
 }
 
 int main(int argc, char** argv) {
+    mongo::runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
 
     OptionsHandler commandLineOptions;
     const auto& options = commandLineOptions.handle(argc, argv);
@@ -138,6 +147,8 @@ int main(int argc, char** argv) {
     for (auto& instance : instances) {
         instance.join();
     }
+
+    uassertStatusOK(mongo::runGlobalDeinitializers());
 
     return 0;
 }
