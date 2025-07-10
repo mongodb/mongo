@@ -51,6 +51,9 @@ filters:
   - "accumulator_internal_construct_stats.cpp":
     approvers:
       - 10gen/query-optimization
+  - "aggregation_hint_translation.h":
+    approvers:
+      - 10gen/query-integration-timeseries
   - "aggregation_request*":
     approvers:
       - 10gen/query-optimization

@@ -61,6 +61,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/aggregation_hint_translation.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
@@ -96,7 +97,6 @@
 #include "mongo/db/query/query_stats/agg_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
-#include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -1011,6 +1011,14 @@ StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> preparePipeline(
         return pipelineCollationStatus;
     }
 
+    // After parsing the pipeline and registering query stats, we must perform pre optimization
+    // rewrites. The only rewrites supported are for viewless timeseries collections.
+    if (aggCatalogState.lockAcquired()) {
+        aggregation_hint_translation::translateIndexHintIfRequired(
+            expCtx, aggCatalogState.getMainCollectionOrView(), aggExState.getRequest());
+        pipeline->performPreOptimizationRewrites(expCtx, aggCatalogState.getMainCollectionOrView());
+    }
+
     // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
     // support querying against encrypted fields.
     if (prepareForFLERewrite(aggExState.getOpCtx(),
@@ -1054,27 +1062,6 @@ StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> preparePipeline(
     }
 
     return std::move(pipeline);
-}
-
-/**
- * Rewrite the AggregateCommandRequest pipeline if the query is over a timeseries collection.
- */
-void rewritePipelineIfTimeseries(const AggExState& aggExState,
-                                 const AggCatalogState& aggCatalogState) {
-    // Conditions for enabling the viewless code path: feature flag is on, request does not use
-    // the rawData flag, and we're querying against a viewless timeseries collection.
-    if (aggCatalogState.lockAcquired()) {
-        if (const auto& coll = aggCatalogState.getMainCollectionOrView().getCollectionPtr();
-            timeseries::isEligibleForViewlessTimeseriesRewrites(aggExState.getOpCtx(), coll)) {
-            const auto timeseriesOptions = coll->getTimeseriesOptions();
-            tassert(10000200,
-                    "Timeseries options must be present for timeseries collection",
-                    timeseriesOptions);
-            // Handle re-rewrite prevention in the callee.
-            timeseries::rewriteRequestPipelineAndHintForTimeseriesCollection(
-                aggExState.getRequest(), *coll.get(), *timeseriesOptions);
-        }
-    }
 }
 
 Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result) {
@@ -1140,9 +1127,6 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
                 *resolvedViewAggExState.getValue(), std::move(aggCatalogState), result);
         }
     }
-
-
-    rewritePipelineIfTimeseries(aggExState, *aggCatalogState);
 
     boost::intrusive_ptr<ExpressionContext> expCtx = aggCatalogState->createExpressionContext();
 

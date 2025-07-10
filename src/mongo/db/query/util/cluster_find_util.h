@@ -39,7 +39,7 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_settings.h"
-#include "mongo/db/query/timeseries/timeseries_rewrites.h"
+#include "mongo/db/query/timeseries/timeseries_translation.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/s/router_role.h"
@@ -68,7 +68,7 @@ inline boost::optional<CursorId> convertFindAndRunAggregateIfViewlessTimeseries(
         return boost::none;
     }
     const auto& cri = routingCtx.getCollectionRoutingInfo(origNss);
-    if (timeseries::isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, cri)) {
+    if (timeseries::requiresViewlessTimeseriesTranslationInRouter(opCtx, cri)) {
         const auto hasExplain = verbosity.has_value();
         auto bodyBuilder = result->getBodyBuilder();
         bodyBuilder.resetToEmpty();

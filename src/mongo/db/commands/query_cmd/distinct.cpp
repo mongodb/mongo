@@ -77,7 +77,7 @@
 #include "mongo/db/query/query_stats/distinct_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
-#include "mongo/db/query/timeseries/timeseries_rewrites.h"
+#include "mongo/db/query/timeseries/timeseries_translation.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/read_concern_support_result.h"
@@ -461,7 +461,7 @@ public:
             diagnostic_printers::ExpressionContextPrinter{canonicalQuery->getExpCtx()});
 
         if (collectionOrView->isView() ||
-            timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx, *collectionOrView)) {
+            timeseries::requiresViewlessTimeseriesTranslation(opCtx, *collectionOrView)) {
             // Relinquish locks. The aggregation command will re-acquire them.
             collectionOrView.reset();
             runDistinctAsAgg(opCtx, std::move(canonicalQuery), verbosity, replyBuilder);
@@ -593,7 +593,7 @@ public:
         }
 
         if (collectionOrView->isView() ||
-            timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx, *collectionOrView)) {
+            timeseries::requiresViewlessTimeseriesTranslation(opCtx, *collectionOrView)) {
             // Relinquish locks. The aggregation command will re-acquire them.
             collectionOrView.reset();
             runDistinctAsAgg(

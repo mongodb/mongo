@@ -66,7 +66,7 @@
 #include "mongo/db/query/query_stats/distinct_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
-#include "mongo/db/query/timeseries/timeseries_rewrites.h"
+#include "mongo/db/query/timeseries/timeseries_translation.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/read_concern_support_result.h"
@@ -301,7 +301,7 @@ public:
                         cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON()
                                         : BSONObj()});
 
-                if (timeseries::isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, cri)) {
+                if (timeseries::requiresViewlessTimeseriesTranslationInRouter(opCtx, cri)) {
                     runDistinctAsAgg(opCtx,
                                      routingCtx,
                                      std::move(canonicalQuery),
@@ -414,7 +414,7 @@ public:
                         cri.isSharded() ? cm.getShardKeyPattern().toBSON() : BSONObj()});
 
                 std::vector<AsyncRequestsSender::Response> shardResponses;
-                if (timeseries::isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, cri)) {
+                if (timeseries::requiresViewlessTimeseriesTranslationInRouter(opCtx, cri)) {
                     runDistinctAsAgg(opCtx,
                                      routingCtx,
                                      std::move(canonicalQuery),

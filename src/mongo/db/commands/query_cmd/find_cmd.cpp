@@ -97,7 +97,7 @@
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
-#include "mongo/db/query/timeseries/timeseries_rewrites.h"
+#include "mongo/db/query/timeseries/timeseries_translation.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -535,7 +535,7 @@ public:
             // If we are running a query against a view or a timeseries collection, redirect this
             // query through the aggregation system.
             if (collectionOrView->isView() ||
-                timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx, *collectionOrView)) {
+                timeseries::requiresViewlessTimeseriesTranslation(opCtx, *collectionOrView)) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 collectionOrView.reset();
                 CurOp::get(opCtx)->debug().queryStatsInfo.disableForSubqueryExecution = true;
@@ -822,7 +822,7 @@ public:
             // If we are running a query against a view or a timeseries collection, redirect this
             // query through the aggregation system.
             if (collectionOrView->isView() ||
-                timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx, *collectionOrView)) {
+                timeseries::requiresViewlessTimeseriesTranslation(opCtx, *collectionOrView)) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 collectionOrView.reset();
                 return runFindAsAgg(opCtx, *cq, boost::none /* verbosity */, replyBuilder);

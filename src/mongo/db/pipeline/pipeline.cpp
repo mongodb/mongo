@@ -63,6 +63,7 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/timeseries/timeseries_translation.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
@@ -331,6 +332,18 @@ void Pipeline::validateCommon(bool alreadyOptimized) const {
                 constraints.hostRequirement != HostTypeRequirement::kAllShardHosts ||
                     !constraints.requiresInputDocSource);
     }
+}
+
+void Pipeline::performPreOptimizationRewrites(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                              const CollectionRoutingInfo& cri) {
+    // The only supported translation is for viewless timeseries collections.
+    timeseries::translateStagesIfRequired(expCtx, *this, cri);
+};
+
+void Pipeline::performPreOptimizationRewrites(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                              const CollectionOrViewAcquisition& collOrView) {
+    // The only supported translation is for viewless timeseries collections.
+    timeseries::translateStagesIfRequired(expCtx, *this, collOrView);
 }
 
 void Pipeline::optimizePipeline() {
@@ -629,6 +642,21 @@ void Pipeline::addFinalSource(intrusive_ptr<DocumentSource> source) {
         finalStage.setSource(dynamic_cast<exec::agg::Stage*>(_sources.back().get()));
     }
     _sources.push_back(source);
+}
+
+void Pipeline::addSourceAtPosition(boost::intrusive_ptr<DocumentSource> source, size_t index) {
+    tassert(10601105,
+            "The index must be positive and less than or equal to the size of the source list",
+            index <= _sources.size() && index >= 0);
+
+    const bool originallyEmpty = _sources.empty();
+    auto sourceIter = _sources.begin();
+    std::advance(sourceIter, index);
+    _sources.insert(sourceIter, source);
+
+    if (!originallyEmpty) {
+        stitch();
+    }
 }
 
 void Pipeline::addVariableRefs(std::set<Variables::Id>* refs) const {

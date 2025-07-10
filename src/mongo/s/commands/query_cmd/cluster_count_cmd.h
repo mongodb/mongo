@@ -40,7 +40,7 @@
 #include "mongo/db/query/query_stats/count_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
-#include "mongo/db/query/timeseries/timeseries_rewrites.h"
+#include "mongo/db/query/timeseries/timeseries_translation.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -81,7 +81,7 @@ inline bool convertAndRunAggregateIfViewlessTimeseries(
     const NamespaceString& nss,
     boost::optional<mongo::ExplainOptions::Verbosity> verbosity = boost::none) {
     const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
-    if (!timeseries::isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, cri)) {
+    if (!timeseries::requiresViewlessTimeseriesTranslationInRouter(opCtx, cri)) {
         return false;
     } else {
         // We only need to route the viewless timeseries request to

@@ -20,11 +20,14 @@ mongo_cc_unit_test(
     name = "db_query_timeseries_test",
     srcs = [
         "timeseries_prepend_unpack_stage_test.cpp",
-        "timeseries_rewrites_test.cpp",
+        "timeseries_translation_test.cpp",
     ],
     tags = ["mongo_unittest_third_group"],
     deps = [
         ":timeseries_rewrites_mocks",
         "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/timeseries:timeseries_test_fixture",
+        "//src/mongo/idl:server_parameter_test_util",
     ],
 )

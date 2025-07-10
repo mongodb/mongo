@@ -70,6 +70,10 @@
 
 namespace mongo {
 class BSONObj;
+
+// TODO SERVER-107320 remove 'CollectionOrViewAcquisition' and 'CollectionRoutingInfo'.
+class CollectionOrViewAcquisition;
+class CollectionRoutingInfo;
 class OperationContext;
 class Pipeline;
 class PipelineDeleter;
@@ -329,6 +333,14 @@ public:
     bool requiredToRunOnRouter() const;
 
     /**
+     * Modifies the pipeline in-place to perform any rewrites that must happen before optimization.
+     */
+    void performPreOptimizationRewrites(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                        const CollectionRoutingInfo& cri);
+    void performPreOptimizationRewrites(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                        const CollectionOrViewAcquisition& collOrView);
+
+    /**
      * Modifies the pipeline, optimizing it by combining and swapping stages.
      */
     void optimizePipeline();
@@ -374,6 +386,8 @@ public:
     void addInitialSource(boost::intrusive_ptr<DocumentSource> source);
 
     void addFinalSource(boost::intrusive_ptr<DocumentSource> source);
+
+    void addSourceAtPosition(boost::intrusive_ptr<DocumentSource> source, size_t index);
 
     /**
      * Write the pipeline's operators to a std::vector<Value>, providing the level of detail

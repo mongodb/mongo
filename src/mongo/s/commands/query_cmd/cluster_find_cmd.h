@@ -46,7 +46,6 @@
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
-#include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/query/util/cluster_find_util.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/server_feature_flags_gen.h"

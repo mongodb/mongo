@@ -46,6 +46,7 @@
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/aggregation_hint_translation.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
@@ -70,7 +71,6 @@
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/tailable_mode_gen.h"
-#include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -513,29 +513,6 @@ void resetRawDataFromRequest(OperationContext* const opCtx, AggregateCommandRequ
     // operation.
     isRawDataOperation(opCtx) = request.getRawData().value_or(false);
 }
-
-void rewritePipelineIfTimeseries(OperationContext* const opCtx,
-                                 AggregateCommandRequest& request,
-                                 const CollectionRoutingInfo& cri) {
-    if (timeseries::isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, cri)) {
-        // TypeCollectionTimeseriesFields encapsulates TimeseriesOptions.
-        const auto timeseriesFields = cri.getChunkManager().getTimeseriesFields();
-        tassert(9949202,
-                "Expected getTimeseriesFields() to return a meaningful value",
-                timeseriesFields.has_value());
-        if (timeseriesFields.has_value()) {
-            timeseries::rewriteRequestPipelineAndHintForTimeseriesCollection(
-                request, *timeseriesFields, timeseriesFields->getTimeseriesOptions());
-            // The query has been rewritten to something that should run directly against the bucket
-            // collection. Set this flag to indicate to the shard that the query's target has
-            // changed to avoid incorrect rewrites in the shard role.
-            //
-            // TODO SERVER-106876 remove manipulation of rawData flag in this function.
-            isRawDataOperation(opCtx) = true;
-        }
-    }
-}
-
 }  // namespace
 
 Status ClusterAggregate::runAggregate(OperationContext* opCtx,
@@ -699,18 +676,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         }
     }
 
-    // This is used later on as well.
-    const auto routingTableIsAvailable = cri && cri->hasRoutingTable();
-
-    // If cri is valueful, then the database definitely exists and the cluster has shards. If the
-    // routing table also exists, the collection exists and is tracked in the router role, so it is
-    // appropriate to attempt the rewrite. If any of these conditions are false, then either cri is
-    // none or the routing table is absent, and the rewrite will either be performed in the shard
-    // role or the database is nonexistent or the cluster has no shards to execute the query anyway.
-    if (routingTableIsAvailable) {
-        rewritePipelineIfTimeseries(opCtx, request, *cri);
-    }
-
     // Create an RAII object that prints the collection's shard key in the case of a tassert
     // or crash.
     ScopedDebugInfo shardKeyDiagnostics(
@@ -734,7 +699,21 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                                requiresCollationForParsingUnshardedAggregate,
                                                resolvedView,
                                                verbosity);
-        auto pipelineCtx = pipeline->getContext();
+        const boost::intrusive_ptr<ExpressionContext>& pipelineCtx = pipeline->getContext();
+
+        // If cri is valueful, then the database definitely exists and the cluster has shards. If
+        // the routing table also exists, the collection exists and is tracked in the router role,
+        // so it is appropriate to attempt the translation. If any of these conditions are false,
+        // then either cri is none or the routing table is absent, and the translation will either
+        // be performed in the shard role or the database is nonexistent or the cluster has no
+        // shards to execute the query anyway.
+        const auto routingTableIsAvailable = cri && cri->hasRoutingTable();
+        if (routingTableIsAvailable) {
+            // The only supported rewrites are for viewless timeseries collections.
+            aggregation_hint_translation::translateIndexHintIfRequired(
+                pipelineCtx, cri.get(), request);
+            pipeline->performPreOptimizationRewrites(pipelineCtx, cri.get());
+        }
 
         // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
         // support querying against encrypted fields.

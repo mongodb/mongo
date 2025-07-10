@@ -2087,6 +2087,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/accumulator_percentile* @10gen/query-integration-extensions @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/accumulator_test.cpp @10gen/query-execution-classic @10gen/query-integration-extensions @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/accumulator_internal_construct_stats.cpp @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/aggregation_hint_translation.h @10gen/query-integration-timeseries @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/aggregation_request* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/aggregation_context_fixture.h @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/aggregation_mongod_context_fixture.h @10gen/query-optimization @svc-auto-approve-bot
