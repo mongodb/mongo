@@ -34,12 +34,11 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/system_clock_source.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
-#include <memory>
 #include <utility>
-#include <variant>
 
 namespace mongo {
 
@@ -57,9 +56,6 @@ class RateLimiter {
          * Constructor for a rate limiter. Specify the number of requests you want to take place, as
          * well as the time period in milliseconds.
          */
-        explicit WindowBasedPolicy(RequestCount requestLimit,
-                                   Milliseconds timePeriod = Seconds{1},
-                                   ClockSource* clockSource = nullptr);
         WindowBasedPolicy(const WindowBasedPolicy&) = delete;
         WindowBasedPolicy& operator=(const WindowBasedPolicy&) = delete;
         WindowBasedPolicy(WindowBasedPolicy&&) = delete;
@@ -98,7 +94,7 @@ class RateLimiter {
         /*
          * Clock source used to track time.
          */
-        ClockSource* const _clockSource = nullptr;
+        ClockSource* const _clockSource = SystemClockSource::get();
 
         /*
          * Sampling rate is the bound on the number of requests we want to admit per window.
@@ -108,7 +104,7 @@ class RateLimiter {
         /*
          * Time period is the window size in ms.
          */
-        const Milliseconds _timePeriod;
+        const Milliseconds _timePeriod = Seconds{1};
 
         /*
          * Window start.
@@ -138,7 +134,6 @@ class RateLimiter {
         /*
          * Constructor for a rate limiter. Specify the percentage of requests you want to take place
          */
-        SampleBasedPolicy(SampleRate samplingRate, uint64_t randomSeed = 0);
         SampleBasedPolicy(const SampleBasedPolicy&) = delete;
         SampleBasedPolicy& operator=(const SampleBasedPolicy&) = delete;
         SampleBasedPolicy(SampleBasedPolicy&&) = delete;
@@ -161,53 +156,35 @@ class RateLimiter {
         }
 
         /*
+         * Setter for the random seed.
+         */
+        inline void setRandomSeed(uint64_t randomSeed) noexcept {
+            _randomSeed.store(randomSeed);
+        }
+
+        /*
          * A method that ensures a steady rate of requests. This method uses a pseudo random
          * number generator to determine whether the request should be handled or not.
          */
         bool handle();
 
     private:
-        PseudoRandom _prng{/* seed = */ 0};
         AtomicWord<SampleRate> _samplingRate = 0;
+        AtomicWord<uint64_t> _randomSeed = 0;
     };
 
 public:
     enum PolicyType { kSampleBasedPolicy, kWindowBasedPolicy };
 
     /*
-     * Creates a rate limiter that decides to allow requests randomly,
-     * based on the given sampling rate.
-     *
-     * The sampling rate is specified in thousandths (i.e., a value of 10 means 1%).
-     */
-    static std::unique_ptr<RateLimiter> createSampleBased(Limit samplingRate, int randomSeed) {
-        return std::unique_ptr<RateLimiter>(new RateLimiter(samplingRate, randomSeed));
-    }
-
-    /*
-     * Create a sliding window based rate limiter. Specify the number of requests you want to take
-     * place, as well as the time period in milliseconds.
-     */
-    static std::unique_ptr<RateLimiter> createWindowBased(Limit maxReqPerTimePeriod,
-                                                          Milliseconds timePeriod,
-                                                          ClockSource* clockSource = nullptr) {
-        return std::unique_ptr<RateLimiter>(
-            new RateLimiter(maxReqPerTimePeriod, timePeriod, clockSource));
-    }
-
-    /*
      * Getter for the sampling rate.
      */
     inline Limit getSamplingRate() const noexcept {
-        return std::visit([](const auto& limiter) { return limiter.getSamplingRate(); }, _policy);
-    }
-
-    /*
-     * Setter for the sampling rate.
-     */
-    inline void setSamplingRate(Limit samplingRate) noexcept {
-        std::visit([&samplingRate](auto& limiter) { limiter.setSamplingRate(samplingRate); },
-                   _policy);
+        if (_mode.load() == PolicyType::kWindowBasedPolicy) {
+            return _windowPolicy.getSamplingRate();
+        } else {
+            return _samplePolicy.getSamplingRate();
+        }
     }
 
     /*
@@ -227,27 +204,23 @@ public:
      */
     static int roundSampleRateToPerThousand(double samplingRate);
 
-private:
-    std::variant<WindowBasedPolicy, SampleBasedPolicy> _policy;
-
-    /*
-     * Constructor for a rate limiter. Specify the number of requests you want to take place, as
-     * well as the time period in milliseconds.
-     */
-    RateLimiter(Limit maxReqPerTimePeriod,
-                Milliseconds timePeriod,
-                ClockSource* clockSource = nullptr)
-        : _policy(
-              std::in_place_type<WindowBasedPolicy>, maxReqPerTimePeriod, timePeriod, clockSource) {
+    void configureSampleBased(uint32_t rate, int seed) {
+        _samplePolicy.setSamplingRate(rate);
+        _samplePolicy.setRandomSeed(seed);
+        _mode.store(PolicyType::kSampleBasedPolicy);
     }
 
-    /*
-     * Constructor for a rate limiter that allows requests based on random sampling,
-     * controlled by the specified sampling rate.
-     *
-     * The sampling rate is specified in thousandths (i.e., a value of 10 means 1%).
-     */
-    RateLimiter(Limit samplingRate, int randomSeed)
-        : _policy(std::in_place_type<SampleBasedPolicy>, samplingRate, randomSeed) {}
+    void configureWindowBased(uint32_t rate) {
+        _windowPolicy.setSamplingRate(rate);
+        _mode.store(PolicyType::kWindowBasedPolicy);
+    }
+
+    RateLimiter() = default;
+    ~RateLimiter() = default;
+
+private:
+    SampleBasedPolicy _samplePolicy;
+    WindowBasedPolicy _windowPolicy;
+    AtomicWord<PolicyType> _mode = PolicyType::kWindowBasedPolicy;
 };
 }  // namespace mongo

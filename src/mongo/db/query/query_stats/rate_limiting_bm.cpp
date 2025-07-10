@@ -74,45 +74,31 @@ int requestDeactivated() {
 // Benchmark sliding window rate limiting.
 void BM_SlidingWindow(benchmark::State& state) {
     // The rate limiter needs a clock source passed in.
-    static std::unique_ptr<ClockSource> clockSource;
-    static std::unique_ptr<RateLimiter> rateLimit;
+    static RateLimiter rateLimit;
 
-    // Initialize the rate limiter only on the first thread to start up.
+    // Configure the rate limiter only on the first thread to start up.
     if (state.thread_index == 0) {
-        clockSource = std::make_unique<SystemClockSource>();
-        rateLimit =
-            RateLimiter::createWindowBased(state.range(0), Milliseconds(1), clockSource.get());
+        rateLimit.configureWindowBased(state.range(0));
     }
 
     // Run the benchmark.
     for (auto keepRunning : state) {
-        benchmark::DoNotOptimize(handleRequest(*rateLimit));
-    }
-
-    // Clean up the rate limiter when the benchmark is done.
-    if (state.thread_index == 0) {
-        rateLimit.reset();
-        clockSource.reset();
+        benchmark::DoNotOptimize(handleRequest(rateLimit));
     }
 }
 
 // Benchmark sample based rate limiting.
 void BM_SampleBased(benchmark::State& state) {
-    static std::unique_ptr<RateLimiter> rateLimit;
+    static RateLimiter rateLimit;
 
     // Initialize the rate limiter only on the first thread to start up.
     if (state.thread_index == 0) {
-        rateLimit = RateLimiter::createSampleBased(state.range(0), /* random seed */ 17);
+        rateLimit.configureSampleBased(state.range(0), /* random seed */ 17);
     }
 
     // Run the benchmark.
     for (auto keepRunning : state) {
-        benchmark::DoNotOptimize(handleRequest(*rateLimit));
-    }
-
-    // Clean up the rate limiter when the benchmark is done.
-    if (state.thread_index == 0) {
-        rateLimit.reset();
+        benchmark::DoNotOptimize(handleRequest(rateLimit));
     }
 }
 
