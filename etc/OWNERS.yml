@@ -15,3 +15,9 @@ filters:
   - "performance_thresholds.yml":
     approvers:
       - 10gen/performance
+  - "/evergreen_yml_components/tasks/release_tasks.yml":
+    approvers:
+      - 10gen/devprod-release-infrastructure
+  - "/evergreen_yml_components/variants/release/release.yml":
+    approvers:
+      - 10gen/devprod-release-infrastructure

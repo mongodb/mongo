@@ -1,0 +1,54 @@
+tasks:
+  - name: publish-sast-report
+    # uses "Admin Only" variables, so patch runs will only work for admins
+    allowed_requesters: ["commit", "github_tag", "patch"]
+    tags: ["auxiliary", "assigned_to_jira_team_devprod_release_infrastructure"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - command: git.get_project
+        params:
+          directory: src
+          clone_depth: 1
+          recurse_submodules: true
+      - func: "get version expansions"
+      - func: "apply version expansions"
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        display_name: Write credentials for SAST report generation to file
+        type: setup
+        params:
+          silent: true
+          binary: "${workdir}/src/evergreen/write_sast_report_env_file.sh"
+          env:
+            WORK_DIR: ${workdir}
+            SAST_REPORT_COVERITY_USERNAME: ${SAST_REPORT_COVERITY_USERNAME}
+            SAST_REPORT_COVERITY_PASSWORD: ${SAST_REPORT_COVERITY_PASSWORD}
+            SAST_REPORT_UPLOAD_GOOGLE_CLIENT_ID: ${SAST_REPORT_UPLOAD_GOOGLE_CLIENT_ID}
+            SAST_REPORT_UPLOAD_GOOGLE_CLIENT_REFRESH_TOKEN: ${SAST_REPORT_UPLOAD_GOOGLE_CLIENT_REFRESH_TOKEN}
+            SAST_REPORT_UPLOAD_GOOGLE_CLIENT_SECRET: ${SAST_REPORT_UPLOAD_GOOGLE_CLIENT_SECRET}
+      - command: subprocess.exec
+        display_name: "Generate SAST report and upload to Google Drive"
+        params:
+          binary: "${workdir}/src/evergreen/generate_sast_report.sh"
+          env:
+            WORK_DIR: ${workdir}
+            MODULE_PATH: ${workdir}/devprodCoveritySrc/devprod_coverity
+            TRIGGERED_BY_GIT_TAG: ${triggered_by_git_tag}
+            MONGODB_VERSION: ${version}
+            MONGODB_RELEASE_BRANCH: ${branch_name}
+            SAST_REPORT_TEST_GOOGLE_DRIVE_FOLDER_ID: ${SAST_REPORT_TEST_GOOGLE_DRIVE_FOLDER_ID}
+            SAST_REPORT_RELEASES_GOOGLE_DRIVE_FOLDER_ID: ${SAST_REPORT_RELEASES_GOOGLE_DRIVE_FOLDER_ID}
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          bucket: mciuploads
+          content_type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+          local_files_include_filter_prefix: devprodCoveritySrc/devprod_coverity
+          local_files_include_filter:
+            - "sast_report_*.xlsx"
+          remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}/${task_name}/
+          permissions: private
+          visibility: signed

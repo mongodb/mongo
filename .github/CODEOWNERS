@@ -265,6 +265,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /etc/code_lockdown.yml @10gen/devprod-correctness @svc-auto-approve-bot
 /etc/evergreen_yml_components/tasks/compile_tasks*.yml @10gen/devprod-build @svc-auto-approve-bot
 /etc/performance_thresholds.yml @10gen/performance @svc-auto-approve-bot
+/etc/evergreen_yml_components/tasks/release_tasks.yml @10gen/devprod-release-infrastructure @svc-auto-approve-bot
+/etc/evergreen_yml_components/variants/release/release.yml @10gen/devprod-release-infrastructure @svc-auto-approve-bot
 
 # The following patterns are parsed from ./etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/OWNERS.yml
 /etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/**/* @10gen/query @svc-auto-approve-bot

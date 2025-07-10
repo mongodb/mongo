@@ -76,6 +76,12 @@ modules:
     repo: git@github.com:10gen/mongot.git
     prefix: ${workdir}/src
     branch: master
+  - name: devprod_coverity
+    owner: mongodb-devprod-infrastructure
+    repo: coverity
+    prefix: "${workdir}/devprodCoveritySrc"
+    branch: main
+    auto_update: true
 
 # Pre task steps
 pre:

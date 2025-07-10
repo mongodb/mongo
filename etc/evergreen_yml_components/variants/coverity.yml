@@ -75,16 +75,3 @@ tasks:
         vars:
           module_prefix: ${workdir}/devprodCoveritySrc
           module_name: devprod_coverity
-
-#######################################
-#               Modules               #
-#######################################
-# for some reason this has can't be included from the included configuration file above
-# it may be because one of the includes needs this module, could be an evergreen bug
-modules:
-  - name: devprod_coverity
-    owner: mongodb-devprod-infrastructure
-    repo: coverity
-    prefix: "${workdir}/devprodCoveritySrc"
-    branch: main
-    auto_update: true
