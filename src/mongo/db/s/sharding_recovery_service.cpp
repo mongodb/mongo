@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
@@ -84,10 +83,6 @@ namespace mongo {
 
 namespace {
 const auto serviceDecorator = ServiceContext::declareDecoration<ShardingRecoveryService>();
-const auto kViewsPermittedDontSkipRSTL =
-    AutoGetCollection::Options{}
-        .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
-        .globalLockOptions({{.skipRSTLLock = false}});  // Make sure we don't skip the RSTL
 
 }  // namespace
 
@@ -101,19 +96,16 @@ void ShardingRecoveryService::FilteringMetadataClearer::operator()(
         return;
     }
 
+    Lock::DBLock dbLock(opCtx, nssBeingReleased.dbName(), MODE_IX);
+
     if (nssBeingReleased.isDbOnly()) {
-        AutoGetDb autoDb(opCtx, nssBeingReleased.dbName(), MODE_IX);
         auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(
             opCtx, nssBeingReleased.dbName());
         scopedDsr->clearDbInfo_DEPRECATED(opCtx);
         return;
     }
 
-    AutoGetCollection autoColl(
-        opCtx,
-        nssBeingReleased,
-        MODE_IX,
-        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
+    Lock::CollectionLock collLock{opCtx, nssBeingReleased, MODE_IX};
 
     auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
         opCtx, nssBeingReleased);
@@ -157,22 +149,19 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
 
     {
         Lock::GlobalLock lk(opCtx, MODE_IX);
-        boost::optional<AutoGetDb> dbLock;
-        boost::optional<AutoGetCollection> collLock;
+        boost::optional<Lock::DBLock> dbLock;
+        boost::optional<Lock::CollectionLock> collLock;
         if (nss.isDbOnly()) {
             tassert(8096300,
                     "Cannot acquire critical section on the config database",
                     !nss.isConfigDB());
             dbLock.emplace(opCtx, nss.dbName(), MODE_S);
         } else {
-            if (nss.isConfigDB()) {
-                // Take the 'config' database lock in mode IX to prevent lock upgrade when we later
-                // write to kCollectionCriticalSectionsNamespace.
-                dbLock.emplace(opCtx, nss.dbName(), MODE_IX);
-            }
+            // Take the 'config' database lock in mode IX to prevent lock upgrade when we later
+            // write to kCollectionCriticalSectionsNamespace.
+            dbLock.emplace(opCtx, nss.dbName(), nss.isConfigDB() ? MODE_IX : MODE_IS);
 
-            // The DBDirectClient below might acquire locks, make sure we don't skip the RSTL here.
-            collLock.emplace(opCtx, nss, MODE_S, kViewsPermittedDontSkipRSTL);
+            collLock.emplace(opCtx, nss, MODE_S);
         }
 
         DBDirectClient dbClient(opCtx);
@@ -280,13 +269,13 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
             !shard_role_details::getLocker(opCtx)->isLocked());
 
     {
-        boost::optional<AutoGetDb> dbLock;
-        boost::optional<AutoGetCollection> collLock;
+        boost::optional<Lock::DBLock> dbLock;
+        boost::optional<Lock::CollectionLock> collLock;
         if (nss.isDbOnly()) {
             dbLock.emplace(opCtx, nss.dbName(), MODE_X);
         } else {
-            // The DBDirectClient below might acquire locks, make sure we don't skip the RSTL here.
-            collLock.emplace(opCtx, nss, MODE_X, kViewsPermittedDontSkipRSTL);
+            dbLock.emplace(opCtx, nss.dbName(), MODE_IX);
+            collLock.emplace(opCtx, nss, MODE_X);
         }
 
         DBDirectClient dbClient(opCtx);
@@ -411,13 +400,11 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
             !shard_role_details::getLocker(opCtx)->isLocked());
 
     {
-        boost::optional<AutoGetDb> dbLock;
-        boost::optional<AutoGetCollection> collLock;
-        if (nss.isDbOnly()) {
-            dbLock.emplace(opCtx, nss.dbName(), MODE_X);
-        } else {
-            // The DBDirectClient below might acquire locks, make sure we don't skip the RSTL here.
-            collLock.emplace(opCtx, nss, MODE_X, kViewsPermittedDontSkipRSTL);
+        Lock::DBLock dbLock{opCtx, nss.dbName(), MODE_IX};
+
+        boost::optional<Lock::CollectionLock> collLock;
+        if (!nss.isDbOnly()) {
+            collLock.emplace(opCtx, nss, MODE_IX);
         }
 
         DBDirectClient dbClient(opCtx);
@@ -562,24 +549,19 @@ void ShardingRecoveryService::onConsistentDataAvailable(OperationContext* opCtx,
 void ShardingRecoveryService::_recoverRecoverableCriticalSections(OperationContext* opCtx) {
     LOGV2_DEBUG(5604000, 2, "Recovering all recoverable critical sections");
 
-    auto autoGetCollOptions = AutoGetCollection::Options{}.globalLockOptions(
-        Lock::GlobalLockOptions{.explicitIntent = rss::consensus::IntentRegistry::Intent::Read});
-    autoGetCollOptions.viewMode(auto_get_collection::ViewMode::kViewsPermitted);
+    Lock::DBLockSkipOptions dbLockOptions{.explicitIntent =
+                                              rss::consensus::IntentRegistry::Intent::Read};
+
     // Release all in-memory critical sections
     for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
-        AutoGetCollection collLock(opCtx, nss, MODE_X, autoGetCollOptions);
+        Lock::DBLock dbLock{opCtx, nss.dbName(), MODE_IX, Date_t::max(), dbLockOptions};
+        Lock::CollectionLock collLock{opCtx, nss, MODE_IX};
         auto scopedCsr =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss);
         scopedCsr->exitCriticalSectionNoChecks();
     }
     for (const auto& dbName : DatabaseShardingState::getDatabaseNames(opCtx)) {
-        AutoGetDb dbLock(opCtx,
-                         dbName,
-                         MODE_X,
-                         boost::none,
-                         Date_t::max(),
-                         Lock::DBLockSkipOptions{
-                             false, false, false, rss::consensus::IntentRegistry::Intent::Read});
+        Lock::DBLock dbLock{opCtx, dbName, MODE_IX, Date_t::max(), dbLockOptions};
         auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
         scopedDsr->exitCriticalSectionNoChecks();
     }
@@ -588,19 +570,10 @@ void ShardingRecoveryService::_recoverRecoverableCriticalSections(OperationConte
     PersistentTaskStore<CollectionCriticalSectionDocument> store(
         NamespaceString::kCollectionCriticalSectionsNamespace);
     store.forEach(
-        opCtx,
-        BSONObj{},
-        [&opCtx, &autoGetCollOptions](const CollectionCriticalSectionDocument& doc) {
+        opCtx, BSONObj{}, [&opCtx, &dbLockOptions](const CollectionCriticalSectionDocument& doc) {
             const auto& nss = doc.getNss();
             if (nss.isDbOnly()) {
-                AutoGetDb dbLock(
-                    opCtx,
-                    nss.dbName(),
-                    MODE_X,
-                    boost::none,
-                    Date_t::max(),
-                    Lock::DBLockSkipOptions{
-                        false, false, false, rss::consensus::IntentRegistry::Intent::Read});
+                Lock::DBLock dbLock{opCtx, nss.dbName(), MODE_X, Date_t::max(), dbLockOptions};
                 auto scopedDsr =
                     DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, nss.dbName());
                 scopedDsr->enterCriticalSectionCatchUpPhase(doc.getReason());
@@ -608,7 +581,8 @@ void ShardingRecoveryService::_recoverRecoverableCriticalSections(OperationConte
                     scopedDsr->enterCriticalSectionCommitPhase(doc.getReason());
                 }
             } else {
-                AutoGetCollection collLock(opCtx, nss, MODE_X, autoGetCollOptions);
+                Lock::DBLock dbLock{opCtx, nss.dbName(), MODE_IX, Date_t::max(), dbLockOptions};
+                Lock::CollectionLock collLock{opCtx, nss, MODE_X};
                 auto scopedCsr =
                     CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
                                                                                          nss);
