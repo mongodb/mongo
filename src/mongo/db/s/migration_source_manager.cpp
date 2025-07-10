@@ -552,7 +552,9 @@ void MigrationSourceManager::commitChunkOnRecipient() {
     ScopeGuard scopedGuard([&] {
         _cleanupOnError();
         migrationutil::asyncRecoverMigrationUntilSuccessOrStepDown(_opCtx,
-                                                                   _args.getCommandParameter());
+                                                                   _args.getCommandParameter())
+            .thenRunOn(Grid::get(_opCtx)->getExecutorPool()->getFixedExecutor())
+            .getAsync([](auto) {});
     });
 
     // Tell the recipient shard to fetch the latest changes.
@@ -578,7 +580,9 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
 
     ScopeGuard scopedGuard([&] {
         _cleanupOnError();
-        migrationutil::asyncRecoverMigrationUntilSuccessOrStepDown(_opCtx, nss());
+        migrationutil::asyncRecoverMigrationUntilSuccessOrStepDown(_opCtx, nss())
+            .thenRunOn(Grid::get(_opCtx)->getExecutorPool()->getFixedExecutor())
+            .getAsync([](auto) {});
     });
 
     // If we have chunks left on the FROM shard, bump the version of one of them as well. This will
@@ -635,7 +639,9 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
         }
         scopedGuard.dismiss();
         _cleanup(false);
-        migrationutil::asyncRecoverMigrationUntilSuccessOrStepDown(_opCtx, nss());
+        migrationutil::asyncRecoverMigrationUntilSuccessOrStepDown(_opCtx, nss())
+            .thenRunOn(Grid::get(_opCtx)->getExecutorPool()->getFixedExecutor())
+            .getAsync([](auto) {});
         uassertStatusOK(migrationCommitStatus);
     }
 

@@ -191,27 +191,15 @@ void drainMigrationsPendingRecovery(OperationContext* opCtx);
 /**
  * Submits an asynchronous task to recover the migration until it succeeds or the node steps down.
  */
-void asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* opCtx,
-                                                 const NamespaceString& nss);
+SemiFuture<void> asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* opCtx,
+                                                             const NamespaceString& nss);
 
 /**
- * This function writes a no-op message to the oplog when migrating a first chunk to the recipient
- * (i.e., the recipient didn't have any * chunks), so that change stream will notice that and close
- * the cursor in order to notify mongos to target the new shard as well.
+ * Exhaust any active and recovery-pending migration. This method is meant to be exclusively called
+ * within the context of a FCV downgrade.
+ * TODO SERVER-103838 Remove this method and its invocations once 9.0 becomes LTS.
  */
-void notifyChangeStreamsOnRecipientFirstChunk(OperationContext* opCtx,
-                                              const NamespaceString& collNss,
-                                              const ShardId& fromShardId,
-                                              const ShardId& toShardId,
-                                              boost::optional<UUID> collUUID);
+void drainMigrationsOnFcvDowngrade(OperationContext* opCtx);
 
-/**
- * This function writes a no-op message to the oplog when during migration the last chunk of the
- * collection collNss is migrated off the off the donor and hence the  donor has no more chunks.
- */
-void notifyChangeStreamsOnDonorLastChunk(OperationContext* opCtx,
-                                         const NamespaceString& collNss,
-                                         const ShardId& donorShardId,
-                                         boost::optional<UUID> collUUID);
 }  // namespace migrationutil
 }  // namespace mongo

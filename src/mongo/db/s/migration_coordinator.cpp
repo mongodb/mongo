@@ -137,14 +137,7 @@ void MigrationCoordinator::setShardKeyPattern(const boost::optional<KeyPattern>&
 void MigrationCoordinator::setTransfersFirstCollectionChunkToRecipient(OperationContext* opCtx,
                                                                        bool value) {
     _migrationInfo.setTransfersFirstCollectionChunkToRecipient(value);
-
-    // Only persist the metadata if the current FCV supports the needed recovery document schema.
-    // TODO SERVER-103838 unconditionally perform the operation once 9.0 becomes LTS.
-    if (feature_flags::gPersistRecipientPlacementInfoInMigrationRecoveryDoc.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        migrationutil::updateMigrationCoordinatorDoc(opCtx, _migrationInfo);
-    }
+    migrationutil::updateMigrationCoordinatorDoc(opCtx, _migrationInfo);
 }
 
 bool MigrationCoordinator::getTransfersFirstCollectionChunkToRecipient() {
@@ -155,9 +148,6 @@ bool MigrationCoordinator::getTransfersFirstCollectionChunkToRecipient() {
 void MigrationCoordinator::startMigration(OperationContext* opCtx) {
     LOGV2_DEBUG(
         23889, 2, "Persisting migration coordinator doc", "migrationDoc"_attr = _migrationInfo);
-    // The transfersFirstCollectionChunkToRecipient is an optional, FCV gated field that is expected
-    // to be only persisted through the migrationutil::updateMigrationCoordinatorDoc() method.
-    invariant(!_migrationInfo.getTransfersFirstCollectionChunkToRecipient().has_value());
     migrationutil::insertMigrationCoordinatorDoc(opCtx, _migrationInfo);
 
     LOGV2_DEBUG(23890,

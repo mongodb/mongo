@@ -60,6 +60,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_coordinator.h"
 #include "mongo/db/s/migration_destination_manager.h"
+#include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/sharding_util.h"
@@ -163,6 +164,23 @@ BSONObj getQueryFilterForRangeDeletionTask(const UUID& collectionUuid, const Chu
         << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
         << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName
         << range.getMax());
+}
+
+// TODO SERVER-103838 Remove this function and replace any call with 'coordinatorDoc.toBSON()'
+// once 9.0 becomes LTS.
+BSONObj serializeAndRedactCoordinatorDocument(OperationContext* opCtx,
+                                              const MigrationCoordinatorDocument& coordinatorDoc) {
+    // Only persist the backwards-incompatible transfersFirstCollectionChunkToRecipient field if
+    // the current FCV supports the needed recovery document schema.
+    if (feature_flags::gPersistRecipientPlacementInfoInMigrationRecoveryDoc.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return coordinatorDoc.toBSON();
+    }
+
+    auto redactedCoordinatorDoc = coordinatorDoc;
+    redactedCoordinatorDoc.setTransfersFirstCollectionChunkToRecipient(boost::none);
+    return redactedCoordinatorDoc.toBSON();
 }
 
 
@@ -270,6 +288,11 @@ bool deletionTaskUuidMatchesFilteringMetadataUuid(
 
 void insertMigrationCoordinatorDoc(OperationContext* opCtx,
                                    const MigrationCoordinatorDocument& migrationDoc) {
+    // The transfersFirstCollectionChunkToRecipient is an optional, FCV gated field that is expected
+    // to be only persisted through the migrationutil::updateMigrationCoordinatorDoc() method.
+    // TODO SERVER-103838 remove the invariant once 9.0 becomes LTS.
+    invariant(!migrationDoc.getTransfersFirstCollectionChunkToRecipient().has_value());
+
     PersistentTaskStore<MigrationCoordinatorDocument> store(
         NamespaceString::kMigrationCoordinatorsNamespace);
     try {
@@ -286,11 +309,12 @@ void insertMigrationCoordinatorDoc(OperationContext* opCtx,
 
 void updateMigrationCoordinatorDoc(OperationContext* opCtx,
                                    const MigrationCoordinatorDocument& migrationDoc) {
+    const auto& docId = migrationDoc.getId();
+    const auto serializedDoc = serializeAndRedactCoordinatorDocument(opCtx, migrationDoc);
+
     PersistentTaskStore<MigrationCoordinatorDocument> store(
         NamespaceString::kMigrationCoordinatorsNamespace);
-    store.update(opCtx,
-                 BSON(MigrationCoordinatorDocument::kIdFieldName << migrationDoc.getId()),
-                 migrationDoc.toBSON());
+    store.update(opCtx, BSON(MigrationCoordinatorDocument::kIdFieldName << docId), serializedDoc);
 }
 
 void persistCommitDecision(OperationContext* opCtx,
@@ -300,11 +324,7 @@ void persistCommitDecision(OperationContext* opCtx,
 
     hangInPersistMigrateCommitDecisionInterruptible.pauseWhileSet(opCtx);
     try {
-        PersistentTaskStore<MigrationCoordinatorDocument> store(
-            NamespaceString::kMigrationCoordinatorsNamespace);
-        store.update(opCtx,
-                     BSON(MigrationCoordinatorDocument::kIdFieldName << migrationDoc.getId()),
-                     migrationDoc.toBSON());
+        updateMigrationCoordinatorDoc(opCtx, migrationDoc);
         ShardingStatistics::get(opCtx).countDonorMoveChunkCommitted.addAndFetch(1);
     } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
         LOGV2_ERROR(6439800,
@@ -324,11 +344,7 @@ void persistAbortDecision(OperationContext* opCtx,
     invariant(migrationDoc.getDecision() && *migrationDoc.getDecision() == DecisionEnum::kAborted);
 
     try {
-        PersistentTaskStore<MigrationCoordinatorDocument> store(
-            NamespaceString::kMigrationCoordinatorsNamespace);
-        store.update(opCtx,
-                     BSON(MigrationCoordinatorDocument::kIdFieldName << migrationDoc.getId()),
-                     migrationDoc.toBSON());
+        updateMigrationCoordinatorDoc(opCtx, migrationDoc);
         ShardingStatistics::get(opCtx).countDonorMoveChunkAborted.addAndFetch(1);
     } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
         LOGV2(6439801,
@@ -401,7 +417,9 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
                               ->clearFilteringMetadata(opCtx);
                       }
 
-                      asyncRecoverMigrationUntilSuccessOrStepDown(opCtx, nss);
+                      asyncRecoverMigrationUntilSuccessOrStepDown(opCtx, nss)
+                          .thenRunOn(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
+                          .getAsync([](auto) {});
 
                       return true;
                   });
@@ -563,9 +581,9 @@ void drainMigrationsPendingRecovery(OperationContext* opCtx) {
     }
 }
 
-void asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* opCtx,
-                                                 const NamespaceString& nss) {
-    ExecutorFuture<void>{Grid::get(opCtx)->getExecutorPool()->getFixedExecutor()}
+SemiFuture<void> asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* opCtx,
+                                                             const NamespaceString& nss) {
+    return ExecutorFuture<void>{Grid::get(opCtx)->getExecutorPool()->getFixedExecutor()}
         .then([svcCtx{opCtx->getServiceContext()}, nss] {
             ThreadClient tc{"MigrationRecovery", svcCtx->getService(ClusterRole::ShardServer)};
             auto uniqueOpCtx{tc->makeOperationContext()};
@@ -581,8 +599,49 @@ void asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* opCtx,
                       "error"_attr = redact(ex));
             }
         })
-        .getAsync([](auto) {});
+        .semi();
 }
+
+void drainMigrationsOnFcvDowngrade(OperationContext* opCtx) {
+    // Chunk migrations that started under FCV >= 8.2 contain a
+    // 'transfersFirstCollectionChunkToRecipient' field in their recovery document that (due to a
+    // 'schema strictness' constraint present in previous binaries) is backwards incompatible.
+    // Ensure that these operations get drained before completing the downgrade.
+
+    // 1. If this shard is currently donating a chunk, abort the operation.
+    auto& activeMigrationRegistry = ActiveMigrationsRegistry::get(opCtx);
+    boost::optional<SharedSemiFuture<void>> abortingMigrationFuture;
+    if (const auto collNameBeingTargetedByChunkDonation =
+            activeMigrationRegistry.getActiveDonateChunkNss();
+        collNameBeingTargetedByChunkDonation.has_value()) {
+        const auto scopedCsr =
+            CollectionShardingRuntime::acquireShared(opCtx, *collNameBeingTargetedByChunkDonation);
+        if (auto msm = MigrationSourceManager::get(*scopedCsr)) {
+            abortingMigrationFuture = msm->abort();
+        }
+    }
+    if (abortingMigrationFuture) {
+        // Drain the abortion after releasing the CSR.
+        abortingMigrationFuture->get(opCtx);
+    }
+
+    // 2. If this shard has still to recover any migration containing with backwards
+    // incompatible metadata, do that now.
+    PersistentTaskStore<MigrationCoordinatorDocument> store(
+        NamespaceString::kMigrationCoordinatorsNamespace);
+    const auto incompatibleMigrationsFilter =
+        BSON(MigrationCoordinatorDocument::kTransfersFirstCollectionChunkToRecipientFieldName
+             << BSON("$ne" << BSONNULL));
+    store.forEach(opCtx,
+                  incompatibleMigrationsFilter,
+                  [&](const MigrationCoordinatorDocument& migrationToRecover) {
+                      migrationutil::asyncRecoverMigrationUntilSuccessOrStepDown(
+                          opCtx, migrationToRecover.getNss())
+                          .get(opCtx);
+                      return true;  // keep iterating
+                  });
+}
+
 
 }  // namespace migrationutil
 }  // namespace mongo

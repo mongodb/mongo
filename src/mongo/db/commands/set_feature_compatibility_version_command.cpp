@@ -83,6 +83,7 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
+#include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
@@ -820,16 +821,11 @@ private:
         const auto isUpgrading = originalVersion < requestedVersion;
 
         if (isDowngrading) {
-            // Drain ongoing chunk migrations to ensure that no backwards-incompatible metadata
-            // will be persisted in their recovery docs.
             // TODO SERVER-103838 Remove this code block once 9.0 becomes LTS.
             if (feature_flags::gPersistRecipientPlacementInfoInMigrationRecoveryDoc
                     .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
                                                                   originalVersion)) {
-                static constexpr char kRegistryLockReason[] = "Performing FCV Downgrade";
-                auto& activeMigrationRegistry = ActiveMigrationsRegistry::get(opCtx);
-                activeMigrationRegistry.lock(opCtx, kRegistryLockReason);
-                activeMigrationRegistry.unlock(kRegistryLockReason);
+                migrationutil::drainMigrationsOnFcvDowngrade(opCtx);
             }
 
             // TODO SERVER-99655: update once gSnapshotFCVInDDLCoordinators is enabled
