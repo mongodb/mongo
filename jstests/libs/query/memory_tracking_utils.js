@@ -4,8 +4,7 @@
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {iterateMatchingLogLines} from "jstests/libs/log.js";
-import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {getAggPlanStages, getExecutionStages} from "jstests/libs/query/analyze_plan.js";
 
 /******************************************************************************************************
  * Constants for the regexes used to extract memory tracking metrics from the slow query log.
@@ -14,6 +13,7 @@ import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 const maxUsedMemBytesRegex = /maxUsedMemBytes"?:([0-9]+)/;
 const inUseMemBytesRegex = /inUseMemBytes"?:([0-9]+)/;
 const cursorIdRegex = /cursorid"?:([0-9]+)/;
+const writeRegex = /WRITE/;
 
 /******************************************************************************************************
  * Utility functions to extract and detect memory metrics from diagnostic channels.
@@ -440,4 +440,107 @@ export function runShardedMemoryStatsTest({
         featureFlagEnabled: featureFlagEnabled,
         numStages: numShards
     });
+}
+
+/**
+ * For a time-series update command, verify that memory tracking statistics are correctly
+ * reported to the slow query log, profiler, and explain("executionStats").
+ */
+export function runMemoryStatsTestForTimeseriesUpdateCommand({db, collName, commandObj}) {
+    const featureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "QueryMemoryTracking");
+    jsTestLog("QueryMemoryTracking feature flag is " + featureFlagEnabled);
+
+    // Log every operation.
+    db.setProfilingLevel(2, {slowms: -1});
+
+    // Verify that maxUsedMemBytes appears in the top-level and stage-level explain output. We need
+    // to run explain first here; if we first run the command, it will perform the update and
+    // explain will return zero memory used.
+    jsTestLog("Testing explain...");
+    const explainRes =
+        assert.commandWorked(db.runCommand({explain: commandObj, verbosity: "executionStats"}));
+    const execStages = getExecutionStages(explainRes);
+    assert.gte(execStages.length, 0, "Expected execution stages in explain: " + tojson(explainRes));
+    assert.eq("SPOOL",
+              execStages[0].inputStage.stage,
+              "Spool stage not found in executionStages: " + tojson(execStages));
+    const spoolStage = execStages[0].inputStage;
+    if (!featureFlagEnabled) {
+        assert(!spoolStage.hasOwnProperty("maxUsedMemBytes"),
+               "Unexpected maxUsedMemBytes in spool stage " + tojson(explainRes));
+    } else {
+        const spoolStage = execStages[0].inputStage;
+        assert.gt(spoolStage.maxUsedMemBytes,
+                  0,
+                  "Expected positive maxUsedMemBytes in spool stage: " + tojson(explainRes));
+    }
+    assert(explainRes.hasOwnProperty("maxUsedMemBytes"),
+           "Expected maxUsedMemBytes in top-level explain: " + tojson(explainRes));
+    assert.gt(explainRes.maxUsedMemBytes,
+              0,
+              "Expected maxUsedMemBytes to be positive: " + tojson(explainRes));
+
+    assert.commandWorked(db.runCommand(commandObj));
+
+    // Get the log line associated with the write operation.
+    jsTestLog("Testing slow query logs...");
+    let logLines = [];
+    assert.soon(() => {
+        const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
+        logLines = [...iterateMatchingLogLines(globalLog.log,
+                                               {msg: "Slow query", comment: commandObj.comment})];
+        return logLines.length >= 1;
+    }, "Failed to find a log line for comment: " + commandObj.comment);
+
+    let writeOperationLogLine;
+    for (let line of logLines) {
+        if (line.match(writeRegex)) {
+            writeOperationLogLine = line;
+            break;
+        }
+    }
+    assert(writeOperationLogLine, "Failed to find write operation log line: " + tojson(logLines));
+
+    // Verify that the maxUsedMemBytes appears in the log lines.
+    if (!featureFlagEnabled) {
+        assertNoMatchInLog(writeOperationLogLine, maxUsedMemBytesRegex);
+        assertNoMatchInLog(writeOperationLogLine, inUseMemBytesRegex);
+    } else {
+        assert(writeOperationLogLine.includes("maxUsedMemBytes"),
+               "Expected maxUsedMemBytes in log line: " + tojson(writeOperationLogLine));
+        const maxUsedMemBytes = getMetricFromLog(writeOperationLogLine, maxUsedMemBytesRegex);
+        assert.gt(maxUsedMemBytes,
+                  0,
+                  "Expected maxUsedMemBytes to be positive: " + tojson(writeOperationLogLine));
+    }
+
+    // Verify that maxUsedMemBytes appears in the profiler entries for update operations.
+    // In the case of a multi-update, there may be more than one profiler entry.
+    jsTestLog("Testing profiler...");
+    const profilerEntries = db.system.profile.find({ns: db.getName() + '.' + collName}).toArray();
+    assert.gte(profilerEntries.length,
+               1,
+               "Expected one or more profiler entries: " + tojson(profilerEntries));
+    if (!featureFlagEnabled) {
+        for (const entry of profilerEntries) {
+            assert(!entry.hasOwnProperty("maxUsedMemBytes"),
+                   "Unexpected maxUsedMemBytes in profiler: " + tojson(entry));
+            assert(!entry.hasOwnProperty("inUseMemBytes"),
+                   "Unexpected inUseMemBytes in profiler: " + tojson(entry));
+        }
+    } else {
+        const updateEntries = profilerEntries.filter(entry => entry.op === "update");
+        assert.gt(updateEntries.length,
+                  0,
+                  "Expected one or more profiler entries: " + tojson(updateEntries));
+
+        for (const entry of updateEntries) {
+            assert(entry.hasOwnProperty("maxUsedMemBytes"),
+                   "Expected maxUsedMemBytes in update entry: " + tojson(updateEntries));
+            assert.gt(entry.maxUsedMemBytes,
+                      0,
+                      "Expected positive maxUsedMemBytes value in update entry: " +
+                          tojson(updateEntries));
+        }
+    }
 }

@@ -31,6 +31,7 @@
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/sorter/sorter.h"
@@ -64,8 +65,10 @@ const char* SpoolStage::kStageType = "SPOOL";
 SpoolStage::SpoolStage(ExpressionContext* expCtx, WorkingSet* ws, std::unique_ptr<PlanStage> child)
     : PlanStage(expCtx, std::move(child), kStageType),
       _ws(ws),
-      _memTracker(expCtx->getAllowDiskUse(), internalQueryMaxSpoolMemoryUsageBytes.load()) {
-
+      _memTracker(OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(
+          *expCtx,
+          expCtx->getAllowDiskUse() && !expCtx->getInRouter(),
+          internalQueryMaxSpoolMemoryUsageBytes.load())) {
     _specificStats.maxMemoryUsageBytes = _memTracker.maxAllowedMemoryUsageBytes();
     _specificStats.maxDiskUsageBytes = internalQueryMaxSpoolDiskUsageBytes.load();
 }
@@ -103,7 +106,7 @@ void SpoolStage::spill() {
     opts.FileStats(_spillStats.get());
 
     SortedFileWriter<RecordId, NullValue> writer(opts, _file);
-    // Do not spill the records that have been already consumed
+    // Do not spill the records that have been already consumed.
     for (size_t i = _nextIndex + 1; i < _buffer.size(); ++i) {
         writer.addAlreadySorted(_buffer[i], NullValue());
     }
@@ -120,6 +123,8 @@ void SpoolStage::spill() {
 
 PlanStage::StageState SpoolStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
+        _specificStats.maxUsedMemBytes = _memTracker.maxMemoryBytes();
+        _memTracker.resetCurrent();
         return PlanStage::IS_EOF;
     }
 
@@ -177,6 +182,8 @@ PlanStage::StageState SpoolStage::doWork(WorkingSetID* out) {
     if (++_nextIndex == static_cast<int>(_buffer.size())) {
         std::vector<RecordId>().swap(_buffer);
         _nextIndex = 0;
+        _specificStats.maxUsedMemBytes = _memTracker.maxMemoryBytes();
+        _memTracker.resetCurrent();
         return PlanStage::IS_EOF;
     }
 

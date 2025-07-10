@@ -77,6 +77,10 @@ public:
         spill();
     }
 
+    const MemoryUsageTracker* getMemoryUsageTracker_forTest() {
+        return &_memTracker;
+    }
+
 protected:
     PlanStage::StageState doWork(WorkingSetID* id) override;
 

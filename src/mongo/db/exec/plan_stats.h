@@ -1310,6 +1310,9 @@ struct SpoolStats : public SpecificStats {
     // The amount of data we've spooled in bytes.
     uint64_t totalDataSizeBytes = 0u;
 
+    // The maximum amount of memory that was used.
+    uint64_t maxUsedMemBytes = 0u;
+
     SpillingStats spillingStats;
 };
 
