@@ -214,8 +214,8 @@ template Position DocumentStorage::findFieldInCache<StringData>(StringData field
 template Position DocumentStorage::findFieldInCache<HashedFieldName>(HashedFieldName field) const;
 
 template <typename T>
-Position DocumentStorage::findField(T field, LookupPolicy policy) const {
-    if (auto pos = findFieldInCache(field); pos.found() || policy == LookupPolicy::kCacheOnly) {
+Position DocumentStorage::findField(T field) const {
+    if (auto pos = findFieldInCache(field); pos.found()) {
         return pos;
     }
 
@@ -228,10 +228,8 @@ Position DocumentStorage::findField(T field, LookupPolicy policy) const {
     // if we got here, there's no such field
     return Position();
 }
-template Position DocumentStorage::findField<StringData>(StringData field,
-                                                         LookupPolicy policy) const;
-template Position DocumentStorage::findField<HashedFieldName>(HashedFieldName field,
-                                                              LookupPolicy policy) const;
+template Position DocumentStorage::findField<StringData>(StringData field) const;
+template Position DocumentStorage::findField<HashedFieldName>(HashedFieldName field) const;
 
 Position DocumentStorage::constructInCache(const BSONElement& elem) {
     auto savedModified = _modified;

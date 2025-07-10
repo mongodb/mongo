@@ -379,7 +379,7 @@ public:
      *  This can potentially save time if you need to refer to a field multiple times.
      */
     Position positionOf(StringData fieldName) const {
-        return storage().findField(fieldName, DocumentStorage::LookupPolicy::kCacheAndBSON);
+        return storage().findField(fieldName);
     }
 
     /** Clone a document.
@@ -652,10 +652,10 @@ public:
         getField(key) = std::move(val);
     }
     MutableValue getField(StringData key) {
-        return MutableValue(storage().getField(key, DocumentStorage::LookupPolicy::kCacheOnly));
+        return MutableValue(storage().getFieldCacheOnlyOrCreate(key));
     }
     MutableValue getFieldNonLeaf(StringData key) {
-        return MutableValue(storage().getField(key, DocumentStorage::LookupPolicy::kCacheAndBSON));
+        return MutableValue(storage().getFieldOrCreate(key));
     }
 
     /// Update field by Position. Must already be a valid Position.

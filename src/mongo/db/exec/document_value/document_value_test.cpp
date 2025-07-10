@@ -206,8 +206,7 @@ TEST(DocumentGetFieldNonCaching, UncachedTopLevelFields) {
         ASSERT_EQ(Value::compare(*value, Value(elt), nullptr), 0);
 
         // Verify that the cache does not contain the field.
-        auto pos = storage->findField(elt.fieldNameStringData(),
-                                      DocumentStorage::LookupPolicy::kCacheOnly);
+        auto pos = storage->findFieldInCache(elt.fieldNameStringData());
         ASSERT_FALSE(pos.found());
     }
 
@@ -260,7 +259,7 @@ TEST(DocumentGetFieldNonCaching, NonArrayDottedPaths) {
 
     auto isFieldCached = [&](StringData field) {
         const DocumentStorage* storage = static_cast<const DocumentStorage*>(document.getPtr());
-        auto pos = storage->findField(field, DocumentStorage::LookupPolicy::kCacheOnly);
+        auto pos = storage->findFieldInCache(field);
         return pos.found();
     };
 

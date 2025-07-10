@@ -285,36 +285,49 @@ private:
 /**
  * Type that bundles the hashed field name along with the actual string so that hashing can be done
  * outside of inserts and lookups and re-used across calls.
+ *
+ * We opt to store uint32_t instead of size_t for hash and length since:
+ *   - hash collisions on field names are unlikely
+ *   - field names are not going to exceed UINT_MAX
+ *   - this gives us a measurable performance benefit.
  */
 class HashedFieldName {
 public:
-    explicit HashedFieldName(StringData sd, std::size_t hash) : _sd(sd), _hash(hash) {}
-    explicit HashedFieldName(std::pair<StringData, std::size_t> pair)
-        : _sd(pair.first), _hash(pair.second) {}
+    using SizeType = uint32_t;
+
+    explicit HashedFieldName(StringData sd, SizeType hash)
+        : _str(sd.data()), _sz(sd.size()), _hash(hash) {
+        uassert(1065170, "Field name too large", sd.size() < std::numeric_limits<uint32_t>::max());
+    }
+    explicit HashedFieldName(std::pair<StringData, SizeType> pair)
+        : HashedFieldName(pair.first, pair.second) {}
 
     StringData key() const {
-        return _sd;
+        return {_str, _sz};
     }
 
-    std::size_t hash() const {
+    SizeType hash() const {
         return _hash;
     }
 
-    std::size_t size() const {
-        return _sd.size();
+    SizeType size() const {
+        return _sz;
     }
 
-    inline size_t copy(char* dest, size_t len) const {
-        return _sd.copy(dest, len);
+    inline SizeType copy(char* dest, SizeType len) const {
+        const auto count = std::min(len, _sz);
+        std::memcpy(dest, _str, count);
+        return count;
     }
 
     constexpr const char* data() const noexcept {
-        return _sd.data();
+        return _str;
     }
 
 private:
-    StringData _sd;
-    std::size_t _hash;
+    const char* _str;
+    SizeType _sz;
+    SizeType _hash;
 };
 
 inline bool operator==(HashedFieldName lhs, StringData rhs) {
@@ -336,20 +349,20 @@ struct FieldNameHasher {
     // This using directive activates heterogeneous lookup in the hash table
     using is_transparent = void;
 
-    std::size_t operator()(StringData sd) const {
+    HashedFieldName::SizeType operator()(StringData sd) const {
         // Use the default absl string hasher.
         return absl::Hash<absl::string_view>{}(absl::string_view(sd.data(), sd.size()));
     }
 
-    std::size_t operator()(const std::string& s) const {
+    HashedFieldName::SizeType operator()(const std::string& s) const {
         return operator()(StringData(s));
     }
 
-    std::size_t operator()(const char* s) const {
+    HashedFieldName::SizeType operator()(const char* s) const {
         return operator()(StringData(s));
     }
 
-    std::size_t operator()(HashedFieldName key) const {
+    HashedFieldName::SizeType operator()(HashedFieldName key) const {
         return key.hash();
     }
 
@@ -414,16 +427,13 @@ public:
         return Position(_usedBytes);
     }
 
-    enum class LookupPolicy {
-        // When looking up a field check the cache only.
-        kCacheOnly,
-        // Look up in a cache and when not found search the underlying BSON.
-        kCacheAndBSON
-    };
+    /// Returns the position of the named field in the cache or Position()
+    template <typename T>
+    Position findFieldInCache(T requested) const;
 
     /// Returns the position of the named field or Position()
     template <typename T>
-    Position findField(T field, LookupPolicy policy) const;
+    Position findField(T field) const;
 
     // Document uses these
     const ValueElement& getField(Position pos) const {
@@ -432,14 +442,14 @@ public:
     }
 
     Value getField(StringData name) const {
-        Position pos = findField(name, LookupPolicy::kCacheAndBSON);
+        Position pos = findField(name);
         if (!pos.found())
             return Value();
         return getField(pos).val;
     }
 
     Value getField(HashedFieldName field) const {
-        Position pos = findField(field, LookupPolicy::kCacheAndBSON);
+        Position pos = findField(field);
         if (!pos.found())
             return Value();
         return getField(pos).val;
@@ -452,9 +462,17 @@ public:
         return *(_firstElement->plusBytes(pos.index));
     }
 
-    Value& getField(StringData name, LookupPolicy policy) {
+    Value& getFieldOrCreate(StringData name) {
         _modified = true;
-        Position pos = findField(name, policy);
+        Position pos = findField(name);
+        if (!pos.found())
+            return appendField(name, ValueElement::Kind::kMaybeInserted);
+        return getField(pos).val;
+    }
+
+    Value& getFieldCacheOnlyOrCreate(StringData name) {
+        _modified = true;
+        Position pos = findFieldInCache(name);
         if (!pos.found())
             return appendField(name, ValueElement::Kind::kMaybeInserted);
         return getField(pos).val;
@@ -464,7 +482,7 @@ public:
      * Retrieves the given field from the cache. Returns a boost::none if the field does not exist.
      */
     boost::optional<Value> getFieldCacheOnly(StringData name) const {
-        Position pos = findField(name, LookupPolicy::kCacheOnly);
+        Position pos = findFieldInCache(name);
         if (pos.found()) {
             return getField(pos).val;
         }
@@ -654,10 +672,6 @@ private:
         }
         MONGO_UNREACHABLE;
     }
-
-    /// Returns the position of the named field in the cache or Position()
-    template <typename T>
-    Position findFieldInCache(T name) const;
 
     /// Allocates space in _cache. Copies existing data if there is any.
     void alloc(unsigned newSize);

@@ -174,7 +174,7 @@ public:
     }
 
 private:
-    FieldPath(std::string string, std::vector<size_t> dots, std::vector<size_t> hashes)
+    FieldPath(std::string string, std::vector<size_t> dots, std::vector<uint32_t> hashes)
         : _fieldPath(std::move(string)),
           _fieldPathDotPosition(std::move(dots)),
           _fieldHash(std::move(hashes)) {
@@ -195,8 +195,8 @@ private:
 
     // Contains the hash value for the field names if it was requested when creating this path.
     // Otherwise all elements are set to 'kHashUninitialized'.
-    std::vector<size_t> _fieldHash;
-    static constexpr std::size_t kHashUninitialized = std::numeric_limits<std::size_t>::max();
+    std::vector<uint32_t> _fieldHash;
+    static constexpr uint32_t kHashUninitialized = std::numeric_limits<uint32_t>::max();
 };
 
 inline bool operator<(const FieldPath& lhs, const FieldPath& rhs) {

@@ -148,7 +148,7 @@ FieldPath FieldPath::concat(const FieldPath& tail) const {
         head._fieldPathDotPosition.size() + tail._fieldPathDotPosition.size() - 2 + 1;
     newDots.reserve(expectedDotSize);
 
-    std::vector<size_t> newHashes;
+    std::vector<uint32_t> newHashes;
     // We don't need the extra entry in hashes.
     newHashes.reserve(expectedDotSize - 1);
 
