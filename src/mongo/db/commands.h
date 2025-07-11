@@ -774,6 +774,14 @@ public:
         return false;
     }
 
+    /**
+     * Returns false if this command manually opts out of mandatory authorization checks, true
+     otherwise. Will enable mandatory authorization checks by default.
+     */
+    virtual bool requiresAuthzChecks() const {
+        return true;
+    }
+
 protected:
     /** For extended role-dependent initialization. */
     virtual void doInitializeClusterRole(ClusterRole role) {}
