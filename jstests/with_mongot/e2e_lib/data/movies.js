@@ -5206,7 +5206,8 @@ export function createMoviesCollAndIndex() {
 
     // Create an index if it doesn't already exist.
     if (!checkForExistingIndex(coll, datasets.MOVIES.indexName)) {
-        createSearchIndex(coll, getMovieVectorSearchIndexSpec(datasets.MOVIES.indexName));
+        createSearchIndex(coll,
+                          getMovieVectorSearchIndexSpec({indexName: datasets.MOVIES.indexName}));
     };
 
     return coll;
@@ -5221,7 +5222,7 @@ export function createMoviesViewAndIndex(viewType) {
     const view = createMoviesView(viewType);
 
     if (!checkForExistingIndex(view, viewType.indexName)) {
-        createSearchIndex(view, getMovieVectorSearchIndexSpec(viewType.indexName));
+        createSearchIndex(view, getMovieVectorSearchIndexSpec({indexName: viewType.indexName}));
     };
 
     return view;
@@ -5239,29 +5240,28 @@ export function makeMovieVectorQuery({queryVector, limit, indexName = "vector_se
             queryVector: queryVector,
             path: "plot_embedding",
             exact: true,
-            index: getMovieVectorSearchIndexSpec(indexName).name,
+            index: getMovieVectorSearchIndexSpec({indexName}).name,
             limit: limit,
         }
     };
 }
 
 /**
- * @param {string} indexName - The name f the vector search index to generate a spec for.
+ * @param {string} indexName - The name of the vector search index to generate a spec for.
+ * @param {list} filterFields - Additional fields to include in the index definition to support
+ *     pre-filtering.
  * @returns A vector search index spec on the plot_embedding field.
  */
-export function getMovieVectorSearchIndexSpec(indexName = "vector_search_movie") {
-    return {
-        name: indexName,
-        type: "vectorSearch",
-        definition: {
-            "fields": [{
-                "type": "vector",
-                "numDimensions": 1536,
-                "path": "plot_embedding",
-                "similarity": "euclidean"
-            }]
-        }
-    };
+export function getMovieVectorSearchIndexSpec(
+    {indexName = "vector_search_movie", filterFields = []} = {}) {
+    const fields = [{
+                       "type": "vector",
+                       "numDimensions": 1536,
+                       "path": "plot_embedding",
+                       "similarity": "euclidean"
+                   }].concat(filterFields);
+
+    return {name: indexName, type: "vectorSearch", definition: {"fields": fields}};
 }
 
 export function getMovieSearchIndexSpec() {
