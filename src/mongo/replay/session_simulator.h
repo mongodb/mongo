@@ -33,11 +33,14 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/replay/replay_command_executor.h"
+#include "mongo/replay/session_scheduler.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
 #include <chrono>
+#include <memory>
 
 namespace mongo {
 
@@ -58,14 +61,19 @@ namespace mongo {
  * design as simple as possible. Performance is not very important in this case, however
  * SessionSimulator is not supposed to be thrown away and reconstructed constantly.
  */
+class SessionScheduler;
+class ReplayCommandExecutor;
 class SessionSimulator {
 public:
+    explicit SessionSimulator();
+    virtual ~SessionSimulator();
+
     void start(StringData uri,
-               std::chrono::steady_clock::time_point replayStart,
-               Date_t recordingStart,
-               Date_t sessionStart);
-    void stop(Date_t sessionEnd);
-    BSONObj run(const ReplayCommand&) const;
+               std::chrono::steady_clock::time_point replayStartTime,
+               const Date_t& recordStartTime,
+               const Date_t& eventTimestamp);
+    void stop(const Date_t& sessionEnd);
+    void run(const ReplayCommand&, const Date_t& commandTimeStamp) const;
 
 private:
     virtual std::chrono::steady_clock::time_point now() const;
@@ -73,6 +81,7 @@ private:
     void waitIfNeeded(Date_t) const;
     void onRecordingStarted(Date_t);
 
+    bool _running = false;
     // Timepoint used for computing when events should occur.
     // Derived from steady_clock not system_clock as the replay should
     // not be affected by clock manipulation (e.g., by NTP).
@@ -81,8 +90,9 @@ private:
     // "offset from start" for each event, rather than a wall clock
     // time point, making the wall clock recording start time
     // unnecessary.
-    Date_t _recordingStartTime;
-    ReplayCommandExecutor _commandExecutor;
+    Date_t _recordStartTime;
+    std::unique_ptr<ReplayCommandExecutor> _commandExecutor;
+    std::unique_ptr<SessionScheduler> _sessionScheduler;
 };
 
 }  // namespace mongo

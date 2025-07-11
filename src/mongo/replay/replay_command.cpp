@@ -64,15 +64,23 @@ Date_t ReplayCommand::fetchRequestTimestamp() const {
     }
 }
 
+int64_t ReplayCommand::fetchRequestSessionId() const {
+    try {
+        return parseSessionId(_bsonCommand);
+    } catch (const DBException& e) {
+        auto lastError = e.toStatus();
+        tasserted(ErrorCodes::ReplayClientFailedToProcessBSON, lastError.reason());
+    } catch (const std::exception& e) {
+        tasserted(ErrorCodes::ReplayClientFailedToProcessBSON, e.what());
+    }
+}
+
 std::string ReplayCommand::toString() const {
     OpMsgRequest messageRequest = fetchMsgRequest();
     return messageRequest.body.toString();
 }
 
 OpMsgRequest ReplayCommand::parseBody(BSONObj command) const {
-
-    // The bsonobj stored inside ReplayCommand must have this format. We can only parse traffic
-    // recording bson like packets.
     // "rawop": {
     //    "header": { messagelength: 339, requestid: 2, responseto: 0, opcode: 2004 },
     //    "body": BinData(0, ...),
@@ -134,6 +142,48 @@ Date_t ReplayCommand::parseSeenTimestamp(BSONObj command) const {
     uint64_t unixSeconds = sec - unixToInternal;
     unixSeconds += nano;
     return Date_t::fromMillisSinceEpoch(unixSeconds);
+}
+
+int64_t ReplayCommand::parseSessionId(BSONObj command) const {
+
+    tassert(ErrorCodes::ReplayClientFailedToProcessBSON,
+            "Ill-formed document. rawop is not a valid field",
+            command.hasField("rawop"));
+
+    tassert(ErrorCodes::ReplayClientFailedToProcessBSON,
+            "Ill-formed document. Session id is not present",
+            command.hasField("seenconnectionnum"));
+
+    BSONElement sessionElem = command["seenconnectionnum"];
+
+    tassert(ErrorCodes::ReplayClientFailedToProcessBSON,
+            "Ill-formed recording document. SessionId is not a scalar type",
+            sessionElem.type() == BSONType::numberLong);
+
+    return sessionElem.Long();
+}
+
+std::string ReplayCommand::parseOpType(BSONObj command) const {
+    tassert(ErrorCodes::InternalError,
+            "failed to parse bson commands, opType must be present",
+            command.hasField("opType"));
+    BSONElement opTypeElem = command["opType"];
+    tassert(ErrorCodes::InternalError,
+            "failed to parse bson commands, opType must be a string",
+            opTypeElem.type() == BSONType::string);
+    auto opType = opTypeElem.String();
+    tassert(ErrorCodes::InternalError,
+            "failed to parse bson commands, opType must not be empty",
+            !opType.empty());
+    return opType;
+}
+
+bool ReplayCommand::isStartRecording() const {
+    return parseOpType(_bsonCommand) == "startTrafficRecording";
+}
+
+bool ReplayCommand::isStopRecording() const {
+    return parseOpType(_bsonCommand) == "stopTrafficRecording";
 }
 
 }  // namespace mongo

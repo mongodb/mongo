@@ -908,7 +908,8 @@ error_codes:
   - {code: 901, name: ReplayClientNotConnected}
   - {code: 902, name: ReplayClientFailedToProcessBSON}
   - {code: 903, name: ReplayClientInternalError}
-  - {code: 904, name: ReplayClientSessionSimulationError}
+  - {code: 904, name: ReplayClientSessionSchedulerError}
+  - {code: 905, name: ReplayClientSessionSimulationError}
 
   - {code: 452, name: ReleaseMemoryShardError}
 

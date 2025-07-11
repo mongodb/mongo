@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 
 #include <string>
 
@@ -41,6 +42,7 @@ public:
     void updateBody(const BSONObj& newBody);
     void updateHeaderField(const std::string& fieldName, int value);
     void updateOpType(const std::string& newOpType);
+    void updateSessionId(int64_t id);
     void updateSeenField(const Date_t& time, int64_t nanoseconds = 0);
 
 private:
@@ -49,8 +51,12 @@ private:
     /** Represents the entire document. */
     BSONObj _document;
 
-    void updateField(const std::string& fieldName, const BSONObj& newValue);
-    void updateField(const std::string& fieldName, const std::string& newValue);
+    template <typename T>
+    void updateField(BSONObj& originalDocument, const std::string& fieldName, const T& newValue) {
+        auto obj = BSON(fieldName << newValue);
+        auto elem = obj.firstElement();
+        originalDocument = originalDocument.addField(elem);
+    }
 
     /*
      * This is the main method that allows any bson command to go inside a recorded packet,

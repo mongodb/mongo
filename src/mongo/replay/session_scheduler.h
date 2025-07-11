@@ -26,28 +26,27 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
+
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/future.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/functional.h"
 
+#include <atomic>
 #include <chrono>
-#include <exception>
-#include <functional>
-#include <iostream>
 #include <memory>
 #include <queue>
+#include <thread>
 #include <vector>
-
 
 namespace mongo {
 
-class SessionPool {
+class SessionScheduler {
 public:
     /** The basic unit of work is a generic function that just runs. */
-    using Task = mongo::unique_function<void()>;
+    using SessionTask = mongo::unique_function<void()>;
 
     /*
      * Session pool can accommodate N sessions.
@@ -56,8 +55,11 @@ public:
      * on the simulation. In general for each session there will be one thread. Each thread can only
      * read/process messages associated to its session.
      */
-    SessionPool(size_t size = 1);
-    ~SessionPool();
+    SessionScheduler(size_t size = 1);
+    ~SessionScheduler();
+
+    /** Add more command executors in case simple scheduling is not enough */
+    void addSession();
 
     /*
      * Submit a task to execute inside the session pool. This means essentially submitting a new
@@ -65,33 +67,29 @@ public:
      * computation to finish.
      */
     template <typename F, typename... Args>
-    auto submit(F&& f, Args&&... args)
-        -> mongo::stdx::future<typename std::invoke_result_t<F, Args...>> {
-        using namespace mongo;
-        using ReturnType = typename std::invoke_result_t<F, Args...>;
-
-        uassert(ErrorCodes::ReplayClientSessionSimulationError,
-                "Cannot submit work to a stopped session pool",
-                !_stop.load());
-        uassert(ErrorCodes::ReplayClientSessionSimulationError,
-                "The session pool has only one active session and it has recorded fatal errors, no "
-                "more tasks can be submitted.",
-                _sessionPoolSize.load() != 1 || !_hasRecordedErrors.load());
-
-        stdx::packaged_task<void()> task(
-            [f = std::forward<F>(f), ... args = std::forward<Args>(args)]() mutable {
-                std::invoke(f, args...);
+    void submit(F&& f, Args&&... args) {
+        using mongo::unique_function;
+        mongo::unique_function<void()> task(
+            [this, f = std::forward<F>(f), ... args = std::forward<Args>(args)]() mutable {
+                try {
+                    // Invoke the callable passed
+                    std::invoke(f, args...);
+                } catch (...) {
+                    // ignore possible exception. The caller is responsible to handle errors. If
+                    // they bubble up here, we will report them but the task will continue.
+                    recordError(std::current_exception());
+                }
             });
-        stdx::future<ReturnType> result = task.get_future();
         {
             stdx::unique_lock<stdx::mutex> lock(_queueMutex);
-            _tasks.emplace(Task(std::move(task)));
+            // Don't allow new tasks once the pool is stopped
+            invariant(!_stop.load());
+            _tasks.emplace(SessionTask(std::move(task)));
         }
         // notify all the threads that are listening on this condition variable. There should be
         // only one thread per session. So notify_one should suffice here, but for testing purposes
         // we need to be sure that all the working threads are awaken once a new task is submitted.
         _condition.notify_all();
-        return result;
     }
 
     bool containsExecutionErrors() const {
@@ -116,19 +114,14 @@ private:
      */
     void recordError(std::exception_ptr);
 
-    // TODO SERVER-106046 will address the possibility to have multiple dead threads in case of
-    // multiple recordings.
+    std::vector<stdx::thread> _workers;   // Sessions threads (one per session is the default)
+    std::queue<SessionTask> _tasks;       // The task queue
+    stdx::mutex _queueMutex;              // Synchronizes access to the task queue
+    stdx::condition_variable _condition;  // Used for thread synchronization
+    AtomicWord<bool> _stop;               // Indicates whether the pool is stopping
 
-    AtomicWord<size_t> _sessionPoolSize;  ///< Store total size of the pool
-
-    std::vector<stdx::thread> _workers;   ///< Worker threads
-    std::queue<Task> _tasks;              ///< The task queue
-    stdx::mutex _queueMutex;              ///< Synchronizes access to the task queue
-    stdx::condition_variable _condition;  ///< Used for thread synchronization
-    AtomicWord<bool> _stop;               ///< Indicates whether the pool is stopping
-
-    stdx::mutex _errorMutex;                  ///< Synchronizes access to the error vector
-    std::vector<std::exception_ptr> _errors;  ///< List of errors recorded during execution
-    AtomicWord<bool> _hasRecordedErrors;  ///< Indicates whether the pool has recorded errors or not
+    stdx::mutex _errorMutex;                  // Synchronizes access to the error vector
+    std::vector<std::exception_ptr> _errors;  // List of errors recorded during execution
+    AtomicWord<bool> _hasRecordedErrors;  // Indicates whether the pool has recorded errors or not
 };
 }  // namespace mongo

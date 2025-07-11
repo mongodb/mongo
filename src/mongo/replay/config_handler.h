@@ -26,20 +26,25 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
 
-#include "mongo/bson/bsonobj.h"
+#include "mongo/replay/replay_config.h"
 
 #include <string>
 #include <vector>
 
 namespace mongo {
-class RecordingReader {
+class ConfigHandler {
 public:
-    RecordingReader(std::string filename) : filename(std::move(filename)) {}
-    std::vector<BSONObj> processRecording() const;
+    /*
+     * Handle command line arguments.
+     * -i <input file> => recording path
+     * -t <target> => uri of the mongodb server
+     * -c <config> => config file. A list of <recording file>,<uri>. Used for spinning up multiple
+     * mongor.
+     */
+    std::vector<ReplayConfig> parse(int argc, char** argv);
 
 private:
-    std::string filename;
+    std::vector<ReplayConfig> parseMultipleInstanceConfig(const std::string& path);
 };
 }  // namespace mongo

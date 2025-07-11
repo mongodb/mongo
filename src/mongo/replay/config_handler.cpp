@@ -26,8 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-#include "mongo/replay/options_handler.h"
+#include "mongo/replay/config_handler.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/util/assert_util.h"
@@ -47,7 +46,7 @@
 
 namespace mongo {
 
-std::vector<ReplayOptions> OptionsHandler::handle(int argc, char** argv) {
+std::vector<ReplayConfig> ConfigHandler::parse(int argc, char** argv) {
     auto recordingPath = "Path to the recording file";
     auto mongodbTarget = "URI of the shadow mongod/s";
     auto configFilePath = "Path to the config file";
@@ -106,23 +105,23 @@ std::vector<ReplayOptions> OptionsHandler::handle(int argc, char** argv) {
             "target and input file must be specified for single instance configuration",
             singleInstanceOptionsSpecified);
 
-    ReplayOptions options;
+    ReplayConfig config;
     // extract file path
     auto filePath = vm["input"].as<std::string>();
     uassert(ErrorCodes::ReplayClientConfigurationError,
             "input file path does not exist",
             std::filesystem::exists(filePath));
-    options.recordingPath = filePath;
+    config.recordingPath = filePath;
     // extract mongo uri
     auto uri = vm["target"].as<std::string>();
     uassert(ErrorCodes::ReplayClientConfigurationError, "target URI is empty", !uri.empty());
-    options.mongoURI = uri;
+    config.mongoURI = uri;
 
-    return {options};
+    return {config};
 }
 
-std::vector<ReplayOptions> OptionsHandler::parseMultipleInstanceConfig(const std::string& path) {
-    std::vector<ReplayOptions> parsedReplayOptions;
+std::vector<ReplayConfig> ConfigHandler::parseMultipleInstanceConfig(const std::string& path) {
+    std::vector<ReplayConfig> configurations;
     uassert(ErrorCodes::ReplayClientConfigurationError,
             "Impossible to open config file",
             std::filesystem::exists(path));
@@ -146,8 +145,8 @@ std::vector<ReplayOptions> OptionsHandler::parseMultipleInstanceConfig(const std
                     recordingNode["path"] && recordingNode["uri"]);
             std::string filePath = recordingNode["path"].as<std::string>();
             std::string targetUri = recordingNode["uri"].as<std::string>();
-            ReplayOptions replayOption = {filePath, targetUri};
-            parsedReplayOptions.push_back(replayOption);
+            ReplayConfig replayConfig = {filePath, targetUri};
+            configurations.push_back(std::move(replayConfig));
         }
     } catch (const YAML::Exception& ex) {
         uassert(ErrorCodes::ReplayClientConfigurationError, ex.what(), false);
@@ -155,7 +154,7 @@ std::vector<ReplayOptions> OptionsHandler::parseMultipleInstanceConfig(const std
         uassert(ErrorCodes::ReplayClientConfigurationError, ex.what(), false);
     }
 
-    return parsedReplayOptions;
+    return configurations;
 }
 
 }  // namespace mongo

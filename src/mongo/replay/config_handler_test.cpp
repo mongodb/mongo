@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/replay/options_handler.h"
+#include "mongo/replay/config_handler.h"
 
 #include "mongo/unittest/unittest.h"
 
@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-class OptionsHandlerTest : public unittest::Test {
+class ConfigHandlerTest : public unittest::Test {
 
 protected:
     std::string tempFilename1;
@@ -82,25 +82,25 @@ protected:
     }
 };
 
-TEST_F(OptionsHandlerTest, SimpleParseSingleInstance) {
+TEST_F(ConfigHandlerTest, SimpleParseSingleInstance) {
     ASSERT_TRUE(boost::filesystem::exists(tempFilename1));
     std::vector<std::string> commandLine = {
         "fakeMongoR", "-i", tempFilename1, "-t", "$local:12345"};
     auto argv = toArgv(commandLine);
-    OptionsHandler commandLineOptions;
-    auto options = commandLineOptions.handle(argv.size(), argv.data());
+    ConfigHandler configHandler;
+    auto options = configHandler.parse(argv.size(), argv.data());
     ASSERT_TRUE(options.size() == 1);
     auto& option = options[0];
     ASSERT_TRUE(option.recordingPath == "tmp_recording_file1.dat");
     ASSERT_TRUE(option.mongoURI == "$local:12345");
 }
 
-TEST_F(OptionsHandlerTest, SimpleParseMultipleInstances) {
+TEST_F(ConfigHandlerTest, SimpleParseMultipleInstances) {
     ASSERT_TRUE(boost::filesystem::exists(tempFileNameConfig));
     std::vector<std::string> commandLine = {"fakeMongoR", "-c", tempFileNameConfig};
     auto argv = toArgv(commandLine);
-    OptionsHandler commandLineOptions;
-    auto options = commandLineOptions.handle(argv.size(), argv.data());
+    ConfigHandler configHandler;
+    auto options = configHandler.parse(argv.size(), argv.data());
     ASSERT_TRUE(options.size() == 2);
     auto& option1 = options[0];
     auto& option2 = options[1];
@@ -110,34 +110,34 @@ TEST_F(OptionsHandlerTest, SimpleParseMultipleInstances) {
     ASSERT_TRUE(option2.mongoURI == "$local:12346");
 }
 
-TEST_F(OptionsHandlerTest, IllFormedCommandLine) {
-    OptionsHandler commandLineOptions;
+TEST_F(ConfigHandlerTest, IllFormedCommandLine) {
+    ConfigHandler configHandler;
 
     std::vector<std::string> commandLine = {"fakeMongoR", "-c", ""};
     auto argv = toArgv(commandLine);
-    ASSERT_THROWS_CODE(commandLineOptions.handle(argv.size(), argv.data()),
+    ASSERT_THROWS_CODE(configHandler.parse(argv.size(), argv.data()),
                        DBException,
                        ErrorCodes::ReplayClientConfigurationError);
 
     std::vector<std::string> commandLine1 = {"fakeMongoR", "-i", "ffff"};
     auto argv1 = toArgv(commandLine1);
-    ASSERT_THROWS_CODE(commandLineOptions.handle(argv1.size(), argv1.data()),
+    ASSERT_THROWS_CODE(configHandler.parse(argv1.size(), argv1.data()),
                        DBException,
                        ErrorCodes::ReplayClientConfigurationError);
 
     std::vector<std::string> commandLine2 = {"fakeMongoR", "-i", tempFilename1, "-t", ""};
     auto argv2 = toArgv(commandLine2);
-    ASSERT_THROWS_CODE(commandLineOptions.handle(argv2.size(), argv2.data()),
+    ASSERT_THROWS_CODE(configHandler.parse(argv2.size(), argv2.data()),
                        DBException,
                        ErrorCodes::ReplayClientConfigurationError);
 }
 
-TEST_F(OptionsHandlerTest, ConfigFileIncompatibleWithSingleInstanceCmdLineArgs) {
-    OptionsHandler commandLineOptions;
+TEST_F(ConfigHandlerTest, ConfigFileIncompatibleWithSingleInstanceCmdLineArgs) {
+    ConfigHandler configHandler;
     std::vector<std::string> commandLine = {
         "fakeMongoR", "-c", tempFileNameConfig, "-i", tempFilename1, "-t", "$local:12345"};
     auto argv = toArgv(commandLine);
-    ASSERT_THROWS_CODE(commandLineOptions.handle(argv.size(), argv.data()),
+    ASSERT_THROWS_CODE(configHandler.parse(argv.size(), argv.data()),
                        DBException,
                        ErrorCodes::ReplayClientConfigurationError);
 }

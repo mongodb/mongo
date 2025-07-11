@@ -27,30 +27,12 @@
  *    it in the license file.
  */
 
-#include <string>
-#include <vector>
+#include "mongo/replay/replay_config.h"
+
 namespace mongo {
-struct ReplayOptions {
-    std::string recordingPath;
-    std::string mongoURI;
-
-    explicit operator bool() const {
-        return !recordingPath.empty() && !mongoURI.empty();
-    }
-};
-
-class OptionsHandler {
+class ReplayClient {
 public:
-    /*
-     * Handle command line arguments.
-     * -i <input file> => recording path
-     * -t <target> => uri of the mongodb server
-     * -c <config> => config file. A list of <recording file>,<uri>. Used for spinning up multiple
-     * mongor.
-     */
-    std::vector<ReplayOptions> handle(int argc, char** argv);
-
-private:
-    std::vector<ReplayOptions> parseMultipleInstanceConfig(const std::string& path);
+    void replayRecording(const ReplayConfigs&);
+    void replayRecording(const std::string& uri, const std::string& recordingFileName);
 };
 }  // namespace mongo

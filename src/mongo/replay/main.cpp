@@ -28,127 +28,17 @@
  */
 
 #include "mongo/base/initializer.h"
-#include "mongo/base/status.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/traffic_reader.h"
-#include "mongo/db/wire_version.h"
-#include "mongo/replay/options_handler.h"
-#include "mongo/replay/recording_reader.h"
-#include "mongo/replay/replay_command.h"
-#include "mongo/replay/replay_command_executor.h"
-#include "mongo/replay/session_pool.h"
-#include "mongo/rpc/factory.h"
-#include "mongo/stdx/chrono.h"
-#include "mongo/stdx/future.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/stdx/type_traits.h"
-#include "mongo/transport/asio/asio_session_manager.h"
-#include "mongo/transport/asio/asio_transport_layer.h"
-#include "mongo/transport/transport_layer_manager.h"
-#include "mongo/transport/transport_layer_manager_impl.h"
+#include "mongo/replay/config_handler.h"
+#include "mongo/replay/replay_client.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/exit_code.h"
-#include "mongo/util/periodic_runner_factory.h"
-#include "mongo/util/signal_handlers.h"
-#include "mongo/util/text.h"  // IWYU pragma: keep
-#include "mongo/util/version.h"
-
-#include <cerrno>
-#include <chrono>
-#include <cstring>
-#include <exception>
-#include <iostream>
-#include <string>
-#include <vector>
-
-#include <fcntl.h>
-
-using namespace mongo;
-
-stdx::mutex m;
-constexpr size_t MAX_PRODUCERS = 1;
-constexpr size_t MAX_CONSUMERS = 4;
-
-template <typename Future>
-void handleResponse(Future&& fut) {
-    try {
-        // During the task execution some errors could occur. In this case we catch the error and
-        // terminate.
-        fut.get();
-    } catch (const DBException& ex) {
-        tassert(ErrorCodes::ReplayClientInternalError, ex.what(), false);
-    } catch (const std::exception& ex) {
-        tassert(ErrorCodes::ReplayClientInternalError, ex.what(), false);
-    } catch (...) {
-        tassert(ErrorCodes::ReplayClientInternalError, "Unknown error type encountered", false);
-    }
-}
-
-void simpleTask(ReplayCommandExecutor& replayCommandExecutor,
-                const std::vector<BSONObj>& bsonCommands) {
-
-    for (const auto& bsonCommand : bsonCommands) {
-
-        ReplayCommand replayCommand{bsonCommand};
-        {
-            // TODO: SERVER-106046 will make the thread pool session compatible with the simulation
-            // requirements.
-            stdx::unique_lock<stdx::mutex> lock(m);
-            auto response = replayCommandExecutor.runCommand(replayCommand);
-        }
-    }
-}
-
-void threadExecutionFunction(const ReplayOptions& replayOptions) {
-    try {
-        ReplayCommandExecutor replayCommandExecutor;
-
-        RecordingReader reader{replayOptions.recordingPath};
-        const auto commands = reader.processRecording();
-
-        if (!commands.empty()) {
-            replayCommandExecutor.connect(replayOptions.mongoURI);
-            // TODO: SERVER-106046 will pin session to worker. For now  MAX_CONSUMERS sessions are
-            //       equal to N different consumers/workers serving a session.
-            SessionPool sessionPool(MAX_CONSUMERS);
-            replayCommandExecutor.connect(replayOptions.mongoURI);
-            std::vector<stdx::future<void>> futures;
-
-            for (size_t i = 0; i < MAX_PRODUCERS; ++i) {
-                auto f = sessionPool.submit(simpleTask, std::ref(replayCommandExecutor), commands);
-                futures.push_back(std::move(f));
-            }
-
-            for (auto& f : futures) {
-                handleResponse(std::move(f));
-            }
-        }
-
-    } catch (const std::exception& e) {
-        tassert(ErrorCodes::ReplayClientInternalError, e.what(), false);
-    }
-}
 
 int main(int argc, char** argv) {
-    mongo::runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
-
-    OptionsHandler commandLineOptions;
-    const auto& options = commandLineOptions.handle(argc, argv);
-
-    std::vector<stdx::thread> instances;
-    for (size_t i = 0; i < options.size(); ++i) {
-        instances.push_back(stdx::thread(threadExecutionFunction, std::ref(options[i])));
-    }
-
-    for (auto& instance : instances) {
-        instance.join();
-    }
-
-    uassertStatusOK(mongo::runGlobalDeinitializers());
-
+    using namespace mongo;
+    runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
+    ReplayClient replayClient;
+    ConfigHandler configHandler;
+    const auto& replayConfig = configHandler.parse(argc, argv);
+    replayClient.replayRecording(replayConfig);
+    uassertStatusOK(runGlobalDeinitializers());
     return 0;
 }

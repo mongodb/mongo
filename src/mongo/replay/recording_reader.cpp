@@ -78,7 +78,7 @@ std::vector<BSONObj> RecordingReader::processRecording() const {
 
         std::string opType;
         BSONElement opTypeElem = elem["opType"];
-        if (opTypeElem.type() == mongo::BSONType::string) {
+        if (opTypeElem.type() == BSONType::string) {
             opType = opTypeElem.String();
         }
 
@@ -87,10 +87,9 @@ std::vector<BSONObj> RecordingReader::processRecording() const {
         if (!isReplayable(opType))
             continue;
 
-        BSONElement rawopElem = elem["rawop"];
-        if (rawopElem.type() == mongo::BSONType::object) {
+        if (elem.type() == BSONType::object) {
             // leave the interpretation of the binary data to replay command
-            res.push_back(rawopElem.Obj().copy());
+            res.push_back(elem.Obj().copy());
         }
     }
     return res;

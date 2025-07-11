@@ -44,8 +44,6 @@
 
 namespace mongo {
 
-ReplayCommandExecutor::ReplayCommandExecutor() = default;
-
 void ReplayCommandExecutor::connect(StringData uri) {
     // Connect to mongo d/s instance and keep instance of the connection alive as long as this
     // object is alive.
@@ -61,7 +59,7 @@ void ReplayCommandExecutor::reset() {
     // connection.
     uassert(ErrorCodes::ReplayClientNotConnected, "MongoR is not connected", isConnected());
     _dbConnection->reset();
-    _dbConnection.reset(nullptr);
+    _dbConnection.reset();
 }
 
 bool ReplayCommandExecutor::isConnected() const {

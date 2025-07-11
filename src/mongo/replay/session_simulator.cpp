@@ -29,7 +29,10 @@
 
 #include "mongo/replay/session_simulator.h"
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/logv2/log.h"
 #include "mongo/replay/replay_command.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
@@ -37,30 +40,84 @@
 
 namespace mongo {
 
+template <typename Callable>
+void handleErrors(Callable&& callable) {
+    try {
+        // TODO SERVER-106495 will handle properly errors, responses and stats.
+        callable();
+    } catch (const DBException& ex) {
+        tasserted(ErrorCodes::ReplayClientSessionSimulationError,
+                  "DBException in handleAsyncResponse, terminating due to:" + ex.toString());
+    } catch (const std::exception& ex) {
+        tasserted(ErrorCodes::ReplayClientSessionSimulationError,
+                  "Exception in handleAsyncResponse, terminating due to:" + std::string{ex.what()});
+    } catch (...) {
+        tasserted(ErrorCodes::ReplayClientSessionSimulationError,
+                  "Unknown exception in handleAsyncResponse, terminating");
+    }
+}
+
+static constexpr size_t MAX_SIMULATION_PROCESSING_TASKS = 1;
+
+SessionSimulator::SessionSimulator()
+    : _commandExecutor(std::make_unique<ReplayCommandExecutor>()),
+      _sessionScheduler(std::make_unique<SessionScheduler>(MAX_SIMULATION_PROCESSING_TASKS)) {}
+
+SessionSimulator::~SessionSimulator() {}
+
 void SessionSimulator::start(StringData uri,
-                             std::chrono::steady_clock::time_point replayStart,
-                             Date_t recordingStart,
-                             Date_t sessionStart) {
-    _replayStartTime = replayStart;
-    // beginning of recording must be used a ref time for the recording
-    _recordingStartTime = recordingStart;
-    // wait if simulation and recording start time have diverged.
-    waitIfNeeded(sessionStart);
-    // connect
-    _commandExecutor.connect(uri);
+                             std::chrono::steady_clock::time_point replayStartTime,
+                             const Date_t& recordStartTime,
+                             const Date_t& eventTimestamp) {
+    // It safe to pass this (because it will be kept alive by the SessionHandler) and to write or
+    // read member variables, because there is only one thread. Beware about spawning multiple
+    // threads. Order of commands can be different than the ones recorded and a mutex must be used
+    // for supporting multiple threads.
+    auto f = [this, uri, replayStartTime, recordStartTime, eventTimestamp]() {
+        _replayStartTime = replayStartTime;
+        _recordStartTime = recordStartTime;
+        // wait if simulation and recording start time have diverged.
+        waitIfNeeded(eventTimestamp);
+        // connect
+        _commandExecutor->connect(uri);
+        // set running flag.
+        _running = true;
+    };
+
+    _sessionScheduler->submit([f]() { handleErrors(f); });
 }
 
-void SessionSimulator::stop(Date_t time) {
-    waitIfNeeded(time);
-    _commandExecutor.reset();
+void SessionSimulator::stop(const Date_t& sessionEnd) {
+    // It safe to pass this (because it will be kept alive by the SessionHandler) and to write or
+    // read member variables, because there is only one thread. Beware about spawning multiple
+    // threads. Order of commands can be different than the ones recorded and a mutex must be used
+    // for supporting multiple threads.
+    auto f = [this, sessionEnd]() {
+        uassert(ErrorCodes::ReplayClientSessionSimulationError,
+                "SessionSimulator is not connected to a valid mongod/s instance.",
+                _running);
+        waitIfNeeded(sessionEnd);
+        _commandExecutor->reset();
+    };
+
+    _sessionScheduler->submit([f]() { handleErrors(f); });
 }
 
-BSONObj SessionSimulator::run(const ReplayCommand& command) const {
-    Date_t time = command.fetchRequestTimestamp();
-    waitIfNeeded(time);
-    return _commandExecutor.runCommand(command);
-}
+void SessionSimulator::run(const ReplayCommand& command, const Date_t& commandTimeStamp) const {
+    // It safe to pass this (because it will be kept alive by the SessionHandler) and to write or
+    // read member variables, because there is only one thread. Beware about spawning multiple
+    // threads. Order of commands can be different than the ones recorded and a mutex must be used
+    // for supporting multiple threads.
+    auto f = [this, command, commandTimeStamp]() {
+        uassert(ErrorCodes::ReplayClientSessionSimulationError,
+                "SessionSimulator is not connected to a valid mongod/s instance.",
+                _running);
+        waitIfNeeded(commandTimeStamp);
+        _commandExecutor->runCommand(command);
+    };
 
+    _sessionScheduler->submit([f]() { handleErrors(f); });
+}
 
 std::chrono::steady_clock::time_point SessionSimulator::now() const {
     return std::chrono::steady_clock::now();
@@ -75,7 +132,7 @@ void SessionSimulator::waitIfNeeded(Date_t eventTimestamp) const {
     // TODO SERVER-106897: Date_t precision is only milliseconds; traffic reader will change the
     // recording format to use "offset from start" for each event with higher precision.
     auto recordingOffset =
-        mongo::duration_cast<Microseconds>(eventTimestamp - _recordingStartTime).toSystemDuration();
+        mongo::duration_cast<Microseconds>(eventTimestamp - _recordStartTime).toSystemDuration();
 
     auto targetTime = _replayStartTime + recordingOffset;
     auto requiredDelay = targetTime - now();

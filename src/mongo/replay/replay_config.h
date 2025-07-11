@@ -28,18 +28,17 @@
  */
 #pragma once
 
-#include "mongo/bson/bsonobj.h"
-
 #include <string>
 #include <vector>
 
 namespace mongo {
-class RecordingReader {
-public:
-    RecordingReader(std::string filename) : filename(std::move(filename)) {}
-    std::vector<BSONObj> processRecording() const;
+struct ReplayConfig {
+    std::string recordingPath;
+    std::string mongoURI;
 
-private:
-    std::string filename;
+    explicit operator bool() const {
+        return !recordingPath.empty() && !mongoURI.empty();
+    }
 };
+using ReplayConfigs = std::vector<ReplayConfig>;
 }  // namespace mongo

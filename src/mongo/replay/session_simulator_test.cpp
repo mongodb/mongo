@@ -70,88 +70,97 @@ auto operator+(const MongoDur& mongoDuration,
                const std::chrono::duration<Rep, Period>& nonMongoDuration) {
     return mongoDuration + mongo::duration_cast<MongoDur>(nonMongoDuration);
 }
-
-
 TEST(SessionSimulatorTest, TestSimpleCommandNoWait) {
 
     BSONObj filter = BSON("name" << "Alice");
     BSONObj findCommand = BSON("find" << "test" << "$db" << "test" << "filter" << filter);
-    std::string jsonStr = R"([{  
-    "_id": "681cb423980b72695075137f",  
-    "name": "Alice",  
-    "age": 30,  
+    std::string jsonStr = R"([{
+    "_id": "681cb423980b72695075137f",
+    "name": "Alice",
+    "age": 30,
     "city": "New York"}])";
     ReplayTestServer server{{"find"}, {jsonStr}};
 
-    TestSessionSimulator sessionSimulator;
+    // test simulator scoped in order to complete all the tasks.
+    {
+        TestSessionSimulator sessionSimulator;
 
-    // connect to server with time
-    const auto uri = server.getConnectionString();
-    auto begin = std::chrono::steady_clock::now();
-    auto recordingStartTimestamp = Date_t::now();
-    auto eventTimestamp = recordingStartTimestamp;
-    // For the next call to now(), report the timestamp the replay started at.
-    sessionSimulator.nowHook.ret(begin);
-    // Recording and session both start "now".
-    sessionSimulator.start(uri, begin, recordingStartTimestamp, eventTimestamp);
+        // connect to server with time
+        const auto uri = server.getConnectionString();
+        auto begin = std::chrono::steady_clock::now();
+        auto recordingStartTimestamp = Date_t::now();
+        auto eventTimestamp = recordingStartTimestamp;
+        // For the next call to now(), report the timestamp the replay started at.
+        sessionSimulator.nowHook.ret(begin);
 
+        // Recording and session both start "now".
+        sessionSimulator.start(uri, begin, recordingStartTimestamp, eventTimestamp);
 
-    using namespace std::chrono_literals;
-    RawOpDocument opDoc{"find", findCommand};
-    opDoc.updateSeenField(recordingStartTimestamp + 1s);
-    ReplayCommand command{opDoc.getDocument()};
-    // For the next call to now(), report the replay is 1s in - the same time the find should be
-    // issued at.
-    sessionSimulator.nowHook.ret(begin + 1s);
-    auto response = sessionSimulator.run(command);
+        using namespace std::chrono_literals;
+        RawOpDocument opDoc{"find", findCommand};
+        eventTimestamp = recordingStartTimestamp + 1s;
+        opDoc.updateSeenField(eventTimestamp);
+        ReplayCommand command{opDoc.getDocument()};
+        // For the next call to now(), report the replay is 1s in - the same time the find should be
+        // issued at.
+        sessionSimulator.nowHook.ret(begin + 1s);
+        sessionSimulator.run(command, eventTimestamp);
+    }
+
+    BSONObj response = fromjson(jsonStr);
+    ASSERT_TRUE(server.checkResponse("find", response));
 }
 
 TEST(SessionSimulatorTest, TestSimpleCommandWait) {
 
     BSONObj filter = BSON("name" << "Alice");
     BSONObj findCommand = BSON("find" << "test" << "$db" << "test" << "filter" << filter);
-    std::string jsonStr = R"([{  
-    "_id": "681cb423980b72695075137f",  
-    "name": "Alice",  
-    "age": 30,  
+    std::string jsonStr = R"([{
+    "_id": "681cb423980b72695075137f",
+    "name": "Alice",
+    "age": 30,
     "city": "New York"}])";
     ReplayTestServer server{{"find"}, {jsonStr}};
 
-    TestSessionSimulator sessionSimulator;
+    // test simulator scoped in order to complete all the tasks.
+    {
+        TestSessionSimulator sessionSimulator;
 
-    // connect to server with time
-    const auto uri = server.getConnectionString();
-    auto begin = std::chrono::steady_clock::now();
+        // connect to server with time
+        const auto uri = server.getConnectionString();
+        auto begin = std::chrono::steady_clock::now();
 
-    using namespace std::chrono_literals;
+        using namespace std::chrono_literals;
+
+        auto recordingStartTimestamp = Date_t::now();
+        // The session start occurred two seconds into the recording.
+        auto eventTimestamp = recordingStartTimestamp + 2s;
+
+        // For the first call to now() return the same timepoint the replay started at.
+        sessionSimulator.nowHook.ret(begin);
+        // Expect the simulator to try sleep for 2 seconds.
+        sessionSimulator.sleepHook.expect(2s);
+
+        sessionSimulator.start(uri, begin, recordingStartTimestamp, eventTimestamp);
 
 
-    auto recordingStartTimestamp = Date_t::now();
-    // The session start occurred two seconds into the recording.
-    auto eventTimestamp = recordingStartTimestamp + 2s;
+        // Issue a find request at 5s into the recording
 
-    // For the first call to now() return the same timepoint the replay started at.
-    sessionSimulator.nowHook.ret(begin);
-    // Expect the simulator to try sleep for 2 seconds.
-    sessionSimulator.sleepHook.expect(2s);
+        RawOpDocument opDoc{"find", findCommand};
+        eventTimestamp = recordingStartTimestamp + 5s;
+        opDoc.updateSeenField(eventTimestamp);
+        ReplayCommand command{opDoc.getDocument()};
 
-    sessionSimulator.start(uri, begin, recordingStartTimestamp, eventTimestamp);
+        // Report "now" as if time has advanced to when the session started.
+        sessionSimulator.nowHook.ret(begin + 2s);
+        // Simulator should attempt to sleep the remaining time to when the
+        // find request was issued.
+        sessionSimulator.sleepHook.expect(3s);
 
+        sessionSimulator.run(command, eventTimestamp);
+    }
 
-    // Issue a find request at 5s into the recording
-
-    RawOpDocument opDoc{"find", findCommand};
-    opDoc.updateSeenField(recordingStartTimestamp + 5s);
-    ReplayCommand command{opDoc.getDocument()};
-
-    // Report "now" as if time has advanced to when the session started.
-    sessionSimulator.nowHook.ret(begin + 2s);
-    // Simulator should attempt to sleep the remaining time to when the
-    // find request was issued.
-    sessionSimulator.sleepHook.expect(3s);
-
-    auto response = sessionSimulator.run(command);
-
+    BSONObj response = fromjson(jsonStr);
     ASSERT_TRUE(server.checkResponse("find", response));
 }
 
@@ -160,37 +169,43 @@ TEST(SessionSimulatorTest, TestSimpleCommandNoWaitTimeInThePast) {
     // Simulate a real scenario where time is in the past. No wait should happen.
     BSONObj filter = BSON("name" << "Alice");
     BSONObj findCommand = BSON("find" << "test" << "$db" << "test" << "filter" << filter);
-    std::string jsonStr = R"([{  
-    "_id": "681cb423980b72695075137f",  
-    "name": "Alice",  
-    "age": 30,  
+    std::string jsonStr = R"([{
+    "_id": "681cb423980b72695075137f",
+    "name": "Alice",
+    "age": 30,
     "city": "New York"}])";
     ReplayTestServer server{{"find"}, {jsonStr}};
 
-    TestSessionSimulator sessionSimulator;
+    // test simulator scoped in order to complete all the tasks.
+    {
+        TestSessionSimulator sessionSimulator;
 
-    // connect to server with time
-    const auto uri = server.getConnectionString();
-    auto begin = stdx::chrono::steady_clock::now();
-    using namespace std::chrono_literals;
-    auto recordingStartTimestamp = Date_t::now();
-    auto eventTimestamp =
-        recordingStartTimestamp + 1s;  // A session started one second into the recording
+        // connect to server with time
+        const auto uri = server.getConnectionString();
+        auto begin = stdx::chrono::steady_clock::now();
+        using namespace std::chrono_literals;
+        auto recordingStartTimestamp = Date_t::now();
+        auto eventTimestamp =
+            recordingStartTimestamp + 1s;  // A session started one second into the recording
 
-    // Pretend the replay is actually *10* seconds into the replay.
-    // That means it is now "late" starting this session, so should not sleep.
-    sessionSimulator.nowHook.ret(begin + 10s);
+        // Pretend the replay is actually *10* seconds into the replay.
+        // That means it is now "late" starting this session, so should not sleep.
+        sessionSimulator.nowHook.ret(begin + 10s);
 
-    sessionSimulator.start(uri, begin, recordingStartTimestamp, eventTimestamp);
+        sessionSimulator.start(uri, begin, recordingStartTimestamp, eventTimestamp);
 
-    RawOpDocument opDoc{"find", findCommand};
-    eventTimestamp = recordingStartTimestamp + 2s;
-    opDoc.updateSeenField(eventTimestamp);
-    ReplayCommand command{opDoc.getDocument()};
+        RawOpDocument opDoc{"find", findCommand};
+        eventTimestamp = recordingStartTimestamp + 2s;
+        opDoc.updateSeenField(eventTimestamp);
+        ReplayCommand command{opDoc.getDocument()};
 
-    // Replay is also "late" trying to replay this find, so should not sleep.
-    sessionSimulator.nowHook.ret(begin + 10s);
-    auto response = sessionSimulator.run(command);
+        // Replay is also "late" trying to replay this find, so should not sleep.
+        sessionSimulator.nowHook.ret(begin + 10s);
+        sessionSimulator.run(command, eventTimestamp);
+    }
+
+    BSONObj response = fromjson(jsonStr);
+    ASSERT_TRUE(server.checkResponse("find", response));
 }
 
 }  // namespace mongo

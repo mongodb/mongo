@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/replay/session_pool.h"
+#include "mongo/replay/session_scheduler.h"
 
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobj.h"
@@ -53,7 +53,7 @@
 
 namespace mongo {
 
-class SessionPoolTest : public unittest::Test {
+class SessionSchedulerTest : public unittest::Test {
 public:
     using Commands = std::vector<std::pair<std::string, BSONObj>>;
 
@@ -98,26 +98,19 @@ public:
     }
 
     template <typename Callable>
-    void submitToSessionPool(SessionPool& sessionPool, size_t nSessions, Callable callable) {
-        std::vector<stdx::future<void>> futures;
+    void submit(SessionScheduler& sessionScheduler, size_t nSessions, Callable callable) {
         for (size_t i = 0; i < nSessions; i++) {
-            auto task = sessionPool.submit(callable, i);
-            futures.push_back(std::move(task));
-        }
-        for (auto& f : futures) {
-            try {
-                f.get();
-            } catch (...) {
-                _errors.push_back(std::current_exception());
-            }
+            sessionScheduler.submit(callable, i);
         }
     }
 
-    bool hasTaskErrors() const {
-        return !_errors.empty();
+    void addError(std::exception_ptr ptr) {
+        std::lock_guard<std::mutex> lg{_m};
+        _errors.push_back(ptr);
     }
 
-    std::vector<std::exception_ptr> getTaskErrors() const {
+    std::vector<std::exception_ptr> getErrors() {
+        std::lock_guard<std::mutex> lg{_m};
         return _errors;
     }
 
@@ -125,14 +118,14 @@ private:
     Commands _commands;
     ReplayTestServer _server;
     std::string _jsonStr;
+    stdx::mutex _m;
     std::vector<std::exception_ptr> _errors;
 };
 
-TEST_F(SessionPoolTest, SubmitQueryOneSession) {
+TEST_F(SessionSchedulerTest, SubmitQueryOneSession) {
     auto executor = std::make_unique<ReplayCommandExecutor>();
     executor->connect(getServerConnectionString());
     ASSERT_TRUE(executor->isConnected());
-    SessionPool sessionPool;
     std::vector<std::unique_ptr<ReplayCommandExecutor>> executors;
     std::vector<synchronized_value<BSONObj>> outputs(1);
     executors.push_back(std::move(executor));
@@ -140,35 +133,32 @@ TEST_F(SessionPoolTest, SubmitQueryOneSession) {
         sessionExecTask(std::move(executors[i]), outputs[i]);
     };
     constexpr size_t totalNumberOfSessions = 1;
-    submitToSessionPool(sessionPool, totalNumberOfSessions, callable);
+    {
+        SessionScheduler sessionScheduler(1);
+        submit(sessionScheduler, totalNumberOfSessions, callable);
+    }
     auto& resp = outputs.back();
-    ASSERT_FALSE(hasTaskErrors());
     ASSERT_FALSE(resp->isEmptyPrototype());
     ASSERT_TRUE(checkServerResponse(*resp));
-    ASSERT_FALSE(sessionPool.containsExecutionErrors());
 }
 
-TEST_F(SessionPoolTest, SubmitTaskThatIsCrashingAndVerifyCorrectShutdown) {
+TEST_F(SessionSchedulerTest, SubmitTaskThatIsCrashingAndVerifyCorrectShutdown) {
     constexpr size_t N = 10;
-    SessionPool sessionPool(N);
-    std::vector<synchronized_value<bool>> outs(N);
-    for (auto&& out : outs) {
-        ASSERT_FALSE(*out);
-    }
-    auto callable = [this, &outs](size_t i) {
-        outs[i] = true;
-        throw std::runtime_error("Fake error.");
+    auto callable = [this](size_t) {
+        try {
+            throw std::runtime_error("Fake error.");
+        } catch (...) {
+            addError(std::current_exception());
+        }
     };
-    submitToSessionPool(sessionPool, N, callable);
-    ASSERT_TRUE(hasTaskErrors());
-    ASSERT_EQ(10, getTaskErrors().size());
-    for (auto&& out : outs) {
-        ASSERT_TRUE(*out);  // verify that all the 10 workers have been called.
+    {
+        SessionScheduler sessionScheduler(N);
+        submit(sessionScheduler, N, callable);
     }
-    ASSERT_FALSE(sessionPool.containsExecutionErrors());
+    ASSERT_EQ(getErrors().size(), 10);
 }
 
-TEST_F(SessionPoolTest, SubmitQueryMultipleSessions) {
+TEST_F(SessionSchedulerTest, SubmitQueryMultipleSessions) {
     // mix a bit things, N sessions in parallel hammering the same server.
     const size_t N = 10;
     std::vector<std::unique_ptr<ReplayCommandExecutor>> executors;
@@ -180,17 +170,17 @@ TEST_F(SessionPoolTest, SubmitQueryMultipleSessions) {
         ASSERT_TRUE(ex->isConnected());
     }
     std::vector<synchronized_value<BSONObj>> outputs(N);
-    SessionPool sessionPool(N);
     auto callable = [this, &executors, &outputs](size_t i) {
         sessionExecTask(std::move(executors[i]), outputs[i]);
     };
-    submitToSessionPool(sessionPool, N, callable);
-    ASSERT_FALSE(hasTaskErrors());
+    {
+        SessionScheduler sessionScheduler(N);
+        submit(sessionScheduler, N, callable);
+    }
     for (auto&& out : outputs) {
         ASSERT_FALSE(out->isEmptyPrototype());
         ASSERT_TRUE(checkServerResponse(*out));
     }
-    ASSERT_FALSE(sessionPool.containsExecutionErrors());
 }
 
 }  // namespace mongo

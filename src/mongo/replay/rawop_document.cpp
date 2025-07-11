@@ -28,7 +28,6 @@
  */
 #include "mongo/replay/rawop_document.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -53,7 +52,7 @@ RawOpDocument::RawOpDocument() {
     rootBuilder.append("seen", BSON("sec" << 63884568370ll << "nsec" << 87));
     rootBuilder.append("session", "{ remote: \"127.0.0.1:54420\", local: \"127.0.0.1:27017\" }");
     rootBuilder.append("order", 87);
-    rootBuilder.append("seenconnectionnum", 16);
+    rootBuilder.append("seenconnectionnum", int64_t{16});
     rootBuilder.append("playedconnectionnum", 0);
     rootBuilder.append("generation", 0);
     rootBuilder.append("opType", "fake");
@@ -77,7 +76,7 @@ void RawOpDocument::updateBody(const BSONObj& newBody) {
     const auto binData = constructWireProtocolBinData(newBody);
     rawOpBuilder.appendBinData("body", binData.size(), BinDataGeneral, binData.data());
     _rawOp = rawOpBuilder.obj();
-    updateField("rawop", _rawOp);
+    updateField(_document, "rawop", _rawOp);
 }
 
 void RawOpDocument::updateHeaderField(const std::string& fieldName, int value) {
@@ -99,11 +98,15 @@ void RawOpDocument::updateHeaderField(const std::string& fieldName, int value) {
     rawOpBuilder.appendBinData("body", binDataLen, BinDataGeneral, binData);
     _rawOp = rawOpBuilder.obj();
 
-    updateField("rawop", _rawOp);
+    updateField(_document, "rawop", _rawOp);
+}
+
+void RawOpDocument::updateSessionId(int64_t id) {
+    updateField(_document, "seenconnectionnum", id);
 }
 
 void RawOpDocument::updateOpType(const std::string& newOpType) {
-    updateField("opType", newOpType);
+    updateField(_document, "opType", newOpType);
 }
 
 void RawOpDocument::updateSeenField(const Date_t& time, int64_t nanoseconds /* = 0 */) {
@@ -112,31 +115,7 @@ void RawOpDocument::updateSeenField(const Date_t& time, int64_t nanoseconds /* =
         62135596800LL;  // mongodb date are stored using a ref to start of epoch
     int64_t seconds = time.toMillisSinceEpoch() + unixToInternal;
     BSONObj updatedSeen = BSON("sec" << seconds << "nsec" << nanoseconds);
-    updateField("seen", updatedSeen);
-}
-
-void RawOpDocument::updateField(const std::string& fieldName, const BSONObj& newValue) {
-    BSONObjBuilder builder;
-    for (auto& elem : _document) {
-        if (elem.fieldName() == fieldName) {
-            builder.append(fieldName, newValue);
-        } else {
-            builder.append(elem);
-        }
-    }
-    _document = builder.obj();
-}
-
-void RawOpDocument::updateField(const std::string& fieldName, const std::string& newValue) {
-    BSONObjBuilder builder;
-    for (auto& elem : _document) {
-        if (elem.fieldName() == fieldName) {
-            builder.append(fieldName, newValue);
-        } else {
-            builder.append(elem);
-        }
-    }
-    _document = builder.obj();
+    updateField(_document, "seen", updatedSeen);
 }
 
 std::vector<char> RawOpDocument::constructWireProtocolBinData(const BSONObj& command) const {

@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #pragma once
 
 #include "mongo/base/error_extra_info.h"
@@ -42,7 +41,6 @@ namespace mongo {
 class ReplayCommand {
 public:
     explicit ReplayCommand(BSONObj bson) : _bsonCommand(std::move(bson)) {}
-
     /*
      * Converts a command to replay into an internal server msg request that is used to execute the
      * command.
@@ -51,6 +49,17 @@ public:
 
     /** Extract only the timestamp. Useful for session simulation. */
     Date_t fetchRequestTimestamp() const;
+
+    /** Extract the session id for the current command */
+    int64_t fetchRequestSessionId() const;
+
+    /** Use this method to know if the command represents a start recording, this starts the session
+     * simulation. */
+    bool isStartRecording() const;
+
+    /** Use this method to know if the command represents a stop recording, this ends the session
+     * simulation. */
+    bool isStopRecording() const;
 
     /** Mostly for debugging purposes, converts the replay command to string. */
     std::string toString() const;
@@ -65,6 +74,17 @@ private:
      * whether to replay the command or not
      */
     Date_t parseSeenTimestamp(BSONObj command) const;
+
+    /*
+     * Extract sessionId. Used for pinning the command to a session simulator
+     */
+    int64_t parseSessionId(BSONObj command) const;
+
+    /**
+     * Extract opType. It represents the type of the command to execute. Start and Stop recording
+     * are 2 special commands to start and stop the simulation. OpType cannot be an empty string.
+     */
+    std::string parseOpType(BSONObj command) const;
 
     BSONObj _bsonCommand;
 };
