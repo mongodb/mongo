@@ -462,8 +462,6 @@ last-continuous:
       ticket: SERVER-106614
     - test_file: jstests/sharding/balancer_should_return_random_migrations_failpoint.js
       ticket: SERVER-105874
-    - test_file: jstests/sharding/resharding_critical_section_abort_txns.js
-      ticket: SERVER-106707
   suites: null
 last-lts:
   all:
@@ -981,8 +979,6 @@ last-lts:
       ticket: SERVER-106614
     - test_file: jstests/sharding/balancer_should_return_random_migrations_failpoint.js
       ticket: SERVER-105874
-    - test_file: jstests/sharding/resharding_critical_section_abort_txns.js
-      ticket: SERVER-106707
     - test_file: jstests/with_mongot/e2e/hybridSearch/ranked_fusion_with_filter.js
       ticket: SERVER-107352
   suites: null

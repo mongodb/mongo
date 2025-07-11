@@ -107,3 +107,12 @@ feature_flags:
         cpp_varname: gFeatureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage
         default: false
         fcv_gated: true
+    featureFlagReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites:
+        description: >-
+            Feature flag to make resharding donors abort in-progress unprepared transactions
+            after transitioning to the "preparing-to-block-writes" state. Aborting unprepared
+            transactions helps prevent the donor from not being to acquire the critical section
+            within the critical section timeout when there are long-running transactions.
+        cpp_varname: gFeatureFlagReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites
+        default: false
+        fcv_gated: true

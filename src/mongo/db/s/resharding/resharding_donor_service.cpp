@@ -854,23 +854,30 @@ void ReshardingDonorService::DonorStateMachine::
         return;
     }
 
-    if (resharding::gReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites.load()) {
-        // Unless explicitly opted out, abort any unprepared transactions that may be running on the
-        // donor shard. This helps prevent the donor from not being to acquire the critical section
-        // within the critical section timeout when there are long-running transactions.
-        //
-        // TODO (SERVER-106990): Abort unprepared transactions after enqueuing the collection lock
-        // request instead.
-        // Until we do SERVER-106990, this is best-effort only since a new transaction may start
-        // between this step and the step for acquiring the critical section. Please note that
-        // InterruptedDueToReshardingCriticalSection is a transient error code so any aborted
-        // transactions would get retried by the driver.
+    {
         auto opCtx = factory.makeOperationContext(&cc());
 
-        SessionKiller::Matcher matcherAllSessions(
-            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx.get())});
-        killSessionsAbortUnpreparedTransactions(
-            opCtx.get(), matcherAllSessions, ErrorCodes::InterruptedDueToReshardingCriticalSection);
+        if (resharding::gFeatureFlagReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites
+                .isEnabled(VersionContext::getDecoration(opCtx.get()),
+                           serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+            resharding::gReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites.load()) {
+            // Unless explicitly opted out, abort any unprepared transactions that may be running on
+            // the donor shard. This helps prevent the donor from not being to acquire the critical
+            // section within the critical section timeout when there are long-running transactions.
+            //
+            // TODO (SERVER-106990): Abort unprepared transactions after enqueuing the collection
+            // lock request instead. Until we do SERVER-106990, this is best-effort only since a new
+            // transaction may start between this step and the step for acquiring the critical
+            // section. Please note that InterruptedDueToReshardingCriticalSection is a transient
+            // error code so any aborted transactions would get retried by the driver.
+
+            SessionKiller::Matcher matcherAllSessions(
+                KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx.get())});
+            killSessionsAbortUnpreparedTransactions(
+                opCtx.get(),
+                matcherAllSessions,
+                ErrorCodes::InterruptedDueToReshardingCriticalSection);
+        }
     }
 
     {

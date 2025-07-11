@@ -4,6 +4,10 @@
  * - The abort error code is InterruptedDueToReshardingCriticalSection.
  * - The response has RetryableWriteError label if the in-progress command is commitTransaction or
  *   abortTransaction. Otherwise, it has TransientTransactionError label.
+ * @tags: [
+ *   requires_fcv_82,
+ *   featureFlagReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
