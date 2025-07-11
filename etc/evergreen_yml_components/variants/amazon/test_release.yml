@@ -465,7 +465,6 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_ldap_pool
         --additionalFeatureFlags=featureFlagStreams
-        --storageEngine=devnull
       push_path: linux
       push_bucket: downloads.10gen.com
       push_name: linux
@@ -514,7 +513,6 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_ldap_pool
         --additionalFeatureFlags=featureFlagStreams
-        --storageEngine=devnull
       push_path: linux
       push_bucket: downloads.10gen.com
       push_name: linux
@@ -563,7 +561,6 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_ldap_pool
         --additionalFeatureFlags=featureFlagStreams
-        --storageEngine=devnull
       push_path: linux
       push_bucket: downloads.10gen.com
       push_name: linux

@@ -456,8 +456,6 @@ buildvariants:
     expansions:
       <<: *sys_perf_compile_expansions
       compile_variant: amazon2023-x86-streams-compile
-      test_flags: >-
-        --storageEngine=devnull
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --release=True
@@ -474,8 +472,6 @@ buildvariants:
     expansions:
       <<: *sys_perf_compile_expansions
       compile_variant: amazon2023-arm64-streams-compile
-      test_flags: >-
-        --storageEngine=devnull
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --release=True
