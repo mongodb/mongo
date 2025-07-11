@@ -150,7 +150,7 @@ public:
     }
 
     // The method used for creating the initial set of markers.
-    enum class MarkersCreationMethod { EmptyCollection, Scanning, Sampling };
+    enum class MarkersCreationMethod { EmptyCollection, Scanning, Sampling, InProgress };
 
     static StringData toString(MarkersCreationMethod creationMethod);
 

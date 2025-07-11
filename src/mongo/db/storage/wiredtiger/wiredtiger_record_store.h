@@ -383,6 +383,7 @@ private:
     WiredTigerKVEngine* _kvEngine;  // not owned.
 
     // Non-null if this record store is underlying the active oplog.
+    mutable RWMutex _oplogTruncateMarkersMutex;
     std::shared_ptr<OplogTruncateMarkers> _oplogTruncateMarkers;
 
     AtomicWord<int64_t>

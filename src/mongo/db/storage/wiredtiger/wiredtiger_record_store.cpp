@@ -71,6 +71,7 @@
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/oplog_truncate_marker_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
@@ -219,10 +220,23 @@ MONGO_FAIL_POINT_DEFINE(WTWriteConflictException);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForReads);
 
 std::shared_ptr<WiredTigerRecordStore::OplogTruncateMarkers>
-WiredTigerRecordStore::OplogTruncateMarkers::createOplogTruncateMarkers(OperationContext* opCtx,
-                                                                        WiredTigerRecordStore* rs,
-                                                                        const NamespaceString& ns) {
+WiredTigerRecordStore::OplogTruncateMarkers::createEmptyOplogTruncateMarkers(
+    WiredTigerRecordStore* rs) {
+    return std::make_shared<WiredTigerRecordStore::OplogTruncateMarkers>(
+        std::deque<CollectionTruncateMarkers::Marker>{},
+        0,
+        0,
+        0,
+        Microseconds{0},
+        CollectionTruncateMarkers::MarkersCreationMethod::InProgress,
+        rs);
+}
 
+std::shared_ptr<WiredTigerRecordStore::OplogTruncateMarkers>
+WiredTigerRecordStore::OplogTruncateMarkers::sampleAndUpdate(OperationContext* opCtx,
+                                                             WiredTigerRecordStore* rs,
+                                                             const NamespaceString& ns) {
+    // Sample
     long long maxSize = rs->_oplogMaxSize.load();
     invariant(rs->_isCapped && rs->_isOplog);
     invariant(maxSize > 0);
@@ -266,6 +280,8 @@ WiredTigerRecordStore::OplogTruncateMarkers::createOplogTruncateMarkers(Operatio
     LOGV2(22382,
           "WiredTiger record store oplog processing finished",
           "duration"_attr = duration_cast<Milliseconds>(initialSetOfMarkers.timeTaken));
+
+    // Update
     return std::make_shared<WiredTigerRecordStore::OplogTruncateMarkers>(
         std::move(initialSetOfMarkers.markers),
         initialSetOfMarkers.leftoverRecordsCount,
@@ -274,6 +290,17 @@ WiredTigerRecordStore::OplogTruncateMarkers::createOplogTruncateMarkers(Operatio
         initialSetOfMarkers.timeTaken,
         initialSetOfMarkers.methodUsed,
         rs);
+}
+
+std::shared_ptr<WiredTigerRecordStore::OplogTruncateMarkers>
+WiredTigerRecordStore::OplogTruncateMarkers::createOplogTruncateMarkers(OperationContext* opCtx,
+                                                                        WiredTigerRecordStore* rs,
+                                                                        const NamespaceString& ns) {
+    if (!feature_flags::gOplogSamplingAsyncEnabled.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return sampleAndUpdate(opCtx, rs, ns);
+    }
+    return createEmptyOplogTruncateMarkers(rs);
 }
 
 WiredTigerRecordStore::OplogTruncateMarkers::OplogTruncateMarkers(
@@ -288,8 +315,7 @@ WiredTigerRecordStore::OplogTruncateMarkers::OplogTruncateMarkers(
           std::move(markers), partialMarkerRecords, partialMarkerBytes, minBytesPerMarker),
       _rs(rs),
       _totalTimeProcessing(totalTimeSpentBuilding),
-      _processBySampling(creationMethod ==
-                         CollectionTruncateMarkers::MarkersCreationMethod::Sampling) {}
+      _creationMethod(creationMethod) {}
 
 bool WiredTigerRecordStore::OplogTruncateMarkers::isDead() {
     stdx::lock_guard<Latch> lk(_reclaimMutex);
@@ -349,7 +375,16 @@ void WiredTigerRecordStore::OplogTruncateMarkers::updateMarkersAfterCappedTrunca
 void WiredTigerRecordStore::OplogTruncateMarkers::getOplogTruncateMarkersStats(
     BSONObjBuilder& builder) const {
     builder.append("totalTimeProcessingMicros", _totalTimeProcessing.count());
-    builder.append("processingMethod", _processBySampling ? "sampling" : "scanning");
+    if (_creationMethod == CollectionTruncateMarkers::MarkersCreationMethod::Sampling) {
+        builder.append("processingMethod", "sampling");
+    } else if (_creationMethod == CollectionTruncateMarkers::MarkersCreationMethod::InProgress) {
+        builder.append("processingMethod", "in progress");
+    } else if (_creationMethod ==
+                   CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection ||
+               _creationMethod == CollectionTruncateMarkers::MarkersCreationMethod::Scanning) {
+        builder.append("processingMethod", "scanning");
+    }
+
     if (auto oplogMinRetentionHours = storageGlobalParams.oplogMinRetentionHours.load()) {
         builder.append("oplogMinRetentionHours", oplogMinRetentionHours);
     }
@@ -725,8 +760,11 @@ WiredTigerRecordStore::~WiredTigerRecordStore() {
                     "getIdent"_attr = getIdent());
     }
 
-    if (_oplogTruncateMarkers) {
-        _oplogTruncateMarkers->kill();
+    {
+        std::shared_lock lk(_oplogTruncateMarkersMutex);  // NOLINT
+        if (_oplogTruncateMarkers) {
+            _oplogTruncateMarkers->kill();
+        }
     }
 
     if (_isOplog) {
@@ -779,7 +817,9 @@ void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx,
     // calculating the oplog truncate markers. The OplogCapMaintainerThread does not get started
     // in this instance.
     if (_isOplog && opCtx->getServiceContext()->userWritesAllowed() &&
-        !storageGlobalParams.repair && !repl::ReplSettings::shouldSkipOplogSampling()) {
+        !storageGlobalParams.repair && !repl::ReplSettings::shouldSkipOplogSampling() &&
+        !gOplogSamplingAsyncEnabled) {
+        std::lock_guard lk(_oplogTruncateMarkersMutex);
         _oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, this, ns);
     }
 
@@ -790,6 +830,7 @@ void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx,
 }
 
 void WiredTigerRecordStore::getOplogTruncateStats(BSONObjBuilder& builder) const {
+    std::shared_lock lk(_oplogTruncateMarkersMutex);  // NOLINT
     if (_oplogTruncateMarkers) {
         _oplogTruncateMarkers->getOplogTruncateMarkersStats(builder);
     }
@@ -940,6 +981,7 @@ Timestamp WiredTigerRecordStore::getPinnedOplog() const {
 }
 
 std::shared_ptr<CollectionTruncateMarkers> WiredTigerRecordStore::getCollectionTruncateMarkers() {
+    std::shared_lock lk(_oplogTruncateMarkersMutex);  // NOLINT
     return _oplogTruncateMarkers->shared_from_this();
 }
 
@@ -949,6 +991,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
 
     Timer timer;
     for (auto getNextMarker = true; getNextMarker;) {
+        std::shared_lock lk(_oplogTruncateMarkersMutex);  // NOLINT
         auto truncateMarker = _oplogTruncateMarkers->peekOldestMarkerIfNeeded(opCtx);
         if (!truncateMarker) {
             break;
@@ -1210,6 +1253,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
     }
     _changeNumRecordsAndDataSize(opCtx, nRecords, totalLength);
 
+    std::shared_lock lk(_oplogTruncateMarkersMutex);  // NOLINT
     if (_oplogTruncateMarkers) {
         invariant(_isOplog);
         // records[nRecords - 1] is the record in the oplog with the highest recordId.
@@ -1230,6 +1274,14 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
     }
 
     return Status::OK();
+}
+
+void WiredTigerRecordStore::sampleAndUpdate(OperationContext* opCtx) {
+    auto oplogTruncateMarkers =
+        OplogTruncateMarkers::sampleAndUpdate(opCtx, this, NamespaceString::kRsOplogNamespace);
+    invariant(oplogTruncateMarkers);
+    std::lock_guard lk(_oplogTruncateMarkersMutex);
+    _oplogTruncateMarkers = oplogTruncateMarkers;
 }
 
 bool WiredTigerRecordStore::isOpHidden_forTest(const RecordId& id) const {
@@ -1343,8 +1395,12 @@ Status WiredTigerRecordStore::doUpdateRecord(OperationContext* opCtx,
 
     int64_t old_length = old_value.size;
 
-    if (_oplogTruncateMarkers && len != old_length) {
-        return {ErrorCodes::IllegalOperation, "Cannot change the size of a document in the oplog"};
+    {
+        std::shared_lock lk(_oplogTruncateMarkersMutex);  // NOLINT
+        if (_oplogTruncateMarkers && len != old_length) {
+            return {ErrorCodes::IllegalOperation,
+                    "Cannot change the size of a document in the oplog"};
+        }
     }
 
     WiredTigerItem value(data, len);
@@ -1553,6 +1609,7 @@ Status WiredTigerRecordStore::doTruncate(OperationContext* opCtx) {
                   session);
     _changeNumRecordsAndDataSize(opCtx, -numRecords(opCtx), -dataSize(opCtx));
 
+    std::shared_lock lk(_oplogTruncateMarkersMutex);  // NOLINT
     if (_oplogTruncateMarkers) {
         _oplogTruncateMarkers->clearMarkersOnCommit(opCtx);
     }
@@ -2033,6 +2090,7 @@ void WiredTigerRecordStore::doCappedTruncateAfter(
         LOGV2_DEBUG(22405, 1, "truncation new read timestamp: {truncTs}", "truncTs"_attr = truncTs);
     }
 
+    std::shared_lock lk(_oplogTruncateMarkersMutex);  // NOLINT
     if (_oplogTruncateMarkers) {
         _oplogTruncateMarkers->updateMarkersAfterCappedTruncateAfter(
             recordsRemoved, bytesRemoved, firstRemovedId);
@@ -2081,6 +2139,7 @@ Status WiredTigerRecordStore::updateOplogSize(OperationContext* opCtx, long long
 
     _oplogMaxSize.store(newOplogSize);
 
+    std::shared_lock lk(_oplogTruncateMarkersMutex);  // NOLINT
     invariant(_oplogTruncateMarkers);
     _oplogTruncateMarkers->adjust(opCtx, newOplogSize);
     return Status::OK();
