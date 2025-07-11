@@ -30,8 +30,10 @@
 #include "mongo/db/exec/agg/pipeline_builder.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/pipeline/pipeline.h"
 
 namespace mongo::exec::agg {
+
 std::unique_ptr<exec::agg::Pipeline> buildPipeline(
     const std::list<boost::intrusive_ptr<DocumentSource>>& documentSources,
     boost::intrusive_ptr<ExpressionContext> expCtx) {
@@ -50,4 +52,13 @@ std::unique_ptr<exec::agg::Pipeline> buildPipeline(
 
     return std::make_unique<Pipeline>(std::move(stages), std::move(expCtx));
 }
+
+std::unique_ptr<exec::agg::Pipeline> buildPipeline(const mongo::Pipeline& pipeline) {
+    // TODO SERVER-102417: Remove the following assertion once all document sources have been
+    // splitted.
+    tassert(
+        10706500, "expecting pipeline frozen for modifications as an input", pipeline.isFrozen());
+    return buildPipeline(pipeline.getSources(), pipeline.getContext());
+}
+
 }  // namespace mongo::exec::agg

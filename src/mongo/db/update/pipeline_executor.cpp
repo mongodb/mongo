@@ -111,7 +111,7 @@ PipelineExecutor::PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>
     }
 
     _pipeline->addInitialSource(DocumentSourceQueue::create(expCtx));
-    _execPipeline = exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
+    _execPipeline = exec::agg::buildPipeline(_pipeline->freeze());
 }
 
 UpdateExecutor::ApplyResult PipelineExecutor::applyUpdate(ApplyParams applyParams) const {

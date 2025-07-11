@@ -361,16 +361,14 @@ BSONObj NonShardServerProcessInterface::preparePipelineAndExplain(
         // extracted the necessary information and won't need it again.
         std::unique_ptr<Pipeline, PipelineDeleter> managedPipeline(
             ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->getOperationContext()));
-        auto managedExecPipeline =
-            exec::agg::buildPipeline(managedPipeline->getSources(), managedPipeline->getContext());
+        auto managedExecPipeline = exec::agg::buildPipeline(managedPipeline->freeze());
         pipelineVec = mergeExplains(*managedPipeline, *managedExecPipeline, opts);
         ownedPipeline = nullptr;
     } else {
         auto pipelineWithCursor = attachCursorSourceToPipelineForLocalRead(ownedPipeline);
         // TODO SERVER-104225: When the cursor stage is split, we can move exec::agg::Pipeline
         // building into the following 'if' statement.
-        auto execPipelineWithCursor = exec::agg::buildPipeline(pipelineWithCursor->getSources(),
-                                                               pipelineWithCursor->getContext());
+        auto execPipelineWithCursor = exec::agg::buildPipeline(pipelineWithCursor->freeze());
         // If we need execution stats, this runs the plan in order to gather the stats.
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             while (execPipelineWithCursor->getNext()) {

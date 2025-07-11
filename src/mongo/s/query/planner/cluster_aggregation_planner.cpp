@@ -397,8 +397,7 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
     // Creating QE pipeline as soon as QO pipeline gets the 'merge' stage added. This is necessary
     // for the consequent changes when QE pipeline will be responsible for closing the remote
     // cursors on disposal.
-    auto mergeExecPipeline =
-        exec::agg::buildPipeline(mergePipeline->getSources(), mergePipeline->getContext());
+    auto mergeExecPipeline = exec::agg::buildPipeline(mergePipeline->freeze());
 
     // First, check whether we can merge on the router. If the merge pipeline MUST run on router,
     // then ignore the internalQueryProhibitMergingOnMongoS parameter.
@@ -719,18 +718,16 @@ ClusterClientCursorGuard convertPipelineToRouterStages(
 
     // We expect the pipeline to be fully executable at this point, so if the pipeline was all skips
     // and limits we expect it to start with a $mergeCursors stage.
-    auto mergeCursors =
-        checked_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get());
+    auto sourceIt = pipeline->getSources().begin();
+    auto mergeCursors = checked_cast<DocumentSourceMergeCursors*>(sourceIt->get());
+
     // Replace the pipeline with RouterExecStages.
     std::unique_ptr<RouterExecStage> root = mergeCursors->convertToRouterStage();
-    pipeline->popFront();
-    while (!pipeline->getSources().empty()) {
-        if (auto skip = pipeline->popFrontWithName(DocumentSourceSkip::kStageName)) {
-            root = std::make_unique<RouterStageSkip>(
-                opCtx, std::move(root), static_cast<DocumentSourceSkip*>(skip.get())->getSkip());
-        } else if (auto limit = pipeline->popFrontWithName(DocumentSourceLimit::kStageName)) {
-            root = std::make_unique<RouterStageLimit>(
-                opCtx, std::move(root), static_cast<DocumentSourceLimit*>(limit.get())->getLimit());
+    for (++sourceIt; sourceIt != pipeline->getSources().end(); ++sourceIt) {
+        if (auto skip = dynamic_cast<DocumentSourceSkip*>(sourceIt->get())) {
+            root = std::make_unique<RouterStageSkip>(opCtx, std::move(root), skip->getSkip());
+        } else if (auto limit = dynamic_cast<DocumentSourceLimit*>(sourceIt->get())) {
+            root = std::make_unique<RouterStageLimit>(opCtx, std::move(root), limit->getLimit());
         } else {
             // We previously checked that everything was a $mergeCursors, $skip, or $limit. We
             // already popped off the $mergeCursors, so everything else should be a $skip or a

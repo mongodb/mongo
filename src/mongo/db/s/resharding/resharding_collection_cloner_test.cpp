@@ -202,7 +202,7 @@ protected:
 
         _pipeline->addInitialSource(
             DocumentSourceMock::createForTest(sourceCollectionData, _pipeline->getContext()));
-        _execPipeline = exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
+        _execPipeline = exec::agg::buildPipeline(_pipeline->freeze());
         _resumeTokenNum = 0;
     }
 

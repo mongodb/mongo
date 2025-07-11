@@ -32,17 +32,19 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_test_optimizations.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::test {
 
 
 TEST(PipelineBuilderTest, OneStagePipeline) {
-    auto dsFake =
-        make_intrusive<DocumentSourceTestOptimizations>(make_intrusive<ExpressionContextForTest>());
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto dsFake = make_intrusive<DocumentSourceTestOptimizations>(expCtx);
     std::list<boost::intrusive_ptr<DocumentSource>> sources{dsFake};
+    auto pipeline = Pipeline::create(std::move(sources), expCtx);
 
-    auto pl = exec::agg::buildPipeline(sources, make_intrusive<ExpressionContextForTest>());
+    auto pl = exec::agg::buildPipeline(pipeline->freeze());
 
     ASSERT_EQ(1UL, pl->getStages().size());
 

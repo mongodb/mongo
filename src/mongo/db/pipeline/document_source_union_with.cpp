@@ -319,8 +319,7 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
                         "pipeline"_attr = _pipeline->serializeToBson());
             _pipeline = pExpCtx->getMongoProcessInterface()->preparePipelineForExecution(
                 _pipeline.release());
-            _execPipeline =
-                exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
+            _execPipeline = exec::agg::buildPipeline(_pipeline->freeze());
             LOGV2_DEBUG(9497003,
                         5,
                         "$unionWith POST pipeline prep: ",

@@ -130,7 +130,7 @@ DocumentSource::GetNextResult DocumentSourceExchange::doGetNext() {
 Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
     : _spec(std::move(spec)),
       _pipeline(std::move(pipeline)),
-      _execPipeline{exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext())},
+      _execPipeline{exec::agg::buildPipeline(_pipeline->freeze())},
       _keyPattern(_spec.getKey().getOwned()),
       _ordering(extractOrdering(_keyPattern)),
       _keyPaths(extractKeyPaths(_keyPattern)),

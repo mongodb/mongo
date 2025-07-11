@@ -230,6 +230,9 @@ public:
     /**
      * Callers can optionally specify 'newExpCtx' to construct the deep clone with it. This will be
      * used to construct all the cloned DocumentSources as well.
+     *
+     * The the resulting pipeline will have default values for '_splitStage', '_disposed',
+     * '_isParameterized', and 'frozen' properties.
      */
     std::unique_ptr<Pipeline, PipelineDeleter> clone(
         const boost::intrusive_ptr<ExpressionContext>& = nullptr) const;
@@ -256,12 +259,21 @@ public:
         return _disposed;
     }
 
+    bool isFrozen() const {
+        return _frozen;
+    }
+
     /**
      * Communicates to the pipeline which part of a split pipeline it is when the pipeline has been
      * split in two.
      */
     void setSplitState(PipelineSplitState state) {
         _splitState = state;
+    }
+
+    const Pipeline& freeze() {
+        _frozen = true;
+        return *this;
     }
 
     /**
@@ -596,6 +608,9 @@ private:
     boost::intrusive_ptr<ExpressionContext> pCtx;
     bool _disposed = false;
     bool _isParameterized = false;
+
+    // Do not allow modifications of this pipeline.
+    bool _frozen{false};
 };
 
 /**

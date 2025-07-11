@@ -858,8 +858,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                             {"stages", targeter.pipeline->writeExplainOps(opts)}};
                         return Status::OK();
                     }
-                    auto execPipeline = exec::agg::buildPipeline(targeter.pipeline->getSources(),
-                                                                 targeter.pipeline->getContext());
+                    auto execPipeline = exec::agg::buildPipeline(targeter.pipeline->freeze());
                     return cluster_aggregation_planner::runPipelineOnMongoS(
                         namespaces,
                         request.getCursor().getBatchSize().value_or(

@@ -388,7 +388,7 @@ void runClusterAggregate(OperationContext* opCtx,
                       .build();
 
     auto pipeline = Pipeline::makePipeline(aggRequest, expCtx);
-    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
     while (auto doc = execPipeline->getNext()) {
         callbackFn(doc->toBson());

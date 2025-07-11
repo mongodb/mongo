@@ -645,7 +645,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
     std::unique_ptr<exec::agg::Pipeline> execPipeline;
     try {
         pipeline = buildPipeline(_fromExpCtx, inputDoc);
-        execPipeline = exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
+        execPipeline = exec::agg::buildPipeline(pipeline->freeze());
         LOGV2_DEBUG(
             9497000, 5, "Built pipeline", "pipeline"_attr = pipeline->serializeForLogging());
     } catch (const ExceptionFor<ErrorCategory::StaleShardVersionError>& ex) {
@@ -1153,7 +1153,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
         _input = nextInput.releaseDocument();
 
         _pipeline = buildPipeline(_fromExpCtx, *_input);
-        _execPipeline = exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
+        _execPipeline = exec::agg::buildPipeline(_pipeline->freeze());
 
         // The $lookup stage takes responsibility for disposing of its Pipeline, since it will
         // potentially be used by multiple OperationContexts, and the $lookup stage is part of an

@@ -97,7 +97,7 @@ boost::optional<Document> StubLookupSingleDocumentProcessInterface::lookupSingle
     std::unique_ptr<exec::agg::Pipeline> execPipeline;
     try {
         pipeline = Pipeline::makePipeline({BSON("$match" << documentKey)}, foreignExpCtx);
-        execPipeline = exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
+        execPipeline = exec::agg::buildPipeline(pipeline->freeze());
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         return boost::none;
     }

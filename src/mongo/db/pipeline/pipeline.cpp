@@ -336,17 +336,30 @@ void Pipeline::validateCommon(bool alreadyOptimized) const {
 
 void Pipeline::performPreOptimizationRewrites(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               const CollectionRoutingInfo& cri) {
+    tassert(10706511,
+            "unexpected attempt to modify a frozen pipeline in "
+            "'Pipeline::performPreOptimizationRewrites()'",
+            !_frozen);
+
     // The only supported translation is for viewless timeseries collections.
     timeseries::translateStagesIfRequired(expCtx, *this, cri);
 };
 
 void Pipeline::performPreOptimizationRewrites(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               const CollectionOrViewAcquisition& collOrView) {
+    tassert(10706512,
+            "unexpected attempt to modify a frozen pipeline in "
+            "'Pipeline::performPreOptimizationRewrites()'",
+            !_frozen);
+
     // The only supported translation is for viewless timeseries collections.
     timeseries::translateStagesIfRequired(expCtx, *this, collOrView);
 }
 
 void Pipeline::optimizePipeline() {
+    tassert(10706501,
+            "unexpected attempt to modify a frozen pipeline in 'Pipeline::optimizePipeline()'",
+            !_frozen);
     // If the disablePipelineOptimization failpoint is enabled, the pipeline won't be optimized.
     if (MONGO_unlikely(disablePipelineOptimization.shouldFail())) {
         return;
@@ -622,6 +635,9 @@ std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) c
 }
 
 void Pipeline::addInitialSource(intrusive_ptr<DocumentSource> source) {
+    tassert(10706502,
+            "unexpected attempt to modify a frozen pipeline in 'Pipeline::addInitialSource()'",
+            !_frozen);
     if (!_sources.empty()) {
         auto& initialStage = dynamic_cast<exec::agg::Stage&>(*_sources.front());
         initialStage.setSource(dynamic_cast<exec::agg::Stage*>(source.get()));
@@ -630,6 +646,9 @@ void Pipeline::addInitialSource(intrusive_ptr<DocumentSource> source) {
 }
 
 void Pipeline::addFinalSource(intrusive_ptr<DocumentSource> source) {
+    tassert(10706503,
+            "unexpected attempt to modify a frozen pipeline in 'Pipeline::addFinalSource()'",
+            !_frozen);
     if (!_sources.empty()) {
         auto& finalStage = dynamic_cast<exec::agg::Stage&>(*source.get());
         finalStage.setSource(dynamic_cast<exec::agg::Stage*>(_sources.back().get()));
@@ -641,6 +660,9 @@ void Pipeline::addSourceAtPosition(boost::intrusive_ptr<DocumentSource> source, 
     tassert(10601105,
             "The index must be positive and less than or equal to the size of the source list",
             index <= _sources.size() && index >= 0);
+    tassert(10706510,
+            "unexpected attempt to modify a frozen pipeline in 'Pipeline::addSourceAtPosition()'",
+            !_frozen);
 
     const bool originallyEmpty = _sources.empty();
     auto sourceIter = _sources.begin();
@@ -827,6 +849,9 @@ Status Pipeline::canRunOnRouter() const {
 }
 
 void Pipeline::pushBack(boost::intrusive_ptr<DocumentSource> newStage) {
+    tassert(10706504,
+            "unexpected attempt to modify a frozen pipeline in 'Pipeline::pushBack()'",
+            !_frozen);
     if (!_sources.empty()) {
         auto& stage = dynamic_cast<exec::agg::Stage&>(*newStage);
         stage.setSource(dynamic_cast<exec::agg::Stage*>(_sources.back().get()));
@@ -835,6 +860,9 @@ void Pipeline::pushBack(boost::intrusive_ptr<DocumentSource> newStage) {
 }
 
 boost::intrusive_ptr<DocumentSource> Pipeline::popBack() {
+    tassert(10706505,
+            "unexpected attempt to modify a frozen pipeline in 'Pipeline::popBack()'",
+            !_frozen);
     if (_sources.empty()) {
         return nullptr;
     }
@@ -844,6 +872,9 @@ boost::intrusive_ptr<DocumentSource> Pipeline::popBack() {
 }
 
 boost::intrusive_ptr<DocumentSource> Pipeline::popFront() {
+    tassert(10706506,
+            "unexpected attempt to modify a frozen pipeline in 'Pipeline::popFront()'",
+            !_frozen);
     if (_sources.empty()) {
         return nullptr;
     }
@@ -858,11 +889,17 @@ DocumentSource* Pipeline::peekFront() const {
 }
 
 boost::intrusive_ptr<DocumentSource> Pipeline::popFrontWithName(StringData targetStageName) {
+    tassert(10706507,
+            "attempting to modify a frozen pipeline in 'Pipeline::popFrontWithName()'",
+            !_frozen);
     return popFrontWithNameAndCriteria(targetStageName, nullptr);
 }
 
 boost::intrusive_ptr<DocumentSource> Pipeline::popFrontWithNameAndCriteria(
     StringData targetStageName, std::function<bool(const DocumentSource* const)> predicate) {
+    tassert(10706508,
+            "attempting to modify a frozen pipeline in 'Pipeline::popFrontWithNameAndCriteria()'",
+            !_frozen);
     if (_sources.empty() || _sources.front()->getSourceName() != targetStageName) {
         return nullptr;
     }
@@ -876,6 +913,9 @@ boost::intrusive_ptr<DocumentSource> Pipeline::popFrontWithNameAndCriteria(
 }
 
 void Pipeline::appendPipeline(std::unique_ptr<Pipeline, PipelineDeleter> otherPipeline) {
+    tassert(10706509,
+            "attempting to modify a frozen pipeline in 'Pipeline::appendPipeline()'",
+            !_frozen);
     auto& otherPipelineSources = otherPipeline->getSources();
     while (!otherPipelineSources.empty()) {
         _sources.push_back(std::move(otherPipelineSources.front()));

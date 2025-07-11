@@ -805,7 +805,7 @@ boost::optional<Document> CommonMongodProcessInterface::doLookupSingleDocument(
         return boost::none;
     }
 
-    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
     auto lookedUpDocument = execPipeline->getNext();
 
     // Ensure that there are no two documents for the same 'documentKey'.

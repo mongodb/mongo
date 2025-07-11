@@ -926,7 +926,7 @@ SamplingBasedSplitPolicy::SampleDocumentPipeline SamplingBasedSplitPolicy::_make
 SamplingBasedSplitPolicy::PipelineDocumentSource::PipelineDocumentSource(
     SampleDocumentPipeline pipeline, int skip)
     : _pipeline(std::move(pipeline)),
-      _execPipeline{exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext())},
+      _execPipeline{exec::agg::buildPipeline(_pipeline->freeze())},
       _skip(skip) {}
 
 boost::optional<BSONObj> SamplingBasedSplitPolicy::PipelineDocumentSource::getNext() {

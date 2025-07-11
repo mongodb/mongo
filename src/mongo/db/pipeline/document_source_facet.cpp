@@ -202,8 +202,7 @@ DocumentSource::GetNextResult DocumentSourceFacet::doGetNext() {
     // Create execution pipeline for each facet (this code is executed only once).
     for (auto&& facet : _facets) {
         tassert(10616300, "facet execution pipeline is already initialized", !facet.execPipeline);
-        facet.execPipeline =
-            exec::agg::buildPipeline(facet.pipeline->getSources(), facet.pipeline->getContext());
+        facet.execPipeline = exec::agg::buildPipeline(facet.pipeline->freeze());
     }
 
     const size_t maxBytes = _maxOutputDocSizeBytes;

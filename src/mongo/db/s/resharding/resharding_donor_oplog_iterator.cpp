@@ -178,8 +178,7 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
                             ->getMongoProcessInterface()
                             ->attachCursorSourceToPipelineForLocalRead(pipeline.release());
             _pipeline.get_deleter().dismissDisposal();
-            _execPipeline =
-                exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
+            _execPipeline = exec::agg::buildPipeline(_pipeline->freeze());
         }
 
         auto batch = _fillBatch();

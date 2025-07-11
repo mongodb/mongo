@@ -314,8 +314,7 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
             // Query for all keys that were in the frontier and not in the cache, populating
             // '_queue' for the next iteration of search.
             auto pipeline = makePipeline(std::move(*query.match), allowForeignSharded);
-            auto execPipeline =
-                exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
+            auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
             while (auto next = execPipeline->getNext()) {
                 uassert(40271,
                         str::stream()
