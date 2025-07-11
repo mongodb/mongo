@@ -184,7 +184,8 @@ MONGO_BAZEL_WRAPPER_ARGS=$(mktemp)
 MONGO_BAZEL_WRAPPER_ARGS=$MONGO_BAZEL_WRAPPER_ARGS \
 MONGO_AUTOCOMPLETE_QUERY=$autocomplete_query \
 >&2 $python $REPO_ROOT/bazel/wrapper_hook/wrapper_hook.py $bazel_real "$@"
-if [[ $? != 0 ]]; then
+exit_code=$?
+if [[ $exit_code != 0 ]]; then
   if [[ ! -z "$CI" ]] || [[ $MONGO_BAZEL_WRAPPER_FALLBACK == 1 ]]; then
     >&2 echo "wrapper script failed! falling back to normal bazel call..."
     exec "$bazel_real" $@
@@ -212,5 +213,9 @@ if [[ $autocomplete_query == 1 ]]; then
   query_output=$("${new_args[@]@Q}") 
   echo $query_output $plus_targets | tr " " "\n"
 else
-  exec "$bazel_real" "${new_args[@]}"
+  $bazel_real "${new_args[@]}"
+  bazel_exit_code=$?
+  # Run post-bazel hook in subshell
+  (>&2 $python $REPO_ROOT/bazel/wrapper_hook/post_bazel_hook.py $bazel_real)
+  exit $bazel_exit_code
 fi

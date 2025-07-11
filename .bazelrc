@@ -518,3 +518,6 @@ try-import %workspace%/.bazelrc.local
 
 # Flag as built with bazelisk
 try-import %workspace%/.bazelrc.bazelisk
+
+# Flags synced from Flag Sync
+try-import %workspace%/.bazelrc.sync

@@ -15,3 +15,22 @@ py_library(
     ],
     visibility = ["//visibility:public"],
 )
+
+py_library(
+    name = "post_bazel_hook",
+    srcs = [
+        "post_bazel_hook.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":flag_sync",
+    ],
+)
+
+py_library(
+    name = "flag_sync",
+    srcs = [
+        "flag_sync.py",
+    ],
+    visibility = ["//visibility:public"],
+)

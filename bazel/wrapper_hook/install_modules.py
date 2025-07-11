@@ -105,7 +105,7 @@ def install_modules(bazel):
         with open(lockfile_hash_file, "w") as f:
             f.write(current_hash)
 
-    deps = ["retry", "gitpython"]
+    deps = ["retry", "gitpython", "requests", "timeout-decorator"]
     deps_installed = []
     deps_needed = search_for_modules(
         deps, deps_installed, lockfile_changed=old_hash != current_hash
@@ -122,7 +122,7 @@ def install_modules(bazel):
         cmd = [
             bazel,
             "build",
-        ] + ["@poetry//:library_" + dep for dep in deps_needed]
+        ] + ["@poetry//:library_" + dep.replace("-", "_") for dep in deps_needed]
         proc = subprocess.run(
             cmd
             + [
