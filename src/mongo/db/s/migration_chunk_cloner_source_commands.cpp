@@ -94,11 +94,14 @@ public:
         uassert(ErrorCodes::NotYetInitialized, "No active migrations were found", nss);
 
         // Once the collection is locked, the migration status cannot change
-        _autoColl.emplace(opCtx, *nss, MODE_IS);
+        _acquisition.emplace(acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, *nss, AcquisitionPrerequisites::kRead),
+            MODE_IS));
 
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Collection " << nss->toStringForErrorMsg() << " does not exist",
-                _autoColl->getCollection());
+                _acquisition->exists());
 
         uassert(ErrorCodes::NotWritablePrimary,
                 "No longer primary when trying to acquire active migrate cloner",
@@ -124,14 +127,17 @@ public:
                               << _chunkCloner->getSessionId().toString(),
                 migrationSessionId.matches(_chunkCloner->getSessionId()));
 
-
         if (!holdCollectionLock)
-            _autoColl = boost::none;
+            _acquisition.reset();
     }
 
-    const CollectionPtr& getColl() const {
-        invariant(_autoColl);
-        return _autoColl->getCollection();
+
+    boost::optional<CollectionAcquisition> getCollectionAcquisition() const {
+        return _acquisition;
+    }
+
+    void resetAcquisition() {
+        _acquisition.reset();
     }
 
     MigrationChunkClonerSource* getCloner() const {
@@ -140,11 +146,11 @@ public:
     }
 
 private:
-    // Scoped database + collection lock
-    boost::optional<AutoGetCollection> _autoColl;
-
     // Contains the active cloner for the namespace
     std::shared_ptr<MigrationChunkClonerSource> _chunkCloner;
+
+    // Scoped database + collection lock
+    boost::optional<CollectionAcquisition> _acquisition;
 };
 
 class InitialCloneCommand : public BasicCommand {
@@ -203,11 +209,18 @@ public:
             if (!arrBuilder) {
                 arrBuilder.emplace(autoCloner.getCloner()->getCloneBatchBufferAllocationSize());
             }
+            // In case of an ongoing jumbo chunk cloning, the cloner has an inner query plan that
+            // will be restored, including its transaction resources (i.e collections acquisitions)
+            // to continue the operation. We should therefore always release the locks and let the
+            // cloner internally re-acquire them.
+            if (autoCloner.getCloner()->hasOngoingJumboChunkCloning()) {
+                autoCloner.resetAcquisition();
+            }
 
             arrSizeAtPrevIteration = arrBuilder->arrSize();
 
             uassertStatusOK(autoCloner.getCloner()->nextCloneBatch(
-                opCtx, autoCloner.getColl(), arrBuilder.get_ptr()));
+                opCtx, autoCloner.getCollectionAcquisition(), arrBuilder.get_ptr()));
         }
 
         invariant(arrBuilder);

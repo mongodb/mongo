@@ -39,6 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/record_id.h"
@@ -89,7 +90,7 @@ class RecordId;
 
 // Overhead to prevent mods buffers from being too large
 const long long kFixedCommandOverhead = 32 * 1024;
-
+const int kMaxObjectPerChunk{250000};
 /**
  * Used to commit work for LogOpForSharding. Used to keep track of changes in documents that are
  * part of a chunk being migrated.
@@ -340,8 +341,15 @@ public:
      * NOTE: Must be called with the collection lock held in at least IS mode.
      */
     Status nextCloneBatch(OperationContext* opCtx,
-                          const CollectionPtr& collection,
+                          boost::optional<CollectionAcquisition> collection,
                           BSONArrayBuilder* arrBuilder);
+
+    /* Whether the cloner has stashed a jumbo chunk state with a query plan, indicating a jumbo
+     * chunk migration is ongoing and it should be continued.*/
+    bool hasOngoingJumboChunkCloning() {
+        return _jumboChunkCloneState.has_value() &&
+            static_cast<bool>(_jumboChunkCloneState->clonerExec) && _forceJumbo;
+    }
 
     /**
      * Called by the recipient shard. Transfers the accummulated local mods from source to
@@ -591,15 +599,15 @@ private:
 
     StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> _getIndexScanExecutor(
         OperationContext* opCtx,
-        const CollectionPtr& collection,
+        const CollectionAcquisition& collection,
         InternalPlanner::IndexScanOptions scanOption);
 
     void _nextCloneBatchFromIndexScan(OperationContext* opCtx,
-                                      const CollectionPtr& collection,
+                                      boost::optional<CollectionAcquisition> collection,
                                       BSONArrayBuilder* arrBuilder);
 
     void _nextCloneBatchFromCloneRecordIds(OperationContext* opCtx,
-                                           const CollectionPtr& collection,
+                                           const CollectionAcquisition& collection,
                                            BSONArrayBuilder* arrBuilder);
 
     /**
@@ -763,6 +771,9 @@ private:
     // False if the move chunk request specified ForceJumbo::kDoNotForce, true otherwise.
     const bool _forceJumbo;
     struct JumboChunkCloneState {
+        std::unique_ptr<TransactionResourcesStasher> transactionResourceStasher =
+            std::make_unique<ShardRoleTransactionResourcesStasherForPipeline>();
+
         // Plan executor for collection scan used to clone docs.
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> clonerExec;
 

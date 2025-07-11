@@ -110,7 +110,6 @@ const char kRecvChunkStatus[] = "_recvChunkStatus";
 const char kRecvChunkCommit[] = "_recvChunkCommit";
 const char kRecvChunkAbort[] = "_recvChunkAbort";
 
-const int kMaxObjectPerChunk{250000};
 const Hours kMaxWaitToCommitCloneForJumboChunk(6);
 
 MONGO_FAIL_POINT_DEFINE(failTooMuchMemoryUsed);
@@ -654,20 +653,29 @@ void MigrationChunkClonerSource::_decrementOutstandingOperationTrackRequests() {
     }
 }
 
-void MigrationChunkClonerSource::_nextCloneBatchFromIndexScan(OperationContext* opCtx,
-                                                              const CollectionPtr& collection,
-                                                              BSONArrayBuilder* arrBuilder) {
+void MigrationChunkClonerSource::_nextCloneBatchFromIndexScan(
+    OperationContext* opCtx,
+    boost::optional<CollectionAcquisition> collection,
+    BSONArrayBuilder* arrBuilder) {
     ElapsedTracker tracker(opCtx->getServiceContext()->getFastClockSource(),
                            internalQueryExecYieldIterations.load(),
                            Milliseconds(internalQueryExecYieldPeriodMS.load()));
-
-    if (!_jumboChunkCloneState->clonerExec) {
+    boost::optional<HandleTransactionResourcesFromStasher> scopedResourceHandler;
+    auto isFirstIteration = !_jumboChunkCloneState->clonerExec;
+    if (isFirstIteration) {
+        tassert(10711502,
+                "Expected an active acquisition when running nextCloneBatch from index scan at the "
+                "first iteration",
+                static_cast<bool>(collection));
         auto exec = uassertStatusOK(_getIndexScanExecutor(
-            opCtx, collection, InternalPlanner::IndexScanOptions::IXSCAN_FETCH));
+            opCtx, *collection, InternalPlanner::IndexScanOptions::IXSCAN_FETCH));
         _jumboChunkCloneState->clonerExec = std::move(exec);
     } else {
+        // Restore the acquisition
+        scopedResourceHandler.emplace(opCtx,
+                                      _jumboChunkCloneState->transactionResourceStasher.get());
         _jumboChunkCloneState->clonerExec->reattachToOperationContext(opCtx);
-        _jumboChunkCloneState->clonerExec->restoreState(&collection);
+        _jumboChunkCloneState->clonerExec->restoreState(nullptr);
     }
 
     PlanExecutor::ExecState execState;
@@ -711,18 +719,27 @@ void MigrationChunkClonerSource::_nextCloneBatchFromIndexScan(OperationContext* 
 
     _jumboChunkCloneState->clonerExec->saveState();
     _jumboChunkCloneState->clonerExec->detachFromOperationContext();
+
+    // From the second iteration, the destruction of the HandleTransactionResourcesFromStasher will
+    // re-stash resources.
+    if (isFirstIteration) {
+        stashTransactionResourcesFromOperationContext(
+            opCtx, _jumboChunkCloneState->transactionResourceStasher.get());
+    }
 }
 
-void MigrationChunkClonerSource::_nextCloneBatchFromCloneRecordIds(OperationContext* opCtx,
-                                                                   const CollectionPtr& collection,
-                                                                   BSONArrayBuilder* arrBuilder) {
+void MigrationChunkClonerSource::_nextCloneBatchFromCloneRecordIds(
+    OperationContext* opCtx,
+    const CollectionAcquisition& collection,
+    BSONArrayBuilder* arrBuilder) {
     ElapsedTracker tracker(opCtx->getServiceContext()->getFastClockSource(),
                            internalQueryExecYieldIterations.load(),
                            Milliseconds(internalQueryExecYieldPeriodMS.load()));
 
     while (true) {
         int recordsNoLongerExist = 0;
-        auto docInFlight = _cloneList.getNextDoc(opCtx, collection, &recordsNoLongerExist);
+        auto docInFlight =
+            _cloneList.getNextDoc(opCtx, collection.getCollectionPtr(), &recordsNoLongerExist);
 
         if (recordsNoLongerExist) {
             stdx::lock_guard lk(_mutex);
@@ -784,9 +801,21 @@ uint64_t MigrationChunkClonerSource::getCloneBatchBufferAllocationSize() {
 }
 
 Status MigrationChunkClonerSource::nextCloneBatch(OperationContext* opCtx,
-                                                  const CollectionPtr& collection,
+                                                  boost::optional<CollectionAcquisition> collection,
                                                   BSONArrayBuilder* arrBuilder) {
-    dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss(), MODE_IS));
+    // Locks will be internally restored by the cloner in case of ongoing jumbo chunk cloning in
+    // progress.
+    if (hasOngoingJumboChunkCloning()) {
+        tassert(10711500,
+                "Expected no active acquisitions when a jumbo chunk cloning is ongoing",
+                !collection.has_value());
+    } else {
+        tassert(10711501,
+                "Expected an active acquisition when running nextCloneBatch and no jumbo chunk "
+                "cloning is ongoing",
+                shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss(), MODE_IS) &&
+                    collection.has_value());
+    }
 
     // If this chunk is too large to store records in _cloneRecordIds and the command args specify
     // to attempt to move it, scan the collection directly.
@@ -799,7 +828,7 @@ Status MigrationChunkClonerSource::nextCloneBatch(OperationContext* opCtx,
         }
     }
 
-    _nextCloneBatchFromCloneRecordIds(opCtx, collection, arrBuilder);
+    _nextCloneBatchFromCloneRecordIds(opCtx, *collection, arrBuilder);
     return Status::OK();
 }
 
@@ -997,12 +1026,12 @@ StatusWith<BSONObj> MigrationChunkClonerSource::_callRecipient(OperationContext*
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
 MigrationChunkClonerSource::_getIndexScanExecutor(OperationContext* opCtx,
-                                                  const CollectionPtr& collection,
+                                                  const CollectionAcquisition& acquisition,
                                                   InternalPlanner::IndexScanOptions scanOption) {
     // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore, any
     // multi-key index prefixed by shard key cannot be multikey over the shard key fields.
     const auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
-                                                       collection,
+                                                       acquisition.getCollectionPtr(),
                                                        _shardKeyPattern.toBSON(),
                                                        /*requireSingleKey=*/false);
     if (!shardKeyIdx) {
@@ -1020,7 +1049,7 @@ MigrationChunkClonerSource::_getIndexScanExecutor(OperationContext* opCtx,
     // We can afford to yield here because any change to the base data that we might miss is already
     // being queued and will migrate in the 'transferMods' stage.
     return InternalPlanner::shardKeyIndexScan(opCtx,
-                                              &collection,
+                                              acquisition,
                                               *shardKeyIdx,
                                               min,
                                               max,
@@ -1031,15 +1060,18 @@ MigrationChunkClonerSource::_getIndexScanExecutor(OperationContext* opCtx,
 }
 
 Status MigrationChunkClonerSource::_storeCurrentRecordId(OperationContext* opCtx) {
-    AutoGetCollection collection(opCtx, nss(), MODE_IS);
-    if (!collection) {
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss(), AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    if (!collection.exists()) {
         return {ErrorCodes::NamespaceNotFound,
                 str::stream() << "Collection " << nss().toStringForErrorMsg()
                               << " does not exist."};
     }
 
-    auto swExec = _getIndexScanExecutor(
-        opCtx, collection.getCollection(), InternalPlanner::IndexScanOptions::IXSCAN_DEFAULT);
+    auto swExec =
+        _getIndexScanExecutor(opCtx, collection, InternalPlanner::IndexScanOptions::IXSCAN_DEFAULT);
     if (!swExec.isOK()) {
         return swExec.getStatus();
     }
@@ -1051,9 +1083,9 @@ Status MigrationChunkClonerSource::_storeCurrentRecordId(OperationContext* opCtx
     unsigned long long maxRecsWhenFull;
     long long avgRecSize;
 
-    const long long totalRecs = collection->numRecords(opCtx);
+    const long long totalRecs = collection.getCollectionPtr()->numRecords(opCtx);
     if (totalRecs > 0) {
-        avgRecSize = collection->dataSize(opCtx) / totalRecs;
+        avgRecSize = collection.getCollectionPtr()->dataSize(opCtx) / totalRecs;
         // The calls to numRecords() and dataSize() are not atomic so it is possible that the data
         // size becomes smaller than the number of records between the two calls, which would result
         // in average record size of zero
@@ -1103,14 +1135,15 @@ Status MigrationChunkClonerSource::_storeCurrentRecordId(OperationContext* opCtx
         throw;
     }
 
-    const uint64_t collectionAverageObjectSize = collection->averageObjectSize(opCtx);
+    const uint64_t collectionAverageObjectSize =
+        collection.getCollectionPtr()->averageObjectSize(opCtx);
 
     uint64_t averageObjectIdSize = 0;
     const uint64_t defaultObjectIdSize = OID::kOIDSize;
 
     // For clustered collection, an index on '_id' is not required.
-    if (totalRecs > 0 && !collection->isClustered()) {
-        const auto idIdx = collection->getIndexCatalog()->findIdIndex(opCtx);
+    if (totalRecs > 0 && !collection.getCollectionPtr()->isClustered()) {
+        const auto idIdx = collection.getCollectionPtr()->getIndexCatalog()->findIdIndex(opCtx);
         if (!idIdx || !idIdx->getEntry()) {
             return {ErrorCodes::IndexNotFound,
                     str::stream() << "can't find index '_id' in storeCurrentRecordId for "
