@@ -166,6 +166,7 @@ mongo_cc_library(
         "//src/mongo/db/auth:security_token_auth",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/collation:collator_icu",
         "//src/mongo/db/query/virtual_collection",
+        "//src/mongo/replay:mongor_lib",
         "//src/mongo/scripting",
         "//src/mongo/transport:message_compressor",  # TODO(SERVER-93876): Remove.
         "//src/mongo/transport/named_pipe",

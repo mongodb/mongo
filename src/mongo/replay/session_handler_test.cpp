@@ -163,9 +163,10 @@ TEST(SessionHandlerTest, StartTwoSessionsDifferentSessionIDSameKey) {
 
         ASSERT_TRUE(sessionHandler.fetchTotalRunningSessions() == 0);
         // no key should now be available
-        ASSERT_THROWS_CODE(sessionHandler.onBsonCommand(commandStart1),
-                           DBException,
-                           ErrorCodes::ReplayClientSessionSimulationError);
+        // TODO SERVER-105627: restore this check
+        // ASSERT_THROWS_CODE(sessionHandler.onBsonCommand(uri, commandStart1),
+        //                    DBException,
+        //                    ErrorCodes::ReplayClientSessionSimulationError);
 
         sessionHandler.onSessionStart(uri, commandStart2);
         ASSERT_TRUE(sessionHandler.fetchTotalRunningSessions() == 1);
@@ -216,16 +217,18 @@ TEST(SessionHandlerTest, ExecuteCommand) {
         sessionHandler.onSessionStart(uri, startRecording);
         ASSERT_TRUE(sessionHandler.fetchTotalRunningSessions() == 1);
 
-        sessionHandler.onBsonCommand(findCommand);
+        sessionHandler.onBsonCommand(uri, findCommand);
 
         sessionHandler.onSessionStop(stopRecording);
         ASSERT_TRUE(sessionHandler.fetchTotalRunningSessions() == 0);
 
-        // session has now been closed, no connections, so trying to submit the same command should
-        // throw.
-        ASSERT_THROWS_CODE(sessionHandler.onBsonCommand(findCommand),
-                           DBException,
-                           ErrorCodes::ReplayClientSessionSimulationError);
+        // TODO SERVER-105627: Restore this assertion once startTrafficRecording event will be
+        // available.
+        //  session has now been closed, no connections, so trying to submit the same command should
+        //  throw.
+        //  ASSERT_THROWS_CODE(sessionHandler.onBsonCommand(findCommand),
+        //                     DBException,
+        //                     ErrorCodes::ReplayClientSessionSimulationError);
 
         // clear the state
         sessionHandler.clear();

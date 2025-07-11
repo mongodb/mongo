@@ -75,7 +75,6 @@ std::vector<BSONObj> RecordingReader::processRecording() const {
     BSONObjIterator it(array);
     while (it.more()) {
         BSONElement elem = it.next();
-
         std::string opType;
         BSONElement opTypeElem = elem["opType"];
         if (opTypeElem.type() == BSONType::string) {

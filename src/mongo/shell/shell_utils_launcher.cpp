@@ -34,6 +34,7 @@
 #include <csignal>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <fstream>  // IWYU pragma: keep
 #include <iostream>
 #include <iterator>
@@ -76,6 +77,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/traffic_reader.h"
 #include "mongo/logv2/log.h"
+#include "mongo/replay/replay_client.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/named_pipe_test_helper.h"
 #include "mongo/shell/program_runner.h"
@@ -975,6 +977,61 @@ MongoProgramScope::~MongoProgramScope() {
 }
 
 /**
+ * Command for running a shadow clusters replay client.
+ * should be used as:
+ *   replayWorkloadRecordingFile("filename.bin", "mongo://connection-string")
+ *   replayWorkloadRecordingFile("recording_dir/", "mongo://connection-string")
+ *
+ * This is primarily used for testing.
+ */
+BSONObj ReplayWorkloadRecordingFile(const BSONObj& a, void*) {
+
+    int nFields = a.nFields();
+    uassert(ErrorCodes::FailedToParse, "wrong number of arguments", nFields <= 2);
+
+    std::vector<BSONElement> elems;
+    a.elems(elems);
+
+    uassert(ErrorCodes::FailedToParse,
+            "First argument must be a filename of a recording",
+            elems[0].type() == BSONType::string);
+    uassert(ErrorCodes::FailedToParse,
+            "Second argument must be a connection string",
+            elems[1].type() == BSONType::string);
+
+    std::string input = elems[0].String();
+    std::string cluster = elems[1].String();
+
+    auto files = [&input]() {
+        std::vector<std::string> files;
+        if (std::filesystem::is_directory(input)) {
+            for (const auto& entry : std::filesystem::directory_iterator{input}) {
+                if (!entry.is_regular_file()) {
+                    continue;
+                }
+                if (entry.path().extension() != ".bin") {
+                    continue;
+                }
+                files.push_back(entry.path().string());
+            }
+            std::sort(files.begin(), files.end());
+        } else {
+            files.push_back(input);
+        }
+        return files;
+    }();
+
+    // if the recording directory is passed by param, then we reply all the recordings found in
+    // there.
+
+    mongo::ReplayClient replayClient;
+    for (const auto& f : files) {
+        replayClient.replayRecording(f, cluster);
+    }
+    return BSONObj{};
+}
+
+/**
  * Defines (funcName, CallbackFunction) pairs where funcName becomes the name of a function in the
  * mongo test shell and CallbackFunction is its C++ callback (handler). The callbacks must all have
  * signatures like
@@ -1019,6 +1076,7 @@ void installShellUtilsLauncher(Scope& scope) {
     scope.injectNative("_writeTestPipeBsonFile", WriteTestPipeBsonFile);
     scope.injectNative("_writeTestPipeBsonFileSync", WriteTestPipeBsonFileSync);
     scope.injectNative("_writeTestPipeObjects", WriteTestPipeObjects);
+    scope.injectNative("replayWorkloadRecordingFile", ReplayWorkloadRecordingFile);
 }
 }  // namespace shell_utils
 }  // namespace mongo

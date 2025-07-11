@@ -33,6 +33,6 @@ namespace mongo {
 class ReplayClient {
 public:
     void replayRecording(const ReplayConfigs&);
-    void replayRecording(const std::string& uri, const std::string& recordingFileName);
+    void replayRecording(const std::string& recordingFileName, const std::string& uri);
 };
 }  // namespace mongo

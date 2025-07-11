@@ -57,7 +57,7 @@ public:
     /**
      * Just replay the command, read from the recording file
      */
-    void onBsonCommand(const ReplayCommand&) const;
+    void onBsonCommand(StringData, const ReplayCommand&);
     /**
      * To use carefully, basically destroys all the sessions and reset the session cache
      */
@@ -84,5 +84,7 @@ private:
     const SessionSimulator& getSessionSimulator(key_t) const;
 
     std::pair<Date_t, int64_t> extractTimeStampAndSessionFromCommand(const ReplayCommand&) const;
+
+    void createNewSessionOnNewCommand(StringData, int64_t);
 };
 }  // namespace mongo

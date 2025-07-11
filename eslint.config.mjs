@@ -138,6 +138,7 @@ export default [
                 isInteractive: true,
                 numberDecimalsAlmostEqual: true,
                 numberDecimalsEqual: true,
+                replayWorkloadRecordingFile: true,
 
                 // src/mongo/shell/shell_utils_extended.d.ts
                 _copyFileRange: true,

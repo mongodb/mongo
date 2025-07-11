@@ -52,20 +52,16 @@ void replayThread(const ReplayConfig& replayConfig) {
                 "The list of recorded commands cannot be empty",
                 !bsonRecordedCommands.empty());
 
-        // create a new handler for handling the recording.
+        // create a new session handler for mananging the recording.
         SessionHandler sessionHandler;
-        bool firstEventProcessed = false;
+
+        // setup recording and replaying starting time
+        auto firstCommand = bsonRecordedCommands[0];
+        sessionHandler.setStartTime(ReplayCommand{firstCommand}.fetchRequestTimestamp());
 
         for (const auto& bsonCommand : bsonRecordedCommands) {
             ReplayCommand command{bsonCommand};
             if (command.isStartRecording()) {
-
-                // record start recording event.
-                if (!firstEventProcessed) {
-                    sessionHandler.setStartTime(command.fetchRequestTimestamp());
-                    firstEventProcessed = true;
-                }
-
                 // will associated the URI to a session task and run all the commands associated
                 // with this session id.
                 sessionHandler.onSessionStart(replayConfig.mongoURI, command);
@@ -74,7 +70,7 @@ void replayThread(const ReplayConfig& replayConfig) {
                 sessionHandler.onSessionStop(command);
             } else {
                 // must be a runnable command.
-                sessionHandler.onBsonCommand(command);
+                sessionHandler.onBsonCommand(replayConfig.mongoURI, command);
             }
         }
 
@@ -103,7 +99,7 @@ void ReplayClient::replayRecording(const ReplayConfigs& configs) {
     }
 }
 
-void ReplayClient::replayRecording(const std::string& uri, const std::string& recordingFileName) {
+void ReplayClient::replayRecording(const std::string& recordingFileName, const std::string& uri) {
     ReplayConfig config{recordingFileName, uri};
     replayRecording({config});
 }
