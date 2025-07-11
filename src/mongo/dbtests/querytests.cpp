@@ -202,8 +202,7 @@ protected:
         });
         {
             WriteUnitOfWork wunit(&_opCtx);
-            uassertStatusOK(
-                indexer.init(&_opCtx, collection, {specObj}, MultiIndexBlock::kNoopOnInitFn));
+            ASSERT_OK(dbtests::initializeMultiIndexBlock(&_opCtx, collection, indexer, specObj));
             wunit.commit();
         }
         uassertStatusOK(indexer.insertAllDocumentsInCollection(&_opCtx, collection.get()));

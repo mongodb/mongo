@@ -282,38 +282,45 @@ boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* o
 }
 
 /**
- * Returns a vector of index specs with the filled in collection default options and removes any
- * indexes that already exist on the collection -- both ready indexes and in-progress builds. If the
- * returned vector is empty after returning, no new indexes need to be built. Throws on error.
- */
-std::vector<BSONObj> resolveDefaultsAndRemoveExistingIndexes(OperationContext* opCtx,
-                                                             const CollectionPtr& collection,
-                                                             std::vector<BSONObj> indexSpecs) {
-    // Normalize the specs' collations, wildcard projections, and partial filters as applicable.
-    auto normalSpecs = IndexCatalog::normalizeIndexSpecs(opCtx, collection, indexSpecs);
-
-    return collection->getIndexCatalog()->removeExistingIndexes(
-        opCtx, collection, normalSpecs, false /*removeIndexBuildsToo*/);
-}
-
-/**
- * Returns true, after filling in the command result, if the index creation can return early.
+ * Fills in the reply and returns true if all of the requested indexes already exist and the command
+ * can return early. Throws if the specs are invalid for any other reason, including an index build
+ * currently being in progress.
  */
 bool indexesAlreadyExist(OperationContext* opCtx,
                          const CollectionPtr& collection,
                          const std::vector<BSONObj>& specs,
                          CreateIndexesReply* reply) {
-    auto specsCopy = resolveDefaultsAndRemoveExistingIndexes(opCtx, collection, specs);
-    if (specsCopy.size() > 0) {
+    // If we're implicitly creating a collection it won't exist yet and doesn't have any indexes
+    if (!collection) {
         return false;
     }
 
-    auto numIndexes = collection->getIndexCatalog()->numIndexesTotal();
-    reply->setNumIndexesBefore(numIndexes);
-    reply->setNumIndexesAfter(numIndexes);
-    appendMessageToNoteField(reply, kAllIndexesAlreadyExist);
+    // Check if all of the request specs, after normalization, are already present in the catalog as
+    // Ready indexes.
+    auto indexCatalog = collection->getIndexCatalog();
+    bool allExist = true;
+    for (auto& spec : specs) {
+        Status canCreate = indexCatalog->canCreateIndex(opCtx, collection, spec);
+        if (canCreate == ErrorCodes::IndexAlreadyExists) {
+            continue;
+        }
+        // It would be fine to ignore other errors as we call prepareSpecForCreate() several more
+        // times in the index build process and validation errors will be caught eventually, but we
+        // have tests which accidentally care about the order of validation by expecting a specific
+        // error code when there's multiple things wrong
+        uassertStatusOK(canCreate);
+        allExist = false;
+    }
 
-    return true;
+    if (allExist) {
+        // All of the requested indexes are valid and exist, so we can skip the index build.
+        auto numIndexes = collection->getIndexCatalog()->numIndexesTotal();
+        reply->setNumIndexesBefore(numIndexes);
+        reply->setNumIndexesAfter(numIndexes);
+        appendMessageToNoteField(reply, kAllIndexesAlreadyExist);
+    }
+
+    return allExist;
 }
 
 void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& nss) {
@@ -356,6 +363,7 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
 void runCreateIndexesOnNewCollection(OperationContext* opCtx,
                                      const NamespaceString& ns,
                                      const std::vector<BSONObj>& specs,
+                                     const std::vector<std::string>& idents,
                                      bool createCollImplicitly,
                                      CreateIndexesReply* reply) {
     WriteUnitOfWork wunit(opCtx);
@@ -373,8 +381,7 @@ void runCreateIndexesOnNewCollection(OperationContext* opCtx,
         // We need to create the collection.
         BSONObjBuilder builder;
         builder.append("create", ns.coll());
-        CollectionOptions options;
-        builder.appendElements(options.toBSON());
+        builder.appendElements(CollectionOptions().toBSON());
         BSONObj idIndexSpec;
 
         if (MONGO_unlikely(hangBeforeCreateIndexesCollectionCreate.shouldFail())) {
@@ -425,14 +432,16 @@ void runCreateIndexesOnNewCollection(OperationContext* opCtx,
 
     const int numIndexesBefore =
         IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection.get());
-    auto filteredSpecs =
-        IndexBuildsCoordinator::prepareSpecListForCreate(opCtx, collection.get(), ns, specs);
-    // It's possible for 'filteredSpecs' to be empty if we receive a createIndexes request for the
-    // _id index and also create the collection implicitly. By this point, the _id index has already
-    // been created, and there is no more work to be done.
+
+    auto [filteredSpecs, filteredIdents] = IndexBuildsCoordinator::prepareSpecListForCreate(
+        opCtx, collection.get(), ns, specs, idents);
+
+    // It's possible for 'filteredSpecs' to be empty if we receive a createIndexes request for
+    // the _id index and also create the collection implicitly. By this point, the _id index has
+    // already been created, and there is no more work to be done.
     if (!filteredSpecs.empty()) {
         IndexBuildsCoordinator::createIndexesOnEmptyCollection(
-            opCtx, collection, filteredSpecs, false);
+            opCtx, collection, filteredSpecs, idents, false);
     }
 
     const int numIndexesAfter = IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection.get());
@@ -484,6 +493,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
     CreateIndexesReply reply;
 
     auto specs = parseAndValidateIndexSpecs(opCtx, cmd, ns);
+    auto idents = opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdents(
+        cmd.getDbName(), specs.size());
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     auto protocol = determineProtocol(opCtx, ns);
@@ -545,8 +556,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
             // Before potentially taking an exclusive collection lock, check if all indexes already
             // exist while holding an intent lock.
-            if (collection.exists() &&
-                indexesAlreadyExist(opCtx, collection.getCollectionPtr(), specs, &reply)) {
+            if (indexesAlreadyExist(opCtx, collection.getCollectionPtr(), specs, &reply)) {
                 return boost::none;
             }
 
@@ -560,7 +570,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                 return collection.uuid();
             }
 
-            runCreateIndexesOnNewCollection(opCtx, ns, specs, !collection.exists(), &reply);
+            runCreateIndexesOnNewCollection(opCtx, ns, specs, idents, !collection.exists(), &reply);
             return boost::none;
         });
 
@@ -609,6 +619,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                                                               cmd.getDbName(),
                                                               *collectionUUID,
                                                               specs,
+                                                              idents,
                                                               buildUUID,
                                                               protocol,
                                                               indexBuildOptions));

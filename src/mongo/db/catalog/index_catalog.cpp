@@ -68,18 +68,10 @@ StringData toString(IndexBuildMethod method) {
     MONGO_UNREACHABLE_TASSERT(10083503);
 }
 
-// Returns normalized versions of 'indexSpecs' for the catalog.
-BSONObj IndexCatalog::normalizeIndexSpecs(OperationContext* opCtx,
-                                          const CollectionPtr& collection,
-                                          const BSONObj& indexSpec) {
-    // This helper function may be called before the collection is created, when we are attempting
-    // to check whether the candidate index collides with any existing indexes. If 'collection' is
-    // nullptr, skip normalization. Since the collection does not exist there cannot be a conflict,
-    // and we will normalize once the candidate spec is submitted to the IndexBuildsCoordinator.
-    if (!collection) {
-        return indexSpec;
-    }
-
+// Returns normalized version of 'indexSpec' for the catalog.
+BSONObj IndexCatalog::normalizeIndexSpec(OperationContext* opCtx,
+                                         const CollectionPtr& collection,
+                                         const BSONObj& indexSpec) {
     // Add collection-default collation where needed and normalize the collation in each index spec.
     auto normalSpec =
         uassertStatusOK(collection->addCollationDefaultsToIndexSpecsForCreate(opCtx, indexSpec));
@@ -102,22 +94,23 @@ BSONObj IndexCatalog::normalizeIndexSpecs(OperationContext* opCtx,
 std::vector<BSONObj> IndexCatalog::normalizeIndexSpecs(OperationContext* opCtx,
                                                        const CollectionPtr& collection,
                                                        const std::vector<BSONObj>& indexSpecs) {
-    // This helper function may be called before the collection is created, when we are attempting
-    // to check whether the candidate index collides with any existing indexes. If 'collection' is
-    // nullptr, skip normalization. Since the collection does not exist there cannot be a conflict,
-    // and we will normalize once the candidate spec is submitted to the IndexBuildsCoordinator.
-    if (!collection) {
-        return indexSpecs;
-    }
-
     std::vector<BSONObj> results;
     results.reserve(indexSpecs.size());
 
     for (const auto& originalSpec : indexSpecs) {
-        results.emplace_back(uassertStatusOK(
-            collection->addCollationDefaultsToIndexSpecsForCreate(opCtx, originalSpec)));
+        results.emplace_back(normalizeIndexSpec(opCtx, collection, originalSpec));
     }
 
     return results;
+}
+
+Status IndexCatalog::canCreateIndex(OperationContext* opCtx,
+                                    const CollectionPtr& collection,
+                                    const BSONObj& indexSpec) const {
+    auto normalized = collection->addCollationDefaultsToIndexSpecsForCreate(opCtx, indexSpec);
+    if (!normalized.isOK()) {
+        return normalized.getStatus();
+    }
+    return prepareSpecForCreate(opCtx, collection, normalized.getValue(), boost::none).getStatus();
 }
 }  // namespace mongo

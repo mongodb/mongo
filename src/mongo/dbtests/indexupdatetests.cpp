@@ -124,8 +124,7 @@ protected:
                 indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
             });
 
-            uassertStatusOK(
-                indexer.init(_opCtx, collection(), {key}, MultiIndexBlock::kNoopOnInitFn));
+            uassertStatusOK(dbtests::initializeMultiIndexBlock(_opCtx, collection(), indexer, key));
             uassertStatusOK(indexer.insertAllDocumentsInCollection(_opCtx, collection().get()));
             WriteUnitOfWork wunit(_opCtx);
             ASSERT_OK(indexer.commit(_opCtx,
@@ -192,7 +191,7 @@ public:
             indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
         });
 
-        ASSERT_OK(indexer.init(_opCtx, coll, {spec}, MultiIndexBlock::kNoopOnInitFn).getStatus());
+        ASSERT_OK(dbtests::initializeMultiIndexBlock(_opCtx, collection(), indexer, spec));
         ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, coll.get()));
         ASSERT_OK(indexer.checkConstraints(_opCtx, coll.get()));
 
@@ -248,8 +247,7 @@ public:
                 indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
             });
 
-            ASSERT_OK(indexer.init(_opCtx, collection(), {spec}, MultiIndexBlock::kNoopOnInitFn)
-                          .getStatus());
+            ASSERT_OK(dbtests::initializeMultiIndexBlock(_opCtx, collection(), indexer, spec));
 
             auto& coll = collection();
             auto desc = coll->getIndexCatalog()->findIndexByName(
@@ -371,8 +369,7 @@ Status IndexBuildBase::createIndex(const BSONObj& indexSpec) {
     MultiIndexBlock indexer;
     ScopeGuard abortOnExit(
         [&] { indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn); });
-    Status status =
-        indexer.init(_opCtx, collection(), {indexSpec}, MultiIndexBlock::kNoopOnInitFn).getStatus();
+    auto status = dbtests::initializeMultiIndexBlock(_opCtx, collection(), indexer, indexSpec);
     if (status == ErrorCodes::IndexAlreadyExists) {
         return Status::OK();
     }

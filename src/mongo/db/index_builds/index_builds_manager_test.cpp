@@ -87,8 +87,12 @@ TEST_F(IndexBuildsManagerTest, IndexBuildsManagerSetUpAndTearDown) {
     CollectionWriter collection(operationContext(), autoColl);
 
     auto specs = makeSpecs(_nss, {"a", "b"});
-    ASSERT_OK(_indexBuildsManager.setUpIndexBuild(
-        operationContext(), collection, specs, _buildUUID, MultiIndexBlock::kNoopOnInitFn));
+    ASSERT_OK(_indexBuildsManager.setUpIndexBuild(operationContext(),
+                                                  collection,
+                                                  specs,
+                                                  {"index-1", "index-2"},
+                                                  _buildUUID,
+                                                  MultiIndexBlock::kNoopOnInitFn));
 
     _indexBuildsManager.abortIndexBuild(
         operationContext(), collection, _buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);

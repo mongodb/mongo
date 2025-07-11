@@ -58,6 +58,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/db/session_manager_mongod.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
@@ -154,20 +155,12 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     {
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);
         CollectionWriter collection(opCtx, nss);
-        status = indexer
-                     .init(opCtx,
-                           collection,
-                           {spec},
-                           [opCtx] {
-                               if (shard_role_details::getRecoveryUnit(opCtx)
-                                       ->getCommitTimestamp()
-                                       .isNull()) {
-                                   uassertStatusOK(
-                                       shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(
-                                           Timestamp(1, 1)));
-                               }
-                           })
-                     .getStatus();
+        status = initializeMultiIndexBlock(opCtx, collection, indexer, spec, [opCtx] {
+            if (shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull()) {
+                uassertStatusOK(
+                    shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(Timestamp(1, 1)));
+            }
+        });
         if (status == ErrorCodes::IndexAlreadyExists) {
             return Status::OK();
         }
@@ -206,6 +199,20 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     }
     abortOnExit.dismiss();
     return Status::OK();
+}
+
+Status initializeMultiIndexBlock(OperationContext* opCtx,
+                                 CollectionWriter& collection,
+                                 MultiIndexBlock& indexer,
+                                 const BSONObj& spec,
+                                 MultiIndexBlock::OnInitFn onInit) {
+    return indexer
+        .init(opCtx,
+              collection,
+              {spec},
+              {ident::generateNewIndexIdent(collection->ns().dbName(), false, false)},
+              onInit)
+        .getStatus();
 }
 
 WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData ns)

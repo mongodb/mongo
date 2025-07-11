@@ -311,6 +311,7 @@ public:
                         const UUID& collUUID,
                         const DatabaseName& dbName,
                         const std::vector<BSONObj>& specs,
+                        const std::vector<std::string>& idents,
                         IndexBuildProtocol protocol);
 
     /**
@@ -543,6 +544,9 @@ public:
     // The specs of the index(es) being built. Facilitates new callers joining an active index
     // build.
     const std::vector<BSONObj> indexSpecs;
+
+    // The idents of the indexes being built.
+    const std::vector<std::string> indexIdents;
 
     // Whether to do a two phase index build or a single phase index build like in v4.0. The FCV
     // at the start of the index build will determine this setting.

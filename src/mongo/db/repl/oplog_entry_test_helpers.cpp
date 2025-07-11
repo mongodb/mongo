@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 
 #include <boost/optional.hpp>
@@ -167,17 +168,33 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
                                      const NamespaceString& nss,
                                      const std::string& indexName,
                                      const BSONObj& keyPattern,
-                                     const UUID& uuid) {
+                                     const UUID& uuid,
+                                     const BSONObj& options) {
+    BSONObjBuilder spec;
+    spec.append("v", 2);
+    spec.append("key", keyPattern);
+    spec.append("name", indexName);
+    spec.appendElementsUnique(options);
+
     BSONObj indexInfo;
     if (feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabledAndIgnoreFCVUnsafe()) {
-        indexInfo =
-            BSON("createIndexes" << nss.coll() << "spec"
-                                 << BSON("v" << 2 << "key" << keyPattern << "name" << indexName));
+        indexInfo = BSON("createIndexes" << nss.coll() << "spec" << spec.obj());
     } else {
-        indexInfo = BSON("createIndexes" << nss.coll() << "v" << 2 << "key" << keyPattern << "name"
-                                         << indexName);
+        BSONObjBuilder builder;
+        builder.append("createIndexes", nss.coll());
+        builder.appendElements(spec.obj());
+        indexInfo = builder.obj();
     }
-    return makeCommandOplogEntry(opTime, nss, indexInfo, boost::none /* object2 */, uuid);
+
+    return makeOplogEntry(opTime,
+                          OpTypeEnum::kCommand,
+                          nss.getCommandNS(),
+                          indexInfo,
+                          boost::none /* object2 */,
+                          {} /* sessionInfo */,
+                          Date_t() /* wallClockTime*/,
+                          {} /* stmtIds */,
+                          uuid);
 }
 
 OplogEntry makeStartIndexBuildOplogEntry(OpTime opTime,

@@ -187,6 +187,7 @@ public:
         const DatabaseName& dbName,
         const UUID& collectionUUID,
         const std::vector<BSONObj>& specs,
+        const std::vector<std::string>& indexIdents,
         const UUID& buildUUID,
         IndexBuildProtocol protocol,
         IndexBuildOptions indexBuildOptions) = 0;
@@ -497,16 +498,21 @@ public:
     /**
      * Creates the specified indexes on an empty collection without yielding locks.
      * Assumes we are enclosed in a WriteUnitOfWork and the caller has exclusive access to the
-     * collection. For two phase index builds, writes both startIndexBuild and commitIndexBuild
-     * oplog entries on success. No two phase index build oplog entries, including abortIndexBuild,
-     * will be written on failure. Throws exception on error.
+     * collection. This always writes one-phase createIndex oplog entries on success, and no oplog
+     * entries will be written on failure. Throws exception on error.
      *
-     * This function doesn't apply the default collation because this function is called in
-     * different cases where we want to make an index with a non-default collator.
+     * This function does not modify the supplied specs, including filtering out existing indexes or
+     * adding default collation. If that is needed the caller should call prepareSpecListForCreate()
+     * first.
      */
     static void createIndexesOnEmptyCollection(OperationContext* opCtx,
                                                CollectionWriter& collection,
                                                const std::vector<BSONObj>& specs,
+                                               bool fromMigrate);
+    static void createIndexesOnEmptyCollection(OperationContext* opCtx,
+                                               CollectionWriter& collection,
+                                               std::span<const BSONObj> specs,
+                                               std::span<const std::string> idents,
                                                bool fromMigrate);
 
     void sleepIndexBuilds_forTestOnly(bool sleep);
@@ -514,18 +520,24 @@ public:
     void verifyNoIndexBuilds_forTestOnly() const;
 
     /**
-     * Helper function that adds collation defaults to 'indexSpecs', as well as filtering out
-     * existing indexes (ready or building) and checking uniqueness constraints are compatible with
-     * sharding.
+     * Preprocesses a list of index specs and idents to normalize them and remove any indexes which
+     * already exist in the ready state. Collation defaults are added to each spec if needed,
+     * uniqueness constraints are checked for compatiblity with sharding if applicable, and entries
+     * are removed from both the specs and idents list if the an index with the same spec already
+     * exists. A non-ready index with the same spec is an error.
      *
-     * Produces final specs to use for an index build, if the result is non-empty.
+     * Produces final specs and idents to use for an index build. The two returned vectors will
+     * always have the same length. If they are empty, all indexes requested already exist and no
+     * index build is required.
      *
      * This function throws on error. Expects caller to have exclusive access to `collection`.
      */
-    static std::vector<BSONObj> prepareSpecListForCreate(OperationContext* opCtx,
-                                                         const CollectionPtr& collection,
-                                                         const NamespaceString& nss,
-                                                         const std::vector<BSONObj>& indexSpecs);
+    static std::pair<std::vector<BSONObj>, std::vector<std::string>> prepareSpecListForCreate(
+        OperationContext* opCtx,
+        const CollectionPtr& collection,
+        const NamespaceString& nss,
+        const std::vector<BSONObj>& indexSpecs,
+        const std::vector<std::string>& indexIdents);
 
     /**
      * Returns total number of indexes in collection, including unfinished/in-progress indexes.
@@ -608,6 +620,7 @@ protected:
                                  const DatabaseName& dbName,
                                  const UUID& collectionUUID,
                                  const std::vector<BSONObj>& specs,
+                                 const std::vector<std::string>& idents,
                                  const UUID& buildUUID,
                                  IndexBuildProtocol protocol);
 

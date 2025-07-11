@@ -250,11 +250,19 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
                                               const DatabaseName& dbName,
                                               const UUID& collectionUUID,
                                               const std::vector<BSONObj>& specs,
+                                              const std::vector<std::string>& idents,
                                               const UUID& buildUUID,
                                               IndexBuildProtocol protocol,
                                               IndexBuildOptions indexBuildOptions) {
-    return _startIndexBuild(
-        opCtx, dbName, collectionUUID, specs, buildUUID, protocol, indexBuildOptions, boost::none);
+    return _startIndexBuild(opCtx,
+                            dbName,
+                            collectionUUID,
+                            specs,
+                            idents,
+                            buildUUID,
+                            protocol,
+                            indexBuildOptions,
+                            boost::none);
 }
 
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
@@ -270,6 +278,7 @@ IndexBuildsCoordinatorMongod::resumeIndexBuild(OperationContext* opCtx,
                             dbName,
                             collectionUUID,
                             specs,
+                            {},
                             buildUUID,
                             IndexBuildProtocol::kTwoPhase,
                             indexBuildOptions,
@@ -281,6 +290,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                                                const DatabaseName& dbName,
                                                const UUID& collectionUUID,
                                                const std::vector<BSONObj>& specs,
+                                               const std::vector<std::string>& idents,
                                                const UUID& buildUUID,
                                                IndexBuildProtocol protocol,
                                                IndexBuildOptions indexBuildOptions,
@@ -383,8 +393,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
             return status;
         }
     } else {
-        auto statusWithOptionalResult =
-            _filterSpecsAndRegisterBuild(opCtx, dbName, collectionUUID, specs, buildUUID, protocol);
+        auto statusWithOptionalResult = _filterSpecsAndRegisterBuild(
+            opCtx, dbName, collectionUUID, specs, idents, buildUUID, protocol);
         if (!statusWithOptionalResult.isOK()) {
             return statusWithOptionalResult.getStatus();
         }

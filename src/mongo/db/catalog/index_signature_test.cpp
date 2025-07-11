@@ -95,7 +95,7 @@ public:
     }
 
     BSONObj normalizeIndexSpec(BSONObj spec) {
-        return IndexCatalog::normalizeIndexSpecs(opCtx(), coll(), spec);
+        return IndexCatalog::normalizeIndexSpec(opCtx(), coll(), spec);
     }
 
     const NamespaceString& nss() const {

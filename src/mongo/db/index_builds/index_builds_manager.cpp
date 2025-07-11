@@ -100,6 +100,7 @@ IndexBuildsManager::~IndexBuildsManager() {
 Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
                                            CollectionWriter& collection,
                                            const std::vector<BSONObj>& specs,
+                                           const std::vector<std::string>& idents,
                                            const UUID& buildUUID,
                                            OnInitFn onInit,
                                            SetupOptions options,
@@ -134,7 +135,7 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
                 ? MultiIndexBlock::InitMode::Recovery
                 : MultiIndexBlock::InitMode::SteadyState;
             return uassertStatusOK(
-                builder->init(opCtx, collection, specs, onInit, mode, resumeInfo));
+                builder->init(opCtx, collection, specs, idents, onInit, mode, resumeInfo));
         });
     } catch (const DBException& ex) {
         return ex.toStatus();

@@ -91,6 +91,7 @@ Status CollectionBulkLoaderImpl::init(const BSONObj& idIndexSpec,
         // locks as yielding a MODE_X/MODE_S lock isn't allowed.
         _secondaryIndexesBlock->setIndexBuildMethod(IndexBuildMethod::kForeground);
         _idIndexBlock->setIndexBuildMethod(IndexBuildMethod::kForeground);
+        auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
         return writeConflictRetry(
             _opCtx.get(), "CollectionBulkLoader::init", _acquisition.nss(), [&] {
                 CollectionWriter collWriter(_opCtx.get(), &_acquisition);
@@ -116,6 +117,8 @@ Status CollectionBulkLoaderImpl::init(const BSONObj& idIndexSpec,
                                       ->init(_opCtx.get(),
                                              collWriter,
                                              specs,
+                                             storageEngine->generateNewIndexIdents(
+                                                 collWriter->ns().dbName(), specs.size()),
                                              MultiIndexBlock::kNoopOnInitFn,
                                              MultiIndexBlock::InitMode::InitialSync,
                                              {} /* resumeInfo */,
@@ -134,6 +137,8 @@ Status CollectionBulkLoaderImpl::init(const BSONObj& idIndexSpec,
                                       ->init(_opCtx.get(),
                                              collWriter,
                                              {idIndexSpec},
+                                             storageEngine->generateNewIndexIdents(
+                                                 collWriter->ns().dbName(), 1),
                                              MultiIndexBlock::kNoopOnInitFn,
                                              MultiIndexBlock::InitMode::InitialSync,
                                              boost::none,

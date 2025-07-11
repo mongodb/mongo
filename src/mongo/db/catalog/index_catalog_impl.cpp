@@ -559,18 +559,15 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(
         return validatedSpec;
     }
 
-    // Now we will check against all indexes, in-progress included.
-    //
-    // The index catalog cannot currently iterate over only in-progress indexes. So by previously
-    // checking against only ready indexes without error, we know that any errors encountered
-    // checking against all indexes occurred due to an in-progress index.
-    status = _doesSpecConflictWithExisting(opCtx, collection, validatedSpec, InclusionPolicy::kAll);
+    // Now we will check against in-progress indexes.
+    status = _doesSpecConflictWithExisting(
+        opCtx, collection, validatedSpec, InclusionPolicy::kFrozen | InclusionPolicy::kUnfinished);
+    if (ErrorCodes::IndexAlreadyExists == status) {
+        // Callers need to be able to distinguish conflicts against ready indexes versus
+        // in-progress indexes.
+        return {ErrorCodes::IndexBuildAlreadyInProgress, status.reason()};
+    }
     if (!status.isOK()) {
-        if (ErrorCodes::IndexAlreadyExists == status.code()) {
-            // Callers need to be able to distinguish conflicts against ready indexes versus
-            // in-progress indexes.
-            return {ErrorCodes::IndexBuildAlreadyInProgress, status.reason()};
-        }
         return status;
     }
 

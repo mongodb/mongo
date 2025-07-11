@@ -32,16 +32,14 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -63,6 +61,12 @@ Status createIndex(OperationContext* opCtx,
  * Creates an index from a BSON spec, if it does not already exist.
  */
 Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj& spec);
+
+Status initializeMultiIndexBlock(OperationContext* opCtx,
+                                 CollectionWriter& collection,
+                                 MultiIndexBlock& indexer,
+                                 const BSONObj& spec,
+                                 MultiIndexBlock::OnInitFn onInit = MultiIndexBlock::kNoopOnInitFn);
 
 /**
  * Combines AutoGetDb and AutoStatsTracker. If the requested 'ns' exists, the constructed

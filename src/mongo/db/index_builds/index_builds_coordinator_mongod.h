@@ -94,6 +94,7 @@ public:
         const DatabaseName& dbName,
         const UUID& collectionUUID,
         const std::vector<BSONObj>& specs,
+        const std::vector<std::string>& idents,
         const UUID& buildUUID,
         IndexBuildProtocol protocol,
         IndexBuildOptions indexBuildOptions) override;
@@ -195,6 +196,7 @@ private:
         const DatabaseName& dbName,
         const UUID& collectionUUID,
         const std::vector<BSONObj>& specs,
+        const std::vector<std::string>& idents,
         const UUID& buildUUID,
         IndexBuildProtocol protocol,
         IndexBuildOptions indexBuildOptions,

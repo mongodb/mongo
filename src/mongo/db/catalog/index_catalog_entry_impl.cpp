@@ -408,7 +408,7 @@ public:
           _indexDescriptor([&] {
               auto desc = entry->descriptor();
               auto normalizedSpec =
-                  IndexCatalog::normalizeIndexSpecs(opCtx, collection, desc->infoObj());
+                  IndexCatalog::normalizeIndexSpec(opCtx, collection, desc->infoObj());
               return IndexDescriptor{desc->getAccessMethodName(), std::move(normalizedSpec)};
           }()),
           _collator([&]() -> std::unique_ptr<CollatorInterface> {

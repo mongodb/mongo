@@ -49,6 +49,7 @@
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/get_executor.h"
@@ -282,6 +283,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     OperationContext* opCtx,
     CollectionWriter& collection,
     const std::vector<BSONObj>& indexSpecs,
+    const std::vector<std::string>& indexIdents,
     OnInitFn onInit,
     const InitMode initMode,
     const boost::optional<ResumeIndexInfo>& resumeInfo,
@@ -353,7 +355,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             onInit();
         }
 
-        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        // When resuming an index build we don't need idents as the indexes already exist in the
+        // catalog
+        invariant(forRecovery || resumeInfo || indexIdents.size() == indexSpecs.size());
 
         // Then proceed to start the index builds. If we encounter conflicts for the index specs at
         // this point we know it is a conflict between the indexes we are requested to build.
@@ -419,9 +423,10 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                 if (!status.isOK())
                     return status;
             } else {
-                auto ident = storageEngine->generateNewIndexIdent(collection->ns().dbName());
-                auto status = index.block->init(
-                    opCtx, collection.getWritableCollection(opCtx), ident, forRecovery);
+                auto status = index.block->init(opCtx,
+                                                collection.getWritableCollection(opCtx),
+                                                forRecovery ? "" : indexIdents[i],
+                                                forRecovery);
                 if (!status.isOK())
                     return status;
             }

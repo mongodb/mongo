@@ -113,6 +113,7 @@
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/damage_vector.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
@@ -206,6 +207,7 @@ Status createIndexFromSpec(OperationContext* opCtx,
                 opCtx,
                 collection,
                 {spec},
+                {ident::generateNewIndexIdent(nss.dbName(), false, false)},
                 [opCtx, clock] {
                     if (opCtx->writesAreReplicated() &&
                         shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull()) {
@@ -488,6 +490,7 @@ public:
                 indexer.init(_opCtx,
                              coll,
                              {BSON("v" << 2 << "name" << indexName << "key" << indexKey)},
+                             {ident::generateNewIndexIdent(coll->ns().dbName(), false, false)},
                              MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, coll.get()));
             ASSERT_OK(swIndexInfoObj.getStatus());
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
@@ -507,7 +510,7 @@ public:
                         _opCtx, coll->ns(), coll->uuid(), indexSpec, ident, false);
                 },
                 MultiIndexBlock::kNoopOnCommitFn));
-            // The timestamping repsponsibility is placed on the caller rather than the
+            // The timestamping responsibility is placed on the caller rather than the
             // MultiIndexBlock.
             wuow.commit();
         }
@@ -821,8 +824,8 @@ public:
     }
 
     void assertIdentsExistAtTimestamp(MDBCatalog* mdbCatalog,
-                                      const std::string& collIdent,
-                                      const std::string& indexIdent,
+                                      StringData collIdent,
+                                      StringData indexIdent,
                                       Timestamp timestamp) {
         OneOffRead oor(_opCtx, timestamp);
 
@@ -839,8 +842,8 @@ public:
     }
 
     void assertIdentsMissingAtTimestamp(MDBCatalog* mdbCatalog,
-                                        const std::string& collIdent,
-                                        const std::string& indexIdent,
+                                        StringData collIdent,
+                                        StringData indexIdent,
                                         Timestamp timestamp) {
         OneOffRead oor(_opCtx, timestamp);
         auto allIdents = mdbCatalog->getAllIdents(_opCtx);
@@ -2011,9 +2014,7 @@ public:
             ASSERT_EQ(1, itCount(autoColl.getCollection()));
         }
 
-        // Save the pre-state idents so we can capture the specific ident related to index
-        // creation.
-        std::vector<std::string> origIdents = mdbCatalog->getAllIdents(_opCtx);
+        const std::string indexIdent = "index-ident";
 
         // Build an index on `{a: 1}`. This index will be multikey.
         MultiIndexBlock indexer;
@@ -2040,6 +2041,7 @@ public:
                 {BSON("v" << 2 << "unique" << true << "name"
                           << "a_1"
                           << "key" << BSON("a" << 1))},
+                {indexIdent},
                 MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, autoColl.getCollection()));
             ASSERT_OK(swIndexInfoObj.getStatus());
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
@@ -2079,8 +2081,6 @@ public:
 
         const Timestamp afterIndexBuild = _clock->tickClusterTime(1).asTimestamp();
 
-        const std::string indexIdent =
-            getNewIndexIdentAtTime(mdbCatalog, origIdents, Timestamp::min());
         assertIdentsMissingAtTimestamp(mdbCatalog, "", indexIdent, beforeIndexBuild.asTimestamp());
 
         // Assert that the index entry exists after init and `ready: false`.
@@ -2658,6 +2658,7 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
                           << "a_1_b_1"
                           << "ns" << collection->ns().ns_forTest() << "key"
                           << BSON("a" << 1 << "b" << 1))},
+                {"index-ident"},
                 MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, collection.get()));
             ASSERT_OK(swSpecs.getStatus());
         }
@@ -2970,10 +2971,12 @@ TEST_F(StorageTimestampTest, CreateCollectionWithSystemIndex) {
     // supports 2 phase index build.
     indexStartTs = op.getTimestamp();
     indexCreateTs =
-        repl::OplogEntry(queryOplog(BSON("op" << "c"
-                                              << "ns" << nss.getCommandNS().ns_forTest()
-                                              << "o.createIndexes" << nss.coll() << "o.name"
-                                              << "user_1_db_1")))
+        repl::OplogEntry(
+            queryOplog(BSON(
+                "op" << "c"
+                     << "ns" << nss.getCommandNS().ns_forTest() << "o.createIndexes" << nss.coll()
+                     << (shouldReplicateLocalCatalogIdentifers(_opCtx) ? "o.spec.name" : "o.name")
+                     << "user_1_db_1")))
             .getTimestamp();
     indexCompleteTs = indexCreateTs;
 

@@ -105,7 +105,8 @@ TEST_F(MultiIndexBlockTest, CommitWithoutInsertingDocuments) {
 
     auto specs = unittest::assertGet(indexer->init(operationContext(),
                                                    coll,
-                                                   std::vector<BSONObj>(),
+                                                   {},
+                                                   {},
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState));
     ASSERT_EQUALS(0U, specs.size());
@@ -131,7 +132,8 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
 
     auto specs = unittest::assertGet(indexer->init(operationContext(),
                                                    coll,
-                                                   std::vector<BSONObj>(),
+                                                   {},
+                                                   {},
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::InitialSync));
     ASSERT_EQUALS(0U, specs.size());
@@ -167,7 +169,8 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
 
     auto specs = unittest::assertGet(indexer->init(operationContext(),
                                                    coll,
-                                                   std::vector<BSONObj>(),
+                                                   {},
+                                                   {},
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::InitialSync));
     ASSERT_EQUALS(0U, specs.size());
@@ -199,6 +202,7 @@ TEST_F(MultiIndexBlockTest, InitWriteConflictException) {
                 operationContext(),
                 coll,
                 {spec},
+                {},
                 [] { throwWriteConflictException("Throw WriteConflictException in 'OnInitFn'."); }),
             DBException,
             ErrorCodes::WriteConflict);
@@ -206,8 +210,11 @@ TEST_F(MultiIndexBlockTest, InitWriteConflictException) {
 
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(indexer->init(operationContext(), coll, {spec}, MultiIndexBlock::kNoopOnInitFn)
-                      .getStatus());
+        ASSERT_OK(
+            indexer
+                ->init(
+                    operationContext(), coll, {spec}, {"index-1"}, MultiIndexBlock::kNoopOnInitFn)
+                .getStatus());
         wuow.commit();
     }
 
@@ -228,9 +235,13 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     // IndexBuildAlreadyInProgress
     {
         WriteUnitOfWork wuow(operationContext());
-        auto status =
-            indexer->init(operationContext(), coll, {spec, spec}, MultiIndexBlock::kNoopOnInitFn)
-                .getStatus();
+        auto status = indexer
+                          ->init(operationContext(),
+                                 coll,
+                                 {spec, spec},
+                                 {"index-1", "index-2"},
+                                 MultiIndexBlock::kNoopOnInitFn)
+                          .getStatus();
         ASSERT_NOT_OK(status);
         ASSERT_NE(status, ErrorCodes::IndexBuildAlreadyInProgress);
     }
@@ -238,8 +249,11 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     // Start one index build is OK
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(indexer->init(operationContext(), coll, {spec}, MultiIndexBlock::kNoopOnInitFn)
-                      .getStatus());
+        ASSERT_OK(
+            indexer
+                ->init(
+                    operationContext(), coll, {spec}, {"index-1"}, MultiIndexBlock::kNoopOnInitFn)
+                .getStatus());
         wuow.commit();
     }
 
@@ -249,7 +263,9 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     {
         WriteUnitOfWork wuow(operationContext());
         ASSERT_EQ(
-            secondaryIndexer->init(operationContext(), coll, {spec}, MultiIndexBlock::kNoopOnInitFn)
+            secondaryIndexer
+                ->init(
+                    operationContext(), coll, {spec}, {"index-1"}, MultiIndexBlock::kNoopOnInitFn)
                 .getStatus(),
             ErrorCodes::IndexBuildAlreadyInProgress);
     }
@@ -259,7 +275,11 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     {
         WriteUnitOfWork wuow(operationContext());
         ASSERT_EQ(secondaryIndexer
-                      ->init(operationContext(), coll, {spec, spec}, MultiIndexBlock::kNoopOnInitFn)
+                      ->init(operationContext(),
+                             coll,
+                             {spec, spec},
+                             {"index-1", "index-2"},
+                             MultiIndexBlock::kNoopOnInitFn)
                       .getStatus(),
                   ErrorCodes::IndexBuildAlreadyInProgress);
     }
@@ -272,11 +292,14 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     // IndexBuildAlreadyInProgress
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_EQ(
-            secondaryIndexer
-                ->init(operationContext(), coll, {specB, spec}, MultiIndexBlock::kNoopOnInitFn)
-                .getStatus(),
-            ErrorCodes::IndexBuildAlreadyInProgress);
+        ASSERT_EQ(secondaryIndexer
+                      ->init(operationContext(),
+                             coll,
+                             {specB, spec},
+                             {"index-2", "index-1"},
+                             MultiIndexBlock::kNoopOnInitFn)
+                      .getStatus(),
+                  ErrorCodes::IndexBuildAlreadyInProgress);
     }
 
     indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
@@ -294,8 +317,11 @@ TEST_F(MultiIndexBlockTest, AddDocumentBetweenInitAndInsertAll) {
 
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(indexer->init(operationContext(), coll, {spec}, MultiIndexBlock::kNoopOnInitFn)
-                      .getStatus());
+        ASSERT_OK(
+            indexer
+                ->init(
+                    operationContext(), coll, {spec}, {"index-1"}, MultiIndexBlock::kNoopOnInitFn)
+                .getStatus());
         wuow.commit();
     }
 

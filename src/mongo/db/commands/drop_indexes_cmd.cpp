@@ -273,11 +273,14 @@ public:
             collection.getWritableCollection(opCtx)->getIndexCatalog()->dropAllIndexes(
                 opCtx, collection.getWritableCollection(opCtx), true, {});
 
-            swIndexesToRebuild = indexer->init(opCtx,
-                                               collection,
-                                               all,
-                                               MultiIndexBlock::kNoopOnInitFn,
-                                               MultiIndexBlock::InitMode::SteadyState);
+            swIndexesToRebuild = indexer->init(
+                opCtx,
+                collection,
+                all,
+                opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdents(
+                    collection->ns().dbName(), all.size()),
+                MultiIndexBlock::kNoopOnInitFn,
+                MultiIndexBlock::InitMode::SteadyState);
             uassertStatusOK(swIndexesToRebuild.getStatus());
             wunit.commit();
         });

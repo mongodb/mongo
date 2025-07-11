@@ -820,6 +820,16 @@ public:
     virtual std::string generateNewCollectionIdent(const DatabaseName& dbName) const = 0;
     virtual std::string generateNewIndexIdent(const DatabaseName& dbName) const = 0;
 
+    virtual std::vector<std::string> generateNewIndexIdents(const DatabaseName& dbName,
+                                                            size_t count) const {
+        std::vector<std::string> idents;
+        idents.reserve(count);
+        for (size_t i = 0; i < count; ++i) {
+            idents.push_back(generateNewIndexIdent(dbName));
+        }
+        return idents;
+    }
+
     /**
      * Returns true if this storage engine stores all data files directly in the dbPath, and not in
      * subdirectories of that path or in some other place.

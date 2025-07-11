@@ -112,6 +112,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -289,12 +290,9 @@ void createIndexForApplyOps(OperationContext* opCtx,
     // Check for conflict with two-phase index builds during initial sync. It is possible that
     // this index may have been dropped and recreated after inserting documents into the collection.
     if (OplogApplication::Mode::kInitialSync == mode) {
-        const auto normalSpec =
-            IndexCatalog::normalizeIndexSpecs(opCtx, indexCollection, indexSpec);
         auto indexCatalog = indexCollection->getIndexCatalog();
-        auto prepareSpecResult =
-            indexCatalog->prepareSpecForCreate(opCtx, indexCollection, normalSpec, {});
-        if (ErrorCodes::IndexBuildAlreadyInProgress == prepareSpecResult) {
+        Status canCreate = indexCatalog->canCreateIndex(opCtx, indexCollection, indexSpec);
+        if (ErrorCodes::IndexBuildAlreadyInProgress == canCreate) {
             LOGV2(4924900,
                   "Index build: already in progress during initial sync",
                   logAttrs(indexNss),
@@ -733,15 +731,6 @@ struct ApplyOpMetadata {
     // they are only valid in non-steady-state oplog application modes.  IndexNotFound is always
     // allowed because index builds are not necessarily synchronized between secondary and primary.
     std::set<ErrorCodes::Error> acceptableErrors;
-
-    ApplyOpMetadata(OpApplyFn fun) {
-        applyFunc = fun;
-    }
-
-    ApplyOpMetadata(OpApplyFn fun, std::set<ErrorCodes::Error> theAcceptableErrors) {
-        applyFunc = fun;
-        acceptableErrors = theAcceptableErrors;
-    }
 };
 
 const StringMap<ApplyOpMetadata> kOpsMap = {

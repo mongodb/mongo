@@ -139,6 +139,7 @@ public:
         OperationContext* opCtx,
         CollectionWriter& collection,
         const std::vector<BSONObj>& specs,
+        const std::vector<std::string>& indexIdents,
         OnInitFn onInit,
         InitMode initMode = InitMode::SteadyState,
         const boost::optional<ResumeIndexInfo>& resumeInfo = boost::none,

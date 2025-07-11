@@ -1221,6 +1221,13 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                            IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions{
                                CommitQuorumOptions(CommitQuorumOptions::kVotingMembers)};
 
+                           // TODO(SERVER-107070): investigate if this is a valid place to generate
+                           // new idents or if we need to do something more complicated for catalog
+                           // consistency.
+                           auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+                           auto indexIdents = storageEngine->generateNewIndexIdents(
+                               _metadata.getTempReshardingNss().dbName(), indexSpecs.size());
+
                            auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx.get());
                            auto indexBuildFuture = indexBuildsCoordinator->startIndexBuild(
                                opCtx.get(),
@@ -1229,6 +1236,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                                // as the collection UUID.
                                _metadata.getReshardingUUID(),
                                indexSpecs,
+                               indexIdents,
                                buildUUID,
                                IndexBuildProtocol::kTwoPhase,
                                indexBuildOptions);

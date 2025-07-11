@@ -589,16 +589,22 @@ public:
      * spec omits the collation and the collection does not have a default, the collation field is
      * omitted from the spec.
      *
-     * If 'collection' is null, no changes are made to the input specs.
-     *
      * This function throws on error.
      */
-    static BSONObj normalizeIndexSpecs(OperationContext* opCtx,
-                                       const CollectionPtr& collection,
-                                       const BSONObj& indexSpec);
+    static BSONObj normalizeIndexSpec(OperationContext* opCtx,
+                                      const CollectionPtr& collection,
+                                      const BSONObj& indexSpec);
     static std::vector<BSONObj> normalizeIndexSpecs(OperationContext* opCtx,
                                                     const CollectionPtr& collection,
                                                     const std::vector<BSONObj>& indexSpecs);
+
+    /**
+     * Checks if the given index spec could be created in this catalog after normalizing it,
+     * returning an error with a reason if it cannot.
+     */
+    Status canCreateIndex(OperationContext* opCtx,
+                          const CollectionPtr& collection,
+                          const BSONObj& indexSpec) const;
 };
 
 inline IndexCatalog::InclusionPolicy operator|(IndexCatalog::InclusionPolicy lhs,
