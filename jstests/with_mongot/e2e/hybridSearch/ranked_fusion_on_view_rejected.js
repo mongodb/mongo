@@ -35,11 +35,6 @@ const matchViewPipeline = {
     $match: {a: "foo"}
 };
 
-const geoNearViewName = collName + "_geo_near_view";
-const geoNearViewPipeline = {
-    $geoNear: {near: {type: "Point", coordinates: [0, 0]}, key: "loc", spherical: true}
-};
-
 const rankFusionPipeline = [{
     $rankFusion: {
         input: {
@@ -53,15 +48,6 @@ const rankFusionPipeline = [{
 
 // Create a view with $match.
 assert.commandWorked(db.createView(matchViewName, coll.getName(), [matchViewPipeline]));
-
-// Create a view with $geoNear.
-assert.commandWorked(db.createView(geoNearViewName, coll.getName(), [geoNearViewPipeline]));
-
-// TODO SERVER-105682: Add tests for $geoNear in the input pipelines.
-// TODO SERVER-105862: Move this test to the allowed test.
-assert.commandFailedWithCode(
-    db.runCommand({aggregate: geoNearViewName, pipeline: rankFusionPipeline, cursor: {}}),
-    ErrorCodes.OptionNotSupportedOnView);
 
 // Cannot create a search index of the same name on both the view and underlying collection.
 const matchExprViewName = collName + "_match_expr_view";

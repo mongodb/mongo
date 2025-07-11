@@ -295,6 +295,13 @@ export function verifyE2EVectorSearchExplainOutput({explainOutput, stageType, li
 /**
  * This function checks that the explain output for two queries contains the same stages, regardless
  * of whether the test is sharded and ignoring irrelevant fields like 'optimizationTimeMillis'.
+ *
+ * Note that we cannot check that the stages entirely exactly match. In a single node $unionWith on
+ * a view, the $unionWith explain is related to the resolved namespace / view pipeline, and in
+ * sharded clusters, the $unionWith explain is related to the user namespace / pipeline.
+ *
+ * Therefore, we just check that the stage names match for each stage in a sharded scenario.
+ *
  * @param {Object} realExplainOutput The results from running explain() on the feature being tested,
  *     e.g. $rankFusion.
  * @param {string} expectedExplainOutput The results from running explain() on the baseline query,
@@ -302,6 +309,7 @@ export function verifyE2EVectorSearchExplainOutput({explainOutput, stageType, li
  */
 export function verifyExplainStagesAreEqual(realExplainOutput, expectedExplainOutput) {
     let realExplainOutputStages, expectedExplainStages;
+    let canCompareStagesExactly = true;
     if (realExplainOutput.hasOwnProperty("splitPipeline")) {
         if (realExplainOutput["splitPipeline"] != null) {
             // Case for sharded collection.
@@ -309,6 +317,7 @@ export function verifyExplainStagesAreEqual(realExplainOutput, expectedExplainOu
                 realExplainOutput["splitPipeline"]["mergerPart"]);
             expectedExplainStages = expectedExplainOutput["splitPipeline"]["shardsPart"].concat(
                 expectedExplainOutput["splitPipeline"]["mergerPart"]);
+            canCompareStagesExactly = false;
         } else {
             // Case for single shard.
             const firstShard = Object.keys(realExplainOutput["shards"])[0];
@@ -320,11 +329,29 @@ export function verifyExplainStagesAreEqual(realExplainOutput, expectedExplainOu
         expectedExplainStages = expectedExplainOutput["stages"];
     }
 
-    assert(arrayEq(realExplainOutputStages,
-                   expectedExplainStages,
-                   true /* verbose */,
-                   null /* valueComparator */,
-                   ['optimizationTimeMillis'] /* fieldsToSkip */),
-           "Explains did not match in 'stages'. Expected:\n" + tojson(realExplainOutput) +
-               "\nView:\n" + tojson(expectedExplainOutput));
+    if (canCompareStagesExactly) {
+        assert(arrayEq(realExplainOutputStages,
+                       expectedExplainStages,
+                       false /* verbose */,
+                       null /* valueComparator */,
+                       ['optimizationTimeMillis'] /* fieldsToSkip */),
+               "Explains did not match in 'stages'. Expected:\n" + tojson(expectedExplainOutput) +
+                   "\nView:\n" + tojson(realExplainOutput));
+    } else {
+        // This branch extracts the top-level stage names from the explain pipeline and ensures that
+        // they are equal - it *does not* compare the stage specs themselves.
+        function getStageNamesFromExplain(pipeline) {
+            return pipeline.map((stage) => Object.keys(stage)[0]);
+        };
+        const realExplainOutputStageNames = getStageNamesFromExplain(realExplainOutputStages);
+        const expectedExplainOutputStageNames = getStageNamesFromExplain(expectedExplainStages);
+        assert(arrayEq(realExplainOutputStageNames,
+                       expectedExplainOutputStageNames,
+                       false /* verbose */,
+                       null /* valueComparator */,
+                       [] /* fieldsToSkip */),
+               "Explains did not match in stage names. Expected: \n" +
+                   tojson(expectedExplainOutputStageNames) + "\nView:\n" +
+                   tojson(realExplainOutputStageNames));
+    }
 }

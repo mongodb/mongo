@@ -15,6 +15,9 @@ const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
 
+assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
+assert.commandWorked(coll.createIndex({summary: "text", space: "text"}, {name: "textIndex"}));
+
 const nDocs = 50;
 let bulk = coll.initializeOrderedBulkOp();
 // This test populates the collection with 5 different types of documents. This is to
@@ -319,147 +322,279 @@ const runRankFusionViewTest =
         }
     };
 
+(function testRankFusionViewCasesWhereFirstViewStageMustBeFirstStageInPipeline() {
+    runRankFusionViewTest(
+        "geo_near",
+        {
+            a: [{$match: {x: {$gt: 3}}}, {$sort: {x: -1}}],
+            b: [{$match: {x: {$lte: 15}}}, {$sort: {x: 1}}],
+        },
+        [{$geoNear: {spherical: true, near: {type: "Point", coordinates: [1, 1]}}}],
+        /*checkCorrectness=**/ true);
+
+    runRankFusionViewTest("match_with_text",
+                          {
+                              a: [{$match: {x: {$gt: 3}}}, {$sort: {x: -1}}],
+                              b: [{$match: {x: {$lte: 15}}}, {$sort: {x: 1}}],
+                          },
+                          [{$match: {$text: {$search: "foo"}}}],
+                          /*CheckCorrectness=**/ true);
+})();
+
 // TODO SERVER-105677: Add tests for $skip.
-// TODO SERVER-105862: Add tests for $geoNear in the view definition.
 // Excluded tests:
 // - $geoNear can't run against views.
-runRankFusionViewTest("simple_match",
-                      {
-                          a: [{$match: {x: {$gt: 5}}}, {$sort: {x: -1}}],
-                          b: [{$match: {x: {$lte: 15}}}, {$sort: {x: 1}}],
-                      },
-                      [{$match: {a: "foo"}}],
-                      /*checkCorrectness=**/ true);
-runRankFusionViewTest("match_and_limit",
-                      {
-                          a: [{$match: {x: {$gte: 3}}}, {$sort: {x: 1}}, {$limit: 10}],
-                          b: [{$match: {x: {$lte: 13}}}, {$sort: {x: -1}}, {$limit: 8}],
-                      },
-                      [{$match: {a: "bar"}}],
-                      /*checkCorrectness=**/ true);
-runRankFusionViewTest("limit_in_view",
-                      {
-                          a: [{$match: {x: {$gte: 4}}}, {$sort: {x: 1}}],
-                          b: [{$match: {x: {$lt: 10}}}, {$sort: {x: 1}}],
-                      },
-                      [{$sort: {x: -1}}, {$limit: 15}],
-                      /*checkCorrectness=**/ true);
-runRankFusionViewTest("no_match",
-                      {
-                          a: [{$sort: {x: 1}}],
-                          b: [{$sort: {x: -1}}],
-                      },
-                      [{$sort: {x: -1}}, {$limit: 15}],
-                      /*checkCorrectness=**/ true);
-runRankFusionViewTest("three_pipelines",
-                      {
-                          a: [{$match: {a: "foo"}}, {$sort: {x: 1}}],
-                          b: [{$match: {a: "bar"}}, {$sort: {x: 1}}],
-                          c: [{$match: {x: {$lt: 10}}}, {$sort: {x: -1}}],
-                      },
-                      [{$match: {"$expr": {$gt: ["$x", 2]}}}],
-                      /*checkCorrectness=**/ true);
-runRankFusionViewTest("limit_in_input",
-                      {
-                          a: [{$match: {x: {$gte: 4}}}, {$sort: {x: 1}}],
-                          b: [{$limit: 5}, {$sort: {x: 1}}],
-                      },
-                      [{$match: {"$expr": {$lt: ["$x", 20]}}}],
-                      /*checkCorrectness=**/ false);
-runRankFusionViewTest("sample",
-                      {
-                          a: [{$match: {x: {$gte: 4}}}, {$sort: {x: 1}}],
-                          b: [{$sample: {size: 5}}, {$sort: {x: 1}}],
-                      },
-                      [{$match: {"$expr": {$lt: ["$x", 20]}}}],
-                      /*checkCorrectness=**/ false);
-runRankFusionViewTest("only_search",
-                      {a: [searchPipelineFoo]},
-                      [{$match: {"$expr": {$lt: ["$x", 0]}}}],
-                      /*checkCorrectness=**/ true,
-                      /*isMongotPipeline=**/ true);
-runRankFusionViewTest("search_first",
-                      {
-                          a: [searchPipelineFoo],
-                          b: [{$sort: {x: 1}}],
-                      },
-                      [{$match: {$expr: {$eq: ["$a", "bar"]}}}],
-                      /*checkCorrectness=**/ true,
-                      /*isMongotPipeline=**/ true);
-runRankFusionViewTest("search_second",
-                      {
-                          a: [{$sort: {x: -1}}],
-                          b: [searchPipelineFoo],
-                      },
-                      [{$match: {"$expr": {$lt: ["$x", 0]}}}],
-                      /*checkCorrectness=**/ true,
-                      /*isMongotPipeline=**/ true);
-runRankFusionViewTest("only_vector_search",
-                      {a: [vectorSearchPipelineV]},
-                      [{$match: {$expr: {$eq: ["$a", "foo"]}}}],
-                      /*checkCorrectness=**/ true,
-                      /*isMongotPipeline=**/ true);
-runRankFusionViewTest("vector_search_first",
-                      {
-                          a: [vectorSearchPipelineV],
-                          b: [{$sort: {x: 1}}],
-                      },
-                      [{$match: {$expr: {$eq: ["$a", "foo"]}}}],
-                      /*checkCorrectness=**/ false,
-                      /*isMongotPipeline=**/ true);
-runRankFusionViewTest("vector_search_second",
-                      {
-                          a: [{$sort: {x: -1}}],
-                          b: [vectorSearchPipelineV],
-                      },
-                      [{$match: {$expr: {$eq: ["$a", "foo"]}}}],
-                      /*checkCorrectness=**/ true,
-                      /*isMongotPipeline=**/ true);
-runRankFusionViewTest("double_search",
-                      {
-                          a: [searchPipelineFoo],
-                          b: [searchPipelineBar],
-                      },
-                      [{$match: {"$expr": {$lt: ["$x", 20]}}}],
-                      /*checkCorrectness=**/ true,
-                      /*isMongotPipeline=**/ true);
-runRankFusionViewTest("swapped_double_search",
-                      {
-                          a: [searchPipelineBar],
-                          b: [searchPipelineFoo],
-                      },
-                      [{$match: {"$expr": {$lt: ["$x", 20]}}}],
-                      /*checkCorrectness=**/ true,
-                      /*isMongotPipeline=**/ true);
-runRankFusionViewTest("double_vector_search",
-                      {
-                          a: [vectorSearchPipelineV],
-                          b: [vectorSearchPipelineZ],
-                      },
-                      [{$match: {"$expr": {$lt: ["$x", 20]}}}],
-                      /*checkCorrectness=**/ true,
-                      /*isMongotPipeline=**/ true);
-runRankFusionViewTest("swapped_double_vector_search",
-                      {
-                          a: [vectorSearchPipelineZ],
-                          b: [vectorSearchPipelineV],
-                      },
-                      [{$match: {"$expr": {$lt: ["$x", 20]}}}],
-                      /*checkCorrectness=**/ true,
-                      /*isMongotPipeline=**/ true);
-runRankFusionViewTest("multi_search",
-                      {
-                          a: [searchPipelineBar],
-                          b: [vectorSearchPipelineV],
-                      },
-                      [{$match: {"$expr": {$lt: ["$x", 20]}}}],
-                      /*checkCorrectness=**/ true,
-                      /*isMongotPipeline=**/ true);
-runRankFusionViewTest("swapped_multi_search",
-                      {
-                          a: [vectorSearchPipelineV],
-                          b: [searchPipelineBar],
-                      },
-                      [{$match: {"$expr": {$lt: ["$x", 20]}}}],
-                      /*checkCorrectness=**/ true,
-                      /*isMongotPipeline=**/ true);
+(function testRankFusionViewSimpleViews() {
+    runRankFusionViewTest("simple_match",
+                          {
+                              a: [{$match: {x: {$gt: 5}}}, {$sort: {x: -1}}],
+                              b: [{$match: {x: {$lte: 15}}}, {$sort: {x: 1}}],
+                          },
+                          [{$match: {a: "foo"}}],
+                          /*checkCorrectness=**/ true);
+    runRankFusionViewTest("match_and_limit",
+                          {
+                              a: [{$match: {x: {$gte: 3}}}, {$sort: {x: 1}}, {$limit: 10}],
+                              b: [{$match: {x: {$lte: 13}}}, {$sort: {x: -1}}, {$limit: 8}],
+                          },
+                          [{$match: {a: "bar"}}],
+                          /*checkCorrectness=**/ true);
+    runRankFusionViewTest("limit_in_view",
+                          {
+                              a: [{$match: {x: {$gte: 4}}}, {$sort: {x: 1}}],
+                              b: [{$match: {x: {$lt: 10}}}, {$sort: {x: 1}}],
+                          },
+                          [{$sort: {x: -1}}, {$limit: 15}],
+                          /*checkCorrectness=**/ true);
+    runRankFusionViewTest("no_match",
+                          {
+                              a: [{$sort: {x: 1}}],
+                              b: [{$sort: {x: -1}}],
+                          },
+                          [{$sort: {x: -1}}, {$limit: 15}],
+                          /*checkCorrectness=**/ true);
+    runRankFusionViewTest("three_pipelines",
+                          {
+                              a: [{$match: {a: "foo"}}, {$sort: {x: 1}}],
+                              b: [{$match: {a: "bar"}}, {$sort: {x: 1}}],
+                              c: [{$match: {x: {$lt: 10}}}, {$sort: {x: -1}}],
+                          },
+                          [{$match: {"$expr": {$gt: ["$x", 2]}}}],
+                          /*checkCorrectness=**/ true);
+    runRankFusionViewTest("limit_in_input",
+                          {
+                              a: [{$match: {x: {$gte: 4}}}, {$sort: {x: 1}}],
+                              b: [{$limit: 5}, {$sort: {x: 1}}],
+                          },
+                          [{$match: {"$expr": {$lt: ["$x", 20]}}}],
+                          /*checkCorrectness=**/ false);
+    runRankFusionViewTest("sample",
+                          {
+                              a: [{$match: {x: {$gte: 4}}}, {$sort: {x: 1}}],
+                              b: [{$sample: {size: 5}}, {$sort: {x: 1}}],
+                          },
+                          [{$match: {"$expr": {$lt: ["$x", 20]}}}],
+                          /*checkCorrectness=**/ false);
+})();
+
+(function testRankFusionViewSearchViews() {
+    runRankFusionViewTest("only_search",
+                          {a: [searchPipelineFoo]},
+                          [{$match: {"$expr": {$lt: ["$x", 0]}}}],
+                          /*checkCorrectness=**/ true,
+                          /*isMongotPipeline=**/ true);
+    runRankFusionViewTest("search_first",
+                          {
+                              a: [searchPipelineFoo],
+                              b: [{$sort: {x: 1}}],
+                          },
+                          [{$match: {$expr: {$eq: ["$a", "bar"]}}}],
+                          /*checkCorrectness=**/ true,
+                          /*isMongotPipeline=**/ true);
+    runRankFusionViewTest("search_second",
+                          {
+                              a: [{$sort: {x: -1}}],
+                              b: [searchPipelineFoo],
+                          },
+                          [{$match: {"$expr": {$lt: ["$x", 0]}}}],
+                          /*checkCorrectness=**/ true,
+                          /*isMongotPipeline=**/ true);
+    runRankFusionViewTest("only_vector_search",
+                          {a: [vectorSearchPipelineV]},
+                          [{$match: {$expr: {$eq: ["$a", "foo"]}}}],
+                          /*checkCorrectness=**/ true,
+                          /*isMongotPipeline=**/ true);
+    runRankFusionViewTest("vector_search_first",
+                          {
+                              a: [vectorSearchPipelineV],
+                              b: [{$sort: {x: 1}}],
+                          },
+                          [{$match: {$expr: {$eq: ["$a", "foo"]}}}],
+                          /*checkCorrectness=**/ false,
+                          /*isMongotPipeline=**/ true);
+    runRankFusionViewTest("vector_search_second",
+                          {
+                              a: [{$sort: {x: -1}}],
+                              b: [vectorSearchPipelineV],
+                          },
+                          [{$match: {$expr: {$eq: ["$a", "foo"]}}}],
+                          /*checkCorrectness=**/ true,
+                          /*isMongotPipeline=**/ true);
+    runRankFusionViewTest("double_search",
+                          {
+                              a: [searchPipelineFoo],
+                              b: [searchPipelineBar],
+                          },
+                          [{$match: {"$expr": {$lt: ["$x", 20]}}}],
+                          /*checkCorrectness=**/ true,
+                          /*isMongotPipeline=**/ true);
+    runRankFusionViewTest("swapped_double_search",
+                          {
+                              a: [searchPipelineBar],
+                              b: [searchPipelineFoo],
+                          },
+                          [{$match: {"$expr": {$lt: ["$x", 20]}}}],
+                          /*checkCorrectness=**/ true,
+                          /*isMongotPipeline=**/ true);
+    runRankFusionViewTest("double_vector_search",
+                          {
+                              a: [vectorSearchPipelineV],
+                              b: [vectorSearchPipelineZ],
+                          },
+                          [{$match: {"$expr": {$lt: ["$x", 20]}}}],
+                          /*checkCorrectness=**/ true,
+                          /*isMongotPipeline=**/ true);
+    runRankFusionViewTest("swapped_double_vector_search",
+                          {
+                              a: [vectorSearchPipelineZ],
+                              b: [vectorSearchPipelineV],
+                          },
+                          [{$match: {"$expr": {$lt: ["$x", 20]}}}],
+                          /*checkCorrectness=**/ true,
+                          /*isMongotPipeline=**/ true);
+    runRankFusionViewTest("multi_search",
+                          {
+                              a: [searchPipelineBar],
+                              b: [vectorSearchPipelineV],
+                          },
+                          [{$match: {"$expr": {$lt: ["$x", 20]}}}],
+                          /*checkCorrectness=**/ true,
+                          /*isMongotPipeline=**/ true);
+    runRankFusionViewTest("swapped_multi_search",
+                          {
+                              a: [vectorSearchPipelineV],
+                              b: [searchPipelineBar],
+                          },
+                          [{$match: {"$expr": {$lt: ["$x", 20]}}}],
+                          /*checkCorrectness=**/ true,
+                          /*isMongotPipeline=**/ true);
+})();
+
+// Test a $unionWith following a $rankFusion to verify that the $rankFusion desugaring doesn't
+// interfere with view resolution of the user provided $unionWith.
+(function testRankFusionViewWithSubsequentUnionOnSameView() {
+    const viewPipeline = [{$sort: {x: -1}}, {$limit: 5}];
+    const rankFusionInputPipelines = {
+        a: [{$match: {x: {$gt: 3}}}, {$sort: {x: -1}}],
+        b: [{$match: {x: {$lte: 15}}}, {$sort: {x: 1}}],
+    };
+
+    // Create a view with viewStage.
+    const viewName = jsTestName() + "_subsequent_union_with_on_same_view";
+    assert.commandWorked(db.createView(viewName, coll.getName(), viewPipeline));
+    const view = db[viewName];
+
+    // Create the rankFusion pipeline with the view stage manually prepended.
+    const rankFusionPipelineWithViewPrepended =
+        createRankFusionPipeline(rankFusionInputPipelines, viewPipeline);
+
+    // Create the rankFusion pipeline without the view stage
+    const rankFusionPipelineWithoutView = createRankFusionPipeline(rankFusionInputPipelines);
+
+    // Create the subsequent $unionWith, on the same view as the query.
+    const unionWithSpec = {
+        $unionWith: {coll: viewName, pipeline: [{$sort: {_id: -1}}, {$limit: 2}]}
+    };
+
+    // Run the two queries. They should return 5 documents - the $rankFusion + the filter pipeline
+    // will together return the 3 documents with the lowest ids, and the $unionWith should return
+    // the 2 documents with the highest ids. The values were manually checked from logs.
+    // Note that these queries do not make sense in the real world, but serve to test that the
+    // $unionWith runs on the correct set of documents w/ the view pipeline.
+
+    // This query will contain a pipeline of [$rankFusion, $unionWith] where the $rankFusion runs
+    // against the base collection and $unionWith runs against a view.
+    const filterPipeline = [{$sort: {_id: 1}}, {$limit: 3}];
+
+    const pipelineWithViewPrepended =
+        [...rankFusionPipelineWithViewPrepended, ...filterPipeline, ...[unionWithSpec]];
+    let resultsFromViewPrependedRankFusionQuery =
+        coll.aggregate(pipelineWithViewPrepended).toArray();
+
+    // This query will contain a pipeline of [$rankFusion, $unionWith] where the $rankFusion AND the
+    // $unionWith are run against the same view.
+    const pipelineWithoutViewPrepended =
+        [...rankFusionPipelineWithoutView, ...filterPipeline, ...[unionWithSpec]];
+    let resultsFromViewlessRankFusionQuery = view.aggregate(pipelineWithoutViewPrepended).toArray();
+
+    // Verify the results match.
+    assert.eq(resultsFromViewPrependedRankFusionQuery.length,
+              resultsFromViewlessRankFusionQuery.length);
+    assert.eq(resultsFromViewPrependedRankFusionQuery.length, 5);
+    assertDocArrExpectedFuzzy(resultsFromViewPrependedRankFusionQuery,
+                              resultsFromViewlessRankFusionQuery);
+})();
+
+// Test a $unionWith following a $rankFusion to verify that the $rankFusion desugaring doesn't
+// interfere with view resolution of the user provided $unionWith.
+(function testRankFusionViewWithSubsequentUnionOnDifferentView() {
+    const viewPipeline = [{$sort: {x: -1}}, {$limit: 5}];
+    const rankFusionInputPipelines = {
+        a: [{$match: {x: {$gt: 3}}}, {$sort: {x: -1}}],
+        b: [{$match: {x: {$lte: 15}}}, {$sort: {x: 1}}],
+    };
+
+    // Create a view with viewStage.
+    const viewName = jsTestName() + "_subsequent_union_with_on_different_view";
+    assert.commandWorked(db.createView(viewName, coll.getName(), viewPipeline));
+    const view = db[viewName];
+
+    // Create the rankFusion pipeline with the view stage manually prepended.
+    const rankFusionPipelineWithViewPrepended =
+        createRankFusionPipeline(rankFusionInputPipelines, viewPipeline);
+
+    // Create the rankFusion pipeline without the view stage
+    const rankFusionPipelineWithoutView = createRankFusionPipeline(rankFusionInputPipelines);
+
+    // Create the subsequent $unionWith, on a different view as the query.
+    const unionWithViewPipeline = [{$sort: {_id: 1, x: 1}}, {$limit: 5}];
+    const unionWithViewName =
+        jsTestName() + "_subsequent_union_with_on_different_view_union_with_view";
+    assert.commandWorked(db.createView(unionWithViewName, coll.getName(), unionWithViewPipeline));
+    const unionWithSpec = {
+        $unionWith: {coll: unionWithViewName, pipeline: [{$match: {x: {$lt: 15}}}]}
+    };
+
+    // Run the two queries. They should return the 5 documents with the highest $x values (from the
+    // $rankFusion) and 5 documents with $x values < 15. The values were manually checked from logs.
+    // Note that these queries do not make sense in the real world, but serve to test that the
+    // $unionWith runs on the correct set of documents w/ the view pipeline.
+
+    // This query will contain a pipeline of [$rankFusion, $unionWith] where the $rankFusion runs
+    // against the base collection and $unionWith runs against its own view.
+    const pipelineWithViewPrepended = [...rankFusionPipelineWithViewPrepended, ...[unionWithSpec]];
+    let resultsFromViewPrependedRankFusionQuery =
+        coll.aggregate(pipelineWithViewPrepended).toArray();
+
+    // This query will contain a pipeline of [$rankFusion, $unionWith] where the $rankFusion runs
+    // against one view and the $unionWith runs against another view.
+    const pipelineWithoutViewPrepended = [...rankFusionPipelineWithoutView, ...[unionWithSpec]];
+    let resultsFromViewlessRankFusionQuery = view.aggregate(pipelineWithoutViewPrepended).toArray();
+
+    // Verify the results match.
+    assert.eq(resultsFromViewPrependedRankFusionQuery.length,
+              resultsFromViewlessRankFusionQuery.length);
+    assert.eq(resultsFromViewPrependedRankFusionQuery.length, 10);
+    assertDocArrExpectedFuzzy(resultsFromViewPrependedRankFusionQuery,
+                              resultsFromViewlessRankFusionQuery);
+})();

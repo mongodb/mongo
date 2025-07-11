@@ -437,6 +437,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
                               verbosity);
 
     if (resolvedView) {
+        const auto& viewName = nsStruct.requestedNss;
         // If applicable, ensure that the resolved namespace is added to the resolvedNamespaces map
         // on the expCtx before calling Pipeline::parse(). This is necessary for search on views as
         // Pipeline::parse() will first check if a view exists directly on the stage specification
@@ -444,30 +445,61 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
         // necessary to add the resolved namespace to the expCtx prior to any call to
         // Pipeline::parse().
         search_helpers::checkAndSetViewOnExpCtx(
-            expCtx, request.getPipeline(), *resolvedView, nsStruct.requestedNss);
+            expCtx, request.getPipeline(), *resolvedView, viewName);
 
-        // Nested $unionWiths running on views will add an entry to the ResolvedNamespacesMap that
-        // looks like
-        //      {'viewName': ResolvedNamespace('viewName', ..., /*involvedNamespaceIsAView*/=false)}
-        // which doesn't hold any reference to the underlying collection. This means that if we try
-        // to addResolvedNamespace() properly, the check will fail because the entry is different.
-        // Since we currently disallow these nested $unionWiths with $rankFusion, there won't be a
-        // collision of namespaces that actually matters.
-        // TODO SERVER-103507: Remove this condition.
-        if (!expCtx->hasResolvedNamespace(nsStruct.requestedNss)) {
-            expCtx->addResolvedNamespace(nsStruct.requestedNss,
-                                         ResolvedNamespace(resolvedView->getNamespace(),
-                                                           resolvedView->getPipeline(),
+        if (request.getIsRankFusion()) {
+            uassert(ErrorCodes::OptionNotSupportedOnView,
+                    "$rankFusion is currently unsupported on views",
+                    feature_flags::gFeatureFlagSearchHybridScoringFull
+                        .isEnabledUseLatestFCVWhenUninitialized(
+                            VersionContext::getDecoration(opCtx),
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+
+            // This step here to add the view to the ExpressionContext ResolvedNamespaceMap exists
+            // to support $unionWiths whose sub-pipelines run on a view (which is also the same view
+            // as the top-level query) on a sharded cluster, where some different stage (like
+            // $rankFusion or $scoreFusion) desugar into a $unionWith on the view.
+            //
+            // Note that there is an unintuitive expectation for any query running a $unionWith on a
+            // view in a sharded cluster (regardless if the original user query contains the
+            // $unionWith, or the query desugars into a $unionWith), where the view that the
+            // $unionWith runs on must be in ExpressionContext ResolvedNamespace map with the
+            // following mapping: {view_name -> {view_name, empty BSON pipeline}} Opposed to the
+            // intuitive / expected mapping of: {view_name -> {coll_name, view BSON pipeline
+            // definition}}, prior to Pipeline parsing.
+            //
+            // This is due to an unfortunate particular of how DocumentSourceUnionWith serializes to
+            // BSON, where it always writes the 'coll' argument as the original user namespace
+            // (instead of the resolved namespace, if it exists), regardless of if the internal
+            // Pipeline maintained in DocumentSourceUnionWith has a resolved view definition
+            // pre-pended to it or not.
+            //
+            // So if we were to include the "expected" mapping in the ResolvedNamespaceMap, both
+            // mongos and mongod would end up prepending the view definition to the unionWith
+            // sub-pipeline (as the serialized BSON of the $unionWith sent down to mongod would
+            // include both the unresolved/user namespace in the 'coll' argument and the
+            // sub-pipeline would already have the view definition pre-pended.
+            //
+            // You can observe this same insertion of {view_name -> {view_name, empty BSON
+            // pipeline}} into the ResolvedNamespaceMap in PipelineBuilder::PipelineBuilder() in
+            // 'sharding_catalog_manager.cpp'.
+            //
+            // The difference is that that the PipelineBuilder call happens before desugar, when
+            // processing a LiteParsedPipeline. So this analogous call handles the cases where the
+            // $unionWith appears after desugar, but placing the ExpressionContext
+            // ResolvedNamespaceMap into the same required state.
+            //
+            // Technically, the view that the $unionWith runs on could be different from the view of
+            // the top level query, however we currently don't have any stages that desugar in such
+            // a way. So for now, we are gating this operation to only occur when the query is a
+            // Hybrid Search, as in those desugarings the view the $unionWith will run on is
+            // guaranteed to be the same as the top-level of the query.
+            expCtx->addResolvedNamespace(viewName,
+                                         ResolvedNamespace(viewName,
+                                                           std::vector<BSONObj>(),
                                                            boost::none,
-                                                           true /*involvedNamespaceIsAView*/));
+                                                           false /*involvedNamespaceIsAView*/));
         }
-        uassert(ErrorCodes::OptionNotSupportedOnView,
-                "$rankFusion is currently unsupported on views",
-                (!request.getIsRankFusion() ||
-                 feature_flags::gFeatureFlagSearchHybridScoringFull
-                     .isEnabledUseLatestFCVWhenUninitialized(
-                         VersionContext::getDecoration(opCtx),
-                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())));
     }
 
     auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
@@ -977,12 +1009,6 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     uassert(ErrorCodes::OptionNotSupportedOnView,
             "$rankFusion is unsupported on timeseries collections",
             !(nsStruct.executionNss.isTimeseriesBucketsCollection() && request.getIsRankFusion()));
-    // TODO SERVER-105862: Remove this uassert.
-    uassert(ErrorCodes::OptionNotSupportedOnView,
-            "$rankFusion is unsupported on a view with $geoNear",
-            !(!resolvedView.getPipeline().empty() &&
-              resolvedView.getPipeline()[0][DocumentSourceGeoNear::kStageName] &&
-              request.getIsRankFusion()));
 
     // For a sharded time-series collection, the routing is based on both routing table and the
     // bucketMaxSpanSeconds value. We need to make sure we use the bucketMaxSpanSeconds of the same

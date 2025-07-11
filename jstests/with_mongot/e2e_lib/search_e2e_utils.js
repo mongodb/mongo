@@ -62,7 +62,6 @@ export function assertDocArrExpectedFuzzy(expectedDocArr,
                                           showVerboseResults = false,
                                           tolerancePercentage = defaultTolerancePercentage,
                                           fuzzingStrategy = defaultFuzzingStrategy) {
-    jsTestLog("HI FINLEY DEFAULT PERCENTAGE", tolerancePercentage);
     // Helper functions that stringify input arrays for developer observablity in assertion logs.
     function stringifyExpectedArray(showFullArray) {
         if (showFullArray) {
