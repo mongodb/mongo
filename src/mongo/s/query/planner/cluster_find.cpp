@@ -935,7 +935,8 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     invariant(cursorId == pinnedCursor.getValue().getCursorId());
 
     // Ensure cursor and getMore belong the same namespace.
-    if (const auto cursorNss = pinnedCursor.getValue().toGenericCursor().getNs();
+    const auto genericCursor = pinnedCursor.getValue().toGenericCursor();
+    if (const auto& cursorNss = genericCursor.getNs();
         cursorNss.has_value() && nss != cursorNss.get()) {
         pinnedCursor.getValue().returnCursor(ClusterCursorManager::CursorState::NotExhausted);
         return Status(ErrorCodes::Unauthorized,

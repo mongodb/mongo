@@ -1087,7 +1087,7 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
     boost::optional<ShardedExchangePolicy> exchangeSpec;
     boost::optional<SplitPipeline> splitPipelines;
     const bool targetAllHosts = pipeline->needsAllShardHosts();
-    const auto cri = routingCtx.hasNss(targetedNss)
+    const auto& cri = routingCtx.hasNss(targetedNss)
         ? boost::optional<CollectionRoutingInfo>(routingCtx.getCollectionRoutingInfo(targetedNss))
         : boost::none;
 
@@ -1151,7 +1151,7 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
                                                                             targetAllHosts,
                                                                             resumeTokenMap);
 
-    auto readPref = ReadPreferenceSetting::get(opCtx);
+    const auto& readPref = ReadPreferenceSetting::get(opCtx);
     if (explain) {
         shardResults = gatherResponses(opCtx,
                                        targetedNss.dbName(),
@@ -1234,7 +1234,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     stdx::unordered_map<ShardId, BSONObj> resumeTokenMap,
     std::set<ShardId> shardsToSkip) {
     const auto& expCtx = pipeline->getContext();
-    const auto cri = routingCtx.hasNss(targetedNss)
+    const auto& cri = routingCtx.hasNss(targetedNss)
         ? boost::optional<CollectionRoutingInfo>(routingCtx.getCollectionRoutingInfo(targetedNss))
         : boost::none;
 

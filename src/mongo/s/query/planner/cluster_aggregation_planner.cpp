@@ -421,7 +421,7 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
         std::find(targetedShards.begin(), targetedShards.end(), mergingShardId) !=
         targetedShards.end();
 
-    const auto cri = routingCtx.hasNss(namespaces.executionNss)
+    const auto& cri = routingCtx.hasNss(namespaces.executionNss)
         ? boost::optional<CollectionRoutingInfo>(
               routingCtx.getCollectionRoutingInfo(namespaces.executionNss))
         : boost::none;
