@@ -107,7 +107,7 @@ public:
     };
 
     // The method used for creating the initial set of markers.
-    enum class MarkersCreationMethod { EmptyCollection, Scanning, Sampling };
+    enum class MarkersCreationMethod { EmptyCollection, Scanning, Sampling, InProgress };
 
     CollectionTruncateMarkers(std::deque<Marker> markers,
                               int64_t leftoverRecordsCount,
@@ -356,8 +356,8 @@ protected:
     }
 
     // Amount of time spent scanning and/or sampling the collection during start up, if any.
-    const Microseconds _totalTimeProcessing;
-    const CollectionTruncateMarkers::MarkersCreationMethod _creationMethod;
+    Microseconds _totalTimeProcessing;
+    CollectionTruncateMarkers::MarkersCreationMethod _creationMethod;
 };
 
 /**

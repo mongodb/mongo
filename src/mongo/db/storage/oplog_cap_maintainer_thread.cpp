@@ -85,13 +85,24 @@ public:
         if (oplogCollection) {
             // In certain modes, like read-only, no truncate markers are created.
             if (auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers()) {
-                builder.append("totalTimeProcessingMicros",
-                               truncateMarkers->getCreationProcessingTime().count());
-                builder.append("processingMethod",
-                               truncateMarkers->getMarkersCreationMethod() ==
-                                       CollectionTruncateMarkers::MarkersCreationMethod::Sampling
-                                   ? "sampling"
-                                   : "scanning");
+                auto method = truncateMarkers->getMarkersCreationMethod();
+                if (method == CollectionTruncateMarkers::MarkersCreationMethod::Sampling) {
+                    builder.append("totalTimeProcessingMicros",
+                                   truncateMarkers->getCreationProcessingTime().count());
+                    builder.append("processingMethod", "sampling");
+                } else if (method == CollectionTruncateMarkers::MarkersCreationMethod::InProgress) {
+                    invariant(truncateMarkers->getCreationProcessingTime().count() == 0);
+                    builder.append("totalTimeProcessingMicros", -1);
+                    builder.append("processingMethod", "in progress");
+                } else if (method ==
+                           CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection) {
+                    builder.append("totalTimeProcessingMicros", -1);
+                    builder.append("processingMethod", "empty collection");
+                } else {
+                    builder.append("totalTimeProcessingMicros",
+                                   truncateMarkers->getCreationProcessingTime().count());
+                    builder.append("processingMethod", "scanning");
+                }
             }
         }
 

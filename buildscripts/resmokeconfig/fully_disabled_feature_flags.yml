@@ -28,3 +28,5 @@
 # TODO (SERVER-73632): Delete featureFlagRouterPort.
 - featureFlagRouterPort
 - featureFlagSessionsCollectionCoordinatorOnConfigServer
+# TODO (SERVER-101672) : Delete featureFlagOplogSamplingAsyncEnabled.
+- featureFlagOplogSamplingAsyncEnabled

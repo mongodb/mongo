@@ -91,6 +91,11 @@ public:
     // efficiently truncate records with WiredTiger by skipping over tombstones, etc.
     RecordId firstRecord;
 
+    static std::shared_ptr<OplogTruncateMarkers> createEmptyOplogTruncateMarkers(RecordStore& rs);
+
+    static std::shared_ptr<OplogTruncateMarkers> sampleAndUpdate(OperationContext* opCtx,
+                                                                 RecordStore& rs);
+
     static std::shared_ptr<OplogTruncateMarkers> createOplogTruncateMarkers(OperationContext* opCtx,
                                                                             RecordStore& rs);
     //

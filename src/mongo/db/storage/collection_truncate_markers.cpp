@@ -56,6 +56,7 @@ namespace {
 static constexpr StringData kEmptyCollectionString = "emptyCollection"_sd;
 static constexpr StringData kScanningString = "scanning"_sd;
 static constexpr StringData kSamplingString = "sampling"_sd;
+static constexpr StringData kInProgressString = "inProgress"_sd;
 }  // namespace
 
 StringData CollectionTruncateMarkers::toString(
@@ -67,6 +68,8 @@ StringData CollectionTruncateMarkers::toString(
             return kScanningString;
         case CollectionTruncateMarkers::MarkersCreationMethod::Sampling:
             return kSamplingString;
+        case CollectionTruncateMarkers::MarkersCreationMethod::InProgress:
+            return kInProgressString;
         default:
             MONGO_UNREACHABLE;
     }

@@ -33,6 +33,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/oplog_truncate_marker_parameters_gen.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -47,8 +48,21 @@ namespace {
 const double kNumMSInHour = 1000 * 60 * 60;
 }
 
-std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::createOplogTruncateMarkers(
-    OperationContext* opCtx, RecordStore& rs) {
+std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::createEmptyOplogTruncateMarkers(
+    RecordStore& rs) {
+    return std::make_shared<OplogTruncateMarkers>(
+        std::deque<CollectionTruncateMarkers::Marker>{},
+        0,
+        0,
+        0,
+        Microseconds{0},
+        CollectionTruncateMarkers::MarkersCreationMethod::InProgress,
+        *rs.oplog());
+}
+
+std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::sampleAndUpdate(OperationContext* opCtx,
+                                                                            RecordStore& rs) {
+    // Sample
     long long maxSize = rs.oplog()->getMaxSize();
     invariant(maxSize > 0);
     invariant(rs.keyFormat() == KeyFormat::Long);
@@ -90,6 +104,8 @@ std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::createOplogTruncateM
     LOGV2(22382,
           "Record store oplog processing finished",
           "duration"_attr = duration_cast<Milliseconds>(initialSetOfMarkers.timeTaken));
+
+    // Update
     return std::make_shared<OplogTruncateMarkers>(std::move(initialSetOfMarkers.markers),
                                                   initialSetOfMarkers.leftoverRecordsCount,
                                                   initialSetOfMarkers.leftoverRecordsBytes,
@@ -97,6 +113,14 @@ std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::createOplogTruncateM
                                                   initialSetOfMarkers.timeTaken,
                                                   initialSetOfMarkers.methodUsed,
                                                   *rs.oplog());
+}
+
+std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::createOplogTruncateMarkers(
+    OperationContext* opCtx, RecordStore& rs) {
+    if (!feature_flags::gOplogSamplingAsyncEnabled.isEnabled()) {
+        return sampleAndUpdate(opCtx, rs);
+    }
+    return createEmptyOplogTruncateMarkers(rs);
 }
 
 OplogTruncateMarkers::OplogTruncateMarkers(
