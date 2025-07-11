@@ -351,9 +351,8 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
     _execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
 
     // stats update (previously done in usedDisk())
-    if (_pipeline) {
-        _stats.planSummaryStats.usedDisk = _pipeline->usedDisk();
-    }
+    _stats.planSummaryStats.usedDisk =
+        _stats.planSummaryStats.usedDisk || _execPipeline->usedDisk();
 
     _executionState = ExecutionProgress::kFinished;
     return GetNextResult::makeEOF();
@@ -403,15 +402,15 @@ DocumentSourceContainer::iterator DocumentSourceUnionWith::doOptimizeAt(
 };
 
 bool DocumentSourceUnionWith::usedDisk() const {
-    return _pipeline && _pipeline->usedDisk();
+    return _execPipeline && _execPipeline->usedDisk();
 }
 
 void DocumentSourceUnionWith::doDispose() {
     if (_pipeline) {
         _pipeline.get_deleter().dismissDisposal();
-        _stats.planSummaryStats.usedDisk =
-            _stats.planSummaryStats.usedDisk || _pipeline->usedDisk();
         if (_execPipeline) {
+            _stats.planSummaryStats.usedDisk =
+                _stats.planSummaryStats.usedDisk || _execPipeline->usedDisk();
             _execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
         }
 

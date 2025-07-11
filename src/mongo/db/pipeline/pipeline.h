@@ -257,11 +257,6 @@ public:
     }
 
     /**
-     * Checks to see if disk is ever used within the pipeline.
-     */
-    bool usedDisk() const;
-
-    /**
      * Communicates to the pipeline which part of a split pipeline it is when the pipeline has been
      * split in two.
      */

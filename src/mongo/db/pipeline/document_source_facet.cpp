@@ -193,7 +193,7 @@ DocumentSource::GetNextResult DocumentSourceFacet::doGetNext() {
         // stats update (previously done in usedDisk())
         _stats.planSummaryStats.usedDisk =
             std::any_of(_facets.begin(), _facets.end(), [](const auto& facet) {
-                return facet.pipeline->usedDisk();
+                return facet.execPipeline && facet.execPipeline->usedDisk();
             });
 
         return GetNextResult::makeEOF();
@@ -393,7 +393,7 @@ StageConstraints DocumentSourceFacet::constraints(PipelineSplitState state) cons
 bool DocumentSourceFacet::usedDisk() const {
     return _done ? _stats.planSummaryStats.usedDisk
                  : std::any_of(_facets.begin(), _facets.end(), [](const auto& facet) {
-                       return facet.pipeline->usedDisk();
+                       return facet.execPipeline && facet.execPipeline->usedDisk();
                    });
 }
 

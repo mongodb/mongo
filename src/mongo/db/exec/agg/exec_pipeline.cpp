@@ -37,6 +37,9 @@ namespace mongo::exec::agg {
 Pipeline::Pipeline(StageContainer&& stages, boost::intrusive_ptr<ExpressionContext> pCtx)
     : _stages(std::move(stages)), expCtx(std::move(pCtx)) {
     tassert(10537101, "Aggregation pipeline missing ExpressionContext", this->expCtx != nullptr);
+    for (const auto& stage : _stages) {
+        tassert(10617300, "stage must not be null", stage != nullptr);
+    }
 }
 
 boost::optional<Document> Pipeline::getNext() {
@@ -150,6 +153,11 @@ std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) c
     }
 
     return execArray;
+}
+
+bool Pipeline::usedDisk() const {
+    return std::any_of(
+        _stages.begin(), _stages.end(), [](const auto& stage) { return stage->usedDisk(); });
 }
 
 }  // namespace mongo::exec::agg

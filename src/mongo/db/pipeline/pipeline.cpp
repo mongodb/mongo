@@ -429,13 +429,6 @@ void Pipeline::dispose(OperationContext* opCtx) {
     }
 }
 
-bool Pipeline::usedDisk() const {
-    return std::any_of(_sources.begin(), _sources.end(), [](const auto& source) {
-        auto& stage = dynamic_cast<exec::agg::Stage&>(*source);
-        return stage.usedDisk();
-    });
-}
-
 BSONObj Pipeline::getInitialQuery() const {
     if (_sources.empty()) {
         return BSONObj{};

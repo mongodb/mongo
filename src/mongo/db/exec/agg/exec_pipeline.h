@@ -99,6 +99,11 @@ public:
 
     void forceSpill();
 
+    /**
+     * Checks to see if disk is ever used within the pipeline.
+     */
+    bool usedDisk() const;
+
 private:
     StageContainer _stages;
     boost::intrusive_ptr<ExpressionContext> expCtx;

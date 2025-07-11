@@ -680,8 +680,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
     }
     execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
 
-    // Check if pipeline uses disk.
-    _stats.planSummaryStats.usedDisk = _stats.planSummaryStats.usedDisk || pipeline->usedDisk();
+    _stats.planSummaryStats.usedDisk = _stats.planSummaryStats.usedDisk || execPipeline->usedDisk();
 
     MutableDocument output(std::move(inputDoc));
     output.setNestedField(_as, Value(std::move(results)));
@@ -1093,7 +1092,7 @@ DocumentSourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
 }  // doOptimizeAt
 
 bool DocumentSourceLookUp::usedDisk() const {
-    return _pipeline && _pipeline->usedDisk();
+    return _execPipeline && _execPipeline->usedDisk();
 }
 
 void DocumentSourceLookUp::doDispose() {
