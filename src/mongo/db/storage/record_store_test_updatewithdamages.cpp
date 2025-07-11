@@ -110,7 +110,8 @@ TEST(RecordStoreTest, UpdateWithDamages) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
-            RecordData record = rs->dataFor(opCtx.get(), loc);
+            RecordData record =
+                rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc);
             ASSERT_EQUALS(modifiedData, record.data());
         }
     }
@@ -171,7 +172,8 @@ TEST(RecordStoreTest, UpdateWithOverlappingDamageEvents) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
-            RecordData record = rs->dataFor(opCtx.get(), loc);
+            RecordData record =
+                rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc);
             ASSERT_EQUALS(modifiedData, record.data());
         }
     }
@@ -233,7 +235,8 @@ TEST(RecordStoreTest, UpdateWithOverlappingDamageEventsReversed) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
-            RecordData record = rs->dataFor(opCtx.get(), loc);
+            RecordData record =
+                rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc);
             ASSERT_EQUALS(modifiedData, record.data());
         }
     }
@@ -284,7 +287,8 @@ TEST(RecordStoreTest, UpdateWithNoDamages) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
-            RecordData record = rs->dataFor(opCtx.get(), loc);
+            RecordData record =
+                rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc);
             ASSERT_EQUALS(data, record.data());
         }
     }
@@ -319,7 +323,9 @@ TEST(RecordStoreTest, UpdateWithDamagesScalar) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT(obj0.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
+        ASSERT(obj0.binaryEqual(
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .toBson()));
     }
 
     {
@@ -341,7 +347,9 @@ TEST(RecordStoreTest, UpdateWithDamagesScalar) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT(obj1.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
+        ASSERT(obj1.binaryEqual(
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .toBson()));
     }
 
     {
@@ -354,7 +362,7 @@ TEST(RecordStoreTest, UpdateWithDamagesScalar) {
             ASSERT(diffOutput);
             auto [_, damageSource, damages] = doc_diff::computeDamages(obj1, *diffOutput, false);
             auto newRecStatus2 = rs->updateWithDamages(
-                opCtx.get(), loc, rs->dataFor(opCtx.get(), loc), damageSource.get(), damages);
+                opCtx.get(), loc, rs->dataFor(opCtx.get(), ru, loc), damageSource.get(), damages);
             ASSERT_OK(newRecStatus2.getStatus());
             ASSERT(obj2.binaryEqual(newRecStatus2.getValue().toBson()));
             txn.commit();
@@ -363,7 +371,9 @@ TEST(RecordStoreTest, UpdateWithDamagesScalar) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT(obj2.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
+        ASSERT(obj2.binaryEqual(
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .toBson()));
     }
 }
 
@@ -403,7 +413,9 @@ TEST(RecordStoreTest, UpdateWithDamagesNested) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT(obj0.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
+        ASSERT(obj0.binaryEqual(
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .toBson()));
     }
 
     {
@@ -425,7 +437,9 @@ TEST(RecordStoreTest, UpdateWithDamagesNested) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT(obj1.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
+        ASSERT(obj1.binaryEqual(
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .toBson()));
     }
 }
 
@@ -458,7 +472,9 @@ TEST(RecordStoreTest, UpdateWithDamagesArray) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT(obj0.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
+        ASSERT(obj0.binaryEqual(
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .toBson()));
     }
 
     {
@@ -480,7 +496,9 @@ TEST(RecordStoreTest, UpdateWithDamagesArray) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT(obj1.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
+        ASSERT(obj1.binaryEqual(
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .toBson()));
     }
 }
 

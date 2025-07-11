@@ -251,7 +251,10 @@ TEST_F(KVEngineTestHarness, SimpleRS1) {
     {
         auto opCtx = _makeOperationContext(engine);
         Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
-        ASSERT_EQUALS(std::string("abc"), rs->dataFor(opCtx.get(), loc).data());
+        ASSERT_EQUALS(
+            std::string("abc"),
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .data());
     }
 
     {
@@ -289,7 +292,10 @@ TEST_F(KVEngineTestHarness, Restart1) {
         {
             auto opCtx = _makeOperationContext(engine);
             Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
-            ASSERT_EQUALS(std::string("abc"), rs->dataFor(opCtx.get(), loc).data());
+            ASSERT_EQUALS(
+                std::string("abc"),
+                rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                    .data());
         }
     }
 
@@ -300,7 +306,10 @@ TEST_F(KVEngineTestHarness, Restart1) {
         auto opCtx = _makeOperationContext(engine);
         Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         rs = engine->getRecordStore(opCtx.get(), kNss, kIdent, kRecordStoreOptions, kUUID);
-        ASSERT_EQUALS(std::string("abc"), rs->dataFor(opCtx.get(), loc).data());
+        ASSERT_EQUALS(
+            std::string("abc"),
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .data());
     }
 }
 
@@ -378,7 +387,10 @@ TEST_F(KVEngineTestHarness, TemporaryRecordStoreSimple) {
     {
         auto opCtx = _makeOperationContext(engine);
         Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
-        ASSERT_EQUALS(std::string("abc"), rs->dataFor(opCtx.get(), loc).data());
+        ASSERT_EQUALS(
+            std::string("abc"),
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .data());
 
         std::vector<std::string> all =
             engine->getAllIdents(*shard_role_details::getRecoveryUnit(opCtx.get()));

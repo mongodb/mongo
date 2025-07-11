@@ -62,7 +62,6 @@ public:
 
     void setIdent(std::shared_ptr<Ident>) final;
 
-    RecordData dataFor(OperationContext* opCtx, const RecordId& loc) const final;
     RecordData dataFor(OperationContext* opCtx, RecoveryUnit&, const RecordId& loc) const final;
 
     bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* out) const final;

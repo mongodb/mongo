@@ -66,9 +66,6 @@ void RecordStoreBase::setIdent(std::shared_ptr<Ident> ident) {
     _ident = std::move(ident);
 }
 
-RecordData RecordStoreBase::dataFor(OperationContext* opCtx, const RecordId& loc) const {
-    return dataFor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), loc);
-}
 RecordData RecordStoreBase::dataFor(OperationContext* opCtx,
                                     RecoveryUnit& ru,
                                     const RecordId& loc) const {

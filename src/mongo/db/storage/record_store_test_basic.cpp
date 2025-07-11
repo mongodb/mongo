@@ -79,12 +79,15 @@ TEST(RecordStoreTest, Simple1) {
             txn.commit();
         }
 
-        ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc1).data());
+        ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), ru, loc1).data());
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc1).data());
+        ASSERT_EQUALS(
+            s,
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc1)
+                .data());
         ASSERT_EQUALS(1, rs->numRecords());
 
         RecordData rd;
@@ -132,7 +135,7 @@ TEST(RecordStoreTest, Delete1) {
             txn.commit();
         }
 
-        ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc).data());
+        ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), ru, loc).data());
     }
 
     ASSERT_EQUALS(1, rs->numRecords());
@@ -178,7 +181,10 @@ TEST(RecordStoreTest, Delete2) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc).data());
+        ASSERT_EQUALS(
+            s,
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .data());
         ASSERT_EQUALS(2, rs->numRecords());
     }
 
@@ -221,7 +227,10 @@ TEST(RecordStoreTest, Update1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(s1, rs->dataFor(opCtx.get(), loc).data());
+        ASSERT_EQUALS(
+            s1,
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .data());
     }
 
     {
@@ -239,7 +248,10 @@ TEST(RecordStoreTest, Update1) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(1, rs->numRecords());
-        ASSERT_EQUALS(s2, rs->dataFor(opCtx.get(), loc).data());
+        ASSERT_EQUALS(
+            s2,
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .data());
     }
 }
 
@@ -270,7 +282,10 @@ TEST(RecordStoreTest, UpdateInPlace1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(s1, rs->dataFor(opCtx.get(), loc).data());
+        ASSERT_EQUALS(
+            s1,
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .data());
     }
 
     {
@@ -295,7 +310,10 @@ TEST(RecordStoreTest, UpdateInPlace1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(s2, rs->dataFor(opCtx.get(), loc).data());
+        ASSERT_EQUALS(
+            s2,
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .data());
     }
 }
 
@@ -324,7 +342,10 @@ TEST(RecordStoreTest, Truncate1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc).data());
+        ASSERT_EQUALS(
+            s,
+            rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc)
+                .data());
     }
 
     ASSERT_EQUALS(1, rs->numRecords());

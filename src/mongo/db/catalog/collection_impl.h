@@ -163,8 +163,10 @@ public:
     bool requiresIdIndex() const final;
 
     Snapshotted<BSONObj> docFor(OperationContext* opCtx, const RecordId& loc) const final {
-        return Snapshotted<BSONObj>(shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId(),
-                                    _shared->_recordStore->dataFor(opCtx, loc).releaseToBson());
+        return Snapshotted<BSONObj>(
+            shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId(),
+            _shared->_recordStore->dataFor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), loc)
+                .releaseToBson());
     }
 
     /**

@@ -410,10 +410,11 @@ public:
                     if (estimate) {
                         size += avgObjSize;
                     } else {
-                        size += collection.getCollectionPtr()
-                                    ->getRecordStore()
-                                    ->dataFor(opCtx, loc)
-                                    .size();
+                        size +=
+                            collection.getCollectionPtr()
+                                ->getRecordStore()
+                                ->dataFor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), loc)
+                                .size();
                     }
 
                     ++numObjects;

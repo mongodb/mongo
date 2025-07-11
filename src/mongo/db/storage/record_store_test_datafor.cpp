@@ -75,7 +75,8 @@ TEST(RecordStoreTest, DataFor) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
-            RecordData record = rs->dataFor(opCtx.get(), loc);
+            RecordData record =
+                rs->dataFor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc);
             ASSERT_EQUALS(data.size() + 1, static_cast<size_t>(record.size()));
             ASSERT_EQUALS(data, record.data());
         }
@@ -118,7 +119,8 @@ TEST(RecordStoreTest, DataForMultiple) {
             ss << "record----" << i;
             std::string data = ss.str();
 
-            RecordData record = rs->dataFor(opCtx.get(), locs[i]);
+            RecordData record = rs->dataFor(
+                opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), locs[i]);
             ASSERT_EQUALS(data.size() + 1, static_cast<size_t>(record.size()));
             ASSERT_EQUALS(data, record.data());
         }

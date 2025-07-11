@@ -107,10 +107,6 @@ public:
         return 0ULL;
     }
 
-    RecordData dataFor(OperationContext*, const RecordId&) const final {
-        unimplementedTasserted();
-        return {};
-    }
     RecordData dataFor(OperationContext*, RecoveryUnit&, const RecordId&) const final {
         unimplementedTasserted();
         return {};

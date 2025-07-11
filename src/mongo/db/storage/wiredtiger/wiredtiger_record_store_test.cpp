@@ -147,8 +147,8 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
         auto w1 = std::make_unique<StorageWriteTransaction>(ru1);
         auto w2 = std::make_unique<StorageWriteTransaction>(ru2);
 
-        rs->dataFor(t1.get(), id1);
-        rs->dataFor(t2.get(), id1);
+        rs->dataFor(t1.get(), ru1, id1);
+        rs->dataFor(t2.get(), ru2, id1);
 
         ASSERT_OK(rs->updateRecord(t1.get(), id1, "b", 2));
         ASSERT_OK(rs->updateRecord(t1.get(), id2, "B", 2));
@@ -201,8 +201,8 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
         auto& ru2 = *storage_details::getRecoveryUnit(t2.get());
 
         // ensure we start transactions
-        rs->dataFor(t1.get(), id2);
-        rs->dataFor(t2.get(), id2);
+        rs->dataFor(t1.get(), ru1, id2);
+        rs->dataFor(t2.get(), ru2, id2);
 
         {
             StorageWriteTransaction w(ru1);
@@ -212,7 +212,7 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
 
         {
             StorageWriteTransaction w(ru2);
-            ASSERT_EQUALS(std::string("a"), rs->dataFor(t2.get(), id1).data());
+            ASSERT_EQUALS(std::string("a"), rs->dataFor(t2.get(), ru2, id1).data());
             try {
                 // this should fail as our version of id1 is too old
                 rs->updateRecord(t2.get(), id1, "c", 2).transitional_ignore();

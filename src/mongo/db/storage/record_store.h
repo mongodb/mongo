@@ -433,10 +433,7 @@ public:
      *
      * In general, prefer findRecord or RecordCursor::seekExact since they can tell you if a record
      * has been removed.
-     *
-     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
-    virtual RecordData dataFor(OperationContext*, const RecordId&) const = 0;
     virtual RecordData dataFor(OperationContext*, RecoveryUnit&, const RecordId&) const = 0;
 
     /**
