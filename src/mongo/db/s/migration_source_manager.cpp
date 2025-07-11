@@ -712,7 +712,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
 
     // If the migration has succeeded, clear the BucketCatalog so that the buckets that got migrated
     // out are no longer updatable.
-    if (nss().isTimeseriesBucketsCollection()) {
+    if (refreshedMetadata.getChunkManager()->isTimeseriesCollection()) {
         auto& bucketCatalog =
             timeseries::bucket_catalog::GlobalBucketCatalog::get(_opCtx->getServiceContext());
         clear(bucketCatalog, _collectionUUID.get());
