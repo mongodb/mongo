@@ -41,9 +41,9 @@ buildvariants:
       - name: burn_in_tags_gen
 
   - name: test-release
-    display_name: Test Release
+    display_name: "! Test Release"
     allowed_requesters: ["commit", "patch"]
-    tags: ["assigned_to_jira_team_devprod_release_infrastructure"]
+    tags: ["required", "assigned_to_jira_team_devprod_release_infrastructure"]
     run_on: ubuntu2404-small
     modules:
       - devprod_coverity
