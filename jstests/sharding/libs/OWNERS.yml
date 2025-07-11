@@ -15,3 +15,6 @@ filters:
   - "mongos_api_params_util.js":
     approvers:
       - 10gen/query-optimization
+  - "create_sharded_collection_util.js":
+    approvers:
+      - 10gen/server-catalog-and-routing

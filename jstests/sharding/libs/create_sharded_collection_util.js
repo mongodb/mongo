@@ -1,3 +1,5 @@
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+
 export var CreateShardedCollectionUtil = (function() {
     /**
      * Shards a non-existing collection (or an unsharded empty collection) using
@@ -41,7 +43,7 @@ export var CreateShardedCollectionUtil = (function() {
 
         const zoneNss =
             (shardCollOptions !== undefined && shardCollOptions.hasOwnProperty("timeseries"))
-            ? `${collection.getDB().getName()}.system.buckets.${collection.getName()}`
+            ? getTimeseriesCollForDDLOps(collection.getDB(), collection).getFullName()
             : collection.getFullName();
 
         let prevChunk;

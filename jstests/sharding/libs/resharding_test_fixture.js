@@ -1,3 +1,7 @@
+import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesBucketsColl
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {getDBNameAndCollNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 import {Thread} from "jstests/libs/parallelTester.js";
@@ -98,9 +102,6 @@ export var ReshardingTest = class {
         this._primaryShardName = undefined;
         /** @private */
         this._underlyingSourceNs = undefined;
-        // For timeseries resharding.
-        /** @private */
-        this._bucketNs = undefined;
 
         // Properties set by startReshardingInBackground() and withReshardingInBackground().
         /** @private */
@@ -336,18 +337,18 @@ export var ReshardingTest = class {
         this._primaryShardName = primaryShardName;
 
         let tempCollNamePrefix = "system.resharding";
-        if (collOptions.timeseries !== undefined) {
-            let bucketCollName = `system.buckets.${sourceCollection.getName()}`;
-
-            let bucketUUID = getUUIDFromListCollections(sourceDB, bucketCollName);
+        // TODO SERVER-101784 simplify once only viewless timeseries collections exist.
+        if (collOptions.timeseries !== undefined && !areViewlessTimeseriesEnabled(this._st.s)) {
+            let bucketUUID = getUUIDFromListCollections(
+                sourceDB, getTimeseriesBucketsColl(sourceCollection.getName()));
 
             assert.neq(bucketUUID, null, `can't find ns: ${this._ns} after creating chunks`);
 
-            this._bucketNs = `${sourceDB.getName()}.${bucketCollName}`;
             this._sourceCollectionUUID = bucketUUID;
 
-            tempCollNamePrefix = "system.buckets.resharding";
-            this._underlyingSourceNs = this._bucketNs;
+            tempCollNamePrefix = getTimeseriesBucketsColl("resharding");
+            this._underlyingSourceNs =
+                `${sourceDB.getName()}.${getTimeseriesBucketsColl(sourceCollection.getName())}`;
         } else {
             this._sourceCollectionUUID = getUUIDFromListCollections(sourceDB, collName);
             this._underlyingSourceNs = this._ns;
@@ -391,18 +392,18 @@ export var ReshardingTest = class {
             sourceCollection, shardKeyPattern, chunks, collOptions);
 
         let tempCollNamePrefix = "system.resharding";
-        if (collOptions.timeseries !== undefined) {
-            let bucketCollName = `system.buckets.${sourceCollection.getName()}`;
-
-            let bucketUUID = getUUIDFromListCollections(sourceDB, bucketCollName);
+        // TODO SERVER-101784 simplify once only viewless timeseries collections exist.
+        if (collOptions.timeseries !== undefined && !areViewlessTimeseriesEnabled(this._st.s)) {
+            let bucketUUID = getUUIDFromListCollections(
+                sourceDB, getTimeseriesBucketsColl(sourceCollection.getName()));
 
             assert.neq(bucketUUID, null, `can't find ns: ${this._ns} after creating chunks`);
 
-            this._bucketNs = `${sourceDB.getName()}.${bucketCollName}`;
             this._sourceCollectionUUID = bucketUUID;
 
-            tempCollNamePrefix = "system.buckets.resharding";
-            this._underlyingSourceNs = this._bucketNs;
+            tempCollNamePrefix = getTimeseriesBucketsColl("resharding");
+            this._underlyingSourceNs =
+                `${sourceDB.getName()}.${getTimeseriesBucketsColl(sourceCollection.getName())}`;
         } else {
             this._sourceCollectionUUID =
                 getUUIDFromListCollections(sourceDB, sourceCollection.getName());
@@ -971,9 +972,10 @@ export var ReshardingTest = class {
         // resharded.
         const nsCursor = this._st.s.getCollection(this._underlyingSourceNs)
                              .find()
+                             .rawData()
                              .readConcern("available")
                              .sort({_id: 1});
-        const tempNsCursor = this._st.s.getCollection(this._tempNs).find().sort({_id: 1});
+        const tempNsCursor = this._st.s.getCollection(this._tempNs).find().rawData().sort({_id: 1});
 
         const diff = ((diff) => {
             return {
@@ -1001,12 +1003,9 @@ export var ReshardingTest = class {
         // which were copied by a recipient shard that are actually owned by a different recipient
         // shard would appear as extra documents.
         const tempColl = this._st.s.getCollection(this._tempNs);
-        const localReadCursor = tempColl.find().sort({_id: 1});
+        const localReadCursor = tempColl.find().rawData().sort({_id: 1});
         const availableReadCursor =
-            new DBCommandCursor(tempColl.getDB(), assert.commandWorked(tempColl.runCommand("find", {
-                sort: {_id: 1},
-                readConcern: {level: "available"},
-            })));
+            tempColl.find().rawData().readConcern("available").sort({_id: 1});
 
         const diff = ((diff) => {
             return {

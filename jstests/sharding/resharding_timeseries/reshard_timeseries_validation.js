@@ -3,7 +3,8 @@
 //   requires_fcv_80,
 // ]
 //
-
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2});
@@ -28,15 +29,14 @@ assert.commandWorked(st.s.adminCommand({
     timeseries: timeseriesOptions,
 }));
 
-const kBucketCollName = "system.buckets.foo";
-const kBucketNss = kDbName + "." + kBucketCollName;
+const sDB = st.s.getDB(kDbName);
+const sColl = sDB.getCollection(kCollName);
 
-let timeseriesCollDoc = st.config.collections.findOne({_id: kBucketNss});
+let timeseriesCollDoc =
+    st.config.collections.findOne({_id: getTimeseriesCollForDDLOps(sDB, sColl).getFullName()});
 assert.eq(timeseriesCollDoc.timeseriesFields.timeField, timeseriesOptions.timeField);
 assert.eq(timeseriesCollDoc.timeseriesFields.metaField, timeseriesOptions.metaField);
 assert.eq(timeseriesCollDoc.key, {meta: 1});
-
-const sDB = st.s.getDB(kDbName);
 
 // Insert some docs
 assert.commandWorked(sDB.getCollection(kCollName).insert([
@@ -58,9 +58,9 @@ assert.commandFailedWithCode(
 
 function reshardAndVerifyShardKeyAndIndexes(newKey,
                                             indexIdx,
-                                            expectedViewIndexKey,
-                                            expectedBucketIndexKey,
-                                            expectedBucketShardKey,
+                                            expectedIndexKey,
+                                            expectedRawIndexKey,
+                                            expectedRawShardKey,
                                             isShardKeyHashedPrefix) {
     jsTestLog("Resharding to new key:");
     printjson(newKey);
@@ -71,16 +71,18 @@ function reshardAndVerifyShardKeyAndIndexes(newKey,
     }
     assert.commandWorked(mongos.adminCommand(cmdObj));
 
-    const viewIndexes =
-        assert.commandWorked(sDB.getCollection(kCollName).runCommand({listIndexes: kCollName}));
-    assert.eq(viewIndexes.cursor.firstBatch[indexIdx]["key"], expectedViewIndexKey);
+    const collIndexes = assert.commandWorked(sColl.runCommand({listIndexes: kCollName}));
+    assert.eq(collIndexes.cursor.firstBatch[indexIdx]["key"], expectedIndexKey);
 
-    const bucketIndexes = assert.commandWorked(
-        sDB.getCollection(kBucketCollName).runCommand({listIndexes: kBucketCollName}));
-    assert.eq(bucketIndexes.cursor.firstBatch[indexIdx]["key"], expectedBucketIndexKey);
+    const rawCollIndexes = assert.commandWorked(getTimeseriesCollForRawOps(sDB, sColl).runCommand({
+        listIndexes: getTimeseriesCollForRawOps(sDB, sColl).getName(),
+        ...getRawOperationSpec(sDB)
+    }));
+    assert.eq(rawCollIndexes.cursor.firstBatch[indexIdx]["key"], expectedRawIndexKey);
 
-    let configCollectionsBucketsEntry = st.config.collections.findOne({_id: kBucketNss});
-    assert.eq(configCollectionsBucketsEntry["key"], expectedBucketShardKey);
+    let configCollectionsEntry =
+        st.config.collections.findOne({_id: getTimeseriesCollForDDLOps(sDB, sColl).getFullName()});
+    assert.eq(configCollectionsEntry["key"], expectedRawShardKey);
 }
 
 // Success scenarios.

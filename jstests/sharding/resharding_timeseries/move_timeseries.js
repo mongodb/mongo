@@ -7,10 +7,11 @@
 // ]
 //
 
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const ns = "reshardingDb.coll";
-const bucketNss = "reshardingDb.system.buckets.coll";
 
 const reshardingTest = new ReshardingTest({numDonors: 2});
 reshardingTest.setup();
@@ -21,7 +22,7 @@ const timeseriesInfo = {
     metaField: 'mFld'
 };
 
-const timeseriesCollection = reshardingTest.createUnshardedCollection({
+const coll = reshardingTest.createUnshardedCollection({
     ns: ns,
     primaryShardName: st.shard0.shardName,
     collOptions: {
@@ -29,21 +30,21 @@ const timeseriesCollection = reshardingTest.createUnshardedCollection({
         collation: {locale: "en_US", strength: 2},
     }
 });
+const db = coll.getDB();
 
 const metaIndexName = "meta_x_1";
-assert.commandWorked(timeseriesCollection.createIndex(
-    {'mFld.x': 1}, {name: metaIndexName, collation: {locale: "simple"}}));
-const preReshardingMetaIndexSpec =
-    timeseriesCollection.getIndexes().filter(idx => idx.name === metaIndexName);
+assert.commandWorked(
+    coll.createIndex({'mFld.x': 1}, {name: metaIndexName, collation: {locale: "simple"}}));
+const preReshardingMetaIndexSpec = coll.getIndexes().filter(idx => idx.name === metaIndexName);
 
 const measurementIndexName = "a_1";
-assert.commandWorked(timeseriesCollection.createIndex(
-    {a: 1}, {name: measurementIndexName, collation: {locale: "simple"}}));
+assert.commandWorked(
+    coll.createIndex({a: 1}, {name: measurementIndexName, collation: {locale: "simple"}}));
 const preReshardingMeasurementIndexSpec =
-    timeseriesCollection.getIndexes().filter(idx => idx.name === measurementIndexName);
+    coll.getIndexes().filter(idx => idx.name === measurementIndexName);
 
 // Insert some docs
-assert.commandWorked(timeseriesCollection.insert([
+assert.commandWorked(coll.insert([
     {data: 1, ts: new Date(), mFld: {x: 1, y: -1}},
     {data: 6, ts: new Date(), mFld: {x: 1, y: -1}},
     {data: 3, ts: new Date(), mFld: {x: 2, y: -2}},
@@ -52,18 +53,19 @@ assert.commandWorked(timeseriesCollection.insert([
     {data: 1, ts: new Date(), mFld: {x: 5, y: -4}}
 ]));
 
-assert.eq(4, st.s0.getCollection(bucketNss).countDocuments({}));
-assert.eq(6, st.s0.getCollection(ns).countDocuments({}));
+assert.eq(4, getTimeseriesCollForRawOps(db, coll).countDocuments({}, getRawOperationSpec(db)));
+assert.eq(6, coll.countDocuments({}));
 
 reshardingTest.withMoveCollectionInBackground({toShard: st.shard2.shardName}, () => {
     reshardingTest.awaitCloneTimestampChosen();
-    assert.commandWorked(timeseriesCollection.insert([
+    assert.commandWorked(coll.insert([
         {data: -6, ts: new Date(), mFld: {x: 1, y: -1}},
         {data: -6, ts: new Date(), mFld: {x: 8, y: 8}},
     ]));
 });
 
-let timeseriesCollDocPostResharding = st.config.collections.findOne({_id: bucketNss});
+let timeseriesCollDocPostResharding =
+    st.config.collections.findOne({_id: getTimeseriesCollForDDLOps(db, coll).getFullName()});
 // Resharding keeps timeseries fields.
 assert.eq(timeseriesCollDocPostResharding.timeseriesFields.timeField, timeseriesInfo.timeField);
 assert.eq(timeseriesCollDocPostResharding.timeseriesFields.metaField, timeseriesInfo.metaField);
@@ -71,16 +73,19 @@ assert.eq(timeseriesCollDocPostResharding.timeseriesFields.metaField, timeseries
 assert.eq(timeseriesCollDocPostResharding.key, {"_id": 1});
 assert.eq(timeseriesCollDocPostResharding.unsplittable, true);
 
-assert.eq(5, st.rs2.getPrimary().getCollection(bucketNss).countDocuments({}));
-assert.eq(0, st.rs0.getPrimary().getCollection(bucketNss).countDocuments({}));
-assert.eq(8, st.s0.getCollection(ns).countDocuments({}));
+assert.eq(5,
+          getTimeseriesCollForRawOps(db, st.rs2.getPrimary().getCollection(coll.getFullName()))
+              .countDocuments({}, getRawOperationSpec(db)));
+assert.eq(0,
+          getTimeseriesCollForRawOps(db, st.rs0.getPrimary().getCollection(coll.getFullName()))
+              .countDocuments({}, getRawOperationSpec(db)));
+assert.eq(8, coll.countDocuments({}));
 
-const postReshardingMetaIndexSpec =
-    timeseriesCollection.getIndexes().filter(idx => idx.name === metaIndexName);
+const postReshardingMetaIndexSpec = coll.getIndexes().filter(idx => idx.name === metaIndexName);
 assert.eq(preReshardingMetaIndexSpec, postReshardingMetaIndexSpec);
 
 const postReshardingMeasurementIndexSpec =
-    timeseriesCollection.getIndexes().filter(idx => idx.name === measurementIndexName);
+    coll.getIndexes().filter(idx => idx.name === measurementIndexName);
 assert.eq(preReshardingMeasurementIndexSpec, postReshardingMeasurementIndexSpec);
 
 reshardingTest.teardown();

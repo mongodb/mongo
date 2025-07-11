@@ -6,6 +6,12 @@
  *    requires_fcv_80,
  * ]
  */
+
+import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesBucketsColl,
+    getTimeseriesCollForDDLOps
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {TTLUtil} from "jstests/libs/ttl/ttl_util.js";
@@ -33,7 +39,7 @@ reshardingTest.createUnshardedCollection({
         expireAfterSeconds: expireAfterSeconds,
     }
 });
-const timeseriesCollection = reshardingTest.createShardedCollection({
+const coll = reshardingTest.createShardedCollection({
     ns: ns,
     shardKeyPattern: {'meta.x': 1},
     chunks: [
@@ -42,6 +48,7 @@ const timeseriesCollection = reshardingTest.createShardedCollection({
     ],
     collOptions: {timeseries: timeseriesInfo}
 });
+const db = coll.getDB();
 
 function assertNumOfDocs(expected) {
     assert.soon(() => {
@@ -59,20 +66,20 @@ function insertDocsToBeDeleted() {
     // and the maximum bucket range. Expect that the TTL monitor deletes these docs.
     const maxTime = new Date((new Date()).getTime() - (1000 * defaultBucketMaxRange));
     const minTime = new Date(maxTime.getTime() - (1000 * 5 * 60));
-    assert.commandWorked(timeseriesCollection.insert([
+    assert.commandWorked(coll.insert([
         {data: 3, ts: minTime, meta: {x: -2, y: -2}},
         {data: 4, ts: maxTime, meta: {x: -2, y: -2}},
     ]));
 }
 
 // Insert initial documents.
-assert.commandWorked(timeseriesCollection.insert([
+assert.commandWorked(coll.insert([
     {data: 1, ts: new Date(), meta: {x: -1, y: 1}},
     {data: 2, ts: new Date(), meta: {x: 1, y: -1}},
 ]));
 assertNumOfDocs(2);
 
-const mongos = timeseriesCollection.getMongo();
+const mongos = coll.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const donor0 = new Mongo(topology.shards[donorShardNames[0]].primary);
 const donor1 = new Mongo(topology.shards[donorShardNames[1]].primary);
@@ -101,14 +108,15 @@ reshardingTest.withReshardingInBackground(
 
         // Wait for TTL to delete the docs on the source
         // collection.
-        TTLUtil.waitForPass(donor0.getDB('reshardingDb'));
+        TTLUtil.waitForPass(donor0.getDB(db.getName()));
         assertNumOfDocs(2);
     });
 
 // Verify that donor has delete oplog entry and recipient has a corresponding applyOps entry.
-const bucketNss = "reshardingDb.system.buckets.coll";
 const ttlDeleteEntryDonor =
-    donor0.getCollection('local.oplog.rs').find({"op": "d", "ns": bucketNss}).toArray();
+    donor0.getCollection('local.oplog.rs')
+        .find({"op": "d", "ns": getTimeseriesCollForDDLOps(db, coll).getFullName()})
+        .toArray();
 assert.eq(1, ttlDeleteEntryDonor.length, ttlDeleteEntryDonor);
 
 const ttlDeleteApplyOpsEntryRecipient =
@@ -116,8 +124,11 @@ const ttlDeleteApplyOpsEntryRecipient =
 assert.eq(1, ttlDeleteApplyOpsEntryRecipient.length, ttlDeleteApplyOpsEntryRecipient);
 assert.eq("c", ttlDeleteApplyOpsEntryRecipient[0].op, ttlDeleteApplyOpsEntryRecipient[0]);
 const applyOps = ttlDeleteApplyOpsEntryRecipient[0].o.applyOps[0];
-assert(applyOps.ns.includes("reshardingDb.system.buckets.resharding"));
-
+if (areViewlessTimeseriesEnabled(db)) {
+    assert(applyOps.ns.includes(`${db.getName()}.system.resharding`));
+} else {
+    assert(applyOps.ns.includes(`${db.getName()}.${getTimeseriesBucketsColl("resharding")}`));
+}
 // Ensure TTL deletes works on the resharded collection.
 const pauseTTLMonitor =
     configureFailPoint(recipient0, 'hangTTLMonitorBetweenPasses', {}, "alwaysOn");
@@ -125,7 +136,7 @@ pauseTTLMonitor.wait();
 insertDocsToBeDeleted();
 assertNumOfDocs(4);
 pauseTTLMonitor.off();
-TTLUtil.waitForPass(recipient0.getDB("reshardingDb"));
+TTLUtil.waitForPass(recipient0.getDB(db.getName()));
 assertNumOfDocs(2);
 
 reshardingTest.teardown();

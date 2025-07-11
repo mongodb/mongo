@@ -5,6 +5,8 @@
 // ]
 //
 
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 const ns = "reshardingDb.coll";
 
@@ -19,7 +21,7 @@ const timeseriesInfo = {
     metaField: 'meta'
 };
 
-const timeseriesCollection = reshardingTest.createShardedCollection({
+const coll = reshardingTest.createShardedCollection({
     ns: ns,
     shardKeyPattern: {'meta.x': 1},
     chunks: [
@@ -30,6 +32,7 @@ const timeseriesCollection = reshardingTest.createShardedCollection({
         timeseries: timeseriesInfo,
     }
 });
+const db = coll.getDB();
 
 const bucket2 = {
     data: 3,
@@ -38,13 +41,10 @@ const bucket2 = {
 };
 
 // Create two buckets one on each donor.
-assert.commandWorked(timeseriesCollection.insert([
+assert.commandWorked(coll.insert([
     {data: 1, ts: new Date(), meta: {x: -2, y: 1}},
     bucket2,
 ]));
-
-const bucketNss = "reshardingDb.system.buckets.coll";
-const bucketsColl = reshardingTest._st.s.getDB("reshardingDb").getCollection('system.buckets.coll');
 
 reshardingTest.withReshardingInBackground(
     {
@@ -53,29 +53,31 @@ reshardingTest.withReshardingInBackground(
             [{min: {'meta.y': MinKey}, max: {'meta.y': MaxKey}, shard: recipientShardNames[0]}],
     },
     () => {
-        const mongos = timeseriesCollection.getMongo();
+        const mongos = coll.getMongo();
         assert.soon(() => {
-            const coordinatorDoc =
-                mongos.getCollection("config.reshardingOperations").findOne({ns: bucketNss});
+            const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
+                ns: getTimeseriesCollForDDLOps(db, coll).getFullName()
+            });
             return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
         });
 
         // Change bucket2's _id to match bucket1's _id.
-        const newId = bucketsColl.findOne({'meta.x': -2})._id;
-        const replacementBucket = bucketsColl.findOne({'meta.x': 2});
+        const newId = getTimeseriesCollForRawOps(db, coll).findOneWithRawData({'meta.x': -2})._id;
+        const replacementBucket =
+            getTimeseriesCollForRawOps(db, coll).findOneWithRawData({'meta.x': 2});
         const oldId = replacementBucket._id;
         replacementBucket._id = newId;
-        bucketsColl.remove({_id: oldId});
+        getTimeseriesCollForRawOps(db, coll).remove({_id: oldId}, getRawOperationSpec(db));
         // This will add bucket2 to the stash collection.
-        bucketsColl.insert(replacementBucket);
+        getTimeseriesCollForRawOps(db, coll).insert(replacementBucket, getRawOperationSpec(db));
 
         // This will replicate an oplog delete entry. Which should delete bucket1 and cause bucket2
         // to get moved from stash to temporary resharding collection. Leading to an empty stash.
-        bucketsColl.remove({'meta.x': -2});
+        getTimeseriesCollForRawOps(db, coll).remove({'meta.x': -2}, getRawOperationSpec(db));
     });
 
 // Make sure bucket2 exists in the resharded collection.
-const res = bucketsColl.find({}).toArray();
+const res = getTimeseriesCollForRawOps(db, coll).find().rawData().toArray();
 assert.eq(res.length, 1);
 assert.eq(res[0].meta, bucket2.meta);
 
