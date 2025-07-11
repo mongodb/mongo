@@ -94,3 +94,12 @@ commands:
                     incrementing timestamp."
                 type: timestamp
                 optional: true
+            dryRun:
+                description:
+                    "If true, performs a dry-run of the FCV transition (upgrade or
+                    downgrade) without making changes or persisting updates to FCV. Dry-run
+                    mode checks for incompatible features across collections and cluster metadata.
+                    Any detected incompatibilities will result in errors, indicating that the
+                    FCV upgrade or downgrade would fail if it were to be executed."
+                type: safeBool
+                optional: true

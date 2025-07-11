@@ -1,5 +1,8 @@
 version: 1.0.0
 filters:
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/server-fcv
   - "rsm*":
     approvers:
       - 10gen/server-networking-and-observability
@@ -80,5 +83,8 @@ filters:
     approvers:
       - 10gen/server-fcv
   - "test_sharding_startup_in_downgrading_state.js":
+    approvers:
+      - 10gen/server-fcv
+  - "set_fcv_dry_run_mode_downgrade.js":
     approvers:
       - 10gen/server-fcv

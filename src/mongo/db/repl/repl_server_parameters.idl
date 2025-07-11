@@ -716,6 +716,6 @@ feature_flags:
 
     featureFlagSetFcvDryRunMode:
         description: "Feature flag to enable dryRun mode when using setFCV command"
-        cpp_varname: gFeatureFlagSetFcvDryRunMode
+        cpp_varname: feature_flags::gFeatureFlagSetFcvDryRunMode
         default: false
         fcv_gated: false

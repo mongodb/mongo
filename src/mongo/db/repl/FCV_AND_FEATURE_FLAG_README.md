@@ -418,7 +418,9 @@ placed in the helper functions:
 - `_prepareToDowngradeActions`: Any downgrade actions that should be done before taking the global
   lock in S mode should go in this function.
 - `_userCollectionsUassertsForDowngrade`: for any checks on user data or settings that will uassert
-  with the `CannotDowngrade` code if users need to manually clean up user data or settings.
+  with the `CannotDowngrade` code if users need to manually clean up user data or settings. It must
+  not modify any user data or system state. It only checks preconditions for downgrades and fails
+  if they are unmet.
 
 `_runDowngrade:` \_runDowngrade performs all the metadata-changing actions of an FCV downgrade. Any
 new feature specific downgrade code should be placed in the `_runDowngrade` helper functions:
