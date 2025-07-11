@@ -1475,14 +1475,34 @@ struct DistinctNode : public QuerySolutionNodeWithSortSet {
     bool fetched() const override {
         return isFetching;
     }
+
     FieldAvailability getFieldAvailability(const std::string& field) const override {
+        // Compound hashed indexes can be covered when the projection is not on the hashed field.
+        // Other custom index access methods may return non-exact key data - this function is
+        // currently used for covering exact key data only.
+        auto indexPluginName = IndexNames::findPluginName(index.keyPattern);
+        switch (IndexNames::nameToType(indexPluginName)) {
+            case IndexType::INDEX_BTREE:
+            case IndexType::INDEX_HASHED:
+                break;
+            default:
+                // All other index types provide no fields.
+                return FieldAvailability::kNotProvided;
+        }
+
+        const auto keyElem = index.keyPattern[field];
+        if (keyElem.eoo()) {
+            return FieldAvailability::kNotProvided;
+        }
+
         // The distinct scan can return collation keys, but we can still consider the field fully
         // provided. This is because the logic around when the index bounds might incorporate
         // collation keys does not rely on 'getFieldAvailability()'. As a future improvement, we
         // could look into using 'getFieldAvailabilty()' for collation covering analysis.
-        return index.keyPattern[field].eoo() ? FieldAvailability::kNotProvided
-                                             : FieldAvailability::kFullyProvided;
+        return keyElem.isNumber() ? FieldAvailability::kFullyProvided
+                                  : FieldAvailability::kHashedValueProvided;
     }
+
     bool sortedByDiskLoc() const override {
         return false;
     }
