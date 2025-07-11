@@ -203,22 +203,6 @@ public:
         ASSERT_EQ(net().getCounters(), expected);
     }
 
-    void assertNumOpsSoon(const ExpectedCounters& expected,
-                          Milliseconds timeout,
-                          long long period = 100) {
-        ClockSource::StopWatch stopwatch;
-        NetworkInterface::Counters counters;
-        while (stopwatch.elapsed() < timeout) {
-            counters = net().getCounters();
-            if (counters == expected) {
-                break;
-            }
-            sleepmillis(period);
-        }
-
-        ASSERT_EQ(counters, expected);
-    }
-
     void setUp() override {
         startNet();
     }
@@ -236,13 +220,12 @@ public:
                                          bool fireAndForget = false,
                                          boost::optional<ErrorCodes::Error> timeoutCode = {},
                                          boost::optional<UUID> operationKey = {}) {
-        if (!operationKey) {
-            operationKey = UUID::gen();
-        }
 
         auto cs = fixture();
-        cmd = cmd.addField(
-            BSON(GenericArguments::kClientOperationKeyFieldName << *operationKey).firstElement());
+        if (operationKey) {
+            cmd = cmd.addField(BSON(GenericArguments::kClientOperationKeyFieldName << *operationKey)
+                                   .firstElement());
+        }
 
         RemoteCommandRequest request(cs.getServers().front(),
                                      DatabaseName::kAdmin,
@@ -484,10 +467,14 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotely) {
     auto deferred = [&] {
         // Kick off an "echo" operation, which should block until cancelCommand causes
         // the operation to be killed.
-        auto deferred =
-            runCommand(cbh,
-                       makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */),
-                       cancellationSource.token());
+        auto deferred = runCommand(cbh,
+                                   makeTestCommand(kNoTimeout,
+                                                   makeEchoCmdObj(),
+                                                   /*opCtx=*/nullptr,
+                                                   /*fireAndForget=*/false,
+                                                   /*timeoutCode=*/{},
+                                                   /*operationKey=*/UUID::gen()),
+                                   cancellationSource.token());
 
         // Wait for the "echo" operation to start.
         numCurrentOpRan += waitForCommandToStart("echo", kMaxWait);
@@ -540,10 +527,14 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
     CancellationSource cancellationSource;
     auto deferred = [&] {
         // Kick off a blocking "echo" operation.
-        auto deferred =
-            runCommand(cbh,
-                       makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */),
-                       cancellationSource.token());
+        auto deferred = runCommand(cbh,
+                                   makeTestCommand(kNoTimeout,
+                                                   makeEchoCmdObj(),
+                                                   /*opCtx=*/nullptr,
+                                                   /*fireAndForget=*/false,
+                                                   /*timeoutCode=*/{},
+                                                   /*operationKey=*/UUID::gen()),
+                                   cancellationSource.token());
 
         // Wait for the "echo" operation to start.
         numCurrentOpRan += waitForCommandToStart("echo", kMaxWait);
@@ -703,7 +694,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, TimeoutGeneralNetworkInterfa
     auto result = deferred.get(interruptible());
 
     ASSERT_EQ(ErrorCodes::NetworkInterfaceExceededTimeLimit, result.status);
-    assertNumOpsSoon({.canceled = 0u, .timedOut = 1u, .failed = 0u, .succeeded = 2u}, kMaxWait);
+    assertNumOps({.canceled = 0u, .timedOut = 1u, .failed = 0u, .succeeded = 1u});
 }
 
 /**
@@ -757,7 +748,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeout) {
     ASSERT_EQ(result.target, fixture().getServers().front());
     // The "ping" will have timed out on the client side, and then because of that a
     // "_killOperations" command will be sent to the server, and that will succeed.
-    assertNumOpsSoon({.canceled = 0u, .timedOut = 1u, .failed = 0u, .succeeded = 1u}, kMaxWait);
+    assertNumOps({.canceled = 0u, .timedOut = 1u, .failed = 0u, .succeeded = 0u});
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineSooner) {
@@ -801,7 +792,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
 
     // Sleep has timed out but _killOperations may still be running. We can't use
     // waitForCommandToStop since there is no guarantee when _killOperations starts.
-    assertNumOpsSoon({.canceled = 0u, .timedOut = 1u, .failed = 0u, .succeeded = 1u}, kMaxWait);
+    assertNumOps({.canceled = 0u, .timedOut = 1u, .failed = 0u, .succeeded = 0u});
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
@@ -846,11 +837,16 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
 
     // Sleep has timed out but _killOperations may still be running. We can't use
     // waitForCommandToStop since there is no guarantee when _killOperations starts.
-    assertNumOpsSoon({.canceled = 0u, .timedOut = 1u, .failed = 0u, .succeeded = 1u}, kMaxWait);
+    assertNumOps({.canceled = 0u, .timedOut = 1u, .failed = 0u, .succeeded = 0u});
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, StartCommand) {
-    auto request = makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */);
+    auto request = makeTestCommand(kNoTimeout,
+                                   makeEchoCmdObj(),
+                                   /*opCtx=*/nullptr,
+                                   /*fireAndForget=*/false,
+                                   /*timeoutCode=*/{},
+                                   /*operationKey=*/UUID::gen());
 
     auto deferred = runCommand(makeCallbackHandle(), std::move(request));
 
