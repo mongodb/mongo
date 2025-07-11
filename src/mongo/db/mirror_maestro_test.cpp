@@ -77,8 +77,10 @@ public:
         _replCoord->setGetConfigReturnValue(config);
         repl::ReplicationCoordinator::set(service, std::move(replCoord));
 
-        MirrorMaestro::init(service);
-        setExecutor_forTest(getServiceContext(), _executor);
+        if (initMaestro()) {
+            MirrorMaestro::init(service);
+            setExecutor_forTest(getServiceContext(), _executor);
+        }
     }
 
     void tearDown() override {
@@ -91,6 +93,10 @@ public:
         MirrorMaestro::shutdown(getServiceContext());
         ServiceContextTest::tearDown();
     }
+
+    virtual bool initMaestro() const {
+        return true;
+    };
 
     void onCommand(executor::NetworkTestEnv::OnCommandFunction func) {
         _networkTestEnv->onCommand(func);
@@ -394,6 +400,53 @@ TEST_F(MirrorMaestroTest, AssertExpectedHostsTargeted) {
     future.default_timed_get();
 
     ASSERT_EQ(hosts, targetedHosts);
+}
+
+TEST_F(MirrorMaestroTest, UninitializedConfigDefersHostCompute) {
+    auto service = getServiceContext();
+
+    // Set the sampling rate for targeted mirroring to always mirror
+    auto param = BSON("samplingRate"
+                      << 0.0 << "targetedMirroring"
+                      << BSON("samplingRate" << 1.0 << "maxTimeMS" << 500 << "tag" << kEastTag));
+    ServerParameterControllerForTest controller("mirrorReads", param);
+
+    // Create an uninitialized config.
+    auto config = repl::ReplSetConfig();
+    _replCoord->setGetConfigReturnValue(config);
+
+    // Attempt to update cached hosts and assert host size.
+    updateCachedHostsForTargetedMirroring_forTest(service, config, false /* tagChanged */);
+    ASSERT_EQ(0, getCachedHostsForTargetedMirroring_forTest(service).size());
+
+    // Update the config to be initialized.
+    auto newConfig = makeConfig(2 /* version */, 1 /* term */, kEastTag, kWestTag);
+    _replCoord->setGetConfigReturnValue(newConfig);
+
+    // Host list should be computed upon getting.
+    auto hosts = getCachedHostsForTargetedMirroring_forTest(service);
+    ASSERT_EQ(1, hosts.size());
+    ASSERT_EQ((hosts)[0].toString(), kHost1);
+}
+
+class NoInitMirrorTest : public MirrorMaestroTest {
+public:
+    bool initMaestro() const override {
+        return false;
+    }
+};
+
+TEST_F(NoInitMirrorTest, UninitMirrorMaestorDoesNotTargetHosts) {
+    auto config = makeConfig(2 /* version */, 1 /* term */, kEastTag, kWestTag);
+    _replCoord->setGetConfigReturnValue(config);
+
+    auto param = BSON("samplingRate"
+                      << 0.0 << "targetedMirroring"
+                      << BSON("samplingRate" << 1.0 << "maxTimeMS" << 500 << "tag" << kEastTag));
+    ServerParameterControllerForTest controller("mirrorReads", param);
+
+    // Uninitialized MirrorMaestro should have 0 hosts that are targeted.
+    ASSERT_EQ(0, getCachedHostsForTargetedMirroring_forTest(getServiceContext()).size());
 }
 
 }  // namespace

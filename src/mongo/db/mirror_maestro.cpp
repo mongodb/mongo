@@ -173,8 +173,12 @@ public:
 
     void overrideExecutor_forTest(std::shared_ptr<executor::TaskExecutor> executor);
 
-    auto getExecutor() {
+    auto getExecutor() const {
         return _executor;
+    }
+
+    auto isInitialized() const {
+        return _isInitialized.load();
     }
 
     /**
@@ -254,6 +258,7 @@ public:
                 }
             }
 
+            consumeDeferHostCompute();
             auto updatedHosts = std::make_shared<TaggedHostsType>();
             auto& updatedHostsValue = *updatedHosts;
             updatedHostsValue.configVersionAndTerm = replSetConfig.getConfigVersionAndTerm();
@@ -280,12 +285,20 @@ public:
             return {};
         }
 
+        void setDeferHostCompute() {
+            _deferHostCompute.store(true);
+        }
+
+        bool consumeDeferHostCompute() {
+            return _deferHostCompute.swap(false);
+        }
 
     private:
         // Mutex used only to serialize updates to _hosts
         stdx::mutex _mutex;
         static thread_local VersionedTaggedHostsType::Snapshot _taggedHostsSnapshot;
         VersionedTaggedHostsType _hosts;
+        Atomic<bool> _deferHostCompute{false};
     };
 
 private:
@@ -310,6 +323,23 @@ private:
         }
 
         return {"", ""};
+    }
+
+    /**
+     * Checks if config is uninitialized and signals to defer host computation accordingly.
+     */
+    bool _maybeDeferHostCompute(repl::ReplSetConfig config) {
+        if (!config.isInitialized()) {
+            // If the config is not yet initialized, then we must defer computation of the host list
+            // until we get the relevant information.
+            LOGV2_INFO(10735900,
+                       "Defering computation of targeted mirroring host list since config is "
+                       "uninitialized");
+            _cachedHostsForTargetedMirroring.setDeferHostCompute();
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -369,13 +399,6 @@ thread_local MirrorMaestroImpl::TargetedHostsCacheManager::VersionedTaggedHostsT
 thread_local MirrorMaestroImpl::VersionedParamsType::Snapshot MirrorMaestroImpl::_paramsSnapshot;
 
 const auto getMirrorMaestroImpl = ServiceContext::declareDecoration<MirrorMaestroImpl>();
-
-void updateMirroredReadsServerParameter(ServiceContext* serviceContext,
-                                        MirroredReadsParameters params) {
-    auto& impl = getMirrorMaestroImpl(serviceContext);
-
-    impl.updateMirroringOptions(params);
-}
 
 // Define a new serverStatus section "mirroredReads"
 class MirroredReadsSection final : public ServerStatusSection {
@@ -512,6 +535,27 @@ auto parseMirroredReadsParameters(const BSONObj& obj) {
     return MirroredReadsParameters::parse(ctx, obj);
 }
 
+Status setMirrorReadsParameter(const BSONObj& param) try {
+    auto serverParam = ServerParameterSet::getNodeParameterSet()->get<MirroredReadsServerParameter>(
+        kMirroredReadsParamName);
+    serverParam->_data = parseMirroredReadsParameters(param);
+
+    if (!hasGlobalServiceContext()) {
+        return Status::OK();
+    }
+
+    auto service = getGlobalServiceContext();
+    auto& impl = getMirrorMaestroImpl(service);
+    if (!impl.isInitialized()) {
+        return Status::OK();
+    }
+    impl.updateMirroringOptions(serverParam->_data.get());
+
+    return Status::OK();
+} catch (const AssertionException& e) {
+    return e.toStatus();
+}
+
 }  // namespace
 
 void MirroredReadsServerParameter::append(OperationContext*,
@@ -524,30 +568,14 @@ void MirroredReadsServerParameter::append(OperationContext*,
 
 Status MirroredReadsServerParameter::set(const BSONElement& value,
                                          const boost::optional<TenantId>&) try {
-    auto obj = value.Obj();
-
-    _data = parseMirroredReadsParameters(obj);
-
-    if (hasGlobalServiceContext()) {
-        updateMirroredReadsServerParameter(getGlobalServiceContext(), _data.get());
-    }
-
-    return Status::OK();
+    return setMirrorReadsParameter(value.Obj());
 } catch (const AssertionException& e) {
     return e.toStatus();
 }
 
 Status MirroredReadsServerParameter::setFromString(StringData str,
                                                    const boost::optional<TenantId>&) try {
-    auto obj = fromjson(str);
-
-    _data = parseMirroredReadsParameters(obj);
-
-    if (hasGlobalServiceContext()) {
-        updateMirroredReadsServerParameter(getGlobalServiceContext(), _data.get());
-    }
-
-    return Status::OK();
+    return setMirrorReadsParameter(fromjson(str));
 } catch (const AssertionException& e) {
     return e.toStatus();
 }
@@ -607,12 +635,17 @@ void MirrorMaestroImpl::updateMirroringOptions(MirroredReadsParameters params) {
         return;
     }
 
+    auto config = _topologyVersionObserver.getReplSetConfig();
+    if (_maybeDeferHostCompute(config)) {
+        return;
+    }
+
     auto targetedParams = _paramsSnapshot->getTargetedMirroring();
 
     // If targeted mirroring was previously enabled and is now disabled, clear the tagged hosts list
     if (targetedParams.getSamplingRate() == 0 && !prevTag.isEmpty()) {
         _cachedHostsForTargetedMirroring.maybeUpdateHosts(
-            toTagFromBSON({}), _topologyVersionObserver.getReplSetConfig(), true /* tagChanged */);
+            toTagFromBSON({}), config, true /* tagChanged */);
         return;
     }
 
@@ -621,18 +654,32 @@ void MirrorMaestroImpl::updateMirroringOptions(MirroredReadsParameters params) {
     if (auto currTag = targetedParams.getTag(); prevRate == 0 ||
         (targetedParams.getSamplingRate() != 0 && prevTag.woCompare(currTag) != 0)) {
         _cachedHostsForTargetedMirroring.maybeUpdateHosts(
-            toTagFromBSON(currTag),
-            _topologyVersionObserver.getReplSetConfig(),
-            true /* tagChanged */);
+            toTagFromBSON(currTag), config, true /* tagChanged */);
     }
 }
 
 std::vector<HostAndPort> MirrorMaestroImpl::getCachedHostsForTargetedMirroring() {
+    if (MONGO_unlikely(_cachedHostsForTargetedMirroring.consumeDeferHostCompute())) {
+        auto config = _topologyVersionObserver.getReplSetConfig();
+
+        // If the config is still uninitialized, early return.
+        if (_maybeDeferHostCompute(config)) {
+            return {};
+        }
+
+        auto targetedParams = _paramsSnapshot->getTargetedMirroring();
+        auto currTag = targetedParams.getTag();
+        _cachedHostsForTargetedMirroring.maybeUpdateHosts(
+            toTagFromBSON(currTag), config, true /* tagChanged */);
+    }
     return _cachedHostsForTargetedMirroring.getHosts();
 }
 
 void MirrorMaestroImpl::updateCachedHostsForTargetedMirroring(
     const repl::ReplSetConfig& replSetConfig, bool tagChanged) {
+    if (_maybeDeferHostCompute(replSetConfig)) {
+        return;
+    }
     _cachedHostsForTargetedMirroring.maybeUpdateHosts(
         _getTagForTargetedMirror(), replSetConfig, tagChanged);
 }
@@ -694,7 +741,7 @@ void MirrorMaestroImpl::tryMirror(const std::shared_ptr<CommandInvocation>& invo
     auto mirrorCount =
         std::ceil(_paramsSnapshot->getSamplingRate() * hostsForGeneralMirroring.size());
 
-    auto hostsForTargetedMirroring = _cachedHostsForTargetedMirroring.getHosts();
+    auto hostsForTargetedMirroring = getCachedHostsForTargetedMirroring();
 
     // If there are no hosts to target, and general mirroring is disabled, there is no work to do.
     if (hostsForTargetedMirroring.empty() && !mirrorMode.generalEnabled) {

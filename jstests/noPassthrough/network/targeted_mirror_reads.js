@@ -7,7 +7,6 @@
  * ]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {MirrorReadsHelpers} from "jstests/libs/mirror_reads_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -33,12 +32,25 @@ function verifyParameterOptions(
     assert.eq(parameterOptions.targetedMirroring.tag, expectedTargetedMirroringOptions.tag);
 }
 
+// Test that setting mirrorReads on a standalone is valid.
+const conn = MongoRunner.runMongod();
+assert.commandWorked(conn.getDB("admin").runCommand({
+    setParameter: 1,
+    mirrorReads: {
+        "samplingRate": 0.05,
+        "maxTimeMS": 5234,
+        "targetedMirroring": {"samplingRate": 0.07, "maxTimeMS": 7234, "tag": {"hello": "world"}}
+    }
+}));
+MongoRunner.stopMongod(conn);
+
 const rst = new ReplSetTest({
     nodes: 4,
     nodeOptions: {
         setParameter: {
             "failpoint.mirrorMaestroExpectsResponse": tojson({mode: "alwaysOn"}),
-            "failpoint.mirrorMaestroTracksPending": tojson({mode: "alwaysOn"})
+            "failpoint.mirrorMaestroTracksPending": tojson({mode: "alwaysOn"}),
+            "mirrorReads": tojson({targetedMirroring: {samplingRate: 1.0, tag: {"a": "1"}}})
         }
     }
 });
