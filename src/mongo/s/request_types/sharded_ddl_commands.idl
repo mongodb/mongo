@@ -918,6 +918,16 @@ commands:
         api_version: ""
         reply_type: OkReply
 
+    _shardsvrAbortMigrations:
+        command_name: _shardsvrAbortMigrations
+        cpp_name: ShardsvrAbortMigrations
+        description: "Internal command used to abort in-flight migrations for a specific namespace."
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        reply_type: OkReply
+
     # TODO (SERVER-105110): Remove this command.
     _shardsvrRenameIndexMetadata:
         command_name: _shardsvrRenameIndexMetadata
