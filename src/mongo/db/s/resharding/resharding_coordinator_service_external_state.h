@@ -31,6 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/async_rpc.h"
@@ -39,6 +40,8 @@
 #include "mongo/s/resharding/common_types_gen.h"
 
 namespace mongo {
+
+using resharding::ParticipantShardsAndChunks;
 
 /**
  * Represents the interface that ReshardingCoordinator uses to interact with the rest of the
@@ -52,16 +55,12 @@ namespace mongo {
 
 class ReshardingCoordinatorExternalState {
 public:
-    struct ParticipantShardsAndChunks {
-        std::vector<DonorShardEntry> donorShards;
-        std::vector<RecipientShardEntry> recipientShards;
-        std::vector<ChunkType> initialChunks;
-    };
-
     virtual ~ReshardingCoordinatorExternalState() = default;
 
     virtual ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
-        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) = 0;
+        OperationContext* opCtx,
+        const ReshardingCoordinatorDocument& coordinatorDoc,
+        std::vector<ReshardingZoneType> zones) = 0;
 
     ChunkVersion calculateChunkVersionForInitialChunks(OperationContext* opCtx);
 
@@ -136,7 +135,9 @@ public:
 class ReshardingCoordinatorExternalStateImpl final : public ReshardingCoordinatorExternalState {
 public:
     ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
-        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) override;
+        OperationContext* opCtx,
+        const ReshardingCoordinatorDocument& coordinatorDoc,
+        std::vector<ReshardingZoneType> zones) override;
 
     std::map<ShardId, int64_t> getDocumentsToCopyFromDonors(
         OperationContext* opCtx,

@@ -914,55 +914,52 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
         return;
     }
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-    ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
-    auto provenance = updatedCoordinatorDoc.getCommonReshardingMetadata().getProvenance();
+    auto provenance = _coordinatorDoc.getCommonReshardingMetadata().getProvenance();
 
+    std::vector<ReshardingZoneType> zones;
     if (resharding::isUnshardCollection(provenance)) {
         // Since the resulting collection of an unshardCollection operation cannot have zones, we do
         // not need to account for existing zones in the original collection. Existing zones from
         // the original collection will be deleted after the unsharding operation commits.
         uassert(ErrorCodes::InvalidOptions,
                 "Cannot specify zones when unsharding a collection.",
-                !updatedCoordinatorDoc.getZones());
+                !_coordinatorDoc.getZones());
     } else {
-        // If zones are not provided by the user, we should use the existing zones for
-        // this resharding operation.
-        if (updatedCoordinatorDoc.getForceRedistribution() &&
-            *updatedCoordinatorDoc.getForceRedistribution() && !updatedCoordinatorDoc.getZones()) {
-            auto zones = resharding::getZonesFromExistingCollection(
-                opCtx.get(), updatedCoordinatorDoc.getSourceNss());
-            updatedCoordinatorDoc.setZones(std::move(zones));
+        if (_coordinatorDoc.getZones()) {
+            zones = *_coordinatorDoc.getZones();
+        } else if (_coordinatorDoc.getForceRedistribution() &&
+                   *_coordinatorDoc.getForceRedistribution()) {
+            // If zones are not provided by the user for same-key resharding, we should use the
+            // existing zones for this resharding operation.
+            zones = resharding::getZonesFromExistingCollection(opCtx.get(),
+                                                               _coordinatorDoc.getSourceNss());
         }
     }
 
     auto shardsAndChunks = _reshardingCoordinatorExternalState->calculateParticipantShardsAndChunks(
-        opCtx.get(), updatedCoordinatorDoc);
-
-    updatedCoordinatorDoc.setDonorShards(std::move(shardsAndChunks.donorShards));
-    updatedCoordinatorDoc.setRecipientShards(std::move(shardsAndChunks.recipientShards));
-    updatedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
-
-    // Remove the presetReshardedChunks and zones from the coordinator document to reduce
-    // the possibility of the document reaching the BSONObj size constraint.
-    std::vector<ReshardingZoneType> zones;
-    if (updatedCoordinatorDoc.getZones()) {
-        zones = *updatedCoordinatorDoc.getZones();
-    }
-
-    updatedCoordinatorDoc.setPresetReshardedChunks(boost::none);
-    updatedCoordinatorDoc.setZones(boost::none);
+        opCtx.get(), _coordinatorDoc, zones);
 
     auto isUnsplittable = _reshardingCoordinatorExternalState->getIsUnsplittable(
-                              opCtx.get(), updatedCoordinatorDoc.getSourceNss()) ||
+                              opCtx.get(), _coordinatorDoc.getSourceNss()) ||
         (provenance && provenance.get() == ReshardingProvenanceEnum::kUnshardCollection);
+
+    resharding::PhaseTransitionFn phaseTransitionFn =
+        [=, this](OperationContext* opCtx, resharding::DaoStorageClient* client) {
+            auto updatedDocument = _coordinatorDao.transitionToPreparingToDonatePhase(
+                opCtx, client, shardsAndChunks, _coordinatorDoc.getReshardingUUID());
+            return updatedDocument;
+        };
 
     resharding::writeParticipantShardsAndTempCollInfo(opCtx.get(),
                                                       _metrics.get(),
-                                                      updatedCoordinatorDoc,
+                                                      _coordinatorDoc,
+                                                      std::move(phaseTransitionFn),
                                                       std::move(shardsAndChunks.initialChunks),
                                                       std::move(zones),
                                                       isUnsplittable);
-    installCoordinatorDocOnStateTransition(opCtx.get(), updatedCoordinatorDoc);
+    installCoordinatorDocOnStateTransition(
+        opCtx.get(),
+        resharding::getCoordinatorDoc(opCtx.get(), _coordinatorDoc.getReshardingUUID()));
 
     reshardingPauseCoordinatorAfterPreparingToDonate.pauseWhileSetAndNotCanceled(
         opCtx.get(), _ctHolder->getAbortToken());

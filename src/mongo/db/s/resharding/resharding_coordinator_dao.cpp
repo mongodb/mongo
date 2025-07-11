@@ -33,7 +33,6 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
-#include "mongo/db/s/resharding/resharding_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
@@ -109,6 +108,48 @@ ReshardingCoordinatorDocument TransactionalDaoStorageClientImpl::readState(
 
 using resharding_metrics::getIntervalEndFieldName;
 using resharding_metrics::getIntervalStartFieldName;
+
+ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToPreparingToDonatePhase(
+    OperationContext* opCtx,
+    DaoStorageClient* client,
+    resharding::ParticipantShardsAndChunks shardsAndChunks,
+    const UUID& reshardingUUID) {
+
+    auto doc = client->readState(opCtx, reshardingUUID);
+    invariant(doc.getState() == CoordinatorStateEnum::kInitializing);
+
+    BSONObjBuilder updateBuilder;
+    {
+        BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
+        setBuilder.append(ReshardingCoordinatorDocument::kStateFieldName,
+                          CoordinatorState_serializer(CoordinatorStateEnum::kPreparingToDonate));
+
+        BSONArrayBuilder donorShards(
+            setBuilder.subarrayStart(ReshardingCoordinatorDocument::kDonorShardsFieldName));
+        for (const auto& donorShard : shardsAndChunks.donorShards) {
+            donorShards.append(donorShard.toBSON());
+        }
+        donorShards.doneFast();
+
+        BSONArrayBuilder recipientShards(
+            setBuilder.subarrayStart(ReshardingCoordinatorDocument::kRecipientShardsFieldName));
+        for (const auto& recipientShard : shardsAndChunks.recipientShards) {
+            recipientShards.append(recipientShard.toBSON());
+        }
+        recipientShards.doneFast();
+
+        setBuilder.doneFast();
+
+        // Remove the presetReshardedChunks and zones from the coordinator document to reduce
+        // the possibility of the document reaching the BSONObj size constraint.
+        BSONObjBuilder unsetBuilder(updateBuilder.subobjStart("$unset"));
+        unsetBuilder.append(ReshardingCoordinatorDocument::kPresetReshardedChunksFieldName, "");
+        unsetBuilder.append(ReshardingCoordinatorDocument::kZonesFieldName, "");
+        unsetBuilder.doneFast();
+    }
+
+    return buildAndExecuteRequest(opCtx, client, reshardingUUID, updateBuilder);
+}
 
 ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToCloningPhase(
     OperationContext* opCtx,

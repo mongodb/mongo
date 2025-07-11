@@ -31,6 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
@@ -74,6 +75,12 @@ public:
                                   const UUID& reshardingUUID) {
         return client->readState(opCtx, reshardingUUID).getState();
     }
+
+    ReshardingCoordinatorDocument transitionToPreparingToDonatePhase(
+        OperationContext* opCtx,
+        DaoStorageClient* client,
+        ParticipantShardsAndChunks shardsAndChunks,
+        const UUID& reshardingUUID);
 
     ReshardingCoordinatorDocument transitionToCloningPhase(OperationContext* opCtx,
                                                            DaoStorageClient* client,

@@ -90,6 +90,77 @@ TEST_F(ReshardingCoordinatorDaoFixture, GetPhase) {
     ASSERT_EQUALS(phase, CoordinatorStateEnum::kApplying);
 }
 
+TEST_F(ReshardingCoordinatorDaoFixture, TransitionToPreparingToDonatePhaseSucceeds) {
+    DonorShardContext donorContext;
+    donorContext.setState(DonorStateEnum::kUnused);
+    std::vector<DonorShardEntry> donorShards = {{ShardId("donorShard1"), donorContext},
+                                                {ShardId("donorShard2"), donorContext}};
+
+    RecipientShardContext recipientContext;
+    recipientContext.setState(RecipientStateEnum::kUnused);
+    std::vector<RecipientShardEntry> recipientShards = {
+        {ShardId("recipientShard1"), recipientContext},
+        {ShardId("recipientShard2"), recipientContext}};
+
+    std::vector<ChunkType> initialChunks;
+    auto shardsAndChunks =
+        ParticipantShardsAndChunks({donorShards, recipientShards, initialChunks});
+
+    runPhaseTransition(CoordinatorStateEnum::kInitializing, [&]() {
+        _dao->transitionToPreparingToDonatePhase(_opCtx, _client.get(), shardsAndChunks, _uuid);
+    });
+
+    BSONArrayBuilder donorShardsArrayBuilder;
+    for (const auto& shard : donorShards) {
+        donorShardsArrayBuilder.append(shard.toBSON());
+    }
+
+    BSONArrayBuilder recipientShardsArrayBuilder;
+    for (const auto& shard : recipientShards) {
+        recipientShardsArrayBuilder.append(shard.toBSON());
+    }
+
+    auto expectedUpdates = BSON_ARRAY(
+        BSON("q" << BSON("_id" << _uuid) << "u"
+                 << BSON("$set" << BSON("state" << "preparing-to-donate"
+                                                << "donorShards" << donorShardsArrayBuilder.arr()
+                                                << "recipientShards"
+                                                << recipientShardsArrayBuilder.arr())
+                                << "$unset"
+                                << BSON("presetReshardedChunks" << ""
+                                                                << "zones" << ""))
+                 << "multi" << false << "upsert" << false));
+
+    const auto& lastRequest = _client->getLastRequest();
+    ASSERT_EQUALS(lastRequest.getStringField("update"),
+                  NamespaceString::kConfigReshardingOperationsNamespace.coll());
+    auto updates = lastRequest.getObjectField("updates");
+    ASSERT_BSONOBJ_EQ(updates, expectedUpdates);
+}
+
+DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
+             TransitionToPreparingToDonateFailsFromInvalidPreviousPhase,
+             "invariant") {
+    DonorShardContext donorContext;
+    donorContext.setState(DonorStateEnum::kUnused);
+    std::vector<DonorShardEntry> donorShards = {{ShardId("donorShard1"), donorContext},
+                                                {ShardId("donorShard2"), donorContext}};
+
+    RecipientShardContext recipientContext;
+    recipientContext.setState(RecipientStateEnum::kUnused);
+    std::vector<RecipientShardEntry> recipientShards = {
+        {ShardId("recipientShard1"), recipientContext},
+        {ShardId("recipientShard2"), recipientContext}};
+
+    std::vector<ChunkType> initialChunks;
+    auto shardsAndChunks =
+        ParticipantShardsAndChunks({donorShards, recipientShards, initialChunks});
+
+    runPhaseTransition(CoordinatorStateEnum::kPreparingToDonate, [&]() {
+        _dao->transitionToPreparingToDonatePhase(_opCtx, _client.get(), shardsAndChunks, _uuid);
+    });
+}
+
 TEST_F(ReshardingCoordinatorDaoFixture, TransitionToCloningPhaseSucceeds) {
     auto bytesToCopy = 100;
     auto documentsToCopy = 5;

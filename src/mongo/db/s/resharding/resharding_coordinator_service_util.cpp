@@ -684,23 +684,27 @@ void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
 
-void writeParticipantShardsAndTempCollInfo(
-    OperationContext* opCtx,
-    ReshardingMetrics* metrics,
-    const ReshardingCoordinatorDocument& updatedCoordinatorDoc,
-    std::vector<ChunkType> initialChunks,
-    std::vector<ReshardingZoneType> zones,
-    boost::optional<bool> isUnsplittable) {
+void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
+                                           ReshardingMetrics* metrics,
+                                           const ReshardingCoordinatorDocument& coordinatorDoc,
+                                           PhaseTransitionFn phaseTransitionFn,
+                                           std::vector<ChunkType> initialChunks,
+                                           std::vector<ReshardingZoneType> zones,
+                                           boost::optional<bool> isUnsplittable) {
     const auto tagsQuery = BSON(TagsType::ns(NamespaceStringUtil::serialize(
-        updatedCoordinatorDoc.getTempReshardingNss(), SerializationContext::stateDefault())));
+        coordinatorDoc.getTempReshardingNss(), SerializationContext::stateDefault())));
 
-    removeChunkAndTagsDocs(opCtx, tagsQuery, updatedCoordinatorDoc.getReshardingUUID());
+    removeChunkAndTagsDocs(opCtx, tagsQuery, coordinatorDoc.getReshardingUUID());
     insertChunksForTempNss(opCtx, initialChunks);
 
     ShardingCatalogManager::get(opCtx)->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
         opCtx,
-        updatedCoordinatorDoc.getSourceNss(),
+        coordinatorDoc.getSourceNss(),
         [&](OperationContext* opCtx, TxnNumber txnNumber) {
+            // Update on-disk state to reflect latest state transition.
+            resharding::TransactionalDaoStorageClientImpl client(txnNumber);
+            ReshardingCoordinatorDocument updatedCoordinatorDoc = phaseTransitionFn(opCtx, &client);
+
             // Insert the config.collections entry for the temporary resharding collection. The
             // chunks all have the same epoch, so picking the last chunk here is arbitrary.
             invariant(initialChunks.size() != 0);
@@ -711,14 +715,13 @@ void writeParticipantShardsAndTempCollInfo(
                                                CollationSpec::kSimpleSpec,
                                                isUnsplittable,
                                                txnNumber);
-            // Update on-disk state to reflect latest state transition.
-            writeToCoordinatorStateNss(opCtx, metrics, updatedCoordinatorDoc, txnNumber);
+
             updateConfigCollectionsForOriginalNss(
                 opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
         },
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 
-    setupZonesForTempNss(opCtx, updatedCoordinatorDoc.getTempReshardingNss(), zones);
+    setupZonesForTempNss(opCtx, coordinatorDoc.getTempReshardingNss(), zones);
 }
 
 void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(

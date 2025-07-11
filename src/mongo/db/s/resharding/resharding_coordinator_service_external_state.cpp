@@ -118,10 +118,11 @@ bool ReshardingCoordinatorExternalState::getIsUnsplittable(OperationContext* opC
     return cri.getChunkManager().isUnsplittable();
 }
 
-ReshardingCoordinatorExternalState::ParticipantShardsAndChunks
+resharding::ParticipantShardsAndChunks
 ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
-    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
-
+    OperationContext* opCtx,
+    const ReshardingCoordinatorDocument& coordinatorDoc,
+    const std::vector<ReshardingZoneType> rawZones) {
     const auto cm =
         uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(
             opCtx, coordinatorDoc.getSourceNss()));
@@ -170,12 +171,11 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
         const auto tempNs = coordinatorDoc.getTempReshardingNss();
 
         boost::optional<std::vector<mongo::TagsType>> parsedZones;
-        auto rawBSONZones = coordinatorDoc.getZones();
-        if (rawBSONZones && rawBSONZones->size() != 0) {
+        if (rawZones.size() != 0) {
             parsedZones.emplace();
-            parsedZones->reserve(rawBSONZones->size());
+            parsedZones->reserve(rawZones.size());
 
-            for (const auto& zone : *rawBSONZones) {
+            for (const auto& zone : rawZones) {
                 ChunkRange range(zone.getMin(), zone.getMax());
                 TagsType tag(
                     coordinatorDoc.getTempReshardingNss(), std::string{zone.getZone()}, range);

@@ -114,7 +114,9 @@ public:
         : ReshardingCoordinatorExternalState(), _options(options) {}
 
     ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
-        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) override {
+        OperationContext* opCtx,
+        const ReshardingCoordinatorDocument& coordinatorDoc,
+        std::vector<ReshardingZoneType> zones) override {
         std::vector<ChunkType> initialChunks;
         auto version = calculateChunkVersionForInitialChunks(opCtx);
 

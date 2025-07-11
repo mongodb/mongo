@@ -78,6 +78,7 @@ void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
 void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
                                            ReshardingMetrics* metrics,
                                            const ReshardingCoordinatorDocument& coordinatorDoc,
+                                           PhaseTransitionFn phaseTransitionFn,
                                            std::vector<ChunkType> initialChunks,
                                            std::vector<ReshardingZoneType> zones,
                                            boost::optional<bool> isUnsplittable);

@@ -83,6 +83,12 @@ constexpr auto kReshardFinalOpLogType = "reshardFinalOp"_sd;
 constexpr auto kReshardProgressMarkOpLogType = "reshardProgressMark"_sd;
 static const auto kReshardErrorMaxBytes = 2000;
 
+struct ParticipantShardsAndChunks {
+    std::vector<DonorShardEntry> donorShards;
+    std::vector<RecipientShardEntry> recipientShards;
+    std::vector<ChunkType> initialChunks;
+};
+
 /**
  * Emplaces the 'fetchTimestamp' onto the ClassWithFetchTimestamp if the timestamp has been
  * emplaced inside the boost::optional.

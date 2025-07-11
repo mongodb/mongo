@@ -100,6 +100,37 @@ using unittest::assertGet;
 const std::string kZone1 = "zone1";
 const std::string kZone2 = "zone2";
 
+PhaseTransitionFn createPreparingToDonateDaoUpdate(
+    ReshardingCoordinatorDocument expectedCoordinatorDoc) {
+    return [expectedCoordinatorDoc](OperationContext* opCtx, DaoStorageClient* /* client */) {
+        DBDirectClient client(opCtx);
+        const BSONObj query(BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName
+                                 << expectedCoordinatorDoc.getReshardingUUID() << "ns"
+                                 << expectedCoordinatorDoc.getSourceNss().ns_forTest()));
+
+        BSONArrayBuilder donorShardsArrayBuilder;
+        for (const auto& shard : expectedCoordinatorDoc.getDonorShards()) {
+            donorShardsArrayBuilder.append(shard.toBSON());
+        }
+
+        BSONArrayBuilder recipientShardsArrayBuilder;
+        for (const auto& shard : expectedCoordinatorDoc.getRecipientShards()) {
+            recipientShardsArrayBuilder.append(shard.toBSON());
+        }
+
+        auto updates =
+            BSON("$set" << BSON("state" << "preparing-to-donate"
+                                        << "donorShards" << donorShardsArrayBuilder.arr()
+                                        << "recipientShards" << recipientShardsArrayBuilder.arr())
+                        << "$unset"
+                        << BSON("presetReshardedChunks" << ""
+                                                        << "zones" << ""));
+
+        client.update(NamespaceString::kConfigReshardingOperationsNamespace, query, updates);
+        return expectedCoordinatorDoc;
+    };
+}
+
 class ReshardingCoordinatorPersistenceTest : public ConfigServerTestFixture {
 protected:
     void setUp() override {
@@ -667,30 +698,38 @@ protected:
 
     void writeInitialStateAndCatalogUpdatesExpectSuccess(
         OperationContext* opCtx,
-        ReshardingCoordinatorDocument expectedCoordinatorDoc,
+        ReshardingCoordinatorDocument coordinatorDoc,
         std::vector<ChunkType> initialChunks,
         std::vector<TagsType> newZones) {
-        setupSourceCollection(opCtx, expectedCoordinatorDoc);
+        setupSourceCollection(opCtx, coordinatorDoc);
 
         auto reshardingCoordinatorExternalState = ReshardingCoordinatorExternalStateImpl();
 
-        insertCoordDocAndChangeOrigCollEntry(opCtx, _metrics.get(), expectedCoordinatorDoc);
+        insertCoordDocAndChangeOrigCollEntry(opCtx, _metrics.get(), coordinatorDoc);
 
+        auto zones = *coordinatorDoc.getZones();
         auto shardsAndChunks =
             reshardingCoordinatorExternalState.calculateParticipantShardsAndChunks(
-                opCtx, expectedCoordinatorDoc);
+                opCtx, coordinatorDoc, zones);
+
+        auto expectedCoordinatorDoc = coordinatorDoc;
 
         expectedCoordinatorDoc.setDonorShards(std::move(shardsAndChunks.donorShards));
         expectedCoordinatorDoc.setRecipientShards(std::move(shardsAndChunks.recipientShards));
 
         expectedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
-
-        auto zones = *expectedCoordinatorDoc.getZones();
         expectedCoordinatorDoc.setZones(boost::none);
         expectedCoordinatorDoc.setPresetReshardedChunks(boost::none);
 
-        writeParticipantShardsAndTempCollInfo(
-            opCtx, _metrics.get(), expectedCoordinatorDoc, initialChunks, zones, boost::none);
+        PhaseTransitionFn mockTransitionFn =
+            createPreparingToDonateDaoUpdate(expectedCoordinatorDoc);
+        writeParticipantShardsAndTempCollInfo(opCtx,
+                                              _metrics.get(),
+                                              expectedCoordinatorDoc,
+                                              std::move(mockTransitionFn),
+                                              initialChunks,
+                                              zones,
+                                              boost::none);
 
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly
@@ -951,20 +990,21 @@ TEST_F(ReshardingCoordinatorPersistenceTest, ThrowsWhenZoneSpecifiedDoesNotExist
     insertCoordDocAndChangeOrigCollEntry(
         operationContext(), _metrics.get(), expectedCoordinatorDoc);
 
+    auto zones = *expectedCoordinatorDoc.getZones();
     auto shardsAndChunks = reshardingCoordinatorExternalState.calculateParticipantShardsAndChunks(
-        operationContext(), expectedCoordinatorDoc);
+        operationContext(), expectedCoordinatorDoc, zones);
 
     expectedCoordinatorDoc.setDonorShards(std::move(shardsAndChunks.donorShards));
     expectedCoordinatorDoc.setRecipientShards(std::move(shardsAndChunks.recipientShards));
     expectedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
-
-    auto zones = *expectedCoordinatorDoc.getZones();
     expectedCoordinatorDoc.setZones(boost::none);
     expectedCoordinatorDoc.setPresetReshardedChunks(boost::none);
 
+    PhaseTransitionFn mockTransitionFn = createPreparingToDonateDaoUpdate(expectedCoordinatorDoc);
     ASSERT_THROWS_CODE(writeParticipantShardsAndTempCollInfo(operationContext(),
                                                              _metrics.get(),
                                                              expectedCoordinatorDoc,
+                                                             std::move(mockTransitionFn),
                                                              initialChunks,
                                                              zones,
                                                              boost::none),
