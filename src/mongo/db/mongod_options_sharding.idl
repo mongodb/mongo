@@ -95,3 +95,11 @@ configs:
         source: yaml
         arg_vartype: Int
         validator: {gte: 0, lte: 65535}
+    replicaSetConfigShardMaintenanceMode:
+        description: >-
+            Bypasses validation of configuration mismatches between startup parameters and the
+            stored replSetConfig. Enables restarting the node as a configsvr even if the stored
+            configuration is for a replica set, and vice versa.
+        arg_vartype: Switch
+        source: [cli, ini]
+        conflicts: shardsvr

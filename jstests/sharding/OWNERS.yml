@@ -58,3 +58,6 @@ filters:
   - "start_shard_draining*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "replica_set_to_csrs_promotion.js":
+    approvers:
+      - 10gen/server-catalog-and-routing

@@ -680,6 +680,16 @@ void ShardingInitializationMongoD::onConsistentDataAvailable(OperationContext* o
         return;
     }
 
+    if (serverGlobalParams.replicaSetConfigShardMaintenanceMode) {
+        if (!feature_flags::gFeatureFlagEnableReplicasetTransitionToCSRS.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            LOGV2_FATAL(10718400,
+                        "replicaSetConfigShardMaintenanceMode is prohibited if "
+                        "featureFlagEnableReplicasetTransitionToCSRS is disabled");
+        }
+    }
+
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         initializeGlobalShardingStateForConfigServer(opCtx);
     }

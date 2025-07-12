@@ -264,6 +264,15 @@ Status validateMongodOptions(const moe::Environment& params) {
         }
     }
 
+    if (params.count("replicaSetConfigShardMaintenanceMode")) {
+        bool isReplSet = params.count("replSet") || params.count("replication.replSet");
+        if (!isReplSet && !setConfigRole) {
+            return Status(ErrorCodes::BadValue,
+                          "replicaSetConfigShardMaintenanceMode can only be used on replicasets or "
+                          "configservers");
+        }
+    }
+
     if (params.count("storage.queryableBackupMode")) {
         // Command line options that are disallowed when --queryableBackupMode is specified.
         for (const auto& disallowedOption :
@@ -597,6 +606,9 @@ Status storeMongodOptions(const moe::Environment& params) {
         serverGlobalParams.maintenanceMode = (value == "replicaSet")
             ? ServerGlobalParams::ReplicaSetMode
             : ServerGlobalParams::StandaloneMode;
+    }
+    if (params.count("replicaSetConfigShardMaintenanceMode")) {
+        serverGlobalParams.replicaSetConfigShardMaintenanceMode = true;
     }
 
     const auto replSettingsWithStatus = populateReplSettings(params);

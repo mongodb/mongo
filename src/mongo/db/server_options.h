@@ -91,8 +91,9 @@ struct ServerGlobalParams {
 
     AtomicWord<bool> quiet{false};  // --quiet
 
-    ClusterRole clusterRole = ClusterRole::None;  // --configsvr/--shardsvr
-    MaintenanceMode maintenanceMode;              // --maintenanceMode
+    ClusterRole clusterRole = ClusterRole::None;       // --configsvr/--shardsvr
+    MaintenanceMode maintenanceMode;                   // --maintenanceMode
+    bool replicaSetConfigShardMaintenanceMode{false};  // --replicaSetConfigShardMaintenanceMode
 
     boost::optional<int> routerPort;      // --routerPort
     boost::optional<int> proxyPort;       // --proxyPort
