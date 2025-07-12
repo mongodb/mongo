@@ -3,7 +3,7 @@
  *
  * @tags: [
  *   requires_replication,
- *   requires_fcv_82,
+ * featureFlagTargetedMirrorReads,
  * ]
  */
 
