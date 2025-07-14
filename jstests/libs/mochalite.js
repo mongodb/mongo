@@ -53,48 +53,65 @@
  *    });
  */
 
+// use grep from global context if available, else match everything
+let GREP = globalThis._mocha_grep ?? ".*";
+try {
+    GREP = new RegExp(GREP);
+} catch (e) {
+    throw new Error(`Failed to create regex from '${GREP}': ${e.message}`);
+}
+
+class Printer {
+    static printPass(title) {
+        jsTest.log.info(`✔ ${title}`);
+    }
+
+    static printFailure(title, error) {
+        const red = msg => `\x1b[31m${msg}\x1b[0m`;
+        jsTest.log.error(red(`✘ ${title}`), {error});
+    }
+}
+
 // Context to be passed into each test and hook
 class Context {}
 
-// Test to be run with a given Context
-class Test {
-    #titleArray;
-    #fn;
-    static #titleSep = " > ";
+class Scope {
+    constructor(title = [], fn = null) {
+        this.title = title;
+        this.fn = fn;
 
-    constructor(title, fn) {
-        this.#titleArray = title;
-        this.#fn = fn;
-    }
+        this.ctx = new Context();
 
-    fullTitle() {
-        return this.#titleArray.join(Test.#titleSep);
+        this.parent = null;
+        this.children = [];
     }
 
     /**
-     * Invoke the test function with the given context.
-     * @param {Context} ctx
+     * Add a child scope to this scope.
+     * @param {Scope} scope
+     */
+    addChild(scope) {
+        scope.ctx = this.ctx;
+        scope.parent = this;
+        this.children.push(scope);
+    }
+
+    /**
+     * Run all child scopes, async but serially.
      * @async
      */
-    async run(ctx) {
-        return this.#fn.call(ctx);
-    }
-
-    printPass() {
-        jsTest.log.info(`✔ ${this.fullTitle()}`);
-    }
-
-    printFailure(error) {
-        jsTest.log.error(`\x1b[31m✘ ${this.fullTitle()}\x1b[0m`, {error});
+    async run() {
+        for (const child of this.children) {
+            await child.run();
+        }
     }
 }
 
 // Scope to group tests and hooks together with relevant context
-class Scope {
-    constructor() {
-        this.title = [];
-        this.content = [];
-        this.ctx = new Context();
+// This is a Composite pattern where DescribeScope can contain other DescribeScopes or TestScopes
+class DescribeScope extends Scope {
+    constructor(title = [], fn = null) {
+        super(title, fn);
 
         // hooks
         this.before = [];
@@ -103,38 +120,47 @@ class Scope {
         this.after = [];
     }
 
-    static inherit(oldScope) {
-        const newScope = new Scope();
-        newScope.title = [...oldScope.title];
-        newScope.beforeEach = [...oldScope.beforeEach];  // queue
-        newScope.ctx = oldScope.ctx;                     // inherit context
-        return newScope;
+    /**
+     * Discover and gather nested content (nested hooks, describe, and it calls)
+     * @param {*} scope Current scope to discover from
+     * @param {string} title Title of this scope
+     * @param {function} fn Function to execute in this scope
+     */
+    discover(scope) {
+        this.ctx = scope.ctx;
+
+        this.beforeEach = [...scope.beforeEach];  // queue
+
+        // change shared context and invoke the content
+        currScope = this;
+        this.fn.call(scope.ctx);
+
+        this.afterEach = [...this.afterEach, ...scope.afterEach];  // stack of queues
     }
 
-    addContent(block) {
-        this.content.push(block);
-    }
-
+    /**
+     * Add a hook to this scope.
+     * @param {string} hookname
+     * @param {Function} fn
+     */
     addHook(hookname, fn) {
         assertNoFunctionArgs(fn);
         this[hookname].push(fn);
     }
 
+    /**
+     * Check if this scope or any nested scopes contain tests.
+     * @returns {boolean}
+     */
     containsTests() {
-        // returns true if this scope or any nested scope contains tests
-        for (const node of this.content) {
-            if (node instanceof Test) {
-                return true;
-            } else {  // a nested scope (describe block)
-                if (node.containsTests()) {
-                    return true;
-                }
-            }
-        }
-        // no tests found in this scope or nested scopes
-        return false;
+        return this.children.some(node => node.containsTests());
     }
 
+    /**
+     * Run all hooks of the given type for this scope.
+     * @param {string} hookname
+     * @async
+     */
     async runHook(hookname) {
         const ctx = this.ctx;
         for (const fn of this[hookname]) {
@@ -144,6 +170,7 @@ class Scope {
 
     /**
      * Run the before-content-after workflow
+     * @async
      */
     async run() {
         if (!this.containsTests()) {
@@ -151,28 +178,63 @@ class Scope {
             return;
         }
         await this.runHook("before");
-        for (const node of this.content) {
-            if (node instanceof Test) {
-                await this.runTest(node);
-            } else {
-                // a nested scope (describe block)
-                await node.run();
-            }
-        }
+        await super.run();
         await this.runHook("after");
+    }
+}
+
+// This a Leaf node in the scope tree, representing a single test's scope.
+class TestScope extends Scope {
+    static #titleSep = " > ";
+
+    /**
+     * Create a new TestScope for a single test.
+     * @param {Test} test test element
+     */
+    constructor(title, fn) {
+        super(title, fn);
+    }
+
+    fullTitle() {
+        let titleArray = [this.title];
+        let node = this;
+        while (node.parent?.parent) {
+            titleArray.unshift(node.parent.title);
+            node = node.parent;
+        }
+        return titleArray.join(TestScope.#titleSep);
     }
 
     /**
-     * Run the beforeEach-test-afterEach workflow for a given test.
-     * @param {Test} test
+     * Check if this scope contains tests to run.
+     * @returns {boolean}
      */
-    async runTest(test) {
+    containsTests() {
+        return GREP.test(this.fullTitle());
+    }
+
+    /**
+     * Run a specific hook for this scope.
+     * @param {string} hookname
+     * @async
+     */
+    async runHook(hookname) {
+        // defer to the parent scope
+        await this.parent.runHook(hookname);
+    }
+
+    /**
+     * Run the beforeEach-test-afterEach workflow
+     * @async
+     */
+    async run() {
+        const title = this.fullTitle();
         try {
             await this.runHook("beforeEach");
-            await test.run(this.ctx);
-            test.printPass();
+            await this.fn.call(this.ctx);
+            Printer.printPass(title);
         } catch (error) {
-            test.printFailure(error);
+            Printer.printFailure(title, error);
             // Re-throw the error to ensure the test suite fails
             throw error;
         } finally {
@@ -181,55 +243,29 @@ class Scope {
     }
 }
 
-// use grep from global context if available, else match everything
-let GREP = globalThis._mocha_grep ?? ".*";
-try {
-    GREP = new RegExp(GREP);
-} catch (e) {
-    throw new Error(`Failed to create regex from '${GREP}': ${e.message}`);
-}
-
-let currScope = new Scope();
-
-function addTest(title, fn) {
-    assertNoFunctionArgs(fn);
-
-    const test = new Test(
-        [...currScope.title, title],
-        fn,
-    );
-    if (!GREP.test(test.fullTitle())) {
-        // filtered out by grep expression
-        return;
-    }
-    currScope.addContent(test);
-}
-
-function addScope(title, fn) {
-    const oldScope = currScope;
-    currScope = Scope.inherit(oldScope);
-    currScope.title.push(title);
-
-    fn.call(oldScope.ctx);
-
-    currScope.afterEach = [...currScope.afterEach, ...oldScope.afterEach];  // stack of queues
-    oldScope.addContent(currScope);
-    currScope = oldScope;
-}
+let currScope = new DescribeScope();
 
 /**
  * Define a test case.
- * @param {string} title
- * @param {function} fn
+ * @param {string} title Test title
+ * @param {function} fn Test content
  *
  * @example
  * it("should do addition", function() {
  *     assert.eq(1 + 2, 3);
  * });
+ *
+ * @example
+ * it("should do async addition", async function() {
+ *     const result = await asyncAdd(1, 2);
+ *     assert.eq(result, 3);
+ * });
  */
 function it(title, fn) {
+    assertNoFunctionArgs(fn);
     markUsage();
-    addTest(title, fn);
+    const scope = new TestScope(title, fn);
+    currScope.addChild(scope);
 }
 
 /**
@@ -246,12 +282,16 @@ function it(title, fn) {
  */
 function describe(title, fn) {
     markUsage();
-    addScope(title, fn);
+    const scope = new DescribeScope(title, fn);
+    const oldScope = currScope;
+    scope.discover(currScope);
+    oldScope.addChild(scope);
+    currScope = oldScope;
 }
 
 /**
  * Run a function before all tests in the current scope.
- * @param {Function} fn
+ * @param {Function} fn Function to invoke
  * @example
  * before(function() {
  *     this.fixtureDB = startupNewDB();
@@ -267,7 +307,7 @@ function before(fn) {
 
 /**
  * Run a function before each test in the current scope.
- * @param {Function} fn
+ * @param {Function} fn Function to invoke
  * @example
  * beforeEach(function() {
  *     this.fixtureDB = startupNewDB();
@@ -283,7 +323,7 @@ function beforeEach(fn) {
 
 /**
  * Run a function after each test in the current scope.
- * @param {Function} fn
+ * @param {Function} fn Function to invoke
  * @example
  * beforeEach(function() {
  *     this.fixtureDB = startupNewDB();
@@ -302,7 +342,7 @@ function afterEach(fn) {
 
 /**
  * Run a function after all tests in the current scope.
- * @param {Function} fn
+ * @param {Function} fn Function to invoke
  * @example
  * before(function() {
  *     this.fixtureDB = startupNewDB();
