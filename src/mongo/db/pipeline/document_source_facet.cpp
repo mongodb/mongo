@@ -249,7 +249,7 @@ Value DocumentSourceFacet::serialize(const SerializationOptions& opts) const {
             auto explain = canAddExecPipelineExplain
                 ? mergeExplains(*facet.pipeline, *facet.execPipeline, opts)
                 : facet.pipeline->writeExplainOps(opts);
-            serialized[opts.serializeFieldPathFromString(facet.name)] = Value(explain);
+            serialized[opts.serializeFieldPathFromString(facet.name)] = Value(std::move(explain));
         } else {
             serialized[opts.serializeFieldPathFromString(facet.name)] =
                 Value(facet.pipeline->serialize(opts));
