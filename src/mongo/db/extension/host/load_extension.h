@@ -29,14 +29,32 @@
 
 #pragma once
 
+#include "mongo/platform/shared_library.h"
+
 #include <string>
+#include <vector>
 
 namespace mongo::extension::host {
 
 /**
- * Given a path to an extension shared library, loads the extension, checks for API version
- * compatibitility, and calls the extension initialization function.
+ * Load all extensions in the provided array. Returns true if loading is successful, otherwise
+ * false.
  */
-void loadExtension(const std::string& extensionPath);
+bool loadExtensions(const std::vector<std::string>& extensionPaths);
+
+class ExtensionLoader {
+public:
+    /**
+     * Given a path to an extension shared library, loads the extension, checks for API version
+     * compatibitility, and calls the extension initialization function.
+     */
+    static void load(const std::string& extensionPath);
+
+private:
+    // Used to keep loaded extension 'SharedLibrary' objects alive for the lifetime of the server.
+    // Initialized during process initialization and const thereafter.
+    // These are intentionally "leaked" on shutdown.
+    static std::vector<std::unique_ptr<SharedLibrary>> loadedExtensions;
+};
 
 }  // namespace mongo::extension::host

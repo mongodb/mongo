@@ -30,6 +30,9 @@
 #include "mongo/db/extension/host/load_extension.h"
 
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/shared_library.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -38,54 +41,89 @@
 #include <stdexcept>
 #include <string>
 
+// TODO SERVER-107120 Use an extensions-specifc log component, if applicable.
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 namespace mongo::extension::host {
 
-void loadExtension(const std::string& extensionPath) {
-    // TODO SERVER-106685:
-    // SharedLibrary is an RAII type that will unload the library when it goes out of scope.
-    // However, the extension API requires that the library remains loaded throughout the
-    // lifetime of the process. We should keep a pointer to the SharedLibrary alive for the lifetime
-    // of a node.
+std::vector<std::unique_ptr<SharedLibrary>> ExtensionLoader::loadedExtensions;
+
+bool loadExtensions(const std::vector<std::string>& extensionPaths) {
+    if (extensionPaths.empty()) {
+        return true;
+    }
+
+    if (!feature_flags::gFeatureFlagExtensionsAPI.isEnabled()) {
+        LOGV2_ERROR(10668500,
+                    "Extensions are not allowed with the current configuration. You may need to "
+                    "enable featureFlagExtensionsAPI.");
+        return false;
+    }
+
+    for (const auto& extension : serverGlobalParams.extensions) {
+        LOGV2(10668501, "Loading extension", "filePath"_attr = extension);
+
+        try {
+            ExtensionLoader::load(extension);
+        } catch (...) {
+            LOGV2_ERROR(10668502,
+                        "Error loading extension",
+                        "filePath"_attr = extension,
+                        "status"_attr = exceptionToStatus());
+            return false;
+        }
+
+        LOGV2(10668503, "Successfully loaded extension", "filePath"_attr = extension);
+    }
+
+    return true;
+}
+
+void ExtensionLoader::load(const std::string& extensionPath) {
     StatusWith<std::unique_ptr<SharedLibrary>> swExtensionLib =
         SharedLibrary::create(extensionPath);
     uassert(10615500,
-            str::stream() << "Failed to load extension '" << extensionPath
-                          << "': " << swExtensionLib.getStatus().reason(),
+            str::stream() << "Loading extension '" << extensionPath
+                          << "' failed: " << swExtensionLib.getStatus().reason(),
             swExtensionLib.isOK());
+    auto& extensionLib = swExtensionLib.getValue();
 
     StatusWith<get_mongo_extension_t> swGetExtensionFunction =
-        swExtensionLib.getValue()->getFunctionAs<get_mongo_extension_t>(
-            GET_MONGODB_EXTENSION_SYMBOL);
+        extensionLib->getFunctionAs<get_mongo_extension_t>(GET_MONGODB_EXTENSION_SYMBOL);
     uassert(10615501,
-            str::stream() << "Failed to load extension '" << extensionPath
-                          << "': " << swExtensionLib.getStatus().reason(),
+            str::stream() << "Loading extension '" << extensionPath
+                          << "' failed: " << swGetExtensionFunction.getStatus().reason(),
             swGetExtensionFunction.isOK());
 
     const MongoExtension* extension = swGetExtensionFunction.getValue()();
     uassert(10615503,
-            str::stream() << "Failed to load extension '" << extensionPath
-                          << "': get_mongodb_extension returned null",
+            str::stream() << "Loading extension '" << extensionPath
+                          << "' failed: get_mongodb_extension returned null",
             extension != nullptr);
 
     // Validate that the major and minor versions from the extension implementation are compatible
     // with the host API version.
     uassert(10615504,
-            str::stream() << "Failed to load extension '" << extensionPath
-                          << "': Invalid API major version; expected "
+            str::stream() << "Loading extension '" << extensionPath
+                          << "' failed: Invalid API major version; expected "
                           << MONGODB_EXTENSION_API_MAJOR_VERSION << ", received "
                           << extension->version.major,
             extension->version.major == MONGODB_EXTENSION_API_MAJOR_VERSION);
     uassert(10615505,
-            str::stream() << "Failed to load extension '" << extensionPath
-                          << "': Invalid API minor version; expected less than or equal to "
+            str::stream() << "Loading extension '" << extensionPath
+                          << "' failed: Invalid API minor version; expected less than or equal to "
                           << MONGODB_EXTENSION_API_MINOR_VERSION << ", received "
                           << extension->version.minor,
             extension->version.minor <= MONGODB_EXTENSION_API_MINOR_VERSION);
     uassert(10615506,
-            str::stream() << "Failed to load extension '" << extensionPath
-                          << "': initialize function is not defined",
+            str::stream() << "Loading extension '" << extensionPath
+                          << "' failed: initialize function is not defined",
             extension->initialize != nullptr);
 
     extension->initialize();
+
+    // Add the 'SharedLibrary' pointer to our loaded extensions array to keep it alive for the
+    // lifetime of the server.
+    loadedExtensions.emplace_back(std::move(extensionLib));
 }
 }  // namespace mongo::extension::host

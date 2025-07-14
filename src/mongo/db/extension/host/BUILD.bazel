@@ -31,25 +31,15 @@ mongo_cc_library(
     ],
 )
 
-# TODO SERVER-106685 This target is not yet linked into mongod, just the unit tests. When we
-# link it into mongod, we should platform-conditionally link either this target or a
-# non-Linux-specific implementation of load_extension.cpp that throws an error for attempting
-# to load an extension on a non-Linux platform. In that case, it may be worth creating a separate
-# target just for load_extension.
 mongo_cc_library(
     name = "extension_loader",
     srcs = ["load_extension.cpp"],
     hdrs = ["load_extension.h"],
-    target_compatible_with = select({
-        "//bazel/config:shared_archive_or_link_dynamic": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }) + select({
-        "@platforms//os:linux": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
     deps = [
         "//src/mongo:base",
+        "//src/mongo:core_headers_library",
         "//src/mongo/db/extension/public:api",
+        "//src/mongo/db/query:query_knobs",
     ],
 )
 

@@ -50,47 +50,47 @@ TEST(LoadExtensionsTest, LoadExtensionErrorCases) {
     ASSERT(!runFilesDir.empty());
 
     // Test that various non-existent extension cases fail with the proper error code.
-    ASSERT_THROWS_CODE(loadExtension("src/"), AssertionException, 10615500);
-    ASSERT_THROWS_CODE(loadExtension("notanextension"), AssertionException, 10615500);
+    ASSERT_THROWS_CODE(ExtensionLoader::load("src/"), AssertionException, 10615500);
+    ASSERT_THROWS_CODE(ExtensionLoader::load("notanextension"), AssertionException, 10615500);
     ASSERT_THROWS_CODE(
-        loadExtension("path/to/nonexistent/extension.so"), AssertionException, 10615500);
-    ASSERT_THROWS_CODE(
-        loadExtension(getExtensionPath("libnotanextension.so")), AssertionException, 10615500);
-    ASSERT_THROWS_CODE(loadExtension(""), AssertionException, 10615501);
+        ExtensionLoader::load("path/to/nonexistent/extension.so"), AssertionException, 10615500);
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libnotanextension.so")),
+                       AssertionException,
+                       10615500);
 
     // malformed1_extension is missing the get_mongodb_extension symbol definition.
-    ASSERT_THROWS_CODE(loadExtension(getExtensionPath("libmalformed1_extension.so")),
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed1_extension.so")),
                        AssertionException,
                        10615501);
 
     // malformed2_extension returns null from get_mongodb_extension.
-    ASSERT_THROWS_CODE(loadExtension(getExtensionPath("libmalformed2_extension.so")),
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed2_extension.so")),
                        AssertionException,
                        10615503);
 
     // malformed3_extension has an incompatible major version (plus 1).
-    ASSERT_THROWS_CODE(loadExtension(getExtensionPath("libmalformed3_extension.so")),
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed3_extension.so")),
                        AssertionException,
                        10615504);
 
     // malformed4_extension has an incompatible major version (minus 1).
-    ASSERT_THROWS_CODE(loadExtension(getExtensionPath("libmalformed4_extension.so")),
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed4_extension.so")),
                        AssertionException,
                        10615504);
 
     // malformed5_extension has an incompatible minor version.
-    ASSERT_THROWS_CODE(loadExtension(getExtensionPath("libmalformed5_extension.so")),
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed5_extension.so")),
                        AssertionException,
                        10615505);
 
     // malformed6_extension has a null initialization function.
-    ASSERT_THROWS_CODE(loadExtension(getExtensionPath("libmalformed6_extension.so")),
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libmalformed6_extension.so")),
                        AssertionException,
                        10615506);
 }
 
 TEST(LoadExtensionTest, LoadExtensionSucceeds) {
     // TODO SERVER-106242: Expand the testing to make sure the initialization function works.
-    ASSERT_DOES_NOT_THROW(loadExtension(getExtensionPath("libfoo_extension.so")));
+    ASSERT_DOES_NOT_THROW(ExtensionLoader::load(getExtensionPath("libfoo_extension.so")));
 }
 }  // namespace mongo::extension::host

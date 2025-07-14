@@ -53,6 +53,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/exec/scoped_timer.h"
+#include "mongo/db/extension/host/load_extension.h"
 #include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/keys_collection_client.h"
@@ -901,6 +902,10 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
                 service_liaison_router_callbacks::killCursorsWithMatchingSessions),
             std::make_unique<SessionsCollectionSharded>(),
             RouterSessionCatalog::reapSessionsOlderThan));
+
+    if (!extension::host::loadExtensions(serverGlobalParams.extensions)) {
+        return ExitCode::badOptions;
+    }
 
     transport::ServiceExecutor::startupAll(serviceContext);
 

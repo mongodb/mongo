@@ -1035,6 +1035,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/noPassthrough/directoryperdb/OWNERS.yml
 /jstests/noPassthrough/directoryperdb/**/* @10gen/server-storage-engine-api @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/noPassthrough/extensions/OWNERS.yml
+/jstests/noPassthrough/extensions/**/* @10gen/query-integration-extensions-api @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/noPassthrough/feature_compatibility_version/OWNERS.yml
 /jstests/noPassthrough/feature_compatibility_version/**/* @10gen/server-fcv @svc-auto-approve-bot
 

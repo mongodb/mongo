@@ -470,6 +470,17 @@ Status storeBaseOptions(const moe::Environment& params) {
         }
     }
 
+    if (params.count("extensions")) {
+#ifdef __linux__
+        // Save off configured extensions, but don't do any validation at this point - that will be
+        // done later on during startup when we attempt to load them.
+        serverGlobalParams.extensions = params["extensions"].as<std::vector<std::string>>();
+#else
+        return Status(ErrorCodes::BadValue,
+                      "The --extensions parameter is only supported on Linux");
+#endif
+    }
+
     return Status::OK();
 }
 
