@@ -164,9 +164,6 @@ void addSingleShardWriteOpToBatch(SimpleWriteBatch& writeBatch,
 void addMultiShardWriteOpToBatch(SimpleWriteBatch& writeBatch,
                                  WriteOp& writeOp,
                                  std::vector<ShardEndpoint>& shardsAffected) {
-    const auto shard = shardsAffected.front();
-    const auto shardName = shard.shardName;
-
     for (const auto& shardEndpoint : shardsAffected) {
         std::vector<ShardEndpoint> shardEndpoints{shardEndpoint};
         addSingleShardWriteOpToBatch(writeBatch, writeOp, shardEndpoints);
