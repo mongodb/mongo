@@ -56,13 +56,17 @@ public:
      * 'createDefaultIndexes' is true, creates the _id index for the collection (and the system
      * indexes, in the case of system collections). Creates the collection's _id index according
      * to 'idIndex', if it is non-empty.  When 'idIndex' is empty, creates the default _id index.
+     * If present, 'catalogIdentifier' specifies how to persist and identify the new collection
+     * through the catalog.
      */
     virtual Status userCreateNS(OperationContext* opCtx,
                                 const NamespaceString& fullns,
                                 CollectionOptions collectionOptions,
                                 bool createDefaultIndexes = true,
                                 const BSONObj& idIndex = BSONObj(),
-                                bool fromMigrate = false) const = 0;
+                                bool fromMigrate = false,
+                                const boost::optional<CreateCollCatalogIdentifier>&
+                                    catalogIdentifier = boost::none) const = 0;
 
     /**
      * Creates the virtual namespace 'fullns' according to 'opts' and 'vopts'.

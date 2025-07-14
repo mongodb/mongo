@@ -617,7 +617,8 @@ BSONObj _generateTimeseriesValidator(int bucketVersion, StringData timeField) {
 Status _createTimeseries(OperationContext* opCtx,
                          const NamespaceString& ns,
                          const CollectionOptions& optionsArg,
-                         const boost::optional<BSONObj>& idIndex) {
+                         const boost::optional<BSONObj>& idIndex,
+                         const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier) {
 
     // This path should only be taken when a user creates a new time-series collection on the
     // primary. Secondaries replicate individual oplog entries.
@@ -757,7 +758,13 @@ Status _createTimeseries(OperationContext* opCtx,
 
         // Create the buckets collection that will back the view.
         const bool createIdIndex = false;
-        uassertStatusOK(db->userCreateNS(opCtx, bucketsNs, bucketsOptions, createIdIndex));
+        uassertStatusOK(db->userCreateNS(opCtx,
+                                         bucketsNs,
+                                         bucketsOptions,
+                                         createIdIndex,
+                                         /*idIndex=*/BSONObj(),
+                                         /*fromMigrate=*/false,
+                                         catalogIdentifier));
 
         CollectionWriter collectionWriter(opCtx, bucketsNs);
 
@@ -820,7 +827,8 @@ Status _createCollection(
     const NamespaceString& nss,
     const CollectionOptions& collectionOptions,
     const boost::optional<BSONObj>& idIndex,
-    const boost::optional<VirtualCollectionOptions>& virtualCollectionOptions = boost::none) {
+    const boost::optional<VirtualCollectionOptions>& virtualCollectionOptions = boost::none,
+    const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier = boost::none) {
     return writeConflictRetry(opCtx, "create", nss, [&] {
         // If a change collection is to be created, that is, the change streams are being enabled
         // for a tenant, acquire exclusive tenant lock.
@@ -873,13 +881,25 @@ Status _createCollection(
         if (idIndex == boost::none || collectionOptions.clusteredIndex) {
             status = virtualCollectionOptions
                 ? db->userCreateVirtualNS(opCtx, nss, collectionOptions, *virtualCollectionOptions)
-                : db->userCreateNS(opCtx, nss, collectionOptions, /*createIdIndex=*/false);
+                : db->userCreateNS(opCtx,
+                                   nss,
+                                   collectionOptions,
+                                   /*createIdIndex=*/false,
+                                   /*idIndex=*/BSONObj(),
+                                   /*fromMigrate=*/false,
+                                   catalogIdentifier);
         } else {
             bool createIdIndex = true;
             if (MONGO_unlikely(skipIdIndex.shouldFail())) {
                 createIdIndex = false;
             }
-            status = db->userCreateNS(opCtx, nss, collectionOptions, createIdIndex, *idIndex);
+            status = db->userCreateNS(opCtx,
+                                      nss,
+                                      collectionOptions,
+                                      createIdIndex,
+                                      *idIndex,
+                                      /*fromMigrate=*/false,
+                                      catalogIdentifier);
         }
         if (!status.isOK()) {
             return status;
@@ -965,12 +985,14 @@ Status createCollection(OperationContext* opCtx, const CreateCommand& cmd) {
     return createCollection(opCtx, cmd.getNamespace(), options, idIndex);
 }
 
-Status createCollectionForApplyOps(OperationContext* opCtx,
-                                   const DatabaseName& dbName,
-                                   const boost::optional<UUID>& ui,
-                                   const BSONObj& cmdObj,
-                                   bool allowRenameOutOfTheWay,
-                                   const boost::optional<BSONObj>& idIndex) {
+Status createCollectionForApplyOps(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const boost::optional<UUID>& ui,
+    const BSONObj& cmdObj,
+    bool allowRenameOutOfTheWay,
+    const boost::optional<BSONObj>& idIndex,
+    const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier) {
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_IX));
 
     const NamespaceString newCollectionName(
@@ -1022,13 +1044,15 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
     auto& collectionOptions = swCollectionOptions.getValue();
     collectionOptions.uuid = ui ? ui : collectionOptions.uuid;
 
-    return createCollection(opCtx, newCollectionName, collectionOptions, idIndex);
+    return createCollection(
+        opCtx, newCollectionName, collectionOptions, idIndex, catalogIdentifier);
 }
 
 Status createCollection(OperationContext* opCtx,
                         const NamespaceString& ns,
                         const CollectionOptions& options,
-                        const boost::optional<BSONObj>& idIndex) {
+                        const boost::optional<BSONObj>& idIndex,
+                        const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier) {
     auto status = userAllowedCreateNS(opCtx, ns);
     if (!status.isOK()) {
         return status;
@@ -1055,7 +1079,10 @@ Status createCollection(OperationContext* opCtx,
         uassert(ErrorCodes::Error(6026500),
                 "The 'clusteredIndex' option is not supported with views",
                 !options.clusteredIndex);
-
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot create view with collection specific catalog "
+                "identifiers",
+                !catalogIdentifier.has_value());
         return _createView(opCtx, ns, options);
     } else if (options.timeseries && opCtx->writesAreReplicated()) {
         // system.profile must be a simple collection since new document insertions directly work
@@ -1070,13 +1097,18 @@ Status createCollection(OperationContext* opCtx,
                 str::stream()
                     << "Cannot create a time-series collection in a multi-document transaction.",
                 !opCtx->inMultiDocumentTransaction());
-        return _createTimeseries(opCtx, ns, options, idIndex);
+        return _createTimeseries(opCtx, ns, options, idIndex, catalogIdentifier);
     } else {
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 str::stream() << "Cannot create system collection " << ns.toStringForErrorMsg()
                               << " within a transaction.",
                 !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
-        return _createCollection(opCtx, ns, options, idIndex);
+        return _createCollection(opCtx,
+                                 ns,
+                                 options,
+                                 idIndex,
+                                 /*virtualCollectionOptions=*/boost::none,
+                                 catalogIdentifier);
     }
 }
 
@@ -1088,7 +1120,8 @@ Status createVirtualCollection(OperationContext* opCtx,
             computeModeEnabled);
     CollectionOptions options;
     options.setNoIdIndex();
-    return _createCollection(opCtx, ns, options, boost::none, vopts);
+    return _createCollection(
+        opCtx, ns, options, boost::none, vopts, /*catalogIdentifier=*/boost::none);
 }
 
 CollectionOptions translateOptionsIfClusterByDefault(const NamespaceString& nss,

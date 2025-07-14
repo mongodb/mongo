@@ -206,6 +206,26 @@ StringData getInvalidatingReason(const OplogApplication::Mode mode, const bool i
     return ""_sd;
 }
 
+boost::optional<CreateCollCatalogIdentifier> extractReplicatedCatalogIdentifier(
+    OperationContext* opCtx, const OplogEntry& oplogEntry) {
+    if (auto& o2 = oplogEntry.getObject2();
+        o2.has_value() && shouldReplicateLocalCatalogIdentifers(opCtx)) {
+        // TODO SERVER-106459: Utilize IDL parsing and input validation.
+        boost::optional<std::string> idIndexIdent;
+        if (auto idIdentElem = o2->getField("idIndexIdent"); idIdentElem) {
+            idIndexIdent = idIdentElem.String();
+        }
+        auto catalogIdElem = o2->getField("catalogId");
+        uassert(
+            ErrorCodes::InvalidOptions, "Missing 'catalogId' field from 'o2' entry", catalogIdElem);
+        return CreateCollCatalogIdentifier{.catalogId = RecordId::deserializeToken(catalogIdElem),
+                                           .ident = std::string(o2->getStringField("ident")),
+                                           .idIndexIdent = idIndexIdent};
+    }
+    // Either no catalog identifier information was provided, or replicated local catalog
+    // identifiers are not supported.
+    return boost::none;
+}
 }  // namespace
 
 namespace internal {
@@ -765,6 +785,9 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
               }
           }
 
+          const boost::optional<CreateCollCatalogIdentifier> replicatedCatalogIdentifier =
+              extractReplicatedCatalogIdentifier(opCtx, entry);
+
           // If a change collection is to be created, that is, the change streams are being enabled
           // for a tenant, acquire exclusive tenant lock.
           Lock::DBLock dbLock(
@@ -782,13 +805,19 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                                                  ui,
                                                  cmdWithoutIdIndex,
                                                  allowRenameOutOfTheWay,
-                                                 idIndexElem.Obj());
+                                                 idIndexElem.Obj(),
+                                                 replicatedCatalogIdentifier);
           }
 
           // Collections clustered by _id do not need _id indexes.
           if (auto clusteredElem = cmd["clusteredIndex"]) {
-              return createCollectionForApplyOps(
-                  opCtx, nss.dbName(), ui, cmd, allowRenameOutOfTheWay, boost::none);
+              return createCollectionForApplyOps(opCtx,
+                                                 nss.dbName(),
+                                                 ui,
+                                                 cmd,
+                                                 allowRenameOutOfTheWay,
+                                                 boost::none,
+                                                 replicatedCatalogIdentifier);
           }
 
           // No _id index spec was provided, so we should build a v:1 _id index.
@@ -798,8 +827,13 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           idIndexSpecBuilder.append(IndexDescriptor::kIndexNameFieldName,
                                     IndexConstants::kIdIndexName);
           idIndexSpecBuilder.append(IndexDescriptor::kKeyPatternFieldName, BSON("_id" << 1));
-          return createCollectionForApplyOps(
-              opCtx, nss.dbName(), ui, cmd, allowRenameOutOfTheWay, idIndexSpecBuilder.done());
+          return createCollectionForApplyOps(opCtx,
+                                             nss.dbName(),
+                                             ui,
+                                             cmd,
+                                             allowRenameOutOfTheWay,
+                                             idIndexSpecBuilder.done(),
+                                             replicatedCatalogIdentifier);
       },
       {ErrorCodes::NamespaceExists}}},
     {"createIndexes",

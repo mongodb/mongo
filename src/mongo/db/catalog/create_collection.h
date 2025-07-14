@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/virtual_collection_options.h"
 #include "mongo/db/commands/create_gen.h"
@@ -67,10 +68,12 @@ Status createCollection(OperationContext* opCtx, const CreateCommand& cmd);
 /**
  * Creates the collection or the view as described by 'options'.
  */
-Status createCollection(OperationContext* opCtx,
-                        const NamespaceString& ns,
-                        const CollectionOptions& options,
-                        const boost::optional<BSONObj>& idIndex);
+Status createCollection(
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    const CollectionOptions& options,
+    const boost::optional<BSONObj>& idIndex,
+    const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier = boost::none);
 
 /**
  * Creates a virtual collection as described by 'vopts'.
@@ -87,12 +90,14 @@ Status createVirtualCollection(OperationContext* opCtx,
  * allowRenameOutOfTheWay is false. If ui is not given, an existing collection will result in an
  * error.
  */
-Status createCollectionForApplyOps(OperationContext* opCtx,
-                                   const DatabaseName& dbName,
-                                   const boost::optional<UUID>& ui,
-                                   const BSONObj& cmdObj,
-                                   bool allowRenameOutOfTheWay,
-                                   const boost::optional<BSONObj>& idIndex = boost::none);
+Status createCollectionForApplyOps(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const boost::optional<UUID>& ui,
+    const BSONObj& cmdObj,
+    bool allowRenameOutOfTheWay,
+    const boost::optional<BSONObj>& idIndex = boost::none,
+    const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier = boost::none);
 
 /**
  * Updates collection options if collections must be clustered by default.

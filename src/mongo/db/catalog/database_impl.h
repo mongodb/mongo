@@ -91,12 +91,14 @@ public:
 
     Status dropView(OperationContext* opCtx, NamespaceString viewName) const final;
 
-    Status userCreateNS(OperationContext* opCtx,
-                        const NamespaceString& nss,
-                        CollectionOptions collectionOptions,
-                        bool createDefaultIndexes,
-                        const BSONObj& idIndex,
-                        bool fromMigrate) const final;
+    Status userCreateNS(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        CollectionOptions collectionOptions,
+        bool createDefaultIndexes,
+        const BSONObj& idIndex,
+        bool fromMigrate,
+        const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier) const final;
 
     Status userCreateVirtualNS(OperationContext* opCtx,
                                const NamespaceString& fullns,
@@ -143,7 +145,8 @@ private:
         bool createDefaultIndexes = true,
         const BSONObj& idIndex = BSONObj(),
         bool fromMigrate = false,
-        const boost::optional<VirtualCollectionOptions>& vopts = boost::none) const;
+        const boost::optional<VirtualCollectionOptions>& vopts = boost::none,
+        const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier = boost::none) const;
 
     /**
      * Throws if there is a reason 'ns' cannot be created as a user collection. Namespace pattern
