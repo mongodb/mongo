@@ -6,22 +6,22 @@ if [ "$PROMOTE_TO_CLOUD_DEV" = '' ]; then
 fi
 
 case "$PROMOTE_BUILD_VARIANT" in
-"enterprise-amazon2")
+"enterprise-amazon2" | "amazon2-x86-compile")
   promote_arch="amd64"
   promote_flavor="amazon2"
   promote_min_os_version="2"
   ;;
-"enterprise-amazon2-arm64")
+"enterprise-amazon2-arm64" | "amazon2-arm64-compile")
   promote_arch="aarch64"
   promote_flavor="amazon2"
   promote_min_os_version="2"
   ;;
-"enterprise-amazon2023")
+"enterprise-amazon2023" | "amazon2023-x86-compile")
   promote_arch="amd64"
   promote_flavor="amazon2023"
   promote_min_os_version=""
   ;;
-"enterprise-amazon2023-arm64")
+"enterprise-amazon2023-arm64" | "amazon2023-arm64-compile")
   promote_arch="aarch64"
   promote_flavor="amazon2023"
   promote_min_os_version=""
