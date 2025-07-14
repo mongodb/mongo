@@ -29,12 +29,19 @@
 
 #pragma once
 
+#include "mongo/db/extension/public/api.h"
 #include "mongo/platform/shared_library.h"
 
 #include <string>
 #include <vector>
 
 namespace mongo::extension::host {
+
+static MongoExtensionAPIVersion supportedVersions[] = {MONGODB_EXTENSION_API_VERSION};
+
+static const MongoExtensionAPIVersionVector MONGO_EXTENSION_API_VERSIONS_SUPPORTED = {
+    .len = 1, .versions = supportedVersions};
+
 
 /**
  * Load all extensions in the provided array. Returns true if loading is successful, otherwise
@@ -46,7 +53,7 @@ class ExtensionLoader {
 public:
     /**
      * Given a path to an extension shared library, loads the extension, checks for API version
-     * compatibitility, and calls the extension initialization function.
+     * compatibility, and calls the extension initialization function.
      */
     static void load(const std::string& extensionPath);
 

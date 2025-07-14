@@ -27,19 +27,15 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/extension/public/api.h"
-
-/**
- * This is the top-level header file for any MongoDB extension implementation. Each extension must
- * define the get_mongodb_extension function, which should be the only symbol exported from the
- * extension shared library.
- */
-extern "C" {
-__attribute__((visibility("default"))) MongoExtensionStatus* get_mongodb_extension(
-    const MongoExtensionAPIVersionVector* hostVersions, const MongoExtension** extension);
-}
+#include "mongo/db/extension/sdk/extension.h"
 
 bool isVersionCompatible(const MongoExtensionAPIVersionVector* hostVersions,
-                         const MongoExtensionAPIVersion* version);
+                         const MongoExtensionAPIVersion* version) {
+    for (size_t i = 0; i < hostVersions->len; ++i) {
+        const auto& hostVersion = hostVersions[i].versions;
+        if (hostVersion->major == version->major && hostVersion->minor >= version->minor) {
+            return true;
+        }
+    }
+    return false;
+}

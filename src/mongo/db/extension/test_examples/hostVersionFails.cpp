@@ -27,19 +27,39 @@
  *    it in the license file.
  */
 
-#pragma once
 
-#include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/sdk/extension.h"
+#include "mongo/db/extension/sdk/extension_status.h"
 
-/**
- * This is the top-level header file for any MongoDB extension implementation. Each extension must
- * define the get_mongodb_extension function, which should be the only symbol exported from the
- * extension shared library.
- */
+void initialize_extension() {}
+static const MongoExtension extensionA = {
+    .version = {MONGODB_EXTENSION_API_MAJOR_VERSION + 1,
+                MONGODB_EXTENSION_API_MINOR_VERSION,
+                MONGODB_EXTENSION_API_PATCH_VERSION},
+    .initialize = initialize_extension,
+};
+
+static const MongoExtension extensionB = {
+    .version = {MONGODB_EXTENSION_API_MAJOR_VERSION,
+                MONGODB_EXTENSION_API_MINOR_VERSION + 1,
+                MONGODB_EXTENSION_API_PATCH_VERSION},
+    .initialize = initialize_extension,
+};
+
 extern "C" {
-__attribute__((visibility("default"))) MongoExtensionStatus* get_mongodb_extension(
-    const MongoExtensionAPIVersionVector* hostVersions, const MongoExtension** extension);
-}
+MongoExtensionStatus* get_mongodb_extension(const MongoExtensionAPIVersionVector* hostVersions,
+                                            const MongoExtension** extension) {
 
-bool isVersionCompatible(const MongoExtensionAPIVersionVector* hostVersions,
-                         const MongoExtensionAPIVersion* version);
+    // We expect to fail to initialize extension. extensionA's major version is higher than host's
+    // and extensionB's minor version is higher than host's.
+    return mongo::extension::sdk::enterCXX([&]() {
+        if (isVersionCompatible(hostVersions, &extensionA.version)) {
+            *extension = &extensionA;
+        } else if (isVersionCompatible(hostVersions, &extensionB.version)) {
+            *extension = &extensionB;
+        } else {
+            *extension = nullptr;
+        }
+    });
+}
+}
