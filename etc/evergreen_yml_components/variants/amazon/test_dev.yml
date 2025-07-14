@@ -105,7 +105,7 @@ buildvariants:
         --define=MONGO_DISTMOD=amazon2023
         --//bazel/config:build_otel=True
         --remote_execution_priority=3
-        --jobs=800
+        --jobs=1600
     tasks:
       - name: run_unit_tests_TG
       - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG

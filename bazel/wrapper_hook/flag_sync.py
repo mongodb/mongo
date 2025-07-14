@@ -11,7 +11,11 @@ from bazel.wrapper_hook.wrapper_debug import wrapper_debug
 from tools.flag_sync.util import get_flags
 
 # Allowed .bazelrc lines. Attempt to remove flag setting as attack vector.
-ALLOW_LINES = ["common --config=local"]
+ALLOW_LINES = [
+    "common --config=local",
+    "--experimental_throttle_remote_action_building",
+    "--noexperimental_throttle_remote_action_building",
+]
 
 
 def update_bazelrc(flags: Dict[str, Dict], verbose: bool):

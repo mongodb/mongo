@@ -70,6 +70,10 @@ common --experimental_remote_downloader_local_fallback
 # not filtered due to their size, timeout, tag, or language.
 test --build_tests_only
 
+# This is a major bottleneck on remote execution concurrency and does not appear to have
+# any negative affects on local RAM usage.
+common --noexperimental_throttle_remote_action_building
+
 # Port blocks that can be exclusively used by one test action at a time, representing
 # a range of 250 ports up until the next block.
 # The contract for acquiring is detailed in buildscripts/bazel_local_resources.py.
@@ -441,6 +445,7 @@ common:clang-tidy --//bazel/config:compiler_type=clang
 common:clang-tidy --keep_going
 common:clang-tidy --aspects @bazel_clang_tidy//clang_tidy:clang_tidy.bzl%clang_tidy_aspect
 common:clang-tidy --output_groups=report
+common:clang-tidy --jobs=300
 
 --config=mod-scanner
 common:mod-scanner --config=dbg
