@@ -63,11 +63,13 @@ void killAllExpiredTransactions(OperationContext* opCtx,
 
 
 /**
- * Aborts the oldest transaction when under cache pressure. We filter out prepared transactions.
+ * Aborts the oldest transaction when under cache pressure. We filter out prepared, or internal
+ * transactions.
  */
 void killOldestTransaction(OperationContext* opCtx,
                            Milliseconds timeout,
                            int64_t* numKills,
+                           int64_t* numSkips,
                            int64_t* numTimeOuts,
                            int64_t* bytesClearedEstimate);
 

@@ -132,12 +132,51 @@ TEST_F(KillSessionsTest, killOldestTransaction) {
     sideOpCtx->setLogicalSessionId(lsid);
 
     int64_t numKills = 0;
+    int64_t numSkips = 0;
     int64_t numTimeOuts = 0;
     int64_t bytesFreed = 0;
 
-    killOldestTransaction(sideOpCtx.get(), Milliseconds(100), &numKills, &numTimeOuts, &bytesFreed);
+    killOldestTransaction(
+        sideOpCtx.get(), Milliseconds(100), &numKills, &numSkips, &numTimeOuts, &bytesFreed);
 
     ASSERT_EQ(1, numKills);
+    ASSERT_EQ(0, numSkips);
+    ASSERT_EQ(0, numTimeOuts);
+    ASSERT_EQ(0, bytesFreed);
+}
+
+TEST_F(KillSessionsTest, killOldestTransactionSkipsInternalSession) {
+    auto lsid = makeLogicalSessionIdWithTxnUUIDForTest();
+
+    createSession(lsid);
+    auto opCtx = makeOperationContext();
+    opCtx->setLogicalSessionId(lsid);
+
+    // Internal sessions are created as child sessions.
+    ASSERT_EQ(2, getAllSessionIds(opCtx.get()).size());
+
+    {
+        // Checkout sessions in order to update transaction expiration.
+        OperationContextSession firstCheckOut(opCtx.get());
+        expireAllTransactions(opCtx.get());
+    }
+
+    auto client =
+        getServiceContext()->getService()->makeClient("CheckOutForKillOldestInternalTransaction");
+    AlternativeClientRegion acr(client);
+    auto sideOpCtx = cc().makeOperationContext();
+    sideOpCtx->setLogicalSessionId(lsid);
+
+    int64_t numKills = 0;
+    int64_t numSkips = 0;
+    int64_t numTimeOuts = 0;
+    int64_t bytesFreed = 0;
+
+    killOldestTransaction(
+        sideOpCtx.get(), Milliseconds(100), &numKills, &numSkips, &numTimeOuts, &bytesFreed);
+
+    ASSERT_EQ(1, numKills);
+    ASSERT_EQ(1, numSkips);
     ASSERT_EQ(0, numTimeOuts);
     ASSERT_EQ(0, bytesFreed);
 }
@@ -161,12 +200,15 @@ TEST_F(KillSessionsTest, killOldestTransactionTimesOut) {
     sideOpCtx->setLogicalSessionId(lsid);
 
     int64_t numKills = 0;
+    int64_t numSkips = 0;
     int64_t numTimeOuts = 0;
     int64_t bytesFreed = 0;
 
-    killOldestTransaction(sideOpCtx.get(), Milliseconds(0), &numKills, &numTimeOuts, &bytesFreed);
+    killOldestTransaction(
+        sideOpCtx.get(), Milliseconds(0), &numKills, &numSkips, &numTimeOuts, &bytesFreed);
 
     ASSERT_EQ(0, numKills);
+    ASSERT_EQ(0, numSkips);
     ASSERT_EQ(1, numTimeOuts);
     ASSERT_EQ(0, bytesFreed);
 }

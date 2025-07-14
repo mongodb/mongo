@@ -180,6 +180,7 @@ void killAllExpiredTransactions(OperationContext* opCtx,
 void killOldestTransaction(OperationContext* opCtx,
                            Milliseconds timeout,
                            int64_t* numKills,
+                           int64_t* numSkips,
                            int64_t* numTimeOuts,
                            int64_t* bytesClearedEstimate) {
     SessionKiller::Matcher matcher(
@@ -189,6 +190,13 @@ void killOldestTransaction(OperationContext* opCtx,
     const auto sessionCatalog = SessionCatalog::get(opCtx);
     sessionCatalog->scanSessions(matcher, [&](const ObservableSession& session) {
         TransactionParticipant::Observer txnParticipant = TransactionParticipant::get(session);
+        ScopeGuard updateSkipStats([&numSkips] { (*numSkips)++; });
+
+        // Filter out internal sessions.
+        if (session.getSessionId().getTxnUUID()) {
+            return;
+        }
+
         // Filtering out prepared transactions as we are unable to abort a prepared transaction.
         if (txnParticipant.transactionIsPrepared()) {
             return;
@@ -198,6 +206,8 @@ void killOldestTransaction(OperationContext* opCtx,
         if (!txnParticipant.transactionIsInProgress() || txnParticipant.transactionIsAborted()) {
             return;
         }
+
+        updateSkipStats.dismiss();
 
         auto currentDuration =
             txnParticipant.getDuration(opCtx->getServiceContext()->getTickSource());

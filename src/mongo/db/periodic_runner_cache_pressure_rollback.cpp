@@ -100,6 +100,9 @@ auto& abortOldestTransactionsPasses = *MetricBuilder<Counter64>("abortOldestTran
 // Tracks the number of transactions the "abortOldestTransactions" thread successfully killed.
 auto& abortOldestTransactionsSuccessfulKills =
     *MetricBuilder<Counter64>("abortOldestTransactions.successfulKills");
+// Tracks the number of sessions the "abortOldestTransactions" thread has skipped.
+auto& abortOldestTransactionsSkippedSessions =
+    *MetricBuilder<Counter64>("abortOldestTransactions.skippedSessions");
 // Tracks the number of transactions unsuccessfully killed by the "abortOldestTransactions" thread
 // due to timing out trying to checkout a sessions.
 auto& abortOldestTransactionsTimedOutKills =
@@ -165,6 +168,7 @@ void PeriodicThreadToRollbackUnderCachePressure::_init(ServiceContext* serviceCo
                     }
 
                     int64_t numKills = 0;
+                    int64_t numSkips = 0;
                     int64_t numTimeOuts = 0;
                     int64_t bytesClearedEstimate = 0;
                     // TODO(SERVER-102762): This is a linear scan of the session catalog for every
@@ -175,10 +179,12 @@ void PeriodicThreadToRollbackUnderCachePressure::_init(ServiceContext* serviceCo
                         opCtx,
                         Milliseconds(gAbortOldestTransactionSessionCheckoutTimeoutMilliseconds),
                         &numKills,
+                        &numSkips,
                         &numTimeOuts,
                         &bytesClearedEstimate);
                     abortOldestTransactionsPasses.increment(1);
                     abortOldestTransactionsSuccessfulKills.increment(numKills);
+                    abortOldestTransactionsSkippedSessions.increment(numSkips);
                     abortOldestTransactionsTimedOutKills.increment(numTimeOuts);
                     abortOldestTransactionsBytesClearedEstimate.increment(bytesClearedEstimate);
 
