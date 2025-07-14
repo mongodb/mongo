@@ -943,12 +943,12 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
                               opCtx.get(), _coordinatorDoc.getSourceNss()) ||
         (provenance && provenance.get() == ReshardingProvenanceEnum::kUnshardCollection);
 
-    resharding::PhaseTransitionFn phaseTransitionFn =
-        [=, this](OperationContext* opCtx, resharding::DaoStorageClient* client) {
-            auto updatedDocument = _coordinatorDao.transitionToPreparingToDonatePhase(
-                opCtx, client, shardsAndChunks, _coordinatorDoc.getReshardingUUID());
-            return updatedDocument;
-        };
+    resharding::PhaseTransitionFn phaseTransitionFn = [=, this](OperationContext* opCtx,
+                                                                TxnNumber txnNumber) {
+        auto updatedDocument = _coordinatorDao.transitionToPreparingToDonatePhase(
+            opCtx, shardsAndChunks, _coordinatorDoc.getReshardingUUID(), txnNumber);
+        return updatedDocument;
+    };
 
     resharding::writeParticipantShardsAndTempCollInfo(opCtx.get(),
                                                       _metrics.get(),
@@ -1002,8 +1002,7 @@ ReshardingApproxCopySize computeApproxCopySize(OperationContext* opCtx,
 ExecutorFuture<void> ReshardingCoordinator::_awaitAllDonorsReadyToDonate(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-    resharding::DaoStorageClientImpl daoClient;
-    if (_coordinatorDao.getPhase(opCtx.get(), &daoClient, _coordinatorDoc.getReshardingUUID()) >
+    if (_coordinatorDao.getPhase(opCtx.get(), _coordinatorDoc.getReshardingUUID()) >
         CoordinatorStateEnum::kPreparingToDonate) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
@@ -1026,19 +1025,19 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllDonorsReadyToDonate(
                 return computeApproxCopySize(opCtx.get(), coordinatorDocChangedOnDisk);
             }();
 
-            _updateCoordinatorDocStateAndCatalogEntries(
-                [=, this](OperationContext* opCtx, resharding::DaoStorageClient* client) {
-                    auto now = resharding::getCurrentTime();
-                    auto updatedDocument = _coordinatorDao.transitionToCloningPhase(
-                        opCtx,
-                        client,
-                        now,
-                        highestMinFetchTimestamp,
-                        approxCopySize,
-                        _coordinatorDoc.getReshardingUUID());
-                    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCloning, now);
-                    return updatedDocument;
-                });
+            _updateCoordinatorDocStateAndCatalogEntries([=, this](OperationContext* opCtx,
+                                                                  TxnNumber txnNumber) {
+                auto now = resharding::getCurrentTime();
+                auto updatedDocument =
+                    _coordinatorDao.transitionToCloningPhase(opCtx,
+                                                             now,
+                                                             highestMinFetchTimestamp,
+                                                             approxCopySize,
+                                                             _coordinatorDoc.getReshardingUUID(),
+                                                             txnNumber);
+                _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCloning, now);
+                return updatedDocument;
+            });
         })
         .then([this] {
             return resharding::waitForMajority(_ctHolder->getAbortToken(),
@@ -1162,8 +1161,7 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneF
 ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-    resharding::DaoStorageClientImpl daoClient;
-    if (_coordinatorDao.getPhase(opCtx.get(), &daoClient, _coordinatorDoc.getReshardingUUID()) >
+    if (_coordinatorDao.getPhase(opCtx.get(), _coordinatorDoc.getReshardingUUID()) >
         CoordinatorStateEnum::kCloning) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
@@ -1191,10 +1189,10 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
         })
         .then([this] {
             this->_updateCoordinatorDocStateAndCatalogEntries(
-                [=, this](OperationContext* opCtx, resharding::DaoStorageClient* client) {
+                [=, this](OperationContext* opCtx, TxnNumber txnNumber) {
                     auto now = resharding::getCurrentTime();
                     auto updatedDocument = _coordinatorDao.transitionToApplyingPhase(
-                        opCtx, client, now, _coordinatorDoc.getReshardingUUID());
+                        opCtx, now, _coordinatorDoc.getReshardingUUID(), txnNumber);
 
                     _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCloning, now);
                     _metrics->setStartFor(ReshardingMetrics::TimedPhase::kApplying, now);
@@ -1285,13 +1283,13 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedApplying(
             const auto criticalSectionExpiresAt = now + criticalSectionTimeout;
 
             _updateCoordinatorDocStateAndCatalogEntries(
-                [=, this](OperationContext* opCtx, resharding::DaoStorageClient* client) {
+                [=, this](OperationContext* opCtx, TxnNumber txnNumber) {
                     auto updatedDocument = _coordinatorDao.transitionToBlockingWritesPhase(
                         opCtx,
-                        client,
                         now,
                         criticalSectionExpiresAt,
-                        _coordinatorDoc.getReshardingUUID());
+                        _coordinatorDoc.getReshardingUUID(),
+                        txnNumber);
                     _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection, now);
                     return updatedDocument;
                 });

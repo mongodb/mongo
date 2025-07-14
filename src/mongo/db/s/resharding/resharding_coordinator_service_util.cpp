@@ -702,8 +702,8 @@ void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
         coordinatorDoc.getSourceNss(),
         [&](OperationContext* opCtx, TxnNumber txnNumber) {
             // Update on-disk state to reflect latest state transition.
-            resharding::TransactionalDaoStorageClientImpl client(txnNumber);
-            ReshardingCoordinatorDocument updatedCoordinatorDoc = phaseTransitionFn(opCtx, &client);
+            ReshardingCoordinatorDocument updatedCoordinatorDoc =
+                phaseTransitionFn(opCtx, txnNumber);
 
             // Insert the config.collections entry for the temporary resharding collection. The
             // chunks all have the same epoch, so picking the last chunk here is arbitrary.
@@ -748,8 +748,7 @@ void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
                 // directly call the phase transition function.
                 ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
                 if (phaseTransitionFn) {
-                    resharding::TransactionalDaoStorageClientImpl client(txnNumber);
-                    updatedCoordinatorDoc = (*phaseTransitionFn)(opCtx, &client);
+                    updatedCoordinatorDoc = (*phaseTransitionFn)(opCtx, txnNumber);
                 } else {
                     writeToCoordinatorStateNss(opCtx, metrics, coordinatorDoc, txnNumber);
                 }

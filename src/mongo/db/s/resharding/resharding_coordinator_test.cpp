@@ -54,6 +54,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
@@ -102,7 +103,7 @@ const std::string kZone2 = "zone2";
 
 PhaseTransitionFn createPreparingToDonateDaoUpdate(
     ReshardingCoordinatorDocument expectedCoordinatorDoc) {
-    return [expectedCoordinatorDoc](OperationContext* opCtx, DaoStorageClient* /* client */) {
+    return [expectedCoordinatorDoc](OperationContext* opCtx, TxnNumber txnNumber) {
         DBDirectClient client(opCtx);
         const BSONObj query(BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName
                                  << expectedCoordinatorDoc.getReshardingUUID() << "ns"

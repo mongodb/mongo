@@ -32,7 +32,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+
+#include <memory>
 
 namespace mongo {
 namespace resharding {
@@ -40,7 +43,6 @@ namespace resharding {
 class DaoStorageClient {
 public:
     virtual ~DaoStorageClient() = default;
-
     virtual void alterState(OperationContext* opCtx, const BatchedCommandRequest& request) = 0;
     virtual ReshardingCoordinatorDocument readState(OperationContext* opCtx,
                                                     const UUID& reshardingUUID) = 0;
@@ -65,40 +67,65 @@ public:
                                             const UUID& reshardingUUID) override;
 };
 
+class DaoStorageClientFactory {
+public:
+    virtual ~DaoStorageClientFactory() = default;
+
+    virtual std::unique_ptr<DaoStorageClient> createDaoStorageClient(
+        boost::optional<TxnNumber> txnNumber) = 0;
+};
+
+class DaoStorageClientFactoryImpl : public DaoStorageClientFactory {
+public:
+    std::unique_ptr<DaoStorageClient> createDaoStorageClient(
+        boost::optional<TxnNumber> txnNumber) override {
+        if (txnNumber) {
+            return std::make_unique<TransactionalDaoStorageClientImpl>(txnNumber.get());
+        }
+        return std::make_unique<DaoStorageClientImpl>();
+    }
+};
+
 class ReshardingCoordinatorDao {
 public:
-    ReshardingCoordinatorDao() = default;
+    explicit ReshardingCoordinatorDao(std::unique_ptr<DaoStorageClientFactory> clientFactory =
+                                          std::make_unique<DaoStorageClientFactoryImpl>())
+        : _clientFactory(std::move(clientFactory)) {}
     ~ReshardingCoordinatorDao() = default;
 
     CoordinatorStateEnum getPhase(OperationContext* opCtx,
-                                  DaoStorageClient* client,
-                                  const UUID& reshardingUUID) {
-        return client->readState(opCtx, reshardingUUID).getState();
-    }
+                                  const UUID& reshardingUUID,
+                                  boost::optional<TxnNumber> txnNumber = boost::none);
 
     ReshardingCoordinatorDocument transitionToPreparingToDonatePhase(
         OperationContext* opCtx,
-        DaoStorageClient* client,
         ParticipantShardsAndChunks shardsAndChunks,
-        const UUID& reshardingUUID);
+        const UUID& reshardingUUID,
+        boost::optional<TxnNumber> txnNumber = boost::none);
 
-    ReshardingCoordinatorDocument transitionToCloningPhase(OperationContext* opCtx,
-                                                           DaoStorageClient* client,
-                                                           Date_t now,
-                                                           Timestamp cloneTimestamp,
-                                                           ReshardingApproxCopySize approxCopySize,
-                                                           const UUID& reshardingUUID);
+    ReshardingCoordinatorDocument transitionToCloningPhase(
+        OperationContext* opCtx,
+        Date_t now,
+        Timestamp cloneTimestamp,
+        ReshardingApproxCopySize approxCopySize,
+        const UUID& reshardingUUID,
+        boost::optional<TxnNumber> txnNumber = boost::none);
 
-    ReshardingCoordinatorDocument transitionToApplyingPhase(OperationContext* opCtx,
-                                                            DaoStorageClient* client,
-                                                            Date_t now,
-                                                            const UUID& reshardingUUID);
+    ReshardingCoordinatorDocument transitionToApplyingPhase(
+        OperationContext* opCtx,
+        Date_t now,
+        const UUID& reshardingUUID,
+        boost::optional<TxnNumber> txnNumber = boost::none);
 
-    ReshardingCoordinatorDocument transitionToBlockingWritesPhase(OperationContext* opCtx,
-                                                                  DaoStorageClient* client,
-                                                                  Date_t now,
-                                                                  Date_t criticalSectionExpireTime,
-                                                                  const UUID& reshardingUUID);
+    ReshardingCoordinatorDocument transitionToBlockingWritesPhase(
+        OperationContext* opCtx,
+        Date_t now,
+        Date_t criticalSectionExpireTime,
+        const UUID& reshardingUUID,
+        boost::optional<TxnNumber> txnNumber = boost::none);
+
+private:
+    std::unique_ptr<DaoStorageClientFactory> _clientFactory;
 };
 
 }  // namespace resharding

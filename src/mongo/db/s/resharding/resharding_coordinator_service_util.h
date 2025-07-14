@@ -45,7 +45,7 @@ class ReshardingCoordinatorDocument;
 
 namespace resharding {
 
-typedef unique_function<ReshardingCoordinatorDocument(OperationContext*, DaoStorageClient*)>
+typedef unique_function<ReshardingCoordinatorDocument(OperationContext*, TxnNumber)>
     PhaseTransitionFn;
 
 const WriteConcernOptions kMajorityWriteConcern{
