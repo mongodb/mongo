@@ -396,6 +396,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/aggregation/sources/sample/**/* @10gen/query-execution-classic @10gen/query-optimization @svc-auto-approve-bot
 /jstests/aggregation/sources/sample/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/aggregation/sources/scoreFusion/OWNERS.yml
+/jstests/aggregation/sources/scoreFusion/**/* @10gen/query-integration-search @svc-auto-approve-bot
+/jstests/aggregation/sources/scoreFusion/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/aggregation/sources/setWindowFields/OWNERS.yml
 /jstests/aggregation/sources/setWindowFields/**/* @10gen/query-integration-extensions @svc-auto-approve-bot
 /jstests/aggregation/sources/setWindowFields/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot

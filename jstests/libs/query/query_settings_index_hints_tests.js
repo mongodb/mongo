@@ -654,7 +654,7 @@ function* crossProductGenerator(...lists) {
     }
 }
 
-function crossProduct(...lists) {
+export function crossProduct(...lists) {
     return [...crossProductGenerator(...lists)];
 }
 
