@@ -38,3 +38,9 @@ cat ./promote-expansions.yml
 echo ""
 echo "The artifact will be accessible at '$artifact_address'"
 echo ""
+
+fetch_address=$(cat task_data.json | jq -r '.artifacts[] | select(.name == "Binaries") | .url')
+
+echo "fetching artifact from $fetch_address"
+
+curl --fail-with-body -L $fetch_address --output "mongo-binaries.tgz"
