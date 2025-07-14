@@ -5,6 +5,7 @@
  * ]
  */
 import {documentEq} from "jstests/aggregation/extras/utils.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {planHasStage} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -13,8 +14,6 @@ TestData.skipCheckOrphans = true;
 
 const dbName = 'test';
 const collName = 'weather';
-const bucketCollName = `system.buckets.${collName}`;
-const bucketCollFullName = `${dbName}.${bucketCollName}`;
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 const mongos = st.s;
@@ -36,10 +35,12 @@ const testColl = testDB[collName];
 
 function defineChunks() {
     function splitAndMove(city, minTime, destination) {
-        assert.commandWorked(st.s.adminCommand(
-            {split: bucketCollFullName, middle: {"meta.city": city, 'control.min.time': minTime}}));
         assert.commandWorked(st.s.adminCommand({
-            movechunk: bucketCollFullName,
+            split: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
+            middle: {"meta.city": city, 'control.min.time': minTime}
+        }));
+        assert.commandWorked(st.s.adminCommand({
+            movechunk: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
             find: {"meta.city": city, 'control.min.time': minTime},
             to: destination.shardName,
             _waitForDelete: true
@@ -211,7 +212,7 @@ function testPipeline({pipeline, expectedDocs, expectedCount, shardsTargetedCoun
 
     // Verify profiling output.
     if (shardsTargetedCount > 0) {
-        let filter = {"command.aggregate": bucketCollName};
+        let filter = {"command.aggregate": getTimeseriesCollForDDLOps(testDB, testColl).getName()};
 
         // Filter out any concurrent admin operations.
         if (Object.keys(pipeline[0])[0] == "$match") {
