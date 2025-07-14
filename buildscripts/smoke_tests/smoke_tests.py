@@ -383,13 +383,13 @@ def run_smoke_tests(
             log_file="clang_format.log",
         ),
         runner.command(
-            name="python format",
+            name="misc. lint",
             args=[
-                MONGO_PYTHON_INTERPRETER,
-                ROOT.joinpath("buildscripts", "pylinters.py"),
-                "fix",
+                BAZEL,
+                "run",
+                "//:lint",
             ],
-            log_file="python_format.log",
+            log_file="misc_lint.log",
         ),
         runner.command(
             # catch-all for other bazel-driven formatters

@@ -63,12 +63,12 @@ Ex: `bash buildscripts/yamllinters.sh`
 
 ## Python Linters
 
-The `buildscripts/pylinters.py` wrapper script runs the Python linters. You can
-see the usage message for the wrapper by running the following command:
-`buildscripts/pylinters.py --help`.
+The `bazel run lint` command runs all Python linters as well as several other linters in our code base. You can
+run auto-remediations via:
+`bazel run lint --fix`.
 
-Ex: `buildscripts/pylinters.py lint`
+Ex: `bazel run lint`
 
-| Linter | Configuration File(s) | Help Command  | Documentation                                                |
-| ------ | --------------------- | ------------- | ------------------------------------------------------------ |
-| `ruff` | `pyproject.toml`      | `ruff --help` | [https://docs.astral.sh/ruff/](https://docs.astral.sh/ruff/) |
+| Linter | Configuration File(s) | Help Command | Documentation                                                |
+| ------ | --------------------- | ------------ | ------------------------------------------------------------ |
+| `ruff` | `pyproject.toml`      |              | [https://docs.astral.sh/ruff/](https://docs.astral.sh/ruff/) |
