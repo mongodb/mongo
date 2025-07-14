@@ -170,10 +170,6 @@ public:
         return !(_isCapped && _lastMoveWasRestore);
     }
 
-    uint64_t getCheckpointId() const final {
-        return 0;
-    }
-
     void detachFromOperationContext() final {}
     void reattachToOperationContext(OperationContext* opCtx) final {}
     void setSaveStorageCursorOnDetachFromOperationContext(bool) override {}

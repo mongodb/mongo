@@ -52,12 +52,12 @@ static constexpr StringData kOverwriteFalse = "overwrite=false"_sd;
 WiredTigerCursor::WiredTigerCursor(Params params,
                                    const std::string& uri,
                                    WiredTigerSession& session)
-    : _tableID(params.tableID), _isCheckpoint(params.isCheckpoint), _session(session) {
+    : _tableID(params.tableID), _session(session) {
     // Passing nullptr is significantly faster for WiredTiger than passing an empty string.
     const char* configStr = nullptr;
 
     // If we have uncommon cursor options, use a costlier string builder.
-    if (params.readOnce || _isCheckpoint || params.random) {
+    if (params.readOnce || params.random) {
         str::stream builder;
         if (params.readOnce) {
             builder << "read_once=true,";
@@ -65,17 +65,6 @@ WiredTigerCursor::WiredTigerCursor(Params params,
 
         if (params.random) {
             builder << "next_random,";
-        }
-
-        if (_isCheckpoint) {
-            // Type can be "lsm" or "file".
-            std::string type, sourceURI;
-            WiredTigerUtil::fetchTypeAndSourceURI(_session, uri, &type, &sourceURI);
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "LSM does not support opening cursors by checkpoint",
-                    type != "lsm");
-
-            builder << "checkpoint=WiredTigerCheckpoint,";
         }
 
         // Add this option last as the string does not have a trailing comma.
@@ -103,22 +92,13 @@ WiredTigerCursor::WiredTigerCursor(Params params,
     try {
         _cursor = _session.getNewCursor(uri, configStr);
     } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
-        // A WiredTiger table will not be available in the latest checkpoint if the checkpoint
-        // thread hasn't run after the initial WiredTiger table was created.
-        if (!_isCheckpoint) {
-            LOGV2_FATAL_NOTRACE(50883, "Cursor not found", "error"_attr = ex);
-        }
+        LOGV2_FATAL_NOTRACE(50883, "Cursor not found", "error"_attr = ex);
         throw;
     }
 }
 
 WiredTigerCursor::~WiredTigerCursor() {
-    if (_isCheckpoint) {
-        // Closes the checkpoint cursor to avoid outdated data view when opening a new one.
-        _session.closeCursor(_cursor);
-    } else {
-        _session.releaseCursor(_tableID, _cursor, std::move(_config));
-    }
+    _session.releaseCursor(_tableID, _cursor, std::move(_config));
 }
 
 WiredTigerBulkLoadCursor::WiredTigerBulkLoadCursor(OperationContext* opCtx,

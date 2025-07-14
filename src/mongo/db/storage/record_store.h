@@ -238,11 +238,6 @@ public:
     virtual void saveUnpositioned() {
         save();
     }
-
-    virtual uint64_t getCheckpointId() const {
-        uasserted(ErrorCodes::CommandNotSupported,
-                  "The current storage engine does not support checkpoint ids");
-    }
 };
 
 /**

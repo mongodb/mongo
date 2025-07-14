@@ -919,13 +919,6 @@ public:
         WiredTigerIndexCursorGeneric::setSaveStorageCursorOnDetachFromOperationContext(detach);
     }
 
-    /**
-     *  Returns the checkpoint ID for checkpoint cursors, otherwise 0.
-     */
-    uint64_t getCheckpointId() const override {
-        return _cursor->getCheckpointId();
-    }
-
 protected:
     bool matchesPositionedKey(std::span<const char> search) const {
         auto ks = _kvView.getKeyStringWithoutRecordIdView();

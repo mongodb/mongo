@@ -48,7 +48,6 @@ public:
     struct Params {
         // The table id this cursor will operate on.
         uint64_t tableID{0};
-        bool isCheckpoint{false};
         // When 'true', data read from disk should not be kept in the storage engine cache.
         bool readOnce{false};
         bool allowOverwrite{false};
@@ -84,16 +83,8 @@ public:
         return &_session;
     }
 
-    /**
-     *  Returns the checkpoint ID for checkpoint cursors, otherwise 0.
-     */
-    uint64_t getCheckpointId() const {
-        return _cursor->checkpoint_id(_cursor);
-    }
-
 protected:
     uint64_t _tableID;
-    bool _isCheckpoint;
     WiredTigerSession& _session;
     std::string _config;
 
