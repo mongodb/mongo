@@ -17,10 +17,13 @@
 #include <algorithm>
 #include <cstdint>
 
+#include "absl/base/config.h"
 #include "absl/base/internal/endian.h"
+#include "absl/base/optimization.h"
 #include "absl/numeric/bits.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/internal/memutil.h"
+#include "absl/strings/string_view.h"
 
 namespace absl {
 ABSL_NAMESPACE_BEGIN

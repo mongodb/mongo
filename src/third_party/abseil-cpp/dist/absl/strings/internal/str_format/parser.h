@@ -15,22 +15,23 @@
 #ifndef ABSL_STRINGS_INTERNAL_STR_FORMAT_PARSER_H_
 #define ABSL_STRINGS_INTERNAL_STR_FORMAT_PARSER_H_
 
-#include <limits.h>
 #include <stddef.h>
 #include <stdlib.h>
 
 #include <cassert>
-#include <cstdint>
+#include <cstring>
 #include <initializer_list>
-#include <iosfwd>
-#include <iterator>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "absl/base/config.h"
+#include "absl/base/optimization.h"
 #include "absl/strings/internal/str_format/checker.h"
 #include "absl/strings/internal/str_format/constexpr_parser.h"
 #include "absl/strings/internal/str_format/extension.h"
+#include "absl/strings/string_view.h"
 
 namespace absl {
 ABSL_NAMESPACE_BEGIN
@@ -131,8 +132,10 @@ class ParsedFormatBase {
     has_error_ = other.has_error_;
     items_ = other.items_;
     size_t text_size = items_.empty() ? 0 : items_.back().text_end;
-    data_.reset(new char[text_size]);
-    memcpy(data_.get(), other.data_.get(), text_size);
+    data_ = std::make_unique<char[]>(text_size);
+    if (text_size > 0) {
+      memcpy(data_.get(), other.data_.get(), text_size);
+    }
     return *this;
   }
 

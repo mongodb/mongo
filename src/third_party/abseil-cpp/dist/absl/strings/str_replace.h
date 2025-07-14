@@ -43,6 +43,7 @@
 #include <vector>
 
 #include "absl/base/attributes.h"
+#include "absl/base/nullability.h"
 #include "absl/strings/string_view.h"
 
 namespace absl {
@@ -65,7 +66,7 @@ ABSL_NAMESPACE_BEGIN
 //        {"$who", "Bob"},
 //        {"#Noun", "Apples"}});
 //   EXPECT_EQ("Bob bought 5 Apples. Thanks Bob!", s);
-ABSL_MUST_USE_RESULT std::string StrReplaceAll(
+[[nodiscard]] std::string StrReplaceAll(
     absl::string_view s,
     std::initializer_list<std::pair<absl::string_view, absl::string_view>>
         replacements);
@@ -113,7 +114,7 @@ std::string StrReplaceAll(absl::string_view s,
 int StrReplaceAll(
     std::initializer_list<std::pair<absl::string_view, absl::string_view>>
         replacements,
-    std::string* target);
+    std::string* absl_nonnull target);
 
 // Overload of `StrReplaceAll()` to replace patterns within a given output
 // string *in place* with replacements provided within a container of key/value
@@ -128,7 +129,8 @@ int StrReplaceAll(
 //  EXPECT_EQ(count, 2);
 //  EXPECT_EQ("if (ptr &lt; &amp;foo)", s);
 template <typename StrToStrMapping>
-int StrReplaceAll(const StrToStrMapping& replacements, std::string* target);
+int StrReplaceAll(const StrToStrMapping& replacements,
+                  std::string* absl_nonnull target);
 
 // Implementation details only, past this point.
 namespace strings_internal {
@@ -185,8 +187,8 @@ std::vector<ViableSubstitution> FindSubstitutions(
 }
 
 int ApplySubstitutions(absl::string_view s,
-                       std::vector<ViableSubstitution>* subs_ptr,
-                       std::string* result_ptr);
+                       std::vector<ViableSubstitution>* absl_nonnull subs_ptr,
+                       std::string* absl_nonnull result_ptr);
 
 }  // namespace strings_internal
 
@@ -201,7 +203,8 @@ std::string StrReplaceAll(absl::string_view s,
 }
 
 template <typename StrToStrMapping>
-int StrReplaceAll(const StrToStrMapping& replacements, std::string* target) {
+int StrReplaceAll(const StrToStrMapping& replacements,
+                  std::string* absl_nonnull target) {
   auto subs = strings_internal::FindSubstitutions(*target, replacements);
   if (subs.empty()) return 0;
 

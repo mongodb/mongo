@@ -47,6 +47,21 @@ TEST(FunctionRefTest, Function2) {
   EXPECT_EQ(1337, ref());
 }
 
+TEST(FunctionRefTest, ConstFunction) {
+  FunctionRef<int() const> ref(Function);
+  EXPECT_EQ(1337, ref());
+}
+
+TEST(FunctionRefTest, CopyAssignment) {
+  FunctionRef<int()> a = +[]() -> int {
+    ADD_FAILURE() << "Unexpectedly called";
+    return 0;
+  };
+  FunctionRef<int()> b = +[] { return 1337; };
+  a = b;
+  EXPECT_EQ(1337, a());
+}
+
 int NoExceptFunction() noexcept { return 1337; }
 
 // TODO(jdennett): Add a test for noexcept member functions.

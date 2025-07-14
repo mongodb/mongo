@@ -14,6 +14,8 @@
 
 #include "absl/strings/internal/cordz_info.h"
 
+#include <cstdint>
+
 #include "absl/base/config.h"
 #include "absl/base/internal/spinlock.h"
 #include "absl/container/inlined_vector.h"
@@ -21,7 +23,6 @@
 #include "absl/strings/internal/cord_internal.h"
 #include "absl/strings/internal/cord_rep_btree.h"
 #include "absl/strings/internal/cord_rep_crc.h"
-#include "absl/strings/internal/cord_rep_ring.h"
 #include "absl/strings/internal/cordz_handle.h"
 #include "absl/strings/internal/cordz_statistics.h"
 #include "absl/strings/internal/cordz_update_tracker.h"
@@ -32,12 +33,6 @@
 namespace absl {
 ABSL_NAMESPACE_BEGIN
 namespace cord_internal {
-
-using ::absl::base_internal::SpinLockHolder;
-
-#ifdef ABSL_INTERNAL_NEED_REDUNDANT_CONSTEXPR_DECL
-constexpr size_t CordzInfo::kMaxStackDepth;
-#endif
 
 ABSL_CONST_INIT CordzInfo::List CordzInfo::global_list_{absl::kConstInit};
 
@@ -79,6 +74,8 @@ class CordRepAnalyzer {
   // adds the results to `statistics`. Note that node counts and memory sizes
   // are not initialized, computed values are added to any existing values.
   void AnalyzeCordRep(const CordRep* rep) {
+    ABSL_ASSERT(rep != nullptr);
+
     // Process all linear nodes.
     // As per the class comments, use refcout - 1 on the top level node, as the
     // top level node is assumed to be referenced only for analysis purposes.
@@ -86,7 +83,7 @@ class CordRepAnalyzer {
     RepRef repref{rep, (refcount > 1) ? refcount - 1 : 1};
 
     // Process the top level CRC node, if present.
-    if (repref.rep->tag == CRC) {
+    if (repref.tag() == CRC) {
       statistics_.node_count++;
       statistics_.node_counts.crc++;
       memory_usage_.Add(sizeof(CordRepCrc), repref.refcount);
@@ -96,15 +93,14 @@ class CordRepAnalyzer {
     // Process all top level linear nodes (substrings and flats).
     repref = CountLinearReps(repref, memory_usage_);
 
-    if (repref.rep != nullptr) {
-      if (repref.rep->tag == RING) {
-        AnalyzeRing(repref);
-      } else if (repref.rep->tag == BTREE) {
+    switch (repref.tag()) {
+      case CordRepKind::BTREE:
         AnalyzeBtree(repref);
-      } else {
-        // We should have either a concat, btree, or ring node if not null.
-        assert(false);
-      }
+        break;
+      default:
+        // We should have a btree node if not null.
+        ABSL_ASSERT(repref.tag() == CordRepKind::UNUSED_0);
+        break;
     }
 
     // Adds values to output
@@ -122,10 +118,18 @@ class CordRepAnalyzer {
     const CordRep* rep;
     size_t refcount;
 
-    // Returns a 'child' RepRef which contains the cumulative reference count of
-    // this instance multiplied by the child's reference count.
+    // Returns a 'child' RepRef which contains the cumulative reference count
+    // of this instance multiplied by the child's reference count. Returns a
+    // nullptr RepRef value with a refcount of 0 if `child` is nullptr.
     RepRef Child(const CordRep* child) const {
+      if (child == nullptr) return RepRef{nullptr, 0};
       return RepRef{child, refcount * child->refcount.Get()};
+    }
+
+    // Returns the tag of this rep, or UNUSED_0 if this instance is null
+    constexpr CordRepKind tag() const {
+      ABSL_ASSERT(rep == nullptr || rep->tag != CordRepKind::UNUSED_0);
+      return rep ? static_cast<CordRepKind>(rep->tag) : CordRepKind::UNUSED_0;
     }
   };
 
@@ -167,7 +171,7 @@ class CordRepAnalyzer {
   // buffers where we count children unrounded.
   RepRef CountLinearReps(RepRef rep, MemoryUsage& memory_usage) {
     // Consume all substrings
-    while (rep.rep->tag == SUBSTRING) {
+    while (rep.tag() == SUBSTRING) {
       statistics_.node_count++;
       statistics_.node_counts.substring++;
       memory_usage.Add(sizeof(CordRepSubstring), rep.refcount);
@@ -175,7 +179,7 @@ class CordRepAnalyzer {
     }
 
     // Consume possible FLAT
-    if (rep.rep->tag >= FLAT) {
+    if (rep.tag() >= FLAT) {
       size_t size = rep.rep->flat()->AllocatedSize();
       CountFlat(size);
       memory_usage.Add(size, rep.refcount);
@@ -183,7 +187,7 @@ class CordRepAnalyzer {
     }
 
     // Consume possible external
-    if (rep.rep->tag == EXTERNAL) {
+    if (rep.tag() == EXTERNAL) {
       statistics_.node_count++;
       statistics_.node_counts.external++;
       size_t size = rep.rep->length + sizeof(CordRepExternalImpl<intptr_t>);
@@ -192,17 +196,6 @@ class CordRepAnalyzer {
     }
 
     return rep;
-  }
-
-  // Analyzes the provided ring.
-  void AnalyzeRing(RepRef rep) {
-    statistics_.node_count++;
-    statistics_.node_counts.ring++;
-    const CordRepRing* ring = rep.rep->ring();
-    memory_usage_.Add(CordRepRing::AllocSize(ring->capacity()), rep.refcount);
-    ring->ForEach([&](CordRepRing::index_type pos) {
-      CountLinearReps(rep.Child(ring->entry_child(pos)), memory_usage_);
-    });
   }
 
   // Analyzes the provided btree.
@@ -252,10 +245,12 @@ CordzInfo* CordzInfo::Next(const CordzSnapshot& snapshot) const {
   return next;
 }
 
-void CordzInfo::TrackCord(InlineData& cord, MethodIdentifier method) {
+void CordzInfo::TrackCord(InlineData& cord, MethodIdentifier method,
+                          int64_t sampling_stride) {
   assert(cord.is_tree());
   assert(!cord.is_profiled());
-  CordzInfo* cordz_info = new CordzInfo(cord.as_tree(), nullptr, method);
+  CordzInfo* cordz_info =
+      new CordzInfo(cord.as_tree(), nullptr, method, sampling_stride);
   cord.set_cordz_info(cordz_info);
   cordz_info->Track();
 }
@@ -271,7 +266,8 @@ void CordzInfo::TrackCord(InlineData& cord, const InlineData& src,
   if (cordz_info != nullptr) cordz_info->Untrack();
 
   // Start new cord sample
-  cordz_info = new CordzInfo(cord.as_tree(), src.cordz_info(), method);
+  cordz_info = new CordzInfo(cord.as_tree(), src.cordz_info(), method,
+                             src.cordz_info()->sampling_stride());
   cord.set_cordz_info(cordz_info);
   cordz_info->Track();
 }
@@ -303,9 +299,8 @@ size_t CordzInfo::FillParentStack(const CordzInfo* src, void** stack) {
   return src->stack_depth_;
 }
 
-CordzInfo::CordzInfo(CordRep* rep,
-                     const CordzInfo* src,
-                     MethodIdentifier method)
+CordzInfo::CordzInfo(CordRep* rep, const CordzInfo* src,
+                     MethodIdentifier method, int64_t sampling_stride)
     : rep_(rep),
       stack_depth_(
           static_cast<size_t>(absl::GetStackTrace(stack_,
@@ -314,7 +309,8 @@ CordzInfo::CordzInfo(CordRep* rep,
       parent_stack_depth_(FillParentStack(src, parent_stack_)),
       method_(method),
       parent_method_(GetParentMethod(src)),
-      create_time_(absl::Now()) {
+      create_time_(absl::Now()),
+      sampling_stride_(sampling_stride) {
   update_tracker_.LossyAdd(method);
   if (src) {
     // Copy parent counters.

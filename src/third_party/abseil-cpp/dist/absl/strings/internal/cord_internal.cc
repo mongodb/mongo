@@ -22,15 +22,12 @@
 #include "absl/strings/internal/cord_rep_btree.h"
 #include "absl/strings/internal/cord_rep_crc.h"
 #include "absl/strings/internal/cord_rep_flat.h"
-#include "absl/strings/internal/cord_rep_ring.h"
 #include "absl/strings/str_cat.h"
 
 namespace absl {
 ABSL_NAMESPACE_BEGIN
 namespace cord_internal {
 
-ABSL_CONST_INIT std::atomic<bool> cord_ring_buffer_enabled(
-    kCordEnableRingBufferDefault);
 ABSL_CONST_INIT std::atomic<bool> shallow_subcords_enabled(
     kCordShallowSubcordsDefault);
 
@@ -46,9 +43,6 @@ void CordRep::Destroy(CordRep* rep) {
     assert(!rep->refcount.IsImmortal());
     if (rep->tag == BTREE) {
       CordRepBtree::Destroy(rep->btree());
-      return;
-    } else if (rep->tag == RING) {
-      CordRepRing::Destroy(rep->ring());
       return;
     } else if (rep->tag == EXTERNAL) {
       CordRepExternal::Delete(rep);

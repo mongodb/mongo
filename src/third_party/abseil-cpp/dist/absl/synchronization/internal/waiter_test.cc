@@ -44,7 +44,7 @@ extern "C" int __clock_gettime(clockid_t c, struct timespec* ts);
 extern "C" int clock_gettime(clockid_t c, struct timespec* ts) {
   if (c == CLOCK_MONOTONIC &&
       !absl::synchronization_internal::KernelTimeout::SupportsSteadyClock()) {
-    absl::SharedBitGen gen;
+    thread_local absl::BitGen gen;  // NOLINT
     ts->tv_sec = absl::Uniform(gen, 0, 1'000'000'000);
     ts->tv_nsec = absl::Uniform(gen, 0, 1'000'000'000);
     return 0;
@@ -108,7 +108,10 @@ TYPED_TEST_P(WaiterTest, WaitDurationWoken) {
       absl::synchronization_internal::KernelTimeout(absl::Seconds(10))));
   absl::Duration waited = absl::Now() - start;
   EXPECT_GE(waited, WithTolerance(absl::Milliseconds(500)));
+#ifndef _MSC_VER
+  // Skip on MSVC due to flakiness.
   EXPECT_LT(waited, absl::Seconds(2));
+#endif
 }
 
 TYPED_TEST_P(WaiterTest, WaitTimeWoken) {

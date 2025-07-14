@@ -1,0 +1,89 @@
+diff --git a/MODULE.bazel b/MODULE.bazel
+index 7f93d3e102d..a4c44f6f72b 100644
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -20,11 +20,6 @@ module(
+     compatibility_level = 1,
+ )
+ 
+-cc_configure = use_extension("@rules_cc//cc:extensions.bzl",
+-                             "cc_configure_extension",
+-                             dev_dependency = True)
+-use_repo(cc_configure, "local_config_cc")
+-
+-bazel_dep(name = "rules_cc", version = "0.1.1")
++bazel_dep(name = "rules_cc", version = "0.0.9")
+ bazel_dep(name = "bazel_skylib", version = "1.7.1")
+ bazel_dep(name = "platforms", version = "0.0.11")
+diff --git a/absl/base/BUILD.bazel b/absl/base/BUILD.bazel
+index ef97b4ee8b2..7cbf80fc9e1 100644
+--- a/absl/base/BUILD.bazel
++++ b/absl/base/BUILD.bazel
+@@ -208,7 +208,6 @@ cc_library(
+     linkopts = select({
+         "@rules_cc//cc/compiler:msvc-cl": [],
+         "@rules_cc//cc/compiler:clang-cl": [],
+-        "@rules_cc//cc/compiler:emscripten": [],
+         "//conditions:default": ["-pthread"],
+     }) + ABSL_DEFAULT_LINKOPTS,
+     visibility = [
+@@ -275,7 +274,6 @@ cc_library(
+             "-DEFAULTLIB:advapi32.lib",
+             "-ladvapi32",
+         ],
+-        "@rules_cc//cc/compiler:emscripten": [],
+         "//conditions:default": ["-pthread"],
+     }) + ABSL_DEFAULT_LINKOPTS,
+     deps = [
+diff --git a/absl/debugging/BUILD.bazel b/absl/debugging/BUILD.bazel
+index cd0f1dea8db..12a91012df5 100644
+--- a/absl/debugging/BUILD.bazel
++++ b/absl/debugging/BUILD.bazel
+@@ -38,7 +38,6 @@ cc_library(
+         "internal/stacktrace_aarch64-inl.inc",
+         "internal/stacktrace_arm-inl.inc",
+         "internal/stacktrace_config.h",
+-        "internal/stacktrace_emscripten-inl.inc",
+         "internal/stacktrace_generic-inl.inc",
+         "internal/stacktrace_powerpc-inl.inc",
+         "internal/stacktrace_riscv-inl.inc",
+@@ -80,7 +79,6 @@ cc_library(
+         "symbolize.cc",
+         "symbolize_darwin.inc",
+         "symbolize_elf.inc",
+-        "symbolize_emscripten.inc",
+         "symbolize_unimplemented.inc",
+         "symbolize_win32.inc",
+     ],
+@@ -181,7 +179,6 @@ cc_test(
+     linkopts = select({
+         "@rules_cc//cc/compiler:msvc-cl": [],
+         "@rules_cc//cc/compiler:clang-cl": [],
+-        "@rules_cc//cc/compiler:emscripten": [],
+         "//conditions:default": ["-pthread"],
+     }) + ABSL_DEFAULT_LINKOPTS,
+     deps = [
+diff --git a/absl/random/internal/BUILD.bazel b/absl/random/internal/BUILD.bazel
+index 994fb5c9f38..02104150661 100644
+--- a/absl/random/internal/BUILD.bazel
++++ b/absl/random/internal/BUILD.bazel
+@@ -181,7 +181,6 @@ cc_library(
+     linkopts = select({
+         "@rules_cc//cc/compiler:msvc-cl": [],
+         "@rules_cc//cc/compiler:clang-cl": [],
+-        "@rules_cc//cc/compiler:emscripten": [],
+         "//conditions:default": ["-pthread"],
+     }) + ABSL_DEFAULT_LINKOPTS,
+     deps = [
+diff --git a/absl/synchronization/BUILD.bazel b/absl/synchronization/BUILD.bazel
+index 920928e2328..2d404d1b6a6 100644
+--- a/absl/synchronization/BUILD.bazel
++++ b/absl/synchronization/BUILD.bazel
+@@ -126,7 +126,6 @@ cc_library(
+     linkopts = select({
+         "@rules_cc//cc/compiler:msvc-cl": [],
+         "@rules_cc//cc/compiler:clang-cl": [],
+-        "@rules_cc//cc/compiler:emscripten": [],
+         "//conditions:default": ["-pthread"],
+     }) + ABSL_DEFAULT_LINKOPTS,
+     visibility = ["//visibility:public"],

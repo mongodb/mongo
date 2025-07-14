@@ -41,6 +41,8 @@
 #include <iostream>
 #include <string>
 #include <vector>
+
+#include <cxxabi.h>
 // IWYU pragma: no_include "libunwind-x86_64.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep

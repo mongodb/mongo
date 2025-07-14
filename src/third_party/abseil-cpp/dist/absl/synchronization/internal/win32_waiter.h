@@ -20,7 +20,8 @@
 #include <sdkddkver.h>
 #endif
 
-#if defined(_WIN32) && _WIN32_WINNT >= _WIN32_WINNT_VISTA
+#if defined(_WIN32) && !defined(__MINGW32__) && \
+    _WIN32_WINNT >= _WIN32_WINNT_VISTA
 
 #include "absl/base/config.h"
 #include "absl/synchronization/internal/kernel_timeout.h"
@@ -65,6 +66,7 @@ class Win32Waiter : public WaiterCrtp<Win32Waiter> {
 ABSL_NAMESPACE_END
 }  // namespace absl
 
-#endif  // defined(_WIN32) && _WIN32_WINNT >= _WIN32_WINNT_VISTA
+#endif  // defined(_WIN32) && !defined(__MINGW32__) &&
+        // _WIN32_WINNT >= _WIN32_WINNT_VISTA
 
 #endif  // ABSL_SYNCHRONIZATION_INTERNAL_WIN32_WAITER_H_

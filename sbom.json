@@ -23,7 +23,7 @@
         "name": "Organization: github"
       },
       "name": "Abseil",
-      "version": "20230802.1",
+      "version": "20250512.1",
       "licenses": [
         {
           "license": {
@@ -31,7 +31,7 @@
           }
         }
       ],
-      "purl": "pkg:github/abseil/abseil-cpp@20230802.1",
+      "purl": "pkg:github/abseil/abseil-cpp@20250512.1",
       "properties": [
         {
           "name": "internal:team_responsible",

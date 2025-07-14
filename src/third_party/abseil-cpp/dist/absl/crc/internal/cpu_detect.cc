@@ -18,10 +18,19 @@
 #include <string>
 
 #include "absl/base/config.h"
+#include "absl/types/optional.h"  // IWYU pragma: keep
 
 #if defined(__aarch64__) && defined(__linux__)
 #include <asm/hwcap.h>
 #include <sys/auxv.h>
+#endif
+
+#if defined(__aarch64__) && defined(__APPLE__)
+#if defined(__has_include) && __has_include(<arm/cpu_capabilities_public.h>)
+#include <arm/cpu_capabilities_public.h>
+#endif
+#include <sys/sysctl.h>
+#include <sys/types.h>
 #endif
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -189,8 +198,14 @@ CpuType GetAmdCpuType() {
       break;
     case 0x19:
       switch (model_num) {
+        case 0x0:  // Stepping Ax
         case 0x1:  // Stepping B0
           return CpuType::kAmdMilan;
+        case 0x10:  // Stepping A0
+        case 0x11:  // Stepping B0
+          return CpuType::kAmdGenoa;
+        case 0x44:  // Stepping A0
+          return CpuType::kAmdRyzenV3000;
         default:
           return CpuType::kUnknown;
       }
@@ -237,16 +252,81 @@ CpuType GetCpuType() {
     ABSL_INTERNAL_AARCH64_ID_REG_READ(MIDR_EL1, midr);
     uint32_t implementer = (midr >> 24) & 0xff;
     uint32_t part_number = (midr >> 4) & 0xfff;
-    if (implementer == 0x41 && part_number == 0xd0c) {
-      return CpuType::kArmNeoverseN1;
+    switch (implementer) {
+      case 0x41:
+        switch (part_number) {
+          case 0xd0c: return CpuType::kArmNeoverseN1;
+          case 0xd40: return CpuType::kArmNeoverseV1;
+          case 0xd49: return CpuType::kArmNeoverseN2;
+          case 0xd4f: return CpuType::kArmNeoverseV2;
+          default:
+            return CpuType::kUnknown;
+        }
+        break;
+      case 0xc0:
+        switch (part_number) {
+          case 0xac3: return CpuType::kAmpereSiryn;
+          default:
+            return CpuType::kUnknown;
+        }
+        break;
+      default:
+        return CpuType::kUnknown;
     }
   }
   return CpuType::kUnknown;
 }
 
 bool SupportsArmCRC32PMULL() {
+#if defined(HWCAP_CRC32) && defined(HWCAP_PMULL)
   uint64_t hwcaps = getauxval(AT_HWCAP);
   return (hwcaps & HWCAP_CRC32) && (hwcaps & HWCAP_PMULL);
+#else
+  return false;
+#endif
+}
+
+#elif defined(__aarch64__) && defined(__APPLE__)
+
+CpuType GetCpuType() { return CpuType::kUnknown; }
+
+template <typename T>
+static absl::optional<T> ReadSysctlByName(const char* name) {
+  T val;
+  size_t val_size = sizeof(T);
+  int ret = sysctlbyname(name, &val, &val_size, nullptr, 0);
+  if (ret == -1) {
+    return absl::nullopt;
+  }
+  return val;
+}
+
+bool SupportsArmCRC32PMULL() {
+  // Newer XNU kernels support querying all capabilities in a single
+  // sysctlbyname.
+#if defined(CAP_BIT_CRC32) && defined(CAP_BIT_FEAT_PMULL)
+  static const absl::optional<uint64_t> caps =
+      ReadSysctlByName<uint64_t>("hw.optional.arm.caps");
+  if (caps.has_value()) {
+    constexpr uint64_t kCrc32AndPmullCaps =
+        (uint64_t{1} << CAP_BIT_CRC32) | (uint64_t{1} << CAP_BIT_FEAT_PMULL);
+    return (*caps & kCrc32AndPmullCaps) == kCrc32AndPmullCaps;
+  }
+#endif
+
+  // https://developer.apple.com/documentation/kernel/1387446-sysctlbyname/determining_instruction_set_characteristics#3915619
+  static const absl::optional<int> armv8_crc32 =
+      ReadSysctlByName<int>("hw.optional.armv8_crc32");
+  if (armv8_crc32.value_or(0) == 0) {
+    return false;
+  }
+  // https://developer.apple.com/documentation/kernel/1387446-sysctlbyname/determining_instruction_set_characteristics#3918855
+  static const absl::optional<int> feat_pmull =
+      ReadSysctlByName<int>("hw.optional.arm.FEAT_PMULL");
+  if (feat_pmull.value_or(0) == 0) {
+    return false;
+  }
+  return true;
 }
 
 #else

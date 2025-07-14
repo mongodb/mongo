@@ -18,15 +18,26 @@
 //
 #include "absl/strings/internal/str_format/arg.h"
 
+#include <algorithm>
 #include <cassert>
-#include <cerrno>
+#include <cstddef>
+#include <cstdint>
 #include <cstdlib>
+#include <cstring>
+#include <cwchar>
 #include <string>
+#include <string_view>
 #include <type_traits>
 
-#include "absl/base/port.h"
+#include "absl/base/config.h"
+#include "absl/base/optimization.h"
+#include "absl/container/fixed_array.h"
+#include "absl/numeric/int128.h"
+#include "absl/strings/internal/str_format/extension.h"
 #include "absl/strings/internal/str_format/float_conversion.h"
+#include "absl/strings/internal/utf8.h"
 #include "absl/strings/numbers.h"
+#include "absl/strings/string_view.h"
 
 namespace absl {
 ABSL_NAMESPACE_BEGIN
@@ -298,6 +309,31 @@ inline bool ConvertStringArg(string_view v, const FormatConversionSpecImpl conv,
                                conv.has_left_flag());
 }
 
+inline bool ConvertStringArg(const wchar_t *v,
+                             size_t len,
+                             const FormatConversionSpecImpl conv,
+                             FormatSinkImpl *sink) {
+  FixedArray<char> mb(len * 4);
+  strings_internal::ShiftState s;
+  size_t chars_written = 0;
+  for (size_t i = 0; i < len; ++i) {
+    const size_t chars =
+        strings_internal::WideToUtf8(v[i], &mb[chars_written], s);
+    if (chars == static_cast<size_t>(-1)) { return false; }
+    chars_written += chars;
+  }
+  return ConvertStringArg(string_view(mb.data(), chars_written), conv, sink);
+}
+
+bool ConvertWCharTImpl(wchar_t v, const FormatConversionSpecImpl conv,
+                       FormatSinkImpl *sink) {
+  char mb[4];
+  strings_internal::ShiftState s;
+  const size_t chars_written = strings_internal::WideToUtf8(v, mb, s);
+  return chars_written != static_cast<size_t>(-1) && !s.saw_high_surrogate &&
+         ConvertStringArg(string_view(mb, chars_written), conv, sink);
+}
+
 }  // namespace
 
 bool ConvertBoolArg(bool v, FormatSinkImpl *sink) {
@@ -316,11 +352,14 @@ bool ConvertIntArg(T v, FormatConversionSpecImpl conv, FormatSinkImpl *sink) {
 
   // This odd casting is due to a bug in -Wswitch behavior in gcc49 which causes
   // it to complain about a switch/case type mismatch, even though both are
-  // FormatConverionChar.  Likely this is because at this point
+  // FormatConversionChar.  Likely this is because at this point
   // FormatConversionChar is declared, but not defined.
   switch (static_cast<uint8_t>(conv.conversion_char())) {
     case static_cast<uint8_t>(FormatConversionCharInternal::c):
-      return ConvertCharImpl(static_cast<char>(v), conv, sink);
+      return (std::is_same<T, wchar_t>::value ||
+              (conv.length_mod() == LengthMod::l))
+                 ? ConvertWCharTImpl(static_cast<wchar_t>(v), conv, sink)
+                 : ConvertCharImpl(static_cast<char>(v), conv, sink);
 
     case static_cast<uint8_t>(FormatConversionCharInternal::o):
       as_digits.PrintAsOct(static_cast<U>(v));
@@ -372,6 +411,8 @@ template bool ConvertIntArg<signed char>(signed char v,
 template bool ConvertIntArg<unsigned char>(unsigned char v,
                                            FormatConversionSpecImpl conv,
                                            FormatSinkImpl *sink);
+template bool ConvertIntArg<wchar_t>(wchar_t v, FormatConversionSpecImpl conv,
+                                     FormatSinkImpl *sink);
 template bool ConvertIntArg<short>(short v,  // NOLINT
                                    FormatConversionSpecImpl conv,
                                    FormatSinkImpl *sink);
@@ -403,16 +444,27 @@ StringConvertResult FormatConvertImpl(const std::string &v,
   return {ConvertStringArg(v, conv, sink)};
 }
 
+StringConvertResult FormatConvertImpl(const std::wstring &v,
+                                      const FormatConversionSpecImpl conv,
+                                      FormatSinkImpl *sink) {
+  return {ConvertStringArg(v.data(), v.size(), conv, sink)};
+}
+
 StringConvertResult FormatConvertImpl(string_view v,
                                       const FormatConversionSpecImpl conv,
                                       FormatSinkImpl *sink) {
   return {ConvertStringArg(v, conv, sink)};
 }
 
-ArgConvertResult<FormatConversionCharSetUnion(
-    FormatConversionCharSetInternal::s, FormatConversionCharSetInternal::p)>
-FormatConvertImpl(const char *v, const FormatConversionSpecImpl conv,
-                  FormatSinkImpl *sink) {
+StringConvertResult FormatConvertImpl(std::wstring_view v,
+                                      const FormatConversionSpecImpl conv,
+                                      FormatSinkImpl* sink) {
+  return {ConvertStringArg(v.data(), v.size(), conv, sink)};
+}
+
+StringPtrConvertResult FormatConvertImpl(const char* v,
+                                         const FormatConversionSpecImpl conv,
+                                         FormatSinkImpl* sink) {
   if (conv.conversion_char() == FormatConversionCharInternal::p)
     return {FormatConvertImpl(VoidPtr(v), conv, sink).value};
   size_t len;
@@ -425,6 +477,30 @@ FormatConvertImpl(const char *v, const FormatConversionSpecImpl conv,
     len = static_cast<size_t>(std::find(v, v + conv.precision(), '\0') - v);
   }
   return {ConvertStringArg(string_view(v, len), conv, sink)};
+}
+
+StringPtrConvertResult FormatConvertImpl(const wchar_t* v,
+                                         const FormatConversionSpecImpl conv,
+                                         FormatSinkImpl* sink) {
+  if (conv.conversion_char() == FormatConversionCharInternal::p) {
+    return {FormatConvertImpl(VoidPtr(v), conv, sink).value};
+  }
+  size_t len;
+  if (v == nullptr) {
+    len = 0;
+  } else if (conv.precision() < 0) {
+    len = std::wcslen(v);
+  } else {
+    // If precision is set, we look for the NUL-terminator on the valid range.
+    len = static_cast<size_t>(std::find(v, v + conv.precision(), L'\0') - v);
+  }
+  return {ConvertStringArg(v, len, conv, sink)};
+}
+
+StringPtrConvertResult FormatConvertImpl(std::nullptr_t,
+                                         const FormatConversionSpecImpl conv,
+                                         FormatSinkImpl* sink) {
+  return FormatConvertImpl(static_cast<const char*>(nullptr), conv, sink);
 }
 
 // ==================== Raw pointers ====================
@@ -459,6 +535,11 @@ FloatingConvertResult FormatConvertImpl(long double v,
 // ==================== Chars ====================
 CharConvertResult FormatConvertImpl(char v, const FormatConversionSpecImpl conv,
                                     FormatSinkImpl *sink) {
+  return {ConvertIntArg(v, conv, sink)};
+}
+CharConvertResult FormatConvertImpl(wchar_t v,
+                                    const FormatConversionSpecImpl conv,
+                                    FormatSinkImpl* sink) {
   return {ConvertIntArg(v, conv, sink)};
 }
 

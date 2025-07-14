@@ -88,6 +88,29 @@ TEST(TestGlobals, LogPrefix) {
   EXPECT_TRUE(absl::ShouldPrependLogPrefix());
 }
 
+TEST(TestGlobals, SetGlobalVLogLevel) {
+  EXPECT_EQ(absl::SetGlobalVLogLevel(42), 0);
+  EXPECT_EQ(absl::SetGlobalVLogLevel(1337), 42);
+  // Restore the value since it affects the default unset module value for
+  // `SetVLogLevel()`.
+  EXPECT_EQ(absl::SetGlobalVLogLevel(0), 1337);
+}
+
+TEST(TestGlobals, SetVLogLevel) {
+  EXPECT_EQ(absl::SetVLogLevel("setvloglevel", 42), 0);
+  EXPECT_EQ(absl::SetVLogLevel("setvloglevel", 1337), 42);
+  EXPECT_EQ(absl::SetVLogLevel("othersetvloglevel", 50), 0);
+
+  EXPECT_EQ(absl::SetVLogLevel("*pattern*", 1), 0);
+  EXPECT_EQ(absl::SetVLogLevel("*less_generic_pattern*", 2), 1);
+  // "pattern_match" matches the pattern "*pattern*". Therefore, the previous
+  // level must be 1.
+  EXPECT_EQ(absl::SetVLogLevel("pattern_match", 3), 1);
+  // "less_generic_pattern_match" matches the pattern "*pattern*". Therefore,
+  // the previous level must be 2.
+  EXPECT_EQ(absl::SetVLogLevel("less_generic_pattern_match", 4), 2);
+}
+
 TEST(TestGlobals, AndroidLogTag) {
   // Verify invalid tags result in a check failure.
   EXPECT_DEATH_IF_SUPPORTED(absl::SetAndroidNativeTag(nullptr), ".*");
@@ -100,5 +123,34 @@ TEST(TestGlobals, AndroidLogTag) {
   // Verify that additional calls (more than 1) result in a check failure.
   EXPECT_DEATH_IF_SUPPORTED(absl::SetAndroidNativeTag("test_tag_fail"), ".*");
 }
+
+TEST(TestExitOnDFatal, OffTest) {
+  // Turn off...
+  absl::log_internal::SetExitOnDFatal(false);
+  EXPECT_FALSE(absl::log_internal::ExitOnDFatal());
+
+  // We don't die.
+  {
+    absl::ScopedMockLog log(absl::MockLogDefault::kDisallowUnexpected);
+
+    // LOG(DFATAL) has severity FATAL if debugging, but is
+    // downgraded to ERROR if not debugging.
+    EXPECT_CALL(log, Log(absl::kLogDebugFatal, _, "This should not be fatal"));
+
+    log.StartCapturingLogs();
+    LOG(DFATAL) << "This should not be fatal";
+  }
+}
+
+#if GTEST_HAS_DEATH_TEST
+TEST(TestDeathWhileExitOnDFatal, OnTest) {
+  absl::log_internal::SetExitOnDFatal(true);
+  EXPECT_TRUE(absl::log_internal::ExitOnDFatal());
+
+  // Death comes on little cats' feet.
+  EXPECT_DEBUG_DEATH({ LOG(DFATAL) << "This should be fatal in debug mode"; },
+                     "This should be fatal in debug mode");
+}
+#endif
 
 }  // namespace

@@ -14,13 +14,26 @@
 
 #include "absl/container/flat_hash_set.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include "absl/base/config.h"
+#include "absl/container/hash_container_defaults.h"
+#include "absl/container/internal/container_memory.h"
 #include "absl/container/internal/hash_generator_testing.h"
+#include "absl/container/internal/test_allocator.h"
 #include "absl/container/internal/unordered_set_constructor_test.h"
 #include "absl/container/internal/unordered_set_lookup_test.h"
 #include "absl/container/internal/unordered_set_members_test.h"
 #include "absl/container/internal/unordered_set_modifiers_test.h"
+#include "absl/hash/hash.h"
 #include "absl/log/check.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/string_view.h"
@@ -170,6 +183,204 @@ TEST(FlatHashSet, EraseIf) {
     EXPECT_EQ(erase_if(s, &IsEven), 2);
     EXPECT_THAT(s, UnorderedElementsAre(1, 3, 5));
   }
+}
+
+TEST(FlatHashSet, CForEach) {
+  using ValueType = std::pair<int, int>;
+  flat_hash_set<ValueType> s;
+  std::vector<ValueType> expected;
+  for (int i = 0; i < 100; ++i) {
+    {
+      SCOPED_TRACE("mutable object iteration");
+      std::vector<ValueType> v;
+      absl::container_internal::c_for_each_fast(
+          s, [&v](const ValueType& p) { v.push_back(p); });
+      ASSERT_THAT(v, UnorderedElementsAreArray(expected));
+    }
+    {
+      SCOPED_TRACE("const object iteration");
+      std::vector<ValueType> v;
+      const flat_hash_set<ValueType>& cs = s;
+      absl::container_internal::c_for_each_fast(
+          cs, [&v](const ValueType& p) { v.push_back(p); });
+      ASSERT_THAT(v, UnorderedElementsAreArray(expected));
+    }
+    {
+      SCOPED_TRACE("temporary object iteration");
+      std::vector<ValueType> v;
+      absl::container_internal::c_for_each_fast(
+          flat_hash_set<ValueType>(s),
+          [&v](const ValueType& p) { v.push_back(p); });
+      ASSERT_THAT(v, UnorderedElementsAreArray(expected));
+    }
+    s.emplace(i, i);
+    expected.emplace_back(i, i);
+  }
+}
+
+class PoisonSoo {
+  int64_t data_;
+
+ public:
+  explicit PoisonSoo(int64_t d) : data_(d) { SanitizerPoisonObject(&data_); }
+  PoisonSoo(const PoisonSoo& that) : PoisonSoo(*that) {}
+  ~PoisonSoo() { SanitizerUnpoisonObject(&data_); }
+
+  int64_t operator*() const {
+    SanitizerUnpoisonObject(&data_);
+    const int64_t ret = data_;
+    SanitizerPoisonObject(&data_);
+    return ret;
+  }
+  template <typename H>
+  friend H AbslHashValue(H h, const PoisonSoo& pi) {
+    return H::combine(std::move(h), *pi);
+  }
+  bool operator==(const PoisonSoo& rhs) const { return **this == *rhs; }
+};
+
+TEST(FlatHashSet, PoisonSooBasic) {
+  PoisonSoo a(0), b(1);
+  flat_hash_set<PoisonSoo> set;
+  set.insert(a);
+  EXPECT_THAT(set, UnorderedElementsAre(a));
+  set.insert(b);
+  EXPECT_THAT(set, UnorderedElementsAre(a, b));
+  set.erase(a);
+  EXPECT_THAT(set, UnorderedElementsAre(b));
+  set.rehash(0);  // Shrink to SOO.
+  EXPECT_THAT(set, UnorderedElementsAre(b));
+}
+
+TEST(FlatHashSet, PoisonSooMoveConstructSooToSoo) {
+  PoisonSoo a(0);
+  flat_hash_set<PoisonSoo> set;
+  set.insert(a);
+  flat_hash_set<PoisonSoo> set2(std::move(set));
+  EXPECT_THAT(set2, UnorderedElementsAre(a));
+}
+
+TEST(FlatHashSet, PoisonSooAllocMoveConstructSooToSoo) {
+  PoisonSoo a(0);
+  flat_hash_set<PoisonSoo> set;
+  set.insert(a);
+  flat_hash_set<PoisonSoo> set2(std::move(set), std::allocator<PoisonSoo>());
+  EXPECT_THAT(set2, UnorderedElementsAre(a));
+}
+
+TEST(FlatHashSet, PoisonSooMoveAssignFullSooToEmptySoo) {
+  PoisonSoo a(0);
+  flat_hash_set<PoisonSoo> set, set2;
+  set.insert(a);
+  set2 = std::move(set);
+  EXPECT_THAT(set2, UnorderedElementsAre(a));
+}
+
+TEST(FlatHashSet, PoisonSooMoveAssignFullSooToFullSoo) {
+  PoisonSoo a(0), b(1);
+  flat_hash_set<PoisonSoo> set, set2;
+  set.insert(a);
+  set2.insert(b);
+  set2 = std::move(set);
+  EXPECT_THAT(set2, UnorderedElementsAre(a));
+}
+
+TEST(FlatHashSet, FlatHashSetPolicyDestroyReturnsTrue) {
+  EXPECT_TRUE((decltype(FlatHashSetPolicy<int>::destroy<std::allocator<int>>(
+      nullptr, nullptr))()));
+  EXPECT_FALSE(
+      (decltype(FlatHashSetPolicy<int>::destroy<CountingAllocator<int>>(
+          nullptr, nullptr))()));
+  EXPECT_FALSE((decltype(FlatHashSetPolicy<std::unique_ptr<int>>::destroy<
+                         std::allocator<int>>(nullptr, nullptr))()));
+}
+
+struct HashEqInvalidOnMove {
+  HashEqInvalidOnMove() = default;
+  HashEqInvalidOnMove(const HashEqInvalidOnMove& rhs) = default;
+  HashEqInvalidOnMove(HashEqInvalidOnMove&& rhs) { rhs.moved = true; }
+  HashEqInvalidOnMove& operator=(const HashEqInvalidOnMove& rhs) = default;
+  HashEqInvalidOnMove& operator=(HashEqInvalidOnMove&& rhs) {
+    rhs.moved = true;
+    return *this;
+  }
+
+  size_t operator()(int x) const {
+    CHECK(!moved);
+    return absl::HashOf(x);
+  }
+
+  bool operator()(int x, int y) const {
+    CHECK(!moved);
+    return x == y;
+  }
+
+  bool moved = false;
+};
+
+TEST(FlatHashSet, MovedFromCleared_HashMustBeValid) {
+  flat_hash_set<int, HashEqInvalidOnMove> s1, s2;
+  // Moving the hashtable must not move the hasher because we need to support
+  // this behavior.
+  s2 = std::move(s1);
+  s1.clear();
+  s1.insert(2);
+  EXPECT_THAT(s1, UnorderedElementsAre(2));
+}
+
+TEST(FlatHashSet, MovedFromCleared_EqMustBeValid) {
+  flat_hash_set<int, DefaultHashContainerHash<int>, HashEqInvalidOnMove> s1, s2;
+  // Moving the hashtable must not move the equality functor because we need to
+  // support this behavior.
+  s2 = std::move(s1);
+  s1.clear();
+  s1.insert(2);
+  EXPECT_THAT(s1, UnorderedElementsAre(2));
+}
+
+TEST(FlatHashSet, Equality) {
+  {
+    flat_hash_set<int> s1 = {1, 2, 3};
+    flat_hash_set<int> s2 = {1, 2, 3};
+    EXPECT_EQ(s1, s2);
+  }
+  {
+    flat_hash_set<std::string> s1 = {"a", "b", "c"};
+    flat_hash_set<std::string> s2 = {"a", "b", "c"};
+    EXPECT_EQ(s1, s2);
+  }
+}
+
+class MoveOnlyInt {
+ public:
+  explicit MoveOnlyInt(int value) : value_(value) {}
+
+  MoveOnlyInt(const MoveOnlyInt& other) = delete;
+  MoveOnlyInt& operator=(const MoveOnlyInt& other) = delete;
+
+  MoveOnlyInt(MoveOnlyInt&& other) = default;
+  MoveOnlyInt& operator=(MoveOnlyInt&& other) = default;
+
+  bool operator==(const MoveOnlyInt& other) const {
+    return value_ == other.value_;
+  }
+  bool operator==(int other) const { return value_ == other; }
+
+ private:
+  template <typename H>
+  friend H AbslHashValue(H h, const MoveOnlyInt& m) {
+    return H::combine(std::move(h), m.value_);
+  }
+
+  int value_;
+};
+
+TEST(FlatHashSet, MoveOnlyKey) {
+  flat_hash_set<MoveOnlyInt> s;
+  s.insert(MoveOnlyInt(1));
+  s.insert(MoveOnlyInt(2));
+  s.insert(MoveOnlyInt(3));
+  EXPECT_THAT(s, UnorderedElementsAre(1, 2, 3));
 }
 
 }  // namespace

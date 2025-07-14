@@ -25,6 +25,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/base/internal/scoped_set_env.h"
+#include "absl/flags/config.h"
 #include "absl/flags/flag.h"
 #include "absl/flags/internal/parse.h"
 #include "absl/flags/internal/usage.h"
@@ -43,31 +44,31 @@
 #define FLAG_MULT(x) F3(x)
 #define TEST_FLAG_HEADER FLAG_HEADER_
 
-#define F(name) ABSL_FLAG(int, name, 0, "");
+#define F(name) ABSL_FLAG(int, name, 0, "")
 
 #define F1(name) \
   F(name##1);    \
   F(name##2);    \
   F(name##3);    \
   F(name##4);    \
-  F(name##5);
+  F(name##5)
 /**/
 #define F2(name) \
   F1(name##1);   \
   F1(name##2);   \
   F1(name##3);   \
   F1(name##4);   \
-  F1(name##5);
+  F1(name##5)
 /**/
 #define F3(name) \
   F2(name##1);   \
   F2(name##2);   \
   F2(name##3);   \
   F2(name##4);   \
-  F2(name##5);
+  F2(name##5)
 /**/
 
-FLAG_MULT(TEST_FLAG_HEADER)
+FLAG_MULT(TEST_FLAG_HEADER);
 
 namespace {
 
@@ -242,6 +243,12 @@ using testing::HasSubstr;
 class ParseTest : public testing::Test {
  public:
   ~ParseTest() override { flags::SetFlagsHelpMode(flags::HelpMode::kNone); }
+
+  void SetUp() override {
+#if ABSL_FLAGS_STRIP_NAMES
+    GTEST_SKIP() << "This test requires flag names to be present";
+#endif
+  }
 
  private:
   absl::FlagSaver flag_saver_;

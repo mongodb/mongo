@@ -18,6 +18,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/base/config.h"
 #include "absl/container/internal/hash_policy_traits.h"
 
 namespace absl {
@@ -61,6 +62,7 @@ TEST_F(NodeTest, transfer) {
   int* b = &s;
   NodePolicy::transfer(&alloc, &a, &b);
   EXPECT_EQ(&s, a);
+  EXPECT_TRUE(NodePolicy::transfer_uses_memcpy());
 }
 
 }  // namespace

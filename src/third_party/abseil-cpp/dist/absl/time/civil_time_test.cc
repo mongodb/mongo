@@ -14,12 +14,15 @@
 
 #include "absl/time/civil_time.h"
 
+#include <iomanip>
 #include <limits>
 #include <sstream>
 #include <type_traits>
 
-#include "absl/base/macros.h"
 #include "gtest/gtest.h"
+#include "absl/base/macros.h"
+#include "absl/hash/hash_testing.h"
+#include "absl/strings/str_format.h"
 
 namespace {
 
@@ -868,6 +871,23 @@ TEST(CivilTime, ParseEdgeCases) {
   EXPECT_FALSE(absl::ParseLenientCivilTime("9223372036854775808", &y)) << y;
 }
 
+TEST(CivilTime, AbslStringify) {
+  EXPECT_EQ("2015-01-02T03:04:05",
+            absl::StrFormat("%v", absl::CivilSecond(2015, 1, 2, 3, 4, 5)));
+
+  EXPECT_EQ("2015-01-02T03:04",
+            absl::StrFormat("%v", absl::CivilMinute(2015, 1, 2, 3, 4)));
+
+  EXPECT_EQ("2015-01-02T03",
+            absl::StrFormat("%v", absl::CivilHour(2015, 1, 2, 3)));
+
+  EXPECT_EQ("2015-01-02", absl::StrFormat("%v", absl::CivilDay(2015, 1, 2)));
+
+  EXPECT_EQ("2015-01", absl::StrFormat("%v", absl::CivilMonth(2015, 1)));
+
+  EXPECT_EQ("2015", absl::StrFormat("%v", absl::CivilYear(2015)));
+}
+
 TEST(CivilTime, OutputStream) {
   absl::CivilSecond cs(2016, 2, 3, 4, 5, 6);
   {
@@ -1238,6 +1258,139 @@ TEST(CivilTime, DocumentationExample) {
   for (absl::CivilDay day = june_1; day < july; ++day) {
     // ...
   }
+}
+
+TEST(CivilTime, SupportsHash) {
+  // To check that every field is used by the hash implementation, test
+  // with values that have all fields the same bar one, for each field.
+
+  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      absl::CivilYear(2017),
+      absl::CivilYear(2018),
+  }));
+
+  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      absl::CivilMonth(2017, 1),
+      absl::CivilMonth(2017, 2),
+      absl::CivilMonth(2018, 1),
+      absl::CivilMonth(2018, 2),
+  }));
+
+  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      absl::CivilDay(2017, 1, 1),
+      absl::CivilDay(2017, 1, 2),
+      absl::CivilDay(2017, 2, 1),
+      absl::CivilDay(2017, 2, 2),
+      absl::CivilDay(2018, 1, 1),
+      absl::CivilDay(2018, 1, 2),
+      absl::CivilDay(2018, 2, 1),
+      absl::CivilDay(2018, 2, 2),
+  }));
+
+  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      absl::CivilHour(2017, 1, 1, 0),
+      absl::CivilHour(2017, 1, 1, 1),
+      absl::CivilHour(2017, 1, 2, 0),
+      absl::CivilHour(2017, 1, 2, 1),
+      absl::CivilHour(2017, 2, 1, 0),
+      absl::CivilHour(2017, 2, 1, 1),
+      absl::CivilHour(2017, 2, 2, 0),
+      absl::CivilHour(2017, 2, 2, 1),
+      absl::CivilHour(2018, 1, 1, 0),
+      absl::CivilHour(2018, 1, 1, 1),
+      absl::CivilHour(2018, 1, 2, 0),
+      absl::CivilHour(2018, 1, 2, 1),
+      absl::CivilHour(2018, 2, 1, 0),
+      absl::CivilHour(2018, 2, 1, 1),
+      absl::CivilHour(2018, 2, 2, 0),
+      absl::CivilHour(2018, 2, 2, 1),
+  }));
+
+  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      absl::CivilMinute(2017, 1, 1, 0, 0), absl::CivilMinute(2017, 1, 1, 0, 1),
+      absl::CivilMinute(2017, 1, 1, 1, 0), absl::CivilMinute(2017, 1, 1, 1, 1),
+      absl::CivilMinute(2017, 1, 2, 0, 0), absl::CivilMinute(2017, 1, 2, 0, 1),
+      absl::CivilMinute(2017, 1, 2, 1, 0), absl::CivilMinute(2017, 1, 2, 1, 1),
+      absl::CivilMinute(2017, 2, 1, 0, 0), absl::CivilMinute(2017, 2, 1, 0, 1),
+      absl::CivilMinute(2017, 2, 1, 1, 0), absl::CivilMinute(2017, 2, 1, 1, 1),
+      absl::CivilMinute(2017, 2, 2, 0, 0), absl::CivilMinute(2017, 2, 2, 0, 1),
+      absl::CivilMinute(2017, 2, 2, 1, 0), absl::CivilMinute(2017, 2, 2, 1, 1),
+      absl::CivilMinute(2018, 1, 1, 0, 0), absl::CivilMinute(2018, 1, 1, 0, 1),
+      absl::CivilMinute(2018, 1, 1, 1, 0), absl::CivilMinute(2018, 1, 1, 1, 1),
+      absl::CivilMinute(2018, 1, 2, 0, 0), absl::CivilMinute(2018, 1, 2, 0, 1),
+      absl::CivilMinute(2018, 1, 2, 1, 0), absl::CivilMinute(2018, 1, 2, 1, 1),
+      absl::CivilMinute(2018, 2, 1, 0, 0), absl::CivilMinute(2018, 2, 1, 0, 1),
+      absl::CivilMinute(2018, 2, 1, 1, 0), absl::CivilMinute(2018, 2, 1, 1, 1),
+      absl::CivilMinute(2018, 2, 2, 0, 0), absl::CivilMinute(2018, 2, 2, 0, 1),
+      absl::CivilMinute(2018, 2, 2, 1, 0), absl::CivilMinute(2018, 2, 2, 1, 1),
+  }));
+
+  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      absl::CivilSecond(2017, 1, 1, 0, 0, 0),
+      absl::CivilSecond(2017, 1, 1, 0, 0, 1),
+      absl::CivilSecond(2017, 1, 1, 0, 1, 0),
+      absl::CivilSecond(2017, 1, 1, 0, 1, 1),
+      absl::CivilSecond(2017, 1, 1, 1, 0, 0),
+      absl::CivilSecond(2017, 1, 1, 1, 0, 1),
+      absl::CivilSecond(2017, 1, 1, 1, 1, 0),
+      absl::CivilSecond(2017, 1, 1, 1, 1, 1),
+      absl::CivilSecond(2017, 1, 2, 0, 0, 0),
+      absl::CivilSecond(2017, 1, 2, 0, 0, 1),
+      absl::CivilSecond(2017, 1, 2, 0, 1, 0),
+      absl::CivilSecond(2017, 1, 2, 0, 1, 1),
+      absl::CivilSecond(2017, 1, 2, 1, 0, 0),
+      absl::CivilSecond(2017, 1, 2, 1, 0, 1),
+      absl::CivilSecond(2017, 1, 2, 1, 1, 0),
+      absl::CivilSecond(2017, 1, 2, 1, 1, 1),
+      absl::CivilSecond(2017, 2, 1, 0, 0, 0),
+      absl::CivilSecond(2017, 2, 1, 0, 0, 1),
+      absl::CivilSecond(2017, 2, 1, 0, 1, 0),
+      absl::CivilSecond(2017, 2, 1, 0, 1, 1),
+      absl::CivilSecond(2017, 2, 1, 1, 0, 0),
+      absl::CivilSecond(2017, 2, 1, 1, 0, 1),
+      absl::CivilSecond(2017, 2, 1, 1, 1, 0),
+      absl::CivilSecond(2017, 2, 1, 1, 1, 1),
+      absl::CivilSecond(2017, 2, 2, 0, 0, 0),
+      absl::CivilSecond(2017, 2, 2, 0, 0, 1),
+      absl::CivilSecond(2017, 2, 2, 0, 1, 0),
+      absl::CivilSecond(2017, 2, 2, 0, 1, 1),
+      absl::CivilSecond(2017, 2, 2, 1, 0, 0),
+      absl::CivilSecond(2017, 2, 2, 1, 0, 1),
+      absl::CivilSecond(2017, 2, 2, 1, 1, 0),
+      absl::CivilSecond(2017, 2, 2, 1, 1, 1),
+      absl::CivilSecond(2018, 1, 1, 0, 0, 0),
+      absl::CivilSecond(2018, 1, 1, 0, 0, 1),
+      absl::CivilSecond(2018, 1, 1, 0, 1, 0),
+      absl::CivilSecond(2018, 1, 1, 0, 1, 1),
+      absl::CivilSecond(2018, 1, 1, 1, 0, 0),
+      absl::CivilSecond(2018, 1, 1, 1, 0, 1),
+      absl::CivilSecond(2018, 1, 1, 1, 1, 0),
+      absl::CivilSecond(2018, 1, 1, 1, 1, 1),
+      absl::CivilSecond(2018, 1, 2, 0, 0, 0),
+      absl::CivilSecond(2018, 1, 2, 0, 0, 1),
+      absl::CivilSecond(2018, 1, 2, 0, 1, 0),
+      absl::CivilSecond(2018, 1, 2, 0, 1, 1),
+      absl::CivilSecond(2018, 1, 2, 1, 0, 0),
+      absl::CivilSecond(2018, 1, 2, 1, 0, 1),
+      absl::CivilSecond(2018, 1, 2, 1, 1, 0),
+      absl::CivilSecond(2018, 1, 2, 1, 1, 1),
+      absl::CivilSecond(2018, 2, 1, 0, 0, 0),
+      absl::CivilSecond(2018, 2, 1, 0, 0, 1),
+      absl::CivilSecond(2018, 2, 1, 0, 1, 0),
+      absl::CivilSecond(2018, 2, 1, 0, 1, 1),
+      absl::CivilSecond(2018, 2, 1, 1, 0, 0),
+      absl::CivilSecond(2018, 2, 1, 1, 0, 1),
+      absl::CivilSecond(2018, 2, 1, 1, 1, 0),
+      absl::CivilSecond(2018, 2, 1, 1, 1, 1),
+      absl::CivilSecond(2018, 2, 2, 0, 0, 0),
+      absl::CivilSecond(2018, 2, 2, 0, 0, 1),
+      absl::CivilSecond(2018, 2, 2, 0, 1, 0),
+      absl::CivilSecond(2018, 2, 2, 0, 1, 1),
+      absl::CivilSecond(2018, 2, 2, 1, 0, 0),
+      absl::CivilSecond(2018, 2, 2, 1, 0, 1),
+      absl::CivilSecond(2018, 2, 2, 1, 1, 0),
+      absl::CivilSecond(2018, 2, 2, 1, 1, 1),
+  }));
 }
 
 }  // namespace

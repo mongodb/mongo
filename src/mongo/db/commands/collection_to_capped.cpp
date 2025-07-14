@@ -138,7 +138,8 @@ public:
                 opCtx, fromNs, AcquisitionPrerequisites::OperationType::kWrite),
             CollectionAcquisitionRequest::fromOpCtx(
                 opCtx, toNs, AcquisitionPrerequisites::OperationType::kWrite)};
-        auto acquisitions = acquireCollections(opCtx, acquisitionRequests, LockMode::MODE_X);
+        [[maybe_unused]] auto acquisitions =
+            acquireCollections(opCtx, acquisitionRequests, LockMode::MODE_X);
 
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, toNs)) {
             uasserted(ErrorCodes::NotWritablePrimary,

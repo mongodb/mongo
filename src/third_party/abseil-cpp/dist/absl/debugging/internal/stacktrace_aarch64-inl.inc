@@ -4,6 +4,7 @@
 // Generate stack tracer for aarch64
 
 #if defined(__linux__)
+#include <signal.h>
 #include <sys/mman.h>
 #include <ucontext.h>
 #include <unistd.h>
@@ -17,6 +18,7 @@
 
 #include "absl/base/attributes.h"
 #include "absl/debugging/internal/address_is_readable.h"
+#include "absl/debugging/internal/addresses.h"
 #include "absl/debugging/internal/vdso_support.h"  // a no-op on non-elf or non-glibc systems
 #include "absl/debugging/stacktrace.h"
 
@@ -70,12 +72,28 @@ static const unsigned char* GetKernelRtSigreturnAddress() {
 // Compute the size of a stack frame in [low..high).  We assume that
 // low < high.  Return size of kUnknownFrameSize.
 template<typename T>
-static inline size_t ComputeStackFrameSize(const T* low,
+static size_t ComputeStackFrameSize(const T* low,
                                            const T* high) {
   const char* low_char_ptr = reinterpret_cast<const char *>(low);
   const char* high_char_ptr = reinterpret_cast<const char *>(high);
   return low < high ? static_cast<size_t>(high_char_ptr - low_char_ptr)
                     : kUnknownFrameSize;
+}
+
+// Saves stack info that is expensive to calculate to avoid recalculating per frame.
+struct StackInfo {
+  uintptr_t stack_low;
+  uintptr_t stack_high;
+  uintptr_t sig_stack_low;
+  uintptr_t sig_stack_high;
+};
+
+static bool InsideSignalStack(void** ptr, const StackInfo* stack_info) {
+  uintptr_t comparable_ptr = reinterpret_cast<uintptr_t>(ptr);
+  if (stack_info->sig_stack_high == kUnknownStackEnd)
+    return false;
+  return (comparable_ptr >= stack_info->sig_stack_low &&
+          comparable_ptr < stack_info->sig_stack_high);
 }
 
 // Given a pointer to a stack frame, locate and return the calling
@@ -84,11 +102,11 @@ static inline size_t ComputeStackFrameSize(const T* low,
 // "STRICT_UNWINDING") to reduce the chance that a bad pointer is returned.
 template<bool STRICT_UNWINDING, bool WITH_CONTEXT>
 ABSL_ATTRIBUTE_NO_SANITIZE_ADDRESS  // May read random elements from stack.
-ABSL_ATTRIBUTE_NO_SANITIZE_MEMORY  // May read random elements from stack.
+ABSL_ATTRIBUTE_NO_SANITIZE_MEMORY   // May read random elements from stack.
+ABSL_ATTRIBUTE_NO_SANITIZE_THREAD   // May read random elements from stack.
 static void **NextStackFrame(void **old_frame_pointer, const void *uc,
-                             size_t stack_low, size_t stack_high) {
+                             const StackInfo *stack_info) {
   void **new_frame_pointer = reinterpret_cast<void**>(*old_frame_pointer);
-  bool check_frame_size = true;
 
 #if defined(__linux__)
   if (WITH_CONTEXT && uc != nullptr) {
@@ -108,16 +126,6 @@ static void **NextStackFrame(void **old_frame_pointer, const void *uc,
       if (pre_signal_frame_pointer >= old_frame_pointer) {
         new_frame_pointer = pre_signal_frame_pointer;
       }
-      // Check that alleged frame pointer is actually readable. This is to
-      // prevent "double fault" in case we hit the first fault due to e.g.
-      // stack corruption.
-      if (!absl::debugging_internal::AddressIsReadable(
-              new_frame_pointer))
-        return nullptr;
-
-      // Skip frame size check if we return from a signal. We may be using a
-      // an alternate stack for signals.
-      check_frame_size = false;
     }
   }
 #endif
@@ -126,9 +134,15 @@ static void **NextStackFrame(void **old_frame_pointer, const void *uc,
   if ((reinterpret_cast<uintptr_t>(new_frame_pointer) & 7) != 0)
     return nullptr;
 
-  // Check frame size.  In strict mode, we assume frames to be under
-  // 100,000 bytes.  In non-strict mode, we relax the limit to 1MB.
-  if (check_frame_size) {
+  uintptr_t new_fp_comparable = reinterpret_cast<uintptr_t>(new_frame_pointer);
+  // Only check the size if both frames are in the same stack.
+  const bool old_inside_signal_stack =
+      InsideSignalStack(old_frame_pointer, stack_info);
+  const bool new_inside_signal_stack =
+      InsideSignalStack(new_frame_pointer, stack_info);
+  if (new_inside_signal_stack == old_inside_signal_stack) {
+    // Check frame size.  In strict mode, we assume frames to be under
+    // 100,000 bytes.  In non-strict mode, we relax the limit to 1MB.
     const size_t max_size = STRICT_UNWINDING ? 100000 : 1000000;
     const size_t frame_size =
         ComputeStackFrameSize(old_frame_pointer, new_frame_pointer);
@@ -136,15 +150,20 @@ static void **NextStackFrame(void **old_frame_pointer, const void *uc,
        return nullptr;
     // A very large frame may mean corrupt memory or an erroneous frame
     // pointer. But also maybe just a plain-old large frame.  Assume that if the
-    // frame is within the known stack, then it is valid.
+    // frame is within a known stack, then it is valid.
     if (frame_size > max_size) {
-       if (stack_high < kUnknownStackEnd &&
+      size_t stack_low = stack_info->stack_low;
+      size_t stack_high = stack_info->stack_high;
+      if (new_inside_signal_stack) {
+        stack_low = stack_info->sig_stack_low;
+        stack_high = stack_info->sig_stack_high;
+      }
+      if (stack_high < kUnknownStackEnd &&
           static_cast<size_t>(getpagesize()) < stack_low) {
-        const uintptr_t new_fp_u =
-            reinterpret_cast<uintptr_t>(new_frame_pointer);
         // Stack bounds are known.
-        if (!(stack_low < new_fp_u && new_fp_u <= stack_high)) {
-          // new_frame_pointer is not within the known stack.
+        if (!(stack_low < new_fp_comparable &&
+              new_fp_comparable <= stack_high)) {
+          // new_frame_pointer is not within a known stack.
           return nullptr;
         }
       } else {
@@ -153,15 +172,31 @@ static void **NextStackFrame(void **old_frame_pointer, const void *uc,
       }
     }
   }
+  // New frame pointer is valid if it is inside either known stack or readable.
+  // This assumes that everything within either known stack is readable. Outside
+  // either known stack but readable is unexpected, and possibly corrupt, but
+  // for now assume it is valid. If it isn't actually valid, the next frame will
+  // be corrupt and we will detect that next iteration.
+  if (new_inside_signal_stack ||
+      (new_fp_comparable >= stack_info->stack_low &&
+       new_fp_comparable < stack_info->stack_high) ||
+      absl::debugging_internal::AddressIsReadable(new_frame_pointer)) {
+    return new_frame_pointer;
+  }
 
-  return new_frame_pointer;
+  return nullptr;
 }
 
 template <bool IS_STACK_FRAMES, bool IS_WITH_CONTEXT>
+// We count on the bottom frame being this one. See the comment
+// at prev_return_address
+ABSL_ATTRIBUTE_NOINLINE
 ABSL_ATTRIBUTE_NO_SANITIZE_ADDRESS  // May read random elements from stack.
 ABSL_ATTRIBUTE_NO_SANITIZE_MEMORY   // May read random elements from stack.
-static int UnwindImpl(void** result, int* sizes, int max_depth, int skip_count,
-                      const void *ucp, int *min_dropped_frames) {
+ABSL_ATTRIBUTE_NO_SANITIZE_THREAD   // May read random elements from stack.
+static int UnwindImpl(void **result, uintptr_t *frames, int *sizes,
+                      int max_depth, int skip_count, const void *ucp,
+                      int *min_dropped_frames) {
 #ifdef __GNUC__
   void **frame_pointer = reinterpret_cast<void**>(__builtin_frame_address(0));
 #else
@@ -171,8 +206,11 @@ static int UnwindImpl(void** result, int* sizes, int max_depth, int skip_count,
   int n = 0;
 
   // Assume that the first page is not stack.
-  size_t stack_low = static_cast<size_t>(getpagesize());
-  size_t stack_high = kUnknownStackEnd;
+  StackInfo stack_info;
+  stack_info.stack_low = static_cast<uintptr_t>(getpagesize());
+  stack_info.stack_high = kUnknownStackEnd;
+  stack_info.sig_stack_low = stack_info.stack_low;
+  stack_info.sig_stack_high = kUnknownStackEnd;
 
   // The frame pointer points to low address of a frame.  The first 64-bit
   // word of a frame points to the next frame up the call chain, which normally
@@ -192,10 +230,18 @@ static int UnwindImpl(void** result, int* sizes, int max_depth, int skip_count,
     if (skip_count > 0) {
       skip_count--;
     } else {
-      result[n] = prev_return_address;
+      result[n] = reinterpret_cast<void *>(
+          absl::debugging_internal::StripPointerMetadata(prev_return_address));
       if (IS_STACK_FRAMES) {
-        sizes[n] = static_cast<int>(
-            ComputeStackFrameSize(prev_frame_pointer, frame_pointer));
+        if (frames != nullptr) {
+          frames[n] = absl::debugging_internal::StripPointerMetadata(
+                          prev_frame_pointer) +
+                      2 * sizeof(void *) /* go past the return address */;
+        }
+        if (sizes != nullptr) {
+          sizes[n] = static_cast<int>(
+              ComputeStackFrameSize(prev_frame_pointer, frame_pointer));
+        }
       }
       n++;
     }
@@ -207,7 +253,7 @@ static int UnwindImpl(void** result, int* sizes, int max_depth, int skip_count,
     // that is as complete as possible (even if it contains a few bogus
     // entries in some rare cases).
     frame_pointer = NextStackFrame<!IS_STACK_FRAMES, IS_WITH_CONTEXT>(
-        frame_pointer, ucp, stack_low, stack_high);
+        frame_pointer, ucp, &stack_info);
   }
 
   if (min_dropped_frames != nullptr) {
@@ -222,7 +268,7 @@ static int UnwindImpl(void** result, int* sizes, int max_depth, int skip_count,
         num_dropped_frames++;
       }
       frame_pointer = NextStackFrame<!IS_STACK_FRAMES, IS_WITH_CONTEXT>(
-          frame_pointer, ucp, stack_low, stack_high);
+          frame_pointer, ucp, &stack_info);
     }
     *min_dropped_frames = num_dropped_frames;
   }

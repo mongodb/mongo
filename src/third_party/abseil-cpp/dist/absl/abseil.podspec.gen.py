@@ -30,6 +30,9 @@ Pod::Spec.new do |s|
     :git => 'https://github.com/abseil/abseil-cpp.git',
     :tag => '${tag}',
   }
+  s.resource_bundles = {
+    s.module_name => 'PrivacyInfo.xcprivacy',
+  }
   s.module_name = 'absl'
   s.header_mappings_dir = 'absl'
   s.header_dir = 'absl'
@@ -40,10 +43,16 @@ Pod::Spec.new do |s|
     'USE_HEADERMAP' => 'NO',
     'ALWAYS_SEARCH_USER_PATHS' => 'NO',
   }
-  s.ios.deployment_target = '9.0'
-  s.osx.deployment_target = '10.10'
-  s.tvos.deployment_target = '9.0'
-  s.watchos.deployment_target = '2.0'
+  s.ios.deployment_target = '12.0'
+  s.osx.deployment_target = '10.13'
+  s.tvos.deployment_target = '12.0'
+  s.watchos.deployment_target = '4.0'
+  s.visionos.deployment_target = '1.0'
+  s.subspec 'xcprivacy' do |ss|
+    ss.resource_bundles = {
+      ss.module_name => 'PrivacyInfo.xcprivacy',
+    }
+  end
 """
 
 # Rule object representing the rule of Bazel BUILD.
@@ -188,6 +197,12 @@ def write_podspec_rule(f, rule, depth):
     name = get_spec_name(dep.replace(":", "/"))
     f.write("{indent}{var}.dependency '{dep}'\n".format(
         indent=indent, var=spec_var, dep=name))
+  # Writes dependency to xcprivacy
+  f.write(
+      "{indent}{var}.dependency '{dep}'\n".format(
+          indent=indent, var=spec_var, dep="abseil/xcprivacy"
+      )
+  )
 
 
 def write_indented_list(f, leading, values):

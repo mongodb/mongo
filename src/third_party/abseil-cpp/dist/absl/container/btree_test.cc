@@ -37,7 +37,7 @@
 #include "absl/base/macros.h"
 #include "absl/container/btree_map.h"
 #include "absl/container/btree_set.h"
-#include "absl/container/internal/counting_allocator.h"
+#include "absl/container/internal/test_allocator.h"
 #include "absl/container/internal/test_instance_tracker.h"
 #include "absl/flags/flag.h"
 #include "absl/hash/hash_testing.h"
@@ -75,16 +75,6 @@ template <typename T, typename U, typename V, typename W>
 void CheckPairEquals(const std::pair<T, U> &x, const std::pair<V, W> &y) {
   CheckPairEquals(x.first, y.first);
   CheckPairEquals(x.second, y.second);
-}
-
-bool IsAssertEnabled() {
-  // Use an assert with side-effects to figure out if they are actually enabled.
-  bool assert_enabled = false;
-  assert([&]() {  // NOLINT
-    assert_enabled = true;
-    return true;
-  }());
-  return assert_enabled;
 }
 }  // namespace
 
@@ -668,111 +658,6 @@ void BtreeMultiTest() {
 }
 
 template <typename T>
-struct PropagatingCountingAlloc : public CountingAllocator<T> {
-  using propagate_on_container_copy_assignment = std::true_type;
-  using propagate_on_container_move_assignment = std::true_type;
-  using propagate_on_container_swap = std::true_type;
-
-  using Base = CountingAllocator<T>;
-  using Base::Base;
-
-  template <typename U>
-  explicit PropagatingCountingAlloc(const PropagatingCountingAlloc<U> &other)
-      : Base(other.bytes_used_) {}
-
-  template <typename U>
-  struct rebind {
-    using other = PropagatingCountingAlloc<U>;
-  };
-};
-
-template <typename T>
-void BtreeAllocatorTest() {
-  using value_type = typename T::value_type;
-
-  int64_t bytes1 = 0, bytes2 = 0;
-  PropagatingCountingAlloc<T> allocator1(&bytes1);
-  PropagatingCountingAlloc<T> allocator2(&bytes2);
-  Generator<value_type> generator(1000);
-
-  // Test that we allocate properly aligned memory. If we don't, then Layout
-  // will assert fail.
-  auto unused1 = allocator1.allocate(1);
-  auto unused2 = allocator2.allocate(1);
-
-  // Test copy assignment
-  {
-    T b1(typename T::key_compare(), allocator1);
-    T b2(typename T::key_compare(), allocator2);
-
-    int64_t original_bytes1 = bytes1;
-    b1.insert(generator(0));
-    EXPECT_GT(bytes1, original_bytes1);
-
-    // This should propagate the allocator.
-    b1 = b2;
-    EXPECT_EQ(b1.size(), 0);
-    EXPECT_EQ(b2.size(), 0);
-    EXPECT_EQ(bytes1, original_bytes1);
-
-    for (int i = 1; i < 1000; i++) {
-      b1.insert(generator(i));
-    }
-
-    // We should have allocated out of allocator2.
-    EXPECT_GT(bytes2, bytes1);
-  }
-
-  // Test move assignment
-  {
-    T b1(typename T::key_compare(), allocator1);
-    T b2(typename T::key_compare(), allocator2);
-
-    int64_t original_bytes1 = bytes1;
-    b1.insert(generator(0));
-    EXPECT_GT(bytes1, original_bytes1);
-
-    // This should propagate the allocator.
-    b1 = std::move(b2);
-    EXPECT_EQ(b1.size(), 0);
-    EXPECT_EQ(bytes1, original_bytes1);
-
-    for (int i = 1; i < 1000; i++) {
-      b1.insert(generator(i));
-    }
-
-    // We should have allocated out of allocator2.
-    EXPECT_GT(bytes2, bytes1);
-  }
-
-  // Test swap
-  {
-    T b1(typename T::key_compare(), allocator1);
-    T b2(typename T::key_compare(), allocator2);
-
-    int64_t original_bytes1 = bytes1;
-    b1.insert(generator(0));
-    EXPECT_GT(bytes1, original_bytes1);
-
-    // This should swap the allocators.
-    swap(b1, b2);
-    EXPECT_EQ(b1.size(), 0);
-    EXPECT_EQ(b2.size(), 1);
-    EXPECT_GT(bytes1, original_bytes1);
-
-    for (int i = 1; i < 1000; i++) {
-      b1.insert(generator(i));
-    }
-
-    // We should have allocated out of allocator2.
-    EXPECT_GT(bytes2, bytes1);
-  }
-
-  allocator1.deallocate(unused1, 1);
-  allocator2.deallocate(unused2, 1);
-}
-
-template <typename T>
 void BtreeMapTest() {
   using value_type = typename T::value_type;
   using mapped_type = typename T::mapped_type;
@@ -811,10 +696,7 @@ void SetTest() {
       sizeof(absl::btree_set<K>),
       2 * sizeof(void *) + sizeof(typename absl::btree_set<K>::size_type));
   using BtreeSet = absl::btree_set<K>;
-  using CountingBtreeSet =
-      absl::btree_set<K, std::less<K>, PropagatingCountingAlloc<K>>;
   BtreeTest<BtreeSet, std::set<K>>();
-  BtreeAllocatorTest<CountingBtreeSet>();
 }
 
 template <typename K, int N = 256>
@@ -823,24 +705,16 @@ void MapTest() {
       sizeof(absl::btree_map<K, K>),
       2 * sizeof(void *) + sizeof(typename absl::btree_map<K, K>::size_type));
   using BtreeMap = absl::btree_map<K, K>;
-  using CountingBtreeMap =
-      absl::btree_map<K, K, std::less<K>,
-                      PropagatingCountingAlloc<std::pair<const K, K>>>;
   BtreeTest<BtreeMap, std::map<K, K>>();
-  BtreeAllocatorTest<CountingBtreeMap>();
   BtreeMapTest<BtreeMap>();
 }
 
 TEST(Btree, set_int32) { SetTest<int32_t>(); }
-TEST(Btree, set_int64) { SetTest<int64_t>(); }
 TEST(Btree, set_string) { SetTest<std::string>(); }
 TEST(Btree, set_cord) { SetTest<absl::Cord>(); }
-TEST(Btree, set_pair) { SetTest<std::pair<int, int>>(); }
 TEST(Btree, map_int32) { MapTest<int32_t>(); }
-TEST(Btree, map_int64) { MapTest<int64_t>(); }
 TEST(Btree, map_string) { MapTest<std::string>(); }
 TEST(Btree, map_cord) { MapTest<absl::Cord>(); }
-TEST(Btree, map_pair) { MapTest<std::pair<int, int>>(); }
 
 template <typename K, int N = 256>
 void MultiSetTest() {
@@ -848,10 +722,7 @@ void MultiSetTest() {
       sizeof(absl::btree_multiset<K>),
       2 * sizeof(void *) + sizeof(typename absl::btree_multiset<K>::size_type));
   using BtreeMSet = absl::btree_multiset<K>;
-  using CountingBtreeMSet =
-      absl::btree_multiset<K, std::less<K>, PropagatingCountingAlloc<K>>;
   BtreeMultiTest<BtreeMSet, std::multiset<K>>();
-  BtreeAllocatorTest<CountingBtreeMSet>();
 }
 
 template <typename K, int N = 256>
@@ -860,24 +731,16 @@ void MultiMapTest() {
             2 * sizeof(void *) +
                 sizeof(typename absl::btree_multimap<K, K>::size_type));
   using BtreeMMap = absl::btree_multimap<K, K>;
-  using CountingBtreeMMap =
-      absl::btree_multimap<K, K, std::less<K>,
-                           PropagatingCountingAlloc<std::pair<const K, K>>>;
   BtreeMultiTest<BtreeMMap, std::multimap<K, K>>();
   BtreeMultiMapTest<BtreeMMap>();
-  BtreeAllocatorTest<CountingBtreeMMap>();
 }
 
 TEST(Btree, multiset_int32) { MultiSetTest<int32_t>(); }
-TEST(Btree, multiset_int64) { MultiSetTest<int64_t>(); }
 TEST(Btree, multiset_string) { MultiSetTest<std::string>(); }
 TEST(Btree, multiset_cord) { MultiSetTest<absl::Cord>(); }
-TEST(Btree, multiset_pair) { MultiSetTest<std::pair<int, int>>(); }
 TEST(Btree, multimap_int32) { MultiMapTest<int32_t>(); }
-TEST(Btree, multimap_int64) { MultiMapTest<int64_t>(); }
 TEST(Btree, multimap_string) { MultiMapTest<std::string>(); }
 TEST(Btree, multimap_cord) { MultiMapTest<absl::Cord>(); }
-TEST(Btree, multimap_pair) { MultiMapTest<std::pair<int, int>>(); }
 
 struct CompareIntToString {
   bool operator()(const std::string &a, const std::string &b) const {
@@ -1483,7 +1346,8 @@ void ExpectOperationCounts(const int expected_moves,
   tracker->ResetCopiesMovesSwaps();
 }
 
-#ifdef ABSL_HAVE_ADDRESS_SANITIZER
+#if defined(ABSL_HAVE_ADDRESS_SANITIZER) || \
+    defined(ABSL_HAVE_HWADDRESS_SANITIZER)
 constexpr bool kAsan = true;
 #else
 constexpr bool kAsan = false;
@@ -2526,50 +2390,23 @@ TEST(Btree, TryEmplaceWithHintAndMultipleValueArgsWorks) {
   EXPECT_EQ(std::string(10, 'a'), m[1]);
 }
 
-TEST(Btree, MoveAssignmentAllocatorPropagation) {
-  InstanceTracker tracker;
+template <typename Alloc>
+using BtreeSetAlloc = absl::btree_set<int, std::less<int>, Alloc>;
 
-  int64_t bytes1 = 0, bytes2 = 0;
-  PropagatingCountingAlloc<MovableOnlyInstance> allocator1(&bytes1);
-  PropagatingCountingAlloc<MovableOnlyInstance> allocator2(&bytes2);
-  std::less<MovableOnlyInstance> cmp;
+TEST(Btree, AllocatorPropagation) {
+  TestAllocPropagation<BtreeSetAlloc>();
+}
 
-  // Test propagating allocator_type.
-  {
-    absl::btree_set<MovableOnlyInstance, std::less<MovableOnlyInstance>,
-                    PropagatingCountingAlloc<MovableOnlyInstance>>
-        set1(cmp, allocator1), set2(cmp, allocator2);
+TEST(Btree, MinimumAlignmentAllocator) {
+  absl::btree_set<int8_t, std::less<int8_t>, MinimumAlignmentAlloc<int8_t>> set;
 
-    for (int i = 0; i < 100; ++i) set1.insert(MovableOnlyInstance(i));
+  // Do some basic operations. Test that everything is fine when allocator uses
+  // minimal alignment.
+  for (int8_t i = 0; i < 100; ++i) set.insert(i);
+  set.erase(set.find(50), set.end());
+  for (int8_t i = 51; i < 101; ++i) set.insert(i);
 
-    tracker.ResetCopiesMovesSwaps();
-    set2 = std::move(set1);
-    EXPECT_EQ(tracker.moves(), 0);
-  }
-  // Test non-propagating allocator_type with equal allocators.
-  {
-    absl::btree_set<MovableOnlyInstance, std::less<MovableOnlyInstance>,
-                    CountingAllocator<MovableOnlyInstance>>
-        set1(cmp, allocator1), set2(cmp, allocator1);
-
-    for (int i = 0; i < 100; ++i) set1.insert(MovableOnlyInstance(i));
-
-    tracker.ResetCopiesMovesSwaps();
-    set2 = std::move(set1);
-    EXPECT_EQ(tracker.moves(), 0);
-  }
-  // Test non-propagating allocator_type with different allocators.
-  {
-    absl::btree_set<MovableOnlyInstance, std::less<MovableOnlyInstance>,
-                    CountingAllocator<MovableOnlyInstance>>
-        set1(cmp, allocator1), set2(cmp, allocator2);
-
-    for (int i = 0; i < 100; ++i) set1.insert(MovableOnlyInstance(i));
-
-    tracker.ResetCopiesMovesSwaps();
-    set2 = std::move(set1);
-    EXPECT_GE(tracker.moves(), 100);
-  }
+  EXPECT_EQ(set.size(), 100);
 }
 
 TEST(Btree, EmptyTree) {
@@ -2837,8 +2674,6 @@ TEST(Btree, HeterogeneousInsertOrAssign) {
 }
 #endif
 
-// This test requires std::launder for mutable key access in node handles.
-#if defined(__cpp_lib_launder) && __cpp_lib_launder >= 201606
 TEST(Btree, NodeHandleMutableKeyAccess) {
   {
     absl::btree_map<std::string, std::string> map;
@@ -2864,7 +2699,6 @@ TEST(Btree, NodeHandleMutableKeyAccess) {
     EXPECT_THAT(map, ElementsAre(Pair("key", "mapped")));
   }
 }
-#endif
 
 struct MultiKey {
   int i1;
@@ -2963,6 +2797,20 @@ TYPED_TEST(BtreeMultiKeyTest, Count) {
   const absl::btree_set<MultiKey, TypeParam> set = {
       {1, 1}, {2, 1}, {2, 2}, {3, 1}};
   EXPECT_EQ(set.count(2), 2);
+}
+
+TEST(Btree, SetIteratorsAreConst) {
+  using Set = absl::btree_set<int>;
+  EXPECT_TRUE(
+      (std::is_same<typename Set::iterator::reference, const int &>::value));
+  EXPECT_TRUE(
+      (std::is_same<typename Set::iterator::pointer, const int *>::value));
+
+  using MSet = absl::btree_multiset<int>;
+  EXPECT_TRUE(
+      (std::is_same<typename MSet::iterator::reference, const int &>::value));
+  EXPECT_TRUE(
+      (std::is_same<typename MSet::iterator::pointer, const int *>::value));
 }
 
 TEST(Btree, AllocConstructor) {
@@ -3098,6 +2946,7 @@ TEST(Btree,
 
 TEST(Btree, ConstructImplicitlyWithUnadaptedComparator) {
   absl::btree_set<MultiKey, MultiKeyComp> set = {{}, MultiKeyComp{}};
+  EXPECT_TRUE(set.empty());
 }
 
 TEST(Btree, InvalidComparatorsCaught) {
@@ -3229,10 +3078,10 @@ TEST(Btree, InvalidIteratorUse) {
   if (!BtreeGenerationsEnabled())
     GTEST_SKIP() << "Generation validation for iterators is disabled.";
 
-  // Invalid memory use can trigger heap-use-after-free in ASan or invalidated
-  // iterator assertions.
+  // Invalid memory use can trigger use-after-free in ASan, HWASAN or
+  // invalidated iterator assertions.
   constexpr const char *kInvalidMemoryDeathMessage =
-      "heap-use-after-free|invalidated iterator";
+      "use-after-free|invalidated iterator";
 
   {
     absl::btree_set<int> set;
@@ -3502,7 +3351,7 @@ TEST(Btree, ReusePoisonMemory) {
   set.insert(0);
 }
 
-TEST(Btree, IteratorSubtraction) {
+TEST(Btree, IteratorDifference) {
   absl::BitGen bitgen;
   std::vector<int> vec;
   // Randomize the set's insertion order so the nodes aren't all full.
@@ -3517,6 +3366,94 @@ TEST(Btree, IteratorSubtraction) {
     size_t end = absl::Uniform(bitgen, begin, set.size());
     ASSERT_EQ(end - begin, set.find(end) - set.find(begin))
         << begin << " " << end;
+  }
+}
+
+TEST(Btree, IteratorAddition) {
+  absl::BitGen bitgen;
+  std::vector<int> vec;
+
+  // Randomize the set's insertion order so the nodes aren't all full.
+  constexpr int kSetSize = 1000000;
+  for (int i = 0; i < kSetSize; ++i) vec.push_back(i);
+  absl::c_shuffle(vec, bitgen);
+
+  absl::btree_set<int> set;
+  for (int i : vec) set.insert(i);
+
+  for (int i = 0; i < 1000; ++i) {
+    int begin = absl::Uniform(bitgen, 0, kSetSize);
+    int end = absl::Uniform(bitgen, begin, kSetSize);
+    ASSERT_LE(begin, end);
+
+    auto it = set.find(begin);
+    it += end - begin;
+    ASSERT_EQ(it, set.find(end)) << end;
+
+    it += begin - end;
+    ASSERT_EQ(it, set.find(begin)) << begin;
+  }
+}
+
+TEST(Btree, IteratorAdditionOutOfBounds) {
+  const absl::btree_set<int> set({5});
+
+  auto it = set.find(5);
+
+  auto forward = it;
+  forward += 1;
+  EXPECT_EQ(forward, set.end());
+
+  auto backward = it;
+  EXPECT_EQ(backward, set.begin());
+
+  if (IsAssertEnabled()) {
+    EXPECT_DEATH(forward += 1, "n == 0");
+    EXPECT_DEATH(backward += -1, "position >= node->start");
+  }
+}
+
+TEST(Btree, IteratorSubtraction) {
+  absl::BitGen bitgen;
+  std::vector<int> vec;
+
+  // Randomize the set's insertion order so the nodes aren't all full.
+  constexpr int kSetSize = 1000000;
+  for (int i = 0; i < kSetSize; ++i) vec.push_back(i);
+  absl::c_shuffle(vec, bitgen);
+
+  absl::btree_set<int> set;
+  for (int i : vec) set.insert(i);
+
+  for (int i = 0; i < 1000; ++i) {
+    int begin = absl::Uniform(bitgen, 0, kSetSize);
+    int end = absl::Uniform(bitgen, begin, kSetSize);
+    ASSERT_LE(begin, end);
+
+    auto it = set.find(end);
+    it -= end - begin;
+    ASSERT_EQ(it, set.find(begin)) << begin;
+
+    it -= begin - end;
+    ASSERT_EQ(it, set.find(end)) << end;
+  }
+}
+
+TEST(Btree, IteratorSubtractionOutOfBounds) {
+  const absl::btree_set<int> set({5});
+
+  auto it = set.find(5);
+
+  auto backward = it;
+  EXPECT_EQ(backward, set.begin());
+
+  auto forward = it;
+  forward -= -1;
+  EXPECT_EQ(forward, set.end());
+
+  if (IsAssertEnabled()) {
+    EXPECT_DEATH(backward -= 1, "position >= node->start");
+    EXPECT_DEATH(forward -= -1, "n == 0");
   }
 }
 
@@ -3561,12 +3498,12 @@ TEST(Btree, InvalidPointerUse) {
   set.insert(0);
   const int *ptr = &*set.begin();
   set.insert(1);
-  EXPECT_DEATH(std::cout << *ptr, "heap-use-after-free");
+  EXPECT_DEATH(std::cout << *ptr, "use-after-free");
   size_t slots_per_node = BtreeNodePeer::GetNumSlotsPerNode<decltype(set)>();
   for (int i = 2; i < slots_per_node - 1; ++i) set.insert(i);
   ptr = &*set.begin();
   set.insert(static_cast<int>(slots_per_node));
-  EXPECT_DEATH(std::cout << *ptr, "heap-use-after-free");
+  EXPECT_DEATH(std::cout << *ptr, "use-after-free");
 }
 
 template<typename Set>

@@ -21,14 +21,18 @@
 namespace absl {
 ABSL_NAMESPACE_BEGIN
 
-void InitializeLog() {
+namespace {
+void InitializeLogImpl(absl::TimeZone time_zone) {
   // This comes first since it is used by RAW_LOG.
-  absl::log_internal::SetTimeZone(absl::LocalTimeZone());
+  absl::log_internal::SetTimeZone(time_zone);
 
   // Note that initialization is complete, so logs can now be sent to their
   // proper destinations rather than stderr.
   log_internal::SetInitialized();
 }
+}  // namespace
+
+void InitializeLog() { InitializeLogImpl(absl::LocalTimeZone()); }
 
 ABSL_NAMESPACE_END
 }  // namespace absl

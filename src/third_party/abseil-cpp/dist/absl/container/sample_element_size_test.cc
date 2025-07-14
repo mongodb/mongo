@@ -12,10 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstddef>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/container/internal/hashtablez_sampler.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
 
@@ -38,15 +44,17 @@ void TestInlineElementSize(
     // set cannot be flat_hash_set, however, since that would introduce a mutex
     // deadlock.
     std::unordered_set<const HashtablezInfo*>& preexisting_info,  // NOLINT
-    std::vector<Table>& tables, const typename Table::value_type& elt,
+    std::vector<Table>& tables,
+    const std::vector<typename Table::value_type>& values,
     size_t expected_element_size) {
+  EXPECT_GT(values.size(), 0);
   for (int i = 0; i < 10; ++i) {
     // We create a new table and must store it somewhere so that when we store
     // a pointer to the resulting `HashtablezInfo` into `preexisting_info`
     // that we aren't storing a dangling pointer.
     tables.emplace_back();
-    // We must insert an element to get a hashtablez to instantiate.
-    tables.back().insert(elt);
+    // We must insert elements to get a hashtablez to instantiate.
+    tables.back().insert(values.begin(), values.end());
   }
   size_t new_count = 0;
   sampler.Iterate([&](const HashtablezInfo& info) {
@@ -76,20 +84,16 @@ TEST(FlatHashMap, SampleElementSize) {
   // Enable sampling even if the prod default is off.
   SetHashtablezEnabled(true);
   SetHashtablezSampleParameter(1);
+  TestOnlyRefreshSamplingStateForCurrentThread();
 
   auto& sampler = GlobalHashtablezSampler();
   std::vector<flat_hash_map<int, bigstruct>> flat_map_tables;
   std::vector<flat_hash_set<bigstruct>> flat_set_tables;
   std::vector<node_hash_map<int, bigstruct>> node_map_tables;
   std::vector<node_hash_set<bigstruct>> node_set_tables;
-
-  // It takes thousands of new tables after changing the sampling parameters
-  // before you actually get some instrumentation.  And if you must actually
-  // put something into those tables.
-  for (int i = 0; i < 10000; ++i) {
-    flat_map_tables.emplace_back();
-    flat_map_tables.back()[i] = bigstruct{};
-  }
+  std::vector<bigstruct> set_values = {bigstruct{{0}}, bigstruct{{1}}};
+  std::vector<std::pair<const int, bigstruct>> map_values = {{0, bigstruct{}},
+                                                             {1, bigstruct{}}};
 
   // clang-tidy gives a false positive on this declaration.  This unordered set
   // cannot be a flat_hash_set, however, since that would introduce a mutex
@@ -97,14 +101,14 @@ TEST(FlatHashMap, SampleElementSize) {
   std::unordered_set<const HashtablezInfo*> preexisting_info;  // NOLINT
   sampler.Iterate(
       [&](const HashtablezInfo& info) { preexisting_info.insert(&info); });
-  TestInlineElementSize(sampler, preexisting_info, flat_map_tables,
-                        {0, bigstruct{}}, sizeof(int) + sizeof(bigstruct));
-  TestInlineElementSize(sampler, preexisting_info, node_map_tables,
-                        {0, bigstruct{}}, sizeof(void*));
-  TestInlineElementSize(sampler, preexisting_info, flat_set_tables,  //
-                        bigstruct{}, sizeof(bigstruct));
-  TestInlineElementSize(sampler, preexisting_info, node_set_tables,  //
-                        bigstruct{}, sizeof(void*));
+  TestInlineElementSize(sampler, preexisting_info, flat_map_tables, map_values,
+                        sizeof(int) + sizeof(bigstruct));
+  TestInlineElementSize(sampler, preexisting_info, node_map_tables, map_values,
+                        sizeof(void*));
+  TestInlineElementSize(sampler, preexisting_info, flat_set_tables, set_values,
+                        sizeof(bigstruct));
+  TestInlineElementSize(sampler, preexisting_info, node_set_tables, set_values,
+                        sizeof(void*));
 #endif
 }
 

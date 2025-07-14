@@ -119,7 +119,11 @@ struct Alloc : std::allocator<T> {
   using propagate_on_container_swap = std::true_type;
 
   // Using old paradigm for this to ensure compatibility.
-  explicit Alloc(size_t id = 0) : id_(id) {}
+  //
+  // NOTE: As of 2025-05, this constructor cannot be explicit in order to work
+  // with the libstdc++ that ships with GCC15.
+  // NOLINTNEXTLINE(google-explicit-constructor)
+  Alloc(size_t id = 0) : id_(id) {}
 
   Alloc(const Alloc&) = default;
   Alloc& operator=(const Alloc&) = default;
@@ -174,8 +178,7 @@ ABSL_NAMESPACE_END
 // From GCC-4.9 Changelog: (src: https://gcc.gnu.org/gcc-4.9/changes.html)
 // "the unordered associative containers in <unordered_map> and <unordered_set>
 // meet the allocator-aware container requirements;"
-#if (defined(__GLIBCXX__) && __GLIBCXX__ <= 20140425 ) || \
-( __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 9 ))
+#if defined(__GLIBCXX__) && __GLIBCXX__ <= 20140425
 #define ABSL_UNORDERED_SUPPORTS_ALLOC_CTORS 0
 #else
 #define ABSL_UNORDERED_SUPPORTS_ALLOC_CTORS 1

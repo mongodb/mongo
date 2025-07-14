@@ -559,7 +559,7 @@ def absl_insert_version_after_absl(cpp_name):
     """Insert version inline namespace after the first `absl` namespace found in the given string."""
     # See more:
     # https://github.com/abseil/abseil-cpp/blob/929c17cf481222c35ff1652498994871120e832a/absl/base/options.h#L203
-    ABSL_OPTION_INLINE_NAMESPACE_NAME = "lts_20230802"
+    ABSL_OPTION_INLINE_NAMESPACE_NAME = "lts_20250512"
 
     absl_ns_str = "absl::"
     absl_ns_start = cpp_name.find(absl_ns_str)
@@ -586,7 +586,7 @@ def absl_get_settings(val):
         if not err.args[0].startswith("No type named "):
             raise
 
-        # Abseil uses `inline namespace lts_20230802 { ... }` for its container types. This
+        # Abseil uses `inline namespace lts_20250512 { ... }` for its container types. This
         # can inhibit GDB from resolving type names when the inline namespace appears within
         # a template argument.
         common_fields_storage_type = gdb.lookup_type(
@@ -603,7 +603,7 @@ def absl_get_settings(val):
 
 
 def absl_container_size(settings):
-    return settings["compressed_tuple_"]["value"]
+    return settings["size_"]["data_"] >> 17
 
 
 def absl_get_nodes(val):
@@ -615,7 +615,8 @@ def absl_get_nodes(val):
         return
 
     capacity = int(settings["capacity_"])
-    ctrl = settings["control_"]
+    heap = settings["heap_or_soo_"]["heap"]
+    ctrl = heap["control"]
 
     # Derive the underlying type stored in the container.
     slot_type = lookup_type(str(val.type.strip_typedefs()) + "::slot_type").strip_typedefs()
@@ -625,7 +626,7 @@ def absl_get_nodes(val):
     for item in range(capacity):
         ctrl_t = int(ctrl[item])
         if ctrl_t >= 0:
-            yield settings["slots_"].cast(slot_type.pointer())[item]
+            yield heap["slot_array"]["p"].cast(slot_type.pointer())[item]
 
 
 class AbslHashSetPrinterBase(object):

@@ -15,154 +15,45 @@
 #include "absl/status/statusor.h"
 
 #include <array>
+#include <cstddef>
 #include <initializer_list>
+#include <map>
 #include <memory>
+#include <ostream>
+#include <sstream>
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/base/casts.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
+#include "absl/status/status_matchers.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/any.h"
+#include "absl/types/variant.h"
 #include "absl/utility/utility.h"
 
 namespace {
 
+using ::absl_testing::IsOk;
+using ::absl_testing::IsOkAndHolds;
 using ::testing::AllOf;
+using ::testing::AnyOf;
 using ::testing::AnyWith;
 using ::testing::ElementsAre;
+using ::testing::EndsWith;
 using ::testing::Field;
 using ::testing::HasSubstr;
 using ::testing::Ne;
 using ::testing::Not;
 using ::testing::Pointee;
+using ::testing::StartsWith;
 using ::testing::VariantWith;
-
-#ifdef GTEST_HAS_STATUS_MATCHERS
-using ::testing::status::IsOk;
-using ::testing::status::IsOkAndHolds;
-#else  // GTEST_HAS_STATUS_MATCHERS
-inline const ::absl::Status& GetStatus(const ::absl::Status& status) {
-  return status;
-}
-
-template <typename T>
-inline const ::absl::Status& GetStatus(const ::absl::StatusOr<T>& status) {
-  return status.status();
-}
-
-// Monomorphic implementation of matcher IsOkAndHolds(m).  StatusOrType is a
-// reference to StatusOr<T>.
-template <typename StatusOrType>
-class IsOkAndHoldsMatcherImpl
-    : public ::testing::MatcherInterface<StatusOrType> {
- public:
-  typedef
-      typename std::remove_reference<StatusOrType>::type::value_type value_type;
-
-  template <typename InnerMatcher>
-  explicit IsOkAndHoldsMatcherImpl(InnerMatcher&& inner_matcher)
-      : inner_matcher_(::testing::SafeMatcherCast<const value_type&>(
-            std::forward<InnerMatcher>(inner_matcher))) {}
-
-  void DescribeTo(std::ostream* os) const override {
-    *os << "is OK and has a value that ";
-    inner_matcher_.DescribeTo(os);
-  }
-
-  void DescribeNegationTo(std::ostream* os) const override {
-    *os << "isn't OK or has a value that ";
-    inner_matcher_.DescribeNegationTo(os);
-  }
-
-  bool MatchAndExplain(
-      StatusOrType actual_value,
-      ::testing::MatchResultListener* result_listener) const override {
-    if (!actual_value.ok()) {
-      *result_listener << "which has status " << actual_value.status();
-      return false;
-    }
-
-    ::testing::StringMatchResultListener inner_listener;
-    const bool matches =
-        inner_matcher_.MatchAndExplain(*actual_value, &inner_listener);
-    const std::string inner_explanation = inner_listener.str();
-    if (!inner_explanation.empty()) {
-      *result_listener << "which contains value "
-                       << ::testing::PrintToString(*actual_value) << ", "
-                       << inner_explanation;
-    }
-    return matches;
-  }
-
- private:
-  const ::testing::Matcher<const value_type&> inner_matcher_;
-};
-
-// Implements IsOkAndHolds(m) as a polymorphic matcher.
-template <typename InnerMatcher>
-class IsOkAndHoldsMatcher {
- public:
-  explicit IsOkAndHoldsMatcher(InnerMatcher inner_matcher)
-      : inner_matcher_(std::move(inner_matcher)) {}
-
-  // Converts this polymorphic matcher to a monomorphic matcher of the
-  // given type.  StatusOrType can be either StatusOr<T> or a
-  // reference to StatusOr<T>.
-  template <typename StatusOrType>
-  operator ::testing::Matcher<StatusOrType>() const {  // NOLINT
-    return ::testing::Matcher<StatusOrType>(
-        new IsOkAndHoldsMatcherImpl<const StatusOrType&>(inner_matcher_));
-  }
-
- private:
-  const InnerMatcher inner_matcher_;
-};
-
-// Monomorphic implementation of matcher IsOk() for a given type T.
-// T can be Status, StatusOr<>, or a reference to either of them.
-template <typename T>
-class MonoIsOkMatcherImpl : public ::testing::MatcherInterface<T> {
- public:
-  void DescribeTo(std::ostream* os) const override { *os << "is OK"; }
-  void DescribeNegationTo(std::ostream* os) const override {
-    *os << "is not OK";
-  }
-  bool MatchAndExplain(T actual_value,
-                       ::testing::MatchResultListener*) const override {
-    return GetStatus(actual_value).ok();
-  }
-};
-
-// Implements IsOk() as a polymorphic matcher.
-class IsOkMatcher {
- public:
-  template <typename T>
-  operator ::testing::Matcher<T>() const {  // NOLINT
-    return ::testing::Matcher<T>(new MonoIsOkMatcherImpl<T>());
-  }
-};
-
-// Macros for testing the results of functions that return absl::Status or
-// absl::StatusOr<T> (for any type T).
-#define EXPECT_OK(expression) EXPECT_THAT(expression, IsOk())
-
-// Returns a gMock matcher that matches a StatusOr<> whose status is
-// OK and whose value matches the inner matcher.
-template <typename InnerMatcher>
-IsOkAndHoldsMatcher<typename std::decay<InnerMatcher>::type> IsOkAndHolds(
-    InnerMatcher&& inner_matcher) {
-  return IsOkAndHoldsMatcher<typename std::decay<InnerMatcher>::type>(
-      std::forward<InnerMatcher>(inner_matcher));
-}
-
-// Returns a gMock matcher that matches a Status or StatusOr<> which is OK.
-inline IsOkMatcher IsOk() { return IsOkMatcher(); }
-#endif  // GTEST_HAS_STATUS_MATCHERS
 
 struct CopyDetector {
   CopyDetector() = default;
@@ -517,7 +408,7 @@ TEST(StatusOr, TestCopyCtorStatusOk) {
   const int kI = 4;
   const absl::StatusOr<int> original(kI);
   const absl::StatusOr<int> copy(original);
-  EXPECT_OK(copy.status());
+  EXPECT_THAT(copy.status(), IsOk());
   EXPECT_EQ(*original, *copy);
 }
 
@@ -532,7 +423,7 @@ TEST(StatusOr, TestCopyCtorNonAssignable) {
   CopyNoAssign value(kI);
   absl::StatusOr<CopyNoAssign> original(value);
   absl::StatusOr<CopyNoAssign> copy(original);
-  EXPECT_OK(copy.status());
+  EXPECT_THAT(copy.status(), IsOk());
   EXPECT_EQ(original->foo, copy->foo);
 }
 
@@ -540,7 +431,7 @@ TEST(StatusOr, TestCopyCtorStatusOKConverting) {
   const int kI = 4;
   absl::StatusOr<int> original(kI);
   absl::StatusOr<double> copy(original);
-  EXPECT_OK(copy.status());
+  EXPECT_THAT(copy.status(), IsOk());
   EXPECT_DOUBLE_EQ(*original, *copy);
 }
 
@@ -560,15 +451,15 @@ TEST(StatusOr, TestAssignmentStatusOk) {
     target = source;
 
     ASSERT_TRUE(target.ok());
-    EXPECT_OK(target.status());
+    EXPECT_THAT(target.status(), IsOk());
     EXPECT_EQ(p, *target);
 
     ASSERT_TRUE(source.ok());
-    EXPECT_OK(source.status());
+    EXPECT_THAT(source.status(), IsOk());
     EXPECT_EQ(p, *source);
   }
 
-  // Move asssignment
+  // Move assignment
   {
     const auto p = std::make_shared<int>(17);
     absl::StatusOr<std::shared_ptr<int>> source(p);
@@ -577,11 +468,11 @@ TEST(StatusOr, TestAssignmentStatusOk) {
     target = std::move(source);
 
     ASSERT_TRUE(target.ok());
-    EXPECT_OK(target.status());
+    EXPECT_THAT(target.status(), IsOk());
     EXPECT_EQ(p, *target);
 
     ASSERT_TRUE(source.ok());
-    EXPECT_OK(source.status());
+    EXPECT_THAT(source.status(), IsOk());
     EXPECT_EQ(nullptr, *source);
   }
 }
@@ -628,11 +519,11 @@ TEST(StatusOr, TestAssignmentStatusOKConverting) {
     target = source;
 
     ASSERT_TRUE(target.ok());
-    EXPECT_OK(target.status());
+    EXPECT_THAT(target.status(), IsOk());
     EXPECT_DOUBLE_EQ(kI, *target);
 
     ASSERT_TRUE(source.ok());
-    EXPECT_OK(source.status());
+    EXPECT_THAT(source.status(), IsOk());
     EXPECT_DOUBLE_EQ(kI, *source);
   }
 
@@ -645,11 +536,11 @@ TEST(StatusOr, TestAssignmentStatusOKConverting) {
     target = std::move(source);
 
     ASSERT_TRUE(target.ok());
-    EXPECT_OK(target.status());
+    EXPECT_THAT(target.status(), IsOk());
     EXPECT_EQ(p, target->get());
 
     ASSERT_TRUE(source.ok());
-    EXPECT_OK(source.status());
+    EXPECT_THAT(source.status(), IsOk());
     EXPECT_EQ(nullptr, source->get());
   }
 }
@@ -1068,7 +959,7 @@ TEST(StatusOr, SelfAssignment) {
     so = *&so;
 
     ASSERT_TRUE(so.ok());
-    EXPECT_OK(so.status());
+    EXPECT_THAT(so.status(), IsOk());
     EXPECT_EQ(long_str, *so);
   }
 
@@ -1091,7 +982,7 @@ TEST(StatusOr, SelfAssignment) {
     so = std::move(same);
 
     ASSERT_TRUE(so.ok());
-    EXPECT_OK(so.status());
+    EXPECT_THAT(so.status(), IsOk());
     EXPECT_EQ(17, *so);
   }
 
@@ -1118,7 +1009,7 @@ TEST(StatusOr, SelfAssignment) {
     so = std::move(same);
 
     ASSERT_TRUE(so.ok());
-    EXPECT_OK(so.status());
+    EXPECT_THAT(so.status(), IsOk());
     EXPECT_EQ(raw, so->get());
   }
 
@@ -1351,7 +1242,7 @@ TEST(StatusOr, TestPointerValueCtor) {
   {
     absl::StatusOr<const int*> so(&kI);
     EXPECT_TRUE(so.ok());
-    EXPECT_OK(so.status());
+    EXPECT_THAT(so.status(), IsOk());
     EXPECT_EQ(&kI, *so);
   }
 
@@ -1359,7 +1250,7 @@ TEST(StatusOr, TestPointerValueCtor) {
   {
     absl::StatusOr<const int*> so(nullptr);
     EXPECT_TRUE(so.ok());
-    EXPECT_OK(so.status());
+    EXPECT_THAT(so.status(), IsOk());
     EXPECT_EQ(nullptr, *so);
   }
 
@@ -1369,7 +1260,7 @@ TEST(StatusOr, TestPointerValueCtor) {
 
     absl::StatusOr<const int*> so(p);
     EXPECT_TRUE(so.ok());
-    EXPECT_OK(so.status());
+    EXPECT_THAT(so.status(), IsOk());
     EXPECT_EQ(nullptr, *so);
   }
 }
@@ -1378,7 +1269,7 @@ TEST(StatusOr, TestPointerCopyCtorStatusOk) {
   const int kI = 0;
   absl::StatusOr<const int*> original(&kI);
   absl::StatusOr<const int*> copy(original);
-  EXPECT_OK(copy.status());
+  EXPECT_THAT(copy.status(), IsOk());
   EXPECT_EQ(*original, *copy);
 }
 
@@ -1392,7 +1283,7 @@ TEST(StatusOr, TestPointerCopyCtorStatusOKConverting) {
   Derived derived;
   absl::StatusOr<Derived*> original(&derived);
   absl::StatusOr<Base2*> copy(original);
-  EXPECT_OK(copy.status());
+  EXPECT_THAT(copy.status(), IsOk());
   EXPECT_EQ(static_cast<const Base2*>(*original), *copy);
 }
 
@@ -1407,7 +1298,7 @@ TEST(StatusOr, TestPointerAssignmentStatusOk) {
   absl::StatusOr<const int*> source(&kI);
   absl::StatusOr<const int*> target;
   target = source;
-  EXPECT_OK(target.status());
+  EXPECT_THAT(target.status(), IsOk());
   EXPECT_EQ(*source, *target);
 }
 
@@ -1423,7 +1314,7 @@ TEST(StatusOr, TestPointerAssignmentStatusOKConverting) {
   absl::StatusOr<Derived*> source(&derived);
   absl::StatusOr<Base2*> target;
   target = source;
-  EXPECT_OK(target.status());
+  EXPECT_THAT(target.status(), IsOk());
   EXPECT_EQ(static_cast<const Base2*>(*source), *target);
 }
 
@@ -1875,6 +1766,37 @@ TEST(StatusOr, StatusAssignmentFromTypeConvertibleToStatus) {
 
   EXPECT_FALSE(statusor.ok());
   EXPECT_EQ(statusor.status(), static_cast<absl::Status>(v));
+}
+
+struct PrintTestStruct {
+  friend std::ostream& operator<<(std::ostream& os, const PrintTestStruct&) {
+    return os << "ostream";
+  }
+
+  template <typename Sink>
+  friend void AbslStringify(Sink& sink, const PrintTestStruct&) {
+    sink.Append("stringify");
+  }
+};
+
+TEST(StatusOr, OkPrinting) {
+  absl::StatusOr<PrintTestStruct> print_me = PrintTestStruct{};
+  std::stringstream stream;
+  stream << print_me;
+  EXPECT_EQ(stream.str(), "ostream");
+  EXPECT_EQ(absl::StrCat(print_me), "stringify");
+}
+
+TEST(StatusOr, ErrorPrinting) {
+  absl::StatusOr<PrintTestStruct> print_me = absl::UnknownError("error");
+  std::stringstream stream;
+  stream << print_me;
+  const auto error_matcher =
+      AllOf(HasSubstr("UNKNOWN"), HasSubstr("error"),
+            AnyOf(AllOf(StartsWith("("), EndsWith(")")),
+                  AllOf(StartsWith("["), EndsWith("]"))));
+  EXPECT_THAT(stream.str(), error_matcher);
+  EXPECT_THAT(absl::StrCat(print_me), error_matcher);
 }
 
 }  // namespace

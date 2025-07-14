@@ -19,7 +19,7 @@
 #endif
 
 #if defined(HAS_STRPTIME) && HAS_STRPTIME
-#if !defined(_XOPEN_SOURCE) && !defined(__OpenBSD__)
+#if !defined(_XOPEN_SOURCE) && !defined(__FreeBSD__) && !defined(__OpenBSD__)
 #define _XOPEN_SOURCE 500  // Exposes definitions for SUSv2 (UNIX 98).
 #endif
 #endif
@@ -46,7 +46,7 @@
 #endif
 
 #include "absl/time/internal/cctz/include/cctz/civil_time.h"
-#include "time_zone_if.h"
+#include "absl/time/internal/cctz/src/time_zone_if.h"
 
 namespace absl {
 ABSL_NAMESPACE_BEGIN

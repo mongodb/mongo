@@ -33,7 +33,7 @@
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 // Log messages at this severity or above are sent to stderr in *addition* to
-// logfiles.  Defaults to `ERROR`.  See log_severity.h for numeric values of
+// `LogSink`s.  Defaults to `ERROR`.  See log_severity.h for numeric values of
 // severity levels.
 ABSL_DECLARE_FLAG(int, stderrthreshold);
 
@@ -49,5 +49,11 @@ ABSL_DECLARE_FLAG(std::string, log_backtrace_at);
 // If true, the log prefix (severity, date, time, PID, etc.) is prepended to
 // each message logged. Defaults to true.
 ABSL_DECLARE_FLAG(bool, log_prefix);
+
+// Global log verbosity level. Default is 0.
+ABSL_DECLARE_FLAG(int, v);
+
+// Per-module log verbosity level. By default is empty and is unused.
+ABSL_DECLARE_FLAG(std::string, vmodule);
 
 #endif  // ABSL_LOG_INTERNAL_FLAGS_H_

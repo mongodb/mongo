@@ -16,13 +16,18 @@
 
 #include "absl/strings/str_cat.h"
 
+#include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <limits>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "gtest/gtest.h"
+#include "absl/base/config.h"
 #include "absl/strings/str_format.h"
-#include "absl/strings/substitute.h"
+#include "absl/strings/string_view.h"
 
 #ifdef __ANDROID__
 // Android assert messages only go to system log, so death tests cannot inspect
@@ -70,7 +75,7 @@ TEST(StrCat, Ints) {
 TEST(StrCat, Enums) {
   enum SmallNumbers { One = 1, Ten = 10 } e = Ten;
   EXPECT_EQ("10", absl::StrCat(e));
-  EXPECT_EQ("-5", absl::StrCat(SmallNumbers(-5)));
+  EXPECT_EQ("1", absl::StrCat(One));
 
   enum class Option { Boxers = 1, Briefs = -1 };
 
@@ -209,6 +214,12 @@ TEST(StrCat, CornerCases) {
   EXPECT_EQ(result, "");
   result = absl::StrCat("", "", "", "", "");
   EXPECT_EQ(result, "");
+}
+
+TEST(StrCat, StdStringView) {
+  std::string_view pieces[] = {"Hello", ", ", "World", "!"};
+  EXPECT_EQ(absl::StrCat(pieces[0], pieces[1], pieces[2], pieces[3]),
+                         "Hello, World!");
 }
 
 TEST(StrCat, NullConstCharPtr) {
@@ -660,6 +671,22 @@ void AbslStringify(Sink& sink, EnumWithStringify e) {
 TEST(StrCat, AbslStringifyWithEnum) {
   const auto e = EnumWithStringify::Choices;
   EXPECT_EQ(absl::StrCat(e), "Choices");
+}
+
+template <typename Integer>
+void CheckSingleArgumentIntegerLimits() {
+  Integer max = std::numeric_limits<Integer>::max();
+  Integer min = std::numeric_limits<Integer>::min();
+
+  EXPECT_EQ(absl::StrCat(max), std::to_string(max));
+  EXPECT_EQ(absl::StrCat(min), std::to_string(min));
+}
+
+TEST(StrCat, SingleArgumentLimits) {
+  CheckSingleArgumentIntegerLimits<int32_t>();
+  CheckSingleArgumentIntegerLimits<uint32_t>();
+  CheckSingleArgumentIntegerLimits<int64_t>();
+  CheckSingleArgumentIntegerLimits<uint64_t>();
 }
 
 }  // namespace

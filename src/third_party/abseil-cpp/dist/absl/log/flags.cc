@@ -28,6 +28,7 @@
 #include "absl/flags/marshalling.h"
 #include "absl/log/globals.h"
 #include "absl/log/internal/config.h"
+#include "absl/log/internal/vlog_config.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
 
@@ -117,4 +118,26 @@ ABSL_FLAG(bool, log_prefix, true,
           "Prepend the log prefix to the start of each log line")
     .OnUpdate([] {
       absl::log_internal::RawEnableLogPrefix(absl::GetFlag(FLAGS_log_prefix));
+    });
+
+ABSL_FLAG(int, v, 0,
+          "Show all VLOG(m) messages for m <= this. Overridable by --vmodule.")
+    .OnUpdate([] {
+      absl::log_internal::UpdateGlobalVLogLevel(absl::GetFlag(FLAGS_v));
+    });
+
+ABSL_FLAG(
+    std::string, vmodule, "",
+    "per-module log verbosity level."
+    " Argument is a comma-separated list of <module name>=<log level>."
+    " <module name> is a glob pattern, matched against the filename base"
+    " (that is, name ignoring .cc/.h./-inl.h)."
+    " A pattern without slashes matches just the file name portion, otherwise"
+    " the whole file path below the workspace root"
+    " (still without .cc/.h./-inl.h) is matched."
+    " ? and * in the glob pattern match any single or sequence of characters"
+    " respectively including slashes."
+    " <log level> overrides any value given by --v.")
+    .OnUpdate([] {
+      absl::log_internal::UpdateVModule(absl::GetFlag(FLAGS_vmodule));
     });
