@@ -5,7 +5,6 @@ mongo_cc_library(
     srcs = [
         "aggregation_stage.cpp",
         "byte_buf.cpp",
-        "extension.cpp",
         "extension_status.cpp",
     ],
     hdrs = [

@@ -37,9 +37,5 @@
  * extension shared library.
  */
 extern "C" {
-__attribute__((visibility("default"))) MongoExtensionStatus* get_mongodb_extension(
-    const MongoExtensionAPIVersionVector* hostVersions, const MongoExtension** extension);
+__attribute__((visibility("default"))) const MongoExtension* get_mongodb_extension();
 }
-
-bool isVersionCompatible(const MongoExtensionAPIVersionVector* hostVersions,
-                         const MongoExtensionAPIVersion* version);
