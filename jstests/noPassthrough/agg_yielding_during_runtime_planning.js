@@ -43,9 +43,9 @@ let awaitShell =
                                 {$lookup: {from: "foreignColl", localField: "a", foreignField: "b", as: "out"}},
                                 {$project: {a: 1, out: 1}}
                             ];
-                           let result =
-                               db.getSiblingDB(dbName)[collName].aggregate(pipeline).toArray();
-                           assert(result.length === 10);
+                           assert.throwsWithCode(
+                               () => db.getSiblingDB(dbName)[collName].aggregate(pipeline),
+                               ErrorCodes.QueryPlanKilled);
                        }, db.getName(), db.coll.getName()), conn.port);
 
 fp.wait();
