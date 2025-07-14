@@ -1499,7 +1499,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/base/OWNERS.yml
 /src/mongo/base/**/* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/base/**/error_codes.yml @10gen/mongo-default-approvers @svc-auto-approve-bot
 /src/mongo/base/**/secure_allocator* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/bson/OWNERS.yml
