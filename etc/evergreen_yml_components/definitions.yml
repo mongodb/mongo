@@ -2635,6 +2635,32 @@ functions:
         display_name: Core Analyzer Results
         optional: true
 
+  "save unsymbolized stacktraces and local invocation":
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/unsymbolized_stacktraces.txt
+        remote_file: ${project}/${build_variant}/${revision}/unsymbolized_stacktraces/${task_name}-${build_id}.txt
+        bucket: mciuploads
+        permissions: private
+        visibility: signed
+        content_type: text/plain
+        display_name: Unsymbolized Stack Traces - Execution ${execution}
+        optional: true
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/unsymbolized_stacktrace_instructions.txt
+        remote_file: ${project}/${build_variant}/${revision}/unsymbolized_stacktrace_instructions/${task_name}-${build_id}.txt
+        bucket: mciuploads
+        permissions: private
+        visibility: signed
+        content_type: text/plain
+        display_name: Instructions to Symbolize Stack Traces
+        optional: true
+
   ### Process & archive failed unittest artifacts ###
   # This only works for unit tests executed under resmoke,
   # see buildscripts/gather_failed_unittests.py for gathering failed unit test artifacts
