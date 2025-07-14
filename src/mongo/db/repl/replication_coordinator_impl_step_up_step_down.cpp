@@ -155,6 +155,10 @@ void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_killOpThreadFn()
     // Set the reason for killing operations.
     ErrorCodes::Error killReason = ErrorCodes::InterruptedDueToReplStateChange;
 
+    // This thread needs storage rollback to complete timely, so instruct the storage
+    // engine to not do any extra eviction for this thread, if supported.
+    shard_role_details::getRecoveryUnit(opCtx)->setNoEvictionAfterCommitOrRollback();
+
     while (true) {
         // Reset the value before killing operations as we only want to track the number
         // of operations that's running after step down.
