@@ -35,98 +35,106 @@
 
 namespace mongo::ce {
 
-void generateData(size_t ndv,
-                  size_t size,
-                  TypeCombination typeCombinationData,
-                  DataDistributionEnum dataDistribution,
-                  const std::pair<size_t, size_t>& dataInterval,
-                  size_t seedData,
-                  int arrayTypeLength,
-                  std::vector<stats::SBEValue>& data) {
-    tassert(
-        10545500, "For valid data generation number of distinct values (NDV) must be > 0", ndv > 0);
-    switch (dataDistribution) {
-        case kUniform:
-            generateDataUniform(
-                size, dataInterval, typeCombinationData, seedData, ndv, data, arrayTypeLength);
-            break;
-        case kNormal:
-            generateDataNormal(
-                size, dataInterval, typeCombinationData, seedData, ndv, data, arrayTypeLength);
-            break;
-        case kZipfian:
-            generateDataZipfian(
-                size, dataInterval, typeCombinationData, seedData, ndv, data, arrayTypeLength);
-            break;
+void initializeSamplingEstimator(DataConfiguration& configuration,
+                                 SamplingEstimatorTest& samplingEstimatorTest) {
+    // Generate data according to the provided configuration
+    std::vector<std::vector<stats::SBEValue>> allData;
+    generateDataBasedOnConfig(configuration, allData);
+
+    samplingEstimatorTest.setUp();
+
+    // Create vector of BSONObj according to the generated data
+    // Number of fields dictates the number of columns the collection will have.
+    auto dataBSON = SamplingEstimatorTest::createDocumentsFromSBEValue(
+        allData, configuration.collectionFieldsConfiguration);
+
+    // Populate collection
+    samplingEstimatorTest.insertDocuments(samplingEstimatorTest._kTestNss, dataBSON);
+}
+
+void SamplingEstimatorTest::insertDocuments(const NamespaceString& nss,
+                                            const std::vector<BSONObj> docs) {
+    std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
+
+    AutoGetCollection agc(operationContext(), nss, LockMode::MODE_IX);
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(collection_internal::insertDocuments(
+            operationContext(), *agc, inserts.begin(), inserts.end(), nullptr /* opDebug */));
+        wuow.commit();
     }
 }
 
-void generateData(SamplingEstimationBenchmarkConfiguration& configuration,
-                  const size_t seedData,
-                  std::vector<stats::SBEValue>& data) {
-
-    const TypeCombination typeCombinationData{
-        TypeCombination{{configuration.sbeDataType, 100, configuration.nanProb}}};
-
-    tassert(10472400,
-            "For valid data generation number of distinct values (NDV) must be initialized",
-            configuration.ndv.has_value());
-
-    generateData(configuration.ndv.value(),
-                 configuration.size,
-                 typeCombinationData,
-                 configuration.dataDistribution,
-                 configuration.dataInterval,
-                 seedData,
-                 configuration.arrayTypeLength,
-                 data);
-}
-ErrorCalculationSummary runQueries(size_t size,
-                                   size_t numberOfQueries,
-                                   QueryType queryType,
-                                   const std::pair<size_t, size_t> interval,
-                                   const TypeProbability queryTypeInfo,
-                                   const std::vector<stats::SBEValue>& data,
-                                   const SamplingEstimatorImpl* ceSample,
-                                   const size_t seedQueriesLow,
-                                   const size_t seedQueriesHigh) {
-    ErrorCalculationSummary finalResults;
-
-    auto queryIntervals = generateIntervals(
-        queryType, interval, numberOfQueries, queryTypeInfo, seedQueriesLow, seedQueriesHigh);
-
-    // Transform input data to vector of BSONObj to simplify calculation of actual cardinality.
-    std::vector<BSONObj> bsonData = transformSBEValueVectorToBSONObjVector(data);
-
-    for (size_t i = 0; i < queryIntervals.size(); i++) {
-
-        auto expr = createQueryMatchExpression(
-            queryType, queryIntervals[i].first, queryIntervals[i].second);
-
-        size_t actualCard = calculateCardinality(expr.get(), bsonData);
-
-        CardinalityEstimate estimatedCard = ceSample->estimateCardinality(expr.get());
-
-        // Store results to final structure.
-        QueryInfoAndResults queryInfoResults;
-        queryInfoResults.low = queryIntervals[i].first;
-        queryInfoResults.high = queryIntervals[i].second;
-
-        // We store results to calculate Q-error:
-        // Q-error = max(true/est, est/true)
-        // where "est" is the estimated cardinality and "true" is the true cardinality.
-        // In practice we replace est = max(est, 1) and true = max(est, 1) to avoid divide-by-zero.
-        // Q-error = 1 indicates a perfect prediction.
-        queryInfoResults.actualCardinality = fmax(actualCard, 1.0);
-        queryInfoResults.estimatedCardinality = fmax(estimatedCard.toDouble(), 1.0);
-
-        finalResults.queryResults.push_back(queryInfoResults);
-
-        // Increment the number of executed queries.
-        ++finalResults.executedQueries;
+std::vector<BSONObj> SamplingEstimatorTest::createDocuments(int num) {
+    std::vector<BSONObj> docs;
+    for (int i = 0; i < num; i++) {
+        BSONObj obj = BSON("_id" << i << "a" << i % 100 << "b" << i % 10 << "arr"
+                                 << BSON_ARRAY(10 << 20 << 30 << 40 << 50) << "nil" << BSONNULL
+                                 << "obj" << BSON("nil" << BSONNULL));
+        docs.push_back(obj);
     }
+    return docs;
+}
 
-    return finalResults;
+std::vector<BSONObj> SamplingEstimatorTest::createDocumentsFromSBEValue(
+    std::vector<std::vector<stats::SBEValue>> data,
+    std::vector<CollectionFieldConfiguration> fieldConfig) {
+    std::vector<BSONObj> docs;
+    size_t dataSize = data[0].size();
+    for (size_t i = 0; i < dataSize; i++) {
+        BSONObjBuilder builder;
+        stats::addSbeValueToBSONBuilder(stats::makeInt64Value(i), "_id", builder);
+
+        int curIdx = -1;
+        for (size_t instance = 0; instance < fieldConfig.size(); instance++) {
+            if (fieldConfig[instance].fieldPositionInCollection != (curIdx + 1)) {
+                // Add any in-between fields required
+                while (curIdx < fieldConfig[instance].fieldPositionInCollection) {
+                    // Each in-between field will be named as the next field followed by an
+                    // underscore and a number e.g., if the first user defined field is 'a' in
+                    // position 3, then this config will automatically add field 'a_0', 'a_1',
+                    // 'a_2', and then 'a'.
+                    std::string extendedName =
+                        fieldConfig[instance].fieldName + "_" + std::to_string(curIdx++);
+                    stats::addSbeValueToBSONBuilder(data[instance][i], extendedName, builder);
+                }
+            }
+            stats::addSbeValueToBSONBuilder(
+                data[instance][i], fieldConfig[instance].fieldName, builder);
+            curIdx++;
+        }
+
+        docs.push_back(builder.obj());
+    }
+    return docs;
+}
+
+size_t translateSampleDefToActualSampleSize(SampleSizeDef sampleSizeDef) {
+    // Translate the sample size definition to corresponding sample size.
+    switch (sampleSizeDef) {
+        case SampleSizeDef::ErrorSetting1: {
+            return SamplingEstimatorForTesting::calculateSampleSize(
+                SamplingConfidenceIntervalEnum::k95, 1.0);
+        }
+        case SampleSizeDef::ErrorSetting2: {
+            return SamplingEstimatorForTesting::calculateSampleSize(
+                SamplingConfidenceIntervalEnum::k95, 2.0);
+        }
+        case SampleSizeDef::ErrorSetting5: {
+            return SamplingEstimatorForTesting::calculateSampleSize(
+                SamplingConfidenceIntervalEnum::k95, 5.0);
+        }
+    }
+    MONGO_UNREACHABLE;
+}
+
+std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>
+iniitalizeSamplingAlgoBasedOnChunks(int numOfChunks) {
+    if (numOfChunks <= 0) {
+        return {SamplingEstimatorImpl::SamplingStyle::kRandom, boost::none};
+    } else {
+        return {SamplingEstimatorImpl::SamplingStyle::kChunk, numOfChunks};
+    }
 }
 
 void createCollAndInsertDocuments(OperationContext* opCtx,
@@ -156,93 +164,75 @@ void createCollAndInsertDocuments(OperationContext* opCtx,
     }
 }
 
-void printResult(const DataDistributionEnum& dataDistribution,
-                 const TypeCombination& typeCombination,
-                 int size,
+ErrorCalculationSummary runQueries(WorkloadConfiguration queryConfig,
+                                   std::vector<BSONObj>& bsonData,
+                                   const SamplingEstimatorImpl* ceSample) {
+    ErrorCalculationSummary finalResults;
+
+    // Generate queries.
+    std::vector<std::vector<std::pair<stats::SBEValue, stats::SBEValue>>> queryFieldsIntervals =
+        generateMultiFieldIntervals(queryConfig);
+
+    std::vector<std::unique_ptr<MatchExpression>> allMatchExpressionQueries =
+        createQueryMatchExpressionOnMultipleFields(queryConfig, queryFieldsIntervals);
+
+    for (const auto& expr : allMatchExpressionQueries) {
+        size_t actualCard = calculateCardinality(expr.get(), bsonData);
+        CardinalityEstimate estimatedCard = ceSample->estimateCardinality(expr.get());
+        // Store results to final structure.
+        QueryInfoAndResults queryInfoResults;
+        queryInfoResults.matchExpression = expr->toString();
+        // We store results to calculate Q-error:
+        // Q-error = max(true/est, est/true)
+        // where "est" is the estimated cardinality and "true" is the true cardinality.
+        // In practice we replace est = max(est, 1) and true = max(est, 1) to avoid
+        // divide-by-zero. Q-error = 1 indicates a perfect prediction.
+        queryInfoResults.actualCardinality = fmax(actualCard, 1.0);
+        queryInfoResults.estimatedCardinality = fmax(estimatedCard.toDouble(), 1.0);
+        finalResults.queryResults.push_back(queryInfoResults);
+        // Increment the number of executed queries.
+        ++finalResults.executedQueries;
+    }
+    return finalResults;
+}
+
+void printResult(DataConfiguration dataConfig,
                  int sampleSize,
-                 const TypeProbability& typeCombinationQuery,
-                 int numberOfQueries,
-                 QueryType queryType,
-                 const std::pair<size_t, size_t>& dataInterval,
-                 size_t seedData,
-                 size_t seedQueriesLow,
-                 size_t seedQueriesHigh,
+                 WorkloadConfiguration queryConfig,
                  const std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>&
                      samplingAlgoAndChunks,
                  ErrorCalculationSummary error) {
-
     BSONObjBuilder builder;
 
-    switch (dataDistribution) {
-        case kUniform:
-            builder << "DataDistribution"
-                    << "Uniform";
-            break;
-        case kNormal:
-            builder << "DataDistribution"
-                    << "Normal";
-            break;
-        case kZipfian:
-            builder << "DataDistribution"
-                    << "Zipfian";
-            break;
-    }
-
+    dataConfig.addToBSONObjBuilder(builder);
     builder << "sampleSize" << sampleSize;
-
-    std::stringstream ss;
-    for (auto type : typeCombination) {
-        ss << type.typeTag << "." << type.typeProbability << "." << type.nanProb << " ";
-    }
-    builder << "DataTypes" << ss.str();
-    builder << "DataSize" << size;
-
-    std::stringstream ssSeedData, ssSeedQueryLow, ssSeedQueryHigh;
-    ssSeedData << seedData;
-    builder << "DataSeed" << ssSeedData.str();
-
-    ssSeedQueryLow << seedQueriesLow;
-    builder << "QueriesSeedLow" << ssSeedQueryLow.str();
-
-    ssSeedQueryHigh << seedQueriesHigh;
-    builder << "QueriesSeedHigh" << ssSeedQueryHigh.str();
-
-    switch (queryType) {
-        case kPoint:
-            builder << "QueryType"
-                    << "Point";
-            break;
-        case kRange:
-            builder << "QueryType"
-                    << "Range";
-            break;
-    }
-
-    std::stringstream ssDataType;
-    ssDataType << typeCombinationQuery.typeTag;
-    builder << "QueryDataType" << ssDataType.str();
-    builder << "NumberOfQueries" << numberOfQueries;
+    queryConfig.addToBSONObjBuilder(builder);
 
     std::vector<std::string> queryValuesLow;
     std::vector<std::string> queryValuesHigh;
+    std::string matchExpression = "";
     std::vector<double> actualCardinality;
     std::vector<double> Estimation;
     for (auto values : error.queryResults) {
-        if (values.low->getTag() == sbe::value::TypeTags::StringBig ||
-            values.low->getTag() == sbe::value::TypeTags::StringSmall) {
-            std::stringstream sslow;
-            sslow << values.low.get().getValue();
-            queryValuesLow.push_back(sslow.str());
-            std::stringstream sshigh;
-            sshigh << values.high.get().getValue();
-            queryValuesHigh.push_back(sshigh.str());
-        } else {
-            std::stringstream sslow;
-            sslow << values.low.get().get();
-            queryValuesLow.push_back(sslow.str());
-            std::stringstream sshigh;
-            sshigh << values.high.get().get();
-            queryValuesHigh.push_back(sshigh.str());
+        if (values.low.has_value()) {
+            if (values.low->getTag() == sbe::value::TypeTags::StringBig ||
+                values.low->getTag() == sbe::value::TypeTags::StringSmall) {
+                std::stringstream sslow;
+                sslow << values.low.get().getValue();
+                queryValuesLow.push_back(sslow.str());
+                std::stringstream sshigh;
+                sshigh << values.high.get().getValue();
+                queryValuesHigh.push_back(sshigh.str());
+            } else {
+                std::stringstream sslow;
+                sslow << values.low.get().getValue();
+                queryValuesLow.push_back(sslow.str());
+                std::stringstream sshigh;
+                sshigh << values.high.get().getValue();
+                queryValuesHigh.push_back(sshigh.str());
+            }
+        } else if (values.matchExpression.has_value()) {
+            matchExpression = values.matchExpression.get();
         }
         actualCardinality.push_back(values.actualCardinality);
         Estimation.push_back(values.estimatedCardinality);
@@ -250,6 +240,7 @@ void printResult(const DataDistributionEnum& dataDistribution,
 
     builder << "QueryLow" << queryValuesLow;
     builder << "QueryHigh" << queryValuesHigh;
+    builder << "QueryMatchExpression" << matchExpression;
 
     std::stringstream ssSamplingAlgoChunks;
     ssSamplingAlgoChunks << static_cast<int>(samplingAlgoAndChunks.first) << "-"
@@ -264,40 +255,22 @@ void printResult(const DataDistributionEnum& dataDistribution,
 }
 
 void SamplingAccuracyTest::runSamplingEstimatorTestConfiguration(
-    const DataDistributionEnum dataDistribution,
-    const TypeCombination& typeCombinationData,
-    const TypeCombination& typeCombinationsQueries,
-    const size_t size,
-    const std::pair<size_t, size_t>& dataInterval,
-    const std::pair<size_t, size_t>& queryInterval,
-    const int numberOfQueries,
-    const size_t seedData,
-    const size_t seedQueriesLow,
-    const size_t seedQueriesHigh,
-    int arrayTypeLength,
-    size_t ndv,
-    size_t numberOfFields,
-    const std::vector<QueryType> queryTypes,
-    const std::vector<SamplingEstimationBenchmarkConfiguration::SampleSizeDef> sampleSizes,
+    DataConfiguration dataConfig,
+    WorkloadConfiguration queryConfig,
+    const std::vector<SampleSizeDef> sampleSizes,
     const std::vector<std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>>
         samplingAlgoAndChunks,
     bool printResults) {
-
     // Generate data according to the provided configuration
-    std::vector<mongo::stats::SBEValue> data;
-    generateData(ndv,
-                 size,
-                 typeCombinationData,
-                 dataDistribution,
-                 dataInterval,
-                 seedData,
-                 arrayTypeLength,
-                 data);
+    std::vector<std::vector<mongo::stats::SBEValue>> allData;
+    generateDataBasedOnConfig(dataConfig, allData);
 
     auto nss =
         NamespaceString::createNamespaceString_forTest("SamplingCeAccuracyTest.TestCollection");
 
-    auto dataBSON = SamplingEstimatorTest::createDocumentsFromSBEValue(data);
+    auto dataBSON = SamplingEstimatorTest::createDocumentsFromSBEValue(
+        allData, dataConfig.collectionFieldsConfiguration);
+
     createCollAndInsertDocuments(operationContext(), nss, dataBSON);
 
     AutoGetCollection collPtr(operationContext(), nss, LockMode::MODE_IX);
@@ -310,10 +283,8 @@ void SamplingAccuracyTest::runSamplingEstimatorTestConfiguration(
 
     for (auto samplingAlgoAndChunk : samplingAlgoAndChunks) {
         for (auto sampleSize : sampleSizes) {
+            double actualSampleSize = translateSampleDefToActualSampleSize(sampleSize);
 
-            double actualSampleSize =
-                SamplingEstimationBenchmarkConfiguration::translateSampleDefToActualSampleSize(
-                    sampleSize);
             // Create sample from the provided collection
             SamplingEstimatorImpl samplingEstimator(
                 operationContext(),
@@ -321,41 +292,12 @@ void SamplingAccuracyTest::runSamplingEstimatorTestConfiguration(
                 actualSampleSize,
                 samplingAlgoAndChunk.first,
                 samplingAlgoAndChunk.second,
-                SamplingEstimatorTest::makeCardinalityEstimate(size));
+                SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
 
-            // Run queries.
-            for (const auto& queryType : queryTypes) {
-                for (const auto& typeCombinationQuery : typeCombinationsQueries) {
-                    if (!checkTypeExistence(typeCombinationQuery.typeTag, typeCombinationData)) {
-                        continue;
-                    }
+            auto error = runQueries(queryConfig, dataBSON, &samplingEstimator);
 
-                    auto error = runQueries(size,
-                                            numberOfQueries,
-                                            queryType,
-                                            queryInterval,
-                                            typeCombinationQuery,
-                                            data,
-                                            &samplingEstimator,
-                                            seedQueriesLow,
-                                            seedQueriesHigh);
-
-                    if (printResults) {
-                        printResult(dataDistribution,
-                                    typeCombinationData,
-                                    size,
-                                    actualSampleSize,
-                                    typeCombinationQuery,
-                                    numberOfQueries,
-                                    queryType,
-                                    dataInterval,
-                                    seedData,
-                                    seedQueriesLow,
-                                    seedQueriesHigh,
-                                    samplingAlgoAndChunk,
-                                    error);
-                    }
-                }
+            if (printResults) {
+                printResult(dataConfig, actualSampleSize, queryConfig, samplingAlgoAndChunk, error);
             }
         }
     }

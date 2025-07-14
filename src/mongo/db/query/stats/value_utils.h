@@ -162,6 +162,9 @@ void addSbeValueToBSONBuilder(const SBEValue& sbeValue,
                               const std::string& fieldName,
                               BSONObjBuilder& builder);
 
+BSONObj sbeValueVectorToBSON(std::vector<SBEValue>& sbeValues,
+                             std::vector<std::string>& fieldNames);
+
 /**
  * Convert a SBEValue of any supported type into a BSONObj.
  */

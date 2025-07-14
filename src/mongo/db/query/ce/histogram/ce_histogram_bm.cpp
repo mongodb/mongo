@@ -36,182 +36,158 @@
 
 namespace mongo::ce {
 
-struct HistogramEstimationBenchmarkConfiguration : public BenchmarkConfiguration {
-    int numberOfBuckets;
-    bool useE2EAPI = false;
-
-    HistogramEstimationBenchmarkConfiguration(benchmark::State& state)
-        : BenchmarkConfiguration(state.range(1),
-                                 static_cast<DataDistributionEnum>(state.range(2)),
-                                 static_cast<DataType>(state.range(3)),
-                                 static_cast<QueryType>(state.range(4))),
-          numberOfBuckets(state.range(0)),
-          useE2EAPI(static_cast<bool>(state.range(5))) {}
-};
-
 void BM_CreateHistogram(benchmark::State& state) {
+    auto dataType = static_cast<sbe::value::TypeTags>(state.range(3));
+    auto ndv = 1000;
+    size_t seed = 1354754;
 
-    HistogramEstimationBenchmarkConfiguration configuration(state);
+    CollectionFieldConfiguration field(
+        /*fieldName*/ "a",
+        /*fieldPositionInCollection*/ 0,
+        /*dataType*/ dataType,
+        /*ndv*/ ndv,
+        /*dataDistribution*/ static_cast<stats::DistrType>(state.range(2)),
+        /*seed*/ seed);
 
-    const TypeCombination typeCombinationData{TypeCombination{{configuration.sbeDataType, 100}}};
+    DataConfiguration dataConfig(
+        /*size*/ static_cast<int>(state.range(1)),
+        /*dataFieldConfig*/ {field});
 
-    std::vector<stats::SBEValue> data;
-    const size_t seed = 1724178214;
+    auto numberOfBuckets = static_cast<int>(state.range(0));
 
-    auto ndv = (configuration.dataInterval.second - configuration.dataInterval.first) / 2;
-    // Create one by one the values.
-    switch (configuration.dataDistribution) {
-        case kUniform:
-            // For ndv we set half the number of values in the provided data interval.
-            generateDataUniform(configuration.size,
-                                configuration.dataInterval,
-                                typeCombinationData,
-                                seed,
-                                ndv,
-                                data,
-                                configuration.arrayTypeLength);
-            break;
-        case kNormal:
-            // For ndv we set half the number of values in the provided data interval.
-            generateDataNormal(configuration.size,
-                               configuration.dataInterval,
-                               typeCombinationData,
-                               seed,
-                               ndv,
-                               data,
-                               configuration.arrayTypeLength);
-            break;
-        case kZipfian:
-            // For ndv we set half the number of values in the provided data interval.
-            generateDataZipfian(configuration.size,
-                                configuration.dataInterval,
-                                typeCombinationData,
-                                seed,
-                                ndv,
-                                data,
-                                configuration.arrayTypeLength);
-            break;
-    }
+    std::vector<std::vector<stats::SBEValue>> data;
+    generateDataBasedOnConfig(dataConfig, data);
 
     for (auto curState : state) {
-        // Built histogram.
-        auto ceHist = stats::createCEHistogram(data, configuration.numberOfBuckets);
+        // Built histogram (there is only one field thus we use data[0])
+        auto ceHist = stats::createCEHistogram(data[0], numberOfBuckets);
     }
 }
 
 void BM_RunHistogramEstimations(benchmark::State& state) {
+    auto dataType = static_cast<sbe::value::TypeTags>(state.range(3));
+    auto ndv = 1000;
+    size_t seed = 1354754;
+    size_t seed2 = 1354754;
 
-    HistogramEstimationBenchmarkConfiguration configuration(state);
+    CollectionFieldConfiguration field(
+        /*fieldName*/ "a",
+        /*fieldPositionInCollection*/ 0,
+        /*dataType*/ dataType,
+        /*ndv*/ ndv,
+        /*dataDistribution*/ static_cast<stats::DistrType>(state.range(2)),
+        /*seed*/ seed);
 
-    const TypeCombination typeCombinationData{
-        TypeCombination{{configuration.sbeDataType, 100, configuration.nanProb}}};
+    DataConfiguration dataConfig(
+        /*size*/ static_cast<int>(state.range(1)),
+        /*dataFieldConfig*/ {field});
 
-    std::vector<stats::SBEValue> data;
-    const size_t seedData = 1724178214;
-    const size_t seedQueries = 2431475868;
+    std::vector<std::vector<stats::SBEValue>> data;
+    generateDataBasedOnConfig(dataConfig, data);
+
+    // Define Queries.
     const int numberOfQueries = 10000;
 
-    auto ndv = (configuration.dataInterval.second - configuration.dataInterval.first) / 2;
-    if (configuration.sbeDataType == sbe::value::TypeTags::StringSmall ||
-        configuration.sbeDataType == sbe::value::TypeTags::StringBig) {
-        // 'dataInterval' for strings is too small for 'ndv' as it represents string lengths. So we
-        // set 'ndv' to a larger number to ensure we have enough distinct values for histograms to
-        // partition buckets.
-        ndv = numberOfQueries;
-    }
-
-    // Create one by one the values.
-    switch (configuration.dataDistribution) {
-        case kUniform:
-            // For ndv we set half the number of values in the provided data interval.
-            generateDataUniform(configuration.size,
-                                configuration.dataInterval,
-                                typeCombinationData,
-                                seedData,
-                                ndv,
-                                data,
-                                configuration.arrayTypeLength);
-            break;
-        case kNormal:
-            // For ndv we set half the number of values in the provided data interval.
-            generateDataNormal(configuration.size,
-                               configuration.dataInterval,
-                               typeCombinationData,
-                               seedData,
-                               ndv,
-                               data,
-                               configuration.arrayTypeLength);
-            break;
-        case kZipfian:
-            // For ndv we set half the number of values in the provided data interval.
-            generateDataZipfian(configuration.size,
-                                configuration.dataInterval,
-                                typeCombinationData,
-                                seedData,
-                                ndv,
-                                data,
-                                configuration.arrayTypeLength);
-            break;
-    }
-
-    // Build histogram.
-    auto ceHist = stats::createCEHistogram(data, configuration.numberOfBuckets);
-
-    TypeProbability typeCombinationQuery{configuration.sbeDataType, 100, configuration.nanProb};
-    if (configuration.dataType == kArray) {
+    sbe::value::TypeTags typeQuery = dataType;
+    if (typeQuery == sbe::value::TypeTags::Array) {
         // The array data generation currently only supports integer elements as implemented in
         // populateTypeDistrVectorAccordingToInputConfig.
-        typeCombinationQuery.typeTag = sbe::value::TypeTags::NumberInt64;
+        typeQuery = sbe::value::TypeTags::NumberInt64;
     }
 
-    auto queryIntervals = generateIntervals(configuration.queryType.value(),
-                                            configuration.dataInterval,
-                                            numberOfQueries,
-                                            typeCombinationQuery,
-                                            seedData,
-                                            seedQueries);
+    QueryConfiguration queryConfig(
+        {DataFieldDefinition(
+            /*fieldName*/ "a",
+            /*fieldType*/ typeQuery,
+            /*ndv*/ ndv,
+            /*dataDistribution*/ static_cast<stats::DistrType>(state.range(2)),
+            /*seed (optional)*/ {seed, seed2})},
+        /*queryTypes*/ {static_cast<QueryType>(state.range(5))});
+
+    WorkloadConfiguration workloadConfig(/*numberOfQueries*/ numberOfQueries,
+                                         /*queryConfig*/ queryConfig);
+
+    // We assume there is only one field i.e., we get always the index 0 in all vectors.
+    auto queryIntervals =
+        generateIntervals(workloadConfig.queryConfig.queryTypes[0],
+                          workloadConfig.queryConfig.queryFields[0].dataInterval,
+                          workloadConfig.numberOfQueries,
+                          workloadConfig.queryConfig.queryFields[0].typeCombinationData,
+                          workloadConfig.queryConfig.queryFields[0].seed1,
+                          workloadConfig.queryConfig.queryFields[0].seed2,
+                          workloadConfig.queryConfig.queryFields[0].ndv);
+
+    auto numberOfBuckets = static_cast<int>(state.range(0));
+    auto useE2EAPI = static_cast<bool>(state.range(1));
+
+    // Build histogram.
+    auto ceHist = stats::createCEHistogram(data[0], numberOfBuckets);
+
     tassert(9787300, "queryIntervals should have at least one interval", queryIntervals.size() > 0);
     size_t i = 0;
     for (auto curState : state) {
-        benchmark::DoNotOptimize(runSingleQuery(configuration.queryType.value(),
+        benchmark::DoNotOptimize(runSingleQuery(queryConfig.queryTypes[0],
                                                 queryIntervals[i].first,
                                                 queryIntervals[i].second,
                                                 ceHist,
-                                                true /*includeScalar*/,
+                                                /*includeScalar*/ true,
                                                 ArrayRangeEstimationAlgo::kConjunctArrayCE,
-                                                configuration.useE2EAPI /*useE2EAPI*/,
-                                                seedData));
+                                                /*useE2EAPI*/ useE2EAPI,
+                                                dataConfig.size));
         i = (i + 1) % queryIntervals.size();
     }
     state.SetItemsProcessed(state.iterations());
 }
 
 BENCHMARK(BM_CreateHistogram)
-    ->ArgNames({"buckets", "size", "distrib", "dataType", "query", "useE2EAPI"})
+    ->ArgNames({"numberOfBuckets", "size", "dataDistribution", "dataType", "useE2EAPI"})
     ->ArgsProduct({/*numberOfBuckets*/ {10, 100, 300},
                    /*size*/ {50'000, 100'000},
-                   /*dataDistribution*/ {kUniform, kNormal, kZipfian},
-                   /*dataType*/ {kInt, kString, kBoolean, kNull, kNan, kArray},
-                   /*queryType*/ {kPoint},
+                   /*dataDistribution*/
+                   {static_cast<int>(stats::DistrType::kUniform),
+                    static_cast<int>(stats::DistrType::kNormal),
+                    static_cast<int>(stats::DistrType::kZipfian)},
+                   /*dataType*/
+                   {static_cast<int>(sbe::value::TypeTags::NumberInt64),
+                    static_cast<int>(sbe::value::TypeTags::StringBig),
+                    static_cast<int>(sbe::value::TypeTags::Boolean),
+                    static_cast<int>(sbe::value::TypeTags::Null),
+                    // kNan,
+                    static_cast<int>(sbe::value::TypeTags::Array)},
                    /*useE2EAPI*/ {0}});
 
 BENCHMARK(BM_RunHistogramEstimations)
-    ->ArgNames({"buckets", "size", "distrib", "dataType", "query", "useE2EAPI"})
+    ->ArgNames(
+        {"numberOfBuckets", "size", "dataDistribution", "dataType", "useE2EAPI", "queryType"})
     ->ArgsProduct({/*numberOfBuckets*/ {10, 100, 300},
                    /*size*/ {50'000},
-                   /*dataDistribution*/ {kUniform},
+                   /*dataDistribution*/ {static_cast<int>(stats::DistrType::kUniform)},
                    /*dataType*/
-                   {kInt, kStringSmall, kString, kBoolean, kNull, kNan, kArray},
-                   /*queryType*/ {kPoint},
-                   /*useE2EAPI*/ {0, 1}});
+                   {static_cast<int>(sbe::value::TypeTags::NumberInt64),
+                    static_cast<int>(sbe::value::TypeTags::StringSmall),
+                    static_cast<int>(sbe::value::TypeTags::StringBig),
+                    static_cast<int>(sbe::value::TypeTags::Boolean),
+                    static_cast<int>(sbe::value::TypeTags::Null),
+                    // kNan,
+                    static_cast<int>(sbe::value::TypeTags::Array)},
+                   /*useE2EAPI*/ {0, 1},
+                   /*queryType*/ {kPoint}});
 
 BENCHMARK(BM_RunHistogramEstimations)
-    ->ArgNames({"buckets", "size", "distrib", "dataType", "query", "useE2EAPI"})
-    ->ArgsProduct({/*numberOfBuckets*/ {10, 100, 300},
-                   /*size*/ {50'000},
-                   /*dataDistribution*/ {kUniform},
-                   /*dataType*/ {kInt, kStringSmall, kString, kBoolean, kArray},
-                   /*queryType*/ {kRange},
-                   /*useE2EAPI*/ {0, 1}});
+    ->ArgNames(
+        {"numberOfBuckets", "size", "dataDistribution", "dataType", "useE2EAPI", "queryType"})
+    ->ArgsProduct({
+        /*numberOfBuckets*/ {10, 100, 300},
+        /*size*/ {50'000},
+        /*dataDistribution*/ {static_cast<int>(stats::DistrType::kUniform)},
+        /*dataType*/
+        {static_cast<int>(sbe::value::TypeTags::NumberInt64),
+         static_cast<int>(sbe::value::TypeTags::StringSmall),
+         static_cast<int>(sbe::value::TypeTags::StringBig),
+         static_cast<int>(sbe::value::TypeTags::Boolean),
+         static_cast<int>(sbe::value::TypeTags::Array)},
+        /*useE2EAPI*/ {0, 1},
+        /*queryType*/ {kRange},
+    });
 
 }  // namespace mongo::ce

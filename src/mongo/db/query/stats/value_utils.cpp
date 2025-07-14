@@ -269,6 +269,42 @@ double valueToDouble(value::TypeTags tag, value::Value val) {
     return result;
 }
 
+void addSbeValueToBSONArrayBuilder(const SBEValue& sbeValue, BSONArrayBuilder& builder) {
+
+    switch (sbeValue.getTag()) {
+        case sbe::value::TypeTags::NumberInt32:
+            builder.append(
+                value::numericCast<int>(sbe::value::TypeTags::NumberInt32, sbeValue.getValue()));
+            break;
+        case sbe::value::TypeTags::NumberInt64:
+            builder.append(value::numericCast<long long>(sbe::value::TypeTags::NumberInt64,
+                                                         sbeValue.getValue()));
+            break;
+        case sbe::value::TypeTags::NumberDecimal:
+            builder.append(value::numericCast<Decimal128>(sbe::value::TypeTags::NumberDecimal,
+                                                          sbeValue.getValue()));
+            break;
+        case sbe::value::TypeTags::NumberDouble:
+            builder.append(
+                value::numericCast<double>(value::TypeTags::NumberInt64, sbeValue.getValue()));
+            break;
+        case sbe::value::TypeTags::StringSmall:
+        case sbe::value::TypeTags::StringBig:
+        case sbe::value::TypeTags::bsonString:
+            builder.append(value::getStringView(sbeValue.getTag(), sbeValue.getValue()));
+            break;
+        case sbe::value::TypeTags::Boolean:
+            builder.appendBool(sbe::value::bitcastTo<bool>(sbeValue.getValue()));
+            break;
+        case sbe::value::TypeTags::Null:
+            builder.appendNull();
+            break;
+        default:
+            uassert(9370101, "Unexpected value type", false);
+            break;
+    }
+}
+
 void addSbeValueToBSONBuilder(const SBEValue& sbeValue,
                               const std::string& fieldName,
                               BSONObjBuilder& builder) {
@@ -305,10 +341,31 @@ void addSbeValueToBSONBuilder(const SBEValue& sbeValue,
         case sbe::value::TypeTags::Null:
             builder.appendNull(fieldName);
             break;
+        case sbe::value::TypeTags::Array: {
+            BSONArrayBuilder bsonArrayBuilder;
+            value::Array* arr = value::getArrayView(sbeValue.getValue());
+            size_t arrSize = arr->size();
+            for (size_t i = 0; i < arrSize; i++) {
+                addSbeValueToBSONArrayBuilder(SBEValue(arr->getAt(i)), bsonArrayBuilder);
+            }
+            builder.appendArray(fieldName, bsonArrayBuilder.obj());
+            break;
+        }
         default:
             uassert(9370100, "Unexpected value type", false);
             break;
     }
+}
+
+BSONObj sbeValueVectorToBSON(std::vector<SBEValue>& sbeValues,
+                             std::vector<std::string>& fieldNames) {
+    BSONObjBuilder builder;
+
+    for (size_t idx = 0; idx < fieldNames.size(); idx++) {
+        addSbeValueToBSONBuilder(sbeValues[idx], fieldNames[idx], builder);
+    }
+
+    return builder.obj();
 }
 
 BSONObj sbeValueToBSON(const SBEValue& sbeValue, const std::string& fieldName) {

@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/ce/ce_test_utils.h"
 #include "mongo/db/query/ce/sampling/sampling_estimator_impl.h"
@@ -42,45 +39,150 @@
 
 namespace mongo::ce {
 
-void initializeSamplingEstimator(SamplingEstimationBenchmarkConfiguration configuration,
-                                 const size_t seedData,
-                                 SamplingEstimatorTest& samplingEstimatorTest) {
+// Defining a constant seed value for data generation, the use of this ensure that point queries
+// will match against at least one generated document in the dataset.
+const size_t seed_value1 = 1724178;
 
-    std::vector<stats::SBEValue> data;
+/**
+ * This map defines a set of configurations for collection generation.
+ * The keys of the map are used as part of the benchmark state inputs to create a variety of base
+ * collection to test against.
+ * Each configuration requires a vector of CollectionFieldConfigurations which represent the set of
+ * "user defined" fields. Each field requires configuring its name, position in the collection as
+ * well as type and distribution information.
+ * The collection will contain as many fields as the maximum position of the user defined fields.
+ * The remaining in-between fields are copies of the user defined fields with names with suffix an
+ * underscore and a number.
+ * When defining the fields in the collection, order the fields in increasing position order.
+ */
+std::map<int, std::vector<CollectionFieldConfiguration>> collectionFieldConfigurations = {
+    {1,
+     {CollectionFieldConfiguration(
+          /*fieldName*/ "a",
+          /*fieldPosition*/ 0,
+          /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+          /*ndv*/ 500,
+          /*dataDistribution*/ stats::DistrType::kUniform,
+          /*seed*/ seed_value1),
+      CollectionFieldConfiguration(
+          /*fieldName*/ "b",
+          /*fieldPosition*/ 5,
+          /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+          /*ndv*/ 500,
+          /*dataDistribution*/ stats::DistrType::kUniform,
+          /*seed*/ seed_value1),
+      CollectionFieldConfiguration(
+          /*fieldName*/ "c",
+          /*fieldPosition*/ 20,
+          /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+          /*ndv*/ 500,
+          /*dataDistribution*/ stats::DistrType::kUniform,
+          /*seed*/ seed_value1)}},
+    {2,
+     {CollectionFieldConfiguration({/*fieldName*/ "a",
+                                    /*fieldPosition*/ 0,
+                                    /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+                                    /*ndv*/ 500,
+                                    /*dataDistribution*/ stats::DistrType::kUniform,
+                                    /*seed*/ seed_value1})}},
+    {3,
+     {CollectionFieldConfiguration(
+         /*fieldName*/ "a",
+         /*fieldPosition*/ 5,
+         /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+         /*ndv*/ 500,
+         /*dataDistribution*/ stats::DistrType::kUniform,
+         /*seed*/ seed_value1)}}};
 
-    // Generate data according to the provided configuration
-    generateData(configuration, seedData, data);
+auto queryConfig1 = WorkloadConfiguration(
+    /*numberOfQueries*/ 1000,
+    QueryConfiguration({DataFieldDefinition(
+                           /*fieldName*/ "a",
+                           /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+                           /*ndv*/ 500,
+                           /*dataDistribution*/ stats::DistrType::kUniform,
+                           /*seed*/ {seed_value1, 1724178})},
+                       /*queryTypes*/ {kPoint}));
 
-    samplingEstimatorTest.setUp();
+auto queryConfig2 = WorkloadConfiguration(
+    /*numberOfQueries*/ 1000,
+    QueryConfiguration({DataFieldDefinition(
+                            /*fieldName*/ "b",
+                            /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+                            /*ndv*/ 500,
+                            /*dataDistribution*/ stats::DistrType::kUniform,
+                            {seed_value1, 1724178}),
+                        DataFieldDefinition(
+                            /*fieldName*/ "c",
+                            /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+                            /*ndv*/ 500,
+                            /*dataDistribution*/ stats::DistrType::kUniform,
+                            /*seed*/ {seed_value1, 1724178})},
+                       /*queryTypes*/ {kPoint, kPoint}));
 
-    // Create vector of BSONObj according to the generated data
-    // Number of fields dictates the number of columns the collection will have.
-    auto dataBSON =
-        SamplingEstimatorTest::createDocumentsFromSBEValue(data, configuration.numberOfFields);
+auto queryConfig3 = WorkloadConfiguration(
+    /*numberOfQueries*/ 1000,
+    QueryConfiguration({DataFieldDefinition(
+                            /*fieldName*/ "a",
+                            /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+                            /*ndv*/ 500,
+                            /*dataDistribution*/ stats::DistrType::kUniform,
+                            {seed_value1, 1724178}),
+                        DataFieldDefinition(
+                            /*fieldName*/ "c",
+                            /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+                            /*ndv*/ 500,
+                            /*dataDistribution*/ stats::DistrType::kUniform,
+                            /*seed*/ {seed_value1, 1724178})},
+                       /*queryTypes*/ {kPoint, kPoint}));
 
-    // Populate collection
-    samplingEstimatorTest.insertDocuments(samplingEstimatorTest._kTestNss, dataBSON);
-}
+auto queryConfig4 = WorkloadConfiguration(
+    /*numberOfQueries*/ 1000,
+    QueryConfiguration({DataFieldDefinition(
+                           /*fieldName*/ "a",
+                           /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+                           /*ndv*/ 500,
+                           /*dataDistribution*/ stats::DistrType::kUniform,
+                           /*seed*/ {seed_value1, 1724178})},
+                       /*queryTypes*/ {kPoint}));
+
+std::vector<std::pair<int, WorkloadConfiguration&>> queryConfigVector{
+    {1, queryConfig1}, {2, queryConfig2}, {3, queryConfig3}, {4, queryConfig4}};
+
+
+/**
+ * This map defines a set of configurations for workload generation.
+ * The keys of the map are used as part of the benchmark state inputs to create a variety of the
+ * workload to run against the defined collection. Each configuration requires a vector of
+ * QueryConfiguration represents the set of fields to be queried against. Each field
+ * requires configuring its name as well as type and distribution information. The implementation
+ * currently supports only conjunction (AND) correlation between fields.
+ * IMPORTANT: To ensure that point queries will have matches, ensure that the seeds provided for
+ * query value generation to be identical with the generation of the dataset.
+ */
+std::map<int, WorkloadConfiguration> queryFieldsConfigurations(queryConfigVector.begin(),
+                                                               queryConfigVector.end());
 
 void BM_CreateSample(benchmark::State& state) {
+    // Translate the fields and positions configurations based on the defined map.
+    auto fieldsConfig = collectionFieldConfigurations[state.range(1)];
 
-    constexpr size_t seedData = 1724178214;
-
-    SamplingEstimationBenchmarkConfiguration configuration(
+    DataConfiguration dataConfig(
         /*dataSize*/ state.range(0),
-        /*dataDistribution*/ static_cast<DataDistributionEnum>(state.range(1)),
-        /*dataType*/ static_cast<DataType>(state.range(2)),
-        /*ndv*/ state.range(3),
-        /*queryType*/ boost::none,
-        /*numberOfFields*/ state.range(4),
-        /*sampleSizeDef*/
-        static_cast<SamplingEstimationBenchmarkConfiguration::SampleSizeDef>(state.range(5)),
-        /*samplingAlgo-numOfChunks*/ state.range(6),
-        /*numberOfQueries*/ boost::none);
+        /*dataFieldConfig*/ fieldsConfig);
+
+    // Translate the sample size definition to corresponding sample size.
+    auto sampleSize = translateSampleDefToActualSampleSize(
+        /*sampleSizeDef*/ static_cast<SampleSizeDef>(state.range(2)));
+
+    // Translate the number of chunks variable to both number of chunks and sampling algo.
+    // This benchmark given as input numOfChunks <= 0 will use kRandom.
+    auto sampling =
+        iniitalizeSamplingAlgoBasedOnChunks(/*samplingAlgo-numOfChunks*/ state.range(3));
 
     // Generate data and populate source collection
     SamplingEstimatorTest samplingEstimatorTest;
-    initializeSamplingEstimator(configuration, seedData, samplingEstimatorTest);
+    initializeSamplingEstimator(dataConfig, samplingEstimatorTest);
 
     // Initialize collection accessor
     AutoGetCollection collPtr(samplingEstimatorTest.getOperationContext(),
@@ -98,33 +200,30 @@ void BM_CreateSample(benchmark::State& state) {
         SamplingEstimatorImpl samplingEstimator(
             samplingEstimatorTest.getOperationContext(),
             collection,
-            configuration.sampleSize,
-            configuration.samplingAlgo,
-            configuration.numChunks,
-            SamplingEstimatorTest::makeCardinalityEstimate(configuration.size));
+            sampleSize,
+            sampling.first,
+            sampling.second,
+            SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
     }
 }
 
 void BM_RunCardinalityEstimationOnSample(benchmark::State& state) {
 
-    constexpr size_t seedData = 1724178214;
-    constexpr size_t seedQueries = 2431475868;
+    // queryFieldsConfigurations.emplace(1, config1);
 
-    SamplingEstimationBenchmarkConfiguration configuration(
+    // Translate the fields and positions configurations based on the defined map.
+    auto fieldsConfig = collectionFieldConfigurations[state.range(1)];
+
+    DataConfiguration dataConfig(
         /*dataSize*/ state.range(0),
-        /*dataDistribution*/ static_cast<DataDistributionEnum>(state.range(1)),
-        /*dataType*/ static_cast<DataType>(state.range(2)),
-        /*ndv*/ state.range(3),
-        /*queryType*/ static_cast<QueryType>(state.range(4)),
-        /*numberOfFields*/ state.range(5),
-        /*sampleSizeDef*/
-        static_cast<SamplingEstimationBenchmarkConfiguration::SampleSizeDef>(state.range(6)),
-        /*samplingAlgo-numOfChunks*/ state.range(7),
-        /*numberOfQueries*/ state.range(8));
+        /*dataFieldConfig*/ fieldsConfig);
+
+    // Setup query types.
+    WorkloadConfiguration& workloadConfig = queryFieldsConfigurations[state.range(5)];
 
     // Generate data and populate source collection
     SamplingEstimatorTest samplingEstimatorTest;
-    initializeSamplingEstimator(configuration, seedData, samplingEstimatorTest);
+    initializeSamplingEstimator(dataConfig, samplingEstimatorTest);
 
     // Initialize collection accessor
     AutoGetCollection collPtr(samplingEstimatorTest.getOperationContext(),
@@ -137,42 +236,36 @@ void BM_RunCardinalityEstimationOnSample(benchmark::State& state) {
                                    /*isAnySecondaryNamespaceAViewOrNotFullyLocal*/ false,
                                    /*secondaryExecNssList*/ {});
 
+    // Translate the sample size definition to corresponding sample size.
+    auto sampleSize = translateSampleDefToActualSampleSize(
+        /*sampleSizeDef*/ static_cast<SampleSizeDef>(state.range(2)));
+
+    // Translate the number of chunks variable to both number of chunks and sampling algo.
+    // This benchmark given as input numOfChunks <= 0 will use kRandom.
+    auto sampling =
+        iniitalizeSamplingAlgoBasedOnChunks(/*samplingAlgo-numOfChunks*/ state.range(3));
+
     // Create sample from the provided collection
     SamplingEstimatorImpl samplingEstimator(
         samplingEstimatorTest.getOperationContext(),
         collection,
-        configuration.sampleSize,
-        configuration.samplingAlgo,
-        configuration.numChunks,
-        SamplingEstimatorTest::makeCardinalityEstimate(configuration.size));
+        sampleSize,
+        sampling.first,
+        sampling.second,
+        SamplingEstimatorTest::makeCardinalityEstimate(dataConfig.size));
 
     // Generate queries.
-    TypeProbability typeCombinationQuery{configuration.sbeDataType, 100, configuration.nanProb};
-    if (configuration.dataType == kArray) {
-        // The array data generation currently only supports integer elements as implemented in
-        // populateTypeDistrVectorAccordingToInputConfig.
-        typeCombinationQuery.typeTag = sbe::value::TypeTags::NumberInt64;
-    }
+    std::vector<std::vector<std::pair<stats::SBEValue, stats::SBEValue>>> queryFieldsIntervals =
+        generateMultiFieldIntervals(workloadConfig);
 
-    // Generate query intervals
-    auto queryIntervals = generateIntervals(configuration.queryType.value(),
-                                            configuration.dataInterval,
-                                            configuration.numberOfQueries.value(),
-                                            typeCombinationQuery,
-                                            seedData,
-                                            seedQueries);
-    tassert(
-        10472402, "queryIntervals should have at least one interval", queryIntervals.size() > 0);
+    std::vector<std::unique_ptr<MatchExpression>> allMatchExpressionQueries =
+        createQueryMatchExpressionOnMultipleFields(workloadConfig, queryFieldsIntervals);
 
     size_t i = 0;
     for (auto _ : state) {
-        state.PauseTiming();
-        auto first = queryIntervals[i].first;
-        auto second = queryIntervals[i].second;
-        auto matchExpr = createQueryMatchExpression(configuration.queryType.value(), first, second);
-        state.ResumeTiming();
-        benchmark::DoNotOptimize(samplingEstimator.estimateCardinality(matchExpr.get()));
-        i = (i + 1) % queryIntervals.size();
+        benchmark::DoNotOptimize(
+            samplingEstimator.estimateCardinality(allMatchExpressionQueries[i].get()));
+        i = (i + 1) % allMatchExpressionQueries.size();
     }
     state.SetItemsProcessed(state.iterations());
 }
@@ -183,34 +276,13 @@ void BM_RunCardinalityEstimationOnSample(benchmark::State& state) {
  * documents and number of fields in the base collection as well as the sample size.
  */
 BENCHMARK(BM_CreateSample)
-    ->ArgNames({"dataSize",
-                "dataDistribution",
-                "dataType",
-                "ndv",
-                "numberOfFields",
-                "sampleSizeDef",
-                "samplingAlgo-numChunks"})
-    ->ArgsProduct(
-        {/*dataSize*/ {100},
-         /*dataDistribution*/ {kUniform},
-         /*dataType*/ {kInt},
-         /*ndv*/ {10},
-         /*numberOfFields*/ {1},
-         /*sampleSizeDef*/
-         {static_cast<int>(SamplingEstimationBenchmarkConfiguration::SampleSizeDef::ErrorSetting1)},
-         /*samplingAlgo-numChunks*/ {/*random*/ -1}});
-
-// Configuration of benchmark for evaluation:
-// ->ArgsProduct(
-//     {/*dataSize*/
-//      {100000, 500000, 1000000},
-//      /*dataDistribution*/ {kUniform},
-//      /*dataType*/ {kInt, kString},
-//      /*ndv*/ {1000},
-//      /*numberOfFields*/ {1, 20},
-//      /*sampleSizeDef*/
-//      {static_cast<int>(SamplingEstimationBenchmarkConfiguration::SampleSizeDef::ErrorSetting1)},
-//      /*samplingAlgo-numChunks*/ {/*random*/ -1, /*chunk*/ 10}});
+    ->ArgNames({"dataSize", "dataFieldsConfiguration", "sampleSizeDef", "samplingAlgo-numChunks"})
+    ->ArgsProduct({/*dataSize*/ {100},
+                   /*dataFieldsConfiguration*/ {1},
+                   /*sampleSizeDef*/
+                   {static_cast<int>(SampleSizeDef::ErrorSetting1)},
+                   /*samplingAlgo-numChunks*/ {/*random*/ -1}})
+    ->Unit(benchmark::kMillisecond);
 
 /**
  * Evaluate the performance of estimating CE using an already populated sample. The
@@ -220,40 +292,20 @@ BENCHMARK(BM_CreateSample)
  * as the sample size.
  */
 BENCHMARK(BM_RunCardinalityEstimationOnSample)
-    ->ArgNames({"dataSize",
-                "dataDistribution",
-                "dataType",
-                "ndv",
-                "queryType",
-                "numberOfFields",
-                "sampleSizeDef",
-                "samplingAlgo-numChunks",
-                "numberOfQueries"})
-    ->ArgsProduct(
-        {/*dataSize*/
-         {100},
-         /*dataDistribution*/ {kUniform},
-         /*dataType*/ {kInt},
-         /*ndv*/ {10},
-         /*queryType*/ {kPoint},
-         /*numberOfFields*/ {1},
-         /*sampleSizeDef*/
-         {static_cast<int>(SamplingEstimationBenchmarkConfiguration::SampleSizeDef::ErrorSetting1)},
-         /*samplingAlgo-numChunks*/ {/*random*/ -1},
-         /*numberOfQueries*/ {1}});
-
-// Configuration of benchmark for evaluation:
-// ->ArgsProduct(
-//     {/*dataSize*/
-//      {100000},
-//      /*dataDistribution*/ {kUniform},
-//      /*dataType*/ {kInt, kString},
-//      /*ndv*/ {1000},
-//      /*queryType*/ {kPoint, kRange},
-//      /*numberOfFields*/ {1},
-//      /*sampleSizeDef*/
-//      {static_cast<int>(SamplingEstimationBenchmarkConfiguration::SampleSizeDef::ErrorSetting1)},
-//      /*samplingAlgo-numChunks*/ {/*random*/ -1},
-//      /*numberOfQueries*/ {1}});
-
+    ->ArgNames({
+        "dataSize",
+        "dataFieldsConfiguration",
+        "sampleSizeDef",
+        "samplingAlgo-numChunks",
+        "numberOfQueries",
+        "queryFieldConfig",
+    })
+    ->ArgsProduct({/*dataSize*/ {100},
+                   /*dataFieldsConfiguration*/ {1},
+                   /*sampleSizeDef*/
+                   {static_cast<int>(SampleSizeDef::ErrorSetting1)},
+                   /*samplingAlgo-numChunks*/ {/*random*/ -1},
+                   /*numberOfQueries*/ {50},
+                   /*queryFieldConfig*/ {1}})
+    ->Unit(benchmark::kMillisecond);
 }  // namespace mongo::ce

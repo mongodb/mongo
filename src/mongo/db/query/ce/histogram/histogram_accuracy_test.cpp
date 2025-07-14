@@ -84,7 +84,9 @@ int main(int argc, char* argv[]) {
     const size_t seedQueriesLow = seedData;
     const size_t seedQueriesHigh = 1012348998;
 
-    auto dataDistributions = {kUniform, kNormal, kZipfian};
+    auto dataDistributions = {mongo::stats::DistrType::kUniform,
+                              mongo::stats::DistrType::kNormal,
+                              mongo::stats::DistrType::kZipfian};
     auto queryTypes = {kPoint, kRange};
 
     for (auto queryType : queryTypes) {

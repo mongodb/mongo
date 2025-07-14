@@ -73,7 +73,7 @@ stats::ScalarHistogram makeHistogram(std::vector<stats::SBEValue>& randData, siz
 
 stats::ScalarHistogram createHistogram(const std::vector<BucketData>& data);
 
-void printResult(const DataDistributionEnum& dataDistribution,
+void printResult(const stats::DistrType& dataDistribution,
                  const TypeCombination& typeCombination,
                  int size,
                  int numberOfBuckets,
@@ -130,7 +130,7 @@ ErrorCalculationSummary runQueries(size_t size,
                                    size_t seedQueriesLow,
                                    size_t seedQueriesHigh);
 
-void runAccuracyTestConfiguration(DataDistributionEnum dataDistribution,
+void runAccuracyTestConfiguration(stats::DistrType dataDistribution,
                                   const TypeCombinations& typeCombinationsData,
                                   const TypeCombination& typeCombinationsQueries,
                                   const std::vector<int>& numberOfBucketsVector,

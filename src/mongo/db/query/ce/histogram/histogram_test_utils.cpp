@@ -100,7 +100,7 @@ ScalarHistogram makeHistogram(std::vector<stats::SBEValue>& randData, size_t nBu
     return genMaxDiffHistogram(dataDistrib, nBuckets);
 }
 
-void printResult(const DataDistributionEnum& dataDistribution,
+void printResult(const stats::DistrType& dataDistribution,
                  const TypeCombination& typeCombination,
                  const int size,
                  const int numberOfBuckets,
@@ -118,15 +118,15 @@ void printResult(const DataDistributionEnum& dataDistribution,
     BSONObjBuilder builder;
 
     switch (dataDistribution) {
-        case kUniform:
+        case stats::DistrType::kUniform:
             builder << "DataDistribution"
                     << "Uniform";
             break;
-        case kNormal:
+        case stats::DistrType::kNormal:
             builder << "DataDistribution"
                     << "Normal";
             break;
-        case kZipfian:
+        case stats::DistrType::kZipfian:
             builder << "DataDistribution"
                     << "Zipfian";
             break;
@@ -304,7 +304,7 @@ ErrorCalculationSummary runQueries(size_t size,
     ErrorCalculationSummary finalResults;
 
     auto queryIntervals = generateIntervals(
-        queryType, interval, numberOfQueries, queryTypeInfo, seedQueriesLow, seedQueriesHigh);
+        queryType, interval, numberOfQueries, {queryTypeInfo}, seedQueriesLow, seedQueriesHigh);
 
     // Transform input data to vector of BSONObj to simplify calculation of actual cardinality.
     std::vector<BSONObj> bsonData = transformSBEValueVectorToBSONObjVector(data);
@@ -347,7 +347,7 @@ ErrorCalculationSummary runQueries(size_t size,
     return finalResults;
 }
 
-void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
+void runAccuracyTestConfiguration(const stats::DistrType dataDistribution,
                                   const TypeCombinations& typeCombinationsData,
                                   const TypeCombination& typeCombinationsQueries,
                                   const std::vector<int>& numberOfBucketsVector,
@@ -373,35 +373,14 @@ void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
             std::map<stats::SBEValue, double> insertedData;
 
             // Create one by one the values.
-            switch (dataDistribution) {
-                case kUniform:
-                    generateDataUniform(size,
-                                        dataInterval,
-                                        typeCombinationData,
-                                        seedData,
-                                        ndv,
-                                        data,
-                                        arrayTypeLength);
-                    break;
-                case kNormal:
-                    generateDataNormal(size,
-                                       dataInterval,
-                                       typeCombinationData,
-                                       seedData,
-                                       ndv,
-                                       data,
-                                       arrayTypeLength);
-                    break;
-                case kZipfian:
-                    generateDataZipfian(size,
-                                        dataInterval,
-                                        typeCombinationData,
-                                        seedData,
-                                        ndv,
-                                        data,
-                                        arrayTypeLength);
-                    break;
-            }
+            generateDataOneField(ndv,
+                                 size,
+                                 typeCombinationData,
+                                 dataDistribution,
+                                 dataInterval,
+                                 seedData,
+                                 arrayTypeLength,
+                                 data);
 
             // Build histogram.
             auto ceHist = stats::createCEHistogram(data, numberOfBuckets);

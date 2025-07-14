@@ -116,7 +116,6 @@ public:
 class SamplingEstimatorTest : public CatalogTestFixture {
 public:
     void setUp() override {
-
         _kTestNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
         CatalogTestFixture::setUp();
@@ -128,58 +127,33 @@ public:
         CatalogTestFixture::tearDown();
     }
 
-    /*
+    /**
      * Insert documents to the default collection.
      */
-    void insertDocuments(const NamespaceString& nss, const std::vector<BSONObj> docs) {
-        std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
+    void insertDocuments(const NamespaceString& nss, std::vector<BSONObj> docs);
 
-        AutoGetCollection agc(operationContext(), nss, LockMode::MODE_IX);
-        {
-            WriteUnitOfWork wuow{operationContext()};
-            ASSERT_OK(collection_internal::insertDocuments(
-                operationContext(), *agc, inserts.begin(), inserts.end(), nullptr /* opDebug */));
-            wuow.commit();
-        }
-    }
+    /**
+     * Create a vector of "num" copies of pre-defined document.
+     */
+    std::vector<BSONObj> createDocuments(int num);
 
-    std::vector<BSONObj> createDocuments(int num) {
-        std::vector<BSONObj> docs;
-        for (int i = 0; i < num; i++) {
-            BSONObj obj = BSON("_id" << i << "a" << i % 100 << "b" << i % 10 << "arr"
-                                     << BSON_ARRAY(10 << 20 << 30 << 40 << 50) << "nil" << BSONNULL
-                                     << "obj" << BSON("nil" << BSONNULL));
-            docs.push_back(obj);
-        }
-        return docs;
-    }
-
-    static std::vector<BSONObj> createDocumentsFromSBEValue(std::vector<stats::SBEValue> data,
-                                                            int numberOfFields = 1) {
-
-        tassert(10472401,
-                "Number of fields should be fewer than the letters of the English alphabet (<= 26)",
-                numberOfFields <= 26);
-
-        std::vector<BSONObj> docs;
-        for (size_t i = 0; i < data.size(); i++) {
-
-            BSONObjBuilder builder;
-            stats::addSbeValueToBSONBuilder(stats::makeInt64Value(i), "_id", builder);
-
-            for (int instance = 0; instance < numberOfFields; instance++) {
-                std::string attributeName;
-
-                // Create simple attribute names starting from 'a' based on ascii codes (i.e.,
-                // starting from ascii 97 (a) to ascii 122 (z))
-                attributeName = (char)(97 + instance);
-                stats::addSbeValueToBSONBuilder(data[i], attributeName, builder);
-            }
-
-            docs.push_back(builder.obj());
-        }
-        return docs;
-    }
+    /**
+     * Generate a vector of BSONObj based on the input data.
+     *
+     * @param data is a vector of vector of values. The inner vectors represent the values for
+     * each field (i.e., a column), and the outer vector represents a collection of fields.
+     * @param fieldConfig The function combines of the provided values from "data" according the the
+     * vector of field configurations, each field configuration represents a field. Specifically, it
+     * extracts the field's name and position in the collection.
+     *
+     * The collection will contain as many fields as the maximum position of the user defined
+     * fields in "fieldConfig". The remaining in-between fields are copies of the user defined
+     * fields with names with suffix an underscore and a number. When defining the fields in the
+     * collection, order the fields in increasing position order.
+     */
+    static std::vector<BSONObj> createDocumentsFromSBEValue(
+        std::vector<std::vector<stats::SBEValue>> data,
+        std::vector<CollectionFieldConfiguration> fieldConfig);
 
     static CardinalityEstimate makeCardinalityEstimate(
         double estimate,
@@ -196,103 +170,12 @@ public:
     NamespaceString _kTestNss;
 };
 
-struct SamplingEstimationBenchmarkConfiguration : public BenchmarkConfiguration {
+enum class SampleSizeDef { ErrorSetting1 = 1, ErrorSetting2 = 2, ErrorSetting5 = 3 };
 
-    enum class SampleSizeDef { ErrorSetting1 = 1, ErrorSetting2 = 2, ErrorSetting5 = 3 };
+size_t translateSampleDefToActualSampleSize(SampleSizeDef sampleSizeDef);
 
-    int numberOfFields;
-    int sampleSize;
-
-    boost::optional<int> numChunks;
-    SamplingEstimatorImpl::SamplingStyle samplingAlgo;
-
-    SamplingEstimationBenchmarkConfiguration(size_t size,
-                                             DataDistributionEnum dataDistribution,
-                                             DataType dataType,
-                                             boost::optional<size_t> ndv,
-                                             boost::optional<QueryType> queryType,
-                                             size_t numberOfFields,
-                                             SampleSizeDef sampleSizeDef,
-                                             int numOfChunks,
-                                             boost::optional<size_t> numberOfQueries = boost::none)
-        : BenchmarkConfiguration(size, dataDistribution, dataType, queryType, ndv, numberOfQueries),
-          numberOfFields(numberOfFields) {
-
-        // Translate the sample size definition to corresponding sample size.
-        sampleSize = translateSampleDefToActualSampleSize(sampleSizeDef);
-
-        // Translate the number of chunks variable to both number of chunks and sampling algo.
-        // This benchmark given as input numOfChunks <= 0 will use kRandom.
-        if (numOfChunks <= 0) {
-            samplingAlgo = SamplingEstimatorImpl::SamplingStyle::kRandom;
-            numChunks = boost::none;
-        } else {
-            samplingAlgo = SamplingEstimatorImpl::SamplingStyle::kChunk;
-            numChunks = numOfChunks;
-        }
-    };
-
-    static size_t translateSampleDefToActualSampleSize(SampleSizeDef sampleSizeDef) {
-        // Translate the sample size definition to corresponding sample size.
-        switch (sampleSizeDef) {
-            case SampleSizeDef::ErrorSetting1: {
-                return SamplingEstimatorForTesting::calculateSampleSize(
-                    SamplingConfidenceIntervalEnum::k95, 1.0);
-            }
-            case SampleSizeDef::ErrorSetting2: {
-                return SamplingEstimatorForTesting::calculateSampleSize(
-                    SamplingConfidenceIntervalEnum::k95, 2.0);
-            }
-            case SampleSizeDef::ErrorSetting5: {
-                return SamplingEstimatorForTesting::calculateSampleSize(
-                    SamplingConfidenceIntervalEnum::k95, 5.0);
-            }
-        }
-        MONGO_UNREACHABLE;
-    }
-};
-
-void generateData(size_t ndv,
-                  size_t size,
-                  TypeCombination typeCombinationData,
-                  DataDistributionEnum dataDistribution,
-                  const std::pair<size_t, size_t>& dataInterval,
-                  size_t seedData,
-                  int arrayTypeLength,
-                  std::vector<stats::SBEValue>& data);
-
-void generateData(SamplingEstimationBenchmarkConfiguration& configuration,
-                  size_t seedData,
-                  std::vector<stats::SBEValue>& data);
-
-ErrorCalculationSummary runQueries(size_t size,
-                                   size_t numberOfQueries,
-                                   QueryType queryType,
-                                   std::pair<size_t, size_t> interval,
-                                   TypeProbability queryTypeInfo,
-                                   const std::vector<stats::SBEValue>& data,
-                                   const SamplingEstimatorImpl* ceSample,
-                                   size_t seedQueriesLow,
-                                   size_t seedQueriesHigh);
-
-void printResult(const DataDistributionEnum& dataDistribution,
-                 const TypeCombination& typeCombination,
-                 int size,
-                 int sampleSize,
-                 const TypeProbability& typeCombinationQuery,
-                 int numberOfQueries,
-                 QueryType queryType,
-                 const std::pair<size_t, size_t>& dataInterval,
-                 size_t seedData,
-                 size_t seedQueriesLow,
-                 size_t seedQueriesHigh,
-                 const std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>&
-                     samplingAlgoAndChunks,
-                 ErrorCalculationSummary error);
-
-void createCollAndInsertDocuments(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  const std::vector<BSONObj>& docs);
+std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>
+iniitalizeSamplingAlgoBasedOnChunks(int numOfChunks);
 
 /**
  * Sampling accuracy test extension used as a vessel to generate samples over collections and
@@ -305,24 +188,31 @@ public:
     SamplingAccuracyTest() : CatalogTestFixture() {}
 
     void runSamplingEstimatorTestConfiguration(
-        DataDistributionEnum dataDistribution,
-        const TypeCombination& typeCombinationData,
-        const TypeCombination& typeCombinationsQueries,
-        size_t size,
-        const std::pair<size_t, size_t>& dataInterval,
-        const std::pair<size_t, size_t>& queryInterval,
-        int numberOfQueries,
-        size_t seedData,
-        size_t seedQueriesLow,
-        size_t seedQueriesHigh,
-        int arrayTypeLength,
-        size_t ndv,
-        size_t numberOfFields,
-        std::vector<QueryType> queryTypes,
-        std::vector<SamplingEstimationBenchmarkConfiguration::SampleSizeDef> sampleSizes,
+        DataConfiguration dataConfig,
+        WorkloadConfiguration queryConfig,
+        std::vector<SampleSizeDef> sampleSizes,
         std::vector<std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>>
             samplingAlgoAndChunks,
         bool printResults = true);
 };
+
+void initializeSamplingEstimator(DataConfiguration& configuration,
+                                 SamplingEstimatorTest& samplingEstimatorTest);
+
+
+void createCollAndInsertDocuments(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const std::vector<BSONObj>& docs);
+
+ErrorCalculationSummary runQueries(WorkloadConfiguration queryConfig,
+                                   std::vector<BSONObj>& bsonData,
+                                   const SamplingEstimatorImpl* ceSample);
+
+void printResult(DataConfiguration dataConfig,
+                 int sampleSize,
+                 WorkloadConfiguration queryConfig,
+                 const std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>&
+                     samplingAlgoAndChunks,
+                 ErrorCalculationSummary error);
 
 }  // namespace mongo::ce
