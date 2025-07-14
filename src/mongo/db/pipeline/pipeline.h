@@ -52,7 +52,9 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -70,10 +72,6 @@
 
 namespace mongo {
 class BSONObj;
-
-// TODO SERVER-107320 remove 'CollectionOrViewAcquisition' and 'CollectionRoutingInfo'.
-class CollectionOrViewAcquisition;
-class CollectionRoutingInfo;
 class OperationContext;
 class Pipeline;
 class PipelineDeleter;

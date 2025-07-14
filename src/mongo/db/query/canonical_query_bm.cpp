@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/canonical_query.h"
+
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_fcv_environment_for_test.h"

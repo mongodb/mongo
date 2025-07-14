@@ -46,6 +46,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"

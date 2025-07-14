@@ -43,8 +43,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/exchange_spec_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
-#include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/version_context.h"
 #include "mongo/db/write_concern_options.h"
@@ -114,13 +114,6 @@ void validateRequestForAPIVersion(const OperationContext* opCtx,
  * request must have been fromRouter.
  */
 void validateRequestFromClusterQueryWithoutShardKey(const AggregateCommandRequest& request);
-
-/**
- * Returns the type of resumable scan required by this aggregation, if applicable. Otherwise returns
- * ResumableScanType::kNone.
- */
-PlanExecutorPipeline::ResumableScanType getResumableScanType(const AggregateCommandRequest& request,
-                                                             bool isChangeStream);
 
 // TODO SERVER-95358 remove once 9.0 becomes last LTS.
 const mongo::OptionalBool& getFromRouter(const AggregateCommandRequest& request);

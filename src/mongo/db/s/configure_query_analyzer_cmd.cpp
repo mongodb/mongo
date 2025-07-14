@@ -54,6 +54,7 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/analyze_shard_key_util.h"
 #include "mongo/db/s/ddl_lock_manager.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"

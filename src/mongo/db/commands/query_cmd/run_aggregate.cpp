@@ -186,6 +186,25 @@ bool checkRetryableWriteAlreadyApplied(const AggExState& aggExState,
     return true;
 }
 
+PlanExecutorPipeline::ResumableScanType getResumableScanType(const AggregateCommandRequest& request,
+                                                             bool isChangeStream) {
+    // $changeStream cannot be run on the oplog, and $_requestReshardingResumeToken can only be run
+    // on the oplog. An aggregation request with both should therefore never reach this point.
+    tassert(5353400,
+            "$changeStream can't be combined with _requestReshardingResumeToken: true",
+            !(isChangeStream && request.getRequestReshardingResumeToken()));
+    if (isChangeStream) {
+        return PlanExecutorPipeline::ResumableScanType::kChangeStream;
+    }
+    if (request.getRequestReshardingResumeToken()) {
+        return PlanExecutorPipeline::ResumableScanType::kOplogScan;
+    }
+    if (request.getRequestResumeToken()) {
+        return PlanExecutorPipeline::ResumableScanType::kNaturalOrderScan;
+    }
+    return PlanExecutorPipeline::ResumableScanType::kNone;
+}
+
 /**
  * If a pipeline is empty (assuming that a $cursor stage hasn't been created yet), it could mean
  * that we were able to absorb all pipeline stages and pull them into a single PlanExecutor. So,
@@ -684,8 +703,7 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
             execs.emplace_back(plan_executor_factory::make(
                 std::move(pipelineExpCtx),
                 std::move(pipelineIt),
-                aggregation_request_helper::getResumableScanType(aggExState.getRequest(),
-                                                                 aggExState.hasChangeStream())));
+                getResumableScanType(aggExState.getRequest(), aggExState.hasChangeStream())));
         }
 
         if (aggCatalogState.lockAcquired()) {

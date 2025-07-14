@@ -39,6 +39,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/parsed_distinct_command.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/storage/storage_options.h"

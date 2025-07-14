@@ -194,25 +194,6 @@ void validateRequestFromClusterQueryWithoutShardKey(const AggregateCommandReques
     }
 }
 
-PlanExecutorPipeline::ResumableScanType getResumableScanType(const AggregateCommandRequest& request,
-                                                             bool isChangeStream) {
-    // $changeStream cannot be run on the oplog, and $_requestReshardingResumeToken can only be run
-    // on the oplog. An aggregation request with both should therefore never reach this point.
-    tassert(5353400,
-            "$changeStream can't be combined with _requestReshardingResumeToken: true",
-            !(isChangeStream && request.getRequestReshardingResumeToken()));
-    if (isChangeStream) {
-        return PlanExecutorPipeline::ResumableScanType::kChangeStream;
-    }
-    if (request.getRequestReshardingResumeToken()) {
-        return PlanExecutorPipeline::ResumableScanType::kOplogScan;
-    }
-    if (request.getRequestResumeToken()) {
-        return PlanExecutorPipeline::ResumableScanType::kNaturalOrderScan;
-    }
-    return PlanExecutorPipeline::ResumableScanType::kNone;
-}
-
 const mongo::OptionalBool& getFromRouter(const AggregateCommandRequest& request) {
     // Check both fields because we cannot rely on the feature flag checks. An aggregate command
     // with 'fromRouter' field set could be sent directly to an initial sync node with uninitialized

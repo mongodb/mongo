@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/summation.h"
 
 #include <climits>
 #include <cmath>

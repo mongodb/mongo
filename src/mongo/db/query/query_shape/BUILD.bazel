@@ -38,9 +38,6 @@ mongo_cc_library(
     srcs = [
         "query_shape.cpp",
         "shape_helpers.cpp",
-        "//src/mongo/db/pipeline:aggregation_request_helper.h",
-        "//src/mongo/db/pipeline:plan_executor_pipeline.h",
-        "//src/mongo/db/pipeline:plan_explainer_pipeline.h",
         "//src/mongo/db/query:count_request.h",
         "//src/mongo/db/query:projection_ast_util.h",
     ],

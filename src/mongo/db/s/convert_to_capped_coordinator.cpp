@@ -41,6 +41,7 @@
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
