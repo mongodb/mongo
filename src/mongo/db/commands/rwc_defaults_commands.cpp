@@ -172,8 +172,8 @@ public:
                         getShardsMissingWriteConcernDefinition(opCtx, *optWC);
                     if (!replCoord->validateWriteConcern(*optWC).isOK()) {
                         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-                        const auto configId = shardRegistry->getConfigShard()->getId();
-                        shardsWithMissingWCDefinition.insert(configId);
+                        const auto configShard = shardRegistry->getConfigShard();
+                        shardsWithMissingWCDefinition.insert(configShard->getId());
                     }
                     uassert(
                         ErrorCodes::UnknownReplWriteConcern,
