@@ -479,6 +479,8 @@ tasks:
       - func: "f_expansions_write"
       - func: "monitor process threads"
       - func: "collect system resource info"
+      - func: "enable bazel test report creation"
+      - func: "f_expansions_write"
       - func: "bazel test"
         vars:
           targets: //src/mongo/...
