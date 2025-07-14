@@ -33,7 +33,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/algebra/operator.h"
 #include "mongo/db/query/algebra/polyvalue.h"
-#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/index_entry.h"
 
 #include <map>

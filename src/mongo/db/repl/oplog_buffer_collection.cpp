@@ -45,7 +45,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/write_ops/write_ops_exec.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/storage_interface.h"

@@ -214,6 +214,7 @@ mongo_cc_library(
         "//src/mongo/db/query:sort_pattern",
         "//src/mongo/db/query/algebra",
         "//src/mongo/db/query/collation:collator_interface",
+        "//src/mongo/db/query/compiler/physical_model/index_bounds",
         "//src/mongo/db/query/datetime:date_time_support",
         "//src/mongo/db/query/plan_cache:query_plan_cache",
         "//src/mongo/db/query/search:mongot_cursor",

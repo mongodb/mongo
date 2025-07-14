@@ -34,8 +34,7 @@
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/index/s2_common.h"
-#include "mongo/db/query/index_bounds.h"
-#include "mongo/db/query/index_bounds_builder.h"  // For OrderedIntervalList
+#include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 
 #include <vector>
 

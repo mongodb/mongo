@@ -31,7 +31,7 @@
  * This file contains tests for mongo/db/query/index_bounds.cpp
  */
 
-#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"

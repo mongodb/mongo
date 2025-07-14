@@ -82,6 +82,7 @@ mongo_cc_library(
         "estimates",
         "//src/mongo/db:server_base",
         "//src/mongo/db/query:query_index_bounds",
+        "//src/mongo/db/query/compiler/physical_model/index_bounds",
     ],
 )
 

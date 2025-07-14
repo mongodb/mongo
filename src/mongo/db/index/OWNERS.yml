@@ -51,3 +51,6 @@ filters:
   - "index_descriptor*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "wildcard_access_method*":
+    approvers:
+      - 10gen/query-execution-write-exec

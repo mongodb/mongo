@@ -54,8 +54,8 @@
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
-#include "mongo/db/query/index_bounds.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/util/string_listset.h"
 

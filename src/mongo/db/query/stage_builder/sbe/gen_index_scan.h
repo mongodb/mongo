@@ -34,7 +34,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/index/index_constants.h"
-#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_types.h"

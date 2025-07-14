@@ -31,7 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_bounds_builder_test_fixture.h"
 #include "mongo/db/query/index_entry.h"

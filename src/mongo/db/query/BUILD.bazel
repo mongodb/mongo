@@ -77,19 +77,16 @@ mongo_cc_library(
 mongo_cc_library(
     name = "query_index_bounds",
     srcs = [
-        "index_bounds.cpp",
         "index_entry.cpp",
         "index_tag.cpp",
     ],
     hdrs = [
-        "index_bounds.h",
         "index_entry.h",
         "index_tag.h",
     ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:query_expressions",
-        "//src/mongo/db/query/compiler/physical_model/interval",
     ],
 )
 
@@ -465,6 +462,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db/geo:geometry",
         "//src/mongo/db/index:expression_params",
+        "//src/mongo/db/query/compiler/physical_model/index_bounds",
         "//src/third_party/s2",
     ],
 )
@@ -527,6 +525,7 @@ mongo_cc_library(
         "//src/mongo/db/commands:server_status_core",
         "//src/mongo/db/query/ce/exact:exact_cardinality_interface",
         "//src/mongo/db/query/collation:collator_factory_icu",
+        "//src/mongo/db/query/compiler/physical_model/index_bounds",
         "//src/mongo/db/query/cost_based_ranker:cardinality_estimator",
         "//src/mongo/db/query/cost_based_ranker:cost_estimator",
         "//src/mongo/db/query/plan_cache:query_plan_cache",
@@ -790,7 +789,6 @@ mongo_cc_unit_test(
         "index_bounds_builder_regex_test.cpp",
         "index_bounds_builder_test.cpp",
         "index_bounds_builder_type_test.cpp",
-        "index_bounds_test.cpp",
         "index_entry_test.cpp",
         "index_hint_test.cpp",
     ],
@@ -801,6 +799,7 @@ mongo_cc_unit_test(
         ":query_index_bounds",
         "//src/mongo/db/query:index_bounds_builder_test_fixture",
         "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/db/query/compiler/physical_model/index_bounds",
         "//src/third_party/s2",
     ],
 )

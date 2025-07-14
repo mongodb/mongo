@@ -33,6 +33,7 @@ mongo_cc_library(
     deps = [
         ":histogram_common",
         "//src/mongo/db/query:query_index_bounds",
+        "//src/mongo/db/query/compiler/physical_model/index_bounds",
         "//src/mongo/db/query/cost_based_ranker:estimates",
         "//src/mongo/db/query/stats:stats_histograms",
     ],

@@ -36,7 +36,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
-#include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/util/assert_util.h"
 

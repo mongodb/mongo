@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/bson/bsonobjbuilder.h"
