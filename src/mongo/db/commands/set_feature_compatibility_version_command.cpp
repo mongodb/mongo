@@ -154,6 +154,7 @@ MONGO_FAIL_POINT_DEFINE(failAfterSendingShardsToDowngradingOrUpgrading);
 MONGO_FAIL_POINT_DEFINE(automaticallyCollmodToRecordIdsReplicatedFalse);
 MONGO_FAIL_POINT_DEFINE(setFCVPauseAfterReadingConfigDropPedingDBs);
 MONGO_FAIL_POINT_DEFINE(failDowngradeValidationDueToIncompatibleFeature);
+MONGO_FAIL_POINT_DEFINE(failUpgradeValidationDueToIncompatibleFeature);
 
 /**
  * Ensures that only one instance of setFeatureCompatibilityVersion can run at a given time.
@@ -532,8 +533,10 @@ public:
             // is already in the requestedVersion (i.e. requestedVersion == actualVersion). However,
             // the cluster should retry/complete the tasks from _finalize* before sending ok:1
             // back to the user/client. Therefore, these tasks **must** be idempotent/retryable.
-            _finalizeUpgrade(opCtx, requestedVersion);
-            _finalizeDowngrade(opCtx, requestedVersion);
+            if (!isDryRun) {
+                _finalizeUpgrade(opCtx, requestedVersion);
+                _finalizeDowngrade(opCtx, requestedVersion);
+            }
             return true;
         }
 
@@ -568,15 +571,7 @@ public:
                 request.getPhase() || (!role || !role->hasExclusively(ClusterRole::ShardServer)));
 
         if (isDryRun) {
-            LOGV2(10684100,
-                  "Executing dry-run for FCV downgrade validation",
-                  "requestedVersion"_attr = requestedVersion);
-
-            _userCollectionsUassertsForDowngrade(opCtx, requestedVersion, actualVersion);
-
-            LOGV2(10684101,
-                  "Dry-run for FCV downgrade completed successfully",
-                  "requestedVersion"_attr = requestedVersion);
+            processDryRun(opCtx, request, requestedVersion, actualVersion);
             return true;
         }
 
@@ -941,6 +936,27 @@ private:
         }
     }
 
+    // This helper function is for any validation in user collections to ensure compatibility with
+    // the requested FCV before an upgrade. This function must not modify any user data or system
+    // state; it only performs precondition checks. Any validation failure would result in transient
+    // errors that can be retried (like InterruptedDueToReplStateChange) or an
+    // ErrorCode::CannotUpgrade, which requires manual cleanup of user data before retrying the
+    // upgrade.  The code added/modified in this helper function should not leave the server in an
+    // inconsistent state if the actions in this function failed part way through. The code in this
+    // helper function is required to be idempotent in case the node crashes or upgrade fails in a
+    // way that the user has to run setFCV again.
+    void _userCollectionsUassertsForUpgrade(OperationContext* opCtx,
+                                            const FCV requestedVersion,
+                                            const FCV originalVersion) {
+
+        auto role = ShardingState::get(opCtx)->pollClusterRole();
+
+        if (MONGO_unlikely(failUpgradeValidationDueToIncompatibleFeature.shouldFail())) {
+            uasserted(ErrorCodes::CannotUpgrade,
+                      "Simulated dry-run validation failure via fail point.");
+        }
+    }
+
     // This helper function is for any user collections uasserts, creations, or deletions that need
     // to happen during the upgrade. It is required that the code in this helper function is
     // idempotent and could be done after _runDowngrade even if it failed at any point in the middle
@@ -1089,6 +1105,14 @@ private:
             //     assumption and will finish before upgrade procedures begin right after this.
             Lock::GlobalLock lk(opCtx, MODE_S);
         }
+
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        invariant(fcvSnapshot.isUpgradingOrDowngrading());
+        const auto originalVersion = getTransitionFCVInfo(fcvSnapshot.getVersion()).from;
+        const auto requestedVersion = request.getCommandParameter();
+
+        _userCollectionsUassertsForUpgrade(opCtx, requestedVersion, originalVersion);
+
         auto role = ShardingState::get(opCtx)->pollClusterRole();
 
         // This helper function is for any user collections uasserts, creations, or deletions that
@@ -1096,19 +1120,12 @@ private:
         // is idempotent and could be done after _runDowngrade even if it failed at any point in the
         // middle of _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
         if (!role || role->has(ClusterRole::None) || role->has(ClusterRole::ShardServer)) {
-            const auto requestedVersion = request.getCommandParameter();
             _userCollectionsWorkForUpgrade(opCtx, requestedVersion);
         }
 
         // Run the authoritative clone phase on ALL shards (including the config
         // server if it's also a shard).
         if (role && role->has(ClusterRole::ConfigServer)) {
-            const auto requestedVersion = request.getCommandParameter();
-            const auto originalVersion =
-                getTransitionFCVInfo(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion())
-                    .from;
-
             if (feature_flags::gShardAuthoritativeDbMetadataDDL
                     .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
                                                                   originalVersion)) {
@@ -1872,6 +1889,27 @@ private:
                         << ex.reason());
             }
         }
+    }
+
+    void processDryRun(OperationContext* opCtx,
+                       const SetFeatureCompatibilityVersion& request,
+                       FCV requestedVersion,
+                       FCV actualVersion) {
+        LOGV2(10710700,
+              "Executing dry-run validation of setFeatureCompatibilityVersion command",
+              "requestedVersion"_attr = requestedVersion,
+              "actualVersion"_attr = actualVersion);
+
+        if (requestedVersion > actualVersion) {
+            _userCollectionsUassertsForUpgrade(opCtx, requestedVersion, actualVersion);
+        } else if (requestedVersion < actualVersion) {
+            _userCollectionsUassertsForDowngrade(opCtx, requestedVersion, actualVersion);
+        }
+
+        LOGV2(10710701,
+              "Dry-run validation of setFeatureCompatibilityVersion command completed successfully",
+              "requestedVersion"_attr = requestedVersion,
+              "actualVersion"_attr = actualVersion);
     }
 };
 MONGO_REGISTER_COMMAND(SetFeatureCompatibilityVersionCommand).forShard();

@@ -385,6 +385,10 @@ in the helper functions:
 - `_prepareToUpgradeActions`: for any upgrade actions that should be done before taking the global
   lock in S mode. It is required that the code in this helper function is
   idempotent and could be done after `_runDowngrade` even if `_runDowngrade` failed at any point.
+- `_userCollectionsUassertsForUpgrade`: for any checks on user data or settings that will uassert
+  with the `CannotUpgrade` code if users need to manually clean up user data or settings. It must
+  not modify any user data or system state. It only checks preconditions for upgrades and fails
+  if they are unmet.
 - `_userCollectionsWorkForUpgrade`: for any user collections uasserts (with the `CannotUpgrade` error code),
   creations, or deletions that need to happen during the upgrade. This happens after the global lock.
   It is required that the code in this helper function is idempotent and could be
