@@ -3555,7 +3555,14 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
     LOGV2(6015313, "Replication config state is Steady, starting reconfig");
     invariant(_rsConfig.unsafePeek().isInitialized());
 
-    if (!force && !_readWriteAbility->canAcceptNonLocalWrites(lk) && !skipSafetyChecks) {
+    if (!force &&
+        (!_readWriteAbility->canAcceptNonLocalWrites(lk) || _pendingTermUpdateDuringStepDown) &&
+        !skipSafetyChecks) {
+        if (_pendingTermUpdateDuringStepDown) {
+            return Status(ErrorCodes::NotWritablePrimary,
+                          str::stream()
+                              << "Safe reconfig rejected due to detected pending stepdown");
+        }
         return Status(
             ErrorCodes::NotWritablePrimary,
             str::stream()
