@@ -89,7 +89,7 @@ export default [
                 QueryHelpers: true,
                 ___it___: true,
 
-                // src/mongo/shell/servers.d.ts
+                // src/mongo/shell/servers_global.js
                 MongoRunner: true,
                 myPort: true,
                 runMongoProgram: true,

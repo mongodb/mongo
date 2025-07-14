@@ -162,6 +162,7 @@ extern const JSFile data_consistency_checker_global;
 extern const JSFile feature_compatibility_version;
 extern const JSFile feature_compatibility_version_global;
 extern const JSFile servers;
+extern const JSFile servers_global;
 extern const JSFile servers_misc;
 extern const JSFile servers_misc_global;
 }  // namespace JSFiles
@@ -1235,16 +1236,15 @@ void initScope(Scope& scope) {
     scope.execSetup(JSFiles::bridge);
     scope.execSetup(JSFiles::data_consistency_checker);
     scope.execSetup(JSFiles::feature_compatibility_version);
+    scope.execSetup(JSFiles::servers);
     scope.execSetup(JSFiles::servers_misc);
 
     // globals
     scope.execSetup(JSFiles::bridge_global);
     scope.execSetup(JSFiles::data_consistency_checker_global);
     scope.execSetup(JSFiles::feature_compatibility_version_global);
+    scope.execSetup(JSFiles::servers_global);
     scope.execSetup(JSFiles::servers_misc_global);
-
-    // scripts
-    scope.execSetup(JSFiles::servers);
 
     initializeEnterpriseScope(scope);
 

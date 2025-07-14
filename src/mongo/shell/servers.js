@@ -1,9 +1,6 @@
 var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoProgramNoConnect,
     myPort;
 
-(function() {
-"use strict";
-
 const SIGTERM = 15;
 
 var shellVersion = version;
@@ -1788,4 +1785,11 @@ myPort = function() {
 
     return 27017;
 };
-}());
+
+export {
+    MongoRunner,
+    myPort,
+    runMongoProgram,
+    startMongoProgram,
+    startMongoProgramNoConnect,
+};

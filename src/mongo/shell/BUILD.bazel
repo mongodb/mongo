@@ -322,6 +322,7 @@ MONGO_SERVER_CPP_JS_FILES = [
     "feature_compatibility_version_global.js",
     "keyvault.js",
     "servers.js",
+    "servers_global.js",
     "servers_misc.js",
     "servers_misc_global.js",
 ]
