@@ -1,4 +1,4 @@
-ToolTest = function(name, extraOptions) {
+function ToolTest(name, extraOptions) {
     this.name = name;
     this.options = extraOptions;
     this.port = allocatePort();
@@ -62,33 +62,18 @@ ToolTest.prototype.runTool = function() {
     return runMongoProgram.apply(null, a);
 };
 
-/**
- * Returns a port number that has not been given out to any other caller from the same mongo shell.
- */
-var allocatePort;
-
-/**
- * Resets the range of ports which have already been given out to callers of allocatePort().
- *
- * This function can be used to allow a test to allocate a large number of ports as part of starting
- * many MongoDB deployments without worrying about hitting the configured maximum. Callers of this
- * function should take care to ensure MongoDB deployments started earlier have been terminated and
- * won't be reused.
- */
-var resetAllocatedPorts;
-
 var uncheckedParallelShellPids;
 
-var startParallelShell;
-
-(function() {
 // Defer initializing these variables until the first call, as TestData attributes may be
 // initialized as part of the --eval argument (e.g. by resmoke.py), which will not be evaluated
 // until after this has loaded.
 var maxPort;
 var nextPort;
 
-allocatePort = function() {
+/**
+ * Returns a port number that has not been given out to any other caller from the same mongo shell.
+ */
+function allocatePort() {
     // The default port was chosen in an attempt to have a large number of unassigned ports that
     // are also outside the ephemeral port range.
     nextPort = nextPort || jsTestOptions().minPort || 20000;
@@ -100,17 +85,25 @@ allocatePort = function() {
     return nextPort++;
 };
 
-resetAllocatedPorts = function() {
+/**
+ * Resets the range of ports which have already been given out to callers of allocatePort().
+ *
+ * This function can be used to allow a test to allocate a large number of ports as part of starting
+ * many MongoDB deployments without worrying about hitting the configured maximum. Callers of this
+ * function should take care to ensure MongoDB deployments started earlier have been terminated and
+ * won't be reused.
+ */
+function resetAllocatedPorts() {
     jsTest.log("Resetting the range of allocated ports");
     maxPort = nextPort = undefined;
 };
 
 var parallelShellPids = [];
-uncheckedParallelShellPidsString = function() {
+function uncheckedParallelShellPidsString() {
     return parallelShellPids.join(", ");
 };
 
-startParallelShell = function(jsCode, port, noConnect, ...optionArgs) {
+function startParallelShell(jsCode, port, noConnect, ...optionArgs) {
     var shellPath = MongoRunner.getMongoShellPath();
     var args = [shellPath];
 
@@ -189,13 +182,12 @@ startParallelShell = function(jsCode, port, noConnect, ...optionArgs) {
         return exitCode;
     };
 };
-})();
 
 /**
  * Returns a list of 'numPorts' port numbers that have not been given out to any other caller from
  * the same mongo shell.
  */
-allocatePorts = function(numPorts) {
+function allocatePorts(numPorts) {
     var ports = [];
     for (var i = 0; i < numPorts; i++) {
         ports.push(allocatePort());
@@ -205,3 +197,13 @@ allocatePorts = function(numPorts) {
 };
 
 var testingReplication = false;
+
+export {
+    ToolTest,
+    allocatePort,
+    allocatePorts,
+    resetAllocatedPorts,
+    startParallelShell,
+    testingReplication,
+    uncheckedParallelShellPidsString,
+};

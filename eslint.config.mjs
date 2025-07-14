@@ -96,7 +96,7 @@ export default [
                 startMongoProgram: true,
                 startMongoProgramNoConnect: true,
 
-                // src/mongo/shell/servers_misc.d.ts
+                // src/mongo/shell/servers_misc_global.js
                 ToolTest: true,
                 allocatePort: true,
                 allocatePorts: true,

@@ -323,6 +323,7 @@ MONGO_SERVER_CPP_JS_FILES = [
     "keyvault.js",
     "servers.js",
     "servers_misc.js",
+    "servers_misc_global.js",
 ]
 
 render_template(
