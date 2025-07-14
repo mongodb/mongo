@@ -747,6 +747,7 @@ void ShardServerOpObserver::onStartIndexBuild(OperationContext* opCtx,
                                               const UUID& collUUID,
                                               const UUID& indexBuildUUID,
                                               const std::vector<BSONObj>& indexes,
+                                              const std::vector<std::string>& idents,
                                               bool fromMigrate) {
     // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
     if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {

@@ -179,7 +179,7 @@ protected:
         if (shouldSucceed) {
             try {
                 opObserver.onCreateIndex(opCtx, nss, uuid, BSONObj(), "", false);
-                opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, false);
+                opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, {}, false);
                 opObserver.onStartIndexBuildSinglePhase(opCtx, nss);
                 opObserver.onCreateCollection(
                     opCtx, nss, {}, BSONObj(), OplogSlot(), boost::none, false);
@@ -232,7 +232,7 @@ protected:
         } else {
             ASSERT_THROWS(opObserver.onCreateIndex(opCtx, nss, uuid, BSONObj(), "", false),
                           AssertionException);
-            ASSERT_THROWS(opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, false),
+            ASSERT_THROWS(opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, {}, false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onStartIndexBuildSinglePhase(opCtx, nss), AssertionException);
             ASSERT_THROWS(opObserver.onCreateCollection(

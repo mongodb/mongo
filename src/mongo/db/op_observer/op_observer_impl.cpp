@@ -370,6 +370,7 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
                                        const UUID& collUUID,
                                        const UUID& indexBuildUUID,
                                        const std::vector<BSONObj>& indexes,
+                                       const std::vector<std::string>& idents,
                                        bool fromMigrate) {
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
@@ -386,13 +387,20 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
     }
     indexesArr.done();
 
+    BSONArrayBuilder identsArr;
+    for (auto&& ident : idents) {
+        identsArr.append(ident);
+    }
+
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-
     oplogEntry.setTid(nss.tenantId());
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setUuid(collUUID);
     oplogEntry.setObject(oplogEntryBuilder.done());
+    if (shouldReplicateLocalCatalogIdentifers(opCtx)) {
+        oplogEntry.setObject2(BSON("idents" << identsArr.arr()));
+    }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
     logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _operationLogger.get());
 }

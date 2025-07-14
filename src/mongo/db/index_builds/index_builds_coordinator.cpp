@@ -2461,6 +2461,7 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
                 replState->collectionUUID,
                 replState->buildUUID,
                 replState->indexSpecs,
+                replState->indexIdents,
                 false /* fromMigrate */);
         };
     } else {

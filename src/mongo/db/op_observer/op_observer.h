@@ -210,6 +210,7 @@ public:
                                    const UUID& collUUID,
                                    const UUID& indexBuildUUID,
                                    const std::vector<BSONObj>& indexes,
+                                   const std::vector<std::string>& idents,
                                    bool fromMigrate) = 0;
 
     virtual void onStartIndexBuildSinglePhase(OperationContext* opCtx,

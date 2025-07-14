@@ -174,6 +174,7 @@ void UserWriteBlockModeOpObserver::onStartIndexBuild(OperationContext* opCtx,
                                                      const UUID& collUUID,
                                                      const UUID& indexBuildUUID,
                                                      const std::vector<BSONObj>& indexes,
+                                                     const std::vector<std::string>& idents,
                                                      bool fromMigrate) {
     _checkWriteAllowed(opCtx, nss);
 }

@@ -147,10 +147,12 @@ public:
                            const UUID& collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
+                           const std::vector<std::string>& idents,
                            bool fromMigrate) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {
-            o->onStartIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate);
+            o->onStartIndexBuild(
+                opCtx, nss, collUUID, indexBuildUUID, indexes, idents, fromMigrate);
         }
     }
 

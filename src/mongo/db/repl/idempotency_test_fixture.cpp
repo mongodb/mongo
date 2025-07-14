@@ -239,23 +239,12 @@ OplogEntry IdempotencyTest::update(IdType _id, const BSONObj& obj) {
 OplogEntry IdempotencyTest::buildIndex(const BSONObj& indexSpec,
                                        const BSONObj& options,
                                        const UUID& uuid) {
-    BSONObjBuilder spec;
-    spec.append("v", 2);
-    spec.append("key", indexSpec);
-    spec.append("name", std::string(indexSpec.firstElementFieldName()) + "_index");
-    spec.appendElementsUnique(options);
-
-    BSONObjBuilder bob;
-    bob.append("createIndexes", _nss.coll());
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (fcvSnapshot.isVersionInitialized() &&
-        mongo::feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabled(
-            VersionContext::getDecoration(_opCtx.get()), fcvSnapshot)) {
-        bob.append("spec", spec.obj());
-    } else {
-        bob.appendElements(spec.obj());
-    }
-    return makeCommandOplogEntry(nextOpTime(), _nss, bob.obj(), boost::none /* object2 */, uuid);
+    return makeCreateIndexOplogEntry(nextOpTime(),
+                                     _nss,
+                                     fmt::format("{}_index", indexSpec.firstElementFieldName()),
+                                     indexSpec,
+                                     uuid,
+                                     options);
 }
 
 OplogEntry IdempotencyTest::dropIndex(const std::string& indexName, const UUID& uuid) {

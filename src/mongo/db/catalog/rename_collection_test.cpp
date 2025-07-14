@@ -109,6 +109,7 @@ public:
                            const UUID& collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
+                           const std::vector<std::string>& idents,
                            bool fromMigrate) override;
 
     void onCommitIndexBuild(OperationContext* opCtx,
@@ -212,9 +213,11 @@ void OpObserverMock::onStartIndexBuild(OperationContext* opCtx,
                                        const UUID& collUUID,
                                        const UUID& indexBuildUUID,
                                        const std::vector<BSONObj>& indexes,
+                                       const std::vector<std::string>& idents,
                                        bool fromMigrate) {
     _logOp(opCtx, nss, "startIndex");
-    OpObserverNoop::onStartIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate);
+    OpObserverNoop::onStartIndexBuild(
+        opCtx, nss, collUUID, indexBuildUUID, indexes, idents, fromMigrate);
 }
 
 void OpObserverMock::onCommitIndexBuild(OperationContext* opCtx,

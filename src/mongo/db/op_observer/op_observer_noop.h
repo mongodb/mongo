@@ -57,6 +57,7 @@ public:
                            const UUID& collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
+                           const std::vector<std::string>& idents,
                            bool fromMigrate) override {}
 
     void onStartIndexBuildSinglePhase(OperationContext* opCtx,

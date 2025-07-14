@@ -211,7 +211,8 @@ TEST_F(IndexBuildsCoordinatorTest, ForegroundIndexOptionsConflictRelax) {
 
 class OpObserverMock : public OpObserverNoop {
 public:
-    boost::optional<std::string> createIndexIdent;
+    std::vector<std::string> createIndexIdents;
+    std::vector<std::string> startIndexBuildIdents;
 
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
@@ -219,16 +220,31 @@ public:
                        BSONObj indexDoc,
                        StringData ident,
                        bool fromMigrate) override {
-        createIndexIdent.emplace(ident);
+        createIndexIdents.emplace_back(ident);
+    }
+
+    void onStartIndexBuild(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           const UUID& collUUID,
+                           const UUID& indexBuildUUID,
+                           const std::vector<BSONObj>& indexes,
+                           const std::vector<std::string>& idents,
+                           bool fromMigrate) override {
+        startIndexBuildIdents = idents;
+    }
+
+    static OpObserverMock* install(OperationContext* opCtx) {
+        auto opObserverRegistry =
+            dynamic_cast<OpObserverRegistry*>(opCtx->getServiceContext()->getOpObserver());
+        auto mockObserver = std::make_unique<OpObserverMock>();
+        auto opObserver = mockObserver.get();
+        opObserverRegistry->addObserver(std::move(mockObserver));
+        return opObserver;
     }
 };
 
 TEST_F(IndexBuildsCoordinatorTest, CreateIndexOnEmptyCollectionReplicatesIdent) {
-    auto opObserverRegistry =
-        dynamic_cast<OpObserverRegistry*>(operationContext()->getServiceContext()->getOpObserver());
-    auto mockObserver = std::make_unique<OpObserverMock>();
-    auto opObserver = mockObserver.get();
-    opObserverRegistry->addObserver(std::move(mockObserver));
+    auto opObserver = OpObserverMock::install(operationContext());
 
     const auto nss = NamespaceString::createNamespaceString_forTest(
         "IndexBuildsCoordinatorTest.CreateIndexOnEmptyCollectionReplicatesIdent");
@@ -248,17 +264,13 @@ TEST_F(IndexBuildsCoordinatorTest, CreateIndexOnEmptyCollectionReplicatesIdent) 
 
     // Verify that the op observer was called and that it was given the correct ident
     AutoGetCollection autoColl(operationContext(), nss, MODE_X);
-    ASSERT(opObserver->createIndexIdent);
+    ASSERT_EQ(opObserver->createIndexIdents.size(), 1);
     ASSERT(autoColl->getIndexCatalog()->findIndexByIdent(operationContext(),
-                                                         *opObserver->createIndexIdent));
+                                                         opObserver->createIndexIdents[0]));
 }
 
 TEST_F(IndexBuildsCoordinatorTest, CreateIndexOnNonEmptyCollectionReplicatesIdent) {
-    auto opObserverRegistry =
-        dynamic_cast<OpObserverRegistry*>(operationContext()->getServiceContext()->getOpObserver());
-    auto mockObserver = std::make_unique<OpObserverMock>();
-    auto opObserver = mockObserver.get();
-    opObserverRegistry->addObserver(std::move(mockObserver));
+    auto opObserver = OpObserverMock::install(operationContext());
 
     const auto nss = NamespaceString::createNamespaceString_forTest(
         "IndexBuildsCoordinatorTest.CreateIndexOnEmptyCollectionReplicatesIdent");
@@ -281,9 +293,97 @@ TEST_F(IndexBuildsCoordinatorTest, CreateIndexOnNonEmptyCollectionReplicatesIden
 
     // Verify that the op observer was called and that it was given the correct ident
     AutoGetCollection autoColl(operationContext(), nss, MODE_X);
-    ASSERT(opObserver->createIndexIdent);
+    ASSERT_EQ(opObserver->createIndexIdents.size(), 1);
     ASSERT(autoColl->getIndexCatalog()->findIndexByIdent(operationContext(),
-                                                         *opObserver->createIndexIdent));
+                                                         opObserver->createIndexIdents[0]));
+}
+
+TEST_F(IndexBuildsCoordinatorTest, StartIndexBuildOnEmptyCollectionReplicatesAsCreateIndex) {
+    auto opObserver = OpObserverMock::install(operationContext());
+
+    const auto nss = NamespaceString::createNamespaceString_forTest(
+        "IndexBuildsCoordinatorTest.CreateIndexOnEmptyCollectionReplicatesIdent");
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, CollectionOptions()));
+
+    std::vector<BSONObj> specs = {BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
+                                  BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1")};
+    std::vector<std::string> idents = {"index-1", "index-2"};
+
+    {
+        AutoGetCollection autoColl(operationContext(), nss, MODE_X);
+        auto indexBuildsCoord = IndexBuildsCoordinator::get(operationContext());
+        auto status = indexBuildsCoord->startIndexBuild(operationContext(),
+                                                        nss.dbName(),
+                                                        autoColl->uuid(),
+                                                        specs,
+                                                        idents,
+                                                        UUID::gen(),
+                                                        IndexBuildProtocol::kTwoPhase,
+                                                        {});
+        ASSERT_OK(status);
+        status.getValue().wait();
+    }
+
+    // Verify that the op observer was called, that it was given the expected idents, and that the
+    // specified idents were actually used. Since the collection was empty, onCreateIndex() was
+    // called instead of onStartIndexBuild.
+    AutoGetCollection autoColl(operationContext(), nss, MODE_X);
+    ASSERT_EQ(opObserver->createIndexIdents, idents);
+    ASSERT(autoColl->getIndexCatalog()->findIndexByIdent(operationContext(),
+                                                         opObserver->createIndexIdents[0]));
+    ASSERT(autoColl->getIndexCatalog()->findIndexByIdent(operationContext(),
+                                                         opObserver->createIndexIdents[1]));
+}
+
+TEST_F(IndexBuildsCoordinatorTest, StartIndexBuildOnNonEmptyCollectionReplicatesIdents) {
+    auto opObserver = OpObserverMock::install(operationContext());
+
+    const auto nss = NamespaceString::createNamespaceString_forTest(
+        "IndexBuildsCoordinatorTest.CreateIndexOnEmptyCollectionReplicatesIdent");
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, CollectionOptions()));
+    ASSERT_OK(storageInterface()->createCollection(
+        operationContext(), NamespaceString::kIndexBuildEntryNamespace, CollectionOptions()));
+
+    std::vector<BSONObj> specs = {BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
+                                  BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1")};
+    std::vector<std::string> idents = {"index-1", "index-2"};
+
+    auto collUUID = [&] {
+        AutoGetCollection autoColl(operationContext(), nss, MODE_X);
+
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(collection_internal::insertDocument(
+            operationContext(), *autoColl, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullptr));
+        wuow.commit();
+
+        return autoColl->uuid();
+    }();
+
+    {
+        auto indexBuildsCoord = IndexBuildsCoordinator::get(operationContext());
+        auto buildUUID = UUID::gen();
+        auto buildFuture =
+            unittest::assertGet(indexBuildsCoord->startIndexBuild(operationContext(),
+                                                                  nss.dbName(),
+                                                                  collUUID,
+                                                                  specs,
+                                                                  idents,
+                                                                  buildUUID,
+                                                                  IndexBuildProtocol::kTwoPhase,
+                                                                  {CommitQuorumOptions(1)}));
+        ASSERT_OK(indexBuildsCoord->voteCommitIndexBuild(
+            operationContext(), buildUUID, HostAndPort("test1", 1234)));
+        ASSERT_OK(buildFuture.getNoThrow());
+    }
+
+    // Verify that the op observer was called, that it was given the expected idents, and that the
+    // specified idents were actually used.
+    AutoGetCollection autoColl(operationContext(), nss, MODE_X);
+    ASSERT_EQ(opObserver->startIndexBuildIdents, idents);
+    ASSERT(autoColl->getIndexCatalog()->findIndexByIdent(operationContext(),
+                                                         opObserver->startIndexBuildIdents[0]));
+    ASSERT(autoColl->getIndexCatalog()->findIndexByIdent(operationContext(),
+                                                         opObserver->startIndexBuildIdents[1]));
 }
 
 }  // namespace

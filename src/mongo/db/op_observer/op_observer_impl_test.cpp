@@ -683,8 +683,13 @@ TEST_F(OpObserverTest, StartIndexBuildExpectedOplogEntry) {
     {
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onStartIndexBuild(
-            opCtx.get(), nss, uuid, indexBuildUUID, specs, false /*fromMigrate*/);
+        opObserver.onStartIndexBuild(opCtx.get(),
+                                     nss,
+                                     uuid,
+                                     indexBuildUUID,
+                                     specs,
+                                     {"index-1", "index-2"},
+                                     false /*fromMigrate*/);
         wunit.commit();
     }
 
@@ -5069,7 +5074,7 @@ TEST_F(OpObserverTest, MagicRestoreNoOplog) {
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onStartIndexBuild(
-            opCtx.get(), nss, uuid, indexBuildUUID, specs, false /*fromMigrate*/);
+            opCtx.get(), nss, uuid, indexBuildUUID, specs, {}, false /*fromMigrate*/);
         wunit.commit();
     }
 
@@ -5133,6 +5138,43 @@ TEST_F(OpObserverTest, OnCreateIndexIncludesIndexIdent) {
 
     ASSERT_BSONOBJ_EQ(*entry1.getObject2(), BSON("ident" << "ident1"));
     ASSERT_BSONOBJ_EQ(*entry2.getObject2(), BSON("ident" << "ident2"));
+}
+
+TEST_F(OpObserverTest, OnStartIndexBuildIncludesIndexIdent) {
+    RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
+        "featureFlagReplicateLocalCatalogIdentifiers", true);
+
+    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+    auto opCtx = cc().makeOperationContext();
+
+    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    auto indexSpec = BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
+                              << "a_1");
+
+    {
+        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+        WriteUnitOfWork wunit(opCtx.get());
+        {
+            RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
+                "featureFlagReplicateLocalCatalogIdentifiers", true);
+            opObserver.onStartIndexBuild(
+                opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexSpec}, {"ident1"}, false);
+        }
+        {
+            RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
+                "featureFlagReplicateLocalCatalogIdentifiers", false);
+            opObserver.onStartIndexBuild(
+                opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexSpec}, {"ident2"}, false);
+        }
+        wunit.commit();
+    }
+
+    auto oplogEntries = getNOplogEntries(opCtx.get(), 2);
+    auto entry1 = assertGet(OplogEntry::parse(oplogEntries[0]));
+    auto entry2 = assertGet(OplogEntry::parse(oplogEntries[1]));
+
+    ASSERT_BSONOBJ_EQ(*entry1.getObject2(), BSON("idents" << BSON_ARRAY("ident1")));
+    ASSERT_FALSE(entry2.getObject2());
 }
 
 class OpObserverServerlessTest : public OpObserverTest {
