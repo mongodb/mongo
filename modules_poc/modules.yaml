@@ -1105,6 +1105,13 @@ key_string: # authoritative: @10gen/server-key-string
   files:
     - src/mongo/db/storage/key_string
 
+disagg_storage:
+  meta:
+    slack: disaggregated-storage-mongod
+    jira: RSSD
+  files:
+    - src/mongo/db/disagg_storage
+
 storage_engine_api:
   meta:
     slack: storage-engines-server-integration

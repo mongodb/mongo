@@ -1792,6 +1792,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/concurrency/**/flow_control_ticketholder* @10gen/server-workload-scheduling @svc-auto-approve-bot
 /src/mongo/db/concurrency/**/replication_state_transition_lock_guard* @10gen/server-replication @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/disagg_storage/OWNERS.yml
+/src/mongo/db/disagg_storage/**/* @10gen/server-disagg-storage @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/exec/OWNERS.yml
 /src/mongo/db/exec/**/* @10gen/query-execution-classic @svc-auto-approve-bot
 /src/mongo/db/exec/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-integration-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
