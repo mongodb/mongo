@@ -169,6 +169,8 @@ public:
         return _expirationTime;
     }
 
+    const AuthorizationContract& getAuthorizationContract() const;
+
 protected:
     friend class AuthorizationSessionImplTestHelper;
 

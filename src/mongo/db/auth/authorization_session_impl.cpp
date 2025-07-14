@@ -1094,4 +1094,8 @@ bool AuthorizationSessionImpl::isExpired() const {
     return _expiredUserName.has_value();
 }
 
+const AuthorizationContract& AuthorizationSessionImpl::getAuthorizationContract() const {
+    return _contract;
+}
+
 }  // namespace mongo
