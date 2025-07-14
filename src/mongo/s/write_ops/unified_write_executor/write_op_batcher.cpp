@@ -132,8 +132,8 @@ bool isNewBatchRequired(SimpleWriteBatch& writeBatch,
 void addSingleShardWriteOpToBatch(SimpleWriteBatch& writeBatch,
                                   WriteOp& writeOp,
                                   std::vector<ShardEndpoint>& shardsAffected) {
-    const auto shard = shardsAffected.front();
-    const auto shardName = shard.shardName;
+    const auto& shard = shardsAffected.front();
+    const auto& shardName = shard.shardName;
 
     tassert(10387000,
             "Single shard write type should only target a single shard",
