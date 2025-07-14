@@ -5,7 +5,6 @@
  *   # $listCatalog does not include the tenant prefix in its results.
  *   command_not_supported_in_serverless,
  *   requires_timeseries,
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {

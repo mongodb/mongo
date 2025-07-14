@@ -11,7 +11,6 @@
  *   requires_timeseries,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 
