@@ -41,7 +41,7 @@ SessionScheduler::SessionScheduler(size_t size) : _stop(false), _hasRecordedErro
     }
 }
 
-SessionScheduler::~SessionScheduler() {
+void SessionScheduler::join() {
     {
         // Technically here we don't need to hold the mutex, however the same variable is checked
         // in combination with _tasks.empty(), so although rare, it is possible that we might access
@@ -49,7 +49,10 @@ SessionScheduler::~SessionScheduler() {
         // thread could wake up prematurely and see _tasks.empty() before _stop.load() is visible.
         // This could result in missed wakeups.
         stdx::unique_lock<stdx::mutex> lock(_queueMutex);
-        _stop.store(true);  // Indicate shutdown
+        if (_stop.swap(true)) {
+            // Stop already set; workers have been notified and joined already.
+            return;
+        }
     }
     // Notify all sessions to stop
     _condition.notify_all();
@@ -59,6 +62,10 @@ SessionScheduler::~SessionScheduler() {
             worker.join();
         }
     }
+}
+
+SessionScheduler::~SessionScheduler() {
+    join();
 }
 
 void SessionScheduler::addWorker() {

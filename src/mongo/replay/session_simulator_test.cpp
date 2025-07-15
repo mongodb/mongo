@@ -56,6 +56,11 @@ public:
         sleepHook(duration);
     }
 
+    ~TestSessionSimulator() override {
+        // Halt all worker threads, before mock functions are destroyed.
+        shutdown();
+    }
+
     mutable MiniMockFunction<std::chrono::steady_clock::time_point> nowHook{"now"};
     mutable MiniMockFunction<void, std::chrono::steady_clock::duration> sleepHook{"sleepFor"};
 };
@@ -73,7 +78,10 @@ auto operator+(const MongoDur& mongoDuration,
 TEST(SessionSimulatorTest, TestSimpleCommandNoWait) {
 
     BSONObj filter = BSON("name" << "Alice");
-    BSONObj findCommand = BSON("find" << "test" << "$db" << "test" << "filter" << filter);
+    BSONObj findCommand = BSON("find" << "test"
+                                      << "$db"
+                                      << "test"
+                                      << "filter" << filter);
     std::string jsonStr = R"([{
     "_id": "681cb423980b72695075137f",
     "name": "Alice",
@@ -114,7 +122,10 @@ TEST(SessionSimulatorTest, TestSimpleCommandNoWait) {
 TEST(SessionSimulatorTest, TestSimpleCommandWait) {
 
     BSONObj filter = BSON("name" << "Alice");
-    BSONObj findCommand = BSON("find" << "test" << "$db" << "test" << "filter" << filter);
+    BSONObj findCommand = BSON("find" << "test"
+                                      << "$db"
+                                      << "test"
+                                      << "filter" << filter);
     std::string jsonStr = R"([{
     "_id": "681cb423980b72695075137f",
     "name": "Alice",
@@ -168,7 +179,10 @@ TEST(SessionSimulatorTest, TestSimpleCommandNoWaitTimeInThePast) {
 
     // Simulate a real scenario where time is in the past. No wait should happen.
     BSONObj filter = BSON("name" << "Alice");
-    BSONObj findCommand = BSON("find" << "test" << "$db" << "test" << "filter" << filter);
+    BSONObj findCommand = BSON("find" << "test"
+                                      << "$db"
+                                      << "test"
+                                      << "filter" << filter);
     std::string jsonStr = R"([{
     "_id": "681cb423980b72695075137f",
     "name": "Alice",

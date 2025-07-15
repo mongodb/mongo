@@ -75,6 +75,15 @@ public:
     void stop(const Date_t& sessionEnd);
     void run(const ReplayCommand&, const Date_t& commandTimeStamp) const;
 
+protected:
+    /**
+     * Halt all work, and join any spawned threads.
+     *
+     * Optional, only required if simulator must be halted before destruction.
+     * (e.g., subclass needs to halt threads before destruction).
+     */
+    void shutdown();
+
 private:
     virtual std::chrono::steady_clock::time_point now() const;
     virtual void sleepFor(std::chrono::steady_clock::duration duration) const;

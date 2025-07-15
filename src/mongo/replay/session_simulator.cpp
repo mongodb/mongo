@@ -65,6 +65,10 @@ SessionSimulator::SessionSimulator()
 
 SessionSimulator::~SessionSimulator() {}
 
+void SessionSimulator::shutdown() {
+    _sessionScheduler->join();
+}
+
 void SessionSimulator::start(StringData uri,
                              std::chrono::steady_clock::time_point replayStartTime,
                              const Date_t& recordStartTime,
@@ -73,7 +77,7 @@ void SessionSimulator::start(StringData uri,
     // read member variables, because there is only one thread. Beware about spawning multiple
     // threads. Order of commands can be different than the ones recorded and a mutex must be used
     // for supporting multiple threads.
-    auto f = [this, uri, replayStartTime, recordStartTime, eventTimestamp]() {
+    auto f = [this, uri = std::string(uri), replayStartTime, recordStartTime, eventTimestamp]() {
         _replayStartTime = replayStartTime;
         _recordStartTime = recordStartTime;
         // wait if simulation and recording start time have diverged.

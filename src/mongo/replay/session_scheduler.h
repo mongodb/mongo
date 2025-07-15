@@ -58,6 +58,8 @@ public:
     SessionScheduler(size_t size = 1);
     ~SessionScheduler();
 
+    void join();
+
     /** Add more command executors in case simple scheduling is not enough */
     void addSession();
 
