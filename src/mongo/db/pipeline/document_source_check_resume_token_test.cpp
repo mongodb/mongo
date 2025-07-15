@@ -228,7 +228,7 @@ private:
  */
 class DocumentSourceChangeStreamMock : public DocumentSourceMock {
 public:
-    // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     DocumentSourceChangeStreamMock(const boost::intrusive_ptr<ExpressionContextForTest>& expCtx)
         : DocumentSourceMock({}, expCtx),
           _collectionPtr(CollectionPtr::CollectionPtr_UNSAFE(&_collection)) {

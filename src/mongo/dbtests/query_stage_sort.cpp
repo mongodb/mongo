@@ -300,14 +300,14 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
+        CollectionPtr coll =
+            CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
+                &_opCtx, nss(), boost::none));
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            // TODO(SERVER-103409): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            coll = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(&_opCtx, nss()));
+            db->createCollection(&_opCtx, nss());
+            coll = CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
+                &_opCtx, nss(), boost::none));
             wuow.commit();
         }
 
@@ -326,14 +326,14 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
+        CollectionPtr coll =
+            CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
+                &_opCtx, nss(), boost::none));
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            // TODO(SERVER-103409): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            coll = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(&_opCtx, nss()));
+            db->createCollection(&_opCtx, nss());
+            coll = CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
+                &_opCtx, nss(), boost::none));
             wuow.commit();
         }
 
@@ -361,14 +361,14 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
+        CollectionPtr coll =
+            CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
+                &_opCtx, nss(), boost::none));
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            // TODO(SERVER-103409): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            coll = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(&_opCtx, nss()));
+            db->createCollection(&_opCtx, nss());
+            coll = CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
+                &_opCtx, nss(), boost::none));
             wuow.commit();
         }
 
@@ -390,14 +390,14 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
+        CollectionPtr coll =
+            CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
+                &_opCtx, nss(), boost::none));
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            // TODO(SERVER-103409): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            coll = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(&_opCtx, nss()));
+            db->createCollection(&_opCtx, nss());
+            coll = CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
+                &_opCtx, nss(), boost::none));
             wuow.commit();
         }
         coll.makeYieldable(&_opCtx, LockedCollectionYieldRestore(&_opCtx, coll));
@@ -525,14 +525,14 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
+        CollectionPtr coll =
+            CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
+                &_opCtx, nss(), boost::none));
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            // TODO(SERVER-103409): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            coll = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(&_opCtx, nss()));
+            db->createCollection(&_opCtx, nss());
+            coll = CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
+                &_opCtx, nss(), boost::none));
             wuow.commit();
         }
         coll.makeYieldable(&_opCtx, LockedCollectionYieldRestore(&_opCtx, coll));
@@ -636,14 +636,14 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
+        CollectionPtr coll =
+            CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
+                &_opCtx, nss(), boost::none));
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            // TODO(SERVER-103409): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            coll = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(&_opCtx, nss()));
+            db->createCollection(&_opCtx, nss());
+            coll = CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
+                &_opCtx, nss(), boost::none));
             wuow.commit();
         }
         coll.makeYieldable(&_opCtx, LockedCollectionYieldRestore(&_opCtx, coll));

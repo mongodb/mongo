@@ -214,7 +214,7 @@ public:
 
 private:
     void _refreshCollection() {
-        // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
         _coll = CollectionPtr::CollectionPtr_UNSAFE(
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss));
     }

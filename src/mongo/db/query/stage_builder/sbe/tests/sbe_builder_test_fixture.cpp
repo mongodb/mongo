@@ -80,7 +80,7 @@ SbeStageBuilderTestFixture::buildPlanStage(std::unique_ptr<QuerySolution> queryS
     }
 
     CollectionMock coll(_nss);
-    // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     CollectionPtr collPtr = CollectionPtr::CollectionPtr_UNSAFE(&coll);
     if (param.shardFilterInterface) {
         auto shardFilterer = param.shardFilterInterface->makeShardFilterer(operationContext());

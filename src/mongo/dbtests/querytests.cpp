@@ -157,17 +157,16 @@ public:
         {
             _database = getDbOrCreate(&_opCtx, nss());
             WriteUnitOfWork wunit(&_opCtx);
-            // TODO(SERVER-103409): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            CollectionPtr collection = CollectionPtr::CollectionPtr_UNSAFE(
-                CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
+            CollectionPtr collection =
+                CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
+                    &_opCtx, nss(), boost::none));
             if (collection) {
                 _database->dropCollection(&_opCtx, nss()).transitional_ignore();
             }
-            // TODO(SERVER-103409): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
+            _database->createCollection(&_opCtx, nss());
             collection =
-                CollectionPtr::CollectionPtr_UNSAFE(_database->createCollection(&_opCtx, nss()));
+                CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
+                    &_opCtx, nss(), boost::none));
             wunit.commit();
             _collection = std::move(collection);
         }
@@ -220,8 +219,8 @@ protected:
             wunit.commit();
         }
         abortOnExit.dismiss();
-        // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        _collection = CollectionPtr::CollectionPtr_UNSAFE(collection.get().get());
+        _collection = CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
+            &_opCtx, nss(), boost::none));
     }
 
     void insert(const char* s) {
@@ -291,10 +290,10 @@ public:
                 _collection = CollectionPtr();
                 db->dropCollection(&_opCtx, nss()).transitional_ignore();
             }
-            // TODO(SERVER-103409): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            _collection = CollectionPtr::CollectionPtr_UNSAFE(
-                db->createCollection(&_opCtx, nss(), CollectionOptions(), false));
+            db->createCollection(&_opCtx, nss(), CollectionOptions(), false);
+            _collection =
+                CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
+                    &_opCtx, nss(), boost::none));
             wunit.commit();
         }
         ASSERT(_collection);

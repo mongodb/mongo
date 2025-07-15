@@ -99,7 +99,7 @@ public:
             .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *findCommand).build(),
             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
-        // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
         auto coll = CollectionPtr::CollectionPtr_UNSAFE(_collection.get());
         stage_builder::ClassicStageBuilder builder{
             opCtx(), &coll, *cq, *querySolution, workingSet(), &_planStageQsnMap};
