@@ -30,7 +30,7 @@ bool
 __wt_live_restore_migration_in_progress(WT_SESSION_IMPL *session)
 {
     /* If live restore is not enabled then background migration is by definition not in progress. */
-    if (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_LIVE_RESTORE_FS))
+    if (!F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS))
         return (false);
     WTI_LIVE_RESTORE_FS *lr_fs = (WTI_LIVE_RESTORE_FS *)S2C(session)->file_system;
     WTI_LIVE_RESTORE_STATE state = __wti_live_restore_get_state(session, lr_fs);
@@ -100,7 +100,7 @@ __live_restore_get_state_from_file(
      * need this lock as we'll never modify the state.
      */
     WT_CONNECTION_IMPL *conn = S2C(session);
-    if (F_ISSET_ATOMIC_32(conn, WT_CONN_LIVE_RESTORE_FS)) {
+    if (F_ISSET(conn, WT_CONN_LIVE_RESTORE_FS)) {
         WTI_LIVE_RESTORE_FS *lr_fs = (WTI_LIVE_RESTORE_FS *)conn->file_system;
         WT_ASSERT_ALWAYS(session, __wt_spin_owned(session, &lr_fs->state_lock),
           "Live restore state lock not held!");
@@ -273,7 +273,7 @@ int
 __wt_live_restore_get_state_string(WT_SESSION_IMPL *session, WT_ITEM *lr_state_str)
 {
     WT_CONNECTION_IMPL *conn = S2C(session);
-    WT_ASSERT_ALWAYS(session, F_ISSET_ATOMIC_32(conn, WT_CONN_LIVE_RESTORE_FS),
+    WT_ASSERT_ALWAYS(session, F_ISSET(conn, WT_CONN_LIVE_RESTORE_FS),
       "Can't fetch state string when live restore is not enabled!");
 
     WTI_LIVE_RESTORE_FS *lr_fs = (WTI_LIVE_RESTORE_FS *)conn->file_system;
@@ -482,7 +482,7 @@ __wt_live_restore_validate_non_lr_system(WT_SESSION_IMPL *session)
 void
 __wt_live_restore_init_stats(WT_SESSION_IMPL *session)
 {
-    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_LIVE_RESTORE_FS)) {
+    if (F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS)) {
         /*
          * The live restore external state is known on initialization, but at that time the stat
          * server hasn't begun so we can't actually set the state. This must be called after the

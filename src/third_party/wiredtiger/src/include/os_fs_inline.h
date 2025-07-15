@@ -134,7 +134,7 @@ __wt_fs_remove(WT_SESSION_IMPL *session, const char *name, bool durable, bool lo
     WT_SESSION *wt_session;
     char *path;
 
-    WT_ASSERT(session, !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_READONLY));
+    WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 
     __wt_verbose(session, WT_VERB_FILEOPS, "%s: file-remove", name);
 
@@ -171,7 +171,7 @@ __wt_fs_rename(WT_SESSION_IMPL *session, const char *from, const char *to, bool 
     WT_SESSION *wt_session;
     char *from_path, *to_path;
 
-    WT_ASSERT(session, !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_READONLY));
+    WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 
     __wt_verbose(session, WT_VERB_FILEOPS, "%s to %s: file-rename", from, to);
 

@@ -42,42 +42,9 @@ extern "C" {
  * wt_get --
  *     Read from WiredTiger.
  */
-model::data_value
-wt_get(
-  WT_SESSION *session, const char *uri, const model::data_value &key, model::timestamp_t timestamp)
-{
-    WT_CURSOR *cursor;
-    WT_DECL_RET;
-    char cfg[64];
-    model::data_value out;
-
-    if (timestamp == 0)
-        testutil_check(session->begin_transaction(session, nullptr));
-    else {
-        testutil_snprintf(cfg, sizeof(cfg), "read_timestamp=%" PRIx64, timestamp);
-        testutil_check(session->begin_transaction(session, cfg));
-    }
-    testutil_check(session->open_cursor(session, uri, nullptr, nullptr, &cursor));
-
-    model::set_wt_cursor_key(cursor, key);
-    ret = cursor->search(cursor);
-    if (ret != WT_NOTFOUND && ret != WT_ROLLBACK)
-        testutil_check(ret);
-    if (ret == 0)
-        out = model::get_wt_cursor_value(cursor);
-
-    testutil_check(cursor->close(cursor));
-    testutil_check(session->commit_transaction(session, nullptr));
-    return ret == 0 ? out : model::NONE;
-}
-
-/*
- * wt_get_ext --
- *     Read from WiredTiger, but also return the error code.
- */
 int
-wt_get_ext(WT_SESSION *session, const char *uri, const model::data_value &key,
-  model::data_value &out, model::timestamp_t timestamp)
+wt_get(WT_SESSION *session, const char *uri, const model::data_value &key, model::data_value &out,
+  model::timestamp_t timestamp)
 {
     WT_CURSOR *cursor;
     WT_DECL_RET;
@@ -334,25 +301,25 @@ wt_txn_set_commit_timestamp(WT_SESSION *session, model::timestamp_t commit_times
 
 /*
  * wt_txn_get --
- *     Read from WiredTiger.
+ *     Read from WiredTiger, and return the error value.
  */
-model::data_value
-wt_txn_get(WT_SESSION *session, const char *uri, const model::data_value &key)
+int
+wt_txn_get(
+  WT_SESSION *session, const char *uri, const model::data_value &key, model::data_value &out)
 {
     WT_CURSOR *cursor;
     WT_DECL_RET;
-    model::data_value out;
 
     testutil_check(session->open_cursor(session, uri, nullptr, nullptr, &cursor));
     model::set_wt_cursor_key(cursor, key);
-    testutil_check_error_ok(ret = cursor->search(cursor), WT_NOTFOUND);
+    ret = cursor->search(cursor);
     if (ret == 0)
         out = model::get_wt_cursor_value(cursor);
     else
         out = model::NONE;
 
     testutil_check(cursor->close(cursor));
-    return out;
+    return ret;
 }
 
 /*
@@ -369,6 +336,23 @@ wt_txn_insert(WT_SESSION *session, const char *uri, const model::data_value &key
     testutil_check(session->open_cursor(
       session, uri, nullptr, overwrite ? nullptr : "overwrite=false", &cursor));
     ret = model::wt_cursor_insert(cursor, key, value);
+    testutil_check(cursor->close(cursor));
+    return ret;
+}
+
+/*
+ * wt_txn_remove --
+ *     Delete from WiredTiger.
+ */
+int
+wt_txn_remove(WT_SESSION *session, const char *uri, const model::data_value &key)
+{
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+
+    testutil_check(session->open_cursor(session, uri, nullptr, nullptr, &cursor));
+
+    ret = model::wt_cursor_remove(cursor, key);
     testutil_check(cursor->close(cursor));
     return ret;
 }

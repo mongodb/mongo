@@ -104,6 +104,10 @@ table_load(TABLE *base, TABLE *table)
 
     /* No bulk load with custom collators, insertion order won't match collation order. */
     is_bulk = TV(BTREE_REVERSE) == 0;
+
+    /* FIXME-WT-14563: There is no support yet for bulk load with disaggregated storage. */
+    if (TV(DISAGG_ENABLED))
+        is_bulk = false;
     wt_wrap_open_cursor(session, table->uri, is_bulk ? "bulk,append" : NULL, &cursor);
 
     /* Set up the key/value buffers. */
@@ -281,6 +285,8 @@ wts_load(void)
     if (!GV(RUNS_IN_MEMORY)) {
         memset(&sap, 0, sizeof(sap));
         wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
+        if (GV(CHECKPOINT_PRECISE))
+            timestamp_once(session, false, false);
         testutil_check(session->checkpoint(session, NULL));
         wt_wrap_close_session(session);
     }

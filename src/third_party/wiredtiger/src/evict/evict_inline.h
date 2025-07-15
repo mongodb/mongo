@@ -317,6 +317,10 @@ __wt_evict_page_cache_bytes_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
               session, &btree->bytes_dirty_leaf, modify->bytes_dirty, "WT_BTREE.bytes_dirty_leaf");
             __wt_cache_decr_check_uint64(
               session, &cache->bytes_dirty_leaf, modify->bytes_dirty, "WT_CACHE.bytes_dirty_leaf");
+            __wt_cache_decr_check_uint64(session, &btree->bytes_delta_updates,
+              modify->bytes_delta_updates, "WT_BTREE.bytes_delta_updates");
+            __wt_cache_decr_check_uint64(session, &cache->bytes_delta_updates,
+              modify->bytes_delta_updates, "WT_CACHE.bytes_delta_updates");
         }
     }
 
@@ -513,7 +517,7 @@ __wt_evict_needed(WT_SESSION_IMPL *session, bool busy, bool readonly, double *pc
      * If the connection is closing we do not need eviction from an application thread. The eviction
      * subsystem is already closed.
      */
-    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING))
+    if (F_ISSET(S2C(session), WT_CONN_CLOSING))
         return (false);
 
     clean_needed = __wt_evict_clean_needed(session, &pct_full);
@@ -691,7 +695,7 @@ __wt_evict_app_assist_worker_check(
         return (0);
 
     /* In memory configurations don't block when the cache is full. */
-    if (F_ISSET_ATOMIC_32(conn, WT_CONN_IN_MEMORY))
+    if (F_ISSET(conn, WT_CONN_IN_MEMORY))
         return (0);
 
     /*
@@ -700,7 +704,7 @@ __wt_evict_app_assist_worker_check(
      * other resources that could block checkpoints or eviction.
      */
     WT_BTREE *btree = S2BT_SAFE(session);
-    if (btree != NULL && (F_ISSET(btree, WT_BTREE_IN_MEMORY) || WT_IS_METADATA(session->dhandle)))
+    if (btree != NULL && (F_ISSET(btree, WT_BTREE_NO_EVICT) || WT_IS_METADATA(session->dhandle)))
         return (0);
 
     /* Check if eviction is needed. */

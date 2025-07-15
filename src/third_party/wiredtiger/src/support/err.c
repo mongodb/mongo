@@ -539,7 +539,7 @@ __wt_panic_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
     va_end(ap);
 
     /* If the connection has already panicked, just return the error. */
-    if (conn != NULL && F_ISSET_ATOMIC_32(conn, WT_CONN_PANIC))
+    if (conn != NULL && F_ISSET(conn, WT_CONN_PANIC))
         return (WT_PANIC);
 
     /*
@@ -565,7 +565,7 @@ __wt_panic_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
      * dropping a core and returning an error.
      */
     if (conn != NULL &&
-      (!F_ISSET_ATOMIC_32(conn, WT_CONN_DATA_CORRUPTION) ||
+      (!F_ISSET(conn, WT_CONN_DATA_CORRUPTION) ||
         FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_CORRUPTION_ABORT)))
         __wt_abort(session);
 #endif
@@ -578,7 +578,7 @@ __wt_panic_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
 #ifndef HAVE_UNITTEST_ASSERTS
     /* Panic the connection. */
     if (conn != NULL)
-        F_SET_ATOMIC_32(conn, WT_CONN_PANIC);
+        F_SET(conn, WT_CONN_PANIC);
 #endif
     /*
      * !!!
@@ -737,7 +737,7 @@ __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v)
 int
 __wt_inmem_unsupported_op(WT_SESSION_IMPL *session, const char *tag) WT_GCC_FUNC_ATTRIBUTE((cold))
 {
-    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_IN_MEMORY))
+    if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
         WT_RET_MSG(session, ENOTSUP, "%s%snot supported for in-memory configurations",
           tag == NULL ? "" : tag, tag == NULL ? "" : ": ");
     return (0);
@@ -764,7 +764,8 @@ __wt_bad_object_type(WT_SESSION_IMPL *session, const char *uri) WT_GCC_FUNC_ATTR
       WT_PREFIX_MATCH(uri, "config:") || WT_PREFIX_MATCH(uri, "file:") ||
       WT_PREFIX_MATCH(uri, "index:") || WT_PREFIX_MATCH(uri, "log:") ||
       WT_PREFIX_MATCH(uri, "object:") || WT_PREFIX_MATCH(uri, "statistics:") ||
-      WT_PREFIX_MATCH(uri, "table:") || WT_PREFIX_MATCH(uri, "tiered:"))
+      WT_PREFIX_MATCH(uri, "table:") || WT_PREFIX_MATCH(uri, "tiered:") ||
+      WT_PREFIX_MATCH(uri, "layered:"))
         return (__wt_object_unsupported(session, uri));
 
     if (WT_PREFIX_MATCH(uri, "lsm:"))

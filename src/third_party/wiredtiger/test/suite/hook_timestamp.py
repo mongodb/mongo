@@ -144,10 +144,10 @@ class TimestampHookCreator(wthooks.WiredTigerHookCreator):
 
 # Override some platform APIs for this hook.
 class TimestampPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
-    def setUp(self):
+    def setUp(self, testcase):
         self._timestamp = wttimestamp.WiredTigerTimeStamp()
 
-    def tearDown(self):
+    def tearDown(self, testcase):
         pass
 
     # Return a timestamping implementation, it will be used by the data set classes.

@@ -178,6 +178,8 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
             "Read failure while accessing a page from the "), 1)
         self.assertGreaterEqual(self.count_file_contains("stderr.txt", "read checksum error"), 1)
 
+        self.ignoreStdoutPatternIfExists('extent list')
+
     def test_verify_api_read_corrupt_pages(self):
         """
         Test verify via API, on a table that is purposely corrupted in
@@ -244,6 +246,8 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(self.count_file_contains("dump_corrupt.out",
             "Read failure while accessing a page from the "), 1)
 
+        self.ignoreStdoutPatternIfExists('extent list')
+
     def test_verify_process_75pct_null(self):
         """
         Test verify in a 'wt' process on a table that is purposely damaged,
@@ -259,10 +263,10 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
             outfilename='dump_corrupt.out', errfilename="dump_corrupt.err", failure=True)
         self.assertEqual(self.count_file_contains("dump_corrupt.out",
             "Read failure while accessing a page from the "), 1)
-        self.runWt(["-p", "verify", "-c", "table:" + self.tablename],
-            errfilename="verifyerr.out", failure=True)
-        self.check_non_empty_file("verifyerr.out")
-        self.assertGreaterEqual(self.count_file_contains("verifyerr.out", "read checksum error"), 1)
+        self.runWt(["-p", "verify", "-c", "table:" + self.tablename], outfilename="verifyerr.out",
+            errfilename="verifyerr.err", failure=True)
+        self.check_non_empty_file("verifyerr.err")
+        self.assertGreaterEqual(self.count_file_contains("verifyerr.err", "read checksum error"), 1)
 
     def test_verify_process_25pct_junk(self):
         """
@@ -279,10 +283,10 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
             outfilename='dump_corrupt.out', errfilename="dump_corrupt.err", failure=True)
         self.assertEqual(self.count_file_contains("dump_corrupt.out",
             "Read failure while accessing a page from the "), 1)
-        self.runWt(["-p", "verify", "-c", "table:" + self.tablename],
-            errfilename="verifyerr.out", failure=True)
-        self.check_non_empty_file("verifyerr.out")
-        self.assertGreaterEqual(self.count_file_contains("verifyerr.out", "read checksum error"), 1)
+        self.runWt(["-p", "verify", "-c", "table:" + self.tablename], outfilename="verifyerr.out",
+            errfilename="verifyerr.err", failure=True)
+        self.check_non_empty_file("verifyerr.err")
+        self.assertGreaterEqual(self.count_file_contains("verifyerr.err", "read checksum error"), 1)
 
     def test_verify_process_read_corrupt_pages(self):
         """
@@ -302,21 +306,21 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         with self.open_and_position(self.tablename, 80) as f:
             for i in range(0, 100):
                 f.write(b'\x01\xff\x80')
-        self.runWt(["-p", "verify", "-c", "table:" + self.tablename],
-            errfilename="verifyerr.out", failure=True)
+        self.runWt(["-p", "verify", "-c", "table:" + self.tablename], outfilename="verifyerr.out",
+            errfilename="verifyerr.err", failure=True)
 
         self.runWt(['-p', 'verify', '-d', 'dump_address', 'table:' + self.tablename, '-d'],
             outfilename='dump_corrupt.out', errfilename="dump_corrupt.err", failure=True)
         self.assertEqual(self.count_file_contains("dump_corrupt.out",
             "Read failure while accessing a page from the "), 1)
-        self.check_non_empty_file("verifyerr.out")
+        self.check_non_empty_file("verifyerr.err")
 
         # It is expected that more than one checksum error is logged given
         # that we have corrupted the table in multiple locations, but we may
         # not necessarily detect all three corruptions - e.g. we won't detect
         # a corruption if we overwrite free space or overwrite a page that is
         # a child of another page that we overwrite.
-        self.assertGreaterEqual(self.count_file_contains("verifyerr.out", "read checksum error"), 1)
+        self.assertGreaterEqual(self.count_file_contains("verifyerr.err", "read checksum error"), 1)
 
     def test_verify_process_truncated(self):
         """
@@ -329,7 +333,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         with self.open_and_position(self.tablename, 75) as f:
             f.truncate(0)
         self.runWt(["-p", "verify", "table:" + self.tablename],
-            errfilename="verifyerr.out", failure=True)
+            errfilename="verifyerr.err", failure=True)
         # The test may output the following error message while opening a file that
         # does not exist. Ignore that.
         self.ignoreStderrPatternIfExists('No such file or directory')
@@ -344,7 +348,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         with self.open_and_position(self.tablename, 0) as f:
             f.truncate(0)
         self.runWt(["verify", "table:" + self.tablename],
-            errfilename="verifyerr.out", failure=True)
+            errfilename="verifyerr.err", failure=True)
         # The test may output the following error message while opening a file that
         # does not exist. Ignore that.
         self.ignoreStderrPatternIfExists('No such file or directory')
@@ -370,8 +374,8 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
                 for i in range(0, 4096):
                     f.write(struct.pack('B', 0))
 
-        self.runWt(["-p", "verify", "-a"], errfilename="verifyerr.out", failure=True)
-        self.assertEqual(self.count_file_contains("verifyerr.out",
+        self.runWt(["-p", "verify", "-a"], outfilename="verifyerr.out", errfilename="verifyerr.err", failure=True)
+        self.assertEqual(self.count_file_contains("verifyerr.err",
             "table:test_verify.a1: WT_ERROR"), 1)
-        self.assertEqual(self.count_file_contains("verifyerr.out",
+        self.assertEqual(self.count_file_contains("verifyerr.err",
             "table:test_verify.a2: WT_ERROR"), 0)

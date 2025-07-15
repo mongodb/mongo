@@ -47,6 +47,10 @@ class test_tiered16(TieredConfigMixin, wttest.WiredTigerTestCase):
         expect = sorted(expect1)
         self.assertEqual(got, expect)
 
+    # Override the TieredConfigMixin function to ensure that the cache is enabled.
+    def tiered_extension_config(self):
+        return 'cache=1'
+
     def test_remove_shared(self):
         uri_a = "table:tiereda"
 

@@ -47,7 +47,7 @@ hs_cursor(void *arg)
     WT_SESSION *session;
     wt_timestamp_t hs_durable_timestamp, hs_start_ts, hs_stop_durable_ts;
     uint64_t hs_counter, hs_upd_type;
-    uint32_t hs_btree_id, i;
+    uint32_t hs_btree_id, hs_id, i;
     u_int period;
     bool next;
 
@@ -68,31 +68,40 @@ hs_cursor(void *arg)
     memset(&hs_key, 0, sizeof(hs_key));
     memset(&hs_value, 0, sizeof(hs_value));
     for (;;) {
-        /* Open a HS cursor. */
-        testutil_check(__wt_curhs_open((WT_SESSION_IMPL *)session, NULL, &cursor));
-        F_SET(cursor, WT_CURSTD_HS_READ_COMMITTED);
-
-        /*
-         * Move the cursor through the table from the beginning or the end. We can't position the
-         * cursor in the HS store because the semantics of search aren't quite the same as other
-         * tables, and we can't correct for them in application code. We don't sleep with an open
-         * cursor, so we should be able to traverse large chunks of the HS store quickly, without
-         * blocking normal operations.
-         */
-        next = mmrand(&g.extra_rnd, 0, 1) == 1;
-        for (i = mmrand(&g.extra_rnd, WT_THOUSAND, 100 * WT_THOUSAND); i > 0; --i) {
-            if ((ret = (next ? cursor->next(cursor) : cursor->prev(cursor))) != 0) {
-                testutil_assertfmt(ret == WT_NOTFOUND || ret == WT_CACHE_FULL || ret == WT_ROLLBACK,
-                  "WT_CURSOR.%s failed: %d", next ? "next" : "prev", ret);
+        hs_id = 0;
+        for (;;) {
+            /* Open a HS cursor on the next history store. */
+            testutil_check_error_ok(
+              ret = __wt_curhs_next_hs_id((WT_SESSION_IMPL *)session, hs_id, &hs_id), WT_NOTFOUND);
+            if (ret == WT_NOTFOUND)
                 break;
-            }
             testutil_check(
-              cursor->get_key(cursor, &hs_btree_id, &hs_key, &hs_start_ts, &hs_counter));
-            testutil_check(cursor->get_value(
-              cursor, &hs_stop_durable_ts, &hs_durable_timestamp, &hs_upd_type, &hs_value));
-        }
+              __wt_curhs_open_ext((WT_SESSION_IMPL *)session, hs_id, 0, NULL, &cursor));
+            F_SET(cursor, WT_CURSTD_HS_READ_COMMITTED);
 
-        testutil_check(cursor->close(cursor));
+            /*
+             * Move the cursor through the table from the beginning or the end. We can't position
+             * the cursor in the HS store because the semantics of search aren't quite the same as
+             * other tables, and we can't correct for them in application code. We don't sleep with
+             * an open cursor, so we should be able to traverse large chunks of the HS store
+             * quickly, without blocking normal operations.
+             */
+            next = mmrand(&g.extra_rnd, 0, 1) == 1;
+            for (i = mmrand(&g.extra_rnd, WT_THOUSAND, 100 * WT_THOUSAND); i > 0; --i) {
+                if ((ret = (next ? cursor->next(cursor) : cursor->prev(cursor))) != 0) {
+                    testutil_assertfmt(
+                      ret == WT_NOTFOUND || ret == WT_CACHE_FULL || ret == WT_ROLLBACK,
+                      "WT_CURSOR.%s failed: %d", next ? "next" : "prev", ret);
+                    break;
+                }
+                testutil_check(
+                  cursor->get_key(cursor, &hs_btree_id, &hs_key, &hs_start_ts, &hs_counter));
+                testutil_check(cursor->get_value(
+                  cursor, &hs_stop_durable_ts, &hs_durable_timestamp, &hs_upd_type, &hs_value));
+            }
+
+            testutil_check(cursor->close(cursor));
+        }
 
         /* Sleep for some number of seconds, in short intervals so we don't make the run wait. */
         for (period = mmrand(&g.extra_rnd, 1, 10); period > 0 && !g.workers_finished; --period)

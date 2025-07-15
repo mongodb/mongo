@@ -165,7 +165,7 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 static bool
 __read_blocked(WT_SESSION_IMPL *session)
 {
-    return (session->current_rwticket != session->current_rwlock->u.s.current);
+    return (session->current_rwticket != __wt_atomic_loadv8(&session->current_rwlock->u.s.current));
 }
 
 /*

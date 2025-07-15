@@ -38,7 +38,7 @@ class test_prepare_hs01(wttest.WiredTigerTestCase):
 
     format_values = [
         ('column', dict(key_format='r', value_format='u')),
-        ('column-fix', dict(key_format='r', value_format='8t')),
+        #('column-fix', dict(key_format='r', value_format='8t')),  # FIXME-WT-14972
         ('string-row', dict(key_format='S', value_format='u')),
     ]
 

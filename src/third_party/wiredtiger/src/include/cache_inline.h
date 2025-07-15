@@ -85,6 +85,16 @@ __wt_cache_bytes_updates(WT_CACHE *cache)
 }
 
 /*
+ * __wt_cache_bytes_delta_updates --
+ *     Return the number of bytes in use for delta updates.
+ */
+static WT_INLINE uint64_t
+__wt_cache_bytes_delta_updates(WT_CACHE *cache)
+{
+    return (__wt_cache_bytes_plus_overhead(cache, __wt_atomic_load64(&cache->bytes_delta_updates)));
+}
+
+/*
  * __wt_cache_bytes_image --
  *     Return the number of page image bytes in use.
  */

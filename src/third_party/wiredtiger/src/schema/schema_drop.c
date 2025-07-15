@@ -64,8 +64,8 @@ __drop_file(
      * connection is not ready for history store operations.
      */
     WT_ERR(ret);
-    if (id_found && !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_IN_MEMORY) &&
-      F_ISSET_ATOMIC_32(S2C(session), WT_CONN_READY))
+    if (id_found && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY) &&
+      F_ISSET(S2C(session), WT_CONN_READY))
         if (__wt_hs_btree_truncate(session, id) != 0)
             __wt_verbose_warning(
               session, WT_VERB_HS, "Failed to truncate history store for the file: %s", uri);
@@ -115,6 +115,55 @@ __drop_index(
         WT_TRET(__wt_schema_drop(session, idx->source, cfg, check_visibility));
 
     WT_TRET(__wt_metadata_remove(session, uri));
+    return (ret);
+}
+
+/*
+ * __drop_layered --
+ *     WT_SESSION::drop for a layered table.
+ */
+static int
+__drop_layered(
+  WT_SESSION_IMPL *session, const char *uri, bool force, const char *cfg[], bool check_visibility)
+{
+    WT_DECL_ITEM(ingest_uri_buf);
+    WT_DECL_ITEM(stable_uri_buf);
+    WT_DECL_RET;
+    const char *ingest_uri, *stable_uri, *tablename;
+    WT_UNUSED(force);
+
+    WT_ASSERT(session, WT_PREFIX_MATCH(uri, "layered:"));
+
+    WT_RET(__wt_scr_alloc(session, 0, &ingest_uri_buf));
+    WT_ERR(__wt_scr_alloc(session, 0, &stable_uri_buf));
+
+    tablename = uri;
+    WT_PREFIX_SKIP_REQUIRED(session, tablename, "layered:");
+    WT_ERR(__wt_buf_fmt(session, ingest_uri_buf, "file:%s.wt_ingest", tablename));
+    ingest_uri = ingest_uri_buf->data;
+    WT_ERR(__wt_buf_fmt(session, stable_uri_buf, "file:%s.wt_stable", tablename));
+    stable_uri = stable_uri_buf->data;
+
+    WT_ERR(__wt_schema_drop(session, ingest_uri, cfg, check_visibility));
+
+    /*
+     * FIXME-WT-14503: as part of the bigger garbage-collection picture, we should eventually find a
+     * way to tell PALI that this was dropped.
+     */
+    WT_ERR(__wt_schema_drop(session, stable_uri, cfg, check_visibility));
+
+    /* Now drop the top-level table. */
+    WT_WITH_HANDLE_LIST_WRITE_LOCK(
+      session, ret = __wt_conn_dhandle_close_all(session, uri, true, true, check_visibility));
+    WT_ERR(ret);
+    WT_ERR(__wt_metadata_remove(session, uri));
+
+    /* No need for a meta track drop, since the top-level table has no underlying files to remove.
+     */
+
+err:
+    __wt_scr_free(session, &ingest_uri_buf);
+    __wt_scr_free(session, &stable_uri_buf);
     return (ret);
 }
 
@@ -394,6 +443,8 @@ __schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], bool
         ret = __drop_file(session, uri, force, cfg, check_visibility);
     else if (WT_PREFIX_MATCH(uri, "index:"))
         ret = __drop_index(session, uri, force, cfg, check_visibility);
+    else if (WT_PREFIX_MATCH(uri, "layered:"))
+        ret = __drop_layered(session, uri, force, cfg, check_visibility);
     else if (WT_PREFIX_MATCH(uri, "table:"))
         ret = __drop_table(session, uri, force, cfg, check_visibility);
     else if (WT_PREFIX_MATCH(uri, "tiered:"))
@@ -411,7 +462,7 @@ __schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], bool
     if (ret == WT_NOTFOUND || ret == ENOENT)
         ret = force ? 0 : ENOENT;
 
-    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_BACKUP_PARTIAL_RESTORE))
+    if (F_ISSET(S2C(session), WT_CONN_BACKUP_PARTIAL_RESTORE))
         WT_TRET(__wt_meta_track_off(session, false, ret != 0));
     else
         WT_TRET(__wt_meta_track_off(session, true, ret != 0));

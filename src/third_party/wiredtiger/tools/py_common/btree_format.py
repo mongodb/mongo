@@ -145,6 +145,55 @@ class PageHeader(object):
         h.version = b.read_uint8()
         return h
 
+# Note: a delta header is almost identical to a page header, there is no recno.
+class DeltaHeader(object):
+    '''
+    A delta header (WT_DELTA_HEADER).
+    '''
+    write_gen: int
+    memsize: int
+    entries: int # Or: overflow data length
+    type: PageType
+    flags: int
+    unused: int
+    version: int
+
+    # Flags
+    WT_PAGE_COMPRESSED: typing.Final[int] = 0x01
+    WT_PAGE_EMPTY_V_ALL: typing.Final[int] = 0x02
+    WT_PAGE_EMPTY_V_NONE: typing.Final[int] = 0x04
+    WT_PAGE_ENCRYPTED: typing.Final[int] = 0x08
+    WT_PAGE_UNUSED: typing.Final[int] = 0x10
+    WT_PAGE_FT_UPDATE: typing.Final[int] = 0x20
+
+    def __init__(self) -> None:
+        '''
+        Initialize the instance with default values.
+        '''
+        self.write_gen = 0
+        self.mem_size = 0
+        self.entries = 0
+        self.type = PageType.WT_PAGE_INVALID
+        self.flags = 0
+        self.unused = 0
+        self.version = 0
+
+    @staticmethod
+    def parse(b: binary_data.BinaryFile) -> 'PageHeader':
+        '''
+        Parse a page header.
+        '''
+        # WT_PAGE_HEADER in btmem.h (28 bytes)
+        h = PageHeader()
+        h.write_gen = b.read_uint64()
+        h.mem_size = b.read_uint32()
+        h.entries = b.read_uint32()
+        h.type = PageType(b.read_uint8())
+        h.flags = b.read_uint8()
+        h.unused = b.read_uint8()
+        h.version = b.read_uint8()
+        return h
+
 
 #
 # Block
@@ -161,6 +210,8 @@ class BlockHeader(object):
 
     # Flags
     WT_BLOCK_DATA_CKSUM: typing.Final[int] = 0x1
+    WT_BLOCK_DISAGG_ENCRYPTED: typing.Final[int] = 0x2  # disagg only
+    WT_BLOCK_DISAGG_COMPRESSED: typing.Final[int] = 0x4 # disagg only
 
     def __init__(self) -> None:
         '''
@@ -172,16 +223,29 @@ class BlockHeader(object):
         self.unused = 0
 
     @staticmethod
-    def parse(b: binary_data.BinaryFile) -> 'BlockHeader':
+    def parse(b: binary_data.BinaryFile, disagg = False) -> 'BlockHeader':
         '''
         Parse a block header.
         '''
         # WT_BLOCK_HEADER in block.h (12 bytes)
         h = BlockHeader()
-        h.disk_size = b.read_uint32()
-        h.checksum = b.read_uint32()
-        h.flags = b.read_uint8()
-        h.unused = int.from_bytes(b.read(3), byteorder='little')
+        if disagg:
+            # Disagg sets additional fields.  If they are examined
+            # by non-disagg code, an exception will be thrown (by design).
+            h.disagg_magic = b.read_uint8()
+            h.disagg_version = b.read_uint8()
+            h.disagg_compatible_version = b.read_uint8()
+            h.disagg_header_size = b.read_uint8()
+            h.checksum = b.read_uint32()
+            h.disagg_previous_checksum = b.read_uint32()
+            h.disagg_reconciliation_id = b.read_uint8()
+            h.flags = b.read_uint8()
+            h.unused = int.from_bytes(b.read(2), byteorder='little')
+        else:
+            h.disk_size = b.read_uint32()
+            h.checksum = b.read_uint32()
+            h.flags = b.read_uint8()
+            h.unused = int.from_bytes(b.read(3), byteorder='little')
         return h
 
 

@@ -9,31 +9,6 @@
 #include "wt_internal.h"
 
 /*
- * __tiered_confchk --
- *     Check for a valid tiered storage source.
- */
-static int
-__tiered_confchk(
-  WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, WT_NAMED_STORAGE_SOURCE **nstoragep)
-{
-    WT_CONNECTION_IMPL *conn;
-    WT_NAMED_STORAGE_SOURCE *nstorage;
-
-    *nstoragep = NULL;
-
-    if (name->len == 0 || WT_CONFIG_LIT_MATCH("none", *name))
-        return (0);
-
-    conn = S2C(session);
-    TAILQ_FOREACH (nstorage, &conn->storagesrcqh, q)
-        if (WT_CONFIG_MATCH(nstorage->name, *name)) {
-            *nstoragep = nstorage;
-            return (0);
-        }
-    WT_RET_MSG(session, EINVAL, "unknown storage source '%.*s'", (int)name->len, name->str);
-}
-
-/*
  * __tiered_common_config --
  *     Parse configuration options common to connection and btrees.
  */
@@ -77,7 +52,7 @@ __wti_tiered_bucket_config(
 
     __wt_spin_lock(session, &conn->storage_lock);
 
-    WT_ERR(__tiered_confchk(session, &name, &nstorage));
+    WT_ERR(__wt_schema_open_storage_source(session, &name, &nstorage));
     if (nstorage == NULL) {
         WT_ERR(__wt_config_gets(session, cfg, "tiered_storage.bucket", &bucket));
         if (bucket.len != 0)
@@ -186,7 +161,7 @@ __wt_tiered_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfi
       session, WT_VERB_TIERED, "TIERED_CONFIG: prefix %s", conn->bstorage->bucket_prefix);
 
     /* Check for incompatible configuration options. */
-    if (F_ISSET_ATOMIC_32(conn, WT_CONN_IN_MEMORY))
+    if (F_ISSET(conn, WT_CONN_IN_MEMORY))
         WT_ERR_MSG(session, EINVAL,
           "the \"in_memory\" connection configuration is not compatible with tiered storage");
 

@@ -24,8 +24,10 @@ __wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **configp)
     WT_DECL_ITEM(checkpoint);
     WT_DECL_RET;
     WT_KEYED_ENCRYPTOR *kencryptor;
-    char *checkpoint_list, *config, *config_tmp, fileid[64], *metadata;
+    uint32_t fileid;
+    char *checkpoint_list, *config, *config_tmp, fileid_cfg[64], *metadata;
     const char *cfg[] = {WT_CONFIG_BASE(session, file_meta), NULL, NULL, NULL, NULL, NULL, NULL};
+    bool shared;
 
     ckptbase = NULL;
     checkpoint_list = config = config_tmp = metadata = NULL;
@@ -97,11 +99,20 @@ __wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **configp)
     WT_ERR(__wt_reset_blkmod(session, a->data, buf));
     cfg[3] = buf->mem;
     cfg[4] = "checkpoint_lsn=";
-    WT_WITH_SCHEMA_LOCK(session,
-      ret = __wt_snprintf(fileid, sizeof(fileid), "id=%" PRIu32, ++S2C(session)->next_file_id));
+    WT_WITH_SCHEMA_LOCK(session, fileid = WT_BTREE_ID_NAMESPACED(++S2C(session)->next_file_id));
+    WT_ERR(__wt_snprintf(fileid_cfg, sizeof(fileid_cfg), "id=%" PRIu32, fileid));
     WT_ERR(ret);
-    cfg[5] = fileid;
+    cfg[5] = fileid_cfg;
     WT_ERR(__wt_config_collapse(session, cfg, &config_tmp));
+
+    /*
+     * FIXME-WT-14723: import needs a little thought for shared tables once we've decided how to
+     * allocate shared file IDs. It's not enough (even temporarily) to just share the allocated file
+     * ID, since if we do that it may clash with another imported shared ID.
+     */
+    WT_ERR(__wt_btree_shared(session, uri, cfg, &shared));
+    if (shared)
+        WT_ERR_MSG(session, EINVAL, "TODO import of shared tree unsupported");
 
     /*
      * Now we need to retrieve the last checkpoint again but this time, with the correct allocation

@@ -196,13 +196,13 @@ def compare_cursors(cc1, cc2, version):
             ecode = 1
         elif version:
             # If we want to use the version cursor:
-            vcur1 = cc1.cursor.session.open_cursor(cc1.uri, None, 'debug=(dump_version)')
+            vcur1 = cc1.cursor.session.open_cursor(cc1.uri, None, 'debug=(dump_version=(enabled=true))')
             vcur1.set_key(k1)
             if vcur1.search() != 0:
                 print('unexpected version cursor search')
                 ecode = 1
                 return
-            vcur2 = cc2.cursor.session.open_cursor(cc2.uri, None, 'debug=(dump_version)')
+            vcur2 = cc2.cursor.session.open_cursor(cc2.uri, None, 'debug=(dump_version=(enabled=true))')
             vcur2.set_key(k2)
             if vcur2.search() != 0:
                 print('unexpected version cursor search')

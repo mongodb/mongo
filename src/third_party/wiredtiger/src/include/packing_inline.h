@@ -292,7 +292,8 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, size_t *vp)
 
             /* The string was previously validated. */
             len = __wt_json_strlen((const char *)pv->u.item.data, pv->u.item.size);
-            WT_ASSERT(session, len >= 0);
+            if (len < 0)
+                WT_RET_MSG(session, EINVAL, "invalid JSON string length in pack_size");
             s = (size_t)len + (pv->type == 'K' ? 0 : 1);
         }
         *vp = s;
@@ -301,7 +302,8 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, size_t *vp)
     case 'S':
         if (pv->type == 's' || pv->havesize) {
             s = pv->size;
-            WT_ASSERT(session, s != 0);
+            if (s == 0)
+                WT_RET_MSG(session, EINVAL, "zero-length string in pack_size");
         } else
             s = strlen(pv->u.s) + 1;
         *vp = s;
@@ -505,7 +507,8 @@ __unpack_read(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, const uint8_t **pp, s
     case 'S':
         if (pv->type == 's' || pv->havesize) {
             s = pv->size;
-            WT_ASSERT(session, s != 0);
+            if (s == 0)
+                WT_RET_MSG(session, EINVAL, "zero-length string in unpack_read");
         } else
             s = strlen((const char *)*pp) + 1;
         if (s > 0)
@@ -658,7 +661,8 @@ __wt_struct_packv(WT_SESSION_IMPL *session, void *buffer, size_t size, const cha
     WT_RET_NOTFOUND_OK(ret);
 
     /* Be paranoid - __pack_write should never overflow. */
-    WT_ASSERT(session, p <= end);
+    if (p > end)
+        WT_RET_MSG(session, EINVAL, "buffer overflow in wt_struct_packv");
 
     return (0);
 }
@@ -725,7 +729,8 @@ __wt_struct_unpackv(
     WT_RET_NOTFOUND_OK(ret);
 
     /* Be paranoid - __pack_write should never overflow. */
-    WT_ASSERT(session, p <= end);
+    if (p > end)
+        WT_RET_MSG(session, EINVAL, "buffer overflow in wt_struct_unpackv");
 
     return (0);
 }

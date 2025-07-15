@@ -43,6 +43,16 @@ def _show_buckets(fh, title, mult, buckets, n):
             shown = True
     print(s, file=fh)
 
+def _latency_buckets(fh, title, buckets, n):
+    total = 0
+    s = title + ': = '
+    for count in range(0, n):
+        val = buckets[count]
+        total += val
+
+    s += str(total)
+    print(s, file=fh)
+
 def _latency_preprocess(arr, merge):
     mx = 0
     cur = 0
@@ -69,17 +79,8 @@ def _latency_plot(box, ch, left, width, arr, merge, scale):
             nch -= 1.0
             y += 1
 
-def _latency_optype(fh, name, ch, t):
-    if t.ops == 0:
-        return
-    if t.latency_ops == 0:
-        print('**** ' + name + ' operations: ' + str(t.ops), file=fh)
-        return
-    print('**** ' + name + ' operations: ' + str(t.ops) + \
-          ', latency operations: ' + str(t.latency_ops), file=fh)
-    print('  avg: ' + str(t.latency/t.latency_ops) + \
-          ', min: ' + str(t.min_latency) + ', max: ' + str(t.max_latency),
-          file=fh)
+def _latency_op_plot(fh, name, ch, t):
+    # process and plot the latency buckets
     us = t.us()
     ms = t.ms()
     sec = t.sec()
@@ -109,17 +110,43 @@ def _latency_optype(fh, name, ch, t):
     _show_buckets(fh, name + ' sec', 1000000, sec, 100)
     print('', file=fh)
 
-def workload_latency(workload, outfilename = None):
+
+def _latency_optype(fh, plot, name, ch, t):
+    if t.ops == 0:
+        return
+    if t.latency_ops == 0:
+        print('**** ' + name + ' operations: ' + str(t.ops), file=fh)
+        return
+    print('**** ' + name + ' operations: ' + str(t.ops) + \
+          ', latency operations: ' + str(t.latency_ops), file=fh)
+    print('  avg: ' + str(t.latency/t.latency_ops) + \
+          ', min: ' + str(t.min_latency) + ', max: ' + str(t.max_latency),
+          file=fh)
+
+    us = t.us()
+    ms = t.ms()
+    sec = t.sec()
+    print('', file=fh)
+    _latency_buckets(fh, name + ' us count ', us, 1000)
+    _latency_buckets(fh, name + ' ms count ', ms, 1000)
+    _latency_buckets(fh, name + ' sec count ', sec, 100)
+    print('', file=fh)
+
+    if plot == True:
+       _latency_op_plot(fh, name, ch, t)
+
+
+def workload_latency(workload, outfilename = None, plot = False):
     if outfilename:
         fh = open(outfilename, 'w')
     else:
         fh = sys.stdout
 
-    _latency_optype(fh, 'insert', 'I', workload.stats.insert)
-    _latency_optype(fh, 'checkpoint', 'C', workload.stats.checkpoint)
-    _latency_optype(fh, 'read', 'R', workload.stats.read)
-    _latency_optype(fh, 'remove', 'X', workload.stats.remove)
-    _latency_optype(fh, 'update', 'U', workload.stats.update)
-    _latency_optype(fh, 'truncate', 'T', workload.stats.truncate)
-    _latency_optype(fh, 'rts', 'S', workload.stats.rts)
-    _latency_optype(fh, 'not found', 'N', workload.stats.not_found)
+    _latency_optype(fh, plot, 'insert', 'I', workload.stats.insert)
+    _latency_optype(fh, plot, 'checkpoint', 'C', workload.stats.checkpoint)
+    _latency_optype(fh, plot, 'read', 'R', workload.stats.read)
+    _latency_optype(fh, plot, 'remove', 'X', workload.stats.remove)
+    _latency_optype(fh, plot, 'update', 'U', workload.stats.update)
+    _latency_optype(fh, plot, 'truncate', 'T', workload.stats.truncate)
+    _latency_optype(fh, plot, 'rts', 'S', workload.stats.rts)
+    _latency_optype(fh, plot, 'not found', 'N', workload.stats.not_found)

@@ -244,7 +244,7 @@ struct __wt_bm {
     void *map; /* Mapped region */
     size_t maplen;
     void *mapped_cookie;
-    bool is_remote; /* Whether the storage is on a remote host. */
+    bool is_remote; /* Whether the storage is located on a remote host. */
 
     /*
      * For trees, such as tiered tables, that are allowed to have more than one backing file or
@@ -267,7 +267,7 @@ struct __wt_bm {
 
 /*
  * WT_BLOCK --
- *	Block manager handle, references a single file.
+ *	Block manager file handle.
  */
 struct __wt_block {
     const char *name;  /* Name */
@@ -278,7 +278,7 @@ struct __wt_block {
     TAILQ_ENTRY(__wt_block) hashq; /* Hashed list of handles */
 
     WT_FH *fh;            /* Backing file handle */
-    wt_off_t size;        /* File size */
+    wt_off_t size;        /* Storage size */
     wt_off_t extend_size; /* File extended size */
     wt_off_t extend_len;  /* File extend chunk size */
 
@@ -420,6 +420,7 @@ struct __wt_block_header {
      */
     uint8_t unused[3]; /* 09-11: unused padding */
 };
+
 /*
  * WT_BLOCK_HEADER_SIZE is the number of bytes we allocate for the structure: if the compiler
  * inserts padding it will break the world.
@@ -427,43 +428,6 @@ struct __wt_block_header {
 #define WT_BLOCK_HEADER_SIZE 12
 
 /*
- * WT_BLOCK_HEADER_BYTE_SIZE --
- *	The first usable data byte on the block (past the combined headers).
- */
-#define WT_BLOCK_HEADER_BYTE_SIZE (WT_PAGE_HEADER_SIZE + WT_BLOCK_HEADER_SIZE)
-#define WT_BLOCK_HEADER_BYTE(dsk) ((void *)((uint8_t *)(dsk) + WT_BLOCK_HEADER_BYTE_SIZE))
-
-/*
- * __wt_block_header_byteswap_copy --
- *     Handle big- and little-endian transformation of a header block, copying from a source to a
- *     target.
- */
-static WT_INLINE void
-__wt_block_header_byteswap_copy(WT_BLOCK_HEADER *from, WT_BLOCK_HEADER *to)
-{
-    *to = *from;
-#ifdef WORDS_BIGENDIAN
-    to->disk_size = __wt_bswap32(from->disk_size);
-    to->checksum = __wt_bswap32(from->checksum);
-#endif
-}
-
-/*
- * __wt_block_header_byteswap --
- *     Handle big- and little-endian transformation of a header block.
- */
-static WT_INLINE void
-__wt_block_header_byteswap(WT_BLOCK_HEADER *blk)
-{
-#ifdef WORDS_BIGENDIAN
-    __wt_block_header_byteswap_copy(blk, blk);
-#else
-    WT_UNUSED(blk);
-#endif
-}
-
-/*
- * WT_BLOCK_HEADER_BYTE
  * WT_BLOCK_HEADER_BYTE_SIZE --
  *	The first usable data byte on the block (past the combined headers).
  */
@@ -508,29 +472,6 @@ struct __wt_block_disagg {
     /*AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
-
-/*
- * __wt_block_header --
- *     Return the size of the block-specific header.
- */
-static WT_INLINE u_int
-__wt_block_header(WT_BLOCK *block)
-{
-    WT_UNUSED(block);
-
-    return ((u_int)WT_BLOCK_HEADER_SIZE);
-}
-
-/*
- * __wt_block_eligible_for_sweep --
- *     Return true if the block meets requirements for sweeping. The check that read reference count
- *     is zero is made elsewhere.
- */
-static WT_INLINE bool
-__wt_block_eligible_for_sweep(WT_BM *bm, WT_BLOCK *block)
-{
-    return (!block->remote && block->objectid <= bm->max_flushed_objectid);
-}
 
 /*
  * WT_BLOCK_DISAGG_HEADER --

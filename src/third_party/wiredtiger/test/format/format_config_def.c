@@ -100,12 +100,20 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"cache.eviction_dirty_trigger", "dirty content trigger for eviction", C_IGNORE, 0, 0, 100,
     V_GLOBAL_CACHE_EVICTION_DIRTY_TRIGGER},
 
+  {"cache.eviction_updates_target", "update content target for eviction", C_IGNORE, 0, 0, 100,
+    V_GLOBAL_CACHE_EVICTION_UPDATES_TARGET},
+
+  {"cache.eviction_updates_trigger", "update content trigger for eviction", C_IGNORE, 0, 0, 100,
+    V_GLOBAL_CACHE_EVICTION_UPDATES_TRIGGER},
+
   {"cache.minimum", "minimum cache size (MB)", C_IGNORE, 0, 0, 100 * 1024, V_GLOBAL_CACHE_MINIMUM},
 
   {"cache.maximum", "maximum cache size (MB)", C_IGNORE, 0, 0, UINT_MAX, V_GLOBAL_CACHE_MAXIMUM},
 
   {"checkpoint", "checkpoint type (on | off | wiredtiger)", C_IGNORE | C_STRING, 0, 0, 0,
     V_GLOBAL_CHECKPOINT},
+
+  {"checkpoint.precise", "Precise checkpoint", C_BOOL, 50, 0, 0, V_GLOBAL_CHECKPOINT_PRECISE},
 
   {"checkpoint.log_size", "MB of log to wait if wiredtiger checkpoints configured", 0x0, 20, 200,
     1024, V_GLOBAL_CHECKPOINT_LOG_SIZE},
@@ -164,6 +172,18 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"debug.update_restore_evict",
     "control all dirty page evictions through forcing update restore eviction", C_BOOL, 2, 0, 0,
     V_GLOBAL_DEBUG_UPDATE_RESTORE_EVICT},
+
+  {"disagg.page_log", "configure page log for disaggregated storage (off | palm)",
+    C_IGNORE | C_STRING, 0, 0, 0, V_GLOBAL_DISAGG_PAGE_LOG},
+
+  {"disagg.mode", "configure mode for disaggregated storage (leader | follower)",
+    C_IGNORE | C_STRING, 0, 0, 0, V_GLOBAL_DISAGG_MODE},
+
+  {"disagg.enabled", "configure disaggregated storage", C_IGNORE | C_BOOL | C_TABLE | C_TYPE_ROW, 0,
+    0, 0, V_TABLE_DISAGG_ENABLED},
+
+  {"disagg.layered", "use layered URI for any disaggregated tables", C_BOOL, 100, 1, 0,
+    V_GLOBAL_DISAGG_LAYERED},
 
   {"disk.checksum", "checksum type (on | off | uncompressed | unencrypted)",
     C_IGNORE | C_STRING | C_TABLE, 0, 0, 0, V_TABLE_DISK_CHECKSUM},
@@ -299,8 +319,8 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
 
   {"runs.rows", "number of rows", C_TABLE, 10, M(1), M(100), V_TABLE_RUNS_ROWS},
 
-  {"runs.source", "data source type (file | table)", C_IGNORE | C_STRING | C_TABLE, 0, 0, 0,
-    V_TABLE_RUNS_SOURCE},
+  {"runs.source", "data source type (file | layered | table)", C_IGNORE | C_STRING | C_TABLE, 0, 0,
+    0, V_TABLE_RUNS_SOURCE},
 
   {"runs.tables", "number of tables", 0x0, 1, 32, V_MAX_TABLES_CONFIG, V_GLOBAL_RUNS_TABLES},
 

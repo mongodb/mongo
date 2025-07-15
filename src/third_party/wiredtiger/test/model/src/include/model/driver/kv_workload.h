@@ -541,6 +541,54 @@ operator<<(std::ostream &out, const evict &op)
 }
 
 /*
+ * get --
+ *     A representation of reading a given key. Does not state the expected value.
+ */
+struct get : public with_txn_id, public with_table_id {
+    data_value key;
+
+    /*
+     * get::get --
+     *     Create the operation.
+     */
+    inline get(table_id_t table_id, txn_id_t txn_id, const data_value &key)
+        : with_txn_id(txn_id), with_table_id(table_id), key(key)
+    {
+    }
+
+    /*
+     * get::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const get &other) const noexcept
+    {
+        return table_id == other.table_id && txn_id == other.txn_id && key == other.key;
+    }
+
+    /*
+     * get::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const get &other) const noexcept
+    {
+        return !(*this == other);
+    }
+};
+
+/*
+ * operator<< --
+ *     Human-readable output.
+ */
+inline std::ostream &
+operator<<(std::ostream &out, const get &op)
+{
+    out << "get(" << op.table_id << ", " << op.txn_id << ", " << op.key << ")";
+    return out;
+}
+
+/*
  * insert --
  *     A representation of this workload operation.
  */
@@ -1115,8 +1163,8 @@ operator<<(std::ostream &out, const wt_config &op)
  *     Any workload operation.
  */
 using any = std::variant<begin_transaction, breakpoint, checkpoint, checkpoint_crash,
-  commit_transaction, crash, create_table, evict, insert, nop, prepare_transaction, remove, restart,
-  rollback_to_stable, rollback_transaction, set_commit_timestamp, set_oldest_timestamp,
+  commit_transaction, crash, create_table, evict, get, insert, nop, prepare_transaction, remove,
+  restart, rollback_to_stable, rollback_transaction, set_commit_timestamp, set_oldest_timestamp,
   set_stable_timestamp, truncate, wt_config>;
 
 /*

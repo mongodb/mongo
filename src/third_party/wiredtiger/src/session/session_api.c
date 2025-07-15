@@ -268,7 +268,7 @@ __session_close_cursors(WT_SESSION_IMPL *session, WT_CURSOR_LIST *cursors)
              */
             WT_TRET_NOTFOUND_OK(cursor->reopen(cursor, false));
         else if (session->event_handler->handle_close != NULL &&
-          strcmp(cursor->internal_uri, WT_HS_URI) != 0)
+          !WT_IS_URI_HS(cursor->internal_uri))
             /*
              * Notify the user that we are closing the cursor handle via the registered close
              * callback.
@@ -393,7 +393,7 @@ __wt_session_close_internal(WT_SESSION_IMPL *session)
      * Close the file where we tracked long operations. Do this before releasing resources, as we do
      * scratch buffer management when we flush optrack buffers to disk.
      */
-    if (F_ISSET_ATOMIC_32(conn, WT_CONN_OPTRACK)) {
+    if (F_ISSET(conn, WT_CONN_OPTRACK)) {
         if (session->optrackbuf_ptr > 0) {
             __wt_optrack_flush_buffer(session);
             WT_TRET(__wt_close(session, &session->optrack_fh));
@@ -674,6 +674,8 @@ __session_open_cursor_int(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *
     case 'l':
         if (WT_PREFIX_MATCH(uri, "log:"))
             WT_RET(__wt_curlog_open(session, uri, cfg, cursorp));
+        else if (WT_PREFIX_MATCH(uri, "layered:"))
+            WT_RET(__wt_clayered_open(session, uri, owner, cfg, cursorp));
         break;
 
     /*
@@ -685,9 +687,10 @@ __session_open_cursor_int(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *
              * Open a version cursor instead of a table cursor if we are using the special debug
              * configuration.
              */
-            if ((ret = __wt_config_gets_def(session, cfg, "debug.dump_version", 0, &cval)) == 0 &&
+            if ((ret = __wt_config_gets_def(
+                   session, cfg, "debug.dump_version.enabled", 0, &cval)) == 0 &&
               cval.val) {
-                if (WT_STREQ(uri, WT_HS_URI))
+                if (WT_IS_URI_HS(uri))
                     WT_RET_MSG(session, EINVAL, "cannot open version cursor on the history store");
                 WT_RET(__wt_curversion_open(session, uri, owner, cfg, cursorp));
             } else
@@ -773,12 +776,11 @@ __wt_open_cursor(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, co
      * There are some exceptions to this rule:
      *  - Verifying the metadata through an internal session.
      *  - The btree is being verified.
-     *  - Opening the meta file itself while performing a checkpoint.
+     *  - Opening the meta files while performing a checkpoint.
      */
     WT_ASSERT(session,
-      strcmp(uri, WT_HS_URI) == 0 ||
-        (strcmp(uri, WT_METAFILE_URI) == 0 &&
-          __wt_atomic_loadvbool(&txn_global->checkpoint_running)) ||
+      WT_IS_URI_HS(uri) ||
+        (WT_IS_URI_METADATA(uri) && __wt_atomic_loadvbool(&txn_global->checkpoint_running)) ||
         session->hs_cursor_counter == 0 || F_ISSET(session, WT_SESSION_INTERNAL) ||
         (S2BT_SAFE(session) != NULL && F_ISSET(S2BT(session), WT_BTREE_VERIFY)));
 
@@ -821,8 +823,8 @@ __session_open_cursor(WT_SESSION *wt_session, const char *uri, WT_CURSOR *to_dup
      * - The session is an internal session
      * - The connection is minimally ready and the URI is "statistics:"
      */
-    if (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_READY) && !F_ISSET(session, WT_SESSION_INTERNAL) &&
-      (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_MINIMAL) || strcmp(uri, "statistics:") != 0))
+    if (!F_ISSET(S2C(session), WT_CONN_READY) && !F_ISSET(session, WT_SESSION_INTERNAL) &&
+      (!F_ISSET(S2C(session), WT_CONN_MINIMAL) || strcmp(uri, "statistics:") != 0))
         WT_ERR_MSG(
           session, EINVAL, "cannot open a non-statistics cursor before connection is opened");
 
@@ -886,7 +888,7 @@ __session_alter_internal(WT_SESSION_IMPL *session, const char *uri, const char *
     WT_DECL_RET;
 
     /* In-memory ignores alter operations. */
-    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_IN_MEMORY))
+    if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
         goto err;
 
     /* Disallow objects in the WiredTiger name space. */
@@ -1749,6 +1751,17 @@ err:
         WT_STAT_CONN_INCR(session, session_table_verify_fail);
     else
         WT_STAT_CONN_INCR(session, session_table_verify_success);
+
+    /*
+     * FIXME-WT-14553: Implement verify for disagg. For now we are skipping the expected ENOTSUP
+     * error.
+     */
+    if (__wt_conn_is_disagg(session) && ret == ENOTSUP) {
+        __wt_verbose_info(
+          session, WT_VERB_VERIFY, "%s", "silenced ENOTSUP from verify due to disagg");
+        ret = 0;
+    }
+
     API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
@@ -2387,7 +2400,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
      * Make sure we don't try to open a new session after the application closes the connection.
      * This is particularly intended to catch cases where server threads open sessions.
      */
-    WT_ASSERT(session, !F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING));
+    WT_ASSERT(session, !F_ISSET(conn, WT_CONN_CLOSING));
 
     /* Find the first inactive session slot. */
     for (session_ret = WT_CONN_SESSIONS_GET(conn), i = 0; i < conn->session_array.size;
@@ -2408,10 +2421,10 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __wt_atomic_store32(&conn->session_array.cnt, i + 1);
 
     /* Find the set of methods appropriate to this session. */
-    if (F_ISSET_ATOMIC_32(conn, WT_CONN_MINIMAL) && !F_ISSET(session, WT_SESSION_INTERNAL))
+    if (F_ISSET(conn, WT_CONN_MINIMAL) && !F_ISSET(session, WT_SESSION_INTERNAL))
         session_ret->iface = stds_min;
     else
-        session_ret->iface = F_ISSET_ATOMIC_32(conn, WT_CONN_READONLY) ? stds_readonly : stds;
+        session_ret->iface = F_ISSET(conn, WT_CONN_READONLY) ? stds_readonly : stds;
     session_ret->iface.connection = &conn->iface;
 
     session_ret->name = NULL;
@@ -2490,7 +2503,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
       session, session_ret->stat_dsrc_bucket == session_ret->id % WT_STAT_DSRC_COUNTER_SLOTS);
 
     /* Allocate the buffer for operation tracking */
-    if (F_ISSET_ATOMIC_32(conn, WT_CONN_OPTRACK)) {
+    if (F_ISSET(conn, WT_CONN_OPTRACK)) {
         WT_ERR(__wt_malloc(session, WT_OPTRACK_BUFSIZE, &session_ret->optrack_buf));
         session_ret->optrackbuf_ptr = 0;
     }
@@ -2498,7 +2511,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
     __wt_stat_session_init_single(&session_ret->stats);
 
     /* Set the default value for session flags. */
-    if (F_ISSET_ATOMIC_32(conn, WT_CONN_CACHE_CURSORS))
+    if (F_ISSET(conn, WT_CONN_CACHE_CURSORS))
         F_SET(session_ret, WT_SESSION_CACHE_CURSORS);
 
     /*

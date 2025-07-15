@@ -223,7 +223,8 @@ public:
      * kv_database::txn_snapshot --
      *     Create a transaction snapshot.
      */
-    kv_transaction_snapshot_ptr txn_snapshot(txn_id_t do_not_exclude = k_txn_none);
+    kv_transaction_snapshot_ptr txn_snapshot(
+      txn_id_t do_not_exclude = k_txn_none, bool is_checkpoint = false);
 
     /*
      * kv_database::crash --
@@ -284,7 +285,8 @@ protected:
      * kv_database::txn_snapshot --
      *     Create a transaction snapshot. Do not lock, because the caller already has a lock.
      */
-    kv_transaction_snapshot_ptr txn_snapshot_nolock(txn_id_t do_not_exclude = k_txn_none);
+    kv_transaction_snapshot_ptr txn_snapshot_nolock(
+      txn_id_t do_not_exclude = k_txn_none, bool is_checkpoint = false);
 
     /*
      * kv_database::clear --

@@ -168,7 +168,7 @@ __rec_hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor
              * case, we'll never get here.
              */
             if (hs_insert_cursor == NULL)
-                WT_ERR(__wt_curhs_open(session, NULL, &hs_insert_cursor));
+                WT_ERR(__wt_curhs_open(session, btree_id, NULL, &hs_insert_cursor));
 
             /*
              * If these history store records are resolved prepared updates, their durable
@@ -677,7 +677,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
       FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_EVICTION_CKPT_TS_ORDERING);
     cache_hs_insert_full_update = cache_hs_insert_reverse_modify = cache_hs_write_squash = 0;
 
-    WT_RET(__wt_curhs_open(session, NULL, &hs_cursor));
+    WT_RET(__wt_curhs_open(session, btree->id, NULL, &hs_cursor));
     F_SET(hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
 
     __wt_update_vector_init(session, &updates);
@@ -837,8 +837,11 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
             /*
              * If we've reached a full update and it's in the history store we don't need to
              * continue as anything beyond this point won't help with calculating deltas.
+             *
+             * No need to insert any data that is older than the update restored from delta. They
+             * are already in the history store.
              */
-            if (F_ISSET(upd, WT_UPDATE_HS)) {
+            if (F_ISSET(upd, WT_UPDATE_HS | WT_UPDATE_RESTORED_FROM_DELTA)) {
                 if (upd->type == WT_UPDATE_STANDARD)
                     break;
 
@@ -847,7 +850,8 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
                  * flag state to deal with this later. We cannot break here as there are scenarios
                  * we need to finish the loop to construct the full update.
                  */
-                hs_flag_set = true;
+                if (F_ISSET(upd, WT_UPDATE_HS))
+                    hs_flag_set = true;
             }
 
             /*
@@ -1161,13 +1165,29 @@ static int
 __rec_hs_delete_record(
   WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_ITEM *key, WT_UPDATE *upd, WT_UPDATE *tombstone)
 {
+    WT_BTREE *btree;
     WT_DECL_RET;
     bool hs_read_committed;
 
     WT_TIME_WINDOW *hs_tw;
 
+    btree = S2BT(session);
+
+    /*
+     * Open a history store cursor if we don't yet have one. If we already have it, check if it
+     * matches the current btree and attempt to reuse it if it does not.
+     */
     if (r->hs_cursor == NULL)
-        WT_RET(__wt_curhs_open(session, NULL, &r->hs_cursor));
+        WT_RET(__wt_curhs_open(session, btree->id, NULL, &r->hs_cursor));
+    else if (__wt_curhs_get_btree_id(session, r->hs_cursor) != btree->id) {
+        WT_RET_ERROR_OK(ret = __wt_curhs_set_btree_id(session, r->hs_cursor, btree->id), EINVAL);
+        if (ret == EINVAL) {
+            WT_RET(r->hs_cursor->close(r->hs_cursor));
+            r->hs_cursor = NULL;
+            WT_RET(__wt_curhs_open(session, btree->id, NULL, &r->hs_cursor));
+        }
+    }
+
     hs_read_committed = F_ISSET(r->hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
     /* Ensure we can see all the content in the history store. */
     F_SET(r->hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
@@ -1176,7 +1196,7 @@ __rec_hs_delete_record(
     if (tombstone != NULL && __wt_txn_upd_visible_all(session, tombstone))
         goto done;
 
-    r->hs_cursor->set_key(r->hs_cursor, 4, S2BT(session)->id, key, WT_TS_MAX, UINT64_MAX);
+    r->hs_cursor->set_key(r->hs_cursor, 4, btree->id, key, WT_TS_MAX, UINT64_MAX);
     WT_ERR_NOTFOUND_OK(__wt_curhs_search_near_before(session, r->hs_cursor), true);
     /* It's possible the value in the history store becomes obsolete concurrently. */
     if (ret == WT_NOTFOUND) {

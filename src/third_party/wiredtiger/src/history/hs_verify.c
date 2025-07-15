@@ -72,7 +72,7 @@ __hs_verify_id(
         WT_ERR(ret);
 
         if (ds_cbt->compare != 0) {
-            F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
+            F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
             /* Note that we are reformatting the HS key here. */
             WT_ERR_PANIC(session, WT_PANIC,
               "the associated history store key %s was not found in the data store %s",
@@ -110,7 +110,7 @@ __wt_hs_verify_one(WT_SESSION_IMPL *session, uint32_t btree_id)
 
     hs_cursor = NULL;
 
-    WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor));
+    WT_ERR(__wt_curhs_open(session, btree_id, NULL, &hs_cursor));
     F_SET(hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
 
     /* Position the hs cursor on the requested btree id, there could be nothing in the HS yet. */
@@ -141,12 +141,12 @@ err:
 }
 
 /*
- * __wt_hs_verify --
+ * __hs_verify --
  *     Verify the history store. There can't be an entry in the history store without having the
  *     latest value for the respective key in the data store.
  */
-int
-__wt_hs_verify(WT_SESSION_IMPL *session)
+static int
+__hs_verify(WT_SESSION_IMPL *session, uint32_t hs_id)
 {
     WT_CURSOR *ds_cursor, *hs_cursor;
     WT_DECL_ITEM(buf);
@@ -165,7 +165,7 @@ __wt_hs_verify(WT_SESSION_IMPL *session)
     uri_data = NULL;
 
     WT_ERR(__wt_scr_alloc(session, 0, &buf));
-    WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor));
+    WT_ERR(__wt_curhs_open_ext(session, hs_id, 0, NULL, &hs_cursor));
     F_SET(hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
 
     /* Position the hs cursor on the first record. */
@@ -183,7 +183,7 @@ __wt_hs_verify(WT_SESSION_IMPL *session)
          */
         WT_ERR(hs_cursor->get_key(hs_cursor, &btree_id, &key, &hs_start_ts, &hs_counter));
         if ((ret = __wt_metadata_btree_id_to_uri(session, btree_id, &uri_data)) != 0) {
-            F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
+            F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
             WT_ERR_PANIC(session, ret,
               "Unable to find btree id %" PRIu32
               " in the metadata file for the associated key '%s'.",
@@ -213,4 +213,24 @@ err:
     if (hs_cursor != NULL)
         WT_TRET(hs_cursor->close(hs_cursor));
     return (ret);
+}
+
+/*
+ * __wt_hs_verify --
+ *     Verify the history store. There can't be an entry in the history store without having the
+ *     latest value for the respective key in the data store.
+ */
+int
+__wt_hs_verify(WT_SESSION_IMPL *session)
+{
+    WT_DECL_RET;
+    uint32_t hs_id;
+
+    hs_id = 0;
+    for (;;) {
+        WT_RET_NOTFOUND_OK(ret = __wt_curhs_next_hs_id(session, hs_id, &hs_id));
+        if (ret == WT_NOTFOUND)
+            return (0);
+        WT_RET(__hs_verify(session, hs_id));
+    }
 }

@@ -496,6 +496,73 @@ __wt_time_value_validate(
           "value time window has a durable start time after its durable stop time; time window %s",
           __wt_time_window_to_string(tw, time_string[0]));
 
+    if (tw->prepare && F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED)) {
+        if (tw->prepare_ts == WT_TS_NONE)
+            WT_TIME_VALIDATE_RET(session,
+              "value time window is prepared and has preserve_prepared enabled but has no prepare "
+              "timestamp; time window %s",
+              __wt_time_window_to_string(tw, time_string[0]));
+        if (tw->prepared_id == WT_PREPARED_ID_NONE)
+            WT_TIME_VALIDATE_RET(session,
+              "value time window is prepared and has preserve_prepared enabled but has no prepared "
+              "id; time window %s",
+              __wt_time_window_to_string(tw, time_string[0]));
+
+        if (WT_TIME_WINDOW_HAS_STOP(tw)) {
+            if (tw->stop_ts != tw->prepare_ts)
+                WT_TIME_VALIDATE_RET(session,
+                  "value time window is stop prepared but has different stop_ts and prepared_ts; "
+                  "time window %s",
+                  __wt_time_window_to_string(tw, time_string[0]));
+
+            if (tw->durable_stop_ts != WT_TS_NONE)
+                WT_TIME_VALIDATE_RET(session,
+                  "value time window is stop prepared but has non-empty durable_stop_ts; "
+                  "time window %s",
+                  __wt_time_window_to_string(tw, time_string[0]));
+
+            if (tw->start_txn == tw->stop_txn) {
+                /* both start and stop are prepared, they must be in the same transaction */
+                if (tw->durable_start_ts != WT_TS_NONE)
+                    WT_TIME_VALIDATE_RET(session,
+                      "value time window is start and stop prepared but has non-empty durable "
+                      "start timestamps; time window %s",
+                      __wt_time_window_to_string(tw, time_string[0]));
+                if (tw->start_ts != tw->prepare_ts)
+                    WT_TIME_VALIDATE_RET(session,
+                      "value time window is start prepared but has different start_ts and "
+                      "prepared_ts; time window %s",
+                      __wt_time_window_to_string(tw, time_string[0]));
+
+            } else if (tw->start_ts >= tw->prepare_ts) {
+                WT_TIME_VALIDATE_RET(session,
+                  "value time window is prepared delete but has a start timestamp greater "
+                  "than or equal to the prepared delete timestamp; time window %s",
+                  __wt_time_window_to_string(tw, time_string[0]));
+            }
+        } else {
+            /* this means time window is start prepared */
+            if (tw->start_ts != tw->prepare_ts)
+                WT_TIME_VALIDATE_RET(session,
+                  "value time window is start prepared but has different start_ts and prepared_ts; "
+                  "time window %s",
+                  __wt_time_window_to_string(tw, time_string[0]));
+            if (tw->durable_start_ts != WT_TS_NONE)
+                WT_TIME_VALIDATE_RET(session,
+                  "value time window is start prepared but has non-empty durable_start_ts; "
+                  "time window %s",
+                  __wt_time_window_to_string(tw, time_string[0]));
+        }
+    } else {
+        /* Validate that prepare_ts and prepared_id must be none */
+        if (tw->prepare_ts != WT_TS_NONE || tw->prepared_id != WT_PREPARED_ID_NONE) {
+            WT_TIME_VALIDATE_RET(session,
+              "Non-prepared value time window but contains prepared ts and prepared id; time "
+              "window %s",
+              __wt_time_window_to_string(tw, time_string[0]));
+        }
+    }
+
     /*
      * Optionally validate the time window against a parent's time window.
      *

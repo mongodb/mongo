@@ -78,6 +78,7 @@
         }                                                                                        \
     }
 
+#define PALM_ENCRYPTION_EQUAL(e1, e2) (memcmp((e1).dek, (e2).dek, sizeof((e1).dek)) == 0)
 /*
  * The default cache size for LMDB. Instead of changing this here, consider setting
  * cache_size_mb=.... when loading the extension library.
@@ -101,6 +102,9 @@ typedef struct {
      */
     pthread_rwlock_t pl_handle_lock;
 
+    /* The LSN when the KV database is opened, used to check encryption. */
+    uint64_t begin_lsn;
+
     /*
      * Keep the number of references to this page log.
      */
@@ -114,6 +118,7 @@ typedef struct {
     uint32_t materialization_delay_ms; /* Average length of materialization delay */
     uint64_t last_materialized_lsn;    /* The last materialized LSN (0 if not set) */
     uint32_t verbose;                  /* Verbose level */
+    bool verbose_msg;                  /* Send verbose messages to msg callback interface */
 
     /*
      * Statistics are collected but not yet exposed.
@@ -139,11 +144,15 @@ typedef struct palm_handle {
  * Forward function declarations for internal functions
  */
 static int palm_configure(PALM *, WT_CONFIG_ARG *);
+static int palm_configure_bool(PALM *, WT_CONFIG_PARSER *, WT_CONFIG_ARG *, const char *, bool *);
 static int palm_configure_int(
   PALM *, WT_CONFIG_PARSER *, WT_CONFIG_ARG *, const char *, uint32_t *);
 static int palm_err(PALM *, WT_SESSION *, int, const char *, ...);
 static int palm_kv_err(PALM *, WT_SESSION *, int, const char *, ...);
+static int palm_get_dek(PALM *, WT_SESSION *, const WT_PAGE_LOG_ENCRYPTION *, uint64_t, uint64_t,
+  bool, uint64_t, WT_PAGE_LOG_ENCRYPTION *);
 static void palm_init_context(PALM *, PALM_KV_CONTEXT *);
+static int palm_init_lsn(PALM *);
 
 /*
  * Forward function declarations for page log API implementation
@@ -189,6 +198,9 @@ palm_configure(PALM *palm, WT_CONFIG_ARG *config)
         goto err;
     if ((ret = palm_configure_int(palm, env_parser, config, "verbose", &palm->verbose)) != 0)
         goto err;
+    if ((ret = palm_configure_bool(palm, env_parser, config, "verbose_msg", &palm->verbose_msg)) !=
+      0)
+        goto err;
 
 err:
     if (env_parser != NULL) {
@@ -196,6 +208,37 @@ err:
         if (ret == 0)
             ret = t_ret;
     }
+    return (ret);
+}
+
+/*
+ * palm_configure_bool
+ *     Look for a particular configuration key, and return its boolean value.
+ */
+static int
+palm_configure_bool(
+  PALM *palm, WT_CONFIG_PARSER *env_parser, WT_CONFIG_ARG *config, const char *key, bool *valuep)
+{
+    WT_CONFIG_ITEM v;
+    int ret;
+
+    ret = 0;
+
+    /*
+     * Environment configuration overrides configuration used with loading the library, so check
+     * that first.
+     */
+    if ((ret = env_parser->get(env_parser, key, &v)) == 0 ||
+      (ret = palm->wt_api->config_get(palm->wt_api, NULL, config, key, &v)) == 0) {
+        if (v.len == 0 || (v.type != WT_CONFIG_ITEM_NUM && v.type != WT_CONFIG_ITEM_BOOL))
+            ret = palm_err(palm, NULL, EINVAL, "force_error config arg: bool required");
+        else
+            *valuep = (v.val != 0);
+    } else if (ret == WT_NOTFOUND)
+        ret = 0;
+    else
+        ret = palm_err(palm, NULL, EINVAL, "WT_API->config_get");
+
     return (ret);
 }
 
@@ -279,7 +322,7 @@ palm_compute_delay_us(PALM *palm, uint64_t avg_delay_us)
  *     Add any artificial delay or simulated network error during an object transfer.
  */
 static int
-palm_delay(PALM *palm)
+palm_delay(PALM *palm, WT_SESSION *session)
 {
     int ret;
     uint64_t us;
@@ -288,7 +331,7 @@ palm_delay(PALM *palm)
     if (palm->force_delay != 0 &&
       (palm->object_gets + palm->object_puts) % palm->force_delay == 0) {
         us = palm_compute_delay_us(palm, (uint64_t)palm->delay_ms * WT_THOUSAND);
-        PALM_VERBOSE_PRINT(palm,
+        PALM_VERBOSE_PRINT(palm, session,
           "Artificial delay %" PRIu64 " microseconds after %" PRIu64 " object reads, %" PRIu64
           " object writes\n",
           us, palm->object_gets, palm->object_puts);
@@ -297,7 +340,7 @@ palm_delay(PALM *palm)
     if (palm->force_error != 0 &&
       (palm->object_gets + palm->object_puts) % palm->force_error == 0) {
         us = palm_compute_delay_us(palm, (uint64_t)palm->error_ms * WT_THOUSAND);
-        PALM_VERBOSE_PRINT(palm,
+        PALM_VERBOSE_PRINT(palm, session,
           "Artificial error returned after %" PRIu64 " microseconds sleep, %" PRIu64
           " object reads, %" PRIu64 " object writes\n",
           us, palm->object_gets, palm->object_puts);
@@ -348,10 +391,76 @@ palm_kv_err(PALM *palm, WT_SESSION *session, int ret, const char *format, ...)
         wt_api->err_printf(wt_api, session, "palm: error overflow");
     lmdb_error = mdb_strerror(ret);
     wt_api->err_printf(wt_api, session, "palm LMDB: %s: %s", lmdb_error, buf);
-    PALM_VERBOSE_PRINT(palm, "palm LMDB: %s: %s\n", lmdb_error, buf);
+    PALM_VERBOSE_PRINT(palm, session, "palm LMDB: %s: %s\n", lmdb_error, buf);
     va_end(ap);
 
     return (WT_ERROR);
+}
+
+/*
+ * palm_get_dek --
+ *     Check or generate a DEK (encryption key).
+ */
+static int
+palm_get_dek(PALM *palm, WT_SESSION *session, const WT_PAGE_LOG_ENCRYPTION *encrypt_in,
+  uint64_t table_id, uint64_t page_id, bool is_delta, uint64_t base_lsn,
+  WT_PAGE_LOG_ENCRYPTION *encrypt_out)
+{
+    static WT_PAGE_LOG_ENCRYPTION zero_encryption;
+    WT_PAGE_LOG_ENCRYPTION tmp;
+    bool was_zeroed;
+
+    /*
+     * The DEK is an encrypted encryption key. A production implementation of the page log interface
+     * would do encryption, using the DEK when it is set. If the DEK is not set, the implementation
+     * must figure out what the DEK should be, which may take some time. The DEK is stored with the
+     * page, and when the implementation gets a page it knows how to decrypt it. It also passes the
+     * DEK to the user of the interface (WiredTiger). That DEK must be kept and used for subsequent
+     * deltas to the page. Thus when deltas are written, the DEK doesn't have to be recomputed.
+     *
+     * Here in PALM, we don't want to do any encryption. Since the encrypt/decryption would
+     * invisible to the calling layer (WiredTiger), having encryption doesn't help test WiredTiger
+     * at all. Also, it gets in the way of efficient debugging.
+     *
+     * However, we do want to test that WiredTiger is passing along the DEK whenever it can and
+     * should. If it stopped doing so, the production page log would need to determine the DEK for
+     * itself more often, and we might not notice the error.
+     *
+     * So WiredTiger receives a DEK with every page get. When writing a delta for such a page, it
+     * needs to pass that DEK. One the other hand, when writing a delta for page that WiredTiger
+     * generated and wrote during the current connection, it uses a zeroed DEK, that's the best it
+     * can do.
+     *
+     * To test this without doing any extra KV requests, we generate and store a DEK for any page
+     * write that doesn't already have it - a simple encoding of the table id and page id. Then,
+     * we'd expect that if a DEK is ever passed to us in the put path, it must match that simple
+     * encoding. That tests that the correct DEK is being passed.
+     *
+     * To test that we're passing a DEK when we should, we compare the base_lsn to the LSN we
+     * started the run with. If the base_lsn is less than that, then WiredTiger must have previously
+     * gotten the page from the page log interface, hence the DEK should be set.
+     */
+#define PALM_DEK_FORMAT ("%" PRIu64 ":%" PRIu64)
+    tmp = zero_encryption;
+    if ((size_t)snprintf(&tmp.dek[0], sizeof(tmp.dek), PALM_DEK_FORMAT, table_id, page_id) >
+      sizeof(tmp.dek))
+        assert(false); /* should never overflow */
+
+    was_zeroed = PALM_ENCRYPTION_EQUAL(*encrypt_in, zero_encryption);
+    if (was_zeroed)
+        *encrypt_out = tmp;
+    else {
+        if (!PALM_ENCRYPTION_EQUAL(*encrypt_in, tmp))
+            return (palm_err(palm, session, EINVAL,
+              "encryption dek %31s does not match expected value %31s", encrypt_in->dek, tmp.dek));
+        PALM_VERBOSE_PRINT(palm, session, "palm using saved dek: %s\n", encrypt_in->dek);
+        *encrypt_out = *encrypt_in;
+    }
+
+    if (was_zeroed && is_delta && base_lsn < palm->begin_lsn)
+        return (palm_err(palm, session, EINVAL, "expected non-zero encryption dek"));
+
+    return (0);
 }
 
 /*
@@ -389,6 +498,30 @@ palm_init_context(PALM *palm, PALM_KV_CONTEXT *context)
      */
     context->materialization_delay_us = palm->materialization_delay_ms * WT_THOUSAND;
     context->last_materialized_lsn = palm->last_materialized_lsn;
+}
+
+/*
+ * palm_init_lsn --
+ *     Remember the current LSN when we started PALM.
+ */
+static int
+palm_init_lsn(PALM *palm)
+{
+    PALM_KV_CONTEXT context;
+    int ret;
+
+    palm_init_context(palm, &context);
+    PALM_KV_RET(palm, NULL, palm_kv_begin_transaction(&context, palm->kv_env, false));
+
+    /*
+     * Get the LSN. If it's never been set, we'll get not found, but that's okay, that will leave
+     * our beginning LSN at zero, which is fine for our purposes.
+     */
+    ret = palm_kv_get_global(&context, PALM_KV_GLOBAL_REVISION, &palm->begin_lsn);
+    if (ret == MDB_NOTFOUND)
+        ret = 0;
+    palm_kv_rollback_transaction(&context);
+    return (ret);
 }
 
 /*
@@ -645,6 +778,71 @@ err:
 }
 
 static int
+palm_handle_discard(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
+  uint64_t checkpoint_id, WT_PAGE_LOG_DISCARD_ARGS *discard_args)
+{
+    static WT_PAGE_LOG_ENCRYPTION zero_encryption;
+    WT_ITEM *tombstone = NULL;
+    PALM_HANDLE *palm_handle = (PALM_HANDLE *)plh;
+    PALM *palm = palm_handle->palm;
+    palm_delay(palm, session);
+
+    PALM_KV_CONTEXT context;
+    palm_init_context(palm, &context);
+
+    /* We always write full pages for tombstones, PALM has its own flag. */
+    bool is_delta = false;
+    uint32_t flags = WT_PALM_KV_TOMBSTONE;
+
+    PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, false));
+    uint64_t lsn;
+    int ret = palm_kv_get_global(&context, PALM_KV_GLOBAL_REVISION, &lsn);
+    if (ret == MDB_NOTFOUND) {
+        lsn = 1;
+        ret = 0;
+    }
+    PALM_KV_ERR(palm, session, ret);
+
+    PALM_VERBOSE_PRINT(palm_handle->palm, session,
+      "palm_handle_discard(plh=%p, table_id=%" PRIu64 ", page_id=%" PRIu64
+      ", checkpoint_id=%" PRIu64 ", backlink_lsn=%" PRIu64 ", base_lsn=%" PRIu64
+      ", backlink_checkpoint_id=%" PRIu64 ", base_checkpoint_id=%" PRIu64 ")\n",
+      (void *)plh, palm_handle->table_id, page_id, checkpoint_id, discard_args->backlink_lsn,
+      discard_args->base_lsn, discard_args->backlink_checkpoint_id,
+      discard_args->base_checkpoint_id);
+
+    /* There should not be any flag set. */
+    assert(discard_args->flags == 0);
+
+    /* Create an empty record as a tombstone. */
+    if ((tombstone = calloc(1, sizeof(WT_ITEM))) == NULL)
+        return (errno);
+
+    PALM_KV_ERR(palm, session,
+      palm_kv_put_page(&context, palm_handle->table_id, page_id, lsn, checkpoint_id, is_delta,
+        discard_args->backlink_lsn, discard_args->base_lsn, discard_args->backlink_checkpoint_id,
+        discard_args->base_checkpoint_id, &zero_encryption, flags, tombstone));
+    PALM_KV_ERR(palm, session, palm_kv_put_global(&context, PALM_KV_GLOBAL_REVISION, lsn + 1));
+    PALM_KV_ERR(palm, session, palm_kv_commit_transaction(&context));
+
+    discard_args->lsn = lsn;
+
+    if (0) {
+err:
+        palm_kv_rollback_transaction(&context);
+
+        PALM_VERBOSE_PRINT(palm_handle->palm, session,
+          "palm_handle_discard(plh=%p, table_id=%" PRIu64 ", page_id=%" PRIu64 ", lsn=%" PRIu64
+          ", checkpoint_id=%" PRIu64 ", is_delta=%d) returned %d\n",
+          (void *)plh, palm_handle->table_id, page_id, lsn, checkpoint_id, is_delta, ret);
+    }
+
+    free(tombstone);
+
+    return (ret);
+}
+
+static int
 palm_handle_put(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
   uint64_t checkpoint_id, WT_PAGE_LOG_PUT_ARGS *put_args, const WT_ITEM *buf)
 {
@@ -654,14 +852,20 @@ palm_handle_put(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
     uint64_t lsn;
     int ret;
     bool is_delta;
+    WT_PAGE_LOG_ENCRYPTION encryption;
 
     is_delta = (put_args->flags & WT_PAGE_LOG_DELTA) != 0;
     lsn = 0;
     palm_handle = (PALM_HANDLE *)plh;
     palm = palm_handle->palm;
-    palm_delay(palm);
+    palm_delay(palm, session);
 
     palm_init_context(palm, &context);
+
+    /* Check or initialize the encryption field. */
+    PALM_KV_RET(palm, session,
+      palm_get_dek(palm, session, &put_args->encryption, palm_handle->table_id, page_id, is_delta,
+        put_args->base_lsn, &encryption));
 
     PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, false));
     ret = palm_kv_get_global(&context, PALM_KV_GLOBAL_REVISION, &lsn);
@@ -671,7 +875,7 @@ palm_handle_put(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
     }
     PALM_KV_ERR(palm, session, ret);
 
-    PALM_VERBOSE_PRINT(palm_handle->palm,
+    PALM_VERBOSE_PRINT(palm_handle->palm, session,
       "palm_handle_put(plh=%p, table_id=%" PRIu64 ", page_id=%" PRIu64 ", lsn=%" PRIu64
       ", checkpoint_id=%" PRIu64 ", backlink_lsn=%" PRIu64 ", base_lsn=%" PRIu64
       ", backlink_checkpoint_id=%" PRIu64 ", base_checkpoint_id=%" PRIu64
@@ -683,7 +887,7 @@ palm_handle_put(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
     PALM_KV_ERR(palm, session,
       palm_kv_put_page(&context, palm_handle->table_id, page_id, lsn, checkpoint_id, is_delta,
         put_args->backlink_lsn, put_args->base_lsn, put_args->backlink_checkpoint_id,
-        put_args->base_checkpoint_id, put_args->flags, buf));
+        put_args->base_checkpoint_id, &encryption, put_args->flags, buf));
     PALM_KV_ERR(palm, session, palm_kv_put_global(&context, PALM_KV_GLOBAL_REVISION, lsn + 1));
     PALM_KV_ERR(palm, session, palm_kv_commit_transaction(&context));
     put_args->lsn = lsn;
@@ -692,7 +896,7 @@ palm_handle_put(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
 err:
     palm_kv_rollback_transaction(&context);
 
-    PALM_VERBOSE_PRINT(palm_handle->palm,
+    PALM_VERBOSE_PRINT(palm_handle->palm, session,
       "palm_handle_put(plh=%p, table_id=%" PRIu64 ", page_id=%" PRIu64 ", lsn=%" PRIu64
       ", checkpoint_id=%" PRIu64 ", is_delta=%d) returned %d\n",
       (void *)plh, palm_handle->table_id, page_id, lsn, checkpoint_id, is_delta, ret);
@@ -717,6 +921,7 @@ palm_handle_get(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
   uint64_t checkpoint_id, WT_PAGE_LOG_GET_ARGS *get_args, WT_ITEM *results_array,
   uint32_t *results_count)
 {
+    static WT_PAGE_LOG_ENCRYPTION zero_encryption;
     PALM *palm;
     PALM_KV_CONTEXT context;
     PALM_HANDLE *palm_handle;
@@ -724,6 +929,7 @@ palm_handle_get(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
     uint32_t count, i;
     uint64_t last_checkpoint_id, last_lsn, lsn;
     int ret;
+    bool zeroed_encryption, was_zeroed_encryption;
 
     count = 0;
     last_checkpoint_id = 0;
@@ -731,14 +937,14 @@ palm_handle_get(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
     lsn = get_args->lsn;
     palm_handle = (PALM_HANDLE *)plh;
     palm = palm_handle->palm;
-    palm_delay(palm);
+    palm_delay(palm, session);
 
     /* Ensure that regular shared tables use LSNs. */
     assert(palm_handle->table_id == 1 || lsn > 0);
 
     palm_init_context(palm, &context);
 
-    PALM_VERBOSE_PRINT(palm_handle->palm,
+    PALM_VERBOSE_PRINT(palm_handle->palm, session,
       "palm_handle_get(plh=%p, table_id=%" PRIu64 ", page_id=%" PRIu64 ", lsn=%" PRIu64
       ", checkpoint_id=%" PRIu64 ")...\n",
       (void *)plh, palm_handle->table_id, page_id, lsn, checkpoint_id);
@@ -746,6 +952,8 @@ palm_handle_get(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
     PALM_KV_ERR(palm, session,
       palm_kv_get_page_matches(
         &context, palm_handle->table_id, page_id, lsn, checkpoint_id, &matches));
+    get_args->encryption = zero_encryption;
+    was_zeroed_encryption = true;
     for (count = 0; count < *results_count; ++count) {
         if (!palm_kv_next_page_match(&matches))
             break;
@@ -768,12 +976,28 @@ palm_handle_get(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
             PALM_GET_VERIFY_EQUAL(matches.base_checkpoint_id, get_args->base_checkpoint_id);
         }
 
+        /* We should not request a page that is discarded. */
+        ret = (matches.flags & WT_PALM_KV_TOMBSTONE) == 0 ? 0 : EINVAL;
+        PALM_KV_ERR(palm, session, ret);
+
         last_lsn = matches.lsn;
         last_checkpoint_id = matches.checkpoint_id;
         get_args->backlink_lsn = matches.backlink_lsn;
         get_args->base_lsn = matches.base_lsn;
         get_args->backlink_checkpoint_id = matches.backlink_checkpoint_id;
         get_args->base_checkpoint_id = matches.base_checkpoint_id;
+        get_args->encryption = matches.encryption;
+        zeroed_encryption = PALM_ENCRYPTION_EQUAL(get_args->encryption, zero_encryption);
+        if (zeroed_encryption)
+            PALM_VERBOSE_PRINT(palm, session, "palm got zero dek%s\n", "");
+        else
+            PALM_VERBOSE_PRINT(
+              palm, session, "palm got non-zero dek: %s\n", get_args->encryption.dek);
+        if (zeroed_encryption && !was_zeroed_encryption) {
+            ret = palm_err(palm, session, EINVAL,
+              "base dek is not zeroed, delta encryption is zero and should not be");
+            goto err;
+        }
         get_args->delta_count = count;
     }
     /* Did the caller give us enough output entries to hold all the results? */
@@ -785,15 +1009,15 @@ palm_handle_get(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
 
 err:
     palm_kv_rollback_transaction(&context);
-    PALM_VERBOSE_PRINT(palm_handle->palm,
+    PALM_VERBOSE_PRINT(palm_handle->palm, session,
       "palm_handle_get(plh=%p, table_id=%" PRIu64 ", page_id=%" PRIu64 ", lsn=%" PRIu64
       ", checkpoint_id=%" PRIu64 ") returns %d (in %d parts)\n",
       (void *)plh, palm_handle->table_id, page_id, lsn, checkpoint_id, ret, (int)count);
     if (ret == 0) {
         for (i = 0; i < count; ++i)
-            PALM_VERBOSE_PRINT(
-              palm_handle->palm, "   part %d: %s\n", (int)i, palm_verbose_item(&results_array[i]));
-        PALM_VERBOSE_PRINT(palm_handle->palm,
+            PALM_VERBOSE_PRINT(palm_handle->palm, session, "   part %d: %s\n", (int)i,
+              palm_verbose_item(&results_array[i]));
+        PALM_VERBOSE_PRINT(palm_handle->palm, session,
           "   metadata: backlink_lsn=%" PRIu64 ", base_lsn=%" PRIu64
           ", backlink_checkpoint_id=%" PRIu64 ", base_checkpoint_id=%" PRIu64 "\n",
           get_args->backlink_lsn, get_args->base_lsn, get_args->backlink_checkpoint_id,
@@ -852,6 +1076,7 @@ palm_open_handle(
     if ((palm_handle = calloc(1, sizeof(PALM_HANDLE))) == NULL)
         return (errno);
     palm_handle->iface.page_log = page_log;
+    palm_handle->iface.plh_discard = palm_handle_discard;
     palm_handle->iface.plh_put = palm_handle_put;
     palm_handle->iface.plh_get = palm_handle_get;
     palm_handle->iface.plh_close = palm_handle_close;
@@ -992,6 +1217,9 @@ palm_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 
     /* Open the LMDB environment. */
     PALM_KV_ERR(palm, NULL, palm_kv_env_open(palm->kv_env, palm->kv_home));
+
+    if ((ret = palm_init_lsn(palm)) != 0)
+        goto err;
 
 err:
     if (ret != 0) {

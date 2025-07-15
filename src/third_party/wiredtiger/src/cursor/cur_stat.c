@@ -384,6 +384,103 @@ __curstat_conn_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 }
 
 /*
+ * __init_layered_constituent_stats --
+ *     For either an ingest or stable table, aggregate dhandle stats into a stat cursor.
+ */
+static int
+__init_layered_constituent_stats(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
+{
+    WT_DATA_HANDLE *dhandle;
+    WT_DECL_RET;
+
+    dhandle = session->dhandle;
+
+    if ((ret = __wt_btree_stat_init(session, cst)) == 0) {
+        __wt_stat_dsrc_aggregate(dhandle->stats, &cst->u.dsrc_stats);
+        if (F_ISSET(cst, WT_STAT_CLEAR))
+            __wt_stat_dsrc_clear_all(dhandle->stats);
+    }
+
+    return (ret);
+}
+
+/*
+ * __curstat_layered_init --
+ *     Initialize the statistics for a layered table.
+ */
+static int
+__curstat_layered_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
+{
+    WT_DATA_HANDLE *dhandle;
+    WT_DECL_ITEM(stable_uri_buf);
+    WT_DECL_RET;
+    WT_LAYERED_TABLE *layered;
+    const char *checkpoint_name;
+    const char *stable_uri;
+
+    layered = NULL;
+
+    WT_RET(__wt_session_get_dhandle(session, uri, NULL, NULL, 0));
+    dhandle = session->dhandle;
+    WT_ASSERT(session, dhandle->type == WT_DHANDLE_TYPE_LAYERED);
+    layered = (WT_LAYERED_TABLE *)dhandle;
+
+    __wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
+
+    /* Do the ingest table. */
+    WT_ERR(__wt_session_get_dhandle(session, layered->ingest_uri, NULL, NULL, 0));
+    WT_ERR(__init_layered_constituent_stats(session, cst));
+    WT_ERR(__wt_session_release_dhandle(session));
+
+    stable_uri = layered->stable_uri;
+    /* Now do the stable table. */
+    if (!S2C(session)->layered_table_manager.leader) {
+        /* Look up the most recent data store checkpoint. This fetches the exact name to use. */
+        checkpoint_name = NULL;
+        WT_ERR_NOTFOUND_OK(
+          __wt_meta_checkpoint_last_name(session, stable_uri, &checkpoint_name, NULL, NULL), true);
+
+        /* We only need to check the stable table if we have picked up a checkpoint. */
+        if (ret == WT_NOTFOUND) {
+            ret = 0;
+            goto done;
+        }
+
+        WT_ERR(__wt_scr_alloc(session, 0, &stable_uri_buf));
+        /*
+         * Use a URI with a "/<checkpoint name> suffix. This is interpreted as reading from the
+         * stable checkpoint, but without it being a traditional checkpoint cursor.
+         */
+        WT_ERR(
+          __wt_buf_fmt(session, stable_uri_buf, "%s/%s", layered->stable_uri, checkpoint_name));
+        stable_uri = stable_uri_buf->data;
+    }
+
+    WT_ERR(__wt_session_get_dhandle(session, stable_uri, NULL, NULL, 0));
+    WT_ERR(__init_layered_constituent_stats(session, cst));
+    WT_ERR(__wt_session_release_dhandle(session));
+
+done:
+    __wt_curstat_dsrc_final(cst);
+
+err:
+    __wt_scr_free(session, &stable_uri_buf);
+    /* The constituent table dhandles have been released. Release the layered dhandle. */
+    if (session->dhandle == NULL)
+        session->dhandle = dhandle;
+    /*
+     * The constituent table dhandle hasn't been released. Release it first then release the layered
+     * dhandle.
+     */
+    else if (dhandle != session->dhandle) {
+        WT_TRET(__wt_session_release_dhandle(session));
+        session->dhandle = dhandle;
+    }
+    WT_TRET(__wt_session_release_dhandle(session));
+    return (ret);
+}
+
+/*
  * __curstat_file_init --
  *     Initialize the statistics for a file.
  */
@@ -495,7 +592,7 @@ __wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], 
     }
 
     /* Data source statistics are only available after recovery completes. */
-    WT_ASSERT(session, F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RECOVERY_COMPLETE));
+    WT_ASSERT(session, F_ISSET(S2C(session), WT_CONN_RECOVERY_COMPLETE));
     dsrc_uri = uri + strlen("statistics:");
 
     if (strcmp(dsrc_uri, "session") == 0) {
@@ -507,6 +604,8 @@ __wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], 
         WT_RET(__curstat_file_init(session, dsrc_uri, cfg, cst));
     else if (WT_PREFIX_MATCH(dsrc_uri, "index:"))
         WT_RET(__wt_curstat_index_init(session, dsrc_uri, cfg, cst));
+    else if (WT_PREFIX_MATCH(dsrc_uri, "layered:"))
+        WT_RET(__curstat_layered_init(session, dsrc_uri, cst));
     else if (WT_PREFIX_MATCH(dsrc_uri, "table:"))
         WT_RET(__wt_curstat_table_init(session, dsrc_uri, cfg, cst));
     else if (WT_PREFIX_MATCH(dsrc_uri, "tiered:"))

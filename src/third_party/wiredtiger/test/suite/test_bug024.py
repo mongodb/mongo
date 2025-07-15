@@ -39,6 +39,7 @@ import os, shutil
 # the temporary turtle file existed. We simulate that by copying the turtle file to its temporary name
 # and then opening the connection readonly.
 @wttest.skip_for_hook("tiered", "Tiered causes python crash")
+@wttest.skip_for_hook("disagg", "Moving the turtle file makes no sense with disaggregated storage")
 class test_bug024(wttest.WiredTigerTestCase):
     conn_config = ('cache_size=50MB')
 

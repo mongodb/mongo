@@ -31,10 +31,19 @@
 
 import wttest
 from wiredtiger import stat
+from wtscenario import make_scenarios
 
 @wttest.skip_for_hook("tiered", "tiered checkpoints override clean checkpoint timer behavior")
 class test_checkpoint07(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=50MB,statistics=(all)'
+    ckpt_precision = [
+        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
+        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
+    ]
+
+    scenarios = make_scenarios(ckpt_precision)
+
+    def conn_config(self):
+        return 'cache_size=50MB,statistics=(all),' + self.ckpt_config
 
     def get_stat(self, uri):
         stat_uri = 'statistics:' + uri
@@ -44,6 +53,10 @@ class test_checkpoint07(wttest.WiredTigerTestCase):
         return val
 
     def test_checkpoint07(self):
+        # Avoid checkpoint error with precise checkpoint
+        if self.ckpt_config == 'checkpoint=(precise=true)':
+            self.conn.set_timestamp('stable_timestamp=1')
+
         self.uri1 = 'table:ckpt07.1'
         self.uri2 = 'table:ckpt07.2'
         self.uri3 = 'table:ckpt07.3'

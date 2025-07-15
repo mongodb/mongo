@@ -25,7 +25,7 @@
 static int __block_append(WT_SESSION_IMPL *, WT_BLOCK *, WT_EXTLIST *, wt_off_t, wt_off_t);
 static int __block_ext_overlap(
   WT_SESSION_IMPL *, WT_BLOCK *, WT_EXTLIST *, WT_EXT **, WT_EXTLIST *, WT_EXT **);
-static int __block_extlist_dump(WT_SESSION_IMPL *, WT_BLOCK *, WT_EXTLIST *, const char *);
+static int __block_extlist_dump_buckets(WT_SESSION_IMPL *, WT_BLOCK *, WT_EXTLIST *, const char *);
 static int __block_merge(WT_SESSION_IMPL *, WT_BLOCK *, WT_EXTLIST *, wt_off_t, wt_off_t);
 
 /*
@@ -91,9 +91,10 @@ __block_off_srch(WT_EXT **head, wt_off_t off, WT_EXT ***stack, bool skip_off)
  *     Search the skiplist for the first available slot.
  */
 static WT_INLINE bool
-__block_first_srch(WT_EXT **head, wt_off_t size, WT_EXT ***stack)
+__block_first_srch(WT_SESSION_IMPL *session, WT_EXT **head, wt_off_t size, WT_EXT ***stack)
 {
     WT_EXT *ext;
+    uint64_t time_start = __wt_clock(session);
 
     /*
      * Linear walk of the available chunks in offset order; take the first one that's large enough.
@@ -101,6 +102,11 @@ __block_first_srch(WT_EXT **head, wt_off_t size, WT_EXT ***stack)
     WT_EXT_FOREACH (ext, head)
         if (ext->size >= size)
             break;
+
+    uint64_t time_stop = __wt_clock(session);
+    uint64_t elapsed = WT_CLOCKDIFF_US(time_stop, time_start);
+    WT_STAT_CONN_SET(session, block_first_srch_walk_time, elapsed);
+
     if (ext == NULL)
         return (false);
 
@@ -570,7 +576,7 @@ __wti_block_alloc(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t *offp, wt_
     if (block->live.avail.bytes < (uint64_t)size)
         goto append;
     if (block->allocfirst) {
-        if (!__block_first_srch(block->live.avail.off, size, estack))
+        if (!__block_first_srch(session, block->live.avail.off, size, estack))
             goto append;
         ext = *estack[0];
     } else {
@@ -1236,7 +1242,7 @@ corrupted:
         WT_ERR(func(session, block, el, off, size));
     }
 
-    WT_ERR(__block_extlist_dump(session, block, el, "read"));
+    WT_ERR(__block_extlist_dump_buckets(session, block, el, "read"));
 
 err:
     __wt_scr_free(session, &tmp);
@@ -1259,7 +1265,7 @@ __wti_block_extlist_write(
     uint32_t entries;
     uint8_t *p;
 
-    WT_RET(__block_extlist_dump(session, block, el, "write"));
+    WT_RET(__block_extlist_dump_buckets(session, block, el, "write"));
 
     /*
      * Figure out how many entries we're writing -- if there aren't any entries, there's nothing to
@@ -1435,11 +1441,12 @@ __wti_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el)
 }
 
 /*
- * __block_extlist_dump --
- *     Dump an extent list as verbose messages.
+ * __block_extlist_dump_buckets --
+ *     Dump an extent list grouped into size buckets as verbose messages.
  */
 static int
-__block_extlist_dump(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, const char *tag)
+__block_extlist_dump_buckets(
+  WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, const char *tag)
 {
     WT_DECL_ITEM(t1);
     WT_DECL_ITEM(t2);
@@ -1454,11 +1461,12 @@ __block_extlist_dump(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, 
       !WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_BLOCK, WT_VERBOSE_DEBUG_2))
         return (0);
 
-    WT_ERR(__wt_scr_alloc(session, 0, &t1));
     if (block->verify_layout)
         level = WT_VERBOSE_NOTICE;
     else
         level = WT_VERBOSE_DEBUG_2;
+
+    WT_ERR(__wt_scr_alloc(session, 0, &t1));
     __wt_verbose_level(session, WT_VERB_BLOCK, level,
       "%s extent list %s, %" PRIu32 " entries, %s bytes", tag, el->name, el->entries,
       __wt_buf_set_size(session, el->bytes, true, t1));
@@ -1492,6 +1500,64 @@ err:
     return (ret);
 }
 
+/*
+ * __wti_block_extlist_dump --
+ *     Dump an extent list as verbose messages. Large extent lists are dumped in chunks to avoid
+ *     verbose message size limits. Only printed with WT_VERB_BLOCK level 3, or if data corruption
+ *     is detected.
+ */
+int
+__wti_block_extlist_dump(WT_SESSION_IMPL *session, WT_EXTLIST *el)
+{
+    WT_DECL_ITEM(ext_buf);
+    WT_DECL_ITEM(fmt_size_buf);
+    WT_DECL_RET;
+    WT_EXT *ext;
+    WT_VERBOSE_LEVEL level;
+    uint32_t ext_count, printed_ext_logs, num_ext_logs;
+
+    level = WT_VERBOSE_WARNING;
+
+    WT_ERR(__wt_scr_alloc(session, 0, &fmt_size_buf));
+    __wt_verbose_level(session, WT_VERB_BLOCK, level,
+      "extent list %s, %" PRIu32 " entries, %s bytes", el->name, el->entries,
+      __wt_buf_set_size(session, el->bytes, true, fmt_size_buf));
+
+    if (el->entries == 0)
+        goto done;
+
+    ext_count = printed_ext_logs = 0;
+#define NUM_EXTENTS_PER_LOG 100
+    num_ext_logs = el->entries / NUM_EXTENTS_PER_LOG;
+
+    WT_ERR(__wt_scr_alloc(session, 0, &ext_buf));
+    WT_EXT_FOREACH (ext, el->off) {
+
+        WT_ERR(__wt_buf_catfmt(session, ext_buf, "%" PRIuMAX "-%" PRIuMAX ",", (uintmax_t)ext->off,
+          (uintmax_t)ext->size));
+        ++ext_count;
+
+        if (ext_count == NUM_EXTENTS_PER_LOG) {
+            __wt_verbose_level(session, WT_VERB_BLOCK, level,
+              "(%s log %" PRIu32 " of %" PRIu32 "): %s", el->name, printed_ext_logs, num_ext_logs,
+              (char *)ext_buf->data);
+            WT_ERR(__wt_buf_set(session, ext_buf, "", 0));
+            ext_count = 0;
+            ++printed_ext_logs;
+        }
+    }
+    __wt_verbose_level(session, WT_VERB_BLOCK, level, "(%s log %" PRIu32 " of %" PRIu32 "): %s",
+      el->name, printed_ext_logs, num_ext_logs, (char *)ext_buf->data);
+    ++printed_ext_logs;
+
+done:
+err:
+    __wt_scr_free(session, &fmt_size_buf);
+    __wt_scr_free(session, &ext_buf);
+
+    return (ret);
+}
+
 #ifdef HAVE_UNITTEST
 WT_EXT *
 __ut_block_off_srch_last(WT_EXT **head, WT_EXT ***stack)
@@ -1506,9 +1572,9 @@ __ut_block_off_srch(WT_EXT **head, wt_off_t off, WT_EXT ***stack, bool skip_off)
 }
 
 bool
-__ut_block_first_srch(WT_EXT **head, wt_off_t size, WT_EXT ***stack)
+__ut_block_first_srch(WT_SESSION_IMPL *session, WT_EXT **head, wt_off_t size, WT_EXT ***stack)
 {
-    return (__block_first_srch(head, size, stack));
+    return (__block_first_srch(session, head, size, stack));
 }
 
 void

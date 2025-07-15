@@ -58,6 +58,39 @@ err:
 }
 
 /*
+ * __truncate_layered --
+ *     Truncate for a layered data source.
+ */
+static int
+__truncate_layered(WT_SESSION_IMPL *session, const char *uri)
+{
+    WT_CURSOR *start;
+    WT_DECL_RET;
+
+    start = NULL;
+    WT_RET(__wt_session_get_dhandle(session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
+
+    WT_STAT_DSRC_INCR(session, cursor_truncate);
+
+    /* To bypass the truncate requiring a btree uri. */
+    WT_ERR(__wt_open_cursor(session, uri, NULL, NULL, &start));
+    WT_ERR_NOTFOUND_OK(start->next(start), true);
+    if (ret == WT_NOTFOUND) {
+        ret = 0;
+        goto done;
+    }
+    WT_WITHOUT_DHANDLE(session, ret = __wt_session_range_truncate(session, NULL, start, NULL));
+    WT_ERR(ret);
+
+done:
+err:
+    if (start != NULL)
+        WT_TRET(start->close(start));
+    WT_TRET(__wt_session_release_dhandle(session));
+    return (ret);
+}
+
+/*
  * __truncate_dsrc --
  *     WT_SESSION::truncate for a data-source without a truncate operation.
  */
@@ -103,6 +136,8 @@ __wt_schema_truncate(WT_SESSION_IMPL *session, const char *uri, const char *cfg[
          * File truncate translates into a range truncate.
          */
         ret = __wt_session_range_truncate(session, uri, NULL, NULL);
+    else if (WT_PREFIX_MATCH(uri, "layered:"))
+        ret = __truncate_layered(session, uri);
     else if (WT_PREFIX_SKIP(tablename, "table:"))
         ret = __truncate_table(session, tablename, cfg);
     else if (WT_PREFIX_MATCH(uri, "tiered:"))
@@ -163,7 +198,7 @@ __wt_schema_range_truncate(WT_TRUNCATE_INFO *trunc_info)
     session = trunc_info->session;
     uri = trunc_info->uri;
 
-    if (WT_STREQ(uri, WT_HS_URI))
+    if (WT_IS_URI_HS(uri))
         ret = __wt_curhs_range_truncate(trunc_info);
     else if (WT_PREFIX_MATCH(uri, "file:")) {
         WT_ERR(__cursor_needkey(trunc_info->start));

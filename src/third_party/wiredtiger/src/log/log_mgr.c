@@ -335,7 +335,7 @@ __wt_logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
 
     WT_RET(__wt_config_gets(session, cfg, "log.zero_fill", &cval));
     if (cval.val != 0) {
-        if (F_ISSET_ATOMIC_32(conn, WT_CONN_READONLY))
+        if (F_ISSET(conn, WT_CONN_READONLY))
             WT_RET_MSG(
               session, EINVAL, "Read-only configuration incompatible with zero-filling log files");
         F_SET(&conn->log_mgr, WT_LOG_ZERO_FILL);
@@ -401,7 +401,7 @@ __compute_min_lognum(WT_SESSION_IMPL *session, WTI_LOG *log, uint32_t backup_fil
     min_lognum = backup_file == 0 ? WT_MIN(log->ckpt_lsn.l.file, log->sync_lsn.l.file) :
                                     WT_MIN(log->ckpt_lsn.l.file, backup_file);
 
-    __wt_readlock(session, &conn->debug_log_retention_lock);
+    __wt_readlock(session, &conn->log_mgr.debug_log_retention_lock);
 
     /* Adjust the number of log files to retain based on debugging options. */
 
@@ -426,7 +426,7 @@ __compute_min_lognum(WT_SESSION_IMPL *session, WTI_LOG *log, uint32_t backup_fil
             min_lognum = WT_MIN(log->fileid - (conn->debug_log_cnt + 1), min_lognum);
     }
 
-    __wt_readunlock(session, &conn->debug_log_retention_lock);
+    __wt_readunlock(session, &conn->log_mgr.debug_log_retention_lock);
 #ifdef HAVE_DIAGNOSTIC
     __wt_epoch(session, &ts);
     if (min_lognum > WT_INIT_LSN_FILE && min_lognum != log->min_fileid) {
@@ -439,7 +439,15 @@ __compute_min_lognum(WT_SESSION_IMPL *session, WTI_LOG *log, uint32_t backup_fil
           log->min_fileid));
         log->min_fileid = min_lognum;
     }
+
+    /* Encourage race conditions in log subsystem during database shutdown. */
+    if (FLD_ISSET(conn->timing_stress_flags, WT_TIMING_STRESS_CLOSE_STRESS_LOG) &&
+      F_ISSET(conn, WT_CONN_CLOSING)) {
+        for (int i = 0; i < 50; i++)
+            WT_IGNORE_RET(__wt_log_printf(session, "DEBUG: Stress for concurrency control"));
+    }
 #endif
+
     return (min_lognum);
 }
 
@@ -879,9 +887,12 @@ __log_wrlsn_server(void *arg)
     }
     /*
      * On close we need to do this one more time because there could be straggling log writes that
-     * need to be written.
+     * need to be written. It is possible to return EBUSY due to the database shutting down.
+     * Therefore loop until we finish the log write.
      */
-    WT_ERR(__wti_log_force_write(session, true, NULL));
+    do {
+        WT_ERR_ERROR_OK(__wti_log_force_write(session, true, NULL), EBUSY, true);
+    } while (ret == EBUSY);
     __wti_log_wrlsn(session, NULL);
     if (0) {
 err:
@@ -981,6 +992,14 @@ __log_server(void *arg)
         force_write_timediff = WT_CLOCKDIFF_MS(time_stop, force_write_time_start);
     }
 
+    /*
+     * On close, force out buffered writes to move the write_lsn forward. The write_lsn needs to be
+     * updated to avoid hangs from the wrlsn thread. It is possible to return EBUSY due to the
+     * database shutting down. Therefore loop until we finish the log write.
+     */
+    do {
+        WT_ERR_ERROR_OK(__wti_log_force_write(session, false, &did_work), EBUSY, true);
+    } while (ret == EBUSY);
     if (0) {
 err:
         WT_IGNORE_RET(__wt_panic(session, ret, "log server error"));

@@ -98,6 +98,7 @@ __wti_blkcache_map_read(
         return (0);
 
     WT_ASSERT(session, !bm->is_multi_handle);
+    WT_ASSERT(session, !bm->is_remote);
 
     block = bm->block;
 

@@ -32,9 +32,18 @@
 import wttest
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
+from wtscenario import make_scenarios
 
 class test_checkpoint04(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=50MB,statistics=(all)'
+    ckpt_precision = [
+        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
+        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
+    ]
+
+    scenarios = make_scenarios(ckpt_precision)
+
+    def conn_config(self):
+        return 'cache_size=50MB,statistics=(all),' + self.ckpt_config
 
     def create_tables(self, ntables):
         tables = {}
@@ -65,6 +74,10 @@ class test_checkpoint04(wttest.WiredTigerTestCase):
         nrows = 100
         ntables = 50
         multiplier = 1
+
+        # Avoid checkpoint error with precise checkpoint
+        if self.ckpt_config == 'checkpoint=(precise=true)':
+            self.conn.set_timestamp('stable_timestamp=1')
 
         # Run the loop and increase the value size with each iteration until
         # the test passes.

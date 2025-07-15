@@ -30,6 +30,7 @@ import time, wiredtiger, wttest
 class test_rollback(wttest.WiredTigerTestCase):
     uri = "table:test_rollback.wt"
 
+    @wttest.skip_for_hook("disagg", "disagg requires an additional condition to evict pages")
     def test_wt_rollback_cursor_next_no_retry(self):
         """
         Try to insert a key value pair while the cache is full, and verify cursor->next() calls

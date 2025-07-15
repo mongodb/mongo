@@ -169,8 +169,11 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
 {
     WT_BLOCK_HEADER *blk, swap;
     size_t bufsize, check_size;
+    uint64_t time_start, time_stop;
     int failures, max_failures;
     bool chunkcache_hit, full_checksum_mismatch;
+
+    time_start = __wt_clock(session);
 
     chunkcache_hit = full_checksum_mismatch = false;
     check_size = 0;
@@ -233,6 +236,9 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
              */
             blk->checksum = 0;
             if (__wt_checksum_match(buf->mem, check_size, checksum)) {
+                time_stop = __wt_clock(session);
+                __wt_stat_msecs_hist_incr_bmread(session, WT_CLOCKDIFF_MS(time_stop, time_start));
+
                 /*
                  * Swap the page-header as needed; this doesn't belong here, but it's the best place
                  * to catch all callers.
@@ -280,8 +286,30 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
     }
 
     /* Panic if a checksum fails during an ordinary read. */
-    F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
+    F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
+
     if (block->verify || F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
         return (WT_ERROR);
+
+    /*
+     * Dump the extent lists associated with all available checkpoints in the system. Viewing the
+     * state of the extent lists in the event of a read error can help pinpoint the reason for the
+     * read error. Since dumping the extent lists also requires reading the block, we must set the
+     * WT_SESSION_DUMPING_EXTLIST flag to ensure we don't recursively attempt to dump extent lists.
+     */
+    if (!F_ISSET(session, WT_SESSION_DUMPING_EXTLIST)) {
+        F_SET(session, WT_SESSION_DUMPING_EXTLIST);
+        /* Dump the live checkpoint extent lists. */
+        WT_IGNORE_RET(__wti_block_extlist_dump(session, &block->live.alloc));
+        WT_IGNORE_RET(__wti_block_extlist_dump(session, &block->live.avail));
+        WT_IGNORE_RET(__wti_block_extlist_dump(session, &block->live.discard));
+
+        /* Dump the rest of the extent lists associated with any other valid checkpoints in the
+         * file. */
+        WT_IGNORE_RET(__wti_block_checkpoint_extlist_dump(session, block));
+
+        F_CLR(session, WT_SESSION_DUMPING_EXTLIST);
+    }
+
     WT_RET_PANIC(session, WT_ERROR, "%s: fatal read error", block->name);
 }

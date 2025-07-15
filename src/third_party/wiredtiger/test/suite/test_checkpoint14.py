@@ -41,7 +41,6 @@ from wtscenario import make_scenarios
 
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
-    conn_config = 'statistics=(all),timing_stress_for_test=[checkpoint_slow]'
     session_config = 'isolation=snapshot'
 
     format_values = [
@@ -56,8 +55,14 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         # This doesn't work because there's no way to open the first unnamed checkpoint.
         #('un', dict(first_checkpoint=None, second_checkpoint='second_checkpoint')),
     ]
-    scenarios = make_scenarios(format_values, name_values)
+    ckpt_precision = [
+        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
+        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
+    ]
+    scenarios = make_scenarios(format_values, name_values, ckpt_precision)
 
+    def conn_config(self):
+        return 'statistics=(all),timing_stress_for_test=[checkpoint_slow],' + self.ckpt_config
     def large_updates(self, uri, ds, nrows, value):
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction()
@@ -84,6 +89,10 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         cursor.close()
 
     def test_checkpoint(self):
+        # Avoid checkpoint error with precise checkpoint
+        if self.ckpt_config == 'checkpoint=(precise=true)':
+            self.conn.set_timestamp('stable_timestamp=1')
+
         uri = 'table:checkpoint14'
         nrows = 10000
 

@@ -75,7 +75,8 @@ check() {
     echo "$search"
     grep -F -who "$search" $l
     ) | sort | uniq -u | \
-      sed -e '/^WT_PAGE_LOG_GET_ARGS$/d' \
+      sed -e '/^WT_PAGE_LOG_ENCRYPTION$/d' \
+          -e '/^WT_PAGE_LOG_GET_ARGS$/d' \
           -e '/^WT_PAGE_LOG_HANDLE$/d' \
           -e '/^WT_PAGE_LOG_PUT_ARGS$/d' \
       > $t

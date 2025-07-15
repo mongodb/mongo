@@ -384,15 +384,18 @@ void
 testutil_wiredtiger_open(TEST_OPTS *opts, const char *home, const char *config,
   WT_EVENT_HANDLER *event_handler, WT_CONNECTION **connectionp, bool rerun, bool benchmarkrun)
 {
-    char buf[1024], tiered_cfg[512], tiered_ext_cfg[512];
+    char buf[1024], disagg_cfg[512], disagg_ext_cfg[512], tiered_cfg[512], tiered_ext_cfg[512];
 
     opts->local_retention = benchmarkrun ? 0 : 2;
+    testutil_disagg_storage_configuration(
+      opts, home, disagg_cfg, sizeof(disagg_cfg), disagg_ext_cfg, sizeof(disagg_ext_cfg));
     testutil_tiered_storage_configuration(
       opts, home, tiered_cfg, sizeof(tiered_cfg), tiered_ext_cfg, sizeof(tiered_ext_cfg));
 
-    testutil_snprintf(buf, sizeof(buf), "%s%s%s%s,extensions=[%s]", config == NULL ? "" : config,
-      (rerun ? TESTUTIL_ENV_CONFIG_REC : ""), (opts->compat ? TESTUTIL_ENV_CONFIG_COMPAT : ""),
-      tiered_cfg, tiered_ext_cfg);
+    testutil_snprintf(buf, sizeof(buf), "%s%s%s%s%s,extensions=[%s,%s]",
+      config == NULL ? "" : config, (rerun ? TESTUTIL_ENV_CONFIG_REC : ""),
+      (opts->compat ? TESTUTIL_ENV_CONFIG_COMPAT : ""), disagg_cfg, tiered_cfg, disagg_ext_cfg,
+      tiered_ext_cfg);
 
     if (opts->verbose)
         printf("wiredtiger_open configuration: %s\n", buf);

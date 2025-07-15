@@ -237,24 +237,47 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
  *     Merge in a split page.
  */
 static int
-__rec_row_merge(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
+__rec_row_merge(
+  WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *ref, uint16_t ref_changes, bool *build_delta)
 {
     WT_ADDR *addr;
     WT_MULTI *multi;
+    WT_PAGE *page;
     WT_PAGE_MODIFY *mod;
     WTI_REC_KV *key, *val;
+    size_t old_key_size;
     uint32_t i;
+    void *old_key;
 
+    page = ref->page;
     mod = page->modify;
 
     key = &r->k;
     val = &r->v;
 
+    /* FIXME-WT-14880: build delta for split pages. */
+    if (*build_delta && mod->mod_multi_entries > 1 && ref_changes > 0) {
+        *build_delta = false;
+        r->delta.size = 0;
+    }
+
     /* For each entry in the split array... */
     for (multi = mod->mod_multi, i = 0; i < mod->mod_multi_entries; ++multi, ++i) {
-        /* Build the key and value cells. */
-        WT_RET(__rec_cell_build_int_key(
-          session, r, WT_IKEY_DATA(multi->key.ikey), r->cell_zero ? 1 : multi->key.ikey->size));
+        /*
+         * Build the key and value cells. We should inherit the old key for the first page if we
+         * want to build a delta. Otherwise, it is difficult to build the delta for that key as it
+         * can change.
+         */
+        if (i == 0) {
+            if (*build_delta) {
+                __wt_ref_key(ref->home, ref, &old_key, &old_key_size);
+                WT_RET(__rec_cell_build_int_key(session, r, old_key, old_key_size));
+            } else
+                WT_RET(__rec_cell_build_int_key(session, r, WT_IKEY_DATA(multi->key.ikey),
+                  r->cell_zero ? 1 : multi->key.ikey->size));
+        } else
+            WT_RET(__rec_cell_build_int_key(
+              session, r, WT_IKEY_DATA(multi->key.ikey), multi->key.ikey->size));
         r->cell_zero = false;
 
         addr = &multi->addr;
@@ -271,7 +294,32 @@ __rec_row_merge(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
 
         /* Update compression state. */
         __rec_key_state_update(r, false);
+
+        if (*build_delta && ref_changes > 0) {
+            WT_ASSERT(session, mod->mod_multi_entries == 1);
+            WT_RET(__wti_rec_pack_delta_internal(session, r, key, val));
+        }
     }
+    return (0);
+}
+
+/*
+ * __rec_build_delta_int --
+ *     Build delta for Internal pages.
+ */
+static int
+__rec_build_delta_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, bool build_delta)
+{
+    WT_DELTA_HEADER *header;
+
+    if (!build_delta) {
+        r->delta.size = 0;
+        return (0);
+    }
+
+    WT_RET(__wti_rec_build_delta_init(session, r));
+    header = (WT_DELTA_HEADER *)r->delta.data;
+    header->type = r->ref->page->type;
     return (0);
 }
 
@@ -295,10 +343,13 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
     WT_REF *ref;
     WT_TIME_AGGREGATE ft_ta, *source_ta, ta;
     size_t size;
+    uint16_t prev_ref_changes;
+    bool build_delta, retain_onpage;
     const void *p;
 
     btree = S2BT(session);
     child = NULL;
+    ref = NULL;
     WT_TIME_AGGREGATE_INIT_MERGE(&ft_ta);
 
     key = &r->k;
@@ -310,8 +361,10 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
 
     ikey = NULL; /* -Wuninitialized */
     cell = NULL;
+    build_delta = WT_BUILD_DELTA_INT(session, r);
 
     WT_RET(__wti_rec_split_init(session, r, page, 0, btree->maxintlpage_precomp, 0));
+    WT_RET(__rec_build_delta_int(session, r, build_delta));
 
     /*
      * Ideally, we'd never store the 0th key on row-store internal pages because it's never used
@@ -329,6 +382,15 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
 
     /* For each entry in the in-memory page... */
     WT_INTL_FOREACH_BEGIN (session, page, ref) {
+        /* FIXME-WT-14880: build delta for split pages. */
+        if (build_delta && r->multi_next > 0) {
+            build_delta = false;
+            r->delta.size = 0;
+        }
+
+        WT_ACQUIRE_READ(prev_ref_changes, ref->ref_changes);
+        retain_onpage = false;
+
         /*
          * There are different paths if the key is an overflow item vs. a straight-forward on-page
          * value. If an overflow item, we would have instantiated it, and we can use that fact to
@@ -352,12 +414,34 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
                 WT_ERR(__wt_ovfl_discard_add(session, page, kpack->cell));
         }
 
-        WT_ERR(__wti_rec_child_modify(session, r, ref, &cms));
+        WT_ERR(__wti_rec_child_modify(session, r, ref, &cms, &build_delta));
         addr = ref->addr;
         child = ref->page;
 
         switch (cms.state) {
         case WTI_CHILD_IGNORE:
+            /*
+             * Cannot build delta if we decide to delete the first key. The first key on the
+             * internal page is a random value. If we delete that, the next key will become the new
+             * first key, which is a random value. We cannot reconstruct the delta in this case as
+             * the key has changed.
+             */
+            if (build_delta && r->cell_zero) {
+                build_delta = false;
+                r->delta.size = 0;
+            }
+
+            if (build_delta && prev_ref_changes > 0) {
+                __wt_ref_key(page, ref, &p, &size);
+                WT_ERR(__rec_cell_build_int_key(session, r, p, size));
+                WT_ERR(__wti_rec_pack_delta_internal(session, r, key, NULL));
+            }
+
+            /*
+             * Set the ref_changes state to zero if there were no concurrent changes while
+             * reconciling the internal page.
+             */
+            __wt_atomic_casv16(&ref->ref_changes, prev_ref_changes, 0);
             /*
              * Ignored child.
              */
@@ -370,17 +454,44 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
              */
             switch (child->modify->rec_result) {
             case WT_PM_REC_EMPTY:
+                /* Cannot build delta if we decide to delete the first key. */
+                if (build_delta && r->cell_zero) {
+                    build_delta = false;
+                    r->delta.size = 0;
+                }
+
+                if (build_delta && prev_ref_changes > 0) {
+                    __wt_ref_key(page, ref, &p, &size);
+                    WT_ERR(__rec_cell_build_int_key(session, r, p, size));
+                    WT_ERR(__wti_rec_pack_delta_internal(session, r, key, NULL));
+                }
+
+                /*
+                 * Set the ref_changes state to zero if there were no concurrent changes while
+                 * reconciling the internal page.
+                 */
+                __wt_atomic_casv16(&ref->ref_changes, prev_ref_changes, 0);
+
                 WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
                 continue;
             case WT_PM_REC_MULTIBLOCK:
-                WT_ERR(__rec_row_merge(session, r, child));
+                WT_ERR(__rec_row_merge(session, r, ref, prev_ref_changes, &build_delta));
+
+                /*
+                 * Set the ref_changes state to zero if there were no concurrent changes while
+                 * reconciling the internal page.
+                 */
+                __wt_atomic_casv16(&ref->ref_changes, prev_ref_changes, 0);
+
                 WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
                 continue;
             case WT_PM_REC_REPLACE:
                 /*
-                 * If the page is replaced, the page's modify structure has the page's address.
+                 * If the page is replaced, the page's modify structure has the page's address. If
+                 * we skipped writing an empty delta, we write the current address.
                  */
-                addr = &child->modify->mod_replace;
+                if (child->modify->mod_replace.block_cookie != NULL)
+                    addr = &child->modify->mod_replace;
                 break;
             default:
                 WT_ERR(__wt_illegal_value(session, child->modify->rec_result));
@@ -410,11 +521,13 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
             __wti_rec_cell_build_addr(session, r, NULL, vpack, WT_RECNO_OOB, page_del);
             source_ta = &vpack->ta;
         } else {
+            retain_onpage = true;
             /*
              * The transaction ids are cleared after restart. Repack the cell with new validity
              * information to flush cleared transaction ids.
              */
-            WT_ASSERT_ALWAYS(session, cms.state == WTI_CHILD_ORIGINAL,
+            WT_ASSERT_ALWAYS(session,
+              cms.state == WTI_CHILD_ORIGINAL || F_ISSET(btree, WT_BTREE_DISAGGREGATED),
               "Not propagating the original fast-truncate information");
             __wt_cell_unpack_addr(session, page->dsk, ref->addr, vpack);
 
@@ -444,7 +557,12 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
 
         /* Build key cell. Truncate any 0th key, internal pages don't need 0th keys. */
         __wt_ref_key(page, ref, &p, &size);
-        if (r->cell_zero)
+
+        /*
+         * Modifying keys when building delta can get us into trouble so it's best not to truncate
+         * the first key when building delta.
+         */
+        if (r->cell_zero && !build_delta)
             size = 1;
         WT_ERR(__rec_cell_build_int_key(session, r, p, size));
         r->cell_zero = false;
@@ -462,6 +580,15 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
 
         /* Update compression state. */
         __rec_key_state_update(r, false);
+
+        if (build_delta && prev_ref_changes > 0 && !retain_onpage)
+            WT_ERR(__wti_rec_pack_delta_internal(session, r, key, val));
+
+        /*
+         * Set the ref_changes state to zero if there were no concurrent changes while reconciling
+         * the internal page.
+         */
+        __wt_atomic_casv16(&ref->ref_changes, prev_ref_changes, 0);
     }
     WT_INTL_FOREACH_END;
 
@@ -491,6 +618,96 @@ __rec_row_zero_len(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
     return (!WT_TIME_WINDOW_HAS_STOP(tw) &&
       ((tw->start_ts == WT_TS_NONE && tw->start_txn == WT_TXN_NONE) ||
         __wt_txn_tw_start_visible_all(session, tw)));
+}
+
+/*
+ * __rec_row_garbage_collect_fixup_update_list --
+ *     Insert a tombstone at the start of an update list if all entries are eligible for garbage
+ *     collection. There is duplication between the update list and insert list versions of these
+ *     functions but my head explodes trying to keep the data structures involved mapped in my head,
+ *     so the duplication feels warranted. Don't bother tracking the additional memory associated
+ *     with these tombstones - it is about to be freed anyway.
+ */
+static int
+__rec_row_garbage_collect_fixup_update_list(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_ROW *rip)
+{
+    WT_BTREE *btree;
+    WT_PAGE *page;
+    WT_PAGE_MODIFY *mod;
+    WT_UPDATE *first_upd, *tombstone, *upd, **upd_entry;
+
+    btree = S2BT(session);
+    page = r->page;
+    mod = page->modify;
+
+    if (!F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT) || !F_ISSET(r, WT_REC_EVICT))
+        return (0);
+
+    if ((first_upd = WT_ROW_UPDATE(page, rip)) == NULL)
+        return (0);
+
+    for (upd = first_upd; upd != NULL && upd->txnid == WT_TXN_ABORTED; upd = first_upd->next)
+        ;
+
+    if (upd == NULL)
+        return (0);
+
+    if (upd->type == WT_UPDATE_TOMBSTONE)
+        return (0);
+
+    if (WT_TXNID_LT(upd->txnid, r->last_running) && r->rec_prune_timestamp != WT_TS_NONE &&
+      upd->durable_ts <= r->rec_prune_timestamp) {
+        WT_RET(__wt_upd_alloc_tombstone(session, &tombstone, NULL));
+        tombstone->next = first_upd;
+        upd_entry = &mod->mod_row_update[WT_ROW_SLOT(page, rip)];
+        *upd_entry = tombstone;
+
+        WT_STAT_CONN_DSRC_INCR(session, rec_ingest_garbage_collection_keys);
+    }
+
+    return (0);
+}
+
+/*
+ * __rec_row_garbage_collect_fixup_insert_list --
+ *     Insert a tombstone at the start of an insert list if all entries are eligible for garbage
+ *     collection.
+ */
+static int
+__rec_row_garbage_collect_fixup_insert_list(
+  WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins)
+{
+    WT_BTREE *btree;
+    WT_UPDATE *first_upd, *tombstone, *upd;
+
+    btree = S2BT(session);
+
+    if (!F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT) || !F_ISSET(r, WT_REC_EVICT))
+        return (0);
+
+    /* The insert list should have an update, but be paranoid */
+    if ((first_upd = ins->upd) == NULL)
+        return (0);
+
+    for (upd = first_upd; upd != NULL && upd->txnid == WT_TXN_ABORTED; upd = upd->next)
+        ;
+
+    if (upd == NULL)
+        return (0);
+
+    if (upd->type == WT_UPDATE_TOMBSTONE)
+        return (0);
+
+    if (WT_TXNID_LT(upd->txnid, r->last_running) && r->rec_prune_timestamp != WT_TS_NONE &&
+      upd->durable_ts <= r->rec_prune_timestamp) {
+        WT_RET(__wt_upd_alloc_tombstone(session, &tombstone, NULL));
+        tombstone->next = first_upd;
+        ins->upd = tombstone;
+
+        WT_STAT_CONN_DSRC_INCR(session, rec_ingest_garbage_collection_keys);
+    }
+
+    return (0);
 }
 
 /*
@@ -524,6 +741,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins
     WT_RET(__wt_scr_alloc(session, 0, &tmpkey));
 
     for (; ins != NULL; ins = WT_SKIP_NEXT(ins)) {
+        WT_ERR(__rec_row_garbage_collect_fixup_insert_list(session, r, ins));
         WT_ERR(__wti_rec_upd_select(session, r, ins, NULL, NULL, &upd_select));
         if ((upd = upd_select.upd) == NULL) {
             /*
@@ -762,6 +980,9 @@ __wti_rec_row_leaf(
         /* Unpack the on-page value cell. */
         __wt_row_leaf_value_cell(session, page, rip, vpack);
 
+        /* Give garbage collected tables a change to mark obsolete content for cleanup */
+        WT_ERR(__rec_row_garbage_collect_fixup_update_list(session, r, rip));
+
         /* Look for an update. */
         WT_ERR(__wti_rec_upd_select(session, r, NULL, rip, vpack, &upd_select));
         upd = upd_select.upd;
@@ -774,10 +995,30 @@ __wti_rec_row_leaf(
 
         /*
          * If we reconcile an on disk key with a globally visible stop time point and there are no
-         * new updates for that key, skip writing that key.
+         * new updates for that key, skip writing that key. Or if garbage collection is enabled for
+         * the table, and the value has become obsolete.
          */
-        if (upd == NULL && __wt_txn_tw_stop_visible_all(session, twp))
-            upd = &upd_tombstone;
+        if (upd == NULL) {
+            if (__wt_txn_tw_stop_visible_all(session, twp))
+                upd = &upd_tombstone;
+            else if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT)) {
+                if (WT_TIME_WINDOW_HAS_STOP(twp)) {
+                    if (WT_TXNID_LT(twp->stop_txn, r->last_running) &&
+                      r->rec_prune_timestamp != WT_TS_NONE &&
+                      twp->durable_stop_ts <= r->rec_prune_timestamp) {
+                        upd = &upd_tombstone;
+                        WT_STAT_CONN_DSRC_INCR(session, rec_ingest_garbage_collection_keys);
+                    }
+                } else {
+                    if (WT_TXNID_LT(twp->start_txn, r->last_running) &&
+                      r->rec_prune_timestamp != WT_TS_NONE &&
+                      twp->durable_start_ts <= r->rec_prune_timestamp) {
+                        upd = &upd_tombstone;
+                        WT_STAT_CONN_DSRC_INCR(session, rec_ingest_garbage_collection_keys);
+                    }
+                }
+            }
+        }
 
         /* Build value cell. */
         if (upd == NULL) {
@@ -837,7 +1078,11 @@ __wti_rec_row_leaf(
              */
             WT_ASSERT(session,
               F_ISSET(upd, WT_UPDATE_DS) || !F_ISSET(r, WT_REC_HS) ||
-                __wt_txn_tw_start_visible_all(session, twp));
+                __wt_txn_tw_start_visible_all(session, twp) ||
+                (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT) &&
+                  WT_TXNID_LT(twp->start_txn, r->last_running) &&
+                  r->rec_prune_timestamp != WT_TS_NONE &&
+                  twp->durable_start_ts <= r->rec_prune_timestamp));
 
             /* The first time we find an overflow record, discard the underlying blocks. */
             if (F_ISSET(vpack, WT_CELL_UNPACK_OVERFLOW) && vpack->raw != WT_CELL_VALUE_OVFL_RM)

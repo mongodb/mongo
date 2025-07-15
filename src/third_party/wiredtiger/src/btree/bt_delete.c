@@ -213,6 +213,8 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
     *skipp = true;
     WT_STAT_CONN_DSRC_INCR(session, rec_page_delete_fast);
 
+    __wt_atomic_addv16(&ref->ref_changes, 1);
+
     /* Set the page to its new state. */
     WT_REF_SET_STATE(ref, WT_REF_DELETED);
     return (0);
@@ -323,6 +325,8 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
             __wt_free(session, ref->page_del);
         }
     }
+
+    __wt_atomic_addv16(&ref->ref_changes, 1);
 
     WT_REF_SET_STATE(ref, current_state);
     return (0);
@@ -488,11 +492,8 @@ __instantiate_tombstone(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del,
   size_t *sizep)
 {
     /*
-     * If we find an existing stop time point we don't need to append a tombstone. Such rows would
-     * not have been visible to the original truncate operation and were, logically, skipped over
-     * rather than re-deleted. (If the row _was_ visible to the truncate in spite of having been
-     * subsequently removed, the stop time not being visible would have forced its page to be slow-
-     * truncated rather than fast-truncated.)
+     * If we find an existing stop time point we don't need to append a tombstone. We have restored
+     * it already when we read the disk page into memory.
      */
     if (WT_TIME_WINDOW_HAS_STOP(tw))
         *updp = NULL;
@@ -501,6 +502,7 @@ __instantiate_tombstone(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del,
 
         if (update_list != NULL)
             update_list[(*countp)++] = *updp;
+        WT_STAT_CONN_DSRC_INCRV(session, cache_read_restored_tombstone_bytes, *sizep);
     }
 
     return (0);
@@ -520,6 +522,7 @@ __instantiate_col_var(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_DELETED *pa
     WT_DECL_RET;
     WT_PAGE *page;
     WT_UPDATE *upd;
+    size_t size;
     uint64_t j, recno, rle;
     uint32_t i;
 
@@ -555,7 +558,7 @@ __instantiate_col_var(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_DELETED *pa
         /* Delete each key. */
         for (j = 0; j < rle; j++) {
             WT_ERR(__instantiate_tombstone(
-              session, page_del, update_list, countp, &unpack.tw, &upd, NULL));
+              session, page_del, update_list, countp, &unpack.tw, &upd, &size));
             if (upd != NULL) {
                 /* Position the cursor on the page. */
                 WT_ERR(__wt_col_search(&cbt, recno + j, ref, true /*leaf_safe*/, NULL));

@@ -181,7 +181,7 @@ list_print(WT_SESSION *session, const char *uri, bool cflag, bool vflag)
          */
         if (!vflag && WT_PREFIX_MATCH(key, WT_SYSTEM_PREFIX))
             continue;
-        if (cflag || vflag || (strcmp(key, WT_METADATA_URI) != 0 && strcmp(key, WT_HS_URI) != 0))
+        if (cflag || vflag || (strcmp(key, WT_METADATA_URI) != 0 && !WT_IS_URI_HS(key)))
             fprintf(fp, "%s\n", key);
 
         if (!cflag && !vflag)

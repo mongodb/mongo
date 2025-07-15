@@ -35,7 +35,7 @@ __wti_rts_visibility_txn_visible_id(WT_SESSION_IMPL *session, uint64_t id)
     conn = S2C(session);
 
     /* If not recovery then assume all the data as visible. */
-    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_RECOVERING))
+    if (!F_ISSET(conn, WT_CONN_RECOVERING))
         return (true);
 
     /*

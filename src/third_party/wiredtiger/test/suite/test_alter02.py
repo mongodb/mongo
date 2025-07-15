@@ -95,6 +95,13 @@ class test_alter02(TieredConfigMixin, wttest.WiredTigerTestCase):
         if metastr == '':
             return
         cursor = self.session.open_cursor('metadata:', None, None)
+
+        # If the metadata string is something like 'log=(enabled=true)', also check for
+        # 'log=(enabled=true,'. We need this if 'log' in the table's metadata has other fields.
+        metastr_alt = metastr
+        if metastr_alt.endswith(')'):
+            metastr_alt = metastr_alt[:-1] + ','
+
         #
         # Walk through all the metadata looking for the entries that are
         # the file URIs for components of the table.
@@ -109,7 +116,7 @@ class test_alter02(TieredConfigMixin, wttest.WiredTigerTestCase):
             if check_meta:
                 value = cursor[key]
                 found = True
-                self.assertTrue(value.find(metastr) != -1)
+                self.assertTrue(value.find(metastr) != -1 or value.find(metastr_alt) != -1)
         cursor.close()
         self.assertTrue(found == True)
 

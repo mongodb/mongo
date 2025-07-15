@@ -28,9 +28,13 @@ __wti_connection_init(WT_CONNECTION_IMPL *conn)
     TAILQ_INIT(&conn->collqh);                /* Collator list */
     TAILQ_INIT(&conn->compqh);                /* Compressor list */
     TAILQ_INIT(&conn->encryptqh);             /* Encryptor list */
+    TAILQ_INIT(&conn->pagelogqh);             /* Page log list */
     TAILQ_INIT(&conn->storagesrcqh);          /* Storage source list */
     TAILQ_INIT(&conn->tieredqh);              /* Tiered work unit list */
     TAILQ_INIT(&conn->pfqh);                  /* Pre-fetch reference list */
+
+    /* Disaggregated storage. */
+    TAILQ_INIT(&conn->disaggregated_storage.copy_metadata_qh);
 
     /* Random numbers. */
     __wt_session_rng_init_once(session);
@@ -46,6 +50,8 @@ __wti_connection_init(WT_CONNECTION_IMPL *conn)
     WT_SPIN_INIT_TRACKED(session, &conn->checkpoint_lock, checkpoint);
     WT_RET(__wt_spin_init(session, &conn->background_compact.lock, "background compact"));
     WT_RET(__wt_spin_init(session, &conn->chunkcache_metadata_lock, "chunk cache metadata"));
+    WT_RET(__wt_spin_init(
+      session, &conn->disaggregated_storage.copy_metadata_lock, "copy shared metadata"));
     WT_RET(__wt_spin_init(session, &conn->encryptor_lock, "encryptor"));
     WT_RET(__wt_spin_init(session, &conn->fh_lock, "file list"));
     WT_RET(__wt_spin_init(session, &conn->flush_tier_lock, "flush tier"));
@@ -58,7 +64,7 @@ __wti_connection_init(WT_CONNECTION_IMPL *conn)
     WT_RET(__wt_spin_init(session, &conn->prefetch_lock, "prefetch"));
 
     /* Read-write locks */
-    WT_RET(__wt_rwlock_init(session, &conn->debug_log_retention_lock));
+    WT_RET(__wt_rwlock_init(session, &conn->log_mgr.debug_log_retention_lock));
     WT_RWLOCK_INIT_SESSION_TRACKED(session, &conn->dhandle_lock, dhandle);
     WT_RET(__wt_rwlock_init(session, &conn->hot_backup_lock));
     WT_RWLOCK_INIT_TRACKED(session, &conn->table_lock, table);
@@ -109,7 +115,8 @@ __wti_connection_destroy(WT_CONNECTION_IMPL *conn)
     __wt_spin_destroy(session, &conn->block_lock);
     __wt_spin_destroy(session, &conn->checkpoint_lock);
     __wt_spin_destroy(session, &conn->chunkcache_metadata_lock);
-    __wt_rwlock_destroy(session, &conn->debug_log_retention_lock);
+    __wt_spin_destroy(session, &conn->disaggregated_storage.copy_metadata_lock);
+    __wt_rwlock_destroy(session, &conn->log_mgr.debug_log_retention_lock);
     __wt_rwlock_destroy(session, &conn->dhandle_lock);
     __wt_spin_destroy(session, &conn->encryptor_lock);
     __wt_spin_destroy(session, &conn->fh_lock);

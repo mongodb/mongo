@@ -35,15 +35,21 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 class test_checkpoint09(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=50MB,statistics=(all)'
-
     format_values = [
         ('column-fix', dict(key_format='r', value_format='8t')),
         ('column', dict(key_format='r', value_format='u')),
         ('row_string', dict(key_format='S', value_format='u')),
     ]
 
-    scenarios = make_scenarios(format_values)
+    ckpt_precision = [
+        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
+        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
+    ]
+
+    scenarios = make_scenarios(format_values, ckpt_precision)
+
+    def conn_config(self):
+        return 'cache_size=50MB,statistics=(all),' + self.ckpt_config
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')

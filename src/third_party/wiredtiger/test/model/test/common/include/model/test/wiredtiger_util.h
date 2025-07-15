@@ -37,17 +37,10 @@ extern "C" {
 }
 
 /*
- * wt_get --
+ * wt_get_ext --
  *     Read from WiredTiger.
  */
-model::data_value wt_get(WT_SESSION *session, const char *uri, const model::data_value &key,
-  model::timestamp_t timestamp = model::k_timestamp_latest);
-
-/*
- * wt_get_ext --
- *     Read from WiredTiger, but also return the error code.
- */
-int wt_get_ext(WT_SESSION *session, const char *uri, const model::data_value &key,
+int wt_get(WT_SESSION *session, const char *uri, const model::data_value &key,
   model::data_value &out, model::timestamp_t timestamp = model::k_timestamp_latest);
 
 /*
@@ -119,9 +112,10 @@ void wt_txn_set_commit_timestamp(WT_SESSION *session, model::timestamp_t commit_
 
 /*
  * wt_txn_get --
- *     Read from WiredTiger.
+ *     Read from WiredTiger and return the error value.
  */
-model::data_value wt_txn_get(WT_SESSION *session, const char *uri, const model::data_value &key);
+int wt_txn_get(
+  WT_SESSION *session, const char *uri, const model::data_value &key, model::data_value &out);
 
 /*
  * wt_txn_insert --
@@ -129,6 +123,12 @@ model::data_value wt_txn_get(WT_SESSION *session, const char *uri, const model::
  */
 int wt_txn_insert(WT_SESSION *session, const char *uri, const model::data_value &key,
   const model::data_value &value, bool overwrite = true);
+
+/*
+ * wt_txn_remove --
+ *     Delete from WiredTiger.
+ */
+int wt_txn_remove(WT_SESSION *session, const char *uri, const model::data_value &key);
 
 /*
  * wt_ckpt_get --
@@ -246,7 +246,7 @@ wt_rollback_to_stable(WT_CONNECTION *conn)
         model::data_value __out_model, __out_wt;                                       \
         int __ret_model, __ret_wt;                                                     \
         __ret_model = table->get_ext(key, __out_model, ##__VA_ARGS__);                 \
-        __ret_wt = wt_get_ext(session, uri, key, __out_wt, ##__VA_ARGS__);             \
+        __ret_wt = wt_get(session, uri, key, __out_wt, ##__VA_ARGS__);                 \
         wt_model_assert_equal(__ret_model, __ret_wt);                                  \
         wt_model_assert_equal_with_labels(std::move(__out_model), std::move(__out_wt), \
           "__out_model", "__out_wt"); /* To make Coverity happy. */                    \
@@ -288,9 +288,13 @@ wt_rollback_to_stable(WT_CONNECTION *conn)
  * wt_model_txn_assert --
  *     Check that the key has the same value in the model as in the database.
  */
-#define wt_model_txn_assert(table, uri, txn, session, key, ...) \
-    wt_model_assert_equal(                                      \
-      table->get(txn, key, ##__VA_ARGS__), wt_txn_get(session, uri, key, ##__VA_ARGS__));
+#define wt_model_txn_assert(table, uri, txn, session, key, ...)                     \
+    {                                                                               \
+        model::data_value __model_out, __wt_out;                                    \
+        wt_model_assert_equal(table->get_ext(txn, key, __model_out, ##__VA_ARGS__), \
+          wt_txn_get(session, uri, key, __wt_out, ##__VA_ARGS__));                  \
+        wt_model_assert_equal(__model_out, __wt_out);                               \
+    }
 
 /*
  * wt_model_txn_begin_both --
@@ -353,12 +357,20 @@ wt_rollback_to_stable(WT_CONNECTION *conn)
     }
 
 /*
- * wt_model_insert_both --
+ * wt_model_txn_insert_both --
  *     Insert both into the model and the database.
  */
 #define wt_model_txn_insert_both(table, uri, txn, session, key, value, ...) \
     wt_model_assert_equal(table->insert(txn, key, value, ##__VA_ARGS__),    \
       wt_txn_insert(session, uri, key, value, ##__VA_ARGS__));
+
+/*
+ * wt_model_txn_remove_both --
+ *     Remove both from the model and the database.
+ */
+#define wt_model_txn_remove_both(table, uri, txn, session, key, ...) \
+    wt_model_assert_equal(                                           \
+      table->remove(txn, key, ##__VA_ARGS__), wt_txn_remove(session, uri, key, ##__VA_ARGS__));
 
 /*
  * wt_model_ckpt_assert --

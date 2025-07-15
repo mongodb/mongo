@@ -39,14 +39,15 @@ __compact_page_inmem_check_addrs(WT_SESSION_IMPL *session, WT_REF *ref, bool *sk
      */
     mod = ref->page->modify;
     if (mod->rec_result == WT_PM_REC_REPLACE)
-        return (
-          bm->compact_page_skip(bm, session, mod->mod_replace.addr, mod->mod_replace.size, skipp));
+        return (bm->compact_page_skip(
+          bm, session, mod->mod_replace.block_cookie, mod->mod_replace.block_cookie_size, skipp));
 
     if (mod->rec_result == WT_PM_REC_MULTIBLOCK)
         for (multi = mod->mod_multi, i = 0; i < mod->mod_multi_entries; ++multi, ++i) {
-            if (multi->addr.addr == NULL)
+            if (multi->addr.block_cookie == NULL)
                 continue;
-            WT_RET(bm->compact_page_skip(bm, session, multi->addr.addr, multi->addr.size, skipp));
+            WT_RET(bm->compact_page_skip(
+              bm, session, multi->addr.block_cookie, multi->addr.block_cookie_size, skipp));
             if (!*skipp)
                 break;
         }
@@ -113,7 +114,7 @@ __compact_page_replace_addr(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY 
     WT_ASSERT(session, addr != NULL);
 
     if (__wt_off_page(ref->home, addr))
-        __wti_ref_addr_safe_free(session, addr->addr, addr->size);
+        __wti_ref_addr_safe_free(session, addr->block_cookie, addr->block_cookie_size);
     else {
         __wt_cell_unpack_addr(session, ref->home->dsk, (WT_CELL *)addr, &unpack);
 
@@ -140,8 +141,8 @@ __compact_page_replace_addr(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY 
         }
     }
 
-    WT_ERR(__wt_strndup(session, copy->addr, copy->size, &addr->addr));
-    addr->size = copy->size;
+    WT_ERR(__wt_strndup(session, copy->addr, copy->size, &addr->block_cookie));
+    addr->block_cookie_size = copy->size;
 
     ref->addr = addr;
     return (0);

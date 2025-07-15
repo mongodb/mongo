@@ -221,8 +221,25 @@ __wt_schema_close_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 
     WT_ASSERT(session,
       FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TABLE_WRITE) ||
-        F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING));
+        F_ISSET(S2C(session), WT_CONN_CLOSING));
     table->cg_complete = table->idx_complete = false;
 
     return (ret);
+}
+
+/*
+ * __wt_schema_close_layered --
+ *     Close a layered handle.
+ */
+void
+__wt_schema_close_layered(WT_SESSION_IMPL *session, WT_LAYERED_TABLE *layered)
+{
+    /* Free copies of copied configuration items. */
+    __wt_free(session, layered->key_format);
+    __wt_free(session, layered->value_format);
+    __wt_free(session, layered->ingest_uri);
+    __wt_free(session, layered->stable_uri);
+
+    /* Remove the ingest handle from layered table manager list */
+    __wt_layered_table_manager_remove_table(session, layered->ingest_btree_id);
 }

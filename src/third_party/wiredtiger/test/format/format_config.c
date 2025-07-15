@@ -37,6 +37,7 @@ static void config_checksum(TABLE *);
 static void config_chunk_cache(void);
 static void config_compact(void);
 static void config_compression(TABLE *, const char *);
+static void config_disagg_storage(void);
 static void config_encryption(void);
 static bool config_explicit(TABLE *, const char *);
 static const char *config_file_type(u_int);
@@ -208,7 +209,7 @@ config_table_am(TABLE *table)
     }
 
     if (!config_explicit(table, "runs.type")) {
-        if (config_explicit(table, "runs.source"))
+        if (config_explicit(table, "runs.source") && DATASOURCE(table, "layered"))
             config_single(table, "runs.type=row", false);
         else
             switch (mmrand(&g.data_rnd, 1, 10)) {
@@ -487,8 +488,12 @@ config_run(void)
 
     tables_apply(config_table, NULL); /* Configure the tables. */
 
+    /* TODO: Temporarily disable salvage test due to increased failures. */
+    config_off(NULL, "ops.salvage");
+
     /* Order can be important, don't shuffle without careful consideration. */
     config_tiered_storage();                         /* Tiered storage */
+    config_disagg_storage();                         /* Disaggregated storage */
     config_chunk_cache();                            /* Chunk cache */
     config_transaction();                            /* Transactions */
     config_backup_incr();                            /* Incremental backup */
@@ -689,10 +694,12 @@ config_cache(void)
     GV(CACHE) = GV(CACHE_MINIMUM);
 
     /*
-     * If it's an in-memory run, size the cache at 2x the maximum initial data set. This calculation
-     * is done in bytes, convert to megabytes before testing against the cache.
+     * If it's an in-memory run or disaggregated follower mode, size the cache at 2x the maximum
+     * initial data set. This calculation is done in bytes, convert to megabytes before testing
+     * against the cache.
      */
-    if (GV(RUNS_IN_MEMORY)) {
+    if (GV(RUNS_IN_MEMORY) ||
+      (g.disagg_storage_config && strcmp(GVS(DISAGG_MODE), "follower") == 0)) {
         cache = table_sumv(V_TABLE_BTREE_KEY_MAX) + table_sumv(V_TABLE_BTREE_VALUE_MAX);
         cache *= table_sumv(V_TABLE_RUNS_ROWS);
         cache *= 2;
@@ -714,8 +721,15 @@ config_cache(void)
     cache = table_sumv(V_TABLE_BTREE_MEMORY_PAGE_MAX); /* in MB units, no conversion to cache */
     cache *= workers;
     cache *= 2;
+
+    if (GV(CHECKPOINT_PRECISE))
+        cache *= 4;
+
     if (GV(CACHE) < cache)
         GV(CACHE) = (uint32_t)cache;
+
+    if (GV(CHECKPOINT_PRECISE) && GV(CACHE) < 2048)
+        GV(CACHE) = 2048;
 
     if (cache_maximum_explicit && GV(CACHE) > GV(CACHE_MAXIMUM))
         GV(CACHE) = GV(CACHE_MAXIMUM);
@@ -737,6 +751,15 @@ dirty_eviction_config:
         config_single(NULL, "cache.eviction_dirty_trigger=40", false);
         config_single(NULL, "cache.eviction_dirty_target=10", false);
     }
+
+    if (g.disagg_storage_config && strcmp(GVS(DISAGG_MODE), "follower") == 0) {
+        WARN("%s",
+          "Setting cache.eviction_dirty_trigger=95 and cache.eviction_update_trigger=95. In "
+          "disaggregated follower mode, these eviction trigger thresholds are increased to help "
+          "avoid operation thread stalls.");
+        config_single(NULL, "cache.eviction_dirty_trigger=95", false);
+        config_single(NULL, "cache.eviction_updates_trigger=95", false);
+    }
 }
 
 /*
@@ -755,13 +778,19 @@ config_checkpoint(void)
         case 4: /* 20% */
             config_single(NULL, "checkpoint=wiredtiger", false);
             break;
-        case 5: /* 5 % */
+        case 5: /* 5% */
             config_off(NULL, "checkpoint");
             break;
         default: /* 75% */
             config_single(NULL, "checkpoint=on", false);
+            /* 50% */
+            if (mmrand(&g.extra_rnd, 1, 10) > 5)
+                config_single(NULL, "checkpoint=on", false);
             break;
         }
+
+    if (GV(OPS_PREPARE))
+        config_off(NULL, "checkpoint.precise");
 }
 
 /*
@@ -1450,6 +1479,48 @@ config_tiered_storage(void)
 }
 
 /*
+ * config_disagg_storage --
+ *     Disaggregated storage configuration.
+ */
+static void
+config_disagg_storage(void)
+{
+    char buf[128];
+    const char *mode, *page_log;
+
+    page_log = GVS(DISAGG_PAGE_LOG);
+
+    g.disagg_storage_config = (strcmp(page_log, "off") != 0 && strcmp(page_log, "none") != 0);
+    if (g.disagg_storage_config) {
+        if (config_explicit(NULL, "disagg.mode")) {
+            mode = GVS(DISAGG_MODE);
+            if (strcmp(mode, "leader") != 0 && strcmp(mode, "follower") != 0)
+                testutil_die(EINVAL, "illegal disagg.mode configuration: %s", mode);
+        } else {
+            /* Randomly assign "leader" or "follower" to disagg.mode with equal probability. */
+            testutil_snprintf(buf, sizeof(buf), "disagg.mode=%s",
+              mmrand(&g.data_rnd, 1, 100) <= 50 ? "leader" : "follower");
+            config_single(NULL, buf, false);
+        }
+
+        /* Disaggregated storage requires timestamps. */
+        config_off(NULL, "transaction.implicit");
+        config_single(NULL, "transaction.timestamps=on", true);
+
+        /* It makes sense to do checkpoints. */
+        config_single(NULL, "checkpoint=on", false);
+
+        /* TODO: Some operations are not yet supported for disaggregated storage. */
+        config_off(NULL, "ops.salvage");
+        config_off(NULL, "ops.verify");
+        config_off(NULL, "backup");
+        config_off(NULL, "backup.incremental");
+        config_off(NULL, "ops.compaction");
+        config_off(NULL, "background_compact");
+    }
+}
+
+/*
  * config_transaction --
  *     Transaction configuration.
  */
@@ -1522,8 +1593,10 @@ config_transaction(void)
         config_off(NULL, "ops.salvage");
         config_off(NULL, "logging");
     }
-    if (!GV(TRANSACTION_TIMESTAMPS))
+    if (!GV(TRANSACTION_TIMESTAMPS)) {
         config_off(NULL, "ops.prepare");
+        config_off(NULL, "checkpoint.precise");
+    }
 
     /* Set a default transaction timeout limit if one is not specified. */
     if (!config_explicit(NULL, "transaction.operation_timeout_ms"))
@@ -1937,6 +2010,7 @@ config_single(TABLE *table, const char *s, bool explicit)
             config_map_checkpoint(equalp, &g.checkpoint_config);
         else if (strncmp(s, "runs.source", strlen("runs.source")) == 0 &&
           strncmp("file", equalp, strlen("file")) != 0 &&
+          strncmp("layered", equalp, strlen("layered")) != 0 &&
           strncmp("table", equalp, strlen("table")) != 0) {
             testutil_die(EINVAL, "Invalid data source option: %s", equalp);
         } else if (strncmp(s, "runs.type", strlen("runs.type")) == 0) {

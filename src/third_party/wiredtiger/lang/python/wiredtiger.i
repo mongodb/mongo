@@ -87,6 +87,12 @@ from packing import pack, unpack
 %typemap(in, numinputs=0) WT_PAGE_LOG_HANDLE ** (WT_PAGE_LOG_HANDLE *temp = NULL) {
 	$1 = &temp;
  }
+%typemap(in, numinputs=0) WT_PAGE_LOG ** (WT_PAGE_LOG *temp = NULL) {
+    $1 = &temp;
+ }
+%typemap(in, numinputs=0) WT_PAGE_LOG_HANDLE ** (WT_PAGE_LOG_HANDLE *temp = NULL) {
+    $1 = &temp;
+ }
 %typemap(in, numinputs=0) WT_STORAGE_SOURCE ** (WT_STORAGE_SOURCE *temp = NULL) {
 	$1 = &temp;
  }
@@ -699,6 +705,7 @@ NOTFOUND_OK(__wt_cursor::_modify)
 NOTFOUND_OK(__wt_cursor::largest_key)
 ANY_OK(__wt_modify::__wt_modify)
 ANY_OK(__wt_modify::~__wt_modify)
+ANY_OK(__wt_page_log_discard_args::__wt_page_log_discard_args)
 ANY_OK(__wt_page_log_get_args::__wt_page_log_get_args)
 ANY_OK(__wt_page_log_put_args::__wt_page_log_put_args)
 
@@ -744,10 +751,19 @@ COMPARE_NOTFOUND_OK(__wt_cursor::_search_near)
 %ignore __wt_page_log::get_open_checkpoint(WT_PAGE_LOG *, int *);
 
 /* TODO: workaround for issues with getting a Python version of structs working. */
+%ignore __wt_page_log_discard_args::lsn;
+%ignore __wt_page_log_discard_args::backlink_lsn;
+%ignore __wt_page_log_discard_args::base_lsn;
+%ignore __wt_page_log_discard_args::backlink_checkpoint_id;
+%ignore __wt_page_log_discard_args::base_checkpoint_id;
+%ignore __wt_page_log_discard_args::lsn_frontier;
+%ignore __wt_page_log_discard_args::delta_count;
+%ignore __wt_page_log_encryption::dek;
 %ignore __wt_page_log_put_args::backlink_lsn;
 %ignore __wt_page_log_put_args::base_lsn;
 %ignore __wt_page_log_put_args::backlink_checkpoint_id;
 %ignore __wt_page_log_put_args::base_checkpoint_id;
+%ignore __wt_page_log_put_args::encryption;
 %ignore __wt_page_log_put_args::flags;
 %ignore __wt_page_log_put_args::lsn;
 %ignore __wt_page_log_get_args::lsn;
@@ -755,6 +771,7 @@ COMPARE_NOTFOUND_OK(__wt_cursor::_search_near)
 %ignore __wt_page_log_get_args::base_lsn;
 %ignore __wt_page_log_get_args::backlink_checkpoint_id;
 %ignore __wt_page_log_get_args::base_checkpoint_id;
+%ignore __wt_page_log_get_args::encryption;
 %ignore __wt_page_log_get_args::lsn_frontier;
 %ignore __wt_page_log_get_args::delta_count;
 
@@ -1246,6 +1263,10 @@ SIDESTEP_METHOD(__wt_page_log_handle, plh_get,
     WT_ITEM *results_array, u_int *results_count),
   (self, session, page_id, checkpoint_id, get_args, results_array, results_count))
 
+SIDESTEP_METHOD(__wt_page_log_handle, plh_discard,
+  (WT_SESSION *session, int page_id, int checkpoint_id, WT_PAGE_LOG_DISCARD_ARGS *discard_args),
+  (self, session, page_id, checkpoint_id, discard_args))
+
 SIDESTEP_METHOD(__wt_page_log_handle, plh_close,
   (WT_SESSION *session),
   (self, session))
@@ -1451,10 +1472,10 @@ OVERRIDE_METHOD(__wt_session, WT_SESSION, log_printf, (self, msg))
 %rename(Connection) __wt_connection;
 %rename(FileHandle) __wt_file_handle;
 %rename(PageLog) __wt_page_log;
+%rename(PageLogDiscardArgs) __wt_page_log_discard_args;
 %rename(PageLogGetArgs) __wt_page_log_get_args;
 %rename(PageLogHandle) __wt_page_log_handle;
 %rename(PageLogPutArgs) __wt_page_log_put_args;
-%rename(StorageSource) __wt_storage_source;
 %rename(StorageSource) __wt_storage_source;
 %rename(FileSystem) __wt_file_system;
 

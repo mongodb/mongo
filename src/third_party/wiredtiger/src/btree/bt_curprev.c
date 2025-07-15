@@ -219,7 +219,8 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
         cbt->iface.value.size = 1;
     } else {
 restart_read:
-        WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd));
+        WT_RET(
+          __wt_txn_read_upd_list(session, cbt, NULL, WT_INSERT_RECNO(cbt->ins), cbt->ins->upd));
         if (cbt->upd_value->type == WT_UPDATE_INVALID ||
           cbt->upd_value->type == WT_UPDATE_TOMBSTONE) {
             cbt->v = 0;
@@ -283,7 +284,8 @@ restart_read:
     __wt_upd_value_clear(cbt->upd_value);
     if (cbt->ins != NULL)
         /* Check the update list. */
-        WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd));
+        WT_RET(
+          __wt_txn_read_upd_list(session, cbt, NULL, WT_INSERT_RECNO(cbt->ins), cbt->ins->upd));
     if (cbt->upd_value->type == WT_UPDATE_INVALID)
         /*
          * Read the on-disk value and/or history. Pass an update list: the update list may contain
@@ -353,7 +355,8 @@ restart_read:
             WT_STAT_CONN_DSRC_INCR(session, cursor_bounds_prev_early_exit);
         WT_RET(ret);
 
-        WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd));
+        WT_RET(
+          __wt_txn_read_upd_list(session, cbt, NULL, WT_INSERT_RECNO(cbt->ins), cbt->ins->upd));
         if (cbt->upd_value->type == WT_UPDATE_INVALID) {
             ++*skippedp;
             continue;
@@ -447,7 +450,8 @@ restart_read:
             if (F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY))
                 return (0);
 
-            WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd));
+            WT_RET(
+              __wt_txn_read_upd_list(session, cbt, NULL, WT_INSERT_RECNO(cbt->ins), cbt->ins->upd));
         }
         if (cbt->upd_value->type != WT_UPDATE_INVALID) {
             if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE) {
@@ -640,7 +644,7 @@ restart_read_insert:
                 WT_STAT_CONN_DSRC_INCR(session, cursor_bounds_prev_early_exit);
             WT_RET(ret);
 
-            WT_RET(__wt_txn_read_upd_list(session, cbt, ins->upd));
+            WT_RET(__wt_txn_read_upd_list(session, cbt, key, WT_RECNO_OOB, ins->upd));
             if (cbt->upd_value->type == WT_UPDATE_INVALID) {
                 ++*skippedp;
                 continue;
@@ -748,6 +752,10 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
     WT_NOT_READ(time_start, 0);
 
     WT_STAT_CONN_DSRC_INCR(session, cursor_prev);
+
+    /* Track prev calls during HS wrapup */
+    if (F_ISSET(session, WT_SESSION_HS_WRAPUP))
+        session->reconcile_stats.hs_wrapup_next_prev_calls++;
 
     /* tree walk flags */
     flags = WT_READ_NO_SPLIT | WT_READ_PREV | WT_READ_SKIP_INTL;

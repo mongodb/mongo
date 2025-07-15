@@ -214,6 +214,7 @@ reread:
                     block_meta->delta_count =
                       get_args.delta_count == 0 ? *results_count - 1 : get_args.delta_count;
                     block_meta->checksum = checksum;
+                    block_meta->encryption = get_args.encryption;
                     if (block_meta->delta_count > 0)
                         WT_ASSERT(session,
                           get_args.base_lsn > 0 ||
@@ -250,7 +251,7 @@ corrupt:
               __wt_bm_corrupt_dump(session, current, 0, (wt_off_t)page_id, size, checksum));
 
         /* Panic if a checksum fails during an ordinary read. */
-        F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
+        F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
         if (F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
             WT_ERR(WT_ERROR);
         WT_ERR_PANIC(session, WT_ERROR, "%s: fatal read error", block_disagg->name);

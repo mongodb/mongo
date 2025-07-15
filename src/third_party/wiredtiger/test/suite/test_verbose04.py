@@ -72,6 +72,7 @@ class test_verbose04(test_verbose_base):
       'WT_VERB_HS_ACTIVITY',
       'WT_VERB_METADATA',
       'WT_VERB_MUTEX',
+      'WT_VERB_PAGE_DELTA',
       'WT_VERB_PREFETCH',
       'WT_VERB_OUT_OF_ORDER',
       'WT_VERB_OVERFLOW',
@@ -91,7 +92,7 @@ class test_verbose04(test_verbose_base):
       'WT_VERB_TRANSACTION',
       'WT_VERB_VERIFY',
       'WT_VERB_VERSION',
-      'WT_VERB_WRITE'
+      'WT_VERB_WRITE',
     ]
 
     # Enable all categories at once.

@@ -1,0 +1,25 @@
+############################################
+#  RUN PARAMETERS: V3
+############################################
+# A configuration for disaggregated storage.
+backup=0
+checkpoint.precise=1
+disagg.page_log=palm
+disagg.enabled=1
+disagg.layered=1
+runs.source=layered
+runs.type=row-store
+runs.tables=3
+import=0
+ops.alter=0
+# FIXME-WT-14467 should fix cursor->modify for layered tables.
+ops.pct.modify=0
+ops.compaction=0
+ops.salvage=0
+ops.throttle=0
+ops.truncate=0
+# FIXME-WT-14553 should fix WT_SESSION->verify for layered tables.
+ops.verify=0
+quiet=0
+runs.in_memory=0
+transaction.timestamps=1

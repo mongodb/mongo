@@ -29,12 +29,13 @@ race:__ref_track_state
 # __wt_configure_method intentionally allows for races between threads to avoid the overhead of taking a lock on each API call.  
 race:__wt_configure_method
 
-# FIXME-WT-13074 This Work has been split out into a separate ticket to keep PR sizes down.
+# FIXME-WT-14930 Dhandle timeofdeath synchronization
+race:__sweep_mark
+
+# FIXME-WT-13074 Unresolved warnings for ex_backup
 race:__wt_free_int
 race:__wt_free_update_list
 race:__wt_page_out
-race:__read_blocked
-race:__sweep_mark
 race:__posix_file_close
 race:__log_newfile
 race:__handle_close
@@ -47,10 +48,25 @@ race:__evict_queue_empty
 race:__evict_get_ref
 race:__evict_clear_all_walks
 race:__session_clear
+race:__rec_row_leaf_insert
+race:__wt_cache_dirty_decr
+race:__wt_reconcile
+
+# FIXME-WT-14856 Unresolved warnings for ex_all
+race:__wti_conn_reconfig
+race:__wt_session_cursor_cache_sweep
+race:__wti_txn_update_pinned_timestamp
+race:__capacity_config
+
 
 # FIXME-WT-13075 Address these warnings separately as they may have perf impacts
 race:hazard.c
 race:__wt_tree_modify_set
 race:__wt_cond_auto_wait_signal
 race:__wt_ref_addr_copy
-
+race:__wt_row_leaf_key_info
+race:__wt_row_leaf_key
+race:__evict_force_check
+race:__wt_page_evict_clean
+race:__wt_evict_touch_page
+race:__wt_row_search

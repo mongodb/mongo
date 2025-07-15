@@ -275,6 +275,7 @@ class test_salvage01(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(["salvage", self.tablename + ".wt"], errfilename=errfile)
         self.check_empty_file(errfile)
         self.check_empty_table(self.tablename)
+        self.ignoreStdoutPatternIfExists("extent list")
 
     def test_salvage_process(self):
         """
@@ -287,6 +288,7 @@ class test_salvage01(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(["salvage", self.tablename + ".wt"], errfilename=errfile)
         self.check_empty_file(errfile)
         self.check_populate(self.tablename)
+        self.ignoreStdoutPatternIfExists("extent list")
 
     def test_salvage_api_empty(self):
         """
@@ -296,6 +298,7 @@ class test_salvage01(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create('table:' + self.tablename, self.session_params)
         self.session.salvage('table:' + self.tablename, None)
         self.check_empty_table(self.tablename)
+        self.ignoreStdoutPatternIfExists("extent list")
 
     def test_salvage_api(self):
         """
@@ -306,6 +309,7 @@ class test_salvage01(wttest.WiredTigerTestCase, suite_subprocess):
         self.populate(self.tablename)
         self.salvageUntilSuccess(self.session, 'file:' + self.tablename + ".wt")
         self.check_populate(self.tablename)
+        self.ignoreStdoutPatternIfExists("extent list")
 
     def test_salvage_api_damaged(self):
         """
@@ -332,6 +336,7 @@ class test_salvage01(wttest.WiredTigerTestCase, suite_subprocess):
 
         self.session.salvage('file:' + self.tablename + ".wt", None)
         self.check_damaged(self.tablename)
+        self.ignoreStdoutPatternIfExists("extent list")
 
     def test_salvage_process_damaged(self):
         """
@@ -342,7 +347,9 @@ class test_salvage01(wttest.WiredTigerTestCase, suite_subprocess):
         self.populate(self.tablename)
         self.damage(self.tablename)
         errfile = "salvageerr.out"
-        self.runWt(["salvage", self.tablename + ".wt"], errfilename=errfile)
+        outfile = "salvageout.out"
+        self.runWt(["salvage", self.tablename + ".wt"], errfilename=errfile, outfilename=outfile)
         self.check_empty_file(errfile)  # expect no output
         self.check_no_error_in_file(errfile)
         self.check_damaged(self.tablename)
+        self.ignoreStdoutPatternIfExists("extent list")

@@ -41,18 +41,24 @@ from wtscenario import make_scenarios
 
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
-    conn_config = ''
     session_config = 'isolation=snapshot'
 
     ckptname_values = [
         ('named', dict(checkpoint_name='my_ckpt')),
         ('unnamed', dict(checkpoint_name=None)),
     ]
-    scenarios = make_scenarios(ckptname_values)
+    ckpt_precision = [
+        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
+        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
+    ]
+    scenarios = make_scenarios(ckptname_values, ckpt_precision)
 
     # No need to run this on more than one btree type.
     key_format = 'r'
     value_format = 'S'
+
+    def conn_config(self):
+        return self.ckpt_config
 
     def updates(self, uri, ds, nrows, value, ts):
         cursor = self.session.open_cursor(uri)

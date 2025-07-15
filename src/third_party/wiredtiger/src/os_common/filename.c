@@ -87,7 +87,7 @@ __wt_remove_if_exists(WT_SESSION_IMPL *session, const char *name, bool durable)
     WT_RET(__wt_fs_exist(session, name, &exist));
     if (exist) {
         /* Modifications are not allowed on a read only database. */
-        if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_READONLY))
+        if (F_ISSET(S2C(session), WT_CONN_READONLY))
             return (EACCES);
         WT_RET(__wt_fs_remove(session, name, durable, false));
     }

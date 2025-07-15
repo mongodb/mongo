@@ -162,7 +162,6 @@ run --bg "s_longlines" &
 run --bg "s_python" &
 run --bg "s_stat" &
 run --bg "s_string" &
-run --bg "s_tags" &
 run --bg "s_typedef -c" &
 run --bg "s_visibility_checks" &
 run --bg "s_void" &

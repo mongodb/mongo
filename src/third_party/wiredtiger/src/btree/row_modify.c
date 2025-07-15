@@ -72,6 +72,7 @@ int
 __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
   WT_UPDATE **updp_arg, u_int modify_type, bool exclusive, bool restore)
 {
+    WT_BTREE *btree;
     WT_DECL_RET;
     WT_INSERT *ins;
     WT_INSERT_HEAD *ins_head, **ins_headp;
@@ -88,6 +89,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
     ins = NULL;
     page = cbt->ref->page;
     session = CUR2S(cbt);
+    btree = S2BT(session);
     last_upd = NULL;
     upd_arg = updp_arg == NULL ? NULL : *updp_arg;
     upd = upd_arg;
@@ -155,7 +157,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
              *  3) Reinsert an update that has been deleted by a prepared rollback.
              */
             WT_ASSERT(session,
-              !WT_IS_HS(S2BT(session)->dhandle) ||
+              !WT_IS_HS(btree->dhandle) ||
                 (*upd_entry == NULL ||
                   ((*upd_entry)->type == WT_UPDATE_TOMBSTONE &&
                     (((*upd_entry)->txnid == WT_TXN_NONE && (*upd_entry)->start_ts == WT_TS_NONE) ||
@@ -175,10 +177,15 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
 
             /*
              * If we restore an update chain in update restore eviction, there should be no update
-             * on the existing update chain.
+             * or a restored tombstone on the existing update chain except for disaggregated btrees.
              */
-            WT_ASSERT_ALWAYS(session, !restore || *upd_entry == NULL,
-              "Update found on the existing update chain during an update restore eviction");
+            WT_ASSERT_ALWAYS(session,
+              !restore ||
+                (*upd_entry == NULL ||
+                  (F_ISSET(btree, WT_BTREE_DISAGGREGATED) &&
+                    (*upd_entry)->type == WT_UPDATE_TOMBSTONE &&
+                    F_ISSET(*upd_entry, WT_UPDATE_RESTORED_FROM_DS))),
+              "Illegal update on chain during update restore eviction");
 
             /*
              * We can either put multiple new updates or a single update on the update chain.
@@ -241,7 +248,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
              * history store if we write a prepared update to the data store.
              */
             WT_ASSERT(session,
-              !WT_IS_HS(S2BT(session)->dhandle) ||
+              !WT_IS_HS(btree->dhandle) ||
                 (upd_arg->type == WT_UPDATE_TOMBSTONE && upd_arg->next != NULL &&
                   upd_arg->next->type == WT_UPDATE_STANDARD && upd_arg->next->next == NULL) ||
                 (upd_arg->type == WT_UPDATE_STANDARD && upd_arg->next == NULL));
@@ -353,7 +360,9 @@ __wt_update_obsolete_check(
     WT_PAGE *page;
     WT_TXN_GLOBAL *txn_global;
     WT_UPDATE *first, *next;
-    size_t size;
+    wt_timestamp_t prune_timestamp;
+    size_t delta_upd_size, size, upd_size;
+    uint64_t oldest_id;
     u_int count;
 
     next = NULL;
@@ -364,6 +373,11 @@ __wt_update_obsolete_check(
     /* If we can't lock it, don't scan, that's okay. */
     if (WT_PAGE_TRYLOCK(session, page) != 0)
         return;
+
+    WT_ACQUIRE_READ(prune_timestamp, CUR2BT(cbt)->prune_timestamp);
+
+    oldest_id = __wt_txn_oldest_id(session);
+
     /*
      * This function identifies obsolete updates, and truncates them from the rest of the chain;
      * because this routine is called from inside a serialization function, the caller has
@@ -391,7 +405,14 @@ __wt_update_obsolete_check(
           upd->next->txnid == WT_TXN_ABORTED && upd->next->prepare_state == WT_PREPARE_INPROGRESS)
             continue;
 
-        if (__wt_txn_upd_visible_all(session, upd)) {
+        /*
+         * If a table has garbage collection enabled, then trim updates as possible. We should check
+         * the logic here - it might be possible to do something more aggressive?
+         */
+        if (__wt_txn_upd_visible_all(session, upd) ||
+          (F_ISSET(CUR2BT(cbt), WT_BTREE_GARBAGE_COLLECT) &&
+            (WT_TXNID_LT(upd->txnid, oldest_id) && prune_timestamp != WT_TS_NONE &&
+              upd->durable_ts <= prune_timestamp))) {
             if (first == NULL && WT_UPDATE_DATA_VALUE(upd))
                 first = upd;
         } else
@@ -419,10 +440,17 @@ __wt_update_obsolete_check(
          * checkpoints cleaning a page.
          */
         if (update_accounting) {
-            for (size = 0, upd = next; upd != NULL; upd = upd->next)
-                size += WT_UPDATE_MEMSIZE(upd);
-            if (size != 0)
+            for (delta_upd_size = 0, size = 0, upd = next; upd != NULL; upd = upd->next) {
+                upd_size = WT_UPDATE_MEMSIZE(upd);
+                size += upd_size;
+                if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DELTA))
+                    delta_upd_size += upd_size;
+            }
+            if (size != 0) {
                 __wt_cache_page_inmem_decr(session, page, size);
+                if (delta_upd_size != 0)
+                    __wt_cache_page_inmem_decr_delta_updates(session, page, delta_upd_size);
+            }
         }
     }
 

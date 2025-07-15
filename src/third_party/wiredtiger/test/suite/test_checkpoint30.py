@@ -38,13 +38,18 @@ from wtscenario import make_scenarios
 # but not all deleted keys on-disk version are not visible.
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=50MB,statistics=(all)'
-
     format_values = [
         ('column', dict(key_format='r', value_format='S', extraconfig='')),
         ('string_row', dict(key_format='S', value_format='S', extraconfig='')),
     ]
-    scenarios = make_scenarios(format_values)
+    ckpt_precision = [
+        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
+        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
+    ]
+    scenarios = make_scenarios(format_values, ckpt_precision)
+
+    def conn_config(self):
+        return 'cache_size=50MB,statistics=(all),' + self.ckpt_config
 
     def large_updates(self, uri, ds, nrows, value, ts):
         cursor = self.session.open_cursor(uri)

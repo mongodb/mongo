@@ -376,6 +376,7 @@ struct __wt_cursor_hs {
     WT_CURSOR *file_cursor; /* Queries of regular history store data */
     WT_TIME_WINDOW time_window;
     uint32_t btree_id;
+    uint32_t hs_id;
     WT_ITEM *datastore_key;
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
@@ -483,16 +484,53 @@ struct __wt_cursor_version {
     /* The previous traversed update's start_ts will become the stop_ts. */
     wt_timestamp_t upd_stop_ts;
 
+    /* Don't show the user any keys from before this time. */
+    wt_timestamp_t start_timestamp;
+
 #define WT_CURVERSION_UPDATE_CHAIN 0
 #define WT_CURVERSION_DISK_IMAGE 1
 #define WT_CURVERSION_HISTORY_STORE 2
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_CURVERSION_HS_EXHAUSTED 0x1u
-#define WT_CURVERSION_ON_DISK_EXHAUSTED 0x2u
-#define WT_CURVERSION_UPDATE_EXHAUSTED 0x4u
+#define WT_CURVERSION_HS_EXHAUSTED 0x01u
+#define WT_CURVERSION_ON_DISK_EXHAUSTED 0x02u
+#define WT_CURVERSION_TIMESTAMP_ORDER 0x04u
+#define WT_CURVERSION_UPDATE_EXHAUSTED 0x08u
+#define WT_CURVERSION_VISIBLE_ONLY 0x10u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
+};
+
+/*
+ * WT_CURSOR_LAYERED --
+ *	A layered table cursor.
+ */
+struct __wt_cursor_layered {
+    WT_CURSOR iface;
+
+    WT_DATA_HANDLE *dhandle;
+
+    WT_CURSOR *current_cursor; /* The current cursor for iteration */
+    WT_CURSOR *ingest_cursor;  /* The ingest table */
+    WT_CURSOR *stable_cursor;  /* The stable table */
+
+    int64_t next_random_seed;
+    u_int next_random_sample_size;
+
+    uint64_t snapshot_gen;  /* Snapshot generation on last update */
+    uint64_t checkpoint_id; /* The checkpoint id on last updated */
+    bool leader;            /* Leader/follower state on last update */
+
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WT_CLAYERED_ACTIVE 0x01u         /* Incremented the session count */
+#define WT_CLAYERED_ITERATE_NEXT 0x02u   /* Forward iteration */
+#define WT_CLAYERED_ITERATE_PREV 0x04u   /* Backward iteration */
+#define WT_CLAYERED_MULTIPLE 0x08u       /* Multiple cursors have values */
+#define WT_CLAYERED_OPEN_READ 0x10u      /* Open for reads */
+#define WT_CLAYERED_RANDOM 0x20u         /* Random cursor operations only */
+#define WT_CLAYERED_STABLE_NO_CKPT 0x40u /* Stable constituent didn't have a checkpoint */
+                                         /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+    uint32_t flags;
 };
 
 #define WT_CURSOR_PRIMARY(cursor) (((WT_CURSOR_TABLE *)(cursor))->cg_cursors[0])

@@ -119,7 +119,7 @@ __wt_meta_checkpoint(WT_SESSION_IMPL *session, const char *fname, const char *ch
  * configured.
  */
 #ifdef WT_STANDALONE_BUILD
-    if (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_COMPATIBILITY))
+    if (!F_ISSET(S2C(session), WT_CONN_COMPATIBILITY))
         /* Check the major/minor version numbers. */
         WT_ERR(__ckpt_version_chk(session, fname, config));
 #else
@@ -652,7 +652,7 @@ __meta_blk_mods_load(
      * checkpoint's modified blocks from the block manager.
      */
     F_SET(ckpt, WT_CKPT_ADD);
-    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_INCR_BACKUP)) {
+    if (F_ISSET(S2C(session), WT_CONN_INCR_BACKUP)) {
         F_SET(ckpt, WT_CKPT_BLOCK_MODS_LIST);
         WT_RET(__ckpt_valid_blk_mods(session, ckpt, rename));
     }
@@ -815,6 +815,7 @@ __wt_meta_ckptlist_get(
 {
     WT_BTREE *btree;
     WT_CKPT *ckptbase_comp;
+    WT_DECL_ITEM(name_buf);
     WT_DECL_RET;
     char *config;
 
@@ -853,11 +854,14 @@ __wt_meta_ckptlist_get(
             WT_ERR(ret);
         }
     } else {
+        WT_ERR(__wt_btree_shared_base_name(session, &fname, NULL, &name_buf));
         WT_ERR(__wt_metadata_search(session, fname, &config));
         WT_ERR(__wt_meta_ckptlist_get_from_config(session, update, ckptbasep, allocated, config));
     }
 
 err:
+    if (name_buf != NULL)
+        __wt_scr_free(session, &name_buf);
     __wt_free(session, config);
     return (ret);
 }
@@ -1037,6 +1041,12 @@ __ckpt_load(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v, WT_C
     if (ret != WT_NOTFOUND && a.len != 0)
         ckpt->run_write_gen = (uint64_t)a.val;
 
+    /* This is a recent addition for disaggregated storage. Allow for the value to be missing. */
+    ret = __wt_config_subgets(session, v, "next_page_id", &a);
+    WT_RET_NOTFOUND_OK(ret);
+    if (ret != WT_NOTFOUND && a.len != 0)
+        ckpt->next_page_id = (uint64_t)a.val;
+
     return (0);
 }
 
@@ -1167,13 +1177,13 @@ __wt_meta_ckptlist_to_meta(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, WT_ITEM 
           "=(addr=\"%.*s\",order=%" PRId64 ",time=%" PRIu64 ",size=%" PRId64
           ",newest_start_durable_ts=%" PRId64 ",oldest_start_ts=%" PRId64 ",newest_txn=%" PRId64
           ",newest_stop_durable_ts=%" PRId64 ",newest_stop_ts=%" PRId64 ",newest_stop_txn=%" PRId64
-          ",prepare=%d,write_gen=%" PRId64 ",run_write_gen=%" PRId64 ")",
+          ",prepare=%d,write_gen=%" PRId64 ",run_write_gen=%" PRId64 ",next_page_id=%" PRId64 ")",
           (int)ckpt->addr.size, (char *)ckpt->addr.data, ckpt->order, ckpt->sec,
           (int64_t)ckpt->size, (int64_t)ckpt->ta.newest_start_durable_ts,
           (int64_t)ckpt->ta.oldest_start_ts, (int64_t)ckpt->ta.newest_txn,
           (int64_t)ckpt->ta.newest_stop_durable_ts, (int64_t)ckpt->ta.newest_stop_ts,
           (int64_t)ckpt->ta.newest_stop_txn, (int)ckpt->ta.prepare, (int64_t)ckpt->write_gen,
-          (int64_t)ckpt->run_write_gen));
+          (int64_t)ckpt->run_write_gen, (int64_t)ckpt->next_page_id));
     }
     WT_RET(__wt_buf_catfmt(session, buf, ")"));
 
@@ -1312,6 +1322,12 @@ __wt_meta_ckptlist_set(
     fname = dhandle->name;
 
     WT_ERR(__wt_scr_alloc(session, 1024, &buf));
+
+    /* Add B-tree metadata to any added checkpoint. */
+    WT_CKPT_FOREACH (ckptbase, ckpt)
+        if (F_ISSET(ckpt, WT_CKPT_ADD))
+            ckpt->next_page_id = S2BT(session)->next_page_id;
+
     WT_ERR(__wt_meta_ckptlist_to_meta(session, ckptbase, buf));
 
     WT_ERR_NOTFOUND_OK(__meta_live_restore_to_meta(session, dhandle, buf), false);

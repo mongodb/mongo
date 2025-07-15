@@ -190,6 +190,19 @@ protected:
      *     Execute the given workload operation in the model.
      */
     int
+    do_operation(const operation::get &op)
+    {
+        data_value value;
+        int ret = table(op.table_id)->get_ext(transaction(op.txn_id), op.key, value);
+        /* FIXME-WT-14863 actually use the value we read. */
+        return ret;
+    }
+
+    /*
+     * kv_workload_runner::do_operation --
+     *     Execute the given workload operation in the model.
+     */
+    int
     do_operation(const operation::insert &op)
     {
         return table(op.table_id)->insert(transaction(op.txn_id), op.key, op.value);

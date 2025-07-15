@@ -54,7 +54,14 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         ('column', dict(key_format='r', value_format='S', extraconfig='')),
         ('string_row', dict(key_format='S', value_format='S', extraconfig='')),
     ]
-    scenarios = make_scenarios(format_values)
+    ckpt_precision = [
+        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
+        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
+    ]
+    scenarios = make_scenarios(format_values, ckpt_precision)
+
+    def conn_config(self):
+        return self.ckpt_config
 
     def large_updates(self, ds, nrows, value, ts):
         cursor = self.session.open_cursor(ds.uri)

@@ -68,6 +68,10 @@ for tsan_log in os.listdir(current_dir):
                 pattern_to_remove = r"/data/mci/.*/wiredtiger/"
                 cleaned_text = re.sub(pattern_to_remove, "", line).strip()
 
+                # Strip away the column line information.
+                pattern_to_remove = r':(\d+):\d+'
+                cleaned_text = re.sub(pattern_to_remove, r':\1', cleaned_text).strip()
+
                 tsan_warnings_set.add(cleaned_text)
 
 print("Unique warnings:")

@@ -269,9 +269,11 @@ __debug_config(WT_SESSION_IMPL *session, WT_DBG *ds, const char *ofile, uint32_t
      * in-memory configuration, or when reading a checkpoint that has no corresponding history store
      * checkpoint.
      */
-    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_IN_MEMORY) && !WT_IS_HS(session->dhandle) &&
-      !(WT_READING_CHECKPOINT(session) && session->hs_checkpoint == NULL))
-        WT_ERR(__wt_curhs_open(session, NULL, &ds->hs_cursor));
+    if (!F_ISSET(conn, WT_CONN_IN_MEMORY) && !WT_IS_HS(session->dhandle) &&
+      !(WT_READING_CHECKPOINT(session) && session->hs_checkpoint == NULL)) {
+        WT_ASSERT(session, session->dhandle != NULL);
+        WT_ERR(__wt_curhs_open(session, S2BT(session)->id, NULL, &ds->hs_cursor));
+    }
 
     if (ds->hs_cursor != NULL) {
         /*
@@ -1097,14 +1099,22 @@ __wt_debug_cursor_tree_hs(void *cursor_arg, const char *ofile)
     WT_CURSOR *hs_cursor;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
+    uint32_t hs_id;
 
     session = CUR2S(cursor_arg);
-    WT_RET(__wt_curhs_open(session, NULL, &hs_cursor));
-    hs_btree = __wt_curhs_get_btree(hs_cursor);
-    WT_WITH_BTREE(session, hs_btree, ret = __wt_debug_tree_all(session, NULL, NULL, ofile));
-    WT_TRET(hs_cursor->close(hs_cursor));
 
-    return (ret);
+    hs_id = 0;
+    for (;;) {
+        WT_RET_NOTFOUND_OK(ret = __wt_curhs_next_hs_id(session, hs_id, &hs_id));
+        if (ret == WT_NOTFOUND)
+            return (0);
+
+        WT_RET(__wt_curhs_open_ext(session, hs_id, 0, NULL, &hs_cursor));
+        hs_btree = __wt_curhs_get_btree(hs_cursor);
+        WT_WITH_BTREE(session, hs_btree, ret = __wt_debug_tree_all(session, NULL, NULL, ofile));
+        WT_TRET(hs_cursor->close(hs_cursor));
+        WT_RET(ret);
+    }
 }
 
 /*
@@ -1679,7 +1689,7 @@ __debug_update(WT_DBG *ds, WT_UPDATE *upd, bool hexbyte)
         if (prepare_state != NULL)
             WT_RET(ds->f(ds, ", prepare: %s", prepare_state));
 
-        WT_RET(ds->f(ds, ", flags: 0x%" PRIx8 "\n", upd->flags));
+        WT_RET(ds->f(ds, ", flags: 0x%" PRIx16 "\n", upd->flags));
     }
     return (0);
 }

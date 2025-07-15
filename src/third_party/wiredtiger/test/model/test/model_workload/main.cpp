@@ -340,6 +340,7 @@ test_workload_parse(void)
              << model::operation::crash() << model::operation::begin_transaction(1)
              << model::operation::insert(
                   k_table1_id, 1, model::data_value((uint64_t)3), model::data_value((uint64_t)3))
+             << model::operation::get(k_table1_id, 5, model::data_value((uint64_t)4))
              << model::operation::truncate(
                   k_table1_id, 2, model::data_value((uint64_t)1), model::data_value((uint64_t)2))
              << model::operation::prepare_transaction(1, 23)

@@ -1,0 +1,143 @@
+#!/bin/bash
+
+# Procs is an associative array.  procs[pid] => python_file_name
+declare -A procs
+verbose="-v 2"
+ecode=0
+summary=""
+python="python3"
+
+Usage() {
+    cat <<EOF
+Usage: pytest_parallel [ options ] [ run.py-options ] -- tests
+
+This must be run from the build directory.
+
+Options:
+    -j parallel_count
+    --python python_executable
+
+run.py options and help follow:
+----------------------------------------------------------------
+EOF
+    $python ../test/suite/run.py --help
+}
+
+# Wait for one process to exit, if it has a bad status, show that in the output log.
+waitone() {
+    # Grab the list of pids running before and after waiting
+    local before="$(jobs -p)"
+    wait -n
+    local procstatus=$?
+    local after="$(jobs -p)"
+
+    if [ "$procstatus" != 0 ]; then
+        # Get the pid missing from the second list, that's the failed one
+        proc=$(echo "$before $after" | tr ' ' '\n' | sort | uniq -u)
+
+        # Now we can get its name, show a message
+        local name=${procs[$proc]}
+        msg="ERROR: $name process returned $procstatus"
+        echo "$msg"
+        summary="${summary}  ${msg}"$'\n'
+        ecode=1
+    fi
+}
+
+# Show processes that we are waiting for.  This is helpful for diagnosing hangs and
+# just general progress near the end of a run.
+showprocs() {
+    echo -n "Waiting on processes: "
+    # Add an extra arg in case all processes are gone
+    for proc in $(jobs -p) ignore; do
+        if [ "$proc" = ignore ]; then
+            continue
+        fi
+        local name=${procs[$proc]}
+        echo -n " $name [$proc]"
+    done
+    echo ''
+}
+
+# Parse arguments
+parallel_count=$(nproc)
+
+# We want to always tell run.py to not remove the WT_TEST directory
+# before it starts its run.  Otherwise some test processes will get their
+# home directory removed out from underneath them.
+run_py_options="--noremove"
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -j )
+            parallel_count="$2"
+            shift; shift
+            ;;
+        --python )    # python executable
+            python="$2"
+            shift; shift
+            ;;
+        --help )
+            Usage
+            exit 1
+            ;;
+        -- )
+            # The end of the options
+            shift
+            break
+            ;;
+        * )
+            run_py_options="$run_py_options $1"
+            shift
+            ;;
+    esac
+done
+
+if [ "$#" = 0 ]; then
+    Usage
+    exit 1
+fi
+
+if [ ! -f wt ]; then
+    echo "Must be run from a build directory"
+    exit 1
+fi
+
+# Add a label to any output.
+# This function is run as a separate process.
+# It exits with the status from the command
+label_output() {
+    label="$1"
+    shift
+    "$@" 2>&1 | sed -e "s/^/$label: /"
+    return ${PIPESTATUS[0]}
+}
+
+# run individual Python tests scripts in the background - it's faster than using run.py -j
+rm -rf WT_TEST
+for pyfile in "$@"; do
+    # Run the test script in the background - modify output so we know what test it is coming from.
+    echo running "$python ../test/suite/run.py $run_py_options $pyfile"
+    label_output "$pyfile" "$python" ../test/suite/run.py $run_py_options $pyfile &
+    procs["$!"]="$pyfile"
+
+    # Wait if we're up to the limit of processes allowed.
+    if [ $(jobs -p | wc -l) -ge $parallel_count ]; then
+        waitone
+    fi
+done
+
+# Wait for last running processes
+while [ $(jobs -p | wc -l) -gt 0 ]; do
+    echo "$procs"
+    showprocs
+    waitone
+done
+
+if [ "$summary" = '' ]; then
+    echo "Success"
+else
+    echo ""
+    echo "Summary:"
+    echo -n "$summary"
+fi
+exit $ecode

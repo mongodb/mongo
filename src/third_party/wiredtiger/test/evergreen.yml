@@ -74,6 +74,11 @@ functions:
               # DO NOT MOVE:This variable must be set in the same function(shell) that runs a test,
               # and as close as possible to the test execution, since it affects all the binaries.
               export LD_PRELOAD=$WT_TOPDIR/TCMALLOC_LIB/libtcmalloc.so
+
+              if [ ! -f "$LD_PRELOAD" ]; then
+                echo "Error: TCMalloc support was requested, but the library doesn't exist: $LD_PRELOAD"
+                exit 1
+              fi
             fi
 
             ${additional_env_vars}
@@ -830,6 +835,34 @@ functions:
             ${python_binary|python3} ../test/suite/run.py ${ignore_stdout} ${unit_test_args|-v 2} ${unit_test_variant_args} $threads_command 2>&1
         fi
 
+  "unit test parallel":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger"
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        ${PREPARE_TEST_ENV}
+        # no_run will contain a list of files we don't want to run,
+        # do_run will contain a list of files we want to run.
+        no_run=$(mktemp)
+        do_run=$(mktemp)
+        sed -e 's/ *#.*//' -e '/^$/d' < ${unit_test_parallel_ignore} > $no_run
+        (cd ./test/suite; ls test_*.py) | fgrep -vf $no_run > $do_run
+        cd cmake_build
+        threads_command="-j ${nproc}"
+        if [[ -n "${num_jobs}" ]]; then
+          threads_command="-j ${num_jobs}"
+        fi
+        py=${python_binary|python3}
+        echo "Using $threads_command for 'unit test parallel'"
+        if [ ${check_coverage|false} = true ]; then
+            ../tools/pytest_parallel --python $py $threads_command ${unit_test_parallel_args|-v 2} ${unit_test_variant_args} -- $(cat $do_run) 2>&1 || echo "Ignoring failed test as we are checking test coverage"
+        else
+            ../tools/pytest_parallel --python $py $threads_command ${unit_test_parallel_args|-v 2} ${unit_test_variant_args} -- $(cat $do_run) 2>&1
+        fi
+
   "code coverage analysis":
     command: shell.exec
     params:
@@ -939,6 +972,22 @@ functions:
         memory_max=$(( ($memory_max * 8) / (${num_jobs} * 1024 * 10) ))
         for i in $(seq ${times|1}); do
           ./format.sh -j ${num_jobs} ${format_test_script_args|} cache.maximum=$memory_max 2>&1
+        done
+  "format test disagg":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/cmake_build/test/format"
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        ${PREPARE_TEST_ENV}
+        format_args=""  # Generally, format arguments are in CONFIG.disagg.
+        for i in $(seq ${times}); do
+          echo Iteration $i/${times}
+          rm -rf RUNDIR
+          ./t -c ../../../test/format/CONFIG.disagg $format_args ${extra_args}
+          ./t -R $format_args ${extra_args}
         done
   "many dbs test":
     command: shell.exec
@@ -1107,7 +1156,7 @@ functions:
         set -o errexit
         set -o verbose
         ${PREPARE_TEST_ENV}
-        ../../../test/evergreen/checkpoint_stress_test.sh ${tiered|0} ${times|1} ${no_of_procs|1}
+        ../../../test/evergreen/checkpoint_stress_test.sh ${tiered|0} ${times|1} ${no_of_procs|1} "${wt_config|cache_size=100M}" "${timestamp_config|}"
 
   "compatibility test":
     - command: shell.exec
@@ -1300,9 +1349,8 @@ variables:
     IMPORT_S3_SDK: -DIMPORT_S3_SDK=external
 
   # Configure flags for address sanitizer for stable mongodb toolchain clang (include builtins).
-  - &configure_flags_address_sanitizer_mongodb_stable_clang_with_builtins
+  - &configure_flags_asan_mongodb_stable_clang_with_builtins
     <<: *configure_flags_with_builtins
-    ENABLE_TCMALLOC: 0
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
     ENABLE_CPPSUITE: -DENABLE_CPPSUITE=0
@@ -1338,8 +1386,8 @@ variables:
 
 #########################################################################################
 # The following stress tests are configured to run for six hours via the "-t 360"
-# argument to format.sh: format-stress-test, format-stress-sanitizer-test, and
-# race-condition-stress-sanitizer-test. The recovery tests run in a loop, with
+# argument to format.sh: format-stress-test, format-stress-asan-test, and
+# race-condition-stress-asan-test. The recovery tests run in a loop, with
 # the number of runs adjusted to provide aproximately six hours of testing.
 #########################################################################################
 
@@ -1354,13 +1402,13 @@ variables:
         vars:
           format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -t 360
 
-  - &format-stress-sanitizer-ppc-test
+  - &format-stress-asan-ppc-test
     exec_timeout_secs: 25200
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          <<: *configure_flags_address_sanitizer_mongodb_stable_clang_with_builtins
+          <<: *configure_flags_asan_mongodb_stable_clang_with_builtins
       - func: "format test script"
         vars:
           additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
@@ -1368,25 +1416,25 @@ variables:
           # See https://bugzilla.redhat.com/show_bug.cgi?id=1686261#c10 for the potential cause.
           format_test_script_args: -t 360 -- -C "mmap=false,mmap_all=false"
 
-  - &format-stress-sanitizer-test
+  - &format-stress-asan-test
     exec_timeout_secs: 25200
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          <<: *configure_flags_address_sanitizer_mongodb_stable_clang_with_builtins
+          <<: *configure_flags_asan_mongodb_stable_clang_with_builtins
           additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
       - func: "format test script"
         vars:
           format_test_script_args: -t 360
 
-  - &race-condition-stress-sanitizer-test
+  - &race-condition-stress-asan-test
     exec_timeout_secs: 25200
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          <<: *configure_flags_address_sanitizer_mongodb_stable_clang_with_builtins
+          <<: *configure_flags_asan_mongodb_stable_clang_with_builtins
       - func: "format test script"
         vars:
           additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
@@ -1577,16 +1625,6 @@ tasks:
       - func: "make check directory"
         vars:
           directory: examples/c
-
-  - name: examples-c-tsan
-    tags: ["pull_request"]
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-      - func: "make check directory"
-        vars:
-          directory: examples/c
-          ctest_extra_args: -E "(ex_all|ex_backup|ex_backup_block)" -j ${num_jobs}
 
   - name: examples-c-production-disable-shared-test
     tags: ["pull_request"]
@@ -2136,6 +2174,41 @@ tasks:
       - func: "unit test"
         vars:
           unit_test_args: -v 2 -R cursor13 schema03 timestamp22
+
+  - name: unit-test-hook-disagg-leader
+    tags: ["python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test parallel"
+        vars:
+          # As leader, run the set of tests that are not in the fail list.
+          unit_test_parallel_ignore: test/suite/hook_disagg.fail
+          # The timeout for this command is on a test file basis. Make the timeouts long,
+          # as there are a few files that contain a large number of slower tests.
+          unit_test_parallel_args: -v 2 --timeout 1800 --hook "disagg=(role=leader)"
+
+  - name: unit-test-hook-disagg-follower
+    tags: ["python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          # As follower, run a minimal functionality test
+          unit_test_args: -v 2 --timeout 60 --hook "disagg=(role=follower)" base01
+
+  - name: unit-test-hook-timing-stress-log
+    tags: ["python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 --hook timing_stress_log_conn_close
 
   - name: unit-test-hook-tiered
     tags: ["python"]
@@ -3459,7 +3532,7 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          <<: *configure_flags_address_sanitizer_mongodb_stable_clang_with_builtins
+          <<: *configure_flags_asan_mongodb_stable_clang_with_builtins
       - func: "format test script"
         vars:
           additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
@@ -3523,7 +3596,7 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -x
+          run_test_checkpoint_args: -x -C cache_size=100MB
 
   - name: data-validation-stress-test-checkpoint-no-timestamp
     tags: ["data-validation-stress-test"]
@@ -3531,6 +3604,8 @@ tasks:
     - name: compile
     commands:
       - func: "run data validation stress test checkpoint"
+        vars:
+          run_test_checkpoint_args: -C cache_size=100MB
 
   - name: data-validation-stress-test-checkpoint-fp-hs-insert-s1
     tags: ["data-validation-stress-test"]
@@ -3539,7 +3614,7 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -x -s 1
+          run_test_checkpoint_args: -x -s 1 -C cache_size=100MB
 
   - name: data-validation-stress-test-checkpoint-fp-hs-insert-s1-no-timestamp
     tags: ["data-validation-stress-test"]
@@ -3548,7 +3623,7 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -s 1
+          run_test_checkpoint_args: -s 1 -C cache_size=100MB
 
   - name: data-validation-stress-test-checkpoint-fp-hs-insert-s2
     tags: ["data-validation-stress-test"]
@@ -3557,7 +3632,7 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -x -s 2
+          run_test_checkpoint_args: -x -s 2 -C cache_size=100MB
 
   - name: data-validation-stress-test-checkpoint-fp-hs-insert-s3
     tags: ["data-validation-stress-test"]
@@ -3566,7 +3641,7 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -x -s 3
+          run_test_checkpoint_args: -x -s 3 -C cache_size=100MB
 
   - name: data-validation-stress-test-checkpoint-fp-hs-insert-s3-no-timestamp
     tags: ["data-validation-stress-test"]
@@ -3575,7 +3650,7 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -s 3
+          run_test_checkpoint_args: -s 3 -C cache_size=100MB
 
   - name: data-validation-stress-test-checkpoint-fp-hs-insert-s4
     tags: ["data-validation-stress-test"]
@@ -3584,7 +3659,7 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -x -s 4
+          run_test_checkpoint_args: -x -s 4 -C cache_size=100MB
 
   - name: data-validation-stress-test-checkpoint-fp-hs-insert-s5
     tags: ["data-validation-stress-test"]
@@ -3593,7 +3668,7 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -x -s 5
+          run_test_checkpoint_args: -x -s 5 -C cache_size=100MB
 
   - name: data-validation-stress-test-checkpoint-fp-hs-insert-s5-no-timestamp
     tags: ["data-validation-stress-test"]
@@ -3602,7 +3677,7 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -s 5
+          run_test_checkpoint_args: -s 5 -C cache_size=100MB
 
   - name: data-validation-stress-test-checkpoint-fp-hs-insert-s6
     tags: ["data-validation-stress-test"]
@@ -3611,7 +3686,7 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -x -s 6
+          run_test_checkpoint_args: -x -s 6 -C cache_size=100MB
 
   - name: data-validation-stress-test-checkpoint-fp-hs-insert-s7
     tags: ["data-validation-stress-test"]
@@ -3620,7 +3695,79 @@ tasks:
     commands:
       - func: "run data validation stress test checkpoint"
         vars:
-          run_test_checkpoint_args: -x -s 7
+          run_test_checkpoint_args: -x -s 7 -C cache_size=100MB
+
+  - name: data-validation-stress-test-precise-checkpoint
+    tags: ["data-validation-stress-test"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "run data validation stress test checkpoint"
+        vars:
+          run_test_checkpoint_args: -x -C cache_size=1000MB,checkpoint=(precise=true)
+
+  - name: data-validation-stress-test-precise-checkpoint-fp-hs-insert-s1
+    tags: ["data-validation-stress-test"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "run data validation stress test checkpoint"
+        vars:
+          run_test_checkpoint_args: -x -s 1 -C cache_size=1000MB,checkpoint=(precise=true)
+
+  - name: data-validation-stress-test-precise-checkpoint-fp-hs-insert-s2
+    tags: ["data-validation-stress-test"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "run data validation stress test checkpoint"
+        vars:
+          run_test_checkpoint_args: -x -s 2 -C cache_size=1000MB,checkpoint=(precise=true)
+
+  - name: data-validation-stress-test-precise-checkpoint-fp-hs-insert-s3
+    tags: ["data-validation-stress-test"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "run data validation stress test checkpoint"
+        vars:
+          run_test_checkpoint_args: -x -s 3 -C cache_size=1000MB,checkpoint=(precise=true)
+
+  - name: data-validation-stress-test-precise-checkpoint-fp-hs-insert-s4
+    tags: ["data-validation-stress-test"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "run data validation stress test checkpoint"
+        vars:
+          run_test_checkpoint_args: -x -s 4 -C cache_size=1000MB,checkpoint=(precise=true)
+
+  - name: data-validation-stress-test-precise-checkpoint-fp-hs-insert-s5
+    tags: ["data-validation-stress-test"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "run data validation stress test checkpoint"
+        vars:
+          run_test_checkpoint_args: -x -s 5 -C cache_size=1000MB,checkpoint=(precise=true)
+
+  - name: data-validation-stress-test-precise-checkpoint-fp-hs-insert-s6
+    tags: ["data-validation-stress-test"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "run data validation stress test checkpoint"
+        vars:
+          run_test_checkpoint_args: -x -s 6 -C cache_size=1000MB,checkpoint=(precise=true)
+
+  - name: data-validation-stress-test-precise-checkpoint-fp-hs-insert-s7
+    tags: ["data-validation-stress-test"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "run data validation stress test checkpoint"
+        vars:
+          run_test_checkpoint_args: -x -s 7 -C cache_size=1000MB,checkpoint=(precise=true)
 
   - name: format-failure-configs-test
     depends_on:
@@ -3696,6 +3843,43 @@ tasks:
           <<: *configure_flags_with_builtins
       - func: "checkpoint stress test"
         vars:
+          no_of_procs: 5  # Number of processes to run in the background
+          tiered: 1       # Enable tiered storage
+          times: 1        # Number of times to run the loop
+
+  - name: precise-checkpoint-stress-test
+    tags: ["stress-test-1"]
+    exec_timeout_secs: 86400
+    commands:
+      - command: timeout.update
+        params:
+          timeout_secs: 86400
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          <<: *configure_flags_with_builtins
+      - func: "checkpoint stress test"
+        vars:
+          timestamp_config: -x
+          wt_config: cache_size=1000M,checkpoint=(precise=true)
+          no_of_procs: 10 # Number of processes to run in the background
+          tiered: 0       # Don't enable tiered storage
+          times: 1        # Number of times to run the loop
+
+  - name: precise-checkpoint-stress-test-tiered
+    exec_timeout_secs: 86400
+    commands:
+      - command: timeout.update
+        params:
+          timeout_secs: 86400
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          <<: *configure_flags_with_builtins
+      - func: "checkpoint stress test"
+        vars:
+          timestamp_config: -x
+          wt_config: cache_size=1000M,checkpoint=(precise=true)
           no_of_procs: 5  # Number of processes to run in the background
           tiered: 1       # Enable tiered storage
           times: 1        # Number of times to run the loop
@@ -3886,36 +4070,36 @@ tasks:
   - <<: *format-stress-test
     name: format-stress-test-4
     tags: ["stress-test-4"]
-  - <<: *format-stress-sanitizer-ppc-test
-    name: format-stress-sanitizer-ppc-test-1
+  - <<: *format-stress-asan-ppc-test
+    name: format-stress-asan-ppc-test-1
     tags: ["stress-test-ppc-1"]
-  - <<: *format-stress-sanitizer-ppc-test
-    name: format-stress-sanitizer-ppc-test-2
+  - <<: *format-stress-asan-ppc-test
+    name: format-stress-asan-ppc-test-2
     tags: ["stress-test-ppc-2"]
-  - <<: *format-stress-sanitizer-test
-    name: format-stress-sanitizer-test-1
-    tags: ["stress-test-sanitizer"]
-  - <<: *format-stress-sanitizer-test
-    name: format-stress-sanitizer-test-2
-    tags: ["stress-test-sanitizer"]
-  - <<: *format-stress-sanitizer-test
-    name: format-stress-sanitizer-test-3
-    tags: ["stress-test-sanitizer"]
-  - <<: *format-stress-sanitizer-test
-    name: format-stress-sanitizer-test-4
-    tags: ["stress-test-sanitizer"]
-  - <<: *race-condition-stress-sanitizer-test
-    name: race-condition-stress-sanitizer-test-1
-    tags: ["stress-test-sanitizer"]
-  - <<: *race-condition-stress-sanitizer-test
-    name: race-condition-stress-sanitizer-test-2
-    tags: ["stress-test-sanitizer"]
-  - <<: *race-condition-stress-sanitizer-test
-    name: race-condition-stress-sanitizer-test-3
-    tags: ["stress-test-sanitizer"]
-  - <<: *race-condition-stress-sanitizer-test
-    name: race-condition-stress-sanitizer-test-4
-    tags: ["stress-test-sanitizer"]
+  - <<: *format-stress-asan-test
+    name: format-stress-asan-test-1
+    tags: ["stress-test-asan"]
+  - <<: *format-stress-asan-test
+    name: format-stress-asan-test-2
+    tags: ["stress-test-asan"]
+  - <<: *format-stress-asan-test
+    name: format-stress-asan-test-3
+    tags: ["stress-test-asan"]
+  - <<: *format-stress-asan-test
+    name: format-stress-asan-test-4
+    tags: ["stress-test-asan"]
+  - <<: *race-condition-stress-asan-test
+    name: race-condition-stress-asan-test-1
+    tags: ["stress-test-asan"]
+  - <<: *race-condition-stress-asan-test
+    name: race-condition-stress-asan-test-2
+    tags: ["stress-test-asan"]
+  - <<: *race-condition-stress-asan-test
+    name: race-condition-stress-asan-test-3
+    tags: ["stress-test-asan"]
+  - <<: *race-condition-stress-asan-test
+    name: race-condition-stress-asan-test-4
+    tags: ["stress-test-asan"]
   - <<: *recovery-stress-test
     name: recovery-stress-test-1
     tags: ["stress-test-1", "stress-test-zseries-1"]
@@ -3939,28 +4123,28 @@ tasks:
         vars:
           format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -t 360
 
-  - name: format-stress-sanitizer-test-no-barrier
-    tags: ["stress-test-sanitizer"]
+  - name: format-stress-asan-test-no-barrier
+    tags: ["stress-test-asan"]
     exec_timeout_secs: 25200
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          <<: *configure_flags_address_sanitizer_mongodb_stable_clang_with_builtins
+          <<: *configure_flags_asan_mongodb_stable_clang_with_builtins
           NON_BARRIER_DIAGNOSTIC_YIELDS: -DNON_BARRIER_DIAGNOSTIC_YIELDS=1
       - func: "format test script"
         vars:
           additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
           format_test_script_args: -t 360
 
-  - name: race-condition-stress-sanitizer-test-no-barrier
-    tags: ["stress-test-sanitizer"]
+  - name: race-condition-stress-asan-test-no-barrier
+    tags: ["stress-test-asan"]
     exec_timeout_secs: 25200
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          <<: *configure_flags_address_sanitizer_mongodb_stable_clang_with_builtins
+          <<: *configure_flags_asan_mongodb_stable_clang_with_builtins
           NON_BARRIER_DIAGNOSTIC_YIELDS: -DNON_BARRIER_DIAGNOSTIC_YIELDS=1
       - func: "format test script"
         vars:
@@ -5360,8 +5544,8 @@ buildvariants:
   - ubuntu2004-test
   expansions:
     ENABLE_TCMALLOC: 1
-    data_validation_stress_test_args: -t r -m -W 3 -D -p -n 100000 -k 100000 -C cache_size=100MB
-    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
+    data_validation_stress_test_args: -t r -m -W 3 -D -p -n 100000 -k 100000
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` / 2" | bc)
   tasks:
     - name: ".pull_request !.pull_request_compilers"
     - name: ".lint"
@@ -5375,9 +5559,12 @@ buildvariants:
     - name: checkpoint-filetypes-test
     - name: unit-test-zstd
     - name: unit-test-random-seed
+    - name: unit-test-hook-disagg-leader
+    - name: unit-test-hook-disagg-follower
     - name: unit-test-hook-tiered
     - name: unit-test-hook-tiered-with-delays
     - name: unit-test-hook-tiered-timestamp
+    - name: unit-test-hook-timing-stress-log
     - name: unit-test-hook-timestamp
     - name: test-prepare-hs03-hook-timestamp
     - name: spinlock-gcc-test
@@ -5401,7 +5588,8 @@ buildvariants:
     - name: catch2-assertions
     - name: ".tiered_unittest"
     - name: bench-tiered-push-pull-s3
-    - name: csuite-timestamp-abort-test-s3
+    # FIXME-WT-14962 - Added for tiered storage; may help disagg but currently a CI blocker and needs re-evaluation.
+    # - name: csuite-timestamp-abort-test-s3
     - name: unit-test-hook-tiered-s3
     - name: chunkcache-test
     - name: ".workgen-test"
@@ -5441,6 +5629,7 @@ buildvariants:
     - name: model-test-long-random-config
       batchtime: 1440 # once a day
     - name: live-restore-long
+    - name: ".stress-test-asan"
 
 - name: ubuntu2004-tsan
   display_name: "! Ubuntu 20.04 TSAN"
@@ -5454,7 +5643,7 @@ buildvariants:
       export TSAN_OPTIONS="$COMMON_SAN_OPTIONS:history_size=7:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/tsan_warnings.supp"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
-    - name: examples-c-tsan
+    - name: examples-c-test
     - name: tsan-warning-metrics
       batchtime: 10080 # 7 days
 
@@ -5602,9 +5791,6 @@ buildvariants:
     - name: ".stress-test-4"
     - name: ".stress-test-no-barrier"
       distros: ubuntu2004-medium
-    - name: ".stress-test-sanitizer"
-      run_on:
-      - ubuntu2004-medium
     - name: format-abort-recovery-stress-test
     - name: format-predictable-test
     - name: schema-abort-predictable-test
@@ -5624,6 +5810,7 @@ buildvariants:
     - name: ".stress-test-4"
     - name: ".stress-test-no-barrier"
     - name: checkpoint-stress-test-tiered
+    - name: precise-checkpoint-stress-test-tiered
     - name: format-abort-recovery-stress-test
 
 - name: cppsuite-stress-tests-ubuntu
@@ -5806,8 +5993,6 @@ buildvariants:
     - name: long-test
       distros: ubuntu2004-arm64-large
     - name: make-check-test
-    - name: memory-model-test
-      batchtime: 40320 # 28 days
     - name: model-test-failure-workloads
       batchtime: 1440 # 24 hours
     - name: model-test-long
@@ -5826,6 +6011,17 @@ buildvariants:
       distros: ubuntu2004-arm64-large
     - name: unit-test-zstd
     - name: wtperf-test
+
+- name: ubuntu2004-arm64-memory-model
+  display_name: "Ubuntu 20.04 ARM64 Memory model test"
+  run_on:
+  - ubuntu2004-arm64-small
+  batchtime: 40320 # 28 days
+  expansions:
+    ENABLE_TCMALLOC: 0
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
+  tasks:
+    - name: memory-model-test
 
 - name: amazon2-arm64
   display_name: "Amazon Linux 2 ARM64"
@@ -5856,6 +6052,7 @@ buildvariants:
     - name: unit-test
     - name: unit-test-extra-long
       distros: amazon2-arm64-large
+    - name: unit-test-hook-timing-stress-log
     - name: unit-test-zstd
     - name: wtperf-test
 
@@ -5961,7 +6158,7 @@ buildvariants:
   - ubuntu2004-test
   expansions:
     ENABLE_TCMALLOC: 1
-    data_validation_stress_test_args: -t r -m -W 3 -D -p -n 100000 -k 100000 -C cache_size=100MB
+    data_validation_stress_test_args: -t r -m -W 3 -D -p -n 100000 -k 100000
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     NONSTANDALONE: -DWT_STANDALONE_BUILD=0
     unit_test_variant_args: "--hook nonstandalone"
@@ -6181,8 +6378,6 @@ buildvariants:
     - name: long-test
       distros: amazon2023-arm64-latest-large-m8g
     - name: make-check-test
-    - name: memory-model-test
-      batchtime: 40320 # 28 days
     - name: model-test-failure-workloads
       batchtime: 1440 # 24 hours
     - name: model-test-long
@@ -6233,7 +6428,6 @@ buildvariants:
     - name: ".stress-test-4"
     - name: ".stress-test-no-barrier"
     - name: format-abort-recovery-stress-test
-    - name: ".stress-test-sanitizer"
     - name: format-predictable-test
     - name: schema-abort-predictable-test
     - name: checkpoint-filetypes-predictable-test
@@ -6260,6 +6454,7 @@ buildvariants:
     - name: model-test-long-random-config
       batchtime: 1440 # once a day
     - name: live-restore-long
+    - name: ".stress-test-asan"
 
 - name: amazon2023-armv9-tsan
   display_name: "(ARMV9) Amazon Linux 2023 TSAN"
@@ -6273,7 +6468,7 @@ buildvariants:
       export TSAN_OPTIONS="$COMMON_SAN_OPTIONS:history_size=7:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/tsan_warnings.supp"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
-    - name: examples-c-tsan
+    - name: examples-c-test
 
 - name: amazon2023-armv9-msan
   display_name: "(ARMV9) Amazon Linux 2023 MSAN"

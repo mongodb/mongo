@@ -77,8 +77,8 @@ def get_cache_eviction_stats(session, cache_eviction_file):
     print('Cache updates trigger  : ' + str(trigger_updates), file=fh)
     trigger_dirty = stat_cursor[wiredtiger.stat.conn.cache_eviction_trigger_dirty_reached][2]
     print('Cache dirty trigger : ' + str(trigger_dirty), file=fh)
-    trigger_clean = stat_cursor[wiredtiger.stat.conn.cache_eviction_trigger_clean_reached][2]
-    print('Cache usage trigger : ' + str(trigger_clean), file=fh)
+    trigger_usage = stat_cursor[wiredtiger.stat.conn.cache_eviction_trigger_reached][2]
+    print('Cache usage trigger : ' + str(trigger_usage), file=fh)
     print(' ', file=fh)
 
     # App cache statistics
@@ -139,13 +139,16 @@ compress_table_config = ""
 table_config = "memory_page_max=10m,leaf_value_max=64MB,checksum=on,split_pct=90,type=file,log=(enabled=false),leaf_page_max=32k"
 tables = []
 table_count = 10
+# Configure key and value sizes.
+cfg_key_size = 10
+cfg_value_size = 2000
 for i in range(0, table_count):
     tname = "table:test" + str(i)
     table = Table(tname)
     s.create(tname, wtperf_table_config +\
              compress_table_config + table_config)
-    table.options.key_size = 10
-    table.options.value_size = 2000
+    table.options.key_size = cfg_key_size
+    table.options.value_size = cfg_value_size
     tables.append(table)
 
 populate_threads = 4
@@ -163,6 +166,35 @@ cache_eviction_file = context.args.home + "/cache_eviction.stat"
 get_cache_eviction_stats(s, cache_eviction_file)
 
 print('Populate complete')
+
+# Log like file, requires that logging be enabled in the connection config.
+log_name = "table:log"
+s.create(log_name, wtperf_table_config + "key_format=S,value_format=S," + compress_table_config + table_config + ",log=(enabled=true)")
+log_table = Table(log_name)
+log_table.options.key_size = cfg_key_size
+log_table.options.value_size = cfg_value_size
+
+ops = Operation(Operation.OP_UPDATE, log_table)
+ops = op_log_like(ops, log_table, 0)
+thread_log_upd = Thread(ops)
+thread_log_upd.options.session_config="isolation=snapshot"
+# These operations include log_like operations, which will increase the number
+# of insert/update operations by a factor of 2.0. This may cause the
+# actual operations performed to be above the throttle.
+thread_log_upd.options.throttle=11
+thread_log_upd.options.throttle_burst=0
+
+ops = Operation(Operation.OP_SEARCH, log_table)
+ops = op_log_like(ops, log_table, 0)
+thread_log_read = Thread(ops)
+thread_log_read.options.session_config="isolation=snapshot"
+thread_log_read.options.throttle=60
+thread_log_read.options.throttle_burst=0
+
+checkpoint_ops = Operation(Operation.OP_SLEEP, "30") + \
+      Operation(Operation.OP_CHECKPOINT, "")
+ops = checkpoint_ops * 10
+checkpoint_thread = Thread(ops)
 
 ############################################################################
 # This part was added to the generated file.
@@ -195,8 +227,26 @@ thread_read10k_sleep10.options.session_config="isolation=snapshot"
 # The new threads will also be added to the workload below.
 ############################################################################
 
-# 15% update workload
-cache_workload = Workload(context, 15 * thread_upd10k_sleep10 + 85 * thread_read10k_sleep10 )
+#Configure only the expected % of read operations
+#15% update workload to hit the cache update trigger threshold
+read_ops = 85
+
+#Specify number of threads for workload
+total_thread_num = 128
+log_read_thread_num = 1
+log_write_thread_num = 1
+#Calculate threads for read operations based on % of read operations
+read_thread_num = int(((read_ops * total_thread_num) / 100))
+#Remaining threads for write operations
+write_thread_num = (total_thread_num - read_thread_num)
+
+cache_workload = Workload(context,\
+                        + log_write_thread_num * thread_log_upd \
+                        + log_read_thread_num * thread_log_read \
+                        + checkpoint_thread \
+                        + write_thread_num * thread_upd10k_sleep10 \
+                        + read_thread_num * thread_read10k_sleep10)
+
 cache_workload.options.report_interval=10
 # max operational latency in milli seconds.
 cache_workload.options.max_latency=1000
@@ -208,7 +258,6 @@ cache_workload.options.sample_interval_ms = 1000
 ret = cache_workload.run(conn)
 assert ret == 0, ret
 
-cache_eviction_file = context.args.home + "/cache_eviction.stat"
 get_cache_eviction_stats(s, cache_eviction_file)
 
 latency_filename = context.args.home + "/latency.stat"

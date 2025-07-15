@@ -68,6 +68,9 @@ __blkcache_free(WT_SESSION_IMPL *session, void *ptr)
 {
     WT_BLKCACHE *blkcache;
 
+    if (ptr == NULL)
+        return;
+
     blkcache = &S2C(session)->blkcache;
 
     if (blkcache->type == WT_BLKCACHE_DRAM)
@@ -551,11 +554,11 @@ err:
 }
 
 /*
- * __wti_blkcache_remove --
+ * __wt_blkcache_remove --
  *     Remove a block from the cache.
  */
 void
-__wti_blkcache_remove(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
+__wt_blkcache_remove(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
 {
     WT_BLKCACHE *blkcache;
     WT_BLKCACHE_ITEM *blkcache_item;
@@ -801,6 +804,9 @@ __wt_blkcache_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[],
     *bmp = NULL;
 
     __wt_verbose(session, WT_VERB_BLKCACHE, "open: %s", uri);
+
+    if (__wt_block_disagg_manager_owns_object(session, uri))
+        return (__wt_block_disagg_manager_open(session, uri, cfg, forced_salvage, readonly, bmp));
 
     WT_RET(__wt_calloc_one(session, &bm));
     __wti_bm_method_set(bm, false);

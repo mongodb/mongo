@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from wiredtiger import stat
+from wtscenario import make_scenarios
 import wttest
 
 # test_checkpoint26.py
@@ -36,10 +37,25 @@ import wttest
 # small data pages so that eviction activity is small, allowing checkpoint to reconcile and
 # evict pages.
 class test_checkpoint26(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=1000MB,statistics=(all),eviction_dirty_target=80,eviction_dirty_trigger=95,timing_stress_for_test=[checkpoint_evict_page]'
+    ckpt_precision = [
+        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
+        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
+    ]
+
+    scenarios = make_scenarios(ckpt_precision)
+
     uri = "table:test_checkpoint26"
 
+    def conn_config(self):
+        return ('cache_size=1000MB,statistics=(all),eviction_dirty_target=80,' +
+                'eviction_dirty_trigger=95,timing_stress_for_test=[checkpoint_evict_page],' +
+                self.ckpt_config)
+
     def test_checkpoint_evict_page(self):
+        # Avoid checkpoint error with precise checkpoint
+        if self.ckpt_config == 'checkpoint=(precise=true)':
+            self.conn.set_timestamp('stable_timestamp=1')
+
         self.session.create(self.uri, 'key_format=i,value_format=S')
 
         cursor = self.session.open_cursor(self.uri)

@@ -389,6 +389,58 @@ __wt_schema_open_indices(WT_SESSION_IMPL *session, WT_TABLE *table)
 }
 
 /*
+ * __wt_schema_open_page_log --
+ *     Return a page log if configured. This doesn't really belong here, but it's shared between
+ *     btree and tiered handle configuration, so I could not think of somewhere better.
+ */
+int
+__wt_schema_open_page_log(
+  WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, WT_NAMED_PAGE_LOG **npage_logp)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_NAMED_PAGE_LOG *npage_log;
+
+    *npage_logp = NULL;
+
+    if (name->len == 0 || WT_CONFIG_LIT_MATCH("none", *name))
+        return (0);
+
+    conn = S2C(session);
+    TAILQ_FOREACH (npage_log, &conn->pagelogqh, q)
+        if (WT_CONFIG_MATCH(npage_log->name, *name)) {
+            *npage_logp = npage_log;
+            return (0);
+        }
+    WT_RET_MSG(session, EINVAL, "unknown page log '%.*s'", (int)name->len, name->str);
+}
+
+/*
+ * __wt_schema_open_storage_source --
+ *     Return a storage source if configured. This doesn't really belong here, but it's shared
+ *     between btree and tiered handle configuration, so I could not think of somewhere better.
+ */
+int
+__wt_schema_open_storage_source(
+  WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, WT_NAMED_STORAGE_SOURCE **nstoragep)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_NAMED_STORAGE_SOURCE *nstorage;
+
+    *nstoragep = NULL;
+
+    if (name->len == 0 || WT_CONFIG_LIT_MATCH("none", *name))
+        return (0);
+
+    conn = S2C(session);
+    TAILQ_FOREACH (nstorage, &conn->storagesrcqh, q)
+        if (WT_CONFIG_MATCH(nstorage->name, *name)) {
+            *nstoragep = nstorage;
+            return (0);
+        }
+    WT_RET_MSG(session, EINVAL, "unknown storage source '%.*s'", (int)name->len, name->str);
+}
+
+/*
  * __schema_open_table --
  *     Open the data handle for a table (internal version).
  */
@@ -562,4 +614,105 @@ __wt_schema_open_table(WT_SESSION_IMPL *session)
       WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED, ret = __schema_open_table(session)));
 
     return (ret);
+}
+
+/*
+ * __schema_open_layered_ingest --
+ *     Open the ingest table for a layered table.
+ */
+static int
+__schema_open_layered_ingest(WT_SESSION_IMPL *session, WT_LAYERED_TABLE *layered, const char *uri)
+{
+    WT_BTREE *ingest_btree;
+
+    WT_RET(__wt_session_get_dhandle(session, uri, NULL, NULL, 0));
+
+    /*
+     * This is a bit of a hack. The problem is that during shutdown, all dhandles are closed. But as
+     * part of closing a layered table, we need to get the IDs of the B-Trees backing the
+     * constituent tables (to remove them from the manager thread). This involves dereferencing the
+     * dhandle pointer, but that's been freed.
+     */
+    ingest_btree = (WT_BTREE *)session->dhandle->handle;
+    layered->ingest_btree_id = ingest_btree->id;
+
+    /* Flag the ingest btree as participating in automatic garbage collection */
+    F_SET(ingest_btree, WT_BTREE_GARBAGE_COLLECT);
+
+    WT_ACQUIRE_READ(
+      ingest_btree->prune_timestamp, S2C(session)->disaggregated_storage.last_checkpoint_timestamp);
+
+    WT_RET(__wt_session_release_dhandle(session));
+    return (0);
+}
+
+/*
+ * __schema_open_layered --
+ *     Open the data handle for a layered table (internal version).
+ */
+static int
+__schema_open_layered(WT_SESSION_IMPL *session)
+{
+    WT_CONFIG_ITEM cval;
+    WT_LAYERED_TABLE *layered;
+    const char **layered_cfg;
+
+    WT_ASSERT_ALWAYS(session, session->dhandle->type == WT_DHANDLE_TYPE_LAYERED,
+      "handle type doesn't match layered");
+    layered = (WT_LAYERED_TABLE *)session->dhandle;
+    layered_cfg = layered->iface.cfg;
+
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TABLE));
+
+    /* FIXME-WT-14738: Setup collator information. */
+    layered->collator = NULL;
+    layered->collator_owned = 0;
+
+    WT_RET(__wt_config_gets(session, layered_cfg, "key_format", &cval));
+    WT_RET(__wt_strndup(session, cval.str, cval.len, &layered->key_format));
+    WT_RET(__wt_config_gets(session, layered_cfg, "value_format", &cval));
+    WT_RET(__wt_strndup(session, cval.str, cval.len, &layered->value_format));
+
+    WT_RET(__wt_config_gets(session, layered_cfg, "ingest", &cval));
+    WT_RET(__wt_strndup(session, cval.str, cval.len, &layered->ingest_uri));
+    WT_RET(__wt_config_gets(session, layered_cfg, "stable", &cval));
+    WT_RET(__wt_strndup(session, cval.str, cval.len, &layered->stable_uri));
+
+    return (0);
+}
+
+/*
+ * __wt_schema_open_layered --
+ *     Open a layered table.
+ */
+int
+__wt_schema_open_layered(WT_SESSION_IMPL *session)
+{
+    WT_DECL_RET;
+    WT_LAYERED_TABLE *layered;
+
+    if (!__wt_conn_is_disagg(session)) {
+        __wt_err(session, EINVAL, "layered table is only supported for disaggregated storage");
+        return (EINVAL);
+    }
+
+    /* This needs to hold the table write lock, so the handle doesn't get swept and closed */
+    WT_WITH_TABLE_WRITE_LOCK(session, ret = __schema_open_layered(session));
+    WT_RET(ret);
+
+    layered = (WT_LAYERED_TABLE *)session->dhandle;
+    WT_ASSERT_ALWAYS(session, session->dhandle->type == WT_DHANDLE_TYPE_LAYERED,
+      "Handle type doesn't match layered");
+    /*
+     * Open the ingest table after releasing the table write lock. That is safe, since if multiple
+     * threads are opening a layered table, the regular handle open scheme handles races of getting
+     * these sub-handles into the connection.
+     */
+    WT_SAVE_DHANDLE(
+      session, ret = __schema_open_layered_ingest(session, layered, layered->ingest_uri));
+    WT_RET(ret);
+
+    WT_RET(__wt_layered_table_manager_add_table(session, layered->ingest_btree_id));
+
+    return (0);
 }

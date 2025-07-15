@@ -103,7 +103,7 @@ __wt_hs_find_upd(WT_SESSION_IMPL *session, uint32_t btree_id, WT_ITEM *key,
         goto done;
     }
 
-    WT_ERR_NOTFOUND_OK(__wt_curhs_open(session, NULL, &hs_cursor), true);
+    WT_ERR_NOTFOUND_OK(__wt_curhs_open(session, btree_id, NULL, &hs_cursor), true);
     /* Do this separately for now because the behavior below is confusing if it triggers. */
     WT_ASSERT(session, ret != WT_NOTFOUND);
     WT_ERR(ret);
@@ -277,7 +277,7 @@ __wt_hs_btree_truncate(WT_SESSION_IMPL *session, uint32_t btree_id)
     WT_RET(__wt_scr_alloc(session, 0, &hs_key));
 
     /* Open a history store start cursor. */
-    WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor_start));
+    WT_ERR(__wt_curhs_open(session, btree_id, NULL, &hs_cursor_start));
     F_SET(hs_cursor_start, WT_CURSTD_HS_READ_COMMITTED);
 
     hs_cursor_start->set_key(hs_cursor_start, 1, btree_id);
@@ -288,7 +288,7 @@ __wt_hs_btree_truncate(WT_SESSION_IMPL *session, uint32_t btree_id)
     }
 
     /* Open a history store stop cursor. */
-    WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor_stop));
+    WT_ERR(__wt_curhs_open(session, btree_id, NULL, &hs_cursor_stop));
     F_SET(hs_cursor_stop, WT_CURSTD_HS_READ_COMMITTED | WT_CURSTD_HS_READ_ACROSS_BTREE);
 
     hs_cursor_stop->set_key(hs_cursor_stop, 1, btree_id + 1);

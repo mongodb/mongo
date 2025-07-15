@@ -47,7 +47,7 @@ static_assert(offsetof(WT_UPDATE, data) == WT_UPDATE_SIZE,
  * updated structure.
  */
 static_assert(WT_UPDATE_SIZE_NOVALUE == sizeof(WT_UPDATE), "WT_UPDATE size mismatch");
-static_assert((WT_UPDATE_SIZE_NOVALUE - WT_UPDATE_SIZE) == 1, "WT_UPDATE size mismatch");
+static_assert((WT_UPDATE_SIZE_NOVALUE - WT_UPDATE_SIZE) == 0, "WT_UPDATE size mismatch");
 
 /* Check specific structures were padded. */
 #define WT_PADDING_CHECK(s)                                                                        \

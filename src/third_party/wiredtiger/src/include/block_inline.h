@@ -47,3 +47,55 @@ __wt_extlist_read_pair(const uint8_t **p, wt_off_t *offp, wt_off_t *sizep)
     *sizep = (wt_off_t)v;
     return (0);
 }
+
+/*
+ * __wt_block_header_byteswap_copy --
+ *     Handle big- and little-endian transformation of a header block, copying from a source to a
+ *     target.
+ */
+static WT_INLINE void
+__wt_block_header_byteswap_copy(WT_BLOCK_HEADER *from, WT_BLOCK_HEADER *to)
+{
+    *to = *from;
+#ifdef WORDS_BIGENDIAN
+    to->disk_size = __wt_bswap32(from->disk_size);
+    to->checksum = __wt_bswap32(from->checksum);
+#endif
+}
+
+/*
+ * __wt_block_header_byteswap --
+ *     Handle big- and little-endian transformation of a header block.
+ */
+static WT_INLINE void
+__wt_block_header_byteswap(WT_BLOCK_HEADER *blk)
+{
+#ifdef WORDS_BIGENDIAN
+    __wt_block_header_byteswap_copy(blk, blk);
+#else
+    WT_UNUSED(blk);
+#endif
+}
+
+/*
+ * __wt_block_header --
+ *     Return the size of the block-specific header.
+ */
+static WT_INLINE u_int
+__wt_block_header(WT_BLOCK *block)
+{
+    WT_UNUSED(block);
+
+    return ((u_int)WT_BLOCK_HEADER_SIZE);
+}
+
+/*
+ * __wt_block_eligible_for_sweep --
+ *     Return true if the block meets requirements for sweeping. The check that read reference count
+ *     is zero is made elsewhere.
+ */
+static WT_INLINE bool
+__wt_block_eligible_for_sweep(WT_BM *bm, WT_BLOCK *block)
+{
+    return (!block->remote && block->objectid <= bm->max_flushed_objectid);
+}

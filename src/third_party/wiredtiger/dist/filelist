@@ -92,7 +92,9 @@ src/conn/conn_chunkcache.c
 src/conn/conn_compact.c
 src/conn/conn_dhandle.c
 src/conn/conn_handle.c
+src/conn/conn_layered.c
 src/conn/conn_open.c
+src/conn/conn_page_history.c
 src/conn/conn_prefetch.c
 src/conn/conn_reconfig.c
 src/conn/conn_stat.c
@@ -107,6 +109,7 @@ src/cursor/cur_dump.c
 src/cursor/cur_file.c
 src/cursor/cur_hs.c
 src/cursor/cur_index.c
+src/cursor/cur_layered.c
 src/cursor/cur_metadata.c
 src/cursor/cur_prepare_discovered.c
 src/cursor/cur_stat.c
@@ -227,6 +230,7 @@ src/support/generation.c
 src/support/global.c
 src/support/hash_city.c
 src/support/hash_fnv.c
+src/support/hash_map.c
 src/support/hazard.c
 src/support/hex.c
 src/support/json.c

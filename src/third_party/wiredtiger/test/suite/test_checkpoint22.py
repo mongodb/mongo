@@ -89,8 +89,14 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         ('named', dict(second_checkpoint='second_checkpoint')),
         ('unnamed', dict(second_checkpoint=None)),
     ]
-    scenarios = make_scenarios(format_values, first_name_values, second_name_values)
+    ckpt_precision = [
+        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
+        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
+    ]
+    scenarios = make_scenarios(format_values, first_name_values, second_name_values, ckpt_precision)
 
+    def conn_config(self):
+        return self.ckpt_config
 
     def do_checkpoint(self, ckpt_name):
         if ckpt_name is None:
@@ -113,6 +119,10 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         cursor.close()
 
     def test_checkpoint(self):
+        # Avoid checkpoint error with precise checkpoint
+        if self.ckpt_config == 'checkpoint=(precise=true)':
+            self.conn.set_timestamp('stable_timestamp=1')
+
         uri = 'table:checkpoint22'
         uri2 = 'table:checkpoint22a'
         nrows = 1000

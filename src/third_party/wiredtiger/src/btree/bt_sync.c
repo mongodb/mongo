@@ -32,9 +32,11 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
     /*
      * This is the history store btree. As part of the checkpointing the data store, we will move
      * the older values into the history store without using any transactions, we shouldn't ignore
-     * them for consistency
+     * them for consistency. Same goes for disaggregated storage metadata.
      */
     if (WT_IS_HS(session->dhandle))
+        return (false);
+    if (WT_IS_DISAGG_META(session->dhandle))
         return (false);
 
     /* The checkpoint's snapshot includes the first dirty update on the page. */
@@ -55,13 +57,13 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
      */
     if (mod->rec_result == WT_PM_REC_MULTIBLOCK)
         for (multi = mod->mod_multi, i = 0; i < mod->mod_multi_entries; ++multi, ++i)
-            if (multi->addr.addr == NULL)
+            if (multi->addr.block_cookie == NULL)
                 return (false);
 
     /* RTS, recovery or shutdown should not leave anything dirty behind. */
     if (F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE))
         return (false);
-    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RECOVERING | WT_CONN_CLOSING_CHECKPOINT))
+    if (F_ISSET(S2C(session), WT_CONN_RECOVERING | WT_CONN_CLOSING_CHECKPOINT))
         return (false);
 
     /*
@@ -353,6 +355,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             tried_eviction = false;
 
             WT_STAT_CONN_INCR(session, checkpoint_pages_reconciled);
+            WT_STAT_CONN_INCRV(session, checkpoint_pages_reconciled_bytes, page->memory_footprint);
             WT_STATP_DSRC_INCR(session, btree->dhandle->stats, btree_checkpoint_pages_reconciled);
             if (FLD_ISSET(rec_flags, WT_REC_HS))
                 WT_STAT_CONN_INCR(session, checkpoint_hs_pages_reconciled);
@@ -375,8 +378,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
          * Do not mark the tree dirty if there is no change to stable timestamp compared to the last
          * checkpoint.
          */
-        if (!btree->modified &&
-          !F_ISSET_ATOMIC_32(conn, WT_CONN_RECOVERING | WT_CONN_CLOSING_CHECKPOINT) &&
+        if (!btree->modified && !F_ISSET(conn, WT_CONN_RECOVERING | WT_CONN_CLOSING_CHECKPOINT) &&
           (btree->rec_max_txn >= txn->snapshot_data.snap_min ||
             (conn->txn_global.checkpoint_timestamp != conn->txn_global.last_ckpt_timestamp &&
               btree->rec_max_timestamp > conn->txn_global.checkpoint_timestamp)))
@@ -419,7 +421,7 @@ err:
      * Leaves are written before a checkpoint (or as part of a file close, before checkpointing the
      * file). Start a flush to stable storage, but don't wait for it.
      */
-    if (ret == 0 && syncop == WT_SYNC_WRITE_LEAVES && F_ISSET_ATOMIC_32(conn, WT_CONN_CKPT_SYNC))
+    if (ret == 0 && syncop == WT_SYNC_WRITE_LEAVES && F_ISSET(conn, WT_CONN_CKPT_SYNC))
         WT_RET(btree->bm->sync(btree->bm, session, false));
 
     return (ret);

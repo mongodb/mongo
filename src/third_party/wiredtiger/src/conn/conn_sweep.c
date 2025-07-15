@@ -448,7 +448,7 @@ __sweep_server(void *arg)
          */
         if (!cv_signalled && (now - last < sweep_interval))
             continue;
-        if (F_ISSET_ATOMIC_32(conn, WT_CONN_CKPT_GATHER)) {
+        if (F_ISSET(conn, WT_CONN_CKPT_GATHER)) {
             WT_STAT_CONN_INCR(session, dh_sweep_skip_ckpt);
             continue;
         }

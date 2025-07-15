@@ -116,7 +116,8 @@ __session_find_dhandle(WT_SESSION_IMPL *session, const char *uri, const char *ch
 retry:
     TAILQ_FOREACH (dhandle_cache, &session->dhhash[bucket], hashq) {
         dhandle = dhandle_cache->dhandle;
-        if (WT_DHANDLE_INACTIVE(dhandle) && !WT_IS_METADATA(dhandle)) {
+        if ((WT_DHANDLE_INACTIVE(dhandle) || F_ISSET(dhandle, WT_DHANDLE_OUTDATED)) &&
+          !WT_IS_METADATA(dhandle)) {
             __session_discard_dhandle(session, dhandle_cache);
             /* We deleted our entry, retry from the start. */
             goto retry;
@@ -544,7 +545,7 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
      * life of the checkpoint cursor.
      */
 
-    is_hs = strcmp(uri, WT_HS_URI) == 0;
+    is_hs = WT_IS_URI_HS(uri);
 
     /*
      * We have already pinned the history store checkpoint dhandle when we open the checkpoint
@@ -816,7 +817,7 @@ __wt_session_dhandle_sweep(WT_SESSION_IMPL *session)
          * reference, so we cannot peer past what is in the dhandle directly.
          */
         if (dhandle != session->dhandle && __wt_atomic_loadi32(&dhandle->session_inuse) == 0 &&
-          (WT_DHANDLE_INACTIVE(dhandle) ||
+          (WT_DHANDLE_INACTIVE(dhandle) || F_ISSET(dhandle, WT_DHANDLE_OUTDATED) ||
             (dhandle->timeofdeath != 0 && now - dhandle->timeofdeath > conn->sweep_idle_time)) &&
           (!WT_DHANDLE_BTREE(dhandle) ||
             FLD_ISSET(dhandle->advisory_flags, WT_DHANDLE_ADVISORY_EVICTED))) {
@@ -841,7 +842,7 @@ __session_find_shared_dhandle(WT_SESSION_IMPL *session, const char *uri, const c
       if ((ret = __wt_conn_dhandle_find(session, uri, checkpoint)) == 0)
         WT_DHANDLE_ACQUIRE(session->dhandle));
 
-    if (ret != WT_NOTFOUND)
+    if (ret != 0 && ret != WT_NOTFOUND)
         return (ret);
 
     WT_WITH_HANDLE_LIST_WRITE_LOCK(session,

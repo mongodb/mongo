@@ -72,7 +72,7 @@ class test_stat13(wttest.WiredTigerTestCase):
         # have to perform an operation on the table to know its depth.
         cursor = ds.open_cursor()
         cursor.set_key(ds.key(50))
-        self.assertEquals(cursor.search(), 0)
+        self.assertEqual(cursor.search(), 0)
         cursor.close()
 
         self.check_depth(2)

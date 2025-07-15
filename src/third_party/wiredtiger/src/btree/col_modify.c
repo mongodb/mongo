@@ -148,7 +148,7 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
 
             /*
              * If we restore an update chain in update restore eviction, there should be no update
-             * on the existing update chain.
+             * or a restored tombstone on the existing update chain.
              */
             WT_ASSERT_ALWAYS(session, !restore || old_upd == NULL,
               "Illegal update on chain during update restore eviction");

@@ -87,6 +87,8 @@ const model::data_value key6("Key 6");
 const model::data_value recno1((uint64_t)1);
 const model::data_value recno2((uint64_t)2);
 const model::data_value recno3((uint64_t)3);
+const model::data_value recno4((uint64_t)4);
+const model::data_value recno5((uint64_t)5);
 
 /* Values. */
 const model::data_value value1("Value 1");
@@ -535,6 +537,9 @@ test_transaction_column_fix_wt(void)
     /* Transactions. */
     model::kv_transaction_ptr txn1, txn2;
 
+    /* Throwaway output parameter. */
+    model::data_value v;
+
     /* Create the test's home directory and database. */
     WT_CONNECTION *conn;
     WT_SESSION *session;
@@ -657,6 +662,41 @@ test_transaction_column_fix_wt(void)
     wt_model_txn_commit_both(txn2, session2, 90);
     wt_model_assert(table, uri, recno1);
 
+    /* Insert recno5, having never touched recno4 up to this point. */
+    wt_model_insert_both(table, uri, recno5, byte1);
+    /*
+     * Removing recno4, which has never been inserted, should be a no-op and should not cause a
+     * prepare conflict with the read in txn2 below.
+     */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_remove_both(table, uri, txn1, session1, recno4);
+    wt_model_txn_prepare_both(txn1, session1, 100);
+    wt_model_txn_begin_both(txn2, session2);
+    testutil_assert(table->get(recno4) == model::ZERO);
+    wt_model_txn_assert(table, uri, txn2, session2, recno4); /* Zero. */
+    wt_model_txn_commit_both(txn1, session1, 100, 100);
+    wt_model_txn_commit_both(txn2, session2, 100);
+
+    /* Double check we agree on recno5. */
+    wt_model_assert(table, uri, recno5);
+
+    /* Insert and then immediately remove recno4. */
+    wt_model_insert_both(table, uri, recno4, byte2);
+    wt_model_remove_both(table, uri, recno4);
+    wt_model_assert(table, uri, recno4);
+    /*
+     * Removing recno4, which is not currently present, counts as a write if recno4 was ever written
+     * to, and will cause a prepare conflict in txn2 below.
+     */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_remove_both(table, uri, txn1, session1, recno4);
+    wt_model_txn_prepare_both(txn1, session1, 110);
+    wt_model_txn_begin_both(txn2, session2);
+    testutil_assert(table->get_ext(recno4, v) == WT_PREPARE_CONFLICT);
+    wt_model_txn_assert(table, uri, txn2, session2, recno4); /* Conflict. */
+    wt_model_txn_commit_both(txn1, session1, 110, 110);
+    wt_model_txn_commit_both(txn2, session2, 110);
+
     /* Verify. */
     testutil_assert(table->verify_noexcept(conn));
 
@@ -748,6 +788,38 @@ test_transaction_prepared(void)
     txn1->prepare(60);
     txn1->rollback();
     testutil_assert(table->get(key1) == value1);
+
+    /* Overlapping transactions with prepare, special read behaviors (1-3) */
+    /* Read behavior 1: insert key3 (txn1), begin txn2, prepare txn1, txn2 can't find key3. */
+    txn1 = database.begin_transaction();
+    testutil_check(table->insert(txn1, key3, value3));
+    txn2 = database.begin_transaction();
+    txn1->prepare(70);
+    testutil_assert(table->get_ext(txn2, key3, v) == WT_NOTFOUND);
+    txn1->commit(70, 70);
+    txn2->commit(70);
+
+    /* Read behavior 2: insert key3 (txn1), prepare txn1, begin txn2, txn2 has read conflict. */
+    txn1 = database.begin_transaction();
+    testutil_check(table->insert(txn1, key3, value1));
+    txn1->prepare(80);
+    txn2 = database.begin_transaction();
+    testutil_assert(table->get_ext(txn2, key3, v) == WT_PREPARE_CONFLICT);
+    txn1->commit(80, 80);
+    txn2->commit(80);
+
+    /*
+     * Read behavior 3: insert key3 (txn1), prepare txn1, begin txn2, commit txn1, txn2 can see
+     * txn1's update.
+     */
+    txn1 = database.begin_transaction();
+    testutil_check(table->insert(txn1, key3, value2));
+    txn1->prepare(90);
+    txn2 = database.begin_transaction();
+    txn1->commit(90, 90);
+    testutil_assert(table->get_ext(txn2, key3, v) == 0);
+    testutil_assert(v == value2);
+    txn2->commit(90);
 }
 
 /*
@@ -835,6 +907,37 @@ test_transaction_prepared_wt(void)
     wt_model_txn_prepare_both(txn1, session1, 60);
     wt_model_txn_rollback_both(txn1, session1);
     wt_model_assert(table, uri, key1, 60); /* Success. */
+
+    /* Overlapping transactions with prepare, special read behaviors (1-3) */
+    /* Read behavior 1: insert key3 (txn1), begin txn2, prepare txn1, txn2 can't find key3. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_insert_both(table, uri, txn1, session1, key3, value3);
+    wt_model_txn_begin_both(txn2, session2);
+    wt_model_txn_prepare_both(txn1, session1, 70);
+    wt_model_txn_assert(table, uri, txn2, session2, key3); /* not found */
+    wt_model_txn_commit_both(txn1, session1, 70, 70);
+    wt_model_txn_commit_both(txn2, session2, 70, 0);
+
+    /* Read behavior 2: insert key3 (txn1), prepare txn1, begin txn2, txn2 has read conflict. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_insert_both(table, uri, txn1, session1, key3, value1);
+    wt_model_txn_prepare_both(txn1, session1, 80);
+    wt_model_txn_begin_both(txn2, session2);
+    wt_model_txn_assert(table, uri, txn2, session2, key3); /* conflict */
+    wt_model_txn_commit_both(txn1, session1, 80, 80);
+    wt_model_txn_commit_both(txn2, session2, 80, 0);
+
+    /*
+     * Read behavior 3: insert key3 (txn1), prepare txn1, begin txn2, commit txn1, txn2 can see
+     * txn1's update.
+     */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_insert_both(table, uri, txn1, session1, key3, value2);
+    wt_model_txn_prepare_both(txn1, session1, 90);
+    wt_model_txn_begin_both(txn2, session2);
+    wt_model_txn_commit_both(txn1, session1, 90, 90);
+    wt_model_txn_assert(table, uri, txn2, session2, key3); /* success */
+    wt_model_txn_commit_both(txn2, session2, 90, 0);
 
     /* Verify. */
     testutil_assert(table->verify_noexcept(conn));

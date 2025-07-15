@@ -230,8 +230,8 @@ main(int argc, char *argv[])
     error_check(cursor->close(cursor));
 
     /* Create a version cursor. */
-    error_check(
-      session->open_cursor(session, "file:map.wt", NULL, "debug=(dump_version=true)", &cursor));
+    error_check(session->open_cursor(
+      session, "file:map.wt", NULL, "debug=(dump_version=(enabled=true))", &cursor));
     error_check(version_cursor_dump(cursor));
     error_check(cursor->close(cursor));
 

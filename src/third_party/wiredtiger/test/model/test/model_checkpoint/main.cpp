@@ -73,6 +73,7 @@ const model::data_value key2("Key 2");
 const model::data_value key3("Key 3");
 const model::data_value key4("Key 4");
 const model::data_value key5("Key 5");
+const model::data_value key6("Key 6");
 
 /* Values. */
 const model::data_value value1("Value 1");
@@ -93,6 +94,9 @@ test_checkpoint(void)
 
     /* Transactions. */
     model::kv_transaction_ptr txn1, txn2;
+
+    /* Throwaway out parameter. */
+    model::data_value v;
 
     /* Add some data. */
     txn1 = database.begin_transaction();
@@ -189,6 +193,23 @@ test_checkpoint(void)
     model_testutil_assert_exception(
       txn1->set_commit_timestamp(62), model::wiredtiger_abort_exception);
     txn1->rollback();
+
+    /*
+     * Add some data in a transaction, prepare it, checkpoint, commit, then crash. On restart, the
+     * checkpoint should not have the prepared transaction's write.
+     */
+    /*
+     * Note: this is hard run against WT in this test suite because, if WT is shut down with a
+     * prepared transaction, WT will abort the entire process. See
+     * test/model/workloads/WT-14832.workload to reproduce it with the runner.
+     */
+    txn1 = database.begin_transaction();
+    testutil_check(table->insert(txn1, key6, value1));
+    txn1->prepare(65);
+    model::kv_checkpoint_ptr chkpt5 = database.checkpoint();
+    txn1->commit(65, 65);
+    database.restart(true);
+    testutil_assert(table->get_ext(key6, v) == WT_NOTFOUND);
 }
 
 /*

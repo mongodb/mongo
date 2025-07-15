@@ -1,0 +1,193 @@
+# This file is used by evergreen.yml when running the python test suite with "--hook disagg" (see hook_disagg.py).
+# This list are test files that are not run, they are known failures. The reasons for the failures are not known,
+# they'll need to be triaged. When we know something about the failure, they are commented.
+test_autoclose.py
+test_base02.py
+test_base04.py
+test_bug003.py
+test_bug006.py
+test_bug010.py
+test_bug019.py
+test_bug027.py # RTS message
+test_bug029.py
+test_bug030.py
+test_bug031.py
+test_bug033.py
+test_bulk01.py
+test_bulk02.py
+test_cc02.py
+test_cc04.py
+test_cc05.py
+test_cc06.py # uses statistics we don't support in disagg
+test_cc07.py
+test_cc08.py
+test_cc09.py
+test_cc10.py
+test_checkpoint01.py
+test_checkpoint02.py
+test_checkpoint10.py
+test_checkpoint11.py
+test_checkpoint14.py
+test_checkpoint16.py
+test_checkpoint17.py
+test_checkpoint18.py
+test_checkpoint19.py
+test_checkpoint20.py
+test_checkpoint21.py
+test_checkpoint22.py
+test_checkpoint24.py
+test_checkpoint25.py
+test_checkpoint27.py
+test_checkpoint28.py
+test_checkpoint29.py
+test_checkpoint33.py
+test_checkpoint35.py
+test_checkpoint_snapshot01.py # RTS message
+test_checkpoint_snapshot02.py
+test_checkpoint_snapshot03.py
+test_checkpoint_snapshot05.py
+test_compat05.py
+test_config02.py
+test_config04.py
+test_config09.py
+test_config10.py
+test_config12.py # RTS message
+test_cursor01.py
+test_cursor02.py
+test_cursor03.py
+test_cursor05.py
+test_cursor06.py
+test_cursor07.py
+test_cursor08.py
+test_cursor13.py
+test_cursor17.py
+test_cursor21.py
+test_debug_mode08.py
+test_drop.py
+test_drop03.py
+test_drop_create.py
+test_dump.py
+test_dump01.py # RTS message
+test_dump02.py # RTS message
+test_dump03.py # RTS message
+test_dump04.py # RTS message
+test_dump05.py # RTS message
+test_dupc.py
+test_durability01.py # RTS message
+test_durable_ts01.py
+test_durable_ts03.py
+test_empty.py
+test_encrypt01.py
+test_encrypt04.py
+test_encrypt06.py
+test_env01.py
+test_error_info01.py
+test_error_info02.py
+test_error_info03.py
+test_eviction02.py
+test_eviction03.py # RTS message
+test_hs01.py
+test_hs06.py
+test_hs09.py
+test_hs11.py
+test_hs18.py
+test_hs21.py
+test_hs24.py # RTS message
+test_hs30.py
+test_hs32.py
+test_hs33.py # RTS message
+test_hs_evict_race01.py # RTS message
+test_import02.py
+test_import04.py
+test_import07.py
+test_import08.py
+test_import10.py
+test_live_restore04.py # RTS message
+test_log03.py
+test_log04.py
+test_metadata_cursor01.py
+test_metadata_cursor02.py
+test_metadata_cursor03.py
+test_metadata_cursor04.py
+test_overwrite.py
+test_prefetch01.py
+test_prefetch02.py
+test_prepare03.py
+test_prepare11.py
+test_prepare13.py
+test_prepare18.py
+test_prepare20.py
+test_prepare21.py # RTS message
+test_prepare22.py
+test_prepare23.py
+test_prepare27.py
+test_prepare28.py
+test_prepare29.py
+test_prepare_cursor01.py
+test_prepare_hs02.py
+test_prepare_hs03.py
+test_prepare_hs04.py # RTS message
+test_readonly01.py
+test_readonly03.py  # WT-14582
+test_recovery01.py # RTS message
+test_reserve.py
+test_scrub_eviction_prepare.py
+test_shared_cache01.py # RTS message
+test_stat01.py
+test_stat02.py
+test_stat03.py
+test_stat04.py
+test_stat05.py
+test_stat06.py
+test_stat13.py
+test_stat_log01.py
+test_stat_log02.py
+test_sweep03.py
+test_sweep06.py
+test_timestamp03.py
+test_timestamp05.py
+test_timestamp06.py # RTS message
+test_timestamp07.py # RTS message
+test_timestamp08.py
+test_timestamp10.py
+test_timestamp12.py
+test_timestamp20.py
+test_timestamp26.py
+test_truncate05.py
+test_truncate11.py
+test_truncate12.py
+test_truncate13.py
+test_truncate14.py
+test_truncate17.py
+test_truncate19.py
+test_txn02.py
+test_txn04.py # RTS message
+test_txn06.py # RTS message
+test_txn08.py # RTS message
+test_txn09.py
+test_txn10.py
+test_txn14.py
+test_txn15.py
+test_txn16.py
+test_txn18.py
+test_txn19.py # RTS message
+test_txn22.py
+test_util01.py # RTS message
+test_util02.py # RTS message
+test_util03.py # RTS message
+test_util04.py
+test_util07.py # RTS message
+test_util09.py # RTS message
+test_util11.py # RTS message
+test_util12.py # RTS message
+test_util13.py # RTS message
+test_util14.py
+test_util15.py
+test_util17.py
+test_util18.py # RTS message
+test_util21.py # RTS message
+test_util22.py # RTS message
+test_verbose01.py
+test_verbose02.py
+test_verbose03.py
+test_verbose04.py

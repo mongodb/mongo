@@ -121,6 +121,8 @@ struct __wt_ckpt {
     WT_ITEM addr; /* Checkpoint cookie string */
     WT_ITEM raw;  /* Checkpoint cookie raw */
 
+    uint64_t next_page_id; /* Next page ID available for allocation */
+
     void *bpriv; /* Block manager private */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */

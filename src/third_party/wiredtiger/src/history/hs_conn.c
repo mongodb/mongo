@@ -22,7 +22,7 @@ __hs_cleanup_las(WT_SESSION_IMPL *session)
     conn = S2C(session);
 
     /* Read-only and in-memory configurations won't drop the lookaside. */
-    if (F_ISSET_ATOMIC_32(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY))
+    if (F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY))
         return (0);
 
     /* The LAS table may exist on upgrade. Discard it. */
@@ -37,13 +37,13 @@ __hs_cleanup_las(WT_SESSION_IMPL *session)
  *     Get the history store btree by opening a history store cursor.
  */
 int
-__wt_hs_get_btree(WT_SESSION_IMPL *session, WT_BTREE **hs_btreep)
+__wt_hs_get_btree(WT_SESSION_IMPL *session, uint32_t hs_id, WT_BTREE **hs_btreep)
 {
     WT_CURSOR *hs_cursor;
 
     *hs_btreep = NULL;
 
-    WT_RET(__wt_curhs_open(session, NULL, &hs_cursor));
+    WT_RET(__wt_curhs_open_ext(session, hs_id, 0, NULL, &hs_cursor));
     *hs_btreep = __wt_curhs_get_btree(hs_cursor);
     WT_ASSERT(session, *hs_btreep != NULL);
 
@@ -53,11 +53,11 @@ __wt_hs_get_btree(WT_SESSION_IMPL *session, WT_BTREE **hs_btreep)
 }
 
 /*
- * __wt_hs_config --
- *     Configure the history store table.
+ * __hs_config --
+ *     Configure one history store table.
  */
-int
-__wt_hs_config(WT_SESSION_IMPL *session, const char **cfg)
+static int
+__hs_config(WT_SESSION_IMPL *session, uint32_t hs_id, const char **cfg)
 {
     WT_BTREE *btree;
     WT_CONFIG_ITEM cval;
@@ -74,13 +74,13 @@ __wt_hs_config(WT_SESSION_IMPL *session, const char **cfg)
           WT_HS_FILE_MIN);
 
     /* The history store is not available for in-memory configurations. */
-    if (F_ISSET_ATOMIC_32(conn, WT_CONN_IN_MEMORY))
+    if (F_ISSET(conn, WT_CONN_IN_MEMORY))
         return (0);
 
     WT_ERR(__wt_open_internal_session(conn, "hs_access", true, 0, 0, &tmp_setup_session));
 
     /* Retrieve the btree from the history store cursor. */
-    WT_ERR(__wt_hs_get_btree(tmp_setup_session, &btree));
+    WT_ERR(__wt_hs_get_btree(tmp_setup_session, hs_id, &btree));
 
     /* Track the history store file ID. */
     if (conn->cache->hs_fileid == 0)
@@ -94,12 +94,31 @@ __wt_hs_config(WT_SESSION_IMPL *session, const char **cfg)
      * Now that we have the history store's handle, we may set the flag because we know the file is
      * open.
      */
-    F_SET_ATOMIC_32(conn, WT_CONN_HS_OPEN);
+    F_SET(conn, WT_CONN_HS_OPEN);
 
 err:
     if (tmp_setup_session != NULL)
         WT_TRET(__wt_session_close_internal(tmp_setup_session));
     return (ret);
+}
+
+/*
+ * __wt_hs_config --
+ *     Configure the all history store tables.
+ */
+int
+__wt_hs_config(WT_SESSION_IMPL *session, const char **cfg)
+{
+    WT_DECL_RET;
+    uint32_t hs_id;
+
+    hs_id = 0;
+    for (;;) {
+        WT_RET_NOTFOUND_OK(ret = __wt_curhs_next_hs_id(session, hs_id, &hs_id));
+        if (ret == WT_NOTFOUND)
+            return (0);
+        WT_RET(__hs_config(session, hs_id, cfg));
+    }
 }
 
 /*
@@ -117,7 +136,7 @@ __wt_hs_open(WT_SESSION_IMPL *session, const char **cfg)
     hs_session = NULL;
 
     /* Read-only and in-memory configurations don't need the history store table. */
-    if (F_ISSET_ATOMIC_32(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY))
+    if (F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY))
         return (0);
 
     /*
@@ -129,9 +148,14 @@ __wt_hs_open(WT_SESSION_IMPL *session, const char **cfg)
     /* Drop the lookaside file if it still exists. */
     WT_ERR(__hs_cleanup_las(hs_session));
 
-    /* Create the table. */
-    WT_ERR(__wt_session_create(hs_session, WT_HS_URI, WT_HS_CONFIG));
+    /* Create the local table. */
+    WT_ERR(__wt_session_create(hs_session, WT_HS_URI, WT_HS_CONFIG_LOCAL));
 
+    /* Create the shared table. */
+    if (__wt_conn_is_disagg(session))
+        WT_ERR(__wt_session_create(hs_session, WT_HS_URI_SHARED, WT_HS_CONFIG_SHARED));
+
+    /* Configure all history stores. */
     WT_ERR(__wt_hs_config(hs_session, cfg));
 
 err:
@@ -147,5 +171,5 @@ err:
 void
 __wt_hs_close(WT_SESSION_IMPL *session)
 {
-    F_CLR_ATOMIC_32(S2C(session), WT_CONN_HS_OPEN);
+    F_CLR(S2C(session), WT_CONN_HS_OPEN);
 }

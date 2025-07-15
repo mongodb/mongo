@@ -111,6 +111,20 @@ __wt_clock(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_milliseconds --
+ *     Return the milliseconds since the Epoch.
+ */
+static WT_INLINE void
+__wt_milliseconds(WT_SESSION_IMPL *session, uint64_t *millisecondsp)
+{
+    struct timespec t;
+
+    __wt_epoch(session, &t);
+
+    *millisecondsp = (uint64_t)(t.tv_sec * WT_THOUSAND + t.tv_nsec / WT_MILLION);
+}
+
+/*
  * __wt_seconds --
  *     Return the seconds since the Epoch.
  */

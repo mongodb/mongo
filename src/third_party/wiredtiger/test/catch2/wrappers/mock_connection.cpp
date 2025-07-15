@@ -63,7 +63,7 @@ int
 mock_connection::setup_block_manager(WT_SESSION_IMPL *session)
 {
     // Check that there should be no connection flags set.
-    WT_ASSERT(session, _connection_impl->flags_atomic == 0);
+    WT_ASSERT(session, _connection_impl->flags == 0);
 
     // Initialize the checksum function.
     __wt_process.checksum = wiredtiger_crc32c_func();

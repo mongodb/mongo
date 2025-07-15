@@ -293,7 +293,7 @@ __curds_insert(WT_CURSOR *cursor)
 
     source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-    CURSOR_UPDATE_API_CALL(cursor, session, ret, insert);
+    CURSOR_UPDATE_API_CALL(cursor, session, ret, insert, NULL);
 
     WT_STAT_CONN_DSRC_INCR(session, cursor_insert);
     WT_STAT_DSRC_INCRV(session, cursor_insert_bytes, cursor->key.size + cursor->value.size);
@@ -321,7 +321,7 @@ __curds_update(WT_CURSOR *cursor)
 
     source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-    CURSOR_UPDATE_API_CALL(cursor, session, ret, update);
+    CURSOR_UPDATE_API_CALL(cursor, session, ret, update, NULL);
 
     WT_STAT_CONN_DSRC_INCR(session, cursor_update);
     WT_STAT_CONN_DSRC_INCRV(session, cursor_update_bytes, cursor->value.size);
@@ -374,7 +374,7 @@ __curds_reserve(WT_CURSOR *cursor)
 
     source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-    CURSOR_UPDATE_API_CALL(cursor, session, ret, reserve);
+    CURSOR_UPDATE_API_CALL(cursor, session, ret, reserve, NULL);
 
     WT_STAT_CONN_DSRC_INCR(session, cursor_reserve);
 

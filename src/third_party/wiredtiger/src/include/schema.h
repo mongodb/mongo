@@ -68,6 +68,28 @@ struct __wt_table {
     u_int ncolgroups, nindices, nkey_columns;
 };
 
+/*
+ * WT_LAYERED_TABLE --
+ *	Handle for a layered table.
+ */
+struct __wt_layered_table {
+    WT_DATA_HANDLE iface;
+
+    uint32_t ingest_btree_id;
+
+    WT_COLLATOR *collator; /* Custom collator */
+    int collator_owned;
+
+    /*
+     * For ingest table garbage collection, the last checkpoint generation number that we know was
+     * in use.
+     */
+    int64_t last_ckpt_inuse;
+
+    const char *key_format, *value_format;
+    const char *ingest_uri, *stable_uri;
+};
+
 /* Holds metadata entry name and the associated config string. */
 struct __wt_import_entry {
 

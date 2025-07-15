@@ -427,6 +427,24 @@ kv_workload_runner_wt::do_operation(const operation::evict &op)
  *     Execute the given workload operation in WiredTiger.
  */
 int
+kv_workload_runner_wt::do_operation(const operation::get &op)
+{
+    std::shared_lock lock(_connection_lock);
+    session_context_ptr session = txn_session(op.txn_id);
+    WT_CURSOR *cursor = session->cursor(op.table_id);
+    int ret = wt_cursor_search(cursor, op.key);
+    if (ret != 0)
+        return ret;
+    data_value value = get_wt_cursor_value(cursor);
+    /* FIXME-WT-14863 actually use the value we read. */
+    return 0;
+}
+
+/*
+ * kv_workload_runner_wt::do_operation --
+ *     Execute the given workload operation in WiredTiger.
+ */
+int
 kv_workload_runner_wt::do_operation(const operation::insert &op)
 {
     std::shared_lock lock(_connection_lock);

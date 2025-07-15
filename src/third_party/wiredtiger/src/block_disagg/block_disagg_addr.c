@@ -18,7 +18,7 @@ __wti_block_disagg_addr_pack(uint8_t **pp, uint64_t page_id, uint64_t lsn, uint6
 {
     uint64_t c, cp, l, p, r, s;
 
-    /* TODO: write extensible byte */
+    /* FIXME-WT-14644: write extensible byte */
     /* See the comment above: this is the reverse operation. */
     if (size == 0) {
         p = WT_BLOCK_INVALID_PAGE_ID;
@@ -57,7 +57,7 @@ __wti_block_disagg_addr_unpack(const uint8_t **buf, size_t buf_size, uint64_t *p
 
     p = 0; /* Avoid compiler warnings. */
 
-    /* TODO: read extensible byte */
+    /* FIXME-WT-14644: read extensible byte */
     begin = *buf;
     WT_RET(__wt_vunpack_uint(buf, 0, &p));
     WT_RET(__wt_vunpack_uint(buf, 0, &l));
@@ -140,7 +140,6 @@ __wti_block_disagg_ckpt_pack(WT_BLOCK_DISAGG *block_disagg, uint8_t **buf, uint6
   uint64_t lsn, uint64_t checkpoint_id, uint64_t reconciliation_id, uint32_t root_sz,
   uint32_t root_checksum)
 {
-    /* size_t len; */
     WT_UNUSED(block_disagg);
 
     WT_RET(__wti_block_disagg_addr_pack(

@@ -31,7 +31,7 @@ __wt_verbose_dump_backup(WT_SESSION_IMPL *session)
 
     conn = S2C(session);
     WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
-    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_INCR_BACKUP)) {
+    if (!F_ISSET(conn, WT_CONN_INCR_BACKUP)) {
         WT_RET(__wt_msg(session, "No incremental backup information exists"));
         return (0);
     }
@@ -98,7 +98,7 @@ __wt_backup_destroy(WT_SESSION_IMPL *session)
     }
     conn->incr_granularity = 0;
     WT_STAT_CONN_SET(session, backup_incremental, 0);
-    F_CLR_ATOMIC_32(conn, WT_CONN_INCR_BACKUP);
+    F_CLR(conn, WT_CONN_INCR_BACKUP);
 }
 
 /*
@@ -125,7 +125,7 @@ __wt_backup_open(WT_SESSION_IMPL *session)
     /*
      * Walk each item in the metadata and set up our last known global incremental information.
      */
-    F_CLR_ATOMIC_32(conn, WT_CONN_INCR_BACKUP);
+    F_CLR(conn, WT_CONN_INCR_BACKUP);
     i = 0;
     while (__wt_config_next(&blkconf, &k, &v) == 0) {
         WT_ASSERT(session, i < WT_BLKINCR_MAX);
@@ -184,7 +184,7 @@ __curbackup_next(WT_CURSOR *cursor)
      * If incremental backup and the configuration list exists, move to the next config value in
      * lock-step. The list may not exist for special backup cursors like querying the IDs.
      */
-    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_INCR_BACKUP) && cb->cfg_list != NULL)
+    if (F_ISSET(S2C(session), WT_CONN_INCR_BACKUP) && cb->cfg_list != NULL)
         cb->cfg_current = cb->cfg_list[cb->next];
     ++cb->next;
 
@@ -370,7 +370,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
     if (WT_STRING_LIT_MATCH("backup:query_id", uri, uri_len)) {
         /* Top level cursor code does not allow a URI and cursor. We don't need to check here. */
         WT_ASSERT(session, othercb == NULL);
-        if (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_INCR_BACKUP))
+        if (!F_ISSET(S2C(session), WT_CONN_INCR_BACKUP))
             WT_ERR_MSG(session, EINVAL, "Incremental backup is not configured");
         F_SET(cb, WT_CURBACKUP_QUERYID);
     } else if (WT_STRING_LIT_MATCH("backup:export", uri, uri_len))
@@ -573,7 +573,7 @@ __backup_config(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[
     WT_RET_NOTFOUND_OK(__wt_config_gets(session, cfg, "incremental.enabled", &cval));
     if (cval.val) {
         /* Granularity can only be set once at the beginning */
-        if (!F_ISSET_ATOMIC_32(conn, WT_CONN_INCR_BACKUP)) {
+        if (!F_ISSET(conn, WT_CONN_INCR_BACKUP)) {
             WT_RET(__wt_config_gets(session, cfg, "incremental.granularity", &cval));
             if (conn->incr_granularity != 0)
                 WT_RET_MSG(session, EINVAL, "Cannot change the incremental backup granularity");
@@ -1017,7 +1017,7 @@ __backup_list_append(
     WT_RET(__wt_realloc_def(session, &cb->list_allocated, cb->list_next + 2, &cb->list));
     p = &cb->list[cb->list_next];
     p[0] = p[1] = NULL;
-    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_INCR_BACKUP)) {
+    if (F_ISSET(S2C(session), WT_CONN_INCR_BACKUP)) {
         /*
          * Add a copy of the metadata config string for tables for incremental backup if one is
          * available. Keep that list in parallel to the file list. Not all files will have the
@@ -1046,7 +1046,7 @@ __backup_list_append(
      * copying of files by applications.
      */
     WT_RET(__wt_strdup(session, name, p));
-    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_INCR_BACKUP)) {
+    if (F_ISSET(S2C(session), WT_CONN_INCR_BACKUP)) {
         if (cfg_value != NULL)
             WT_RET(__wt_strdup(session, cfg_value, c));
         else

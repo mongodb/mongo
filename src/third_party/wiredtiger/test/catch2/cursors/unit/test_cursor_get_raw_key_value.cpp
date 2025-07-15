@@ -145,8 +145,8 @@ TEST_CASE("Cursor: get key and value()", "[cursor]")
     SECTION("Check get_raw_key_value() on a cursor type that does not support it")
     {
         WT_CURSOR *version_cursor = nullptr;
-        REQUIRE(session->open_cursor(session, file.c_str(), nullptr, "debug=(dump_version=true)",
-                  &version_cursor) == 0);
+        REQUIRE(session->open_cursor(session, file.c_str(), nullptr,
+                  "debug=(dump_version=(enabled=true))", &version_cursor) == 0);
         WT_ITEM item_key;
         init_wt_item(item_key);
         WT_ITEM item_value;

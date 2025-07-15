@@ -99,18 +99,18 @@ class BaseDataSet(object):
             self.store_one_cursor(c, i, variant)
         c.close()
 
-    def fill(self, variant=1):
-        self.store_range(1, self.rows, variant)
+    def fill(self, variant=1, first_row=1):
+        self.store_range(first_row, self.rows - first_row + 1, variant)
 
     def postfill_create(self):
         pass
 
-    def populate(self, create=True, variant=1):
+    def populate(self, create=True, variant=1, first_row=1):
         self.testcase.pr('populate variant ' + str(variant) + ': ' + self.uri + ' with '
                          + str(self.rows) + ' rows')
         if create:
             self.create()
-        self.fill(variant)
+        self.fill(variant, first_row)
         if create:
             self.postfill_create()
 

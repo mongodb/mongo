@@ -17,10 +17,12 @@ static int
 __rec_child_deleted(
   WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *ref, WTI_CHILD_MODIFY_STATE *cmsp)
 {
+    WT_CONNECTION_IMPL *conn;
     WT_PAGE_DELETED *page_del;
     uint8_t prepare_state;
     bool visible, visible_all;
 
+    conn = S2C(session);
     visible = visible_all = false;
     page_del = ref->page_del;
 
@@ -31,7 +33,7 @@ __rec_child_deleted(
      * underlying disk blocks and don't write anything in the internal page.
      */
     if (page_del == NULL)
-        return (__wt_ref_block_free(session, ref));
+        return (__wt_ref_block_free(session, ref, false));
 
     /*
      * Check visibility. If the truncation is visible to us, we'll also want to know if it's visible
@@ -55,8 +57,27 @@ __rec_child_deleted(
      * setting the page delete structure committed flag cannot overlap with us checking the flag.
      */
     if (__wt_page_del_committed_set(page_del)) {
-        if (F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT)) {
+        if (F_ISSET(r, WT_REC_VISIBLE_ALL)) {
+            visible = page_del->txnid <= r->last_running;
+
+            if (visible) {
+                WT_ACQUIRE_READ_WITH_BARRIER(prepare_state, page_del->prepare_state);
+                if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED)
+                    visible = false;
+            }
+
+            if (visible && F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT) &&
+              page_del->durable_timestamp > r->rec_start_pinned_stable_ts)
+                visible = false;
+
+            visible_all = visible ? __wt_page_del_visible_all(session, page_del, true) : false;
+        } else if (F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT)) {
             visible = __wt_page_del_visible(session, page_del, true);
+
+            if (visible && F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT) &&
+              page_del->durable_timestamp > r->rec_start_pinned_stable_ts)
+                visible = false;
+
             visible_all = visible ? __wt_page_del_visible_all(session, page_del, true) : false;
         } else
             visible = visible_all = __wt_page_del_visible_all(session, page_del, true);
@@ -160,7 +181,7 @@ __rec_child_deleted(
      * is ever a read into this part of the name space again, the cache read function instantiates
      * an entirely new page.)
      */
-    WT_RET(__wt_ref_block_free(session, ref));
+    WT_RET(__wt_ref_block_free(session, ref, false));
 
     /* Globally visible fast-truncate information is never used again, a NULL value is identical. */
     __wt_overwrite_and_free(session, ref->page_del);
@@ -173,8 +194,8 @@ __rec_child_deleted(
  *     Return if the internal page's child references any modifications.
  */
 int
-__wti_rec_child_modify(
-  WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *ref, WTI_CHILD_MODIFY_STATE *cmsp)
+__wti_rec_child_modify(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *ref,
+  WTI_CHILD_MODIFY_STATE *cmsp, bool *build_delta)
 {
     WT_DECL_RET;
     WT_PAGE_MODIFY *mod;
@@ -214,6 +235,12 @@ __wti_rec_child_modify(
              */
             if (!WT_REF_CAS_STATE(session, ref, WT_REF_DELETED, WT_REF_LOCKED))
                 break;
+
+            /* FIXME-WT-14879: support delta for fast truncate. */
+            if (build_delta != NULL) {
+                *build_delta = false;
+                r->delta.size = 0;
+            }
             ret = __rec_child_deleted(session, r, ref, cmsp);
             WT_REF_SET_STATE(ref, WT_REF_DELETED);
             goto done;

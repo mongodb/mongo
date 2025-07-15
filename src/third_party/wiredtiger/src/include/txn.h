@@ -12,6 +12,7 @@
 #define WT_TXN_FIRST 1               /* First transaction to run */
 #define WT_TXN_MAX (UINT64_MAX - 10) /* End of time */
 #define WT_TXN_ABORTED UINT64_MAX    /* Update rolled back */
+#define WT_PREPARED_ID_NONE 0        /* Empty prepared id */
 
 #define WT_TS_NONE 0         /* Beginning of time */
 #define WT_TS_MAX UINT64_MAX /* End of time */
@@ -157,6 +158,7 @@ struct __wt_txn_global {
     wt_shared wt_timestamp_t pinned_timestamp;
     wt_timestamp_t recovery_timestamp;
     wt_shared wt_timestamp_t stable_timestamp;
+    wt_shared wt_timestamp_t newest_seen_timestamp; /* Used by eviction to make guesses */
     wt_timestamp_t version_cursor_pinned_timestamp;
     bool has_durable_timestamp;
     wt_shared bool has_oldest_timestamp;
@@ -291,6 +293,13 @@ struct __wt_txn_snapshot {
 
 #define WT_TS_VERBOSE_PREFIX "unexpected timestamp usage: "
 
+struct __wt_txn_log {
+    uint32_t txn_logsync; /* Log sync configuration */
+
+    /* Scratch buffer for in-memory log records. */
+    WT_ITEM *logrec;
+};
+
 /*
  * WT_TXN --
  *	Per-session transaction context.
@@ -304,7 +313,7 @@ struct __wt_txn {
 
     uint32_t forced_iso; /* Isolation is currently forced. */
 
-    uint32_t txn_logsync; /* Log sync configuration */
+    WT_TXN_LOG txn_log;
 
     /* Snapshot data. */
     WT_TXN_SNAPSHOT snapshot_data;
@@ -357,9 +366,6 @@ struct __wt_txn {
 #ifdef HAVE_DIAGNOSTIC
     u_int prepare_count;
 #endif
-
-    /* Scratch buffer for in-memory log records. */
-    WT_ITEM *logrec;
 
     /* Checkpoint status. */
     WT_LSN ckpt_lsn;

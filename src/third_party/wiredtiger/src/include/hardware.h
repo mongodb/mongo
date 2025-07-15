@@ -145,7 +145,7 @@
         }                                                                                          \
     } while (0)
 #else
-#define WT_ACQUIRE_READ(v, val) (v) = __atomic_load_n(&(val), __ATOMIC_ACQUIRE);
+#define WT_ACQUIRE_READ(v, val) (v) = __atomic_load_n(&(val), __ATOMIC_ACQUIRE)
 #endif
 #else
 #define WT_ACQUIRE_READ(v, val) WT_ACQUIRE_READ_WITH_BARRIER(v, val)
@@ -168,8 +168,6 @@
 
 #define FLD_ISSET_ATOMIC_16(field, mask) (__wt_atomic_load16(&(field)) & (uint16_t)(mask))
 
-#define FLD_ISSET_ATOMIC_32(field, mask) (__wt_atomic_load32(&(field)) & (uint32_t)(mask))
-
 #define FLD_SET_ATOMIC_8(field, mask)                                            \
     do {                                                                         \
         uint8_t __orig;                                                          \
@@ -188,16 +186,6 @@
         do {                                                                       \
             __orig = __wt_atomic_load16(&(field));                                 \
         } while (!__wt_atomic_cas16(&(field), __orig, __orig | (uint16_t)(mask))); \
-    } while (0)
-
-#define FLD_SET_ATOMIC_32(field, mask)                                             \
-    do {                                                                           \
-        uint32_t __orig;                                                           \
-        if (FLD_ISSET_ATOMIC_32((field), (mask)))                                  \
-            break;                                                                 \
-        do {                                                                       \
-            __orig = __wt_atomic_load32(&(field));                                 \
-        } while (!__wt_atomic_cas32(&(field), __orig, __orig | (uint32_t)(mask))); \
     } while (0)
 
 #define FLD_CLR_ATOMIC_8(field, mask)                                               \
@@ -220,25 +208,12 @@
         } while (!__wt_atomic_cas16(&(field), __orig, __orig & (uint16_t)(~(mask)))); \
     } while (0)
 
-#define FLD_CLR_ATOMIC_32(field, mask)                                                \
-    do {                                                                              \
-        uint32_t __orig;                                                              \
-        if (!FLD_ISSET_ATOMIC_32((field), (mask)))                                    \
-            break;                                                                    \
-        do {                                                                          \
-            __orig = __wt_atomic_load32(&(field));                                    \
-        } while (!__wt_atomic_cas32(&(field), __orig, __orig & (uint32_t)(~(mask)))); \
-    } while (0)
-
 #define F_ISSET_ATOMIC_8(p, mask) FLD_ISSET_ATOMIC_8((p)->flags_atomic, mask)
 #define F_ISSET_ATOMIC_16(p, mask) FLD_ISSET_ATOMIC_16((p)->flags_atomic, mask)
-#define F_ISSET_ATOMIC_32(p, mask) FLD_ISSET_ATOMIC_32((p)->flags_atomic, mask)
 #define F_CLR_ATOMIC_8(p, mask) FLD_CLR_ATOMIC_8((p)->flags_atomic, mask)
 #define F_CLR_ATOMIC_16(p, mask) FLD_CLR_ATOMIC_16((p)->flags_atomic, mask)
-#define F_CLR_ATOMIC_32(p, mask) FLD_CLR_ATOMIC_32((p)->flags_atomic, mask)
 #define F_SET_ATOMIC_8(p, mask) FLD_SET_ATOMIC_8((p)->flags_atomic, mask)
 #define F_SET_ATOMIC_16(p, mask) FLD_SET_ATOMIC_16((p)->flags_atomic, mask)
-#define F_SET_ATOMIC_32(p, mask) FLD_SET_ATOMIC_32((p)->flags_atomic, mask)
 
 /*
  * Cache line alignment.

@@ -50,9 +50,21 @@ class test_checkpoint02(wttest.WiredTigerTestCase):
         ('table-10', dict(uri='table:test',dsize=10,nops=50000,nthreads=30))
     ]
 
-    scenarios = make_scenarios(format_values, size_values)
+    ckpt_precision = [
+        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
+        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
+    ]
+
+    scenarios = make_scenarios(format_values, size_values, ckpt_precision)
+
+    def conn_config(self):
+        return self.ckpt_config
 
     def test_checkpoint02(self):
+        # Avoid checkpoint error with precise checkpoint
+        if self.ckpt_config == 'checkpoint=(precise=true)':
+            self.conn.set_timestamp('stable_timestamp=1')
+
         done = threading.Event()
         self.session.create(self.uri,
             "key_format={},value_format={}".format(self.key_format, self.value_format))

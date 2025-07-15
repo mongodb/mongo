@@ -142,17 +142,19 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 {
     WT_ADDR_COPY addr;
     WT_DECL_RET;
-    WT_ITEM tmp;
+    WT_ITEM *deltas;
+    WT_ITEM *tmp;
     WT_PAGE *notused;
+    WT_PAGE_BLOCK_META block_meta;
     WT_REF_STATE previous_state;
+    size_t count, i;
     uint32_t page_flags;
-    bool prepare;
+    bool instantiate_upd, disk_image_freed;
 
-    /*
-     * Don't pass an allocated buffer to the underlying block read function, force allocation of new
-     * memory of the appropriate size.
-     */
-    WT_CLEAR(tmp);
+    WT_CLEAR(block_meta);
+    tmp = NULL;
+    count = 0;
+    disk_image_freed = false;
 
     /* Lock the WT_REF. */
     switch (previous_state = WT_REF_GET_STATE(ref)) {
@@ -229,7 +231,14 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     }
 
     /* There's an address, read the backing disk page and build an in-memory version of the page. */
-    WT_ERR(__wt_blkcache_read(session, &tmp, NULL, addr.addr, addr.size));
+    WT_ERR(__wt_blkcache_read_multi(session, &tmp, &count, &block_meta, addr.addr, addr.size));
+
+    WT_ASSERT(session, tmp != NULL && count > 0);
+
+    if (count > 1)
+        deltas = &tmp[1];
+    else
+        deltas = NULL;
 
     /*
      * Build the in-memory version of the page. Clear our local reference to the allocated copy of
@@ -240,15 +249,31 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
      * workloads repeatedly reading a page with eviction disabled (e.g., a metadata page), then
      * evicting that page and deciding that is a sign that eviction is unstuck.
      */
-    page_flags = WT_DATA_IN_ITEM(&tmp) ? WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED;
+    page_flags = WT_DATA_IN_ITEM(&tmp[0]) ? WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED;
     if (LF_ISSET(WT_READ_IGNORE_CACHE_SIZE))
         FLD_SET(page_flags, WT_PAGE_EVICT_NO_PROGRESS);
     if (LF_ISSET(WT_READ_PREFETCH))
         FLD_SET(page_flags, WT_PAGE_PREFETCH);
-    WT_ERR(__wti_page_inmem(session, ref, tmp.data, page_flags, &notused, &prepare));
-    tmp.mem = NULL;
-    if (prepare)
-        WT_ERR(__wti_page_inmem_prepare(session, ref));
+    if (deltas != NULL)
+        FLD_SET(page_flags, WT_PAGE_WITH_DELTAS);
+    WT_ERR(__wti_page_inmem(session, ref, tmp[0].data, page_flags, &notused, &instantiate_upd));
+    tmp[0].mem = NULL;
+    ref->page->block_meta = block_meta;
+    ref->page->old_rec_lsn_max = block_meta.disagg_lsn;
+    ref->page->rec_lsn_max = block_meta.disagg_lsn;
+
+    /* Reconstruct deltas*/
+    if (count > 1) {
+        ret = __wti_page_reconstruct_deltas(session, ref, deltas, count - 1);
+        for (i = 0; i < count - 1; ++i)
+            __wt_buf_free(session, &deltas[i]);
+        WT_ERR(ret);
+    }
+
+    __wt_free(session, tmp);
+
+    if (instantiate_upd && !WT_IS_HS(session->dhandle))
+        WT_ERR(__wti_page_inmem_updates(session, ref));
 
     /*
      * In the case of a fast delete, move all of the page's records to a deleted state based on the
@@ -275,6 +300,9 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
             WT_ERR(__wti_delete_page_instantiate(session, ref));
     }
 
+    /* Track page reads for debugging purposes. */
+    WT_ERR(__wt_conn_page_history_track_read(session, ref->page));
+
 skip_read:
     F_CLR_ATOMIC_8(ref, WT_REF_FLAG_READING);
     WT_REF_SET_STATE(ref, WT_REF_MEM);
@@ -287,13 +315,20 @@ err:
      * If the function building an in-memory version of the page failed, it discarded the page, but
      * not the disk image. Discard the page and separately discard the disk image in all cases.
      */
-    if (ref->page != NULL)
+    if (ref->page != NULL) {
+        disk_image_freed = ref->page->dsk != NULL;
+        __wt_page_modify_clear(session, ref->page);
         __wt_ref_out(session, ref);
+    }
+
+    if (tmp != NULL) {
+        for (i = disk_image_freed ? 1 : 0; i < count; ++i)
+            __wt_buf_free(session, &tmp[i]);
+        __wt_free(session, tmp);
+    }
 
     F_CLR_ATOMIC_8(ref, WT_REF_FLAG_READING);
     WT_REF_SET_STATE(ref, previous_state);
-
-    __wt_buf_free(session, &tmp);
 
     return (ret);
 }
@@ -357,8 +392,10 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
             if (LF_ISSET(WT_READ_CACHE | WT_READ_NO_WAIT))
                 return (WT_NOTFOUND);
             if (LF_ISSET(WT_READ_SKIP_DELETED) &&
-              __wti_delete_page_skip(session, ref, !F_ISSET(txn, WT_TXN_HAS_SNAPSHOT)))
+              __wti_delete_page_skip(session, ref, !F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))) {
+                WT_STAT_CONN_INCR(session, page_read_skip_deleted);
                 return (WT_NOTFOUND);
+            }
             goto read;
         case WT_REF_DISK:
             /* Optionally limit reads to cache-only. */
@@ -406,6 +443,7 @@ read:
             stalled = true;
             break;
         case WT_REF_SPLIT:
+            WT_STAT_CONN_INCR(session, page_split_restart);
             return (WT_RESTART);
         case WT_REF_MEM:
             /*
@@ -414,7 +452,7 @@ read:
              * Get a hazard pointer if one is required. We cannot be evicting if no hazard pointer
              * is required, we're done.
              */
-            if (F_ISSET(btree, WT_BTREE_IN_MEMORY))
+            if (F_ISSET(btree, WT_BTREE_NO_EVICT))
                 goto skip_evict;
 
 /*

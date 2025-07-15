@@ -246,7 +246,7 @@ class AbstractWiredTigerTestCase(unittest.TestCase):
             d += '.' + time.strftime('%Y%m%d-%H%M%S', time.localtime())
         if removeAtStart:
             shutil.rmtree(d, ignore_errors=True)
-        os.makedirs(d)
+        os.makedirs(d, exist_ok=True)
         AbstractWiredTigerTestCase._origcwd = os.getcwd()
         AbstractWiredTigerTestCase._parentTestdir = os.path.abspath(d)
         AbstractWiredTigerTestCase._preserveFiles = preserveFiles
@@ -461,6 +461,9 @@ class AbstractWiredTigerTestCase(unittest.TestCase):
         So transform '(', but remove final ')'.
         '''
         name = self.shortid().translate(str.maketrans('($[]/ ','______', ')'))
+
+        # Remove '<' and '>', because some qualified names contain strings such as "<locals>".
+        name = name.replace('<', '_').replace('>', '_')
 
         # On OS/X, we can get name conflicts if names differ by case. Upper
         # case letters are uncommon in our python class and method names, so

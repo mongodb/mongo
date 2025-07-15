@@ -28,7 +28,6 @@
 
 import threading, time
 import wttest
-import wiredtiger
 from wiredtiger import stat
 from wtthread import checkpoint_thread
 from wtdataset import SimpleDataSet
@@ -48,7 +47,6 @@ from wtscenario import make_scenarios
 
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
-    conn_config = 'statistics=(all),timing_stress_for_test=[checkpoint_slow]'
     session_config = 'isolation=snapshot'
 
     format_values = [
@@ -57,8 +55,14 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         ('column', dict(key_format='r', value_format='S', extraconfig='')),
         ('string_row', dict(key_format='S', value_format='S', extraconfig='')),
     ]
-    scenarios = make_scenarios(format_values)
+    ckpt_precision = [
+        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
+        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
+    ]
+    scenarios = make_scenarios(format_values, ckpt_precision)
 
+    def conn_config(self):
+        return 'statistics=(all),timing_stress_for_test=[checkpoint_slow],' + self.ckpt_config
     def large_updates(self, ds, nrows, value):
         cursor = self.session.open_cursor(ds.uri)
         self.session.begin_transaction()
@@ -86,6 +90,10 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         #self.session.rollback_transaction()
 
     def test_checkpoint(self):
+        # Avoid checkpoint error with precise checkpoint
+        if self.ckpt_config == 'checkpoint=(precise=true)':
+            self.conn.set_timestamp('stable_timestamp=1')
+
         uri = 'table:checkpoint18'
         nrows = 10000
 

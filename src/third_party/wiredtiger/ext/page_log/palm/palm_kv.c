@@ -79,8 +79,15 @@ typedef struct PAGE_KEY {
     uint64_t base_checkpoint_id;
     uint32_t flags;
 
+    /*
+     * An encryption key. This module does no encryption, but we do generate a fake key and return
+     * it for testing.
+     */
+    WT_PAGE_LOG_ENCRYPTION encryption;
+
     /* To simulate materialization delays, this is the timestamp this record becomes available. */
     uint64_t timestamp_materialized_us;
+
 } PAGE_KEY;
 
 /*
@@ -345,7 +352,8 @@ palm_kv_get_global(PALM_KV_CONTEXT *context, PALM_KV_GLOBAL_KEY key, uint64_t *v
 int
 palm_kv_put_page(PALM_KV_CONTEXT *context, uint64_t table_id, uint64_t page_id, uint64_t lsn,
   uint64_t checkpoint_id, bool is_delta, uint64_t backlink_lsn, uint64_t base_lsn,
-  uint64_t backlink_checkpoint_id, uint64_t base_checkpoint_id, uint32_t flags, const WT_ITEM *buf)
+  uint64_t backlink_checkpoint_id, uint64_t base_checkpoint_id,
+  const WT_PAGE_LOG_ENCRYPTION *encryption, uint32_t flags, const WT_ITEM *buf)
 {
     MDB_val kval;
     MDB_val vval;
@@ -364,6 +372,7 @@ palm_kv_put_page(PALM_KV_CONTEXT *context, uint64_t table_id, uint64_t page_id, 
     page_key.backlink_checkpoint_id = backlink_checkpoint_id;
     page_key.base_checkpoint_id = base_checkpoint_id;
     page_key.flags = flags;
+    page_key.encryption = *encryption;
     page_key.timestamp_materialized_us = palm_kv_timestamp_us() + context->materialization_delay_us;
     swap_page_key(&page_key, &page_key);
     kval.mv_size = sizeof(page_key);
@@ -451,6 +460,7 @@ palm_kv_get_page_matches(PALM_KV_CONTEXT *context, uint64_t table_id, uint64_t p
             matches->base_lsn = result_key.base_lsn;
             matches->backlink_checkpoint_id = result_key.backlink_checkpoint_id;
             matches->base_checkpoint_id = result_key.base_checkpoint_id;
+            matches->encryption = result_key.encryption;
             matches->first = true;
             return (0);
         }
@@ -515,6 +525,7 @@ palm_kv_next_page_match(PALM_KV_PAGE_MATCHES *matches)
             matches->base_lsn = page_key.base_lsn;
             matches->backlink_checkpoint_id = page_key.backlink_checkpoint_id;
             matches->base_checkpoint_id = page_key.base_checkpoint_id;
+            matches->encryption = page_key.encryption;
             matches->flags = page_key.flags;
             return (true);
         }

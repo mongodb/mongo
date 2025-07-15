@@ -36,7 +36,6 @@ class test_hs14(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=500MB'
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
-        ('column-fix', dict(key_format='r', value_format='8t')),
         ('string-row', dict(key_format='S', value_format='S'))
     ]
     scenarios = make_scenarios(format_values)

@@ -30,7 +30,7 @@ __wti_rts_history_delete_hs(WT_SESSION_IMPL *session, WT_ITEM *key, wt_timestamp
     btree_id = S2BT(session)->id;
 
     /* Open a history store table cursor. */
-    WT_RET(__wt_curhs_open(session, NULL, &hs_cursor));
+    WT_RET(__wt_curhs_open(session, btree_id, NULL, &hs_cursor));
     /*
      * Rollback-to-stable operates exclusively (i.e., it is the only active operation in the system)
      * outside the constraints of transactions. Therefore, there is no need for snapshot based
@@ -190,8 +190,7 @@ __wti_rts_history_final_pass(WT_SESSION_IMPL *session, wt_timestamp_t rollback_t
      * btree ids that do not exist as part of the database anymore due to performing a selective
      * restore from backup.
      */
-    if (F_ISSET_ATOMIC_32(conn, WT_CONN_BACKUP_PARTIAL_RESTORE) &&
-      conn->partial_backup_remove_ids != NULL)
+    if (F_ISSET(conn, WT_CONN_BACKUP_PARTIAL_RESTORE) && conn->partial_backup_remove_ids != NULL)
         for (i = 0; conn->partial_backup_remove_ids[i] != 0; ++i)
             WT_ERR(
               __wti_rts_history_btree_hs_truncate(session, conn->partial_backup_remove_ids[i]));

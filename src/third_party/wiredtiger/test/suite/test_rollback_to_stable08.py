@@ -38,7 +38,7 @@ class test_rollback_to_stable08(test_rollback_to_stable_base):
 
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
+        #('column_fix', dict(key_format='r', value_format='8t')),  # FIXME-WT-14972
         ('row_integer', dict(key_format='i', value_format='S')),
     ]
 

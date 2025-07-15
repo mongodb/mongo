@@ -208,8 +208,8 @@ __wt_delta_header_byteswap(WT_DELTA_HEADER *dsk)
 struct __wt_addr {
     WT_TIME_AGGREGATE ta;
 
-    uint8_t *addr; /* Block-manager's cookie */
-    uint8_t size;  /* Block-manager's cookie length */
+    uint8_t *block_cookie;     /* Block-manager's cookie */
+    uint8_t block_cookie_size; /* Block-manager's cookie length */
 
 #define WT_ADDR_INT 1     /* Internal page */
 #define WT_ADDR_LEAF 2    /* Leaf page */
@@ -296,13 +296,15 @@ struct __wt_ovfl_reuse {
 #define WT_HS_KEY_FORMAT WT_UNCHECKED_STRING(IuQQ)
 #define WT_HS_VALUE_FORMAT WT_UNCHECKED_STRING(QQQu)
 /* Disable logging for history store in the metadata. */
-#define WT_HS_CONFIG                                                   \
+#define WT_HS_CONFIG_COMMON                                            \
     "key_format=" WT_HS_KEY_FORMAT ",value_format=" WT_HS_VALUE_FORMAT \
     ",block_compressor=" WT_HS_COMPRESSOR                              \
     ",log=(enabled=false)"                                             \
     ",internal_page_max=16KB"                                          \
     ",leaf_value_max=64MB"                                             \
     ",prefix_compression=false"
+#define WT_HS_CONFIG_LOCAL WT_HS_CONFIG_COMMON
+#define WT_HS_CONFIG_SHARED WT_HS_CONFIG_COMMON ",block_manager=disagg"
 
 /*
  * WT_SAVE_UPD --
@@ -333,6 +335,8 @@ struct __wt_page_block_meta {
     uint64_t disagg_lsn;
 
     uint32_t checksum;
+
+    WT_PAGE_LOG_ENCRYPTION encryption;
 };
 
 /*
@@ -353,6 +357,7 @@ struct __wt_multi {
      * memory.
      */
     void *disk_image;
+    WT_PAGE_BLOCK_META block_meta; /* the metadata for the disk image */
 
     /*
      * List of unresolved updates. Updates are either a row-store insert or update list, or
@@ -416,12 +421,23 @@ struct __wt_page_modify {
     uint64_t rec_max_txn;
     wt_timestamp_t rec_max_timestamp;
 
+    /*
+     * Track the timestamp used for the most recent reconciliation. It's useful to avoid duplicating
+     * work when precise checkpoints are enabled, so we don't re-reconcile pages when no new content
+     * could be written.
+     */
+    wt_timestamp_t rec_pinned_stable_timestamp;
+
+    /* An approximate timestamp of the newest update */
+    wt_shared wt_timestamp_t newest_commit_timestamp;
+
     /* The largest update transaction ID (approximate). */
     wt_shared uint64_t update_txn;
 
     /* Dirty bytes added to the cache. */
-    wt_shared size_t bytes_dirty;
-    wt_shared size_t bytes_updates;
+    wt_shared uint64_t bytes_dirty;
+    wt_shared uint64_t bytes_updates;
+    wt_shared uint64_t bytes_delta_updates;
 
     /*
      * When pages are reconciled, the result is one or more replacement blocks. A replacement block
@@ -814,19 +830,22 @@ struct __wt_page {
     uint32_t prefix_stop;  /* Maximum slot to which the best page prefix applies */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_PAGE_BUILD_KEYS 0x001u         /* Keys have been built in memory */
-#define WT_PAGE_COMPACTION_WRITE 0x002u   /* Writing the page for compaction */
-#define WT_PAGE_DISK_ALLOC 0x004u         /* Disk image in allocated memory */
-#define WT_PAGE_DISK_MAPPED 0x008u        /* Disk image in mapped memory */
-#define WT_PAGE_EVICT_LRU 0x010u          /* Page is on the LRU queue */
-#define WT_PAGE_EVICT_LRU_URGENT 0x020u   /* Page is in the urgent queue */
-#define WT_PAGE_EVICT_NO_PROGRESS 0x040u  /* Eviction doesn't count as progress */
-#define WT_PAGE_INTL_OVERFLOW_KEYS 0x080u /* Internal page has overflow keys (historic only) */
-#define WT_PAGE_PREFETCH 0x100u           /* The page is being pre-fetched */
-#define WT_PAGE_SPLIT_INSERT 0x200u       /* A leaf page was split for append */
-#define WT_PAGE_UPDATE_IGNORE 0x400u      /* Ignore updates on page discard */
-                                          /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
-    wt_shared uint16_t flags_atomic;      /* Atomic flags, use F_*_ATOMIC_16 */
+#define WT_PAGE_BUILD_KEYS 0x0001u         /* Keys have been built in memory */
+#define WT_PAGE_COMPACTION_WRITE 0x0002u   /* Writing the page for compaction */
+#define WT_PAGE_DISK_ALLOC 0x0004u         /* Disk image in allocated memory */
+#define WT_PAGE_DISK_MAPPED 0x0008u        /* Disk image in mapped memory */
+#define WT_PAGE_EVICT_LRU 0x0010u          /* Page is on the LRU queue */
+#define WT_PAGE_EVICT_LRU_URGENT 0x0020u   /* Page is in the urgent queue */
+#define WT_PAGE_EVICT_NO_PROGRESS 0x0040u  /* Eviction doesn't count as progress */
+#define WT_PAGE_INTL_OVERFLOW_KEYS 0x0080u /* Internal page has overflow keys (historic only) */
+#define WT_PAGE_INTL_PINDEX_UPDATE 0x0100u /* Page index updated */
+#define WT_PAGE_PREFETCH 0x0200u           /* The page is being pre-fetched */
+#define WT_PAGE_REC_FAIL 0x0400u           /* The previous reconciliation failed on the page. */
+#define WT_PAGE_SPLIT_INSERT 0x0800u       /* A leaf page was split for append */
+#define WT_PAGE_UPDATE_IGNORE 0x1000u      /* Ignore updates on page discard */
+#define WT_PAGE_WITH_DELTAS 0x2000u        /* Page was built with deltas */
+                                           /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
+    wt_shared uint16_t flags_atomic;       /* Atomic flags, use F_*_ATOMIC_16 */
 
 #define WT_PAGE_IS_INTERNAL(page) \
     ((page)->type == WT_PAGE_COL_INT || (page)->type == WT_PAGE_ROW_INT)
@@ -838,6 +857,7 @@ struct __wt_page {
 #define WT_PAGE_OVFL 5          /* Overflow page */
 #define WT_PAGE_ROW_INT 6       /* Row-store internal page */
 #define WT_PAGE_ROW_LEAF 7      /* Row-store leaf page */
+#define WT_PAGE_TYPE_COUNT 8    /* First value beyond valid for checks */
     uint8_t type;               /* Page type */
 
     /* 1 byte hole expected. */
@@ -885,6 +905,9 @@ struct __wt_page {
     uint64_t cache_create_gen; /* Page create timestamp */
     uint64_t evict_pass_gen;   /* Eviction pass generation */
 
+    uint64_t old_rec_lsn_max; /* The LSN associated with the page's before the most recent
+                                 reconciliation */
+    uint64_t rec_lsn_max;     /* The LSN associated with the page's most recent reconciliation */
     WT_PAGE_BLOCK_META block_meta;
 
 #ifdef HAVE_DIAGNOSTIC
@@ -1392,6 +1415,19 @@ struct __wt_ref {
     WT_REF_HIST hist[WT_REF_SAVE_STATE_MAX];
     uint64_t histoff;
 #endif
+
+    /*
+     * A counter used to track how many times a ref has changed during internal page reconciliation.
+     * The value is compared and swapped to 0 for each internal page reconciliation. If the counter
+     * has a value greater than zero, this implies that the ref has been changed concurrently and
+     * that the ref remains dirty after internal page reconciliation. It is possible for other
+     * operations such as page splits and fast-truncate to concurrently write new values to the ref,
+     * but depending on timing or race conditions, it cannot be guaranteed that these new values are
+     * included as part of the reconciliation. The page would need to be reconciled again to ensure
+     * that these modifications are included.
+     */
+    wt_shared volatile uint16_t ref_changes;
+    char pad[6]; /* Padding */
 };
 
 #ifdef HAVE_REF_TRACK
@@ -1404,9 +1440,9 @@ struct __wt_ref {
  * WT_REF_SIZE is the expected structure size -- we verify the build to ensure the compiler hasn't
  * inserted padding which would break the world.
  */
-#define WT_REF_SIZE (48 + WT_REF_SAVE_STATE_MAX * sizeof(WT_REF_HIST) + 8)
+#define WT_REF_SIZE (56 + WT_REF_SAVE_STATE_MAX * sizeof(WT_REF_HIST) + 8)
 #else
-#define WT_REF_SIZE 48
+#define WT_REF_SIZE 56
 #define WT_REF_CLEAR_SIZE (sizeof(WT_REF))
 #endif
 
@@ -1575,16 +1611,18 @@ struct __wt_update {
 
 /* When introducing a new flag, consider adding it to WT_UPDATE_SELECT_FOR_DS. */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_UPDATE_DS 0x01u                       /* Update has been written to the data store. */
-#define WT_UPDATE_HS 0x02u                       /* Update has been written to history store. */
-#define WT_UPDATE_PREPARE_RESTORED_FROM_DS 0x04u /* Prepared update restored from data store. */
-#define WT_UPDATE_RESTORED_FAST_TRUNCATE 0x08u   /* Fast truncate instantiation */
-#define WT_UPDATE_RESTORED_FROM_DS 0x10u         /* Update restored from data store. */
-#define WT_UPDATE_RESTORED_FROM_HS 0x20u         /* Update restored from history store. */
-#define WT_UPDATE_RTS_DRYRUN_ABORT 0x40u         /* Used by dry run to mark a would-be abort. */
-#define WT_UPDATE_TO_DELETE_FROM_HS 0x80u        /* Update needs to be deleted from history store */
-                                                 /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
-    uint8_t flags;
+#define WT_UPDATE_DS 0x001u                       /* Update has been chosen to the data store. */
+#define WT_UPDATE_DURABLE 0x002u                  /* Update has been durable. */
+#define WT_UPDATE_HS 0x004u                       /* Update has been written to history store. */
+#define WT_UPDATE_PREPARE_RESTORED_FROM_DS 0x008u /* Prepared update restored from data store. */
+#define WT_UPDATE_RESTORED_FAST_TRUNCATE 0x010u   /* Fast truncate instantiation */
+#define WT_UPDATE_RESTORED_FROM_DELTA 0x020u      /* Update restored from delta. */
+#define WT_UPDATE_RESTORED_FROM_DS 0x040u         /* Update restored from data store. */
+#define WT_UPDATE_RESTORED_FROM_HS 0x080u         /* Update restored from history store. */
+#define WT_UPDATE_RTS_DRYRUN_ABORT 0x100u         /* Used by dry run to mark a would-be abort. */
+#define WT_UPDATE_TO_DELETE_FROM_HS 0x200u /* Update needs to be deleted from history store */
+                                           /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
+    uint16_t flags;
 
 /* There are several cases we should select the update irrespective of visibility to write to the
  * disk image:
@@ -1609,7 +1647,7 @@ struct __wt_update {
  */
 #define WT_UPDATE_SELECT_FOR_DS                                                      \
     WT_UPDATE_DS | WT_UPDATE_PREPARE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_DS | \
-      WT_UPDATE_RESTORED_FROM_HS | WT_UPDATE_TO_DELETE_FROM_HS
+      WT_UPDATE_RESTORED_FROM_HS | WT_UPDATE_RESTORED_FROM_DELTA | WT_UPDATE_TO_DELETE_FROM_HS
     /*
      * Zero or more bytes of value (the payload) immediately follows the WT_UPDATE structure. We use
      * a C99 flexible array member which has the semantics we want.
@@ -1621,7 +1659,7 @@ struct __wt_update {
  * WT_UPDATE_SIZE is the expected structure size excluding the payload data -- we verify the build
  * to ensure the compiler hasn't inserted padding.
  */
-#define WT_UPDATE_SIZE 63
+#define WT_UPDATE_SIZE 64
 
 /*
  * If there is no value, ensure that the memory allocation size matches that returned by sizeof().

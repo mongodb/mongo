@@ -295,6 +295,12 @@ protected:
      * kv_workload_runner_wt::do_operation --
      *     Execute the given workload operation in WiredTiger.
      */
+    int do_operation(const operation::get &op);
+
+    /*
+     * kv_workload_runner_wt::do_operation --
+     *     Execute the given workload operation in WiredTiger.
+     */
     int do_operation(const operation::insert &op);
 
     /*

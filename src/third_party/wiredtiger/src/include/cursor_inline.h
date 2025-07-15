@@ -566,3 +566,23 @@ slow: /*
     cbt->rip_saved = rip;
     return (0);
 }
+
+/*
+ * We need a tombstone to mark deleted records, and we use the special value below for that purpose.
+ * We use two 0x14 (Device Control 4) bytes to minimize the likelihood of colliding with an
+ * application-chosen encoding byte, if the application uses two leading DC4 byte for some reason,
+ * we'll do a wasted data copy each time a new value is inserted into the object. FIXME-WT-14806:
+ * this needs tests and a bit more documentation.
+ */
+static const WT_ITEM __wt_tombstone = {"\x14\x14", 2, NULL, 0, 0};
+
+/*
+ * __wt_clayered_deleted --
+ *     Check whether the current value is a tombstone.
+ */
+static WT_INLINE bool
+__wt_clayered_deleted(const WT_ITEM *item)
+{
+    return (item->size == __wt_tombstone.size &&
+      memcmp(item->data, __wt_tombstone.data, __wt_tombstone.size) == 0);
+}

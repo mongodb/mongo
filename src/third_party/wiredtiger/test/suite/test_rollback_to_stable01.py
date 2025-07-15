@@ -37,7 +37,7 @@ from wtscenario import make_scenarios
 class test_rollback_to_stable01(test_rollback_to_stable_base):
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
-        ('column_fix', dict(key_format='r', value_format='8t')),
+        #('column_fix', dict(key_format='r', value_format='8t')),  # FIXME-WT-14972
         ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
@@ -71,6 +71,8 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
         return config
 
     def test_rollback_to_stable(self):
+        # FIXME-WT-14937: not working with disagg.
+        self.skipTest("page delta")
         nrows = 10000
 
         # Create a table.

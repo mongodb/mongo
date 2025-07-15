@@ -150,14 +150,15 @@ struct __wt_config_parser_impl {
 #define WT_CONFIG_ENTRY_file_config 42
 #define WT_CONFIG_ENTRY_file_meta 43
 #define WT_CONFIG_ENTRY_index_meta 44
-#define WT_CONFIG_ENTRY_object_meta 45
-#define WT_CONFIG_ENTRY_table_meta 46
-#define WT_CONFIG_ENTRY_tier_meta 47
-#define WT_CONFIG_ENTRY_tiered_meta 48
-#define WT_CONFIG_ENTRY_wiredtiger_open 49
-#define WT_CONFIG_ENTRY_wiredtiger_open_all 50
-#define WT_CONFIG_ENTRY_wiredtiger_open_basecfg 51
-#define WT_CONFIG_ENTRY_wiredtiger_open_usercfg 52
+#define WT_CONFIG_ENTRY_layered_meta 45
+#define WT_CONFIG_ENTRY_object_meta 46
+#define WT_CONFIG_ENTRY_table_meta 47
+#define WT_CONFIG_ENTRY_tier_meta 48
+#define WT_CONFIG_ENTRY_tiered_meta 49
+#define WT_CONFIG_ENTRY_wiredtiger_open 50
+#define WT_CONFIG_ENTRY_wiredtiger_open_all 51
+#define WT_CONFIG_ENTRY_wiredtiger_open_basecfg 52
+#define WT_CONFIG_ENTRY_wiredtiger_open_usercfg 53
 
 extern const char __WT_CONFIG_CHOICE_NULL[]; /* not set in configuration */
 extern const char __WT_CONFIG_CHOICE_DRAM[];
@@ -192,8 +193,12 @@ extern const char __WT_CONFIG_CHOICE_compact[];
 extern const char __WT_CONFIG_CHOICE_compact_progress[];
 extern const char __WT_CONFIG_CHOICE_compact_slow[];
 extern const char __WT_CONFIG_CHOICE_configuration[];
+extern const char __WT_CONFIG_CHOICE_conn_close_stress_log_printf[];
 extern const char __WT_CONFIG_CHOICE_cursor_check[];
 extern const char __WT_CONFIG_CHOICE_data[];
+extern const char __WT_CONFIG_CHOICE_default[];
+extern const char __WT_CONFIG_CHOICE_disagg[];
+extern const char __WT_CONFIG_CHOICE_disaggregated_storage[];
 extern const char __WT_CONFIG_CHOICE_disk_validate[];
 extern const char __WT_CONFIG_CHOICE_dsync[];
 extern const char __WT_CONFIG_CHOICE_error[];
@@ -208,6 +213,7 @@ extern const char __WT_CONFIG_CHOICE_fast[];
 extern const char __WT_CONFIG_CHOICE_fileops[];
 extern const char __WT_CONFIG_CHOICE_first[];
 extern const char __WT_CONFIG_CHOICE_first_commit[];
+extern const char __WT_CONFIG_CHOICE_follower[];
 extern const char __WT_CONFIG_CHOICE_force[];
 extern const char __WT_CONFIG_CHOICE_fsync[];
 extern const char __WT_CONFIG_CHOICE_generation[];
@@ -224,6 +230,8 @@ extern const char __WT_CONFIG_CHOICE_json[];
 extern const char __WT_CONFIG_CHOICE_key_consistent[];
 extern const char __WT_CONFIG_CHOICE_key_out_of_order[];
 extern const char __WT_CONFIG_CHOICE_last_checkpoint[];
+extern const char __WT_CONFIG_CHOICE_layered[];
+extern const char __WT_CONFIG_CHOICE_leader[];
 extern const char __WT_CONFIG_CHOICE_live_restore[];
 extern const char __WT_CONFIG_CHOICE_live_restore_clean_up[];
 extern const char __WT_CONFIG_CHOICE_live_restore_progress[];
@@ -245,6 +253,7 @@ extern const char __WT_CONFIG_CHOICE_open_index_slow[];
 extern const char __WT_CONFIG_CHOICE_ordered[];
 extern const char __WT_CONFIG_CHOICE_out_of_order[];
 extern const char __WT_CONFIG_CHOICE_overflow[];
+extern const char __WT_CONFIG_CHOICE_page_delta[];
 extern const char __WT_CONFIG_CHOICE_pinned[];
 extern const char __WT_CONFIG_CHOICE_prefetch[];
 extern const char __WT_CONFIG_CHOICE_prefetch_1[];

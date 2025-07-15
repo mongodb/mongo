@@ -275,6 +275,7 @@ update_spec(model::kv_workload_generator_spec &spec, std::string &conn_config,
         UPDATE_SPEC(use_set_commit_timestamp, float);
 
         UPDATE_SPEC(finish_transaction, float);
+        UPDATE_SPEC(get, float);
         UPDATE_SPEC(insert, float);
         UPDATE_SPEC(remove, float);
         UPDATE_SPEC(set_commit_timestamp, float);

@@ -176,6 +176,12 @@ struct __wti_reconcile {
     /* Track the pinned timestamp at the time reconciliation started. */
     wt_timestamp_t rec_start_pinned_ts;
 
+    /* Track the pinned stable timestamp at the time reconciliation started. */
+    wt_timestamp_t rec_start_pinned_stable_ts;
+
+    /* Track the prune timestamp at the time reconciliation started. */
+    wt_timestamp_t rec_prune_timestamp;
+
     /* Track the page's maximum transaction/timestamp. */
     uint64_t max_txn;
     wt_timestamp_t max_ts;
@@ -254,6 +260,8 @@ struct __wti_reconcile {
      */
     WTI_REC_CHUNK chunk_A, chunk_B, *cur_ptr, *prev_ptr;
 
+    WT_ITEM delta;
+
     size_t disk_img_buf_size; /* Base size needed for a chunk memory image */
 
     /*
@@ -330,6 +338,7 @@ struct __wti_reconcile {
      * write.
      */
     WT_ITEM *wrapup_checkpoint;
+    WT_PAGE_BLOCK_META wrapup_checkpoint_block_meta;
     bool wrapup_checkpoint_compressed;
 
     /*
@@ -434,6 +443,29 @@ typedef struct {
 #define WTI_COL_FIX_ENTRIES_TO_BYTES(btree, entries) \
     ((uint32_t)WT_ALIGN((entries) * (btree)->bitcnt, 8))
 
+#define WT_REC_RESULT_SINGLE_PAGE(session, r)                                    \
+    (((r)->ref->page->modify->rec_result == 0 && (r)->ref->page->dsk != NULL) || \
+      (r)->ref->page->modify->rec_result == WT_PM_REC_REPLACE ||                 \
+      ((r)->ref->page->modify->rec_result == WT_PM_REC_MULTIBLOCK &&             \
+        (r)->ref->page->modify->mod_multi_entries == 1))
+
+/* Called when writing the leaf disk image. */
+#define WT_BUILD_DELTA_LEAF(session, r)                                           \
+    F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) &&                             \
+      F_ISSET(&S2C(session)->disaggregated_storage, WT_DISAGG_LEAF_PAGE_DELTA) && \
+      (r)->multi_next == 1 && !r->ovfl_items && WT_REC_RESULT_SINGLE_PAGE((session), (r))
+
+/*
+ * Called when building the internal page image to indicate should we start to build a delta for the
+ * page. We are still building so multi_next should still be 0 instead of 1.
+ */
+#define WT_BUILD_DELTA_INT(session, r)                                                   \
+    F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) &&                                    \
+      F_ISSET(&S2C(session)->disaggregated_storage, WT_DISAGG_INTERNAL_PAGE_DELTA) &&    \
+      !__wt_ref_is_root(r->ref) && (r)->multi_next == 0 &&                               \
+      !F_ISSET_ATOMIC_16(r->ref->page, WT_PAGE_REC_FAIL | WT_PAGE_INTL_PINDEX_UPDATE) && \
+      WT_REC_RESULT_SINGLE_PAGE((session), (r))
+
 /* DO NOT EDIT: automatically built by prototypes.py: BEGIN */
 
 extern int __wti_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page, const uint8_t *addr,
@@ -446,10 +478,12 @@ extern int __wti_ovfl_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_ovfl_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wti_rec_build_delta_init(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_rec_cell_build_ovfl(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_KV *kv,
   uint8_t type, WT_TIME_WINDOW *tw, uint64_t rle) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_rec_child_modify(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *ref,
-  WTI_CHILD_MODIFY_STATE *cmsp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  WTI_CHILD_MODIFY_STATE *cmsp, bool *build_delta) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_rec_col_fix(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref,
   WT_SALVAGE_COOKIE *salvage) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_rec_col_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref)
@@ -469,6 +503,8 @@ extern int __wti_rec_hs_delete_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI *multi)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wti_rec_pack_delta_internal(WT_SESSION_IMPL *session, WTI_RECONCILE *r,
+  WTI_REC_KV *key, WTI_REC_KV *value) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_rec_row_leaf(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref,
@@ -507,6 +543,7 @@ static WT_INLINE void __wti_rec_image_copy(
   WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_KV *kv);
 static WT_INLINE void __wti_rec_incr(
   WT_SESSION_IMPL *session, WTI_RECONCILE *r, uint32_t v, size_t size);
+static WT_INLINE void __wti_rec_kv_copy(WT_SESSION_IMPL *session, uint8_t *p, WTI_REC_KV *kv);
 static WT_INLINE void __wti_rec_time_window_clear_obsolete(WT_SESSION_IMPL *session,
   WTI_UPDATE_SELECT *upd_select, WT_CELL_UNPACK_KV *vpack, WTI_RECONCILE *r);
 

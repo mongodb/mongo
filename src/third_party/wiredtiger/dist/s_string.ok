@@ -88,6 +88,7 @@ Crummey
 CustomersPhone
 Cygwin
 DBI
+DEK
 DESC
 DEST
 DHANDLE
@@ -291,6 +292,7 @@ PALI
 PDEATHSIG
 PFX
 PID
+PINDEX
 POS
 POSIX
 PPC
@@ -611,6 +613,7 @@ ckpt
 ckptfrag
 ckptlist
 cksum
+clayered
 cloexec
 closedir
 cmd
@@ -691,6 +694,7 @@ ddd
 decile
 deciles
 decl
+decompressor
 decr
 decrementing
 decrypt
@@ -700,10 +704,12 @@ decryptor
 decrypts
 deflateEnd
 deflateInit
+dek
 del
 dequeued
 der
 dereference
+dereferencing
 desc
 designator
 dest
@@ -825,6 +831,7 @@ fuzzutil
 fvisibility
 fwrite
 gb
+gc
 gcc
 gcp
 gdb
@@ -897,6 +904,7 @@ initsize
 initval
 inlined
 inlining
+inlock
 inmem
 inmemory
 inserters

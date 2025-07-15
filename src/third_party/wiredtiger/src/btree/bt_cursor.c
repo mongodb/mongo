@@ -267,7 +267,15 @@ __cursor_valid_insert(WT_CURSOR_BTREE *cbt, WT_ITEM *key, bool *valid, bool chec
             return (0);
     }
 
-    WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd));
+    if (CUR2BT(cbt)->type == BTREE_ROW) {
+        WT_ITEM tmp_key;
+        tmp_key.data = WT_INSERT_KEY(cbt->ins);
+        tmp_key.size = WT_INSERT_KEY_SIZE(cbt->ins);
+        WT_RET(__wt_txn_read_upd_list(session, cbt, &tmp_key, WT_RECNO_OOB, cbt->ins->upd));
+    } else
+        WT_RET(
+          __wt_txn_read_upd_list(session, cbt, NULL, WT_INSERT_RECNO(cbt->ins), cbt->ins->upd));
+
     *valid =
       cbt->upd_value->type != WT_UPDATE_INVALID && cbt->upd_value->type != WT_UPDATE_TOMBSTONE;
     return (0);

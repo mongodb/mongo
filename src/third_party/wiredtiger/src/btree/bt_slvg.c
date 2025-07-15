@@ -75,8 +75,8 @@ struct __wt_track_shared {
  * split the leaf page chunks up, one chunk for each unique key range.
  */
 struct __wt_track {
-#define trk_addr shared->addr.addr
-#define trk_addr_size shared->addr.size
+#define trk_addr shared->addr.block_cookie
+#define trk_addr_size shared->addr.block_cookie_size
 #define trk_gen shared->gen
 #define trk_ovfl_addr shared->ovfl_addr
 #define trk_ovfl_cnt shared->ovfl_cnt
@@ -767,9 +767,9 @@ __slvg_trk_leaf_ovfl(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_TRA
     ovfl_cnt = 0;
     WT_CELL_FOREACH_KV (session, dsk, unpack) {
         if (FLD_ISSET(unpack.flags, WT_CELL_UNPACK_OVERFLOW)) {
-            WT_RET(
-              __wt_memdup(session, unpack.data, unpack.size, &trk->trk_ovfl_addr[ovfl_cnt].addr));
-            trk->trk_ovfl_addr[ovfl_cnt].size = (uint8_t)unpack.size;
+            WT_RET(__wt_memdup(
+              session, unpack.data, unpack.size, &trk->trk_ovfl_addr[ovfl_cnt].block_cookie));
+            trk->trk_ovfl_addr[ovfl_cnt].block_cookie_size = (uint8_t)unpack.size;
 
             __wt_verbose(session, WT_VERB_SALVAGE, "%s overflow reference %s",
               __wt_addr_string(session, trk->trk_addr, trk->trk_addr_size, trk->ss->tmp1),
@@ -1211,7 +1211,7 @@ __slvg_col_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
     addr = NULL;
 
     /* Allocate a column-store root (internal) page and fill it in. */
-    WT_RET(__wt_page_alloc(session, WT_PAGE_COL_INT, leaf_cnt, true, &page));
+    WT_RET(__wt_page_alloc(session, WT_PAGE_COL_INT, leaf_cnt, true, &page, 0));
     WT_ERR(__slvg_modify_init(session, page));
 
     WT_INTL_INDEX_GET_SAFE(page, pindex);
@@ -1225,8 +1225,8 @@ __slvg_col_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
 
         WT_ERR(__wt_calloc_one(session, &addr));
         WT_TIME_AGGREGATE_COPY(&addr->ta, &trk->trk_ta);
-        WT_ERR(__wt_memdup(session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
-        addr->size = trk->trk_addr_size;
+        WT_ERR(__wt_memdup(session, trk->trk_addr, trk->trk_addr_size, &addr->block_cookie));
+        addr->block_cookie_size = trk->trk_addr_size;
         addr->type = trk->trk_ovfl_cnt == 0 ? WT_ADDR_LEAF_NO : WT_ADDR_LEAF;
         ref->addr = addr;
         addr = NULL;
@@ -1817,7 +1817,7 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
     addr = NULL;
 
     /* Allocate a row-store root (internal) page and fill it in. */
-    WT_RET(__wt_page_alloc(session, WT_PAGE_ROW_INT, leaf_cnt, true, &page));
+    WT_RET(__wt_page_alloc(session, WT_PAGE_ROW_INT, leaf_cnt, true, &page, 0));
     WT_ERR(__slvg_modify_init(session, page));
 
     WT_INTL_INDEX_GET_SAFE(page, pindex);
@@ -1831,8 +1831,8 @@ __slvg_row_build_internal(WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF 
 
         WT_ERR(__wt_calloc_one(session, &addr));
         WT_TIME_AGGREGATE_COPY(&addr->ta, &trk->trk_ta);
-        WT_ERR(__wt_memdup(session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
-        addr->size = trk->trk_addr_size;
+        WT_ERR(__wt_memdup(session, trk->trk_addr, trk->trk_addr_size, &addr->block_cookie));
+        addr->block_cookie_size = trk->trk_addr_size;
         addr->type = trk->trk_ovfl_cnt == 0 ? WT_ADDR_LEAF_NO : WT_ADDR_LEAF;
         ref->addr = addr;
         addr = NULL;
@@ -2154,10 +2154,10 @@ __slvg_ovfl_compare(const void *a, const void *b)
     addr = (WT_ADDR *)a;
     trk = *(WT_TRACK **)b;
 
-    len = WT_MIN(trk->trk_addr_size, addr->size);
-    ret = memcmp(addr->addr, trk->trk_addr, len);
-    if (ret == 0 && addr->size != trk->trk_addr_size)
-        ret = addr->size < trk->trk_addr_size ? -1 : 1;
+    len = WT_MIN(trk->trk_addr_size, addr->block_cookie_size);
+    ret = memcmp(addr->block_cookie, trk->trk_addr, len);
+    if (ret == 0 && addr->block_cookie_size != trk->trk_addr_size)
+        ret = addr->block_cookie_size < trk->trk_addr_size ? -1 : 1;
     return (ret);
 }
 
@@ -2221,7 +2221,7 @@ __slvg_ovfl_reconcile(WT_SESSION_IMPL *session, WT_STUFF *ss)
 
             __wt_verbose(session, WT_VERB_SALVAGE, "%s references unavailable overflow page %s",
               __wt_addr_string(session, trk->trk_addr, trk->trk_addr_size, ss->tmp1),
-              __wt_addr_string(session, addr->addr, addr->size, ss->tmp2));
+              __wt_addr_string(session, addr->block_cookie, addr->block_cookie_size, ss->tmp2));
 
             /*
              * Clear the "referenced" flag for any overflow pages already claimed by this leaf page
@@ -2455,7 +2455,7 @@ __slvg_trk_free_addr(WT_SESSION_IMPL *session, WT_TRACK *trk)
 
     if (trk->trk_ovfl_addr != NULL) {
         for (i = 0; i < trk->trk_ovfl_cnt; ++i)
-            __wt_free(session, trk->trk_ovfl_addr[i].addr);
+            __wt_free(session, trk->trk_ovfl_addr[i].block_cookie);
         __wt_free(session, trk->trk_ovfl_addr);
     }
 }

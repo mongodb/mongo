@@ -53,6 +53,7 @@ kv_workload_generator_spec::kv_workload_generator_spec()
     column_var = 0.1;
 
     finish_transaction = 0.08;
+    get = 0.5;
     insert = 0.75;
     remove = 0.15;
     set_commit_timestamp = 0.05;
@@ -67,6 +68,7 @@ kv_workload_generator_spec::kv_workload_generator_spec()
     set_oldest_timestamp = 0.1;
     set_stable_timestamp = 0.2;
 
+    get_existing = 0.9;
     remove_existing = 0.9;
     update_existing = 0.1;
 
@@ -421,7 +423,7 @@ kv_workload_generator::generate_transaction(size_t seq_no)
     /* Add all operations. But do not actually fill in timestamps; we'll do that later. */
     bool done = false;
     while (!done) {
-        float total = _spec.finish_transaction + _spec.insert + _spec.remove +
+        float total = _spec.finish_transaction + _spec.get + _spec.insert + _spec.remove +
           _spec.set_commit_timestamp + _spec.truncate;
         probability_switch(_random.next_float() * total)
         {
@@ -448,6 +450,21 @@ kv_workload_generator::generate_transaction(size_t seq_no)
                 } else
                     txn << operation::commit_transaction(txn_id);
                 done = true;
+            }
+            probability_case(_spec.get)
+            {
+                table_context_ptr table = choose_table(txn_ptr);
+                /*
+                 * FIXME-WT-14903 Under FLCS, get operations expose some relatively complex effects.
+                 * For instance, eviction changes implicit records to explicit. To re-enable this,
+                 * check that all FLCS interactions are accounted for.
+                 */
+                if (table->type() == kv_table_type::column_fix)
+                    break;
+
+                data_value key = generate_key(table, op_category::get);
+                /* A get operation shouldn't affect context. */
+                txn << operation::get(table->id(), txn_id, key);
             }
             probability_case(_spec.insert)
             {
@@ -753,6 +770,10 @@ kv_workload_generator::generate_key(table_context_ptr table, op_category op)
 
     case op_category::evict:
         p_existing = 1.0;
+        break;
+
+    case op_category::get:
+        p_existing = _spec.get_existing;
         break;
 
     case op_category::remove:
