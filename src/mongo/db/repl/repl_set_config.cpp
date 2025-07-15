@@ -422,7 +422,10 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
                               "servers cannot have a non-zero secondaryDelaySecs");
             }
         }
-        if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
+        // If we are running with replicaSetConfigShardMaintenanceMode then it's safe to restart a
+        // former configserver as a replicaset as we are about to reconfigure.
+        if (!serverGlobalParams.replicaSetConfigShardMaintenanceMode &&
+            !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
             !skipShardingConfigurationChecks) {
             return Status(ErrorCodes::BadValue,
                           "Nodes being used for config servers must be started with the "
@@ -436,6 +439,7 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
         }
     } else if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         // TODO: SERVER-82024 Remove this when master is 8.1.
+        // Remove only the gFeatureFlagAllMongodsAreSharded
         //
         // Skip this check to allow upgrading a 7.0 non auto-bootstrapped replica set node to a 8.0
         // node with auto-bootstrapping enabled despite not having `configsvr:true` in the
@@ -446,7 +450,11 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
         // that all nodes in the replica set eventually have the same cluster role, the server
         // fasserts (on startup or replication) if the shard identity document matches the server's
         // cluster role. For why this is correct and for more context see: SERVER-80249
-        if (!gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
+        //
+        // If we are running with replicaSetConfigShardMaintenanceMode then it's safe to restart a
+        // former replicaset as a configserver as we are about to reconfigure.
+        if (!serverGlobalParams.replicaSetConfigShardMaintenanceMode &&
+            !gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
                 // This code will be removed since master is 8.1 already (see SERVER-82024).
                 // Ignore the versionContext for simplicity.
                 kVersionContextIgnored_UNSAFE,

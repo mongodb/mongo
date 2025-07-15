@@ -195,7 +195,10 @@ Status validateOldAndNewConfigsCompatible(const VersionContext& vCtx,
                                     << newConfig.getReplicaSetId());
     }
 
+    // If we are running with replicaSetConfigShardMaintenanceMode then it's safe to skip this check
+    // as we are about to reconfigure the replicaset
     if (oldConfig.getConfigServer_deprecated() && !newConfig.getConfigServer_deprecated() &&
+        !serverGlobalParams.replicaSetConfigShardMaintenanceMode &&
         !gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
             vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,

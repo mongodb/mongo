@@ -2761,8 +2761,11 @@ MemberState TopologyCoordinator::getMemberState() const {
 
     if (_rsConfig.getConfigServer_deprecated() ||
         _options.clusterRole.has(ClusterRole::ConfigServer)) {
+        // If we are running with replicaSetConfigShardMaintenanceMode then it's not a removed node,
+        // rather under reconfiguration, so it's safe to consider it as part of the replicaset
         if (!_options.clusterRole.has(ClusterRole::ConfigServer) &&
-            !skipShardingConfigurationChecks) {
+            !skipShardingConfigurationChecks &&
+            !serverGlobalParams.replicaSetConfigShardMaintenanceMode) {
             return MemberState::RS_REMOVED;
         } else {
             invariant(_storageEngineSupportsReadCommitted != ReadCommittedSupport::kUnknown);
