@@ -273,7 +273,7 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
     }
 
     const auto& options = collection->getCollectionOptions();
-    const auto includeOptionsFields = [&]() -> auto& {
+    const auto& includeOptionsFields = [&]() -> auto& {
         if (showAsTimeseries) {
             return timeseries::kAllowedCollectionCreationOptions;
         } else {
