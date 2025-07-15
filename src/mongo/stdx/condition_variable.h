@@ -42,8 +42,7 @@ namespace mongo {
 
 namespace stdx {
 
-using cv_status = ::std::cv_status;      // NOLINT
-using ::std::notify_all_at_thread_exit;  // NOLINT
+using cv_status = ::std::cv_status;  // NOLINT
 
 /**
  * We wrap std::condition_variable_any to allow us to register Notifiables which can "wait" on the
