@@ -58,7 +58,6 @@ selector:
     # fail spuriously.
     - requires_profiling
     - uses_transactions
-    - wildcard_indexes_incompatible
 
 executor:
   archive:
