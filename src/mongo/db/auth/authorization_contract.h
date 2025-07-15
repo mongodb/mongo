@@ -73,6 +73,7 @@ public:
     AuthorizationContract(const AuthorizationContract& other) {
         _checks = other._checks;
         _privilegeChecks = other._privilegeChecks;
+        _isPermissionChecked.storeRelaxed(other._isPermissionChecked.loadRelaxed());
     }
 
     /**
@@ -81,7 +82,7 @@ public:
     void clear();
 
     /**
-     * Add a access check to the contract.
+     * Add an access check to the contract.
      */
     void addAccessCheck(AccessCheckEnum check);
 
@@ -105,6 +106,13 @@ public:
      */
     bool contains(const AuthorizationContract& other) const;
 
+    /**
+     * Return true if PermissionCheckStatus is Checked
+     */
+    bool isPermissionChecked() const {
+        return _isPermissionChecked.loadRelaxed();
+    }
+
 private:
     mutable stdx::mutex _mutex;
 
@@ -113,6 +121,9 @@ private:
 
     // Set of privileges performed per resource pattern type
     std::array<ActionSet, idlEnumCount<MatchTypeEnum>> _privilegeChecks;
+
+    // Current status of permission check, updated on added access check, added privilege, or clear
+    Atomic<bool> _isPermissionChecked{false};
 
     // If false accounting and mutex guards are disabled
     bool _isTestModeEnabled{true};

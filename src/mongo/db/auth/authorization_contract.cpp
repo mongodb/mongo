@@ -55,6 +55,8 @@ void AuthorizationContract::clear() {
     for (size_t i = 0; i < _privilegeChecks.size(); ++i) {
         _privilegeChecks[i].removeAllActions();
     }
+
+    _isPermissionChecked.storeRelaxed(false);
 }
 
 void AuthorizationContract::addAccessCheck(AccessCheckEnum check) {
@@ -65,6 +67,8 @@ void AuthorizationContract::addAccessCheck(AccessCheckEnum check) {
     stdx::lock_guard<stdx::mutex> lck(_mutex);
 
     _checks.set(static_cast<size_t>(check), true);
+
+    _isPermissionChecked.storeRelaxed(true);
 }
 
 bool AuthorizationContract::hasAccessCheck(AccessCheckEnum check) const {
@@ -83,6 +87,8 @@ void AuthorizationContract::addPrivilege(const Privilege& p) {
     auto matchType = p.getResourcePattern().matchType();
 
     _privilegeChecks[static_cast<size_t>(matchType)].addAllActionsFromSet(p.getActions());
+
+    _isPermissionChecked.storeRelaxed(true);
 }
 
 bool AuthorizationContract::hasPrivileges(const Privilege& p) const {
