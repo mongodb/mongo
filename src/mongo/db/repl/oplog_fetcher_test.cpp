@@ -2742,12 +2742,12 @@ DEATH_TEST_REGEX_F(OplogFetcherTest,
     validateLastBatch(true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched());
 
     // Process second batch that throws BSONObjectTooLarge.
-    // Simulate a BSONObjectTooLarge error response to the OplogFetcher.
+    // Simulate a BSONObjectTooLarge error response to the OplogFetcher. This should cause the oplog
+    // fetcher to throw an exception.
     const Status tooLargeError = BSONObj().validateBSONObjSize(BSONObj::kMinBSONLength - 1);
     processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(), tooLargeError);
 
-    // Can't be reached.
-    ASSERT_FALSE(true);
+    oplogFetcher->join();
 }
 
 }  // namespace
