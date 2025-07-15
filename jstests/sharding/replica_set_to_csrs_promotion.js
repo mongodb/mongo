@@ -28,6 +28,23 @@ describe("replicaSetConfigShardMaintenanceMode startup flag incompatibility test
         assert.eq(error.name, "StopError");
         assert.eq(error.returnCode, 1);
     });
+
+    it("incompatible with fcv changes", () => {
+        const rs = new ReplSetTest({nodes: 1});
+        rs.startSet({
+            replSet: "replica_set_to_csrs_promotion",
+            replicaSetConfigShardMaintenanceMode: "",
+        });
+        rs.initiate();
+
+        assert.commandFailedWithCode(rs.getPrimary().adminCommand({
+            setFeatureCompatibilityVersion: lastLTSFCV,
+            confirm: true,
+        }),
+                                     ErrorCodes.IllegalOperation);
+
+        rs.stopSet();
+    });
 });
 
 describe("replicaSetConfigShardMaintenanceMode startup flag compatibility tests", function() {

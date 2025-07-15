@@ -453,6 +453,10 @@ public:
              BSONObjBuilder& result) override {
         hangAtSetFCVStart.pauseWhileSet(opCtx);
 
+        uassert(ErrorCodes::IllegalOperation,
+                "Changing FCV is prohibited with --replicaSetConfigShardMaintenanceMode",
+                !serverGlobalParams.replicaSetConfigShardMaintenanceMode);
+
         // Ensure that this operation will be killed by the RstlKillOpThread during step-up or
         // stepdown.
         opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
