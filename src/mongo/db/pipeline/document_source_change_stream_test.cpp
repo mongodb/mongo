@@ -27,41 +27,23 @@
  *    it in the license file.
  */
 
-#include <array>
-#include <cstdint>
-#include <cstring>
+#include "mongo/db/pipeline/document_source_change_stream.h"
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
-#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/index/index_constants.h"
-#include "mongo/db/matcher/matcher.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/change_stream_read_mode.h"
-#include "mongo/db/pipeline/change_stream_test_helpers.h"
+#include "mongo/db/pipeline/change_stream_stage_test_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
@@ -69,41 +51,43 @@
 #include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
-#include "mongo/db/pipeline/document_source_change_stream_handle_topology_change_v2.h"
 #include "mongo/db/pipeline/document_source_change_stream_inject_control_events.h"
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
 #include "mongo/db/pipeline/document_source_change_stream_split_large_event.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
-#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
-#include <algorithm>
+#include <array>
 #include <deque>
 #include <initializer_list>
 #include <iterator>
 #include <memory>
 #include <set>
 #include <vector>
+
+// #include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {
@@ -112,8 +96,6 @@ using namespace change_stream_test_helper;
 using boost::intrusive_ptr;
 using repl::OplogEntry;
 using repl::OpTypeEnum;
-using std::string;
-using std::vector;
 
 using D = Document;
 using V = Value;
@@ -130,341 +112,6 @@ void assertCommitTimestamp(bool expandedEvents, const Document& doc) {
         ASSERT_TRUE(doc[DSChangeStream::kCommitTimestampField].missing());
     }
 }
-
-class ExecutableStubMongoProcessInterface : public StubMongoProcessInterface {
-    bool isExpectedToExecuteQueries() override {
-        return true;
-    }
-};
-
-class ChangeStreamStageTestNoSetup : public AggregationContextFixture {
-public:
-    ChangeStreamStageTestNoSetup() : ChangeStreamStageTestNoSetup(nss) {}
-    explicit ChangeStreamStageTestNoSetup(NamespaceString nsString)
-        : AggregationContextFixture(std::move(nsString)) {
-        getExpCtx()->setMongoProcessInterface(
-            std::make_unique<ExecutableStubMongoProcessInterface>());
-    };
-};
-
-struct MockMongoInterface final : public ExecutableStubMongoProcessInterface {
-    // Used by operations which need to obtain the oplog's UUID.
-    static const UUID& oplogUuid() {
-        static const UUID* oplog_uuid = new UUID(UUID::gen());
-        return *oplog_uuid;
-    }
-
-    // This mock iterator simulates a traversal of transaction history in the oplog by returning
-    // mock oplog entries from a list.
-    struct MockTransactionHistoryIterator : public TransactionHistoryIteratorBase {
-        bool hasNext() const final {
-            return (mockEntriesIt != mockEntries.end());
-        }
-
-        repl::OplogEntry next(OperationContext* opCtx) final {
-            ASSERT(hasNext());
-            return *(mockEntriesIt++);
-        }
-
-        repl::OpTime nextOpTime(OperationContext* opCtx) final {
-            ASSERT(hasNext());
-            return (mockEntriesIt++)->getOpTime();
-        }
-
-        std::vector<repl::OplogEntry> mockEntries;
-        std::vector<repl::OplogEntry>::const_iterator mockEntriesIt;
-    };
-
-    MockMongoInterface(std::vector<repl::OplogEntry> transactionEntries = {},
-                       std::vector<Document> documentsForLookup = {})
-        : _transactionEntries(std::move(transactionEntries)),
-          _documentsForLookup{std::move(documentsForLookup)} {}
-
-    // For tests of transactions that involve multiple oplog entries.
-    std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
-        repl::OpTime time) const override {
-        auto iterator = std::make_unique<MockTransactionHistoryIterator>();
-
-        // Simulate a lookup on the oplog timestamp by manually advancing the iterator until we
-        // reach the desired timestamp.
-        iterator->mockEntries = _transactionEntries;
-        ASSERT(iterator->mockEntries.size() > 0);
-        for (iterator->mockEntriesIt = iterator->mockEntries.begin();
-             iterator->mockEntriesIt->getOpTime() != time;
-             ++iterator->mockEntriesIt) {
-            ASSERT(iterator->mockEntriesIt != iterator->mockEntries.end());
-        }
-
-        return iterator;
-    }
-
-    // Called by DocumentSourceAddPreImage to obtain the UUID of the oplog. Since that's the only
-    // piece of collection info we need for now, just return a BSONObj with the mock oplog UUID.
-    BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) override {
-        return BSON("uuid" << oplogUuid());
-    }
-
-    boost::optional<Document> lookupSingleDocument(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const NamespaceString& nss,
-        boost::optional<UUID> collectionUUID,
-        const Document& documentKey,
-        boost::optional<BSONObj> readConcern) final {
-        Matcher matcher(documentKey.toBson(), expCtx);
-        auto it =
-            std::find_if(_documentsForLookup.begin(),
-                         _documentsForLookup.end(),
-                         [&](const Document& lookedUpDoc) {
-                             return exec::matcher::matches(&matcher, lookedUpDoc.toBson(), nullptr);
-                         });
-        return (it != _documentsForLookup.end() ? *it : boost::optional<Document>{});
-    }
-
-    // Stores oplog entries associated with a commit operation, including the oplog entries that a
-    // real DocumentSourceChangeStream would not see, because they are marked with a "prepare" or
-    // "partialTxn" flag. When the DocumentSourceChangeStream sees the commit for the transaction,
-    // either an explicit "commitCommand" or an implicit commit represented by an "applyOps" that is
-    // not marked with the "prepare" or "partialTxn" flag, it uses a TransactionHistoryIterator to
-    // go back and look up these entries.
-    //
-    // These entries are stored in the order they would be returned by the
-    // TransactionHistoryIterator, which is the _reverse_ of the order they appear in the oplog.
-    std::vector<repl::OplogEntry> _transactionEntries;
-
-    // These documents are used to feed the 'lookupSingleDocument' method.
-    std::vector<Document> _documentsForLookup;
-};
-
-class ChangeStreamStageTest : public ChangeStreamStageTestNoSetup {
-public:
-    ChangeStreamStageTest() : ChangeStreamStageTest(nss) {
-        // Initialize the UUID on the ExpressionContext, to allow tests with a resumeToken.
-        getExpCtx()->setUUID(testUuid());
-    }
-
-    explicit ChangeStreamStageTest(NamespaceString nsString)
-        : ChangeStreamStageTestNoSetup(nsString) {
-        repl::ReplicationCoordinator::set(
-            getExpCtx()->getOperationContext()->getServiceContext(),
-            std::make_unique<repl::ReplicationCoordinatorMock>(
-                getExpCtx()->getOperationContext()->getServiceContext()));
-    }
-
-    void checkTransformation(const OplogEntry& entry,
-                             const boost::optional<Document> expectedDoc,
-                             const BSONObj& spec = kDefaultSpec,
-                             const boost::optional<Document> expectedInvalidate = {},
-                             const std::vector<repl::OplogEntry> transactionEntries = {},
-                             std::vector<Document> documentsForLookup = {},
-                             const boost::optional<std::int32_t> expectedErrorCode = {}) {
-        auto execPipeline = makeExecPipeline(entry.getEntry().toBSON(), spec);
-        auto lastStage = execPipeline->getStages().back();
-
-        getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
-            transactionEntries, std::move(documentsForLookup)));
-
-        if (expectedErrorCode) {
-            ASSERT_THROWS_CODE(lastStage->getNext(),
-                               AssertionException,
-                               ErrorCodes::Error(expectedErrorCode.get()));
-            return;
-        }
-
-        auto next = lastStage->getNext();
-        // Match stage should pass the doc down if expectedDoc is given.
-        ASSERT_EQ(next.isAdvanced(), static_cast<bool>(expectedDoc));
-        if (expectedDoc) {
-            ASSERT_DOCUMENT_EQ(next.releaseDocument(), *expectedDoc);
-        }
-
-        if (expectedInvalidate) {
-            next = lastStage->getNext();
-            ASSERT_TRUE(next.isAdvanced());
-            ASSERT_DOCUMENT_EQ(next.releaseDocument(), *expectedInvalidate);
-
-            // Then throw an exception on the next call of getNext().
-            ASSERT_THROWS(lastStage->getNext(), ExceptionFor<ErrorCodes::ChangeStreamInvalidated>);
-        }
-    }
-
-    /**
-     * Returns a list of stages expanded from a $changStream specification, starting with a
-     * DocumentSourceMock which contains a single document representing 'entry'.
-     *
-     * Stages such as DSEnsureResumeTokenPresent which can swallow results are removed from the
-     * returned list.
-     */
-    std::unique_ptr<exec::agg::Pipeline> makeExecPipeline(BSONObj entry, const BSONObj& spec) {
-        return makeExecPipeline({entry}, spec, true /* removeEnsureResumeTokenStage */);
-    }
-
-    /**
-     * Returns a list of the stages expanded from a $changStream specification, starting with a
-     * DocumentSourceMock which contains a list of document representing 'entries'.
-     */
-    std::unique_ptr<exec::agg::Pipeline> makeExecPipeline(
-        std::vector<BSONObj> entries,
-        const BSONObj& spec,
-        bool removeEnsureResumeTokenStage = false) {
-        std::list<intrusive_ptr<DocumentSource>> result =
-            DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
-        getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
-
-        // This match stage is a DocumentSourceChangeStreamOplogMatch, which we explicitly disallow
-        // from executing as a safety mechanism, since it needs to use the collection-default
-        // collation, even if the rest of the pipeline is using some other collation. To avoid ever
-        // executing that stage here, we'll up-convert it from the non-executable
-        // DocumentSourceChangeStreamOplogMatch to a fully-executable DocumentSourceMatch. This is
-        // safe because all of the unit tests will use the 'simple' collation.
-        auto match = dynamic_cast<DocumentSourceMatch*>(result.front().get());
-        ASSERT(match);
-        auto executableMatch = DocumentSourceMatch::create(match->getQuery(), getExpCtx());
-        // Replace the original match with the executable one.
-        result.front() = executableMatch;
-
-        // Check the oplog entry is transformed correctly.
-        auto transform = std::next(result.begin(), 2)->get();
-        ASSERT(transform);
-        ASSERT(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform));
-
-        // Create mock stage and insert at the front of the stages.
-        auto mock = DocumentSourceMock::createForTest(entries, getExpCtx());
-        result.insert(result.begin(), mock);
-
-        if (removeEnsureResumeTokenStage) {
-            auto newEnd = std::remove_if(result.begin(), result.end(), [](auto& stage) {
-                return dynamic_cast<DocumentSourceChangeStreamEnsureResumeTokenPresent*>(
-                    stage.get());
-            });
-            result.erase(newEnd, result.end());
-        }
-
-        return exec::agg::buildPipeline(result, getExpCtx());
-    }
-
-    std::unique_ptr<exec::agg::Pipeline> makeExecPipeline(const OplogEntry& entry,
-                                                          const BSONObj& spec = kDefaultSpec) {
-        return makeExecPipeline(entry.getEntry().toBSON(), spec);
-    }
-
-    OplogEntry createCommand(const BSONObj& oField,
-                             const boost::optional<UUID> uuid = boost::none,
-                             const boost::optional<bool> fromMigrate = boost::none,
-                             boost::optional<repl::OpTime> opTime = boost::none) {
-        return makeOplogEntry(OpTypeEnum::kCommand,  // op type
-                              nss.getCommandNS(),    // namespace
-                              oField,                // o
-                              uuid,                  // uuid
-                              fromMigrate,           // fromMigrate
-                              boost::none,           // o2
-                              opTime);               // opTime
-    }
-
-
-    /**
-     * Helper for running an applyOps through the pipeline, and getting all of the results.
-     */
-    std::vector<Document> getApplyOpsResults(const Document& applyOpsDoc,
-                                             const LogicalSessionFromClient& lsid,
-                                             BSONObj spec = kDefaultSpec,
-                                             bool hasTxnNumber = true) {
-        BSONObj applyOpsObj = applyOpsDoc.toBson();
-
-        // Create an oplog entry and then glue on an lsid and optionally a txnNumber
-        auto baseOplogEntry = makeOplogEntry(OpTypeEnum::kCommand,
-                                             nss.getCommandNS(),
-                                             applyOpsObj,
-                                             testUuid(),
-                                             boost::none,  // fromMigrate
-                                             BSONObj());
-        BSONObjBuilder builder(baseOplogEntry.getEntry().toBSON());
-        builder.append("lsid", lsid.toBSON());
-        if (hasTxnNumber) {
-            builder.append("txnNumber", 0LL);
-        }
-        BSONObj oplogEntry = builder.done();
-
-        // Create the stages and check that the documents produced matched those in the applyOps.
-        auto execPipeline = makeExecPipeline(oplogEntry, spec);
-        auto transform = execPipeline->getStages()[3].get();
-        invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
-
-        std::vector<Document> res;
-        auto next = transform->getNext();
-        while (next.isAdvanced()) {
-            res.push_back(next.releaseDocument());
-            next = transform->getNext();
-        }
-        return res;
-    }
-
-    Document makeExpectedUpdateEvent(Timestamp ts,
-                                     const NamespaceString& nss,
-                                     BSONObj documentKey,
-                                     Document updateDescription) {
-        return Document{
-            {DSChangeStream::kIdField,
-             makeResumeToken(ts, testUuid(), V{documentKey}, DSChangeStream::kUpdateOpType)},
-            {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
-            {DSChangeStream::kClusterTimeField, ts},
-            {DSChangeStream::kCollectionUuidField, V{testUuid()}},
-            {DSChangeStream::kWallTimeField, Date_t()},
-            {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
-            {DSChangeStream::kDocumentKeyField, V{documentKey}},
-            {"updateDescription", updateDescription},
-        };
-    }
-
-    /**
-     * Helper function to do a $v:2 delta oplog test.
-     */
-    void runUpdateV2OplogTest(BSONObj diff, Document updateModificationEntry) {
-        BSONObj o2 = BSON("_id" << 1);
-        auto deltaOplog = makeOplogEntry(OpTypeEnum::kUpdate,                // op type
-                                         nss,                                // namespace
-                                         BSON("diff" << diff << "$v" << 2),  // o
-                                         testUuid(),                         // uuid
-                                         boost::none,                        // fromMigrate
-                                         o2);                                // o2
-
-        const auto expectedUpdateField =
-            makeExpectedUpdateEvent(kDefaultTs, nss, o2, updateModificationEntry);
-        checkTransformation(deltaOplog, expectedUpdateField);
-    }
-
-    /**
-     * Helper to create change stream pipeline for testing.
-     */
-    std::unique_ptr<Pipeline, PipelineDeleter> buildTestPipeline(
-        const std::vector<BSONObj>& rawPipeline) {
-        auto expCtx = getExpCtx();
-        expCtx->setNamespaceString(
-            NamespaceString::createNamespaceString_forTest(boost::none, "a.collection"));
-        expCtx->setInRouter(true);
-
-        auto pipeline = Pipeline::parse(rawPipeline, expCtx);
-        pipeline->optimizePipeline();
-
-        return pipeline;
-    }
-
-    /**
-     * Helper to verify if the change stream pipeline contains expected stages.
-     */
-    void assertStagesNameOrder(std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-                               const std::vector<std::string> expectedStages) {
-        ASSERT_EQ(pipeline->size(), expectedStages.size());
-
-        auto stagesItr = pipeline->getSources().cbegin();
-        auto expectedStagesItr = expectedStages.cbegin();
-
-        while (expectedStagesItr != expectedStages.end()) {
-            ASSERT_EQ(*expectedStagesItr, stagesItr->get()->getSourceName());
-            ++expectedStagesItr;
-            ++stagesItr;
-        }
-    }
-};
 
 TEST_F(ChangeStreamStageTest, ShouldRejectNonObjectArg) {
     auto expCtx = getExpCtx();
@@ -1052,13 +699,14 @@ TEST_F(ChangeStreamStageTest, TransformUpdateFields) {
                                       boost::none,          // fromMigrate
                                       o2);                  // o2
 
-    const auto expectedUpdateField = makeExpectedUpdateEvent(kDefaultTs,
-                                                             nss,
-                                                             o2,
-                                                             D{{"updatedFields", D{{"y", 1}}},
-                                                               {"removedFields", vector<V>()},
-                                                               {"truncatedArrays", vector<V>()},
-                                                               {"disambiguatedPaths", D{}}});
+    const auto expectedUpdateField =
+        makeExpectedUpdateEvent(kDefaultTs,
+                                nss,
+                                o2,
+                                D{{"updatedFields", D{{"y", 1}}},
+                                  {"removedFields", std::vector<V>()},
+                                  {"truncatedArrays", std::vector<V>()},
+                                  {"disambiguatedPaths", D{}}});
 
     checkTransformation(updateField, expectedUpdateField);
 }
@@ -1074,13 +722,14 @@ TEST_F(ChangeStreamStageTest, TransformUpdateFieldsShowExpandedEvents) {
                                       boost::none,          // fromMigrate
                                       o2);                  // o2
 
-    const auto expectedUpdateField = makeExpectedUpdateEvent(kDefaultTs,
-                                                             nss,
-                                                             o2,
-                                                             D{{"updatedFields", D{{"y", 1}}},
-                                                               {"removedFields", vector<V>()},
-                                                               {"truncatedArrays", vector<V>()},
-                                                               {"disambiguatedPaths", D{}}});
+    const auto expectedUpdateField =
+        makeExpectedUpdateEvent(kDefaultTs,
+                                nss,
+                                o2,
+                                D{{"updatedFields", D{{"y", 1}}},
+                                  {"removedFields", std::vector<V>()},
+                                  {"truncatedArrays", std::vector<V>()},
+                                  {"disambiguatedPaths", D{}}});
     checkTransformation(updateField, expectedUpdateField, kShowExpandedEventsSpec);
 }
 
@@ -1090,8 +739,8 @@ TEST_F(ChangeStreamStageTest, TransformSimpleDeltaOplogUpdatedFields) {
 
     runUpdateV2OplogTest(diff,
                          D{{"updatedFields", D{{"a", 1}, {"b", "updated"_sd}}},
-                           {"removedFields", vector<V>{}},
-                           {"truncatedArrays", vector<V>{}},
+                           {"removedFields", std::vector<V>{}},
+                           {"truncatedArrays", std::vector<V>{}},
                            {"disambiguatedPaths", D{}}});
 }
 
@@ -1101,8 +750,8 @@ TEST_F(ChangeStreamStageTest, TransformSimpleDeltaOplogInsertFields) {
 
     runUpdateV2OplogTest(diff,
                          D{{"updatedFields", D{{"a", 1}, {"b", "updated"_sd}}},
-                           {"removedFields", vector<V>{}},
-                           {"truncatedArrays", vector<V>{}},
+                           {"removedFields", std::vector<V>{}},
+                           {"truncatedArrays", std::vector<V>{}},
                            {"disambiguatedPaths", D{}}});
 }
 
@@ -1111,8 +760,8 @@ TEST_F(ChangeStreamStageTest, TransformSimpleDeltaOplogRemovedFields) {
 
     runUpdateV2OplogTest(diff,
                          D{{"updatedFields", D{}},
-                           {"removedFields", vector<V>{V("a"_sd), V("b"_sd)}},
-                           {"truncatedArrays", vector<V>{}},
+                           {"removedFields", std::vector<V>{V("a"_sd), V("b"_sd)}},
+                           {"truncatedArrays", std::vector<V>{}},
                            {"disambiguatedPaths", D{}}});
 }
 
@@ -1126,8 +775,8 @@ TEST_F(ChangeStreamStageTest, TransformComplexDeltaOplog) {
 
     runUpdateV2OplogTest(diff,
                          D{{"updatedFields", D{{"c", 1}, {"d", "updated"_sd}, {"e", 2}, {"f", 3}}},
-                           {"removedFields", vector<V>{V("a"_sd), V("b"_sd)}},
-                           {"truncatedArrays", vector<V>{}},
+                           {"removedFields", std::vector<V>{V("a"_sd), V("b"_sd)}},
+                           {"truncatedArrays", std::vector<V>{}},
                            {"disambiguatedPaths", D{}}});
 }
 
@@ -1145,8 +794,8 @@ TEST_F(ChangeStreamStageTest, TransformDeltaOplogSubObjectDiff) {
         diff,
         D{{"updatedFields",
            D{{"c", 1}, {"d", "updated"_sd}, {"subObj.c", 1}, {"subObj.d", "updated"_sd}}},
-          {"removedFields", vector<V>{V("subObj.a"_sd), V("subObj.b"_sd)}},
-          {"truncatedArrays", vector<V>{}},
+          {"removedFields", std::vector<V>{V("subObj.a"_sd), V("subObj.b"_sd)}},
+          {"truncatedArrays", std::vector<V>{}},
           {"disambiguatedPaths", D{}}});
 }
 
@@ -1161,10 +810,10 @@ TEST_F(ChangeStreamStageTest, TransformDeltaOplogSubArrayDiff) {
 
     runUpdateV2OplogTest(diff,
                          D{{"updatedFields", D{{"arrField.0", 1}, {"arrField.1", D{{"a", 1}}}}},
-                           {"removedFields", vector<V>{}},
+                           {"removedFields", std::vector<V>{}},
                            {"truncatedArrays",
-                            vector<V>{V{D{{"field", "arrField"_sd}, {"newSize", 10}}},
-                                      V{D{{"field", "arrField2"_sd}, {"newSize", 20}}}}},
+                            std::vector<V>{V{D{{"field", "arrField"_sd}, {"newSize", 10}}},
+                                           V{D{{"field", "arrField2"_sd}, {"newSize", 20}}}}},
                            {"disambiguatedPaths", D{}}});
 }
 
@@ -1176,11 +825,12 @@ TEST_F(ChangeStreamStageTest, TransformDeltaOplogSubArrayDiffWithEmptyStringFiel
         "           u1: {a: 1}}"
         "}");
 
-    runUpdateV2OplogTest(diff,
-                         D{{"updatedFields", D{{".0", 1}, {".1", D{{"a", 1}}}}},
-                           {"removedFields", vector<V>{}},
-                           {"truncatedArrays", vector<V>{V{D{{"field", ""_sd}, {"newSize", 10}}}}},
-                           {"disambiguatedPaths", D{}}});
+    runUpdateV2OplogTest(
+        diff,
+        D{{"updatedFields", D{{".0", 1}, {".1", D{{"a", 1}}}}},
+          {"removedFields", std::vector<V>{}},
+          {"truncatedArrays", std::vector<V>{V{D{{"field", ""_sd}, {"newSize", 10}}}}},
+          {"disambiguatedPaths", D{}}});
 }
 
 TEST_F(ChangeStreamStageTest, TransformDeltaOplogNestedComplexSubDiffs) {
@@ -1211,8 +861,8 @@ TEST_F(ChangeStreamStageTest, TransformDeltaOplogNestedComplexSubDiffs) {
                {"arrField.6", 2},
                {"subObj.a", 1},
            }},
-          {"removedFields", vector<V>{V("subObj.b"_sd)}},
-          {"truncatedArrays", vector<V>{V{D{{"field", "arrField"_sd}, {"newSize", 10}}}}},
+          {"removedFields", std::vector<V>{V("subObj.b"_sd)}},
+          {"truncatedArrays", std::vector<V>{V{D{{"field", "arrField"_sd}, {"newSize", 10}}}}},
           {"disambiguatedPaths", D{}}});
 }
 
@@ -1229,13 +879,14 @@ TEST_F(ChangeStreamStageTest, TransformUpdateFieldsLegacyNoId) {
                                       boost::none,          // fromMigrate
                                       o2);                  // o2
 
-    const auto expectedUpdateField = makeExpectedUpdateEvent(kDefaultTs,
-                                                             nss,
-                                                             o2,
-                                                             D{{"updatedFields", D{{"y", 1}}},
-                                                               {"removedFields", vector<V>()},
-                                                               {"truncatedArrays", vector<V>()},
-                                                               {"disambiguatedPaths", D{}}});
+    const auto expectedUpdateField =
+        makeExpectedUpdateEvent(kDefaultTs,
+                                nss,
+                                o2,
+                                D{{"updatedFields", D{{"y", 1}}},
+                                  {"removedFields", std::vector<V>()},
+                                  {"truncatedArrays", std::vector<V>()},
+                                  {"disambiguatedPaths", D{}}});
     checkTransformation(updateField, expectedUpdateField);
 }
 
@@ -1250,13 +901,14 @@ TEST_F(ChangeStreamStageTest, TransformRemoveFields) {
                                       boost::none,          // fromMigrate
                                       o2);                  // o2
 
-    const auto expectedUpdateField = makeExpectedUpdateEvent(kDefaultTs,
-                                                             nss,
-                                                             o2,
-                                                             D{{"updatedFields", D{}},
-                                                               {"removedFields", {"y"_sd}},
-                                                               {"truncatedArrays", vector<V>()},
-                                                               {"disambiguatedPaths", D{}}});
+    const auto expectedUpdateField =
+        makeExpectedUpdateEvent(kDefaultTs,
+                                nss,
+                                o2,
+                                D{{"updatedFields", D{}},
+                                  {"removedFields", {"y"_sd}},
+                                  {"truncatedArrays", std::vector<V>()},
+                                  {"disambiguatedPaths", D{}}});
     checkTransformation(removeField, expectedUpdateField);
 }  // namespace
 
@@ -1809,7 +1461,7 @@ TEST_F(ChangeStreamStageTest, TransformEmptyApplyOps) {
     Document applyOpsDoc{{"applyOps", Value{std::vector<Document>{}}}};
 
     LogicalSessionFromClient lsid = testLsid();
-    vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid);
+    std::vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid);
 
     // Should not return anything.
     ASSERT_EQ(results.size(), 0u);
@@ -1864,7 +1516,7 @@ TEST_F(ChangeStreamStageTest, TransformNonTxnNumberApplyOps) {
                                {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}};
 
     LogicalSessionFromClient lsid = testLsid();
-    vector<Document> results =
+    std::vector<Document> results =
         getApplyOpsResults(applyOpsDoc, lsid, kDefaultSpec, false /* hasTxnNumber */);
 
     ASSERT_EQ(results.size(), 1u);
@@ -1898,7 +1550,7 @@ TEST_F(ChangeStreamStageTest, TransformNonTxnNumberBatchedDeleteApplyOps) {
          }}},
     };
     LogicalSessionFromClient lsid = testLsid();
-    vector<Document> results =
+    std::vector<Document> results =
         getApplyOpsResults(applyOpsDoc, lsid, kDefaultSpec, false /* hasTxnNumber */);
 
     ASSERT_EQ(results.size(), 3u);
@@ -1933,7 +1585,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithEntriesOnDifferentNs) {
          }}},
     };
     LogicalSessionFromClient lsid = testLsid();
-    vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid);
+    std::vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid);
 
     // All documents should be skipped.
     ASSERT_EQ(results.size(), 0u);
@@ -1949,7 +1601,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionApplyOpsEntriesAreIgnored) {
                                {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}},
                  {"prepare", true}};
     LogicalSessionFromClient lsid = testLsid();
-    vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid);
+    std::vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid);
 
     // applyOps entries that are part of a prepared transaction are ignored. These entries will be
     // fetched for changeStreams delivery as part of transaction commit.
@@ -2682,7 +2334,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOps) {
          }}},
     };
     LogicalSessionFromClient lsid = testLsid();
-    vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid);
+    std::vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid);
 
     // The third document should be skipped.
     ASSERT_EQ(results.size(), 2u);
@@ -2736,7 +2388,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
          }}},
     };
     LogicalSessionFromClient lsid = testLsid();
-    vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid, kShowExpandedEventsSpec);
+    std::vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid, kShowExpandedEventsSpec);
 
     size_t expectedSize = 3;
 
@@ -2795,13 +2447,14 @@ TEST_F(ChangeStreamStageTest, ClusterTimeMatchesOplogEntry) {
                                       o2,                   // o2
                                       opTime);              // opTime
 
-    const auto expectedUpdateField = makeExpectedUpdateEvent(ts,
-                                                             nss,
-                                                             o2,
-                                                             D{{"updatedFields", D{{"y", 1}}},
-                                                               {"removedFields", vector<V>()},
-                                                               {"truncatedArrays", vector<V>()},
-                                                               {"disambiguatedPaths", D{}}});
+    const auto expectedUpdateField =
+        makeExpectedUpdateEvent(ts,
+                                nss,
+                                o2,
+                                D{{"updatedFields", D{{"y", 1}}},
+                                  {"removedFields", std::vector<V>()},
+                                  {"truncatedArrays", std::vector<V>()},
+                                  {"disambiguatedPaths", D{}}});
     checkTransformation(updateField, expectedUpdateField);
 
     // Test the 'clusterTime' field is copied from the oplog entry for a collection drop.
@@ -3077,7 +2730,8 @@ TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage
 
     auto result = DSChangeStream::createFromBson(originalSpec.firstElement(), expCtx);
 
-    vector<intrusive_ptr<DocumentSource>> allStages(std::begin(result), std::end(result));
+    std::vector<boost::intrusive_ptr<DocumentSource>> allStages(std::begin(result),
+                                                                std::end(result));
 
     ASSERT_EQ(allStages.size(), 6);
 
@@ -3087,7 +2741,7 @@ TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage
     //
     // Serialize the stage and confirm contents.
     //
-    vector<Value> serialization;
+    std::vector<Value> serialization;
     stage->serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 1UL);
     ASSERT_EQ(serialization[0].getType(), BSONType::object);
@@ -3126,14 +2780,15 @@ TEST_F(ChangeStreamStageTest, DSCSTransformStageEmptySpecSerializeResumeAfter) {
     auto result = DSChangeStream::createFromBson(originalSpec.firstElement(), expCtx);
     ASSERT(!expCtx->getInitialPostBatchResumeToken().isEmpty());
 
-    vector<intrusive_ptr<DocumentSource>> allStages(std::begin(result), std::end(result));
+    std::vector<boost::intrusive_ptr<DocumentSource>> allStages(std::begin(result),
+                                                                std::end(result));
     ASSERT_EQ(allStages.size(), 6);
     auto transformStage = allStages[2];
     ASSERT(dynamic_cast<DocumentSourceChangeStreamTransform*>(transformStage.get()));
 
 
     // Verify that an additional start point field is populated while serializing.
-    vector<Value> serialization;
+    std::vector<Value> serialization;
     transformStage->serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 1UL);
     ASSERT_EQ(serialization[0].getType(), BSONType::object);
@@ -3162,7 +2817,7 @@ TEST_F(ChangeStreamStageTest, DSCSTransformStageWithResumeTokenSerialize) {
         DocumentSourceChangeStreamTransform::createFromBson(originalSpec.firstElement(), expCtx);
     ASSERT(!expCtx->getInitialPostBatchResumeToken().isEmpty());
 
-    vector<Value> serialization;
+    std::vector<Value> serialization;
     stage->serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 1UL);
     ASSERT_EQ(serialization[0].getType(), BSONType::object);
@@ -3177,7 +2832,7 @@ template <typename Stage, typename StageSpec>
 void validateDocumentSourceStageSerialization(
     StageSpec spec, BSONObj specAsBSON, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto stage = Stage::createFromBson(specAsBSON.firstElement(), expCtx);
-    vector<Value> serialization;
+    std::vector<Value> serialization;
     stage->serializeToArray(serialization);
 
     ASSERT_EQ(serialization.size(), 1UL);
@@ -3409,72 +3064,6 @@ TEST_F(ChangeStreamStageTest, InjectControlEventsHandlesMatchingInputsCorrectly)
 
     next = injectControlEvents->getNext();
     ASSERT_TRUE(next.isEOF());
-}
-
-TEST_F(ChangeStreamStageTest, DSCSHandleTopologyChangeV2CreateFromInvalidInput) {
-    // Test invalid top-level BSON type.
-    BSONObj spec = BSON("$_internalChangeStreamHandleTopologyChangeV2" << BSON("foo" << "bar"));
-    ASSERT_THROWS_CODE(DocumentSourceChangeStreamHandleTopologyChangeV2::createFromBson(
-                           spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       10612600);
-}
-
-TEST_F(ChangeStreamStageTest, DSCSHandleTopologyChangeV2HandleInputs) {
-    // The only valid spec for this stage is an empty object.
-    BSONObj spec = BSON("$_internalChangeStreamHandleTopologyChangeV2" << BSONObj());
-    auto handleTopologyChangeStage =
-        DocumentSourceChangeStreamHandleTopologyChangeV2::createFromBson(spec.firstElement(),
-                                                                         getExpCtx());
-
-    // Test that the stage returns all inputs as they are.
-    const BSONObj doc1 = BSON("operationType" << "test1" << "foo" << "bar");
-    const BSONObj doc2 = BSON("operationType" << "test2" << "test" << "value");
-
-    std::deque<DocumentSource::GetNextResult> inputDocs = {
-        DocumentSource::GetNextResult::makePauseExecution(),
-        Document::fromBsonWithMetaData(doc1),
-        DocumentSource::GetNextResult::makePauseExecution(),
-        Document::fromBsonWithMetaData(doc2),
-        DocumentSource::GetNextResult::makeEOF(),
-    };
-
-    auto source = DocumentSourceMock::createForTest(inputDocs, getExpCtx());
-    handleTopologyChangeStage->setSource(source.get());
-
-    auto next = handleTopologyChangeStage->getNext();
-    ASSERT_TRUE(next.isPaused());
-
-    next = handleTopologyChangeStage->getNext();
-    ASSERT_TRUE(next.isAdvanced());
-    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc1), next.getDocument());
-
-    next = handleTopologyChangeStage->getNext();
-    ASSERT_TRUE(next.isPaused());
-
-    next = handleTopologyChangeStage->getNext();
-    ASSERT_TRUE(next.isAdvanced());
-    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc2), next.getDocument());
-
-    next = handleTopologyChangeStage->getNext();
-    ASSERT_TRUE(next.isEOF());
-}
-
-TEST_F(ChangeStreamStageTest, DSCSHandleTopologyChangeV2Serialization) {
-    // The only valid spec for this stage is an empty object.
-    BSONObj spec = BSON("$_internalChangeStreamHandleTopologyChangeV2" << BSONObj());
-    auto handleTopologyChangeStage =
-        DocumentSourceChangeStreamHandleTopologyChangeV2::createFromBson(spec.firstElement(),
-                                                                         getExpCtx());
-
-    std::vector<Value> serialization;
-    handleTopologyChangeStage->serializeToArray(serialization);
-
-    ASSERT_EQ(serialization.size(), 1UL);
-    ASSERT_EQ(serialization[0].getType(), BSONType::object);
-    ASSERT_BSONOBJ_EQ(
-        serialization[0].getDocument().toBson(),
-        BSON(DocumentSourceChangeStreamHandleTopologyChangeV2::kStageName << BSONObj()));
 }
 
 TEST_F(ChangeStreamStageTest, DSCSOplogMatchStageSerialization) {
@@ -3991,13 +3580,14 @@ TEST_F(ChangeStreamStageDBTest, TransformUpdateFields) {
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
     auto updateField = makeOplogEntry(OpTypeEnum::kUpdate, nss, o, testUuid(), boost::none, o2);
 
-    const auto expectedUpdateField = makeExpectedUpdateEvent(kDefaultTs,
-                                                             nss,
-                                                             o2,
-                                                             D{{"updatedFields", D{{"y", 1}}},
-                                                               {"removedFields", vector<V>()},
-                                                               {"truncatedArrays", vector<V>()},
-                                                               {"disambiguatedPaths", D{}}});
+    const auto expectedUpdateField =
+        makeExpectedUpdateEvent(kDefaultTs,
+                                nss,
+                                o2,
+                                D{{"updatedFields", D{{"y", 1}}},
+                                  {"removedFields", std::vector<V>()},
+                                  {"truncatedArrays", std::vector<V>()},
+                                  {"disambiguatedPaths", D{}}});
     checkTransformation(updateField, expectedUpdateField);
 }
 
@@ -4012,13 +3602,14 @@ TEST_F(ChangeStreamStageDBTest, TransformRemoveFields) {
                                       boost::none,          // fromMigrate
                                       o2);                  // o2
 
-    const auto expectedRemoveField = makeExpectedUpdateEvent(kDefaultTs,
-                                                             nss,
-                                                             o2,
-                                                             D{{"updatedFields", D{}},
-                                                               {"removedFields", {"y"_sd}},
-                                                               {"truncatedArrays", vector<V>()},
-                                                               {"disambiguatedPaths", D{}}});
+    const auto expectedRemoveField =
+        makeExpectedUpdateEvent(kDefaultTs,
+                                nss,
+                                o2,
+                                D{{"updatedFields", D{}},
+                                  {"removedFields", {"y"_sd}},
+                                  {"truncatedArrays", std::vector<V>()},
+                                  {"disambiguatedPaths", D{}}});
     checkTransformation(removeField, expectedRemoveField);
 }
 
@@ -5476,19 +5067,6 @@ TEST_F(ChangeStreamStageTestNoSetup,
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamHandleTopologyChange":{}})",
-        docSource->serialize().getDocument().toBson());
-
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
-    ASSERT(docSource->serialize(opts).missing());
-}
-
-TEST_F(ChangeStreamStageTestNoSetup,
-       DocumentSourceChangeStreamHandleTopologyChangeV2EmptyForQueryStats) {
-    auto docSource = DocumentSourceChangeStreamHandleTopologyChangeV2::create(getExpCtx());
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$_internalChangeStreamHandleTopologyChangeV2":{}})",
         docSource->serialize().getDocument().toBson());
 
     auto opts = SerializationOptions{
