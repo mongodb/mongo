@@ -306,3 +306,8 @@ feature_flags:
         cpp_varname: feature_flags::gOplogSamplingAsyncEnabled
         default: false
         fcv_gated: false
+    featureFlagPrimaryDrivenIndexBuilds:
+        description: "Enable primary-driven index builds."
+        cpp_varname: feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
+        default: false
+        fcv_gated: true
