@@ -239,7 +239,8 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
         RecordId toDelete = std::move(record->id);
         record = cursor->next();
 
-        collection->getRecordStore()->deleteRecord(opCtx, toDelete);
+        collection->getRecordStore()->deleteRecord(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx), toDelete);
 
         if (opDebug) {
             opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);

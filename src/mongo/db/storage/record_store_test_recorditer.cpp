@@ -436,7 +436,8 @@ TEST(RecordStoreTest, SeekExactForMissingRecordReturnsNone) {
     // Delete the second record.
     {
         StorageWriteTransaction txn(ru);
-        recordStore->deleteRecord(opCtx.get(), recordIds[1]);
+        recordStore->deleteRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), recordIds[1]);
         txn.commit();
     }
 

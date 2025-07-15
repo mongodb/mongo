@@ -259,7 +259,7 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
         }
 
         // Delete the record so that it is not applied more than once.
-        recordStore->deleteRecord(opCtx, record->id);
+        recordStore->deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), record->id);
 
         cursor->save();
         wuow->commit();

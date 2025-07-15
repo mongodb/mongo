@@ -275,7 +275,8 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
         // Delete documents from the side table as soon as they have been inserted into the index.
         // This ensures that no key is ever inserted twice and no keys are skipped.
         for (const auto& recordId : recordsAddedToIndex) {
-            _sideWritesTable->rs()->deleteRecord(opCtx, recordId);
+            _sideWritesTable->rs()->deleteRecord(
+                opCtx, *shard_role_details::getRecoveryUnit(opCtx), recordId);
         }
 
         if (batchSize == 0) {

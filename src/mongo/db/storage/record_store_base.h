@@ -70,7 +70,6 @@ public:
                     const RecordId& loc,
                     RecordData* out) const final;
 
-    void deleteRecord(OperationContext*, const RecordId&) final;
     void deleteRecord(OperationContext*, RecoveryUnit&, const RecordId&) final;
 
     Status insertRecords(OperationContext*,

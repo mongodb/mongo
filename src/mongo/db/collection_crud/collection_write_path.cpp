@@ -916,7 +916,8 @@ void deleteDocument(OperationContext* opCtx,
                     "recordId"_attr = loc,
                     "doc"_attr = doc.value().toString());
     } else {
-        collection->getRecordStore()->deleteRecord(opCtx, loc);
+        collection->getRecordStore()->deleteRecord(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx), loc);
     }
 
     const auto& documentKey = getDocumentKey(collection, doc.value());

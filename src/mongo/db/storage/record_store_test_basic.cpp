@@ -146,7 +146,7 @@ TEST(RecordStoreTest, Delete1) {
 
         {
             StorageWriteTransaction txn(ru);
-            rs->deleteRecord(opCtx.get(), loc);
+            rs->deleteRecord(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc);
             txn.commit();
         }
 
@@ -193,7 +193,7 @@ TEST(RecordStoreTest, Delete2) {
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
             StorageWriteTransaction txn(ru);
-            rs->deleteRecord(opCtx.get(), loc);
+            rs->deleteRecord(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc);
             txn.commit();
         }
     }
@@ -530,7 +530,8 @@ TEST(RecordStoreTest, CursorRestoreDeletedDoc) {
 
     {
         StorageWriteTransaction txn(ru);
-        rs->deleteRecord(opCtx.get(), RecordId(1));
+        rs->deleteRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), RecordId(1));
         txn.commit();
     }
     cursor->restore(ru);
@@ -544,7 +545,8 @@ TEST(RecordStoreTest, CursorRestoreDeletedDoc) {
 
     {
         StorageWriteTransaction txn(ru);
-        rs->deleteRecord(opCtx.get(), RecordId(2));
+        rs->deleteRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), RecordId(2));
         txn.commit();
     }
     cursor->restore(ru);
@@ -558,7 +560,8 @@ TEST(RecordStoreTest, CursorRestoreDeletedDoc) {
 
     {
         StorageWriteTransaction txn(ru);
-        rs->deleteRecord(opCtx.get(), RecordId(3));
+        rs->deleteRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), RecordId(3));
         txn.commit();
     }
     cursor->restore(ru);
@@ -730,7 +733,8 @@ TEST(RecordStoreTest, ClusteredRecordStore) {
     {
         StorageWriteTransaction txn(ru);
         for (int i = 0; i < numRecords; i += 10) {
-            rs->deleteRecord(opCtx.get(), records.at(i).id);
+            rs->deleteRecord(
+                opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), records.at(i).id);
         }
         txn.commit();
 

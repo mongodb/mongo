@@ -267,7 +267,9 @@ Status CollectionBulkLoaderImpl::commit() {
                             // the document after committing the index, it's possible that the we
                             // may unindex a record with the same key but a different RecordId.
                             _acquisition.getCollectionPtr()->getRecordStore()->deleteRecord(
-                                _opCtx.get(), rid);
+                                _opCtx.get(),
+                                *shard_role_details::getRecoveryUnit(_opCtx.get()),
+                                rid);
 
                             auto indexIt =
                                 _acquisition.getCollectionPtr()

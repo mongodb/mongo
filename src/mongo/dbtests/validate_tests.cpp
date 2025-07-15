@@ -429,7 +429,7 @@ public:
         // Remove {_id: 1} from the record store, so we get more _id entries than records.
         {
             beginTransaction();
-            rs->deleteRecord(&_opCtx, id1);
+            rs->deleteRecord(&_opCtx, *shard_role_details::getRecoveryUnit(&_opCtx), id1);
             commitTransaction();
         }
         releaseDb();
@@ -487,7 +487,7 @@ public:
         // Remove a record, so we get more _id entries than records, and verify validate fails.
         {
             beginTransaction();
-            rs->deleteRecord(&_opCtx, id1);
+            rs->deleteRecord(&_opCtx, *shard_role_details::getRecoveryUnit(&_opCtx), id1);
             commitTransaction();
         }
         releaseDb();
@@ -619,7 +619,7 @@ public:
         // have an index entry.
         {
             beginTransaction();
-            rs->deleteRecord(&_opCtx, id1);
+            rs->deleteRecord(&_opCtx, *shard_role_details::getRecoveryUnit(&_opCtx), id1);
             auto doc = BSON("_id" << 3);
             ASSERT_OK(rs->insertRecord(&_opCtx, doc.objdata(), doc.objsize(), timestampToUse)
                           .getStatus());
@@ -1501,7 +1501,7 @@ public:
             RecordStore* rs = coll()->getRecordStore();
 
             beginTransaction();
-            rs->deleteRecord(&_opCtx, rid);
+            rs->deleteRecord(&_opCtx, *shard_role_details::getRecoveryUnit(&_opCtx), rid);
             commitTransaction();
             releaseDb();
         }
@@ -1939,7 +1939,7 @@ public:
             RecordStore* rs = coll()->getRecordStore();
 
             beginTransaction();
-            rs->deleteRecord(&_opCtx, rid);
+            rs->deleteRecord(&_opCtx, *shard_role_details::getRecoveryUnit(&_opCtx), rid);
             commitTransaction();
             releaseDb();
         }

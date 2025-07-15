@@ -153,7 +153,8 @@ boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkCon
         }
 
         WriteUnitOfWork wuow(opCtx);
-        _keyConstraintsTable->rs()->deleteRecord(opCtx, record->id);
+        _keyConstraintsTable->rs()->deleteRecord(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx), record->id);
 
         constraintsCursor->save();
         wuow.commit();

@@ -80,7 +80,7 @@ TEST(RecordStoreTest, DeleteRecord) {
 
         {
             StorageWriteTransaction txn(ru);
-            rs->deleteRecord(opCtx.get(), loc);
+            rs->deleteRecord(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), loc);
             txn.commit();
         }
     }
@@ -121,7 +121,8 @@ TEST(RecordStoreTest, DeleteMultipleRecords) {
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
             StorageWriteTransaction txn(ru);
-            rs->deleteRecord(opCtx.get(), locs[i]);
+            rs->deleteRecord(
+                opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), locs[i]);
             txn.commit();
         }
     }
@@ -153,7 +154,9 @@ DEATH_TEST_REGEX(RecordStoreTest, DeleteNonExistentRecord, "Record to be deleted
 
         StorageWriteTransaction txn(ru);
         // Should crash with a log message.
-        rs->deleteRecord(opCtx.get(), RecordId(loc.getLong() + 1));
+        rs->deleteRecord(opCtx.get(),
+                         *shard_role_details::getRecoveryUnit(opCtx.get()),
+                         RecordId(loc.getLong() + 1));
         MONGO_UNREACHABLE;
     }
 }

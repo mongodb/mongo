@@ -121,9 +121,6 @@ public:
         return false;
     }
 
-    void deleteRecord(OperationContext* opCtx, const RecordId& dl) final {
-        unimplementedTasserted();
-    }
     void deleteRecord(OperationContext* opCtx, RecoveryUnit&, const RecordId& dl) final {
         unimplementedTasserted();
     }

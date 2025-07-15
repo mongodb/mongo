@@ -149,7 +149,7 @@ public:
         Lock::GlobalLock globalLock(op, MODE_IX);
         WriteUnitOfWork wuow(op);
         ASSERT_OK(shard_role_details::getRecoveryUnit(op.get())->setTimestamp(_counter));
-        rs->deleteRecord(op, id);
+        rs->deleteRecord(op, *shard_role_details::getRecoveryUnit(op.get()), id);
         wuow.commit();
     }
 

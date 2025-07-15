@@ -292,7 +292,7 @@ Status MDBCatalog::removeEntry(OperationContext* opCtx, const RecordId& catalogI
                 "deleting metadata for {it_second_namespace} @ {catalogId}",
                 "it_second_namespace"_attr = it->second.nss,
                 "catalogId"_attr = catalogId);
-    _rs->deleteRecord(opCtx, catalogId);
+    _rs->deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), catalogId);
     _catalogIdToEntryMap.erase(it);
 
     return Status::OK();

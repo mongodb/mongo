@@ -207,7 +207,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                                   "Invalid BSON detected; deleting",
                                   "id"_attr = id,
                                   "error"_attr = redact(validStatus));
-                    rs->deleteRecord(opCtx, id);
+                    rs->deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), id);
                     {
                         stdx::unique_lock<Client> lk(*opCtx->getClient());
                         // Must reduce the progress meter's expected total after deleting an invalid

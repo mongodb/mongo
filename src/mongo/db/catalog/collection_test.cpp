@@ -1103,7 +1103,9 @@ TEST_F(CollectionTest, BoundedSeek) {
             recordIds[i] = doInsert(operationContext());
         }
         Lock::GlobalLock globalLock{operationContext(), MODE_IX};
-        rs->deleteRecord(operationContext(), recordIds[0]);
+        rs->deleteRecord(operationContext(),
+                         *shard_role_details::getRecoveryUnit(operationContext()),
+                         recordIds[0]);
         wuow.commit();
     }
 

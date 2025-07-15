@@ -731,7 +731,7 @@ TEST(WiredTigerRecordStoreTest, SizeInfoAccurateAfterRollbackWithDelete) {
         auto& ru = *storage_details::getRecoveryUnit(ctx.get());
         StorageWriteTransaction txn(ru);
         // Registered changes are executed in reverse order.
-        rs->deleteRecord(ctx.get(), rid);
+        rs->deleteRecord(ctx.get(), *storage_details::getRecoveryUnit(ctx.get()), rid);
         storage_details::getRecoveryUnit(ctx.get())->onRollback(
             [&](OperationContext*) { deleted->countDownAndWait(); });
         storage_details::getRecoveryUnit(ctx.get())->onRollback(
@@ -741,7 +741,7 @@ TEST(WiredTigerRecordStoreTest, SizeInfoAccurateAfterRollbackWithDelete) {
     // Wait for the other thread to abort.
     aborted->countDownAndWait();
 
-    rs->deleteRecord(ctx.get(), rid);
+    rs->deleteRecord(ctx.get(), *storage_details::getRecoveryUnit(ctx.get()), rid);
 
     // Notify the other thread we have deleted, let it complete the rollback.
     deleted->countDownAndWait();

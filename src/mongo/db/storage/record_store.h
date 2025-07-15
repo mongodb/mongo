@@ -449,10 +449,6 @@ public:
                             const RecordId&,
                             RecordData*) const = 0;
 
-    /**
-     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
-     */
-    virtual void deleteRecord(OperationContext* opCtx, const RecordId& dl) = 0;
     virtual void deleteRecord(OperationContext* opCtx, RecoveryUnit&, const RecordId& dl) = 0;
 
     /**
