@@ -1069,7 +1069,7 @@ tasks:
           target: >-
             //src/mongo/...
           args: >-
-            --test_tag_filters=mongo_unittest_debug,-final_target,-code_coverage_quarantine
+            --test_tag_filters=mongo_unittest_debug,-final_target,-code_coverage_quarantine_debug
             --test_timeout=600
             --verbose_failures
             --instrumentation_filter="^//src/mongo[/:],-^//src/mongo/util:boost_assert_shim,-^//src/mongo/util:icu,-^//src/mongo/db/modules/enterprise/src/streams[/:]"

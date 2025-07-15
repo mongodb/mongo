@@ -1732,7 +1732,7 @@ mongo_cc_unit_test(
     ],
     tags = [
         # State mismatch in sandbox in resharding_recipient_service_test.cpp
-        "code_coverage_quarantine_debug",
+        "code_coverage_quarantine",
         "code_coverage_quarantine_SERVER-98847",
         "mongo_unittest_fourth_group",
     ],
