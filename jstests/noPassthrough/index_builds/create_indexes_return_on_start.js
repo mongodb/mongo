@@ -1,5 +1,10 @@
 /**
  * Tests the returnOnStart option of the createIndexes command.
+ *
+ * @tags: [
+ *   # TODO SERVER-107530 re-enable this test
+ *   __TEMPORARILY_DISABLED__,
+ * ]
  */
 
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
