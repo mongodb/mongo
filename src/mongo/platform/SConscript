@@ -34,89 +34,98 @@ env.Benchmark(
     LIBDEPS=[],
 )
 
-if not get_option("link-model") == "dynamic":
-    Return()
+if get_option("link-model") == "dynamic":
 
-env.Library(
-    target="visibility_test_libcommon",
-    source=[
-        "visibility_test_libcommon.cpp",
-    ],
-    LIBDEPS_NO_INHERIT=[
-        '$BUILD_DIR/third_party/shim_allocator',
-    ],
-    LIBDEPS=[],
-    MONGO_API_NAME="visibility_test_libcommon",
-)
+    env.Library(
+        target="visibility_test_libcommon",
+        source=[
+            "visibility_test_libcommon.cpp",
+        ],
+        LIBDEPS_NO_INHERIT=[
+            '$BUILD_DIR/third_party/shim_allocator',
+        ],
+        LIBDEPS=[],
+        MONGO_API_NAME="visibility_test_libcommon",
+    )
 
-env.Library(
-    target="visibility_test_lib1",
-    source=[
-        "visibility_test_lib1.cpp",
-    ],
-    LIBDEPS_NO_INHERIT=[
-        '$BUILD_DIR/third_party/shim_allocator',
-    ],
-    LIBDEPS=[],
-    LIBDEPS_PRIVATE=[
-        "visibility_test_libcommon",
-    ],
-    MONGO_API_NAME="visibility_test_lib1",
-)
+    env.Library(
+        target="visibility_test_lib1",
+        source=[
+            "visibility_test_lib1.cpp",
+        ],
+        LIBDEPS_NO_INHERIT=[
+            '$BUILD_DIR/third_party/shim_allocator',
+        ],
+        LIBDEPS=[],
+        LIBDEPS_PRIVATE=[
+            "visibility_test_libcommon",
+        ],
+        MONGO_API_NAME="visibility_test_lib1",
+    )
 
-env.Library(
-    target="visibility_test_lib2",
+    env.Library(
+        target="visibility_test_lib2",
+        source=[
+            "visibility_test_lib2.cpp",
+        ],
+        LIBDEPS_NO_INHERIT=[
+            '$BUILD_DIR/third_party/shim_allocator',
+        ],
+        LIBDEPS=[
+            "visibility_test_lib1",
+        ],
+        LIBDEPS_PRIVATE=[
+            "visibility_test_libcommon",
+        ],
+        MONGO_API_NAME="visibility_test_lib2",
+    )
+
+    visibility_test1 = env.Program(
+        target="visibility_test1",
+        source=[
+            "visibility_test1.cpp",
+        ],
+        LIBDEPS_NO_INHERIT=[
+            '$BUILD_DIR/third_party/shim_allocator',
+        ],
+        LIBDEPS=[
+            "visibility_test_lib1",
+        ],
+        AIB_COMPONENT="visibility-test",
+        AIB_COMPONENTS_EXTRA=[
+            "unittests",
+            "tests",
+            "first-quarter-unittests",
+        ],
+    )
+    env.RegisterTest("$UNITTEST_LIST", visibility_test1[0])
+
+    visibility_test2 = env.Program(
+        target="visibility_test2",
+        source=[
+            "visibility_test2.cpp",
+        ],
+        LIBDEPS_NO_INHERIT=[
+            '$BUILD_DIR/third_party/shim_allocator',
+        ],
+        LIBDEPS=[
+            "visibility_test_lib2",
+        ],
+        AIB_COMPONENT="visibility-test",
+        AIB_COMPONENTS_EXTRA=[
+            "unittests",
+            "tests",
+            "first-quarter-unittests",
+        ],
+    )
+    env.RegisterTest("$UNITTEST_LIST", visibility_test2[0])
+
+env.CppUnitTest(
+    target='rwmutex_test',
     source=[
-        "visibility_test_lib2.cpp",
-    ],
-    LIBDEPS_NO_INHERIT=[
-        '$BUILD_DIR/third_party/shim_allocator',
+        'rwmutex_test.cpp',
     ],
     LIBDEPS=[
-        "visibility_test_lib1",
-    ],
-    LIBDEPS_PRIVATE=[
-        "visibility_test_libcommon",
-    ],
-    MONGO_API_NAME="visibility_test_lib2",
-)
-
-visibility_test1 = env.Program(
-    target="visibility_test1",
-    source=[
-        "visibility_test1.cpp",
-    ],
-    LIBDEPS_NO_INHERIT=[
-        '$BUILD_DIR/third_party/shim_allocator',
-    ],
-    LIBDEPS=[
-        "visibility_test_lib1",
-    ],
-    AIB_COMPONENT="visibility-test",
-    AIB_COMPONENTS_EXTRA=[
-        "unittests",
-        "tests",
-        "first-quarter-unittests",
+        '$BUILD_DIR/mongo/base',
     ],
 )
-env.RegisterTest("$UNITTEST_LIST", visibility_test1[0])
-
-visibility_test2 = env.Program(
-    target="visibility_test2",
-    source=[
-        "visibility_test2.cpp",
-    ],
-    LIBDEPS_NO_INHERIT=[
-        '$BUILD_DIR/third_party/shim_allocator',
-    ],
-    LIBDEPS=[
-        "visibility_test_lib2",
-    ],
-    AIB_COMPONENT="visibility-test",
-    AIB_COMPONENTS_EXTRA=[
-        "unittests",
-        "tests",
-        "first-quarter-unittests",
-    ],
-)
-env.RegisterTest("$UNITTEST_LIST", visibility_test2[0])
