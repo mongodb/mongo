@@ -50,7 +50,6 @@
 #include "mongo/db/exec/sbe/stages/sorted_merge.h"
 #include "mongo/db/exec/sbe/stages/spool.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/exec/sbe/stages/traverse.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
@@ -352,20 +351,6 @@ TEST_F(PlanSizeTest, SpoolLazyProducer) {
 TEST_F(PlanSizeTest, SpoolConsumer) {
     auto stage =
         makeS<SpoolConsumerStage<true>>(1, mockSV(), nullptr /* yieldPolicy */, kEmptyPlanNodeId);
-    assertPlanSize(*stage);
-}
-
-TEST_F(PlanSizeTest, Traverse) {
-    auto stage = makeS<TraverseStage>(mockS(),
-                                      mockS(),
-                                      generateSlotId(),
-                                      generateSlotId(),
-                                      generateSlotId(),
-                                      mockSV(),
-                                      nullptr,
-                                      nullptr,
-                                      kEmptyPlanNodeId,
-                                      boost::none);
     assertPlanSize(*stage);
 }
 
