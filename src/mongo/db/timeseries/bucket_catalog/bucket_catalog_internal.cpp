@@ -792,8 +792,8 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
 
 std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(const uint64_t storageCacheSizeBytes,
                                                          const int64_t workloadCardinality) {
-    // Global statistics can transiently be negative.
-    if (workloadCardinality <= 0) {
+    invariant(workloadCardinality >= 0);
+    if (workloadCardinality == 0) {
         return {gTimeseriesBucketMaxSize, INT_MAX};
     }
 

@@ -31,17 +31,55 @@
 
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/platform/compiler.h"
+
+#include <limits>
 
 namespace mongo::timeseries::bucket_catalog {
+namespace {
+constexpr long long kNumActiveBucketsSentinel = std::numeric_limits<long long>::min();
+
+/**
+ * Adds 'increment' to 'atomicValue' with conditions.
+ * No-op if 'atomicValue' is already set to the sentinel value.
+ * 'increment' can be negative but the result of the addition has to be non-negative.
+ */
+long long addFloored(AtomicWord<long long>& atomicValue, long long increment) {
+    if (MONGO_unlikely(!increment)) {
+        return static_cast<long long>(0);
+    }
+
+    long long current = atomicValue.load();
+    long long result = 0;
+    long long actualIncrement = increment;
+
+    do {
+        if (current == kNumActiveBucketsSentinel) {
+            // No-op if a sentinel value was already set.
+            return static_cast<long long>(0);
+        }
+        // Result cannot be negative.
+        result = std::max(static_cast<long long>(0), current + increment);
+        actualIncrement = result - current;
+    } while (!atomicValue.compareAndSwap(&current, result));
+
+    return actualIncrement;
+}
+}  // namespace
 
 void ExecutionStatsController::incNumActiveBuckets(long long increment) {
-    _collectionStats->numActiveBuckets.fetchAndAddRelaxed(increment);
-    _globalStats->numActiveBuckets.fetchAndAddRelaxed(increment);
+    // Increments the global stats if the collection stats are modified.
+    if (auto actualIncrement = addFloored(_collectionStats->numActiveBuckets, increment)) {
+        tassert(10645100, "numActiveBuckets overflowed", increment == actualIncrement);
+        _globalStats->numActiveBuckets.fetchAndAddRelaxed(increment);
+    }
 }
 
 void ExecutionStatsController::decNumActiveBuckets(long long decrement) {
-    _collectionStats->numActiveBuckets.fetchAndSubtractRelaxed(decrement);
-    _globalStats->numActiveBuckets.fetchAndSubtractRelaxed(decrement);
+    // Decrements the global and collection stats with the same value.
+    if (auto actualIncrement = addFloored(_collectionStats->numActiveBuckets, -decrement)) {
+        addFloored(_globalStats->numActiveBuckets, actualIncrement);
+    }
 }
 
 void ExecutionStatsController::incNumBucketInserts(long long increment) {
@@ -354,8 +392,11 @@ void addCollectionExecutionGauges(ExecutionStats& stats, const ExecutionStats& c
     stats.numActiveBuckets.fetchAndAdd(collStats.numActiveBuckets.load());
 }
 
-void removeCollectionExecutionGauges(ExecutionStats& stats, const ExecutionStats& collStats) {
-    stats.numActiveBuckets.fetchAndSubtract(collStats.numActiveBuckets.load());
+void removeCollectionExecutionGauges(ExecutionStats& stats, ExecutionStats& collStats) {
+    // Set the collection stats to a sentinel value to prevent modifications by concurrent threads
+    // which are still holding the shared pointer.
+    auto collNumActiveBuckets = collStats.numActiveBuckets.swap(kNumActiveBucketsSentinel);
+    stats.numActiveBuckets.fetchAndSubtract(collNumActiveBuckets);
 }
 
 }  // namespace mongo::timeseries::bucket_catalog

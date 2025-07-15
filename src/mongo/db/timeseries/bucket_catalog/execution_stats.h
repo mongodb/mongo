@@ -157,6 +157,6 @@ void addCollectionExecutionGauges(ExecutionStats& stats, const ExecutionStats& c
 /**
  * Removes the execution stats classified as gauges from an ExecutionStats.
  */
-void removeCollectionExecutionGauges(ExecutionStats& stats, const ExecutionStats& collStats);
+void removeCollectionExecutionGauges(ExecutionStats& stats, ExecutionStats& collStats);
 
 }  // namespace mongo::timeseries::bucket_catalog
