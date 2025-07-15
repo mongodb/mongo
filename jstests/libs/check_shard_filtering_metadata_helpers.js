@@ -1,3 +1,5 @@
+import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
+
 export var CheckShardFilteringMetadataHelpers = (function() {
     function run(mongosConn, nodeConn, shardId, skipCheckShardedCollections = false) {
         function checkDatabase(configDatabasesEntry) {
@@ -136,7 +138,15 @@ export var CheckShardFilteringMetadataHelpers = (function() {
         jsTest.log.info("CheckShardFilteringMetadata: finished");
     }
 
+    function isTransientError(e) {
+        return ErrorCodes.isRetriableError(e.code) || ErrorCodes.isInterruption(e.code) ||
+            ErrorCodes.isNetworkTimeoutError(e.code) || isNetworkError(e) ||
+            e.code === ErrorCodes.FailedToSatisfyReadPreference ||
+            RetryableWritesUtil.isFailedToSatisfyPrimaryReadPreferenceError(e);
+    }
+
     return {
         run: run,
+        isTransientError: isTransientError,
     };
 })();

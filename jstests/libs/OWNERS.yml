@@ -72,6 +72,9 @@ filters:
   - "pause_after_populate.js":
     approvers:
       - 10gen/query-optimization
+  - "check_shard_filtering_metadata_helpers.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "check_metadata_consistency_helpers.js":
     approvers:
       - 10gen/server-catalog-and-routing

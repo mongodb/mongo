@@ -33,3 +33,6 @@ filters:
   - "run_check_repl_dbhash*.js":
     approvers:
       - 10gen/server-dbhash
+  - "run_check_shard_filtering_metadata.js":
+    approvers:
+      - 10gen/server-catalog-and-routing

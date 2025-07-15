@@ -783,6 +783,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/hooks/**/run_check_repl_oplogs.js @10gen/server-jstest-infra @svc-auto-approve-bot
 /jstests/hooks/**/run_cleanup_hello_failures.js @10gen/server-hello @svc-auto-approve-bot
 /jstests/hooks/**/run_check_repl_dbhash*.js @10gen/server-dbhash @svc-auto-approve-bot
+/jstests/hooks/**/run_check_shard_filtering_metadata.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/hooks/write_conflicts/OWNERS.yml
 /jstests/hooks/write_conflicts/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot
@@ -815,6 +816,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/**/mirror_reads_helpers.js @10gen/server-networking-and-observability @svc-auto-approve-bot
 /jstests/libs/**/conn_pool_helpers.js @10gen/server-networking-and-observability @svc-auto-approve-bot
 /jstests/libs/**/pause_after_populate.js @10gen/query-optimization @svc-auto-approve-bot
+/jstests/libs/**/check_shard_filtering_metadata_helpers.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/libs/**/check_metadata_consistency_helpers.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/libs/clustered_collections/OWNERS.yml
