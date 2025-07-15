@@ -93,4 +93,15 @@ TEST(LoadExtensionTest, LoadExtensionSucceeds) {
     // TODO SERVER-106242: Expand the testing to make sure the initialization function works.
     ASSERT_DOES_NOT_THROW(ExtensionLoader::load(getExtensionPath("libfoo_extension.so")));
 }
+
+TEST(LoadExtensionTest, LoadExtensionHostVersionParameterSucceeds) {
+    ASSERT_DOES_NOT_THROW(
+        ExtensionLoader::load(getExtensionPath("libhostVersionSucceeds_extension.so")));
+}
+
+TEST(LoadExtensionTest, LoadExtensionHostVersionParameterFails) {
+    ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libhostVersionFails_extension.so")),
+                       AssertionException,
+                       10615503);
+}
 }  // namespace mongo::extension::host

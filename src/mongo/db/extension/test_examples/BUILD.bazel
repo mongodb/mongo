@@ -36,5 +36,7 @@ package(default_visibility = ["//visibility:public"])
         "malformed5",
         "malformed6",
         "foo",
+        "hostVersionSucceeds",
+        "hostVersionFails",
     ]
 ]

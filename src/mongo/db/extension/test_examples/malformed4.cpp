@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/extension/sdk/extension.h"
+#include "mongo/db/extension/sdk/extension_status.h"
 
 // The initialization function is empty since the test should never reach initialization.
 void initialize_extension() {}
@@ -39,7 +40,8 @@ static const MongoExtension my_extension = {
 };
 
 extern "C" {
-const MongoExtension* get_mongodb_extension() {
-    return &my_extension;
+MongoExtensionStatus* get_mongodb_extension(const MongoExtensionAPIVersionVector* hostVersions,
+                                            const MongoExtension** extension) {
+    return mongo::extension::sdk::enterCXX([&]() { *extension = &my_extension; });
 }
 }

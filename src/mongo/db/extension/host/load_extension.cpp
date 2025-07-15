@@ -30,6 +30,7 @@
 #include "mongo/db/extension/host/load_extension.h"
 
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
@@ -79,6 +80,37 @@ bool loadExtensions(const std::vector<std::string>& extensionPaths) {
     return true;
 }
 
+void assertVersionCompatibility(const MongoExtensionAPIVersionVector* hostVersions,
+                                const MongoExtensionAPIVersion& extensionVersion) {
+    bool foundCompatibleMajor = false;
+    bool foundCompatibleMinor = false;
+
+    for (size_t i = 0; i < hostVersions->len; ++i) {
+        const auto& hostVersion = hostVersions[i].versions;
+        if (hostVersion->major == extensionVersion.major) {
+            foundCompatibleMajor = true;
+            if (hostVersion->minor >= extensionVersion.minor) {
+                foundCompatibleMinor = true;
+                break;
+            }
+        }
+    }
+
+    uassert(10615504,
+            mongo::str::stream() << "Failed to load extension: Invalid API major version; expected "
+                                 << extensionVersion.major
+                                 << " to match one of the host major versions",
+            foundCompatibleMajor);
+
+    uassert(10615505,
+            mongo::str::stream()
+                << "Failed to load extension: Incompatible API minor version; expected "
+                << extensionVersion.minor
+                << " to be no greater than the maximum minor version for major version "
+                << extensionVersion.major,
+            foundCompatibleMinor);
+}
+
 void ExtensionLoader::load(const std::string& extensionPath) {
     StatusWith<std::unique_ptr<SharedLibrary>> swExtensionLib =
         SharedLibrary::create(extensionPath);
@@ -95,26 +127,19 @@ void ExtensionLoader::load(const std::string& extensionPath) {
                           << "' failed: " << swGetExtensionFunction.getStatus().reason(),
             swGetExtensionFunction.isOK());
 
-    const MongoExtension* extension = swGetExtensionFunction.getValue()();
+    const MongoExtension* extension = nullptr;
+    sdk::enterC([&]() {
+        return swGetExtensionFunction.getValue()(&MONGO_EXTENSION_API_VERSIONS_SUPPORTED,
+                                                 &extension);
+    });
     uassert(10615503,
-            str::stream() << "Loading extension '" << extensionPath
-                          << "' failed: get_mongodb_extension returned null",
+            str::stream() << "Failed to load extension '" << extensionPath
+                          << "': get_mongodb_extension failed to set an extension",
             extension != nullptr);
 
     // Validate that the major and minor versions from the extension implementation are compatible
     // with the host API version.
-    uassert(10615504,
-            str::stream() << "Loading extension '" << extensionPath
-                          << "' failed: Invalid API major version; expected "
-                          << MONGODB_EXTENSION_API_MAJOR_VERSION << ", received "
-                          << extension->version.major,
-            extension->version.major == MONGODB_EXTENSION_API_MAJOR_VERSION);
-    uassert(10615505,
-            str::stream() << "Loading extension '" << extensionPath
-                          << "' failed: Invalid API minor version; expected less than or equal to "
-                          << MONGODB_EXTENSION_API_MINOR_VERSION << ", received "
-                          << extension->version.minor,
-            extension->version.minor <= MONGODB_EXTENSION_API_MINOR_VERSION);
+    assertVersionCompatibility(&MONGO_EXTENSION_API_VERSIONS_SUPPORTED, extension->version);
     uassert(10615506,
             str::stream() << "Loading extension '" << extensionPath
                           << "' failed: initialize function is not defined",

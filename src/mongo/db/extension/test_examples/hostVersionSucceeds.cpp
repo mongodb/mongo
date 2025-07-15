@@ -27,18 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/db/extension/sdk/extension.h"
+
+#include "mongo/db/extension/sdk/extension_helper.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 
-// The initialization function is null.
-static const MongoExtension my_extension = {
+void initialize_extension() {}
+static const MongoExtension extensionA = {
+    .version = {MONGODB_EXTENSION_API_MAJOR_VERSION + 1,
+                MONGODB_EXTENSION_API_MINOR_VERSION,
+                MONGODB_EXTENSION_API_PATCH_VERSION},
+    .initialize = initialize_extension,
+};
+
+static const MongoExtension extensionB = {
     .version = MONGODB_EXTENSION_API_VERSION,
-    .initialize = nullptr,
+    .initialize = initialize_extension,
 };
 
 extern "C" {
 MongoExtensionStatus* get_mongodb_extension(const MongoExtensionAPIVersionVector* hostVersions,
                                             const MongoExtension** extension) {
-    return mongo::extension::sdk::enterCXX([&]() { *extension = &my_extension; });
+
+    // We expect to successfully set extension to extensionB. extensionA is not compatible with the
+    // most recent host version, but extensionB is.
+    return mongo::extension::sdk::enterCXX([&]() {
+        if (mongo::extension::sdk::isVersionCompatible(hostVersions, &extensionA.version)) {
+            *extension = &extensionA;
+        } else if (mongo::extension::sdk::isVersionCompatible(hostVersions, &extensionB.version)) {
+            *extension = &extensionB;
+        } else {
+            *extension = nullptr;
+        }
+    });
 }
 }

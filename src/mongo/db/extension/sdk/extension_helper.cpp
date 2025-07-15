@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/db/extension/sdk/extension.h"
-#include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/db/extension/sdk/extension_helper.h"
 
-// The initialization function is null.
-static const MongoExtension my_extension = {
-    .version = MONGODB_EXTENSION_API_VERSION,
-    .initialize = nullptr,
-};
+namespace mongo::extension::sdk {
 
-extern "C" {
-MongoExtensionStatus* get_mongodb_extension(const MongoExtensionAPIVersionVector* hostVersions,
-                                            const MongoExtension** extension) {
-    return mongo::extension::sdk::enterCXX([&]() { *extension = &my_extension; });
+bool isVersionCompatible(const MongoExtensionAPIVersionVector* hostVersions,
+                         const MongoExtensionAPIVersion* version) {
+    for (size_t i = 0; i < hostVersions->len; ++i) {
+        const auto& hostVersion = hostVersions[i].versions;
+        if (hostVersion->major == version->major && hostVersion->minor >= version->minor) {
+            return true;
+        }
+    }
+    return false;
 }
-}
+}  // namespace mongo::extension::sdk

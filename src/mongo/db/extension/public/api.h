@@ -61,6 +61,18 @@ typedef struct {
     }
 
 /**
+ * A generic struct for a vector of Extensions API versions.
+ *
+ * Used for version compatibility checking, where it contains all supported extensions API versions
+ * by the host. For example, if 'versions' contains {v1.3.2, v2.4.3}, then the host will support any
+ * extension written for versions in the ranges [v1.0.0, v1.3.2] and [v2.0.0, v2.4.3].
+ */
+typedef struct {
+    size_t len;
+    MongoExtensionAPIVersion* versions;
+} MongoExtensionAPIVersionVector;
+
+/**
  * A read-only view of a byte array.
  */
 typedef struct MongoExtensionByteView {
@@ -220,13 +232,16 @@ typedef struct {
 
 /**
  * The symbol that must be defined in all extension shared libraries to register the extension with
- * the MongoDB server when the extension is loaded.
+ * the MongoDB server when the extension is loaded. Returns a MongoExtensionStatus indicating
+ * whether or not the parameter MongoExtension was successfully initialized. Also takes a struct
+ * representing the API version requirements to comply with the host.
  *
  * NOTE: You must define this symbol in your extension shared library and avoid name mangling (for
  * example, with 'extern "C"') so that the MongoDB server can find it at loadtime.
  */
 #define GET_MONGODB_EXTENSION_SYMBOL "get_mongodb_extension"
-typedef const MongoExtension* (*get_mongo_extension_t)();
+typedef MongoExtensionStatus* (*get_mongo_extension_t)(
+    const MongoExtensionAPIVersionVector* hostVersions, const MongoExtension** extension);
 
 #ifdef __cplusplus
 }  // extern "C"

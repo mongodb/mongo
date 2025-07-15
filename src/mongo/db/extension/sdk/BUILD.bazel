@@ -5,6 +5,7 @@ mongo_cc_library(
     srcs = [
         "aggregation_stage.cpp",
         "byte_buf.cpp",
+        "extension_helper.cpp",
         "extension_status.cpp",
     ],
     hdrs = [
@@ -12,6 +13,7 @@ mongo_cc_library(
         "byte_buf.h",
         "byte_buf_utils.h",
         "extension.h",
+        "extension_helper.h",
         "extension_status.h",
         "handle.h",
     ],

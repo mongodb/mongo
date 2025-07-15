@@ -39,6 +39,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo:core_headers_library",
         "//src/mongo/db/extension/public:api",
+        "//src/mongo/db/extension/sdk:sdk_cpp",
         "//src/mongo/db/query:query_knobs",
     ],
 )
@@ -52,6 +53,8 @@ mongo_cc_unit_test(
     # loaded in the unit tests.
     data = [
         "//src/mongo/db/extension/test_examples:foo_extension",
+        "//src/mongo/db/extension/test_examples:hostVersionFails_extension",
+        "//src/mongo/db/extension/test_examples:hostVersionSucceeds_extension",
         "//src/mongo/db/extension/test_examples:malformed1_extension",
         "//src/mongo/db/extension/test_examples:malformed2_extension",
         "//src/mongo/db/extension/test_examples:malformed3_extension",
