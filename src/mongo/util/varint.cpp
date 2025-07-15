@@ -27,59 +27,60 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ftdc/varint.h"
+#include "mongo/util/varint.h"
 
-#include "mongo/base/data_builder.h"
-#include "mongo/base/data_view.h"
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
+#include <base/integral_types.h>
+#include <util/coding/varint.h>
 
 namespace mongo {
 
-// Test integer packing and unpacking
-void TestInt(std::uint64_t i) {
-    char buf[11];
+Status DataType::Handler<VarInt>::load(
+    VarInt* t, const char* ptr, size_t length, size_t* advanced, std::ptrdiff_t debug_offset) {
+    std::uint64_t value;
 
-    DataView dvWrite(&buf[0]);
+    const char* newptr =
+        Varint::Parse64WithLimit(ptr, ptr + length, reinterpret_cast<uint64*>(&value));
 
-    dvWrite.write(i);
-
-    ConstDataView cdvRead(&buf[0]);
-
-    std::uint64_t d = cdvRead.read<std::uint64_t>();
-
-    ASSERT_EQUALS(i, d);
-}
-
-// Test various integer combinations compress and uncompress correctly
-TEST(FTDCVarIntTest, TestIntCompression) {
-    // Check numbers with leading 1
-    for (int i = 0; i < 63; i++) {
-        TestInt(i);
-        TestInt(i - 1);
+    if (!newptr) {
+        return DataType::makeTrivialLoadStatus(VarInt::kMaxSizeBytes64, length, debug_offset);
     }
 
-    // Check numbers composed of repeating hex numbers
-    for (int i = 0; i < 15; i++) {
-        std::uint64_t v = 0;
-        for (int j = 0; j < 15; j++) {
-            v = v << 4 | i;
-            TestInt(v);
-        }
+    if (t) {
+        *t = value;
     }
+
+    if (advanced) {
+        *advanced = newptr - ptr;
+    }
+
+    return Status::OK();
 }
 
-// Test data builder can write a lot of zeros
-TEST(FTDCVarIntTest, TestDataBuilder) {
-    DataBuilder db(1);
+Status DataType::Handler<VarInt>::store(
+    const VarInt& t, char* ptr, size_t length, size_t* advanced, std::ptrdiff_t debug_offset) {
+    // nullptr means it wants to know how much space we want
+    if (!ptr) {
+        *advanced = VarInt::kMaxSizeBytes64;
+        return Status::OK();
+    }
 
-    // DataBuilder grows by 2x, and we reserve 10 bytes
-    // lcm(2**x, 10) == 16
-    for (int i = 0; i < 16; i++) {
-        auto s1 = db.writeAndAdvance(FTDCVarInt(0));
-        ASSERT_OK(s1);
-    };
+    if (VarInt::kMaxSizeBytes64 > length) {
+        return DataType::makeTrivialStoreStatus(VarInt::kMaxSizeBytes64, length, debug_offset);
+    }
+
+    // Use a dassert since static_assert does not work because the expression does not have a
+    // constant value
+    dassert(Varint::kMax64 == VarInt::kMaxSizeBytes64);
+
+    const char* newptr = Varint::Encode64(ptr, t);
+
+    if (advanced) {
+        *advanced = newptr - ptr;
+    }
+
+    return Status::OK();
 }
 
 }  // namespace mongo

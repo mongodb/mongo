@@ -79,21 +79,15 @@ boost::filesystem::path EncryptionHooks::getProtectedPathSuffix() {
     return "";
 }
 
-Status EncryptionHooks::protectTmpData(const uint8_t* in,
-                                       size_t inlen,
-                                       uint8_t* out,
-                                       size_t outLen,
-                                       size_t* resultLen,
+Status EncryptionHooks::protectTmpData(ConstDataRange in,
+                                       DataRange* out,
                                        boost::optional<DatabaseName> dbName) {
     return Status(ErrorCodes::InternalError,
                   "Encryption hooks must be enabled to use preprocessTmpData.");
 }
 
-Status EncryptionHooks::unprotectTmpData(const uint8_t* in,
-                                         size_t inLen,
-                                         uint8_t* out,
-                                         size_t outLen,
-                                         size_t* resultLen,
+Status EncryptionHooks::unprotectTmpData(ConstDataRange in,
+                                         DataRange* out,
                                          boost::optional<DatabaseName> dbName) {
     return Status(ErrorCodes::InternalError,
                   "Encryption hooks must be enabled to use postprocessTmpData.");

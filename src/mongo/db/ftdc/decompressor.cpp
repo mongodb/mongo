@@ -36,8 +36,8 @@
 #include "mongo/base/status.h"
 #include "mongo/db/ftdc/compressor.h"
 #include "mongo/db/ftdc/util.h"
-#include "mongo/db/ftdc/varint.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/util/varint.h"
 
 #include <cstdint>
 
@@ -142,14 +142,14 @@ StatusWith<std::vector<BSONObj>> FTDCDecompressor::uncompress(ConstDataRange buf
                 continue;
             }
 
-            auto swDelta = cdrc.readAndAdvanceNoThrow<FTDCVarInt>();
+            auto swDelta = cdrc.readAndAdvanceNoThrow<VarInt>();
 
             if (!swDelta.isOK()) {
                 return swDelta.getStatus();
             }
 
             if (swDelta.getValue() == 0) {
-                auto swZero = cdrc.readAndAdvanceNoThrow<FTDCVarInt>();
+                auto swZero = cdrc.readAndAdvanceNoThrow<VarInt>();
 
                 if (!swZero.isOK()) {
                     return swZero.getStatus();

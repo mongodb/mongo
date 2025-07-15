@@ -44,14 +44,14 @@ namespace mongo {
  *  Information Retrieval: Implementing and Evaluating Search Engines. MIT Press, Cambridge, MA,
  *  2010
  */
-struct FTDCVarInt {
+struct VarInt {
     /**
      * Maximum number of bytes an integer can compress to
      */
     static const std::size_t kMaxSizeBytes64 = 10;
 
-    FTDCVarInt() = default;
-    FTDCVarInt(std::uint64_t t) : _value(t) {}
+    VarInt() = default;
+    VarInt(std::uint64_t t) : _value(t) {}
 
     operator std::uint64_t() const {
         return _value;
@@ -62,7 +62,7 @@ private:
 };
 
 template <>
-struct DataType::Handler<FTDCVarInt> {
+struct DataType::Handler<VarInt> {
     /**
      * Compress a 64-bit integer and return the new buffer position.
      *
@@ -70,22 +70,16 @@ struct DataType::Handler<FTDCVarInt> {
      *
      * Return nullptr for bad encoded data.
      */
-    static Status load(FTDCVarInt* t,
-                       const char* ptr,
-                       size_t length,
-                       size_t* advanced,
-                       std::ptrdiff_t debug_offset);
+    static Status load(
+        VarInt* t, const char* ptr, size_t length, size_t* advanced, std::ptrdiff_t debug_offset);
 
     /**
      * Compress a 64-bit integer and return the new buffer position
      */
-    static Status store(const FTDCVarInt& t,
-                        char* ptr,
-                        size_t length,
-                        size_t* advanced,
-                        std::ptrdiff_t debug_offset);
+    static Status store(
+        const VarInt& t, char* ptr, size_t length, size_t* advanced, std::ptrdiff_t debug_offset);
 
-    static FTDCVarInt defaultConstruct() {
+    static VarInt defaultConstruct() {
         return 0;
     }
 };

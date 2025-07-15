@@ -55,7 +55,6 @@ mongo_cc_library(
         "file_writer.cpp",
         "metadata_compressor.cpp",
         "util.cpp",
-        "varint.cpp",
         ":ftdc_feature_flag_gen",
     ],
     hdrs = [
@@ -71,7 +70,6 @@ mongo_cc_library(
         "file_writer.h",
         "metadata_compressor.h",
         "util.h",
-        "varint.h",
     ],
     deps = [
         "//src/mongo/bson:bson_validate",
@@ -80,8 +78,8 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/admission:execution_admission_context",
+        "//src/mongo/util:varint",
         "//src/mongo/util/concurrency:spin_lock",
-        "//src/third_party/s2",  # For VarInt
         "//src/third_party/zlib",
     ],
 )
@@ -198,7 +196,6 @@ mongo_cc_unit_test(
         "ftdc_test.h",
         "ftdc_util_test.cpp",
         "metadata_compressor_test.cpp",
-        "varint_test.cpp",
     ],
     tags = ["mongo_unittest_second_group"],
     deps = [

@@ -381,18 +381,15 @@ private:
 
         if (auto encryptionHooks = sorter::getEncryptionHooksIfEnabled()) {
             auto out = std::make_unique<char[]>(blockSize);
-            size_t outLen;
-            Status status =
-                encryptionHooks->unprotectTmpData(reinterpret_cast<const uint8_t*>(_buffer.get()),
-                                                  blockSize,
-                                                  reinterpret_cast<uint8_t*>(out.get()),
-                                                  blockSize,
-                                                  &outLen,
-                                                  _dbName);
+            DataRange outRange(out.get(), blockSize);
+            Status status = encryptionHooks->unprotectTmpData(
+                ConstDataRange(reinterpret_cast<const uint8_t*>(_buffer.get()), blockSize),
+                &outRange,
+                _dbName);
             uassert(28841,
                     str::stream() << "Failed to unprotect data: " << status.toString(),
                     status.isOK());
-            blockSize = outLen;
+            blockSize = outRange.length();
             _buffer.swap(out);
         }
 
@@ -1606,18 +1603,16 @@ void SortedFileWriter<Key, Value>::writeChunk() {
     if (auto encryptionHooks = sorter::getEncryptionHooksIfEnabled()) {
         size_t protectedSizeMax = size + encryptionHooks->additionalBytesForProtectedBuffer();
         out = std::make_unique<char[]>(protectedSizeMax);
-        size_t resultLen;
-        Status status = encryptionHooks->protectTmpData(reinterpret_cast<const uint8_t*>(outBuffer),
-                                                        size,
-                                                        reinterpret_cast<uint8_t*>(out.get()),
-                                                        protectedSizeMax,
-                                                        &resultLen,
-                                                        _opts.dbName);
+        DataRange outRange(out.get(), protectedSizeMax);
+        Status status = encryptionHooks->protectTmpData(
+            ConstDataRange(reinterpret_cast<const uint8_t*>(outBuffer), size),
+            &outRange,
+            _opts.dbName);
         uassert(28842,
                 str::stream() << "Failed to compress data: " << status.toString(),
                 status.isOK());
         outBuffer = out.get();
-        size = resultLen;
+        size = outRange.length();
     }
 
     // Negative size means compressed.

@@ -333,6 +333,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/base:secure_allocator",
         "//src/mongo/util:secure_zero_memory",
+        "//src/mongo/util:varint",
     ],
 )
 

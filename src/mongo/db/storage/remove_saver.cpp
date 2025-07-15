@@ -90,16 +90,16 @@ RemoveSaver::~RemoveSaver() {
 
         size_t protectedSizeMax = encryptionHooks->additionalBytesForProtectedBuffer();
         std::unique_ptr<uint8_t[]> protectedBuffer(new uint8_t[protectedSizeMax]);
+        DataRange outRange(protectedBuffer.get(), protectedSizeMax);
 
-        size_t resultLen;
-        Status status = _protector->finalize(protectedBuffer.get(), protectedSizeMax, &resultLen);
+        Status status = _protector->finalize(&outRange);
         if (!status.isOK()) {
             LOGV2_FATAL(34350,
                         "Unable to finalize DataProtector while closing RemoveSaver",
                         "error"_attr = redact(status));
         }
 
-        _out->write(reinterpret_cast<const char*>(protectedBuffer.get()), resultLen);
+        _out->write(reinterpret_cast<const char*>(protectedBuffer.get()), outRange.length());
         if (_out->fail()) {
             auto ec = lastSystemError();
             LOGV2_FATAL(34351,
@@ -109,22 +109,23 @@ RemoveSaver::~RemoveSaver() {
         }
 
         protectedBuffer.reset(new uint8_t[protectedSizeMax]);
-        status = _protector->finalizeTag(protectedBuffer.get(), protectedSizeMax, &resultLen);
+        outRange = DataRange(protectedBuffer.get(), protectedSizeMax);
+        status = _protector->finalizeTag(&outRange);
         if (!status.isOK()) {
             LOGV2_FATAL(34352,
                         "Unable to get finalizeTag from DataProtector while closing RemoveSaver",
                         "error"_attr = redact(status));
         }
 
-        if (resultLen != _protector->getNumberOfBytesReservedForTag()) {
+        if (outRange.length() != _protector->getNumberOfBytesReservedForTag()) {
             LOGV2_FATAL(34353,
                         "Attempted to write tag of larger size than DataProtector reserved size",
-                        "sizeBytes"_attr = resultLen,
+                        "sizeBytes"_attr = outRange.length(),
                         "reservedBytes"_attr = _protector->getNumberOfBytesReservedForTag());
         }
 
         _out->seekp(0);
-        _out->write(reinterpret_cast<const char*>(protectedBuffer.get()), resultLen);
+        _out->write(reinterpret_cast<const char*>(protectedBuffer.get()), outRange.length());
 
         if (_out->fail()) {
             auto ec = lastSystemError();
@@ -167,16 +168,15 @@ Status RemoveSaver::goingToDelete(const BSONObj& o) {
         size_t protectedSizeMax = dataSize + encryptionHooks->additionalBytesForProtectedBuffer();
         protectedBuffer.reset(new uint8_t[protectedSizeMax]);
 
-        size_t resultLen;
-        Status status = _protector->protect(
-            data, dataSize, protectedBuffer.get(), protectedSizeMax, &resultLen);
+        DataRange outRange(protectedBuffer.get(), protectedSizeMax);
+        Status status = _protector->protect(ConstDataRange(data, dataSize), &outRange);
 
         if (!status.isOK()) {
             return status;
         }
 
         data = protectedBuffer.get();
-        dataSize = resultLen;
+        dataSize = outRange.length();
     }
 
     _out->write(reinterpret_cast<const char*>(data), dataSize);
