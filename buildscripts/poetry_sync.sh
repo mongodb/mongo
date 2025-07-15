@@ -75,11 +75,21 @@ fi
 pip_opts=()
 if [[ "${allow_no_venv}" != 1 ]]; then
     # Exploit pip's own enforcement of virtualenv.
-    pip_opts+=('--require-virtualenv')
+    pip_opts+=(--require-virtualenv)
 fi
-run "${py3}" -m pip install "${pip_opts[@]}" -r poetry_requirements.txt
+
+# check if poetry should be installed via pip
+need_poetry_install=0              # 0 = no, 1 = yes
+if ! "${py3}" -m pip show poetry &>/dev/null; then
+    echo "Poetry not found in this interpreter, installing via pip." >&2
+    need_poetry_install=1
+fi
+
+# we'll need to use pip this time around
+if (( need_poetry_install )); then
+    run "${py3}" -m pip install "${pip_opts[@]}" -r poetry_requirements.txt
+fi
 
 run env \
-    PYTHON_KEYRING_BACKEND="keyring.backends.null.Keyring" \
-
-"${py3}" -m poetry install --no-root --sync
+  PYTHON_KEYRING_BACKEND="keyring.backends.null.Keyring" \
+  "${py3}" -m poetry sync --no-root
