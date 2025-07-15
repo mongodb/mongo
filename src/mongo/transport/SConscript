@@ -91,6 +91,7 @@ tlEnv.Library(
         'asio/asio_transport_layer.cpp',
         'asio/asio_utils.cpp',
         'proxy_protocol_header_parser.cpp',
+        'transport_options.cpp',
         'transport_options.idl',
     ],
     LIBDEPS=[
@@ -104,6 +105,7 @@ tlEnv.Library(
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_feature_flags',
+        '$BUILD_DIR/mongo/db/server_options',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',

@@ -110,7 +110,7 @@ private:
 /*
  * Returns true if a session with remote/local addresses should be exempted from maxConns
  */
-bool shouldOverrideMaxConns(const std::shared_ptr<transport::Session>& session,
+bool isExemptedByCIDRList(const std::shared_ptr<transport::Session>& session,
                             const std::vector<stdx::variant<CIDR, std::string>>& exemptions);
 
 }  // namespace mongo

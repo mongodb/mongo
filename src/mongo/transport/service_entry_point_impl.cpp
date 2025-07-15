@@ -114,8 +114,8 @@ struct ClientSummary {
 };
 }  // namespace
 
-bool shouldOverrideMaxConns(const std::shared_ptr<transport::Session>& session,
-                            const std::vector<stdx::variant<CIDR, std::string>>& exemptions) {
+bool isExemptedByCIDRList(const std::shared_ptr<transport::Session>& session,
+                          const std::vector<stdx::variant<CIDR, std::string>>& exemptions) {
     if (exemptions.empty())
         return false;
 
@@ -317,7 +317,8 @@ void ServiceEntryPointImpl::startSession(std::shared_ptr<transport::Session> ses
     auto restrictionEnvironment = std::make_unique<RestrictionEnvironment>(remoteAddr, localAddr);
     RestrictionEnvironment::set(session, std::move(restrictionEnvironment));
 
-    bool isPrivilegedSession = shouldOverrideMaxConns(session, serverGlobalParams.maxConnsOverride);
+    bool isPrivilegedSession =
+        isExemptedByCIDRList(session, serverGlobalParams.maxIncomingConnsOverride);
 
     auto client = _svcCtx->makeClient("conn{}"_format(session->id()), session);
     auto clientPtr = client.get();
@@ -468,7 +469,7 @@ void ServiceEntryPointImpl::appendStats(BSONObjBuilder* bob) const {
 
     const auto seStats = transport::ServiceExecutorStats::get(_svcCtx);
     appendInt("threaded", seStats.usesDedicated);
-    if (!serverGlobalParams.maxConnsOverride.empty())
+    if (!serverGlobalParams.maxIncomingConnsOverride.empty())
         appendInt("limitExempt", seStats.limitExempt);
 
     auto&& hm = HelloMetrics::get(_svcCtx);

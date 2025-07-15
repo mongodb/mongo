@@ -38,6 +38,7 @@
 #include "mongo/stdx/variant.h"
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/version/releases.h"
+#include "mongo/util/versioned_value.h"
 
 namespace mongo {
 
@@ -89,7 +90,8 @@ struct ServerGlobalParams {
     std::string transportLayer;   // --transportLayer (must be either "asio" or "legacy")
 
     size_t maxConns = DEFAULT_MAX_CONN;  // Maximum number of simultaneous open connections.
-    std::vector<stdx::variant<CIDR, std::string>> maxConnsOverride;
+    std::vector<stdx::variant<CIDR, std::string>> maxIncomingConnsOverride;
+    VersionedValue<std::vector<std::variant<CIDR, std::string>>> maxEstablishingConnsOverride;
     int reservedAdminThreads = 0;
 
     int unixSocketPermissions = DEFAULT_UNIX_PERMS;  // permissions for the UNIX domain socket
