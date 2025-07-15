@@ -37,11 +37,11 @@ namespace unified_write_executor {
 Analysis WriteOpAnalyzer::analyze(OperationContext* opCtx,
                                   const RoutingContext& routingCtx,
                                   const WriteOp& op) {
-    auto cri = routingCtx.getCollectionRoutingInfo(op.getNss());
+    const auto& cri = routingCtx.getCollectionRoutingInfo(op.getNss());
     // TODO SERVER-103782 Don't use CRITargeter.
     CollectionRoutingInfoTargeter targeter(op.getNss(), cri);
     // TODO SERVER-103780 Add support for kNoKey.
-    // TODO SERVER-103781 Add support for kParitalKeyWithId.
+    // TODO SERVER-103781 Add support for kPartialKeyWithId.
     // TODO SERVER-103146 Add kChangesOwnership.
     std::vector<ShardEndpoint> shardsAffected = [&]() {
         switch (op.getType()) {
