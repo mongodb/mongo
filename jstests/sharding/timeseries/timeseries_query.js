@@ -8,6 +8,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {isClusteredIxscan, isCollscan, isIxscan} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -72,7 +73,7 @@ function runQuery(
 
     if (expectedShards) {
         let filter = {
-            "command.aggregate": `system.buckets.${collName}`,
+            "command.aggregate": getTimeseriesCollForDDLOps(sDB, coll).getName(),
         };
 
         // If the query was rewritten to be a match expression on the buckets collection, we should
@@ -126,8 +127,9 @@ function runQuery(
 (function timeShardKey() {
     // Shard time-series collection.
     const shardKey = {[timeField]: 1};
+    const coll = sDB[collName];
     assert.commandWorked(sDB.adminCommand({
-        shardCollection: `${dbName}.${collName}`,
+        shardCollection: coll.getFullName(),
         key: shardKey,
         timeseries: {timeField, granularity: "hours"}
     }));
@@ -135,25 +137,24 @@ function runQuery(
     // Split the chunks such that primary shard has chunk: [MinKey, 2020-01-01) and other shard has
     // chunk [2020-01-01, MaxKey].
     let splitPoint = {[`control.min.${timeField}`]: ISODate(`2020-01-01`)};
-    assert.commandWorked(
-        sDB.adminCommand({split: `${dbName}.system.buckets.${collName}`, middle: splitPoint}));
+    assert.commandWorked(sDB.adminCommand(
+        {split: getTimeseriesCollForDDLOps(sDB, coll).getFullName(), middle: splitPoint}));
 
     // Move one of the chunks into the second shard.
     const primaryShard = st.getPrimaryShard(dbName);
     const otherShard = st.getOther(primaryShard);
     assert.commandWorked(sDB.adminCommand({
-        movechunk: `${dbName}.system.buckets.${collName}`,
+        movechunk: getTimeseriesCollForDDLOps(sDB, coll).getFullName(),
         find: splitPoint,
         to: otherShard.name,
         _waitForDelete: true
     }));
 
     // Ensure that each shard owns one chunk.
-    const counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
+    const counts = st.chunkCounts(coll.getName(), dbName);
     assert.eq(1, counts[primaryShard.shardName], counts);
     assert.eq(1, counts[otherShard.shardName], counts);
 
-    const coll = sDB.getCollection(collName);
     for (let i = 0; i < 2; i++) {
         runInsert("2019-11-11");
         runInsert("2019-12-31");
@@ -296,8 +297,9 @@ function runQuery(
 
 // Shard key on the metadata field and time fields.
 (function metaAndTimeShardKey() {
+    const coll = sDB[collName];
     assert.commandWorked(sDB.adminCommand({
-        shardCollection: `${dbName}.${collName}`,
+        shardCollection: coll.getFullName(),
         key: {[metaField]: 1, 'time': 1},
         timeseries: {timeField, metaField, granularity: "hours"}
     }));
@@ -305,24 +307,22 @@ function runQuery(
     // Split the chunks such that primary shard has chunk: [{MinKey, MinKey}, {0, 2020-01-01}) and
     // other shard has chunk [{0, 2020-01-01}, {MaxKey, MaxKey}].
     assert.commandWorked(st.s.adminCommand({
-        split: `${dbName}.system.buckets.${collName}`,
+        split: getTimeseriesCollForDDLOps(sDB, coll).getFullName(),
         middle: {meta: 0, 'control.min.time': ISODate(`2020-01-01`)}
     }));
 
     const primaryShard = st.getPrimaryShard(dbName);
     const otherShard = st.getOther(primaryShard);
     assert.commandWorked(st.s.adminCommand({
-        movechunk: `${dbName}.system.buckets.${collName}`,
+        movechunk: getTimeseriesCollForDDLOps(sDB, coll).getFullName(),
         find: {meta: 10, 'control.min.time': MinKey},
         to: otherShard.shardName,
         _waitForDelete: true
     }));
 
-    const counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
+    const counts = st.chunkCounts(coll.getName(), dbName);
     assert.eq(1, counts[st.shard0.shardName]);
     assert.eq(1, counts[st.shard1.shardName]);
-
-    const coll = sDB.getCollection(collName);
 
     for (let i = 0; i < 2; i++) {
         runInsert("2019-11-11", i);
@@ -457,32 +457,28 @@ function runQuery(
     const metaPrefix = `${metaField}.prefix`;
     const metaSuffix = `${metaField}.suffix`;
     const shardKey = {[metaPrefix]: 1, [metaSuffix]: 1};
-    assert.commandWorked(sDB.adminCommand({
-        shardCollection: `${dbName}.${collName}`,
-        key: shardKey,
-        timeseries: {timeField, metaField}
-    }));
+    const coll = sDB[collName];
+    assert.commandWorked(sDB.adminCommand(
+        {shardCollection: coll.getFullName(), key: shardKey, timeseries: {timeField, metaField}}));
 
     let splitPoint = {'meta.prefix': 0, 'meta.suffix': 0};
-    assert.commandWorked(
-        sDB.adminCommand({split: `${dbName}.system.buckets.${collName}`, middle: splitPoint}));
+    assert.commandWorked(sDB.adminCommand(
+        {split: getTimeseriesCollForDDLOps(sDB, coll).getFullName(), middle: splitPoint}));
 
     // Move one of the chunks into the second shard.
     const primaryShard = st.getPrimaryShard(dbName);
     const otherShard = st.getOther(primaryShard);
     assert.commandWorked(sDB.adminCommand({
-        movechunk: `${dbName}.system.buckets.${collName}`,
+        movechunk: getTimeseriesCollForDDLOps(sDB, coll).getFullName(),
         find: splitPoint,
         to: otherShard.name,
         _waitForDelete: true
     }));
 
     // Ensure that each shard owns one chunk.
-    const counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
+    const counts = st.chunkCounts(coll.getName(), dbName);
     assert.eq(1, counts[primaryShard.shardName], counts);
     assert.eq(1, counts[otherShard.shardName], counts);
-
-    const coll = sDB.getCollection(collName);
 
     for (let i = 0; i < 2; i++) {
         runInsert("2019-11-11", {prefix: -i, suffix: -i});
