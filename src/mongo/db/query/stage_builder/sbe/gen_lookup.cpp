@@ -737,8 +737,8 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> buildIndexJoinLookupForeignSid
     SbBuilder b(state, nodeId);
 
     const auto foreignCollUUID = foreignColl->uuid();
-    const auto foreignCollDbName = foreignColl->ns().dbName();
-    const auto indexName = index.identifier.catalogName;
+    const auto& foreignCollDbName = foreignColl->ns().dbName();
+    const auto& indexName = index.identifier.catalogName;
     const auto indexDescriptor =
         foreignColl->getIndexCatalog()->findIndexByName(state.opCtx, indexName);
     tassert(6447401,
