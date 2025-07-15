@@ -19,6 +19,7 @@ env.InjectThirdParty(libraries=[
 
 env.SConscript(
     dirs=[
+        'admission',
         'auth',
         'bson',
         'catalog',

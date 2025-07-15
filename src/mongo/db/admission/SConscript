@@ -1,0 +1,31 @@
+# -*- mode: python -*-
+Import("env")
+
+follyEnv = env.Clone()
+follyEnv.InjectThirdParty(libraries=[
+    'folly',
+])
+
+follyEnv.Library(
+    target='rate_limiter',
+    source=[
+        'rate_limiter.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+)
+
+follyEnv.CppUnitTest(
+    target='rate_limiter_util_test',
+    source='rate_limiter_util_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
+        'rate_limiter',
+    ],
+)
