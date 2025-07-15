@@ -55,7 +55,19 @@ export var MetadataConsistencyChecker = (function() {
                 jsTest.log.info("Skipping index consistency check across the cluster");
             }
 
-            const inconsistencies = adminDB.checkMetadataConsistency(checkOptions).toArray();
+            var inconsistencies = adminDB.checkMetadataConsistency(checkOptions).toArray();
+
+            // TODO SERVER-xyz to be blocked on the backport: do not ignore CorruptedChunkHistory in
+            // multiversion suites
+            const isMultiVersion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+            if (isMultiVersion) {
+                for (let i = inconsistencies.length - 1; i >= 0; i--) {
+                    if (inconsistencies[i].type == "CorruptedChunkHistory") {
+                        inconsistencies.splice(i, 1);  // Remove inconsistency
+                    }
+                }
+            }
+
             assert.eq(0,
                       inconsistencies.length,
                       `Found metadata inconsistencies: ${tojson(inconsistencies)}`);

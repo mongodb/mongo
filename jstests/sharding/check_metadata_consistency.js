@@ -1143,4 +1143,91 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     assertNoInconsistencies();
 })();
 
+(function testEmptyChunkHistory() {
+    jsTest.log("Executing testEmptyChunkHistory");
+
+    // TODO SERVER-xyz to be blocked on the backport: do not skip test in multiversion suites
+    const isMultiVersion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+    if (isMultiVersion) {
+        jsTestLog(
+            "Skipping testEmptyChunkHistory because checkMetadataConsistency in the previous binary " +
+            "the resharding test-only preset chunks feature was not adding the history");
+        return;
+    }
+
+    const db = getNewDb();
+    const collName = "collection";
+    const kNss = db.getName() + "." + collName;
+
+    // Create sharded collection with unique chunk placed on shard0
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
+    assertNoInconsistencies();
+
+    const chunk =
+        findChunksUtil.findOneChunkByNs(st.s.getDB('config'), kNss, {shard: st.shard0.shardName});
+
+    // Artificially corrupt chunk (missing onCurrentShardSince field)
+    {
+        const onCurrentShardSince = chunk.onCurrentShardSince;
+        assert.commandWorked(
+            configDB.chunks.update({_id: chunk._id}, {$unset: {onCurrentShardSince: 1}}));
+
+        let inconsistencies = db.checkMetadataConsistency().toArray();
+        assert.eq(inconsistencies.length, 1);
+        assert.eq("CorruptedChunkHistory", inconsistencies[0].type, tojson(inconsistencies));
+        assert.eq('The onCurrentShardSince field is missing',
+                  inconsistencies[0].details.issue,
+                  tojson(inconsistencies));
+
+        // Restore correct value
+        assert.commandWorked(configDB.chunks.update(
+            {_id: chunk._id}, {$set: {'onCurrentShardSince': onCurrentShardSince}}));
+        assertNoInconsistencies();
+    }
+
+    // Artificially corrupt chunk (wrong firt shard in the history array)
+    {
+        const errMsg = "The first element in the history for this chunk must be the owning shard " +
+            st.shard0.shardName + " but it is " + st.shard1.shardName;
+        assert.commandWorked(configDB.chunks.update(
+            {_id: chunk._id}, {$set: {'history.0.shard': st.shard1.shardName}}));
+        let inconsistencies = db.checkMetadataConsistency().toArray();
+        assert.eq(inconsistencies.length, 1);
+        assert.eq("CorruptedChunkHistory", inconsistencies[0].type, tojson(inconsistencies));
+        assert.eq(errMsg, inconsistencies[0].details.issue, tojson(inconsistencies));
+
+        // Restore correct value
+        assert.commandWorked(configDB.chunks.update(
+            {_id: chunk._id}, {$set: {'history.0.shard': st.shard0.shardName}}));
+        assertNoInconsistencies();
+    }
+
+    // Artificially corrupt chunk (empty history array)
+    {
+        assert.commandWorked(configDB.chunks.update({_id: chunk._id}, {$set: {history: []}}));
+        let inconsistencies = db.checkMetadataConsistency().toArray();
+        assert.eq(inconsistencies.length, 1);
+        assert.eq("CorruptedChunkHistory", inconsistencies[0].type, tojson(inconsistencies));
+        assert.eq('The history field is empty',
+                  inconsistencies[0].details.issue,
+                  tojson(inconsistencies));
+    }
+
+    // Artificially corrupt chunk (missing history field)
+    {
+        assert.commandWorked(configDB.chunks.update({_id: chunk._id}, {$unset: {history: 1}}));
+
+        let inconsistencies = db.checkMetadataConsistency().toArray();
+        assert.eq(inconsistencies.length, 1);
+        assert.eq("CorruptedChunkHistory", inconsistencies[0].type, tojson(inconsistencies));
+        assert.eq('The history field is empty',
+                  inconsistencies[0].details.issue,
+                  tojson(inconsistencies));
+    }
+
+    db.dropDatabase();
+})();
+
 st.stop();

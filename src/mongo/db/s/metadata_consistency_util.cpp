@@ -1162,6 +1162,44 @@ std::vector<MetadataInconsistencyItem> checkChunksConsistency(OperationContext* 
             chunksCursor->nextSafe(), collection.getEpoch(), collection.getTimestamp()));
         totalChunks++;
 
+        const bool chunkHistoryEmpty = chunk.getHistory().empty();
+        if (chunkHistoryEmpty) {
+            const std::string errMsg = str::stream()
+                << "The " << ChunkType::history() << " field is empty";
+            inconsistencies.emplace_back(makeInconsistency(
+                MetadataInconsistencyTypeEnum::kCorruptedChunkHistory,
+                CorruptedChunkHistoryDetails{nss, uuid, chunk.toConfigBSON(), errMsg}));
+
+        } else {
+            if (chunk.getHistory().front().getShard() != chunk.getShard()) {
+                std::string errMsg = str::stream()
+                    << "The first element in the history for this chunk must be the owning shard "
+                    << chunk.getShard() << " but it is "
+                    << chunk.getHistory().front().getShard().toString();
+                inconsistencies.emplace_back(makeInconsistency(
+                    MetadataInconsistencyTypeEnum::kCorruptedChunkHistory,
+                    CorruptedChunkHistoryDetails{nss, uuid, chunk.toConfigBSON(), errMsg}));
+            }
+
+            const bool onCurrentShardSinceMissing = !chunk.getOnCurrentShardSince().has_value();
+            if (onCurrentShardSinceMissing) {
+                const std::string errMsg = str::stream()
+                    << "The " << ChunkType::onCurrentShardSince() << " field is missing";
+                inconsistencies.emplace_back(makeInconsistency(
+                    MetadataInconsistencyTypeEnum::kCorruptedChunkHistory,
+                    CorruptedChunkHistoryDetails{nss, uuid, chunk.toConfigBSON(), errMsg}));
+            } else if (chunk.getHistory().front().getValidAfter() !=
+                       *chunk.getOnCurrentShardSince()) {
+                std::string errMsg = str::stream()
+                    << "The " << ChunkHistoryBase::kValidAfterFieldName
+                    << " for the first element in the history"
+                    << " must match the value of " << ChunkType::onCurrentShardSince();
+                inconsistencies.emplace_back(makeInconsistency(
+                    MetadataInconsistencyTypeEnum::kCorruptedChunkHistory,
+                    CorruptedChunkHistoryDetails{nss, uuid, chunk.toConfigBSON(), errMsg}));
+            }
+        }
+
         if (!shardKeyPattern.isShardKey(chunk.getMin()) ||
             !shardKeyPattern.isShardKey(chunk.getMax())) {
             inconsistencies.emplace_back(

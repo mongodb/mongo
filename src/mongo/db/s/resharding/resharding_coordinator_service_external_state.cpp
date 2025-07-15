@@ -156,6 +156,10 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
                                        ChunkRange{reshardedChunk.getMin(), reshardedChunk.getMax()},
                                        version,
                                        reshardedChunk.getRecipientShardId());
+            auto& newChunk = initialChunks.back();
+            newChunk.setOnCurrentShardSince(version.getTimestamp());
+            newChunk.setHistory({ChunkHistory(*newChunk.getOnCurrentShardSince(),
+                                              reshardedChunk.getRecipientShardId())});
             version.incMinor();
         }
     } else {

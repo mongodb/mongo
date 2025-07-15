@@ -41,6 +41,7 @@ enums:
             kCollectionOptionsMismatch: "CollectionOptionsMismatch"
             kCollectionAuxiliaryMetadataMismatch: "CollectionAuxiliaryMetadataMismatch"
             kCollectionUUIDMismatch: "CollectionUUIDMismatch"
+            kCorruptedChunkHistory: "CorruptedChunkHistory"
             kCorruptedChunkShardKey: "CorruptedChunkShardKey"
             kCorruptedZoneShardKey: "CorruptedZoneShardKey"
             kHiddenShardedCollection: "HiddenShardedCollection"
@@ -71,6 +72,7 @@ enums:
             kCollectionOptionsMismatch: "Found collection with mismatching options across shards and/or config server"
             kCollectionAuxiliaryMetadataMismatch: "Found collection with mismatching auxiliary metadata across shards and/or config server"
             kCollectionUUIDMismatch: "Found collection on non primary shard with mismatching UUID"
+            kCorruptedChunkHistory: "Found chunk with an invalid history field"
             kCorruptedChunkShardKey: "Found chunk with a shard key pattern violation"
             kCorruptedZoneShardKey: "Found zone with a shard key pattern violation"
             kHiddenShardedCollection: "Found sharded collection but relative database does not exist"
@@ -282,6 +284,24 @@ structs:
             globalMax:
                 type: object
                 description: "The expected max key of the collection."
+
+    CorruptedChunkHistoryDetails:
+        description: "Details about a corrupted chunk history field."
+        strict: false
+        fields:
+            namespace:
+                cpp_name: nss
+                type: namespacestring
+                description: "The namespace of the collection."
+            collectionUUID:
+                type: uuid
+                description: "The UUID of the collection."
+            chunk:
+                type: object
+                description: "The chunk with a corrupted history."
+            issue:
+                type: string
+                description: "The type of corruption."
 
     CorruptedChunkShardKeyDetails:
         description: "Details about a corrupted chunk shard key inconsistency."
