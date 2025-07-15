@@ -641,6 +641,7 @@ mongo_cc_library(
     srcs = [
         "create_database_util.cpp",
         "ddl_lock_manager.cpp",
+        "periodic_replica_set_configshard_maintenance_mode_checker.cpp",
         "periodic_sharded_index_consistency_checker.cpp",
         "sharding_ddl_util.cpp",
         "sharding_ddl_util_detail.cpp",
@@ -674,6 +675,7 @@ mongo_cc_library(
     hdrs = [
         "create_database_util.h",
         "ddl_lock_manager.h",
+        "periodic_replica_set_configshard_maintenance_mode_checker.h",
         "periodic_sharded_index_consistency_checker.h",
         "sharding_ddl_util.h",
         "sharding_ddl_util_detail.h",

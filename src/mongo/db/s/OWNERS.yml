@@ -334,3 +334,6 @@ filters:
   - "*complete_promotion_to_sharded_cluster*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "periodic_replica_set_configshard_maintenance_mode_checker.*":
+    approvers:
+      - 10gen/server-catalog-and-routing

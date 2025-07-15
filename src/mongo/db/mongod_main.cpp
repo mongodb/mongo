@@ -159,6 +159,7 @@
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/periodic_replica_set_configshard_maintenance_mode_checker.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
 #include "mongo/db/s/query_analysis_op_observer_configsvr.h"
 #include "mongo/db/s/query_analysis_op_observer_rs.h"
@@ -1097,6 +1098,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
         if (!gChangeCollectionRemoverDisabled) {
             startChangeCollectionExpiredDocumentsRemover(serviceContext);
         }
+        if (serverGlobalParams.replicaSetConfigShardMaintenanceMode) {
+            PeriodicReplicaSetConfigShardMaintenanceModeChecker::get(serviceContext)->start();
+        }
     }
 
     if (computeModeEnabled) {
@@ -1954,6 +1958,8 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         LOGV2(4784928, "Shutting down the TTL monitor");
         shutdownTTLMonitor(serviceContext);
     }
+
+    PeriodicReplicaSetConfigShardMaintenanceModeChecker::get(serviceContext)->stop();
 
     {
         SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),

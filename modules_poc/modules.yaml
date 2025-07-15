@@ -635,6 +635,8 @@ routing_and_topology:
     - src/mongo/db/s/complete_promotion_to_sharded_cluster_coordinator*
     - src/mongo/db/s/topology_change_helpers*
 
+    - src/mongo/db/s/periodic_replica_set_configshard_maintenance_mode_checker*
+
     # shard identity
     - src/mongo/db/s/*shard_identity*
 

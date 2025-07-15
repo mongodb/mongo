@@ -54,6 +54,9 @@ describe("replicaSetConfigShardMaintenanceMode startup flag compatibility tests"
 
     afterEach(() => {
         this.rs.initiate();
+        assert.soon(() => {
+            return checkLog.getLogMessage(this.rs.getPrimary(), "10718700") != null;
+        });
         this.rs.stopSet();
     });
 
