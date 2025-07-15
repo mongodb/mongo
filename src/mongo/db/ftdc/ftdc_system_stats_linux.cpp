@@ -204,7 +204,6 @@ public:
             subObjBuilder.doneFast();
         }
 
-        // TODO SERVER-83707 Remove PSI capture, once T2 uses the ServerStatus section of FTDC
         {
             BSONObjBuilder subObjBuilder(builder.subobjStart("pressure"_sd));
             processStatusErrors(
