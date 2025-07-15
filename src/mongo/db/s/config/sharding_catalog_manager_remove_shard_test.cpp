@@ -136,9 +136,10 @@ protected:
                                                                                     shardId)) {
             return *drainingProgress;
         }
-        if (auto drainingProgress =
-                ShardingCatalogManager::get(opCtx)->checkDrainingProgress(opCtx, shardId)) {
-            return *drainingProgress;
+        auto drainingProgress =
+            ShardingCatalogManager::get(opCtx)->checkDrainingProgress(opCtx, shardId);
+        if (drainingProgress.getState() != ShardDrainingStateEnum::kDrainingComplete) {
+            return drainingProgress;
         }
         return ShardingCatalogManager::get(opCtx)->removeShard(opCtx, shardId);
     }

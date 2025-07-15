@@ -397,6 +397,7 @@ let testCases = {
     removeQuerySettings: {skip: "does not return user data"},
     setUserWriteBlockMode: {skip: "primary only"},
     shardCollection: {skip: "primary only"},
+    shardDrainingStatus: {skip: "internal command"},
     shardingState: {skip: "does not return user data"},
     shutdown: {skip: "does not return user data"},
     sleep: {skip: "does not return user data"},

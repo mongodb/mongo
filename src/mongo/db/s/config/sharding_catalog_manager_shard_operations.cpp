@@ -780,11 +780,7 @@ boost::optional<RemoveShardProgress> ShardingCatalogManager::checkPreconditionsA
 
     // Figure out if shard is already draining
     const bool isShardCurrentlyDraining =
-        topology_change_helpers::runCountCommandOnConfig(
-            opCtx,
-            _localConfigShard,
-            NamespaceString::kConfigsvrShardsNamespace,
-            BSON(ShardType::name() << shardName << ShardType::draining(true))) > 0;
+        ShardingCatalogManager::isShardCurrentlyDraining(opCtx, shardId);
 
     if (!isShardCurrentlyDraining) {
         LOGV2(21945, "Going to start draining shard", "shardId"_attr = shardName);
@@ -814,8 +810,8 @@ boost::optional<RemoveShardProgress> ShardingCatalogManager::checkPreconditionsA
     return boost::none;
 }
 
-boost::optional<RemoveShardProgress> ShardingCatalogManager::checkDrainingProgress(
-    OperationContext* opCtx, const ShardId& shardId) {
+RemoveShardProgress ShardingCatalogManager::checkDrainingProgress(OperationContext* opCtx,
+                                                                  const ShardId& shardId) {
     hangRemoveShardAfterSettingDrainingFlag.pauseWhileSet(opCtx);
 
     // Draining has already started, now figure out how many chunks and databases are still on the
@@ -842,7 +838,18 @@ boost::optional<RemoveShardProgress> ShardingCatalogManager::checkDrainingProgre
         progress.setRemaining(drainingProgress.removeShardCounts);
         return progress;
     }
-    return boost::none;
+    RemoveShardProgress progress(ShardDrainingStateEnum::kDrainingComplete);
+    return progress;
+}
+
+bool ShardingCatalogManager::isShardCurrentlyDraining(OperationContext* opCtx,
+                                                      const ShardId& shardId) {
+    const auto shardName = shardId.toString();
+    return topology_change_helpers::runCountCommandOnConfig(
+               opCtx,
+               _localConfigShard,
+               NamespaceString::kConfigsvrShardsNamespace,
+               BSON(ShardType::name() << shardName << ShardType::draining(true))) > 0;
 }
 
 RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,

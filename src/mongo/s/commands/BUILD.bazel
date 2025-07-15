@@ -328,6 +328,7 @@ mongo_cc_library(
         "cluster_move_range_cmd.cpp",
         "cluster_remove_shard_cmd.cpp",
         "cluster_remove_shard_from_zone_cmd.cpp",
+        "cluster_shard_draining_status_cmd.cpp",
         "cluster_split_cmd.cpp",
         "cluster_split_vector_cmd.cpp",
         "cluster_start_shard_draining_cmd.cpp",

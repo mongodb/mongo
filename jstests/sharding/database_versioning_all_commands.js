@@ -750,6 +750,7 @@ let testCases = {
     removeQuerySettings: {skip: "not on a user database"},
     setUserWriteBlockMode: {skip: "executes locally on mongos (not sent to any remote node)"},
     shardCollection: {skip: "does not forward command to primary shard"},
+    shardDrainingStatus: {skip: "not on a user database"},
     shutdown: {skip: "does not forward command to primary shard"},
     split: {skip: "does not forward command to primary shard"},
     splitVector: {skip: "does not forward command to primary shard"},

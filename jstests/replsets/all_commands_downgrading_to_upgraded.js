@@ -69,6 +69,7 @@ const allCommands = {
     _configsvrSetAllowMigrations: {skip: isAnInternalCommand},
     _configsvrSetClusterParameter: {skip: isAnInternalCommand},
     _configsvrSetUserWriteBlockMode: {skip: isAnInternalCommand},
+    _configsvrShardDrainingStatus: {skip: isAnInternalCommand},
     _configsvrStartShardDraining: {skip: isAnInternalCommand},
     _configsvrTransitionFromDedicatedConfigServer: {skip: isAnInternalCommand},
     _configsvrTransitionToDedicatedConfigServer: {skip: isAnInternalCommand},
@@ -1525,6 +1526,13 @@ const allCommands = {
         teardown: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
+    },
+    shardDrainingStatus: {
+        // We cannot test shardDrainingStatus because we need to be able to run addShard during set
+        // up.
+        // This will be tested in FCV upgrade/downgrade passthroughs in the sharding
+        // directory.
+        skip: "cannot add shard while in downgrading FCV state",
     },
     shardingState: {
         isAdminCommand: true,

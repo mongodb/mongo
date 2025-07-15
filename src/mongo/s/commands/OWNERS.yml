@@ -180,3 +180,6 @@ filters:
   - "cluster_start_shard_draining_cmd.cpp":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "cluster_shard_draining_status_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing

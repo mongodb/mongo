@@ -101,10 +101,9 @@ RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId)
             if (auto drainingStatus = topology_change_helpers::startShardDraining(opCtx, shardId)) {
                 return *drainingStatus;
             }
-
-            if (auto drainingStatus =
-                    shardingCatalogManager->checkDrainingProgress(opCtx, shardId)) {
-                return *drainingStatus;
+            auto drainingStatus = shardingCatalogManager->checkDrainingProgress(opCtx, shardId);
+            if (drainingStatus.getState() != ShardDrainingStateEnum::kDrainingComplete) {
+                return drainingStatus;
             }
 
             boost::optional<DDLLockManager::ScopedCollectionDDLLock> ddlLock{

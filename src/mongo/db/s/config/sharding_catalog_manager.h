@@ -553,12 +553,11 @@ public:
 
     /**
      * Checks if the shard is still draining and returns the draining status if so. If not, returns
-     * boost::none indicating that the commit of the shard removal can proceed.
+     * drainingComplete indicating that the commit of the shard removal can proceed.
      */
-    boost::optional<RemoveShardProgress> checkDrainingProgress(OperationContext* opCtx,
-                                                               const ShardId& shardId);
+    RemoveShardProgress checkDrainingProgress(OperationContext* opCtx, const ShardId& shardId);
 
-
+    bool isShardCurrentlyDraining(OperationContext* opCtx, const ShardId& shardId);
     /**
      * Tries to remove a shard. To completely remove a shard from a sharded cluster,
      * the data residing in that shard must be moved to the remaining shards in the

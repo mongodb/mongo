@@ -1090,6 +1090,8 @@ std::string getRemoveShardMessage(const ShardDrainingStateEnum& status) {
             return "draining ongoing";
         case ShardDrainingStateEnum::kPendingDataCleanup:
             return "waiting for data to be cleaned up";
+        case ShardDrainingStateEnum::kDrainingComplete:
+            return "draining completed successfully";
         case ShardDrainingStateEnum::kCompleted:
             return "removeshard completed successfully";
         default:

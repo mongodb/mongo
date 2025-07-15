@@ -23,4 +23,5 @@ export const commandsRemovedFromMongodSinceLastLTS = [
 export const commandsAddedToMongodSinceLastLTS = [
     "releaseMemory",
     "_configsvrStartShardDraining",
+    "_configsvrShardDrainingStatus",
 ];

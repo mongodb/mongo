@@ -105,3 +105,6 @@ filters:
   - "configsvr_start_shard_draining_command.cpp":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "configsvr_shard_draining_status_command.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing

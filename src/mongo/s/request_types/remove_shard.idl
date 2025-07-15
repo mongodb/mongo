@@ -122,3 +122,25 @@ commands:
         strict: false
         chained_structs:
             RemoveShardRequestBase: RemoveShardRequestBase
+
+    shardDrainingStatus:
+        command_name: shardDrainingStatus
+        description: "The public shardDrainingStatus command on mongos"
+        cpp_name: ShardDrainingStatus
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false
+        chained_structs:
+            RemoveShardRequestBase: RemoveShardRequestBase
+
+    _configsvrShardDrainingStatus:
+        command_name: _configsvrShardDrainingStatus
+        description: "The internal shardDrainingStatus command on config server"
+        cpp_name: ConfigSvrShardDrainingStatus
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false
+        chained_structs:
+            RemoveShardRequestBase: RemoveShardRequestBase
