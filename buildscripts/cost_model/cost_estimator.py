@@ -30,6 +30,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any, Callable
 
 import numpy as np
 from sklearn.metrics import explained_variance_score, mean_squared_error, r2_score
@@ -63,7 +64,8 @@ class LinearModel:
     mse: float  # Mean Squared Error
     r2: float  # Coefficient of determination
     evs: float  # Explained Variance Score
-    corrcoef: any  # Correlation Coefficients
+    corrcoef: Any  # Correlation Coefficients
+    predict: Callable[[Any], Any] = None  # the actual linear function
 
 
 def estimate(
@@ -96,5 +98,11 @@ def estimate(
     corrcoef = np.corrcoef(np.transpose(X[:, 1:]), y)
 
     return LinearModel(
-        coef=coef[1:], intercept=coef[0], mse=mse, r2=r2, evs=evs, corrcoef=corrcoef[0, 1:]
+        coef=coef[1:],
+        intercept=coef[0],
+        mse=mse,
+        r2=r2,
+        evs=evs,
+        corrcoef=corrcoef[0, 1:],
+        predict=predict,
     )

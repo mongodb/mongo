@@ -158,16 +158,11 @@ async def execute_index_intersections(
     await execute_index_intersections_with_requests(database, collections, requests)
 
 
-async def execute_limitskip(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
-    collection = [ci for ci in collections if ci.name.startswith("index_scan")][0]
-    limits = [5, 10, 15, 20]
-    skips = [5, 10, 15, 20]
-    requests = []
+async def execute_limits(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
+    collection = [c for c in collections if c.name.startswith("index_scan")][0]
+    limits = [1, 2, 5, 10, 15, 20, 25, 50]  # , 100, 250, 500, 1000, 2500, 5000, 10000]
 
-    for limit in limits:
-        for skip in skips:
-            requests.append(Query(pipeline=[{"$skip": skip}, {"$limit": limit}], note="LimitSkip"))
-
+    requests = [Query([{"$limit": limit}], note="Limit") for limit in limits]
     await workload_execution.execute(
         database, main_config.workload_execution, [collection], requests
     )
@@ -186,12 +181,7 @@ async def main():
         await generator.populate_collections()
         # 3. Collecting data for calibration (optional).
         # It runs the pipelines and stores explains to the database.
-        execution_query_functions = [
-            execute_index_scan_queries,
-            execute_physical_scan_queries,
-            execute_index_intersections,
-            execute_limitskip,
-        ]
+        execution_query_functions = [execute_limits]
         for execute_query in execution_query_functions:
             await execute_query(database, generator.collection_infos)
             main_config.workload_execution.write_mode = WriteMode.APPEND

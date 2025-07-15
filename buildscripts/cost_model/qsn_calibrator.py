@@ -30,6 +30,7 @@
 from __future__ import annotations
 
 import experiment as exp
+import matplotlib.pyplot as plt
 import pandas as pd
 import statsmodels.api as sm
 from config import QsNodeCalibrationConfig, QuerySolutionCalibrationConfig
@@ -78,4 +79,23 @@ def calibrate_node(
         model = nnls.fit(X, y)
         return (model.coef_, model.predict)
 
-    return estimate(fit, X.to_numpy(), y.to_numpy(), config.test_size, config.trace)
+    model = estimate(fit, X.to_numpy(), y.to_numpy(), config.test_size, config.trace)
+    # plot regression and save to file
+    if model.predict:
+        fig, ax = plt.subplots()
+        ax.scatter(qsn_node_df[variables], y, label="Executions")
+        ax.plot(
+            qsn_node_df[variables],
+            model.predict(X),
+            linewidth=3,
+            color="tab:orange",
+            label="Linear Regression",
+        )
+        ax.set(
+            xlabel="Number of documents",
+            ylabel="Execution time (ns)",
+            title=f"Regression for {node_config.type}",
+        )
+        ax.legend()
+        fig.savefig(f"{node_config.type}.png")
+    return model

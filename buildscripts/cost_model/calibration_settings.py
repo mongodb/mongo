@@ -321,8 +321,8 @@ workload_execution = config.WorkloadExecutionConfig(
     enabled=True,
     output_collection_name="calibrationData",
     write_mode=config.WriteMode.REPLACE,
-    warmup_runs=3,
-    runs=30,
+    warmup_runs=5,
+    runs=100,
 )
 
 

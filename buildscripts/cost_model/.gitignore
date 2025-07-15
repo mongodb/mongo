@@ -1,1 +1,4 @@
 cm
+# generated files
+*.png
+parameters.csv
