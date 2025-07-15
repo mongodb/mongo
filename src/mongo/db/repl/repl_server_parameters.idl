@@ -719,3 +719,9 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagSetFcvDryRunMode
         default: false
         fcv_gated: false
+
+    featureFlagUpgradingToDowngrading:
+        description: When enabled, allows downgrading back to the old FCV in case an upgrade fails due to incompatible features
+        cpp_varname: feature_flags::gFeatureFlagUpgradingToDowngrading
+        default: false
+        fcv_gated: false
