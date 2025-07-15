@@ -62,6 +62,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -87,6 +88,8 @@
 namespace mongo {
 namespace {
 const auto rangeDeleterServiceDecorator = ServiceContext::declareDecoration<RangeDeleterService>();
+
+const Seconds kCheckForEnabledServiceInterval(10);
 
 BSONObj getShardKeyPattern(OperationContext* opCtx,
                            const DatabaseName& dbName,
@@ -203,6 +206,14 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
                                       << ex.toStatus());
                 break;
             }
+        }
+
+        // Once passing this check, the range deletion will be processed without being halted, even
+        // if the range deleter gets disabled halfway through.
+        if (RangeDeleterService::get(opCtx)->isDisabled()) {
+            MONGO_IDLE_THREAD_BLOCK;
+            sleepFor(kCheckForEnabledServiceInterval);
+            continue;
         }
 
         auto task = _queue.front();
@@ -355,23 +366,12 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
 }
 
 void RangeDeleterService::onStartup(OperationContext* opCtx) {
-    if (disableResumableRangeDeleter.load()) {
-        return;
-    }
-
     auto opObserverRegistry =
         checked_cast<OpObserverRegistry*>(opCtx->getServiceContext()->getOpObserver());
     opObserverRegistry->addObserver(std::make_unique<RangeDeleterServiceOpObserver>());
 }
 
 void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long term) {
-    if (disableResumableRangeDeleter.load()) {
-        LOGV2_INFO(
-            6872508,
-            "Not resuming range deletions on step-up because `disableResumableRangeDeleter=true`");
-        return;
-    }
-
     // Wait until all tasks and thread from previous term drain
     _joinAndResetState();
 
@@ -391,6 +391,10 @@ void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long te
     _readyRangeDeletionsProcessorPtr = std::make_unique<ReadyRangeDeletionsProcessor>(opCtx);
 
     _recoverRangeDeletionsOnStepUp(opCtx);
+}
+
+bool RangeDeleterService::isDisabled() {
+    return disableResumableRangeDeleter.load();
 }
 
 void RangeDeleterService::_recoverRangeDeletionsOnStepUp(OperationContext* opCtx) {
@@ -569,17 +573,6 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
     SemiFuture<void>&& waitForActiveQueriesToComplete,
     bool fromResubmitOnStepUp,
     bool pending) {
-
-    if (disableResumableRangeDeleter.load()) {
-        LOGV2_INFO(6872509,
-                   "Not scheduling range deletion because `disableResumableRangeDeleter=true`");
-        return SemiFuture<void>::makeReady(
-                   Status(ErrorCodes::ResumableRangeDeleterDisabled,
-                          "Not submitting any range deletion task because the "
-                          "disableResumableRangeDeleter server parameter is set to true"))
-            .share();
-    }
-
     auto scheduleRangeDeletionChain = [&](SharedSemiFuture<void> pendingFuture) {
         (void)pendingFuture.thenRunOn(_executor)
             .then([this,
@@ -675,12 +668,11 @@ int RangeDeleterService::getNumRangeDeletionTasksForCollection(const UUID& colle
 
 SharedSemiFuture<void> RangeDeleterService::getOverlappingRangeDeletionsFuture(
     const UUID& collectionUUID, const ChunkRange& range) {
-
-    if (disableResumableRangeDeleter.load()) {
+    if (isDisabled()) {
         return SemiFuture<void>::makeReady(
                    Status(ErrorCodes::ResumableRangeDeleterDisabled,
-                          "Not submitting any range deletion task because the "
-                          "disableResumableRangeDeleter server parameter is set to true"))
+                          "Not waiting for overlapping range deletion tasks because the resumable "
+                          "range deleter is disabled"))
             .share();
     }
 

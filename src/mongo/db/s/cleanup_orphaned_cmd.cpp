@@ -48,7 +48,6 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
-#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -133,11 +132,6 @@ Status cleanupOrphanedData(OperationContext* opCtx,
     // sleep for a short time and then try waitForClean again.
     while (auto numRemainingDeletionTasks =
                rangedeletionutil::checkForConflictingDeletions(opCtx, *range, *collectionUuid)) {
-        uassert(ErrorCodes::ResumableRangeDeleterDisabled,
-                "Failing cleanupOrphaned because the disableResumableRangeDeleter server parameter "
-                "is set to true and this shard contains range deletion tasks for the collection.",
-                !disableResumableRangeDeleter.load());
-
         LOGV2(4416003,
               "cleanupOrphaned going to wait for range deletion tasks to complete",
               logAttrs(ns),

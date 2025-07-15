@@ -1,10 +1,13 @@
 /**
- * Verifies the effect of setting disableResumableRangeDeleter to true on a shard.
+ * Verifies the effect of setting disableResumableRangeDeleter to true on a shard (startup and
+ * runtime).
  *
  * requires_persistence - This test restarts shards and expects them to remember their data.
- * @tags: [requires_persistence]
+ * @tags: [
+ *   requires_persistence,
+ *   requires_fcv_82,
+ * ]
  */
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // This test intentionally disables the resumable range deleter.
@@ -26,107 +29,166 @@ let randomStr = () => {
     return str;
 };
 
-const st = new ShardingTest({shards: 2});
+function verifyRangeDeleterStatusOnShard(
+    st, shardPrimary, toShardName, expectFailure, ns, chunkToMove) {
+    // Test 1: Attempt to receive a chunk that would require cleaning an overlapping range.
+    // To set this up, we assume a range deletion task was previously created for chunkToMove on
+    // this shard.
+    const moveChunkRes = st.s.adminCommand(
+        {moveChunk: ns, find: chunkToMove, to: toShardName, _waitForDelete: true});
+    if (expectFailure) {
+        assert.commandFailedWithCode(
+            moveChunkRes,
+            ErrorCodes.OperationFailed,
+            `MoveChunk to ${
+                toShardName} should have failed due to ResumableRangeDeleterDisabled. Response: ${
+                tojson(moveChunkRes)}`);
+    } else {
+        assert.commandWorked(
+            moveChunkRes,
+            `MoveChunk to ${toShardName} should have succeeded. Response: ${tojson(moveChunkRes)}`);
+    }
 
-jsTest.log("Setup");
+    // Test 2: Attempt cleanupOrphaned on the specific namespace.
+    const cleanupRes = shardPrimary.adminCommand({cleanupOrphaned: ns});
+    if (expectFailure) {
+        assert.commandFailedWithCode(
+            cleanupRes,
+            ErrorCodes.OrphanedRangeCleanUpFailed,
+            `cleanupOrphaned on ${ns} on ${toShardName} should have failed. Response: ${
+                tojson(cleanupRes)}`);
+    } else {
+        assert.commandWorked(
+            cleanupRes,
+            `cleanupOrphaned on ${ns} on ${toShardName} should have succeeded. Response: ${
+                tojson(cleanupRes)}`);
+    }
+
+    // Test 3: cleanupOrphaned on an unrelated namespace should always work.
+    jsTest.log(`Attempting cleanupOrphaned on unrelated namespace on ${toShardName}`);
+    assert.commandWorked(
+        shardPrimary.adminCommand({cleanupOrphaned: `${dbName}.unrelated`}),
+        `cleanupOrphaned on unrelated namespace on ${toShardName} failed unexpectedly.`);
+}
+
+function createRangeDeletionTask(st, shardPrimary, toShardName, chunkToMove) {
+    jsTest.log(`Creating range deletion task on ${shardPrimary.shardName} for chunk ${tojson(chunkToMove)}
+     by moving to ${toShardName}`);
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: chunkToMove, to: toShardName}));
+}
+
+const st = new ShardingTest({shards: 3});
+
 assert.commandWorked(
     st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
+
+// Split into a few chunks across shards
+// Chunk1: {_id: MinKey} -> {_id: 0} on shard0
+// Chunk2: {_id: 0}      -> {_id: 100} on shard1
+// Chunk3: {_id: 100}    -> {_id: MaxKey} on shard2
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
+assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 100}}));
+assert.commandWorked(st.s.adminCommand(
+    {moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName, _waitForDelete: true}));
+assert.commandWorked(st.s.adminCommand(
+    {moveChunk: ns, find: {_id: 100}, to: st.shard2.shardName, _waitForDelete: true}));
 
-jsTest.log("Suspend range deletion and cause a range deletion task to be created on shard0.");
-let suspendRangeDeletionFailpoint = configureFailPoint(st.rs0.getPrimary(), "suspendRangeDeletion");
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
+const chunkOnShard0 = {
+    _id: -10
+};  // Belongs to range MinKey -> 0
+const chunkOnShard1 = {
+    _id: 50
+};  // Belongs to range 0 -> 100
 
-jsTest.log("Restart shard0 with disableResumableRangeDeleter=true.");
-// Note, the suspendRangeDeletion failpoint will not survive the restart.
-st.rs0.restart(0, {
-    remember: true,
-    appendOptions: true,
-    startClean: false,
-    setParameter: "disableResumableRangeDeleter=true"
-});
+jsTest.log("Test Case: Enable/disable the range deleter via the server parameter on a shard");
+(() => {
+    // Disable the range deleter in shard0 (via runtime) and shard1 (via startup).
+    st.shard0.adminCommand({setParameter: 1, disableResumableRangeDeleter: true});
+    st.rs1.restart(0, {
+        remember: true,
+        appendOptions: true,
+        startClean: false,
+        setParameter: {disableResumableRangeDeleter: true}
+    });
 
-jsTest.log("Shard0 should fail to submit the range deletion task on stepup.");
+    // Create range deletion tasks on shard0 and shard1.
+    createRangeDeletionTask(st, st.shard0, st.shard2.shardName, chunkOnShard0);
+    createRangeDeletionTask(st, st.shard1, st.shard2.shardName, chunkOnShard1);
 
-jsTest.log("Shard0 should fail to receive a range that overlaps the range deletion task.");
-// The error from moveChunk gets wrapped as an OperationFailed error, so we have to check the error
-// message to find the original cause.
-const moveChunkRes = st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName});
-assert.commandFailedWithCode(moveChunkRes, ErrorCodes.OperationFailed);
-assert(moveChunkRes.errmsg.indexOf("ResumableRangeDeleterDisabled") > -1);
+    verifyRangeDeleterStatusOnShard(
+        st, st.shard0, st.shard0.shardName, true /*expectFailure*/, ns, chunkOnShard0);
+    verifyRangeDeleterStatusOnShard(
+        st, st.shard1, st.shard1.shardName, true /*expectFailure*/, ns, chunkOnShard1);
 
-jsTest.log("Shard0 should fail to do cleanupOrphaned on the namespace.");
-assert.commandFailedWithCode(st.rs0.getPrimary().adminCommand({cleanupOrphaned: ns}),
-                             ErrorCodes.ResumableRangeDeleterDisabled);
+    // Enable the range deleter service and verify the status on all shards.
+    st.shard0.adminCommand({setParameter: 1, disableResumableRangeDeleter: false});
+    st.shard1.adminCommand({setParameter: 1, disableResumableRangeDeleter: false});
 
-jsTest.log("Shard0 should be able to do cleanupOrphaned on an unrelated namespace.");
-assert.commandWorked(st.rs0.getPrimary().adminCommand({cleanupOrphaned: "test.unrelated"}));
+    verifyRangeDeleterStatusOnShard(
+        st, st.shard0, st.shard0.shardName, false /*expectFailure*/, ns, chunkOnShard0);
+    verifyRangeDeleterStatusOnShard(
+        st, st.shard1, st.shard1.shardName, false /*expectFailure*/, ns, chunkOnShard1);
 
-jsTest.log("Restart shard1 with disableResumableRangeDeleter=true.");
-st.rs1.restart(0, {
-    remember: true,
-    appendOptions: true,
-    startClean: false,
-    setParameter: "disableResumableRangeDeleter=true"
-});
-st.rs1.waitForPrimary();
-
-jsTest.log("Shard0 should be able to donate a chunk and shard1 should be able to receive it.");
-// disableResumableRangeDeleter should not prevent a shard from donating a chunk, and should not
-// prevent a shard from receiving a chunk for which it doesn't have overlapping range deletion
-// tasks.
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: -1}, to: st.shard1.shardName}));
-
-jsTest.log("Restart shard0 with disableResumableRangeDeleter=false.");
-st.rs0.restart(0, {
-    remember: true,
-    appendOptions: true,
-    startClean: false,
-    setParameter: "disableResumableRangeDeleter=false"
-});
-st.rs0.waitForPrimary();
-
-jsTest.log("Shard0 should now be able to re-receive the chunk it failed to receive earlier.");
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}));
+    // Clean up: Move chunks back to their original shards for consistency in subsequent tests.
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: chunkOnShard0, to: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: chunkOnShard1, to: st.shard1.shardName}));
+})();
 
 jsTest.log(
-    "Restart shard0 with a delay between range deletions and a low wait timeout, this way, with a large enough collection, there will be a timeout on a recipient when waiting for the range deleter task to finish.");
+    "Test Case: Disabling the server parameter does not affect moving non-conflicting chunks");
+(() => {
+    st.shard0.adminCommand({setParameter: 1, disableResumableRangeDeleter: true});
 
-st.rs0.restart(0, {
-    remember: true,
-    appendOptions: true,
-    startClean: false,
-    setParameter: {rangeDeleterBatchDelayMS: 60000, rangeDeleterBatchSize: 128}
-});
+    // Shard0 should be able to donate a chunk (e.g., chunk {_id: -50}) and shard2 should be able to
+    // receive it if shard2 has no overlapping tasks.
+    const nonConflictingChunk = {_id: -50};
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: nonConflictingChunk, to: st.shard2.shardName}),
+        "MoveChunk of non-conflicting range should succeed even if the range deleter is disabled");
 
-st.rs1.restart(0, {
-    remember: true,
-    appendOptions: true,
-    startClean: false,
-    setParameter: {disableResumableRangeDeleter: false}
-});
+    // Clean up: Move it back to shard0 and enable the range deleter.
+    st.shard0.adminCommand({setParameter: 1, disableResumableRangeDeleter: false});
+    assert.commandWorked(st.s.adminCommand(
+        {moveChunk: ns, find: nonConflictingChunk, to: st.shard0.shardName, _waitForDelete: true}));
+})();
 
-st.rs0.getPrimary().adminCommand({setParameter: 1, receiveChunkWaitForRangeDeleterTimeoutMS: 500});
-st.rs1.waitForPrimary();
-
-let bulkOp = st.s.getCollection(ns).initializeUnorderedBulkOp();
-
-let str = randomStr();
-for (let i = -129; i <= 129; ++i) {
-    bulkOp.insert({_id: i, str: str});
-}
-
-bulkOp.execute();
-
-// Move a chunk to shard1, this will start the range deletion on shard0.
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
-
-// Move the same chunk back, this will make this migration to wait for the range to be deleted.
 jsTest.log(
-    "Shard0 should not be able to receive a chunk because the range deletion on an intersecting range is taking too long");
-assert.commandFailedWithCode(
-    st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}),
-    ErrorCodes.OperationFailed);
+    "Restart shard0 with a delay between range deletions and a low wait timeout, this way, with a " +
+    "large enough collection, there will be a timeout on a recipient when waiting for the range" +
+    "deleter task to finish.");
+(() => {
+    st.rs0.restart(0, {
+        remember: true,
+        appendOptions: true,
+        startClean: false,
+        setParameter: {rangeDeleterBatchDelayMS: 60000, rangeDeleterBatchSize: 128}
+    });
+
+    st.rs0.getPrimary().adminCommand(
+        {setParameter: 1, receiveChunkWaitForRangeDeleterTimeoutMS: 500});
+
+    let bulkOp = st.s.getCollection(ns).initializeUnorderedBulkOp();
+
+    let str = randomStr();
+    for (let i = -129; i <= 129; ++i) {
+        bulkOp.insert({_id: i, str: str});
+    }
+
+    bulkOp.execute();
+
+    // Move a chunk to shard1, this will start the range deletion on shard0.
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: chunkOnShard0, to: st.shard1.shardName}));
+
+    // Move the same chunk back, this will make this migration to wait for the range to be deleted.
+    jsTest.log(
+        "Shard0 should not be able to receive a chunk because the range deletion on an intersecting range is taking too long");
+    assert.commandFailedWithCode(
+        st.s.adminCommand({moveChunk: ns, find: chunkOnShard0, to: st.shard0.shardName}),
+        ErrorCodes.OperationFailed);
+})();
 
 st.stop();

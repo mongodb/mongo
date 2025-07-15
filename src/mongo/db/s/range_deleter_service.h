@@ -261,6 +261,11 @@ public:
     SharedSemiFuture<void> getOverlappingRangeDeletionsFuture(const UUID& collectionUUID,
                                                               const ChunkRange& range);
 
+    /**
+     * Checks if the range deleter service is disabled.
+     */
+    bool isDisabled();
+
     /* ReplicaSetAwareServiceShardSvr implemented methods */
     void onStartup(OperationContext* opCtx) override;
     void onSetCurrentConfig(OperationContext* opCtx) override {}

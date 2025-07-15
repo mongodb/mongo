@@ -406,21 +406,21 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                                                ChunkRange orphanRange,
                                                Date_t deadline) {
     while (true) {
-        StatusWith<SharedSemiFuture<void>> swOrphanCleanupFuture =
-            [&]() -> StatusWith<SharedSemiFuture<void>> {
+        SharedSemiFuture<void> orphanCleanupFuture = [&]() {
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
             const auto self =
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
             stdx::lock_guard lk(self->_metadataManagerLock);
-
             // If the metadata was reset, or the collection was dropped and recreated since the
             // metadata manager was created, return an error.
             if (self->_metadataType != MetadataType::kTracked ||
                 !self->_metadataManager->getCollectionUuid().has_value() ||
                 collectionUuid != self->_metadataManager->getCollectionUuid().get()) {
-                return {ErrorCodes::ConflictingOperationInProgress,
-                        "Collection being migrated was dropped and created or otherwise had its "
-                        "metadata reset"};
+                return SemiFuture<void>::makeReady(
+                           Status(ErrorCodes::ConflictingOperationInProgress,
+                                  "Collection being migrated was dropped and created or otherwise "
+                                  "had its metadata reset"))
+                    .share();
             }
 
             const auto rangeDeleterService = RangeDeleterService::get(opCtx);
@@ -430,18 +430,13 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                 self->_metadataManager->getCollectionUuid().get(), orphanRange);
         }();
 
-        if (!swOrphanCleanupFuture.isOK()) {
-            return swOrphanCleanupFuture.getStatus();
-        }
-
-        auto orphanCleanupFuture = std::move(swOrphanCleanupFuture.getValue());
         if (orphanCleanupFuture.isReady()) {
             LOGV2_OPTIONS(21918,
                           {logv2::LogComponent::kShardingMigration},
                           "Finished waiting for deletion of orphans",
                           logAttrs(nss),
                           "orphanRange"_attr = redact(orphanRange.toString()));
-            return Status::OK();
+            return orphanCleanupFuture.getNoThrow(opCtx);
         }
 
         LOGV2_OPTIONS(21919,

@@ -625,8 +625,14 @@ TEST_F(RangeDeleterServiceTest, RegisterTaskWithDisableResumableRangeDeleterFlag
         registerAndCreatePersistentTask(opCtx,
                                         taskWithOngoingQueries->getTask(),
                                         taskWithOngoingQueries->getOngoingQueriesFuture());
-    ASSERT(completionFuture.isReady());
-    ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+    ASSERT(!completionFuture.isReady());
+    ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+
+    auto overlappingRangeFuture = rds->getOverlappingRangeDeletionsFuture(
+        uuidCollA, taskWithOngoingQueries->getTask().getRange());
+    ASSERT(overlappingRangeFuture.isReady());
+    ASSERT_THROWS_CODE(
+        overlappingRangeFuture.get(opCtx), DBException, ErrorCodes::ResumableRangeDeleterDisabled);
 }
 
 TEST_F(RangeDeleterServiceTest,

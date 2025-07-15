@@ -83,7 +83,6 @@
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_recovery_service.h"
-#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/start_chunk_clone_request.h"
@@ -1374,12 +1373,6 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             return rangedeletionutil::checkForConflictingDeletions(
                 outerOpCtx, range, donorCollectionOptionsAndIndexes.uuid);
         })) {
-            uassert(ErrorCodes::ResumableRangeDeleterDisabled,
-                    "Failing migration because the disableResumableRangeDeleter server "
-                    "parameter is set to true on the recipient shard, which contains range "
-                    "deletion tasks overlapping the incoming range.",
-                    !disableResumableRangeDeleter.load());
-
             LOGV2(22001,
                   "Migration paused because the requested range overlaps with a range already "
                   "scheduled for deletion",
