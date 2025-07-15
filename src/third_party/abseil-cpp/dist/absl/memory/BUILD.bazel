@@ -21,14 +21,7 @@ load(
     "ABSL_TEST_COPTS",
 )
 
-package(
-    default_visibility = ["//visibility:public"],
-    features = [
-        "header_modules",
-        "layering_check",
-        "parse_headers",
-    ],
-)
+package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
 
@@ -54,7 +47,6 @@ cc_test(
     deps = [
         ":memory",
         "//absl/base:core_headers",
-        "@googletest//:gtest",
-        "@googletest//:gtest_main",
+        "@com_google_googletest//:gtest_main",
     ],
 )

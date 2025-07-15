@@ -22,7 +22,6 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/flags/config.h"
 #include "absl/flags/flag.h"
 #include "absl/flags/internal/parse.h"
 #include "absl/flags/internal/program_name.h"
@@ -97,11 +96,6 @@ class UsageReportingTest : public testing::Test {
     flags::SetFlagsHelpMode(flags::HelpMode::kNone);
     flags::SetFlagsHelpMatchSubstr("");
     flags::SetFlagsHelpFormat(flags::HelpFormat::kHumanReadable);
-  }
-  void SetUp() override {
-#if ABSL_FLAGS_STRIP_NAMES
-    GTEST_SKIP() << "This test requires flag names to be present";
-#endif
   }
 
  private:

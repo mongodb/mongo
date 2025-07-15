@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "absl/strings/internal/memutil.h"
+
 #include <algorithm>
 #include <cstdlib>
 
-#include "absl/strings/ascii.h"
-#include "absl/strings/internal/memutil.h"
 #include "benchmark/benchmark.h"
+#include "absl/strings/ascii.h"
 
 // We fill the haystack with aaaaaaaaaaaaaaaaaa...aaaab.
 // That gives us:

@@ -88,9 +88,9 @@ TEST(PredictTest, Optional) {
   EXPECT_FALSE(ABSL_PREDICT_FALSE(no_value));
 }
 
-class ImplicitlyConvertibleToBool {
+class ImplictlyConvertibleToBool {
  public:
-  explicit ImplicitlyConvertibleToBool(bool value) : value_(value) {}
+  explicit ImplictlyConvertibleToBool(bool value) : value_(value) {}
   operator bool() const {  // NOLINT(google-explicit-constructor)
     return value_;
   }
@@ -100,17 +100,17 @@ class ImplicitlyConvertibleToBool {
 };
 
 TEST(PredictTest, ImplicitBoolConversion) {
-  const ImplicitlyConvertibleToBool is_true(true);
-  const ImplicitlyConvertibleToBool is_false(false);
+  const ImplictlyConvertibleToBool is_true(true);
+  const ImplictlyConvertibleToBool is_false(false);
   if (!ABSL_PREDICT_TRUE(is_true)) ADD_FAILURE();
   if (ABSL_PREDICT_TRUE(is_false)) ADD_FAILURE();
   if (!ABSL_PREDICT_FALSE(is_true)) ADD_FAILURE();
   if (ABSL_PREDICT_FALSE(is_false)) ADD_FAILURE();
 }
 
-class ExplicitlyConvertibleToBool {
+class ExplictlyConvertibleToBool {
  public:
-  explicit ExplicitlyConvertibleToBool(bool value) : value_(value) {}
+  explicit ExplictlyConvertibleToBool(bool value) : value_(value) {}
   explicit operator bool() const { return value_; }
 
  private:
@@ -118,24 +118,12 @@ class ExplicitlyConvertibleToBool {
 };
 
 TEST(PredictTest, ExplicitBoolConversion) {
-  const ExplicitlyConvertibleToBool is_true(true);
-  const ExplicitlyConvertibleToBool is_false(false);
+  const ExplictlyConvertibleToBool is_true(true);
+  const ExplictlyConvertibleToBool is_false(false);
   if (!ABSL_PREDICT_TRUE(is_true)) ADD_FAILURE();
   if (ABSL_PREDICT_TRUE(is_false)) ADD_FAILURE();
   if (!ABSL_PREDICT_FALSE(is_true)) ADD_FAILURE();
   if (ABSL_PREDICT_FALSE(is_false)) ADD_FAILURE();
-}
-
-// This verifies that ABSL_ASSUME compiles in a variety of contexts.
-// It does not test optimization.
-TEST(AbslAssume, Compiles) {
-  int x = 0;
-  ABSL_ASSUME(x >= 0);
-  EXPECT_EQ(x, 0);
-
-  // https://github.com/abseil/abseil-cpp/issues/1814
-  ABSL_ASSUME(x >= 0), (x >= 0) ? ++x : --x;
-  EXPECT_EQ(x, 1);
 }
 
 }  // namespace

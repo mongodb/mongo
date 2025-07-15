@@ -24,7 +24,6 @@
 namespace absl {
 ABSL_NAMESPACE_BEGIN
 
-absl::string_view CommandLineFlag::TypeName() const { return ""; }
 bool CommandLineFlag::IsRetired() const { return false; }
 bool CommandLineFlag::ParseFrom(absl::string_view value, std::string* error) {
   return ParseFrom(value, flags_internal::SET_FLAGS_VALUE,

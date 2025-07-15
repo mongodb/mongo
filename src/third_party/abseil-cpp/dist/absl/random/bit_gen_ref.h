@@ -24,14 +24,12 @@
 #ifndef ABSL_RANDOM_BIT_GEN_REF_H_
 #define ABSL_RANDOM_BIT_GEN_REF_H_
 
-#include <cstdint>
 #include <limits>
 #include <type_traits>
 #include <utility>
 
-#include "absl/base/attributes.h"
-#include "absl/base/config.h"
-#include "absl/base/fast_type_id.h"
+#include "absl/base/internal/fast_type_id.h"
+#include "absl/base/macros.h"
 #include "absl/meta/type_traits.h"
 #include "absl/random/internal/distribution_caller.h"
 #include "absl/random/internal/fast_uniform_bits.h"
@@ -88,7 +86,7 @@ class MockHelpers;
 //
 class BitGenRef {
   // SFINAE to detect whether the URBG type includes a member matching
-  // bool InvokeMock(key_id, args_tuple*, result*).
+  // bool InvokeMock(base_internal::FastTypeIdType, void*, void*).
   //
   // These live inside BitGenRef so that they have friend access
   // to MockingBitGen. (see similar methods in DistributionCaller).
@@ -100,7 +98,7 @@ class BitGenRef {
 
   template <class T>
   using invoke_mock_t = decltype(std::declval<T*>()->InvokeMock(
-      std::declval<FastTypeIdType>(), std::declval<void*>(),
+      std::declval<base_internal::FastTypeIdType>(), std::declval<void*>(),
       std::declval<void*>()));
 
   template <typename T>
@@ -112,21 +110,20 @@ class BitGenRef {
   BitGenRef& operator=(const BitGenRef&) = default;
   BitGenRef& operator=(BitGenRef&&) = default;
 
-  template <
-      typename URBGRef, typename URBG = absl::remove_cvref_t<URBGRef>,
-      typename absl::enable_if_t<(!std::is_same<URBG, BitGenRef>::value &&
-                                  random_internal::is_urbg<URBG>::value &&
-                                  !HasInvokeMock<URBG>::value)>* = nullptr>
-  BitGenRef(URBGRef&& gen ABSL_ATTRIBUTE_LIFETIME_BOUND)  // NOLINT
+  template <typename URBG, typename absl::enable_if_t<
+                               (!std::is_same<URBG, BitGenRef>::value &&
+                                random_internal::is_urbg<URBG>::value &&
+                                !HasInvokeMock<URBG>::value)>* = nullptr>
+  BitGenRef(URBG& gen)  // NOLINT
       : t_erased_gen_ptr_(reinterpret_cast<uintptr_t>(&gen)),
         mock_call_(NotAMock),
         generate_impl_fn_(ImplFn<URBG>) {}
 
-  template <typename URBGRef, typename URBG = absl::remove_cvref_t<URBGRef>,
+  template <typename URBG,
             typename absl::enable_if_t<(!std::is_same<URBG, BitGenRef>::value &&
                                         random_internal::is_urbg<URBG>::value &&
                                         HasInvokeMock<URBG>::value)>* = nullptr>
-  BitGenRef(URBGRef&& gen ABSL_ATTRIBUTE_LIFETIME_BOUND)  // NOLINT
+  BitGenRef(URBG& gen)  // NOLINT
       : t_erased_gen_ptr_(reinterpret_cast<uintptr_t>(&gen)),
         mock_call_(&MockCall<URBG>),
         generate_impl_fn_(ImplFn<URBG>) {}
@@ -145,7 +142,8 @@ class BitGenRef {
 
  private:
   using impl_fn = result_type (*)(uintptr_t);
-  using mock_call_fn = bool (*)(uintptr_t, FastTypeIdType, void*, void*);
+  using mock_call_fn = bool (*)(uintptr_t, base_internal::FastTypeIdType, void*,
+                                void*);
 
   template <typename URBG>
   static result_type ImplFn(uintptr_t ptr) {
@@ -157,19 +155,19 @@ class BitGenRef {
 
   // Get a type-erased InvokeMock pointer.
   template <typename URBG>
-  static bool MockCall(uintptr_t gen_ptr, FastTypeIdType key_id, void* result,
-                       void* arg_tuple) {
-    return reinterpret_cast<URBG*>(gen_ptr)->InvokeMock(key_id, result,
+  static bool MockCall(uintptr_t gen_ptr, base_internal::FastTypeIdType type,
+                       void* result, void* arg_tuple) {
+    return reinterpret_cast<URBG*>(gen_ptr)->InvokeMock(type, result,
                                                         arg_tuple);
   }
-  static bool NotAMock(uintptr_t, FastTypeIdType, void*, void*) {
+  static bool NotAMock(uintptr_t, base_internal::FastTypeIdType, void*, void*) {
     return false;
   }
 
-  inline bool InvokeMock(FastTypeIdType key_id, void* args_tuple,
+  inline bool InvokeMock(base_internal::FastTypeIdType type, void* args_tuple,
                          void* result) {
     if (mock_call_ == NotAMock) return false;  // avoids an indirect call.
-    return mock_call_(t_erased_gen_ptr_, key_id, args_tuple, result);
+    return mock_call_(t_erased_gen_ptr_, type, args_tuple, result);
   }
 
   uintptr_t t_erased_gen_ptr_;

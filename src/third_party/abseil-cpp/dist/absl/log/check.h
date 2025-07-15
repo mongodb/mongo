@@ -42,8 +42,7 @@
 
 // CHECK()
 //
-// `CHECK` enforces that the `condition` is true. If the condition is false,
-// the program is terminated with a fatal error.
+// `CHECK` terminates the program with a fatal error if `condition` is not true.
 //
 // The message may include additional information such as stack traces, when
 // available.
@@ -170,7 +169,7 @@
 #define DCHECK_OK(status) ABSL_LOG_INTERNAL_DCHECK_OK_IMPL((status), #status)
 
 // `CHECK_STREQ` and friends provide `CHECK_EQ` functionality for C strings,
-// i.e., null-terminated char arrays.  The `CASE` versions are case-insensitive.
+// i.e., nul-terminated char arrays.  The `CASE` versions are case-insensitive.
 //
 // Example:
 //

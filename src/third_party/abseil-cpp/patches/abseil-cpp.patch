@@ -1,0 +1,14 @@
+diff --git a/MODULE.bazel b/MODULE.bazel
+new file mode 100644
+index 00000000..b617cefa
+--- /dev/null
++++ b/MODULE.bazel
+@@ -0,0 +1,8 @@
++"""Module definition for Abseil LTS 20230802.1."""
++
++module(
++    name = "abseil-cpp",
++)
++
++bazel_dep(name = "bazel_skylib", version = "1.4.1")
++bazel_dep(name = "platforms", version = "0.0.7")

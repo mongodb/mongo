@@ -2212,7 +2212,7 @@ TEST_F(ShardRoleTest, RestoreChangesReadSourceAfterStepUp) {
         shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
 
     PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
-    [[maybe_unused]] const auto acquisitions =
+    const auto acquisitions =
         acquireCollectionsOrViewsMaybeLockFree(operationContext(),
                                                {{
                                                    nssUnshardedCollection1,

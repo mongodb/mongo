@@ -130,11 +130,7 @@ struct PerThreadSynch {
 };
 
 // The instances of this class are allocated in NewThreadIdentity() with an
-// alignment of PerThreadSynch::kAlignment and never destroyed. Initialization
-// should happen in OneTimeInitThreadIdentity().
-//
-// Instances may be reused by new threads - fields should be reset in
-// ResetThreadIdentityBetweenReuse().
+// alignment of PerThreadSynch::kAlignment.
 //
 // NOTE: The layout of fields in this structure is critical, please do not
 //       add, remove, or modify the field placements without fully auditing the

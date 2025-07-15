@@ -22,7 +22,6 @@
 #define ABSL_LOG_LOG_SINK_REGISTRY_H_
 
 #include "absl/base/config.h"
-#include "absl/base/nullability.h"
 #include "absl/log/internal/log_sink_set.h"
 #include "absl/log/log_sink.h"
 
@@ -44,10 +43,8 @@ ABSL_NAMESPACE_BEGIN
 // sink instead which writes them to `stderr`.
 //
 // Do not call these inside `absl::LogSink::Send`.
-inline void AddLogSink(absl::LogSink* absl_nonnull sink) {
-  log_internal::AddLogSink(sink);
-}
-inline void RemoveLogSink(absl::LogSink* absl_nonnull sink) {
+inline void AddLogSink(absl::LogSink* sink) { log_internal::AddLogSink(sink); }
+inline void RemoveLogSink(absl::LogSink* sink) {
   log_internal::RemoveLogSink(sink);
 }
 

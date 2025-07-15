@@ -60,8 +60,7 @@ class ABSL_LOCKABLE CordzInfo : public CordzHandle {
   // and/or deleted. `method` identifies the Cord public API method initiating
   // the cord to be sampled.
   // Requires `cord` to hold a tree, and `cord.cordz_info()` to be null.
-  static void TrackCord(InlineData& cord, MethodIdentifier method,
-                        int64_t sampling_stride);
+  static void TrackCord(InlineData& cord, MethodIdentifier method);
 
   // Identical to TrackCord(), except that this function fills the
   // `parent_stack` and `parent_method` properties of the returned CordzInfo
@@ -182,8 +181,6 @@ class ABSL_LOCKABLE CordzInfo : public CordzHandle {
   // or RemovePrefix.
   CordzStatistics GetCordzStatistics() const;
 
-  int64_t sampling_stride() const { return sampling_stride_; }
-
  private:
   using SpinLock = absl::base_internal::SpinLock;
   using SpinLockHolder = ::absl::base_internal::SpinLockHolder;
@@ -202,7 +199,7 @@ class ABSL_LOCKABLE CordzInfo : public CordzHandle {
   static constexpr size_t kMaxStackDepth = 64;
 
   explicit CordzInfo(CordRep* rep, const CordzInfo* src,
-                     MethodIdentifier method, int64_t weight);
+                     MethodIdentifier method);
   ~CordzInfo() override;
 
   // Sets `rep_` without holding a lock.
@@ -253,14 +250,12 @@ class ABSL_LOCKABLE CordzInfo : public CordzHandle {
   const MethodIdentifier parent_method_;
   CordzUpdateTracker update_tracker_;
   const absl::Time create_time_;
-  const int64_t sampling_stride_;
 };
 
 inline ABSL_ATTRIBUTE_ALWAYS_INLINE void CordzInfo::MaybeTrackCord(
     InlineData& cord, MethodIdentifier method) {
-  auto stride = cordz_should_profile();
-  if (ABSL_PREDICT_FALSE(stride > 0)) {
-    TrackCord(cord, method, stride);
+  if (ABSL_PREDICT_FALSE(cordz_should_profile())) {
+    TrackCord(cord, method);
   }
 }
 

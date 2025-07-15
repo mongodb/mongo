@@ -16,16 +16,14 @@
 #define ABSL_RANDOM_DISCRETE_DISTRIBUTION_H_
 
 #include <cassert>
-#include <cstddef>
-#include <initializer_list>
+#include <cmath>
 #include <istream>
 #include <limits>
-#include <ostream>
+#include <numeric>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
-#include "absl/base/config.h"
 #include "absl/random/bernoulli_distribution.h"
 #include "absl/random/internal/iostream_state_saver.h"
 #include "absl/random/uniform_int_distribution.h"

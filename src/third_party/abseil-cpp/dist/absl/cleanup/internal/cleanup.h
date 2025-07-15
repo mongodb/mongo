@@ -19,6 +19,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "absl/base/internal/invoke.h"
 #include "absl/base/macros.h"
 #include "absl/base/thread_annotations.h"
 #include "absl/utility/utility.h"
@@ -38,7 +39,7 @@ constexpr bool WasDeduced() {
 
 template <typename Callback>
 constexpr bool ReturnsVoid() {
-  return (std::is_same<std::invoke_result_t<Callback>, void>::value);
+  return (std::is_same<base_internal::invoke_result_t<Callback>, void>::value);
 }
 
 template <typename Callback>
@@ -69,7 +70,7 @@ class Storage {
 
   Storage& operator=(const Storage& other) = delete;
 
-  void* GetCallbackBuffer() { return static_cast<void*>(callback_buffer_); }
+  void* GetCallbackBuffer() { return static_cast<void*>(+callback_buffer_); }
 
   Callback& GetCallback() {
     return *reinterpret_cast<Callback*>(GetCallbackBuffer());
@@ -88,7 +89,7 @@ class Storage {
 
  private:
   bool is_callback_engaged_;
-  alignas(Callback) unsigned char callback_buffer_[sizeof(Callback)];
+  alignas(Callback) char callback_buffer_[sizeof(Callback)];
 };
 
 }  // namespace cleanup_internal

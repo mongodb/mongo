@@ -172,7 +172,7 @@ inline bool PeriodicSamplerBase::Sample() noexcept {
 // Typical use case:
 //
 //   struct HashTablezTag {};
-//   thread_local PeriodicSampler<HashTablezTag, 100> sampler;
+//   thread_local PeriodicSampler sampler;
 //
 //   void HashTableSamplingLogic(...) {
 //     if (sampler.Sample()) {

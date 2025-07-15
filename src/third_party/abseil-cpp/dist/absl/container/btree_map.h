@@ -47,17 +47,12 @@
 // iterator at the current position. Another important difference is that
 // key-types must be copy-constructible.
 //
-// There are other API differences: first, btree iterators can be subtracted,
-// and this is faster than using `std::distance`. Additionally, btree
-// iterators can be advanced via `operator+=` and `operator-=`, which is faster
-// than using `std::advance`.
-//
-// B-tree maps are not exception-safe.
+// Another API difference is that btree iterators can be subtracted, and this
+// is faster than using std::distance.
 
 #ifndef ABSL_CONTAINER_BTREE_MAP_H_
 #define ABSL_CONTAINER_BTREE_MAP_H_
 
-#include "absl/base/attributes.h"
 #include "absl/container/internal/btree.h"  // IWYU pragma: export
 #include "absl/container/internal/btree_container.h"  // IWYU pragma: export
 
@@ -89,7 +84,7 @@ struct map_params;
 //
 template <typename Key, typename Value, typename Compare = std::less<Key>,
           typename Alloc = std::allocator<std::pair<const Key, Value>>>
-class ABSL_ATTRIBUTE_OWNER btree_map
+class btree_map
     : public container_internal::btree_map_container<
           container_internal::btree<container_internal::map_params<
               Key, Value, Compare, Alloc, /*TargetNodeSize=*/256,
@@ -527,7 +522,7 @@ typename btree_map<K, V, C, A>::size_type erase_if(
 //
 template <typename Key, typename Value, typename Compare = std::less<Key>,
           typename Alloc = std::allocator<std::pair<const Key, Value>>>
-class ABSL_ATTRIBUTE_OWNER btree_multimap
+class btree_multimap
     : public container_internal::btree_multimap_container<
           container_internal::btree<container_internal::map_params<
               Key, Value, Compare, Alloc, /*TargetNodeSize=*/256,
@@ -869,8 +864,7 @@ struct map_params : common_params<Key, Compare, Alloc, TargetNodeSize, IsMulti,
   using init_type = typename super_type::init_type;
 
   template <typename V>
-  static auto key(const V &value ABSL_ATTRIBUTE_LIFETIME_BOUND)
-      -> decltype((value.first)) {
+  static auto key(const V &value) -> decltype(value.first) {
     return value.first;
   }
   static const Key &key(const slot_type *s) { return slot_policy::key(s); }

@@ -22,8 +22,7 @@ set -euox pipefail
 absl_dir=/abseil-cpp
 absl_build_dir=/buildfs
 googletest_builddir=/googletest_builddir
-googletest_archive="googletest-${ABSL_GOOGLETEST_VERSION}.tar.gz"
-project_dir="${absl_dir}/CMake/install_test_project"
+project_dir="${absl_dir}"/CMake/install_test_project
 project_build_dir=/buildfs/project-build
 
 build_shared_libs="OFF"
@@ -34,9 +33,9 @@ fi
 # Build and install GoogleTest
 mkdir "${googletest_builddir}"
 pushd "${googletest_builddir}"
-curl -L "${ABSL_GOOGLETEST_DOWNLOAD_URL}" --output "${googletest_archive}"
-tar -xz -f "${googletest_archive}"
-pushd "googletest-${ABSL_GOOGLETEST_VERSION}"
+curl -L "${ABSL_GOOGLETEST_DOWNLOAD_URL}" --output "${ABSL_GOOGLETEST_COMMIT}".zip
+unzip "${ABSL_GOOGLETEST_COMMIT}".zip
+pushd "googletest-${ABSL_GOOGLETEST_COMMIT}"
 mkdir build
 pushd build
 cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS="${build_shared_libs}" ..

@@ -32,7 +32,6 @@
 
 #include <ostream>
 
-#include "absl/base/attributes.h"
 #include "absl/base/config.h"
 #include "absl/log/internal/structured.h"
 #include "absl/strings/string_view.h"
@@ -61,11 +60,7 @@ ABSL_NAMESPACE_BEGIN
 //                                 int line) {
 //     LOG(LEVEL(severity)).AtLocation(file, line) << absl::LogAsLiteral(str);
 //   }
-//
-// `LogAsLiteral` should only be used as a streaming operand and not, for
-// example, as a local variable initializer.
-inline log_internal::AsLiteralImpl LogAsLiteral(
-    absl::string_view s ABSL_ATTRIBUTE_LIFETIME_BOUND) {
+inline log_internal::AsLiteralImpl LogAsLiteral(absl::string_view s) {
   return log_internal::AsLiteralImpl(s);
 }
 

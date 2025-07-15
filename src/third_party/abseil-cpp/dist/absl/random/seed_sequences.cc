@@ -14,18 +14,14 @@
 
 #include "absl/random/seed_sequences.h"
 
-#include <iterator>
-
-#include "absl/base/config.h"
-#include "absl/random/internal/entropy_pool.h"
+#include "absl/random/internal/pool_urbg.h"
 
 namespace absl {
 ABSL_NAMESPACE_BEGIN
 
 SeedSeq MakeSeedSeq() {
   SeedSeq::result_type seed_material[8];
-  random_internal::GetEntropyFromRandenPool(&seed_material[0],
-                                            sizeof(seed_material[0]) * 8);
+  random_internal::RandenPool<uint32_t>::Fill(absl::MakeSpan(seed_material));
   return SeedSeq(std::begin(seed_material), std::end(seed_material));
 }
 

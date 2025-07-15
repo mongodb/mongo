@@ -5095,7 +5095,7 @@ TEST_F(
         measurementsAndRolloverReason.end(),
         {std::make_pair(nonSchemaChangeBucketVec, RolloverReason::kSchemaChange),
          std::make_pair(schemaChangeVec, RolloverReason::kSchemaChange)});
-    [[maybe_unused]] absl::InlinedVector<Bucket*, 8> buckets =
+    absl::InlinedVector<Bucket*, 8> buckets =
         _generateBucketsWithMeasurements(_ns1, _uuid1, measurementsAndRolloverReason);
 
     // Inserting a batch of measurements with meta field values into a collection with a meta field.
@@ -5309,7 +5309,7 @@ TEST_F(
             std::make_pair(measurement1Vec, RolloverReason::kSchemaChange),
             std::make_pair(measurement1Vec, RolloverReason::kSchemaChange),
         });
-    [[maybe_unused]] absl::InlinedVector<Bucket*, 8> buckets =
+    absl::InlinedVector<Bucket*, 8> buckets =
         _generateBucketsWithMeasurements(_nsNoMeta, _uuidNoMeta, measurementsAndRolloverReason);
 
     // Inserting a batch of measurements without meta field values into a collection without a meta

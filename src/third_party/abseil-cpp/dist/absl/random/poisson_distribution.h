@@ -17,12 +17,11 @@
 
 #include <cassert>
 #include <cmath>
-#include <cstdint>
 #include <istream>
 #include <limits>
 #include <ostream>
+#include <type_traits>
 
-#include "absl/base/config.h"
 #include "absl/random/internal/fast_uniform_bits.h"
 #include "absl/random/internal/fastmath.h"
 #include "absl/random/internal/generate_real.h"
@@ -49,8 +48,8 @@ ABSL_NAMESPACE_BEGIN
 // the distribution results are limited to the max() value.
 //
 // The goals of this implementation are to provide good performance while still
-// being thread-safe: This limits the implementation to not using lgamma
-// provided by <math.h>.
+// beig thread-safe: This limits the implementation to not using lgamma provided
+// by <math.h>.
 //
 template <typename IntType = int>
 class poisson_distribution {

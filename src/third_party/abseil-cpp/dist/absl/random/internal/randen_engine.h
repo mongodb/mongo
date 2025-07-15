@@ -18,10 +18,9 @@
 #include <algorithm>
 #include <cinttypes>
 #include <cstdlib>
-#include <istream>
+#include <iostream>
 #include <iterator>
 #include <limits>
-#include <ostream>
 #include <type_traits>
 
 #include "absl/base/internal/endian.h"

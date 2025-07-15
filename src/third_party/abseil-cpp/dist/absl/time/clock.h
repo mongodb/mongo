@@ -22,9 +22,6 @@
 #ifndef ABSL_TIME_CLOCK_H_
 #define ABSL_TIME_CLOCK_H_
 
-#include <cstdint>
-
-#include "absl/base/config.h"
 #include "absl/base/macros.h"
 #include "absl/time/time.h"
 
@@ -67,8 +64,7 @@ ABSL_NAMESPACE_END
 // By changing our extension points to be extern "C", we dodge this
 // check.
 extern "C" {
-ABSL_DLL void ABSL_INTERNAL_C_SYMBOL(AbslInternalSleepFor)(
-    absl::Duration duration);
+void ABSL_INTERNAL_C_SYMBOL(AbslInternalSleepFor)(absl::Duration duration);
 }  // extern "C"
 
 inline void absl::SleepFor(absl::Duration duration) {

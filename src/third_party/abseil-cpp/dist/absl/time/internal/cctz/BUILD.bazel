@@ -12,13 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-load("//absl:copts/configure_copts.bzl", "ABSL_DEFAULT_COPTS", "ABSL_DEFAULT_LINKOPTS", "ABSL_TEST_COPTS")
-
-package(features = [
-    "header_modules",
-    "layering_check",
-    "parse_headers",
-])
+package(features = ["-parse_headers"])
 
 licenses(["notice"])
 
@@ -30,8 +24,6 @@ cc_library(
     hdrs = [
         "include/cctz/civil_time.h",
     ],
-    copts = ABSL_DEFAULT_COPTS,
-    linkopts = ABSL_DEFAULT_LINKOPTS,
     textual_hdrs = ["include/cctz/civil_time_detail.h"],
     visibility = ["//visibility:public"],
     deps = ["//absl/base:config"],
@@ -61,8 +53,7 @@ cc_library(
         "include/cctz/time_zone.h",
         "include/cctz/zone_info_source.h",
     ],
-    copts = ABSL_DEFAULT_COPTS,
-    linkopts = ABSL_DEFAULT_LINKOPTS + select({
+    linkopts = select({
         "@platforms//os:osx": ["-Wl,-framework,CoreFoundation"],
         "@platforms//os:ios": ["-Wl,-framework,CoreFoundation"],
         "//conditions:default": [],
@@ -89,13 +80,10 @@ cc_test(
     name = "civil_time_test",
     size = "small",
     srcs = ["src/civil_time_test.cc"],
-    copts = ABSL_TEST_COPTS,
-    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":civil_time",
         "//absl/base:config",
-        "@googletest//:gtest",
-        "@googletest//:gtest_main",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -103,9 +91,8 @@ cc_test(
     name = "time_zone_format_test",
     size = "small",
     srcs = ["src/time_zone_format_test.cc"],
-    copts = ABSL_TEST_COPTS,
     data = [":zoneinfo"],
-    linkopts = ABSL_DEFAULT_LINKOPTS,
+    env = {"TZDIR": "absl/time/internal/cctz/testdata/zoneinfo"},
     tags = [
         "no_test_android_arm",
         "no_test_android_arm64",
@@ -116,8 +103,7 @@ cc_test(
         ":civil_time",
         ":time_zone",
         "//absl/base:config",
-        "@googletest//:gtest",
-        "@googletest//:gtest_main",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -126,9 +112,8 @@ cc_test(
     size = "small",
     timeout = "moderate",
     srcs = ["src/time_zone_lookup_test.cc"],
-    copts = ABSL_TEST_COPTS,
     data = [":zoneinfo"],
-    linkopts = ABSL_DEFAULT_LINKOPTS,
+    env = {"TZDIR": "absl/time/internal/cctz/testdata/zoneinfo"},
     tags = [
         "no_test_android_arm",
         "no_test_android_arm64",
@@ -139,8 +124,7 @@ cc_test(
         ":civil_time",
         ":time_zone",
         "//absl/base:config",
-        "@googletest//:gtest",
-        "@googletest//:gtest_main",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -155,24 +139,22 @@ cc_test(
         "src/time_zone_info.h",
         "src/tzfile.h",
     ],
-    copts = ABSL_TEST_COPTS,
-    linkopts = ABSL_DEFAULT_LINKOPTS,
     linkstatic = 1,
     tags = ["benchmark"],
     deps = [
         ":civil_time",
         ":time_zone",
         "//absl/base:config",
-        "@google_benchmark//:benchmark_main",
+        "@com_github_google_benchmark//:benchmark_main",
     ],
 )
-
-### examples
-
-### binaries
 
 filegroup(
     name = "zoneinfo",
     srcs = glob(["testdata/zoneinfo/**"]),
     visibility = ["//absl/time:__subpackages__"],
 )
+
+### examples
+
+### binaries

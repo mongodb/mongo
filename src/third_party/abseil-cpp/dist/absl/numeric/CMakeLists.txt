@@ -23,9 +23,7 @@ absl_cc_library(
   COPTS
     ${ABSL_DEFAULT_COPTS}
   DEPS
-    absl::config
     absl::core_headers
-    absl::endian
   PUBLIC
 )
 
@@ -55,7 +53,6 @@ absl_cc_library(
   COPTS
     ${ABSL_DEFAULT_COPTS}
   DEPS
-    absl::compare
     absl::config
     absl::core_headers
     absl::bits
@@ -73,7 +70,6 @@ absl_cc_test(
   DEPS
     absl::int128
     absl::base
-    absl::compare
     absl::hash_testing
     absl::type_traits
     absl::strings

@@ -23,23 +23,17 @@
 #endif
 
 #include <algorithm>
-#include <cassert>
 #include <cerrno>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <string>
-#include <vector>
 
-#include "absl/base/config.h"
 #include "absl/base/dynamic_annotations.h"
 #include "absl/base/internal/raw_logging.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
-#include "absl/types/optional.h"
-#include "absl/types/span.h"
 
 #if defined(__native_client__)
 
@@ -173,27 +167,24 @@ bool ReadSeedMaterialFromDevURandom(absl::Span<uint32_t> values) {
   size_t buffer_size = sizeof(uint32_t) * values.size();
 
   int dev_urandom = open(kEntropyFile, O_RDONLY);
-  if (dev_urandom < 0) {
-    ABSL_RAW_LOG(ERROR, "Failed to open /dev/urandom.");
+  bool success = (-1 != dev_urandom);
+  if (!success) {
     return false;
   }
 
-  while (buffer_size > 0) {
+  while (success && buffer_size > 0) {
     ssize_t bytes_read = read(dev_urandom, buffer, buffer_size);
     int read_error = errno;
-    if (bytes_read == -1 && read_error == EINTR) {
-      // Interrupted, try again.
-      continue;
-    } else if (bytes_read <= 0) {
-      // EOF, or error.
-      break;
+    success = (bytes_read > 0);
+    if (success) {
+      buffer += bytes_read;
+      buffer_size -= static_cast<size_t>(bytes_read);
+    } else if (bytes_read == -1 && read_error == EINTR) {
+      success = true;  // Need to try again.
     }
-    buffer += bytes_read;
-    buffer_size -= static_cast<size_t>(bytes_read);
   }
-
   close(dev_urandom);
-  return buffer_size == 0;
+  return success;
 }
 
 bool ReadSeedMaterialFromOSEntropyImpl(absl::Span<uint32_t> values) {
@@ -260,7 +251,8 @@ absl::optional<uint32_t> GetSaltMaterial() {
   static const auto salt_material = []() -> absl::optional<uint32_t> {
     uint32_t salt_value = 0;
 
-    if (ReadSeedMaterialFromOSEntropy(absl::MakeSpan(&salt_value, 1))) {
+    if (random_internal::ReadSeedMaterialFromOSEntropy(
+            MakeSpan(&salt_value, 1))) {
       return salt_value;
     }
 

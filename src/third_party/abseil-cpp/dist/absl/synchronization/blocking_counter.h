@@ -22,7 +22,6 @@
 
 #include <atomic>
 
-#include "absl/base/internal/tracing.h"
 #include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
 
@@ -90,11 +89,6 @@ class BlockingCounter {
   void Wait();
 
  private:
-  // Convenience helper to reduce verbosity at call sites.
-  static inline constexpr base_internal::ObjectKind TraceObjectKind() {
-    return base_internal::ObjectKind::kBlockingCounter;
-  }
-
   Mutex lock_;
   std::atomic<int> count_;
   int num_waiting_ ABSL_GUARDED_BY(lock_);

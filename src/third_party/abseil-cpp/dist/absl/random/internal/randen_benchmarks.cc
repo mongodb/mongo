@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+#include "absl/random/internal/randen.h"
+
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -19,8 +21,6 @@
 #include "absl/base/internal/raw_logging.h"
 #include "absl/random/internal/nanobenchmark.h"
 #include "absl/random/internal/platform.h"
-#include "absl/random/internal/randen.h"
-#include "absl/random/internal/randen_detect.h"
 #include "absl/random/internal/randen_engine.h"
 #include "absl/random/internal/randen_hwaes.h"
 #include "absl/random/internal/randen_slow.h"
@@ -28,7 +28,6 @@
 
 namespace {
 
-using absl::random_internal::CPUSupportsRandenHwAes;
 using absl::random_internal::Randen;
 using absl::random_internal::RandenHwAes;
 using absl::random_internal::RandenSlow;
@@ -152,14 +151,14 @@ void RunAll(const int argc, char* argv[]) {
   const FuncInput unpredictable = (argc != 999);
   static const FuncInput inputs[] = {unpredictable * 100, unpredictable * 1000};
 
-  if (CPUSupportsRandenHwAes()) {
-    Measure<AbsorbFn<RandenHwAes>>("Absorb (HwAes)", inputs);
-  }
+#if !defined(ABSL_INTERNAL_DISABLE_AES) && ABSL_HAVE_ACCELERATED_AES
+  Measure<AbsorbFn<RandenHwAes>>("Absorb (HwAes)", inputs);
+#endif
   Measure<AbsorbFn<RandenSlow>>("Absorb (Slow)", inputs);
 
-  if (CPUSupportsRandenHwAes()) {
-    Measure<GenerateFn<RandenHwAes>>("Generate (HwAes)", inputs);
-  }
+#if !defined(ABSL_INTERNAL_DISABLE_AES) && ABSL_HAVE_ACCELERATED_AES
+  Measure<GenerateFn<RandenHwAes>>("Generate (HwAes)", inputs);
+#endif
   Measure<GenerateFn<RandenSlow>>("Generate (Slow)", inputs);
 
   // Measure the production engine.

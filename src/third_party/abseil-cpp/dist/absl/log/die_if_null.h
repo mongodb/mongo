@@ -55,13 +55,13 @@ namespace log_internal {
 // `line` location. Called when `ABSL_DIE_IF_NULL` fails. Calling this function
 // generates less code than its implementation would if inlined, for a slight
 // code size reduction each time `ABSL_DIE_IF_NULL` is called.
-[[noreturn]] ABSL_ATTRIBUTE_NOINLINE void DieBecauseNull(
+ABSL_ATTRIBUTE_NORETURN ABSL_ATTRIBUTE_NOINLINE void DieBecauseNull(
     const char* file, int line, const char* exprtext);
 
 // Helper for `ABSL_DIE_IF_NULL`.
 template <typename T>
-[[nodiscard]] T DieIfNull(const char* file, int line, const char* exprtext,
-                          T&& t) {
+ABSL_MUST_USE_RESULT T DieIfNull(const char* file, int line,
+                                 const char* exprtext, T&& t) {
   if (ABSL_PREDICT_FALSE(t == nullptr)) {
     // Call a non-inline helper function for a small code size improvement.
     DieBecauseNull(file, line, exprtext);

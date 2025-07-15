@@ -33,7 +33,7 @@
 namespace {
 
 enum CrcEngine {
-  ACCELERATED = 0,
+  X86 = 0,
   NONTEMPORAL = 1,
   FALLBACK = 2,
 };
@@ -66,10 +66,10 @@ typedef CrcMemcpyTest<4500> CrcSmallTest;
 typedef CrcMemcpyTest<(1 << 24)> CrcLargeTest;
 // Parametrize the small test so that it can be done with all configurations.
 template <typename ParamsT>
-class EngineParamTestTemplate : public CrcSmallTest,
-                                public ::testing::WithParamInterface<ParamsT> {
+class x86ParamTestTemplate : public CrcSmallTest,
+                             public ::testing::WithParamInterface<ParamsT> {
  protected:
-  EngineParamTestTemplate() {
+  x86ParamTestTemplate() {
     if (GetParam().crc_engine_selector == FALLBACK) {
       engine_ = std::make_unique<absl::crc_internal::FallbackCrcMemcpyEngine>();
     } else if (GetParam().crc_engine_selector == NONTEMPORAL) {
@@ -89,14 +89,14 @@ class EngineParamTestTemplate : public CrcSmallTest,
   std::unique_ptr<absl::crc_internal::CrcMemcpyEngine> engine_;
 };
 struct TestParams {
-  CrcEngine crc_engine_selector = ACCELERATED;
+  CrcEngine crc_engine_selector = X86;
   int vector_lanes = 0;
   int integer_lanes = 0;
 };
-using EngineParamTest = EngineParamTestTemplate<TestParams>;
+using x86ParamTest = x86ParamTestTemplate<TestParams>;
 // SmallCorrectness is designed to exercise every possible set of code paths
 // in the memcpy code, not including the loop.
-TEST_P(EngineParamTest, SmallCorrectnessCheckSourceAlignment) {
+TEST_P(x86ParamTest, SmallCorrectnessCheckSourceAlignment) {
   constexpr size_t kTestSizes[] = {0, 100, 255, 512, 1024, 4000, kMaxCopySize};
 
   for (size_t source_alignment = 0; source_alignment < kAlignment;
@@ -107,9 +107,6 @@ TEST_P(EngineParamTest, SmallCorrectnessCheckSourceAlignment) {
         *(base_data + i) =
             static_cast<char>(absl::Uniform<unsigned char>(gen_));
       }
-      SCOPED_TRACE(absl::StrCat("engine=<", GetParam().vector_lanes, ",",
-                                GetParam().integer_lanes, ">, ", "size=", size,
-                                ", source_alignment=", source_alignment));
       absl::crc32c_t initial_crc =
           absl::crc32c_t{absl::Uniform<uint32_t>(gen_)};
       absl::crc32c_t experiment_crc =
@@ -130,7 +127,7 @@ TEST_P(EngineParamTest, SmallCorrectnessCheckSourceAlignment) {
   }
 }
 
-TEST_P(EngineParamTest, SmallCorrectnessCheckDestAlignment) {
+TEST_P(x86ParamTest, SmallCorrectnessCheckDestAlignment) {
   constexpr size_t kTestSizes[] = {0, 100, 255, 512, 1024, 4000, kMaxCopySize};
 
   for (size_t dest_alignment = 0; dest_alignment < kAlignment;
@@ -141,9 +138,6 @@ TEST_P(EngineParamTest, SmallCorrectnessCheckDestAlignment) {
         *(base_data + i) =
             static_cast<char>(absl::Uniform<unsigned char>(gen_));
       }
-      SCOPED_TRACE(absl::StrCat("engine=<", GetParam().vector_lanes, ",",
-                                GetParam().integer_lanes, ">, ", "size=", size,
-                                ", destination_alignment=", dest_alignment));
       absl::crc32c_t initial_crc =
           absl::crc32c_t{absl::Uniform<uint32_t>(gen_)};
       absl::crc32c_t experiment_crc =
@@ -163,12 +157,10 @@ TEST_P(EngineParamTest, SmallCorrectnessCheckDestAlignment) {
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(EngineParamTest, EngineParamTest,
+INSTANTIATE_TEST_SUITE_P(x86ParamTest, x86ParamTest,
                          ::testing::Values(
                              // Tests for configurations that may occur in prod.
-                             TestParams{ACCELERATED, 3, 0},
-                             TestParams{ACCELERATED, 1, 2},
-                             TestParams{ACCELERATED, 1, 0},
+                             TestParams{X86, 3, 0}, TestParams{X86, 1, 2},
                              // Fallback test.
                              TestParams{FALLBACK, 0, 0},
                              // Non Temporal

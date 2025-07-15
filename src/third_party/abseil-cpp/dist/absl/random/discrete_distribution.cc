@@ -14,16 +14,6 @@
 
 #include "absl/random/discrete_distribution.h"
 
-#include <cassert>
-#include <cmath>
-#include <cstddef>
-#include <iterator>
-#include <numeric>
-#include <utility>
-#include <vector>
-
-#include "absl/base/config.h"
-
 namespace absl {
 ABSL_NAMESPACE_BEGIN
 namespace random_internal {

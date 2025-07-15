@@ -13,7 +13,9 @@
 // limitations under the License.
 #include "absl/status/status_payload_printer.h"
 
-#include "absl/base/config.h"
+#include <atomic>
+
+#include "absl/base/attributes.h"
 #include "absl/base/internal/atomic_hook.h"
 
 namespace absl {

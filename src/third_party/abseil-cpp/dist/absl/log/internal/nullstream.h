@@ -79,7 +79,6 @@ class NullStream {
     return *this;
   }
   NullStream& InternalStream() { return *this; }
-  void Flush() {}
 };
 template <typename T>
 inline NullStream& operator<<(NullStream& str, const T&) {
@@ -118,7 +117,16 @@ class NullStreamMaybeFatal final : public NullStream {
 class NullStreamFatal final : public NullStream {
  public:
   NullStreamFatal() = default;
-  [[noreturn]] ~NullStreamFatal() { _exit(1); }
+  // ABSL_ATTRIBUTE_NORETURN doesn't seem to work on destructors with msvc, so
+  // disable msvc's warning about the d'tor never returning.
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma warning(push)
+#pragma warning(disable : 4722)
+#endif
+  ABSL_ATTRIBUTE_NORETURN ~NullStreamFatal() { _exit(1); }
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma warning(pop)
+#endif
 };
 
 }  // namespace log_internal

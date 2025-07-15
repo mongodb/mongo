@@ -117,6 +117,7 @@ void TestBernoulli(URBG* gen) {
   absl::Bernoulli(*gen, 0.5);
 }
 
+
 template <typename URBG>
 void TestZipf(URBG* gen) {
   absl::Zipf<int>(*gen, 100);

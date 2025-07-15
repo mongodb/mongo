@@ -56,14 +56,7 @@ class ReplicaSetChangeNotifier {
 public:
     using Key = std::string;
     class Listener;
-
-    struct State {
-        ConnectionString connStr;
-        HostAndPort primary;
-        std::set<HostAndPort> passives;
-
-        int64_t generation = 0;
-    };
+    struct State;
 
 public:
     ReplicaSetChangeNotifier() = default;
@@ -171,6 +164,14 @@ public:
 
 private:
     Notifier* _notifier = nullptr;
+};
+
+struct ReplicaSetChangeNotifier::State {
+    ConnectionString connStr;
+    HostAndPort primary;
+    std::set<HostAndPort> passives;
+
+    int64_t generation = 0;
 };
 
 }  // namespace mongo

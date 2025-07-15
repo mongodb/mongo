@@ -27,6 +27,9 @@
  *    it in the license file.
  */
 
+#include <absl/hash/hash.h>
+
+// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/data_range.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -58,8 +61,6 @@
 #include <utility>
 #include <vector>
 
-#include <absl/hash/hash.h>
-
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
@@ -76,7 +77,6 @@
 #endif
 
 #if defined(_POSIX_VERSION) && defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
-#include <cxxabi.h>
 #include <dlfcn.h>
 #include <execinfo.h>
 #endif

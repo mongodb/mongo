@@ -35,6 +35,11 @@ namespace absl {
 ABSL_NAMESPACE_BEGIN
 namespace synchronization_internal {
 
+#ifdef ABSL_INTERNAL_NEED_REDUNDANT_CONSTEXPR_DECL
+constexpr uint64_t KernelTimeout::kNoTimeout;
+constexpr int64_t KernelTimeout::kMaxNanos;
+#endif
+
 int64_t KernelTimeout::SteadyClockNow() {
   if (!SupportsSteadyClock()) {
     return absl::GetCurrentTimeNanos();

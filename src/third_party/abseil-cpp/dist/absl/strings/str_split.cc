@@ -15,13 +15,16 @@
 #include "absl/strings/str_split.h"
 
 #include <algorithm>
-#include <cstddef>
+#include <cassert>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <iterator>
+#include <limits>
+#include <memory>
 
-#include "absl/base/config.h"
 #include "absl/base/internal/raw_logging.h"
-#include "absl/strings/string_view.h"
+#include "absl/strings/ascii.h"
 
 namespace absl {
 ABSL_NAMESPACE_BEGIN
@@ -94,11 +97,6 @@ absl::string_view ByString::Find(absl::string_view text, size_t pos) const {
     return text.substr(found_pos, 1);
   }
   return GenericFind(text, delimiter_, pos, LiteralPolicy());
-}
-
-absl::string_view ByAsciiWhitespace::Find(absl::string_view text,
-                                          size_t pos) const {
-  return GenericFind(text, " \t\v\f\r\n", pos, AnyOfPolicy());
 }
 
 //

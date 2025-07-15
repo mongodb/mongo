@@ -16,14 +16,14 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <memory>
-#include <vector>
 
 #include "absl/base/attributes.h"
 #include "absl/base/config.h"
+#include "absl/base/dynamic_annotations.h"
 #include "absl/base/internal/endian.h"
 #include "absl/base/prefetch.h"
 #include "absl/crc/internal/cpu_detect.h"
+#include "absl/crc/internal/crc.h"
 #include "absl/crc/internal/crc32_x86_arm_combined_simd.h"
 #include "absl/crc/internal/crc_internal.h"
 #include "absl/memory/memory.h"
@@ -64,27 +64,27 @@ class CRC32AcceleratedX86ARMCombined : public CRC32 {
 constexpr size_t kSmallCutoff = 256;
 constexpr size_t kMediumCutoff = 2048;
 
-#define ABSL_INTERNAL_STEP1(crc, p)                   \
+#define ABSL_INTERNAL_STEP1(crc)                      \
   do {                                                \
     crc = CRC32_u8(static_cast<uint32_t>(crc), *p++); \
   } while (0)
-#define ABSL_INTERNAL_STEP2(crc, p)                                            \
+#define ABSL_INTERNAL_STEP2(crc)                                               \
   do {                                                                         \
     crc =                                                                      \
         CRC32_u16(static_cast<uint32_t>(crc), absl::little_endian::Load16(p)); \
     p += 2;                                                                    \
   } while (0)
-#define ABSL_INTERNAL_STEP4(crc, p)                                            \
+#define ABSL_INTERNAL_STEP4(crc)                                               \
   do {                                                                         \
     crc =                                                                      \
         CRC32_u32(static_cast<uint32_t>(crc), absl::little_endian::Load32(p)); \
     p += 4;                                                                    \
   } while (0)
-#define ABSL_INTERNAL_STEP8(crc, p)                                            \
-  do {                                                                         \
-    crc =                                                                      \
-        CRC32_u64(static_cast<uint32_t>(crc), absl::little_endian::Load64(p)); \
-    p += 8;                                                                    \
+#define ABSL_INTERNAL_STEP8(crc, data)                  \
+  do {                                                  \
+    crc = CRC32_u64(static_cast<uint32_t>(crc),         \
+                    absl::little_endian::Load64(data)); \
+    data += 8;                                          \
   } while (0)
 #define ABSL_INTERNAL_STEP8BY2(crc0, crc1, p0, p1) \
   do {                                             \
@@ -101,17 +101,13 @@ constexpr size_t kMediumCutoff = 2048;
 namespace {
 
 uint32_t multiply(uint32_t a, uint32_t b) {
-  V128 power = V128_From64WithZeroFill(a);
-  V128 crc = V128_From64WithZeroFill(b);
+  V128 shifts = V128_From2x64(0, 1);
+  V128 power = V128_From2x64(0, a);
+  V128 crc = V128_From2x64(0, b);
   V128 res = V128_PMulLow(power, crc);
 
-  // Combine crc values.
-  //
-  // Adding res to itself is equivalent to multiplying by 2,
-  // or shifting left by 1. Addition is used as not all compilers
-  // are able to generate optimal code without this hint.
-  // https://godbolt.org/z/rr3fMnf39
-  res = V128_Add64(res, res);
+  // Combine crc values
+  res = V128_ShiftLeft64(res, shifts);
   return static_cast<uint32_t>(V128_Extract32<1>(res)) ^
          CRC32_u32(0, static_cast<uint32_t>(V128_Low64(res)));
 }
@@ -221,8 +217,7 @@ class CRC32AcceleratedX86ARMCombinedMultipleStreamsBase
   // We are applying it to CRC32C polynomial.
   ABSL_ATTRIBUTE_ALWAYS_INLINE void Process64BytesPclmul(
       const uint8_t* p, V128* partialCRC) const {
-    V128 loopMultiplicands =
-        V128_Load(reinterpret_cast<const V128*>(kFoldAcross512Bits));
+    V128 loopMultiplicands = V128_Load(reinterpret_cast<const V128*>(k1k2));
 
     V128 partialCRC1 = partialCRC[0];
     V128 partialCRC2 = partialCRC[1];
@@ -266,33 +261,53 @@ class CRC32AcceleratedX86ARMCombinedMultipleStreamsBase
 
     // Combine 4 vectors of partial crc into a single vector.
     V128 reductionMultiplicands =
-        V128_Load(reinterpret_cast<const V128*>(kFoldAcross256Bits));
+        V128_Load(reinterpret_cast<const V128*>(k5k6));
 
     V128 low = V128_PMulLow(reductionMultiplicands, partialCRC1);
     V128 high = V128_PMulHi(reductionMultiplicands, partialCRC1);
 
     partialCRC1 = V128_Xor(low, high);
-    partialCRC1 = V128_Xor(partialCRC1, partialCRC3);
+    partialCRC1 = V128_Xor(partialCRC1, partialCRC2);
 
-    low = V128_PMulLow(reductionMultiplicands, partialCRC2);
-    high = V128_PMulHi(reductionMultiplicands, partialCRC2);
+    low = V128_PMulLow(reductionMultiplicands, partialCRC3);
+    high = V128_PMulHi(reductionMultiplicands, partialCRC3);
 
-    partialCRC2 = V128_Xor(low, high);
-    partialCRC2 = V128_Xor(partialCRC2, partialCRC4);
+    partialCRC3 = V128_Xor(low, high);
+    partialCRC3 = V128_Xor(partialCRC3, partialCRC4);
 
-    reductionMultiplicands =
-        V128_Load(reinterpret_cast<const V128*>(kFoldAcross128Bits));
+    reductionMultiplicands = V128_Load(reinterpret_cast<const V128*>(k3k4));
 
     low = V128_PMulLow(reductionMultiplicands, partialCRC1);
     high = V128_PMulHi(reductionMultiplicands, partialCRC1);
     V128 fullCRC = V128_Xor(low, high);
-    fullCRC = V128_Xor(fullCRC, partialCRC2);
+    fullCRC = V128_Xor(fullCRC, partialCRC3);
 
     // Reduce fullCRC into scalar value.
-    uint32_t crc = 0;
-    crc = CRC32_u64(crc, V128_Extract64<0>(fullCRC));
-    crc = CRC32_u64(crc, V128_Extract64<1>(fullCRC));
-    return crc;
+    reductionMultiplicands = V128_Load(reinterpret_cast<const V128*>(k5k6));
+
+    V128 mask = V128_Load(reinterpret_cast<const V128*>(kMask));
+
+    V128 tmp = V128_PMul01(reductionMultiplicands, fullCRC);
+    fullCRC = V128_ShiftRight<8>(fullCRC);
+    fullCRC = V128_Xor(fullCRC, tmp);
+
+    reductionMultiplicands = V128_Load(reinterpret_cast<const V128*>(k7k0));
+
+    tmp = V128_ShiftRight<4>(fullCRC);
+    fullCRC = V128_And(fullCRC, mask);
+    fullCRC = V128_PMulLow(reductionMultiplicands, fullCRC);
+    fullCRC = V128_Xor(tmp, fullCRC);
+
+    reductionMultiplicands = V128_Load(reinterpret_cast<const V128*>(kPoly));
+
+    tmp = V128_And(fullCRC, mask);
+    tmp = V128_PMul01(reductionMultiplicands, tmp);
+    tmp = V128_And(tmp, mask);
+    tmp = V128_PMulLow(reductionMultiplicands, tmp);
+
+    fullCRC = V128_Xor(tmp, fullCRC);
+
+    return static_cast<uint64_t>(V128_Extract32<1>(fullCRC));
   }
 
   // Update crc with 64 bytes of data from p.
@@ -306,23 +321,15 @@ class CRC32AcceleratedX86ARMCombinedMultipleStreamsBase
     return crc;
   }
 
-  // Constants generated by './scripts/gen-crc-consts.py x86_pclmul
-  // crc32_lsb_0x82f63b78' from the Linux kernel.
-  alignas(16) static constexpr uint64_t kFoldAcross512Bits[2] = {
-      // (x^543 mod G) * x^32
-      0x00000000740eef02,
-      // (x^479 mod G) * x^32
-      0x000000009e4addf8};
-  alignas(16) static constexpr uint64_t kFoldAcross256Bits[2] = {
-      // (x^287 mod G) * x^32
-      0x000000003da6d0cb,
-      // (x^223 mod G) * x^32
-      0x00000000ba4fc28e};
-  alignas(16) static constexpr uint64_t kFoldAcross128Bits[2] = {
-      // (x^159 mod G) * x^32
-      0x00000000f20c0dfe,
-      // (x^95 mod G) * x^32
-      0x00000000493c7d27};
+  // Generated by crc32c_x86_test --crc32c_generate_constants=true
+  // and verified against constants in linux kernel for S390:
+  // https://github.com/torvalds/linux/blob/master/arch/s390/crypto/crc32le-vx.S
+  alignas(16) static constexpr uint64_t k1k2[2] = {0x0740eef02, 0x09e4addf8};
+  alignas(16) static constexpr uint64_t k3k4[2] = {0x1384aa63a, 0x0ba4fc28e};
+  alignas(16) static constexpr uint64_t k5k6[2] = {0x0f20c0dfe, 0x14cd00bd6};
+  alignas(16) static constexpr uint64_t k7k0[2] = {0x0dd45aab8, 0x000000000};
+  alignas(16) static constexpr uint64_t kPoly[2] = {0x105ec76f0, 0x0dea713f1};
+  alignas(16) static constexpr uint32_t kMask[4] = {~0u, 0u, ~0u, 0u};
 
   // Medium runs of bytes are broken into groups of kGroupsSmall blocks of same
   // size. Each group is CRCed in parallel then combined at the end of the
@@ -333,6 +340,24 @@ class CRC32AcceleratedX86ARMCombinedMultipleStreamsBase
   // are combined in the end.
   static constexpr size_t kMaxStreams = 3;
 };
+
+#ifdef ABSL_INTERNAL_NEED_REDUNDANT_CONSTEXPR_DECL
+alignas(16) constexpr uint64_t
+    CRC32AcceleratedX86ARMCombinedMultipleStreamsBase::k1k2[2];
+alignas(16) constexpr uint64_t
+    CRC32AcceleratedX86ARMCombinedMultipleStreamsBase::k3k4[2];
+alignas(16) constexpr uint64_t
+    CRC32AcceleratedX86ARMCombinedMultipleStreamsBase::k5k6[2];
+alignas(16) constexpr uint64_t
+    CRC32AcceleratedX86ARMCombinedMultipleStreamsBase::k7k0[2];
+alignas(16) constexpr uint64_t
+    CRC32AcceleratedX86ARMCombinedMultipleStreamsBase::kPoly[2];
+alignas(16) constexpr uint32_t
+    CRC32AcceleratedX86ARMCombinedMultipleStreamsBase::kMask[4];
+constexpr size_t
+    CRC32AcceleratedX86ARMCombinedMultipleStreamsBase::kGroupsSmall;
+constexpr size_t CRC32AcceleratedX86ARMCombinedMultipleStreamsBase::kMaxStreams;
+#endif  // ABSL_INTERNAL_NEED_REDUNDANT_CONSTEXPR_DECL
 
 template <size_t num_crc_streams, size_t num_pclmul_streams,
           CutoffStrategy strategy>
@@ -355,15 +380,15 @@ class CRC32AcceleratedX86ARMCombinedMultipleStreams
       length &= ~size_t{8};
     }
     if (length & 4) {
-      ABSL_INTERNAL_STEP4(l, p);
+      ABSL_INTERNAL_STEP4(l);
       length &= ~size_t{4};
     }
     if (length & 2) {
-      ABSL_INTERNAL_STEP2(l, p);
+      ABSL_INTERNAL_STEP2(l);
       length &= ~size_t{2};
     }
     if (length & 1) {
-      ABSL_INTERNAL_STEP1(l, p);
+      ABSL_INTERNAL_STEP1(l);
       length &= ~size_t{1};
     }
     if (length == 0) {
@@ -419,11 +444,11 @@ class CRC32AcceleratedX86ARMCombinedMultipleStreams
 
         V128 magic = *(reinterpret_cast<const V128*>(kClmulConstants) + bs - 1);
 
-        V128 tmp = V128_From64WithZeroFill(l64);
+        V128 tmp = V128_From2x64(0, l64);
 
         V128 res1 = V128_PMulLow(tmp, magic);
 
-        tmp = V128_From64WithZeroFill(l641);
+        tmp = V128_From2x64(0, l641);
 
         V128 res2 = V128_PMul10(tmp, magic);
         V128 x = V128_Xor(res1, res2);
@@ -449,7 +474,7 @@ class CRC32AcceleratedX86ARMCombinedMultipleStreams
       const uint8_t* x = RoundUp<8>(p);
       // Process bytes until p is 8-byte aligned, if that isn't past the end.
       while (p != x) {
-        ABSL_INTERNAL_STEP1(l, p);
+        ABSL_INTERNAL_STEP1(l);
       }
 
       size_t bs = static_cast<size_t>(e - p) /
@@ -568,7 +593,7 @@ class CRC32AcceleratedX86ARMCombinedMultipleStreams
     }
     // Process the last few bytes
     while (p != e) {
-      ABSL_INTERNAL_STEP1(l, p);
+      ABSL_INTERNAL_STEP1(l);
     }
 
 #undef ABSL_INTERNAL_STEP8BY3
@@ -609,16 +634,8 @@ CRCImpl* TryNewCRC32AcceleratedX86ARMCombined() {
       return new CRC32AcceleratedX86ARMCombinedMultipleStreams<
           3, 0, CutoffStrategy::Fold3>();
     case CpuType::kArmNeoverseN1:
-    case CpuType::kArmNeoverseN2:
-    case CpuType::kArmNeoverseV1:
       return new CRC32AcceleratedX86ARMCombinedMultipleStreams<
           1, 1, CutoffStrategy::Unroll64CRC>();
-    case CpuType::kAmpereSiryn:
-      return new CRC32AcceleratedX86ARMCombinedMultipleStreams<
-          3, 2, CutoffStrategy::Fold3>();
-    case CpuType::kArmNeoverseV2:
-      return new CRC32AcceleratedX86ARMCombinedMultipleStreams<
-          1, 2, CutoffStrategy::Unroll64CRC>();
 #if defined(__aarch64__)
     default:
       // Not all ARM processors support the needed instructions, so check here

@@ -40,15 +40,13 @@ std::atomic<int> g_cordz_mean_interval(50000);
 // Special negative 'not initialized' per thread value for cordz_next_sample.
 static constexpr int64_t kInitCordzNextSample = -1;
 
-ABSL_CONST_INIT thread_local SamplingState cordz_next_sample = {
-    kInitCordzNextSample, 1};
+ABSL_CONST_INIT thread_local int64_t cordz_next_sample = kInitCordzNextSample;
 
 // kIntervalIfDisabled is the number of profile-eligible events need to occur
 // before the code will confirm that cordz is still disabled.
 constexpr int64_t kIntervalIfDisabled = 1 << 16;
 
-ABSL_ATTRIBUTE_NOINLINE int64_t
-cordz_should_profile_slow(SamplingState& state) {
+ABSL_ATTRIBUTE_NOINLINE bool cordz_should_profile_slow() {
 
   thread_local absl::profiling_internal::ExponentialBiased
       exponential_biased_generator;
@@ -57,34 +55,30 @@ cordz_should_profile_slow(SamplingState& state) {
   // Check if we disabled profiling. If so, set the next sample to a "large"
   // number to minimize the overhead of the should_profile codepath.
   if (mean_interval <= 0) {
-    state = {kIntervalIfDisabled, kIntervalIfDisabled};
-    return 0;
+    cordz_next_sample = kIntervalIfDisabled;
+    return false;
   }
 
   // Check if we're always sampling.
   if (mean_interval == 1) {
-    state = {1, 1};
-    return 1;
+    cordz_next_sample = 1;
+    return true;
   }
 
-  if (cordz_next_sample.next_sample <= 0) {
+  if (cordz_next_sample <= 0) {
     // If first check on current thread, check cordz_should_profile()
     // again using the created (initial) stride in cordz_next_sample.
-    const bool initialized =
-        cordz_next_sample.next_sample != kInitCordzNextSample;
-    auto old_stride = state.sample_stride;
-    auto stride = exponential_biased_generator.GetStride(mean_interval);
-    state = {stride, stride};
-    bool should_sample = initialized || cordz_should_profile() > 0;
-    return should_sample ? old_stride : 0;
+    const bool initialized = cordz_next_sample != kInitCordzNextSample;
+    cordz_next_sample = exponential_biased_generator.GetStride(mean_interval);
+    return initialized || cordz_should_profile();
   }
 
-  --state.next_sample;
-  return 0;
+  --cordz_next_sample;
+  return false;
 }
 
 void cordz_set_next_sample_for_testing(int64_t next_sample) {
-  cordz_next_sample = {next_sample, next_sample};
+  cordz_next_sample = next_sample;
 }
 
 #endif  // ABSL_INTERNAL_CORDZ_ENABLED

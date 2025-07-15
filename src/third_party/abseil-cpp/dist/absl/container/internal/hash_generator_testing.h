@@ -23,9 +23,7 @@
 #include <algorithm>
 #include <cassert>
 #include <iosfwd>
-#include <memory>
 #include <random>
-#include <string>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -34,7 +32,6 @@
 #include "absl/container/internal/hash_policy_testing.h"
 #include "absl/memory/memory.h"
 #include "absl/meta/type_traits.h"
-#include "absl/random/random.h"
 #include "absl/strings/string_view.h"
 
 namespace absl {
@@ -51,7 +48,9 @@ struct IsMap<Map, absl::void_t<typename Map::mapped_type>> : std::true_type {};
 
 }  // namespace generator_internal
 
-enum Enum : uint64_t {
+std::mt19937_64* GetSharedRng();
+
+enum Enum {
   kEnumEmpty,
   kEnumDeleted,
 };
@@ -70,27 +69,37 @@ struct Generator;
 
 template <class T>
 struct Generator<T, typename std::enable_if<std::is_integral<T>::value>::type> {
-  T operator()() const { return dist(gen); }
-  mutable absl::InsecureBitGen gen;
-  mutable std::uniform_int_distribution<T> dist;
+  T operator()() const {
+    std::uniform_int_distribution<T> dist;
+    return dist(*GetSharedRng());
+  }
 };
 
 template <>
 struct Generator<Enum> {
-  Enum operator()() const { return static_cast<Enum>(dist(gen)); }
-  mutable absl::InsecureBitGen gen;
-  mutable std::uniform_int_distribution<
-      typename std::underlying_type<Enum>::type>
-      dist;
+  Enum operator()() const {
+    std::uniform_int_distribution<typename std::underlying_type<Enum>::type>
+        dist;
+    while (true) {
+      auto variate = dist(*GetSharedRng());
+      if (variate != kEnumEmpty && variate != kEnumDeleted)
+        return static_cast<Enum>(variate);
+    }
+  }
 };
 
 template <>
 struct Generator<EnumClass> {
-  EnumClass operator()() const { return static_cast<EnumClass>(dist(gen)); }
-  mutable absl::InsecureBitGen gen;
-  mutable std::uniform_int_distribution<
-      typename std::underlying_type<EnumClass>::type>
-      dist;
+  EnumClass operator()() const {
+    std::uniform_int_distribution<
+        typename std::underlying_type<EnumClass>::type>
+        dist;
+    while (true) {
+      EnumClass variate = static_cast<EnumClass>(dist(*GetSharedRng()));
+      if (variate != EnumClass::kEmpty && variate != EnumClass::kDeleted)
+        return static_cast<EnumClass>(variate);
+    }
+  }
 };
 
 template <>
@@ -134,17 +143,17 @@ struct Generator<std::unique_ptr<T>> {
 
 template <class U>
 struct Generator<U, absl::void_t<decltype(std::declval<U&>().key()),
-                                 decltype(std::declval<U&>().value())>>
+                                decltype(std::declval<U&>().value())>>
     : Generator<std::pair<
           typename std::decay<decltype(std::declval<U&>().key())>::type,
           typename std::decay<decltype(std::declval<U&>().value())>::type>> {};
 
 template <class Container>
-using GeneratedType =
-    decltype(std::declval<const Generator<typename std::conditional<
-                 generator_internal::IsMap<Container>::value,
-                 typename Container::value_type,
-                 typename Container::key_type>::type>&>()());
+using GeneratedType = decltype(
+    std::declval<const Generator<
+        typename std::conditional<generator_internal::IsMap<Container>::value,
+                                  typename Container::value_type,
+                                  typename Container::key_type>::type>&>()());
 
 // Naive wrapper that performs a linear search of previous values.
 // Beware this is O(SQR), which is reasonable for smaller kMaxValues.

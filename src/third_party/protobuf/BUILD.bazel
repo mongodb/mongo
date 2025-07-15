@@ -317,6 +317,7 @@ mongo_cc_library(
         "//src/third_party/abseil-cpp:absl_base",
         "//src/third_party/abseil-cpp:absl_debugging_internal",
         "//src/third_party/abseil-cpp:absl_die_if_null",
+        "//src/third_party/abseil-cpp:absl_flags",
         "//src/third_party/abseil-cpp:absl_hash",
         "//src/third_party/abseil-cpp:absl_log_initialize",
         "//src/third_party/abseil-cpp:absl_log_internal_check_op",
@@ -423,6 +424,7 @@ mongo_cc_library(
         "//src/third_party/abseil-cpp:absl_base",
         "//src/third_party/abseil-cpp:absl_debugging_internal",
         "//src/third_party/abseil-cpp:absl_die_if_null",
+        "//src/third_party/abseil-cpp:absl_flags",
         "//src/third_party/abseil-cpp:absl_hash",
         "//src/third_party/abseil-cpp:absl_log_initialize",
         "//src/third_party/abseil-cpp:absl_log_internal_check_op",
@@ -562,7 +564,6 @@ mongo_cc_library(
     deps = [
         "protobuf",
         "//src/third_party/abseil-cpp:absl_base",
-        "//src/third_party/abseil-cpp:absl_raw_hash_set",
         "//src/third_party/abseil-cpp:absl_strings",
     ],
 )

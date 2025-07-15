@@ -14,22 +14,16 @@
 
 #include "absl/strings/str_format.h"
 
-#include <cerrno>
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
-#include <ostream>
-#include <sstream>
 #include <string>
-#include <type_traits>
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/base/config.h"
-#include "absl/base/macros.h"
 #include "absl/strings/cord.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/span.h"
 
 namespace absl {
 ABSL_NAMESPACE_BEGIN
@@ -516,13 +510,7 @@ TEST_F(FormatEntryPointTest, SNPrintF) {
   EXPECT_EQ(result, 17);
   EXPECT_EQ(std::string(buffer), "NUMBER: 1234567");
 
-  // The `output` parameter is annotated nonnull, but we want to test that
-  // it is never written to if the size is zero.
-  // Use a variable instead of passing nullptr directly to avoid a `-Wnonnull`
-  // warning.
-  char* null_output = nullptr;
-  result =
-      SNPrintF(null_output, 0, "Just checking the %s of the output.", "size");
+  result = SNPrintF(nullptr, 0, "Just checking the %s of the output.", "size");
   EXPECT_EQ(result, 37);
 }
 
@@ -551,13 +539,7 @@ TEST_F(FormatEntryPointTest, SNPrintFWithV) {
 
   std::string size = "size";
 
-  // The `output` parameter is annotated nonnull, but we want to test that
-  // it is never written to if the size is zero.
-  // Use a variable instead of passing nullptr directly to avoid a `-Wnonnull`
-  // warning.
-  char* null_output = nullptr;
-  result =
-      SNPrintF(null_output, 0, "Just checking the %v of the output.", size);
+  result = SNPrintF(nullptr, 0, "Just checking the %v of the output.", size);
   EXPECT_EQ(result, 37);
 }
 
@@ -645,10 +627,6 @@ TEST(StrFormat, BehavesAsDocumented) {
   auto ptr_value = static_cast<uintptr_t>(value);
   const int& something = *reinterpret_cast<const int*>(ptr_value);
   EXPECT_EQ(StrFormat("%p", &something), StrFormat("0x%x", ptr_value));
-
-  // The output of formatting a null pointer is not documented as being a
-  // specific thing, but the attempt should at least compile.
-  (void)StrFormat("%p", nullptr);
 
   // Output widths are supported, with optional flags.
   EXPECT_EQ(StrFormat("%3d", 1), "  1");

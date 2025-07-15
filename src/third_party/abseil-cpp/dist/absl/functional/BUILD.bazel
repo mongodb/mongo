@@ -21,14 +21,7 @@ load(
     "ABSL_TEST_COPTS",
 )
 
-package(
-    default_visibility = ["//visibility:public"],
-    features = [
-        "header_modules",
-        "layering_check",
-        "parse_headers",
-    ],
-)
+package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
 
@@ -39,6 +32,7 @@ cc_library(
     copts = ABSL_DEFAULT_COPTS,
     linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
+        "//absl/base:base_internal",
         "//absl/base:config",
         "//absl/base:core_headers",
         "//absl/meta:type_traits",
@@ -56,12 +50,12 @@ cc_test(
     linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":any_invocable",
+        "//absl/base:base_internal",
         "//absl/base:config",
         "//absl/base:core_headers",
         "//absl/meta:type_traits",
         "//absl/utility",
-        "@googletest//:gtest",
-        "@googletest//:gtest_main",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -72,6 +66,7 @@ cc_library(
     copts = ABSL_DEFAULT_COPTS,
     linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
+        "//absl/base:base_internal",
         "//absl/container:compressed_tuple",
         "//absl/meta:type_traits",
         "//absl/utility",
@@ -86,8 +81,7 @@ cc_test(
     deps = [
         ":bind_front",
         "//absl/memory",
-        "@googletest//:gtest",
-        "@googletest//:gtest_main",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -99,6 +93,7 @@ cc_library(
     linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":any_invocable",
+        "//absl/base:base_internal",
         "//absl/base:core_headers",
         "//absl/meta:type_traits",
     ],
@@ -114,41 +109,12 @@ cc_test(
         ":function_ref",
         "//absl/container:test_instance_tracker",
         "//absl/memory",
-        "@googletest//:gtest",
-        "@googletest//:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "overload",
-    hdrs = ["overload.h"],
-    copts = ABSL_DEFAULT_COPTS,
-    linkopts = ABSL_DEFAULT_LINKOPTS,
-    deps = [
-        "//absl/base:config",
-        "//absl/meta:type_traits",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
 cc_test(
-    name = "overload_test",
-    size = "small",
-    srcs = ["overload_test.cc"],
-    copts = ABSL_TEST_COPTS,
-    deps = [
-        ":overload",
-        "//absl/base:config",
-        "//absl/strings",
-        "//absl/strings:string_view",
-        "//absl/types:variant",
-        "@googletest//:gtest",
-        "@googletest//:gtest_main",
-    ],
-)
-
-cc_binary(
     name = "function_type_benchmark",
-    testonly = True,
     srcs = [
         "function_type_benchmark.cc",
     ],
@@ -159,6 +125,6 @@ cc_binary(
         ":any_invocable",
         ":function_ref",
         "//absl/base:core_headers",
-        "@google_benchmark//:benchmark_main",
+        "@com_github_google_benchmark//:benchmark_main",
     ],
 )
