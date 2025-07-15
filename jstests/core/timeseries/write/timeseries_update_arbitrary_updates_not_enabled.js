@@ -13,6 +13,9 @@
  *   # Specifically testing that certain commands should not work when the feature flag for
  *   # time-series arbitrary updates is not enabled.
  *   featureFlagTimeseriesUpdatesSupport_incompatible,
+ *   # TODO SERVER-106641: Re-enable this test once we support updates on viewless time-series
+ *   # collections.
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
