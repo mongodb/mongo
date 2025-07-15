@@ -195,13 +195,7 @@ void doFLERewriteInTxn(OperationContext* opCtx,
         sharedBlock->doRewrite(&queryInterface);
         return;
     }
-    // This scoped object will stash transaction resource and restore them on commit. This is
-    // necessary because the internal transaction will cause the participant to take ownership of
-    // the locker in case of yield and destroy it in case of abort. Destroying the locker invariants
-    // if some locks are still held. Note that for transactions (where we hold 2-phase locks)
-    // stashing locks doesn't directly release them but signals the locker it can destroy them if
-    // necessary.
-    auto stashHandle = StashTransactionResourcesForMultiDocumentTransaction(opCtx);
+
     auto txn = getTxn(opCtx);
     auto service = opCtx->getService();
     auto swCommitResult = txn->runNoThrow(
@@ -218,7 +212,6 @@ void doFLERewriteInTxn(OperationContext* opCtx,
     uassertStatusOK(swCommitResult);
     uassertStatusOK(swCommitResult.getValue().cmdStatus);
     uassertStatusOK(swCommitResult.getValue().getEffectiveStatus());
-    stashHandle.restoreOnCommit();
 }
 
 NamespaceString getAndValidateEscNsFromSchema(const EncryptionInformation& encryptInfo,

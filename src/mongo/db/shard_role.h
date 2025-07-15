@@ -517,7 +517,8 @@ void restoreTransactionResourcesToOperationContext(
  * take care of restoring the TransactionResources onto the operation and stash them back once it
  * goes out of scope.
  */
-struct StashedTransactionResources {
+class StashedTransactionResources {
+public:
     StashedTransactionResources() = default;
 
     StashedTransactionResources(
@@ -542,6 +543,9 @@ struct StashedTransactionResources {
      * releases all locks and acquisitions held.
      */
     void dispose();
+
+private:
+    friend class HandleTransactionResourcesFromStasher;
 
     std::unique_ptr<shard_role_details::TransactionResources> _yieldedResources;
     shard_role_details::TransactionResources::State _originalState;
@@ -610,41 +614,6 @@ private:
     TransactionResourcesStasher* _stasher;
     std::unique_ptr<shard_role_details::TransactionResources> _originalTransactionResources;
 };
-
-/**
- * An RAII class that handles stashing and restoration of the TransactionResources onto the
- * OperationContext in between an internal multi-document transaction. The parent operation,
- * resposible to instanciate the multi-document transaction, must use this class if acquisitions are
- * still in scope before the transaction starts. This is necessary because TransactionParticipant
- * will
- * - Take ownership of the locker in case of yield
- * - Assume it can destroy the locker in case of abort
- * Destroying the locker requires
- * - No locks are held
- * - All the 2-phase locks can be released
- * As long as the parent operation holds active transaction resources, the locker cannot be
- * destroyed and the node will crash.
- * Class usage:
- * - The caller must explictly call `restoreOnCommit` to signal this class to restore the resources
- * to safely continue the parent operation.
- * - In case not called, this class will assume the transaction has aborted and will restore the
- * TransactionResources as FAILED, leaving them unlocked.
- */
-class StashTransactionResourcesForMultiDocumentTransaction {
-public:
-    StashTransactionResourcesForMultiDocumentTransaction(OperationContext* opCtx);
-    ~StashTransactionResourcesForMultiDocumentTransaction();
-
-    void restoreOnCommit();
-    void restoreOnAbort();
-
-private:
-    OperationContext* _opCtx;
-    StashedTransactionResources _stashedResources;
-    bool _restored = false;
-    bool _stashed = false;
-};
-
 
 namespace shard_role_details {
 class SnapshotAttempt {
