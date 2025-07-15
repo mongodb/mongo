@@ -163,10 +163,6 @@ public:
         return {ErrorCodes::Error::UnknownError, "Unknown error"};
     }
 
-    Status updateRecord(OperationContext*, const RecordId&, const char* data, int len) final {
-        unimplementedTasserted();
-        return {ErrorCodes::Error::UnknownError, "Unknown error"};
-    }
     Status updateRecord(
         OperationContext*, RecoveryUnit&, const RecordId&, const char* data, int len) final {
         unimplementedTasserted();

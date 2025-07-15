@@ -315,7 +315,11 @@ Status ReplicationConsistencyMarkersImpl::_upsertOplogTruncateAfterPointDocument
             // Update the record with the storage engine API to avoid op observers for this
             // non-replicated collection
             uassertStatusOK(collection->getRecordStore()->updateRecord(
-                opCtx, _oplogTruncateRecordId.get(), doc.objdata(), doc.objsize()));
+                opCtx,
+                *shard_role_details::getRecoveryUnit(opCtx),
+                _oplogTruncateRecordId.get(),
+                doc.objdata(),
+                doc.objsize()));
 
             wuow.commit();
 

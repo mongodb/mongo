@@ -126,8 +126,11 @@ void MDBCatalog::putUpdatedEntry(OperationContext* opCtx,
                                  const RecordId& catalogId,
                                  const BSONObj& catalogEntryObj) {
     LOGV2_DEBUG(22211, 3, "recording new metadata: ", "catalogEntryObj"_attr = catalogEntryObj);
-    Status status =
-        _rs->updateRecord(opCtx, catalogId, catalogEntryObj.objdata(), catalogEntryObj.objsize());
+    Status status = _rs->updateRecord(opCtx,
+                                      *shard_role_details::getRecoveryUnit(opCtx),
+                                      catalogId,
+                                      catalogEntryObj.objdata(),
+                                      catalogEntryObj.objsize());
     fassert(28521, status);
 }
 
@@ -302,8 +305,11 @@ Status MDBCatalog::putRenamedEntry(OperationContext* opCtx,
                                    const RecordId& catalogId,
                                    const NamespaceString& toNss,
                                    const BSONObj& renamedEntry) {
-    Status status =
-        _rs->updateRecord(opCtx, catalogId, renamedEntry.objdata(), renamedEntry.objsize());
+    Status status = _rs->updateRecord(opCtx,
+                                      *shard_role_details::getRecoveryUnit(opCtx),
+                                      catalogId,
+                                      renamedEntry.objdata(),
+                                      renamedEntry.objsize());
     fassert(28522, status);
 
     stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);

@@ -140,7 +140,11 @@ public:
         Lock::GlobalLock globalLock(op, MODE_IX);
         WriteUnitOfWork wuow(op);
         ASSERT_OK(shard_role_details::getRecoveryUnit(op.get())->setTimestamp(_counter));
-        ASSERT_OK(rs->updateRecord(op, id, contents.c_str(), contents.length() + 1));
+        ASSERT_OK(rs->updateRecord(op,
+                                   *shard_role_details::getRecoveryUnit(op.get()),
+                                   id,
+                                   contents.c_str(),
+                                   contents.length() + 1));
         wuow.commit();
     }
 

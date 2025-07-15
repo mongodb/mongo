@@ -150,12 +150,15 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
         rs->dataFor(t1.get(), ru1, id1);
         rs->dataFor(t2.get(), ru2, id1);
 
-        ASSERT_OK(rs->updateRecord(t1.get(), id1, "b", 2));
-        ASSERT_OK(rs->updateRecord(t1.get(), id2, "B", 2));
+        ASSERT_OK(rs->updateRecord(
+            t1.get(), *shard_role_details::getRecoveryUnit(t1.get()), id1, "b", 2));
+        ASSERT_OK(rs->updateRecord(
+            t1.get(), *shard_role_details::getRecoveryUnit(t1.get()), id2, "B", 2));
 
         try {
             // this should fail
-            rs->updateRecord(t2.get(), id1, "c", 2).transitional_ignore();
+            rs->updateRecord(t2.get(), *shard_role_details::getRecoveryUnit(t2.get()), id1, "c", 2)
+                .transitional_ignore();
             ASSERT(0);
         } catch (const StorageUnavailableException&) {
             w2.reset();
@@ -206,7 +209,8 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
 
         {
             StorageWriteTransaction w(ru1);
-            ASSERT_OK(rs->updateRecord(t1.get(), id1, "b", 2));
+            ASSERT_OK(rs->updateRecord(
+                t1.get(), *shard_role_details::getRecoveryUnit(t1.get()), id1, "b", 2));
             w.commit();
         }
 
@@ -215,7 +219,9 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
             ASSERT_EQUALS(std::string("a"), rs->dataFor(t2.get(), ru2, id1).data());
             try {
                 // this should fail as our version of id1 is too old
-                rs->updateRecord(t2.get(), id1, "c", 2).transitional_ignore();
+                rs->updateRecord(
+                      t2.get(), *shard_role_details::getRecoveryUnit(t2.get()), id1, "c", 2)
+                    .transitional_ignore();
                 ASSERT(0);
             } catch (const StorageUnavailableException&) {
             }
@@ -690,7 +696,11 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     const auto dataUpdated = "updated";
     {
         StorageWriteTransaction txn(ru);
-        ASSERT_OK(rs->updateRecord(opCtx.get(), rid, dataUpdated, strlen(dataUpdated)));
+        ASSERT_OK(rs->updateRecord(opCtx.get(),
+                                   *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                   rid,
+                                   dataUpdated,
+                                   strlen(dataUpdated)));
         ASSERT_EQUALS(1, rs->numRecords());
         txn.commit();
     }

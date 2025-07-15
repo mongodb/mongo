@@ -82,7 +82,11 @@ protected:
                               &unused));
 
         auto data = BSON("tid" << state.threadIndex << "inc" << state.committed);
-        ASSERT_OK(rs->updateRecord(state.opCtx.get(), RecordId(1), data.objdata(), data.objsize()));
+        ASSERT_OK(rs->updateRecord(state.opCtx.get(),
+                                   *shard_role_details::getRecoveryUnit(state.opCtx.get()),
+                                   RecordId(1),
+                                   data.objdata(),
+                                   data.objsize()));
 
         wuow.commit();
         ++state.committed;

@@ -78,7 +78,7 @@ TEST(RecordStoreTest, UpdateRecord) {
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
             StorageWriteTransaction txn(ru);
-            Status res = rs->updateRecord(opCtx.get(), loc, data.c_str(), data.size() + 1);
+            Status res = rs->updateRecord(opCtx.get(), ru, loc, data.c_str(), data.size() + 1);
             ASSERT_OK(res);
 
             txn.commit();
@@ -133,7 +133,7 @@ TEST(RecordStoreTest, UpdateMultipleRecords) {
             std::string data = ss.str();
 
             StorageWriteTransaction txn(ru);
-            Status res = rs->updateRecord(opCtx.get(), locs[i], data.c_str(), data.size() + 1);
+            Status res = rs->updateRecord(opCtx.get(), ru, locs[i], data.c_str(), data.size() + 1);
             ASSERT_OK(res);
 
             txn.commit();

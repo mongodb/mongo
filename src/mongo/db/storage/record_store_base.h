@@ -95,7 +95,6 @@ public:
                                       int len,
                                       Timestamp) final;
 
-    Status updateRecord(OperationContext*, const RecordId&, const char* data, int len) final;
     Status updateRecord(
         OperationContext*, RecoveryUnit&, const RecordId&, const char* data, int len) final;
 

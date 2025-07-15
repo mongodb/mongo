@@ -484,7 +484,8 @@ TEST_F(KVEngineTestHarness, PinningOldestWithAnotherSession) {
 
     ASSERT(rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid, &rd));
     ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx2)->setTimestamp(Timestamp(20, 20)));
-    ASSERT_OK(rs->updateRecord(opCtx2, rid, "updated", 8));
+    ASSERT_OK(
+        rs->updateRecord(opCtx2, *shard_role_details::getRecoveryUnit(opCtx2), rid, "updated", 8));
 
     ASSERT(rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid, &rd));
     ASSERT_EQUALS(std::string("abc"), rd.data());
@@ -670,7 +671,8 @@ TEST_F(KVEngineTestHarness, BasicTimestampMultiple) {
 
         // Update a record at a later time.
         ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx.get())->setTimestamp(t20));
-        auto res = rs->updateRecord(opCtx.get(), rid, "updated", 8);
+        auto res = rs->updateRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), rid, "updated", 8);
         ASSERT_OK(res);
         wuow.commit();
     }
@@ -729,7 +731,8 @@ DEATH_TEST_REGEX_F(KVEngineTestHarness, SnapshotHidesVisibility, ".*item not fou
 
     // Trying to write in an outdated snapshot will cause item not found.
     WriteUnitOfWork uow2(opCtx2);
-    auto swRid = rs->updateRecord(opCtx2, loc, "updated", 8);
+    auto swRid =
+        rs->updateRecord(opCtx2, *shard_role_details::getRecoveryUnit(opCtx2), loc, "updated", 8);
     uow2.commit();
 }
 

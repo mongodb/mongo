@@ -140,12 +140,6 @@ StatusWith<RecordId> RecordStoreBase::insertRecord(OperationContext* opCtx,
     return std::move(inOutRecords.front().id);
 }
 
-Status RecordStoreBase::updateRecord(OperationContext* opCtx,
-                                     const RecordId& id,
-                                     const char* data,
-                                     int len) {
-    return updateRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), id, data, len);
-}
 Status RecordStoreBase::updateRecord(
     OperationContext* opCtx, RecoveryUnit& ru, const RecordId& id, const char* data, int len) {
     validateWriteAllowed(opCtx);

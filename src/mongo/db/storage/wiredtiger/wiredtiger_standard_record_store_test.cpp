@@ -213,13 +213,15 @@ TEST_F(SizeStorerUpdateTest, DataSizeModification) {
     ASSERT_EQ(getDataSize(), 5);
     {
         StorageWriteTransaction txn(ru);
-        ASSERT_OK(rs->updateRecord(opCtx.get(), recordId, "54321", 5));
+        ASSERT_OK(rs->updateRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), recordId, "54321", 5));
         txn.commit();
     }
     ASSERT_EQ(getDataSize(), 5);
     {
         StorageWriteTransaction txn(ru);
-        ASSERT_OK(rs->updateRecord(opCtx.get(), recordId, "1234", 4));
+        ASSERT_OK(rs->updateRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), recordId, "1234", 4));
         txn.commit();
     }
     ASSERT_EQ(getDataSize(), 4);

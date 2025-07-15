@@ -549,7 +549,11 @@ public:
         {
             beginTransaction();
             auto doc = BSON("_id" << 1 << "a" << 9);
-            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize());
+            auto updateStatus = rs->updateRecord(&_opCtx,
+                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                 id1,
+                                                 doc.objdata(),
+                                                 doc.objsize());
 
             ASSERT_OK(updateStatus);
             commitTransaction();
@@ -592,7 +596,11 @@ public:
         {
             beginTransaction();
             auto doc = BSON("_id" << 9);
-            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize());
+            auto updateStatus = rs->updateRecord(&_opCtx,
+                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                 id1,
+                                                 doc.objdata(),
+                                                 doc.objsize());
             ASSERT_OK(updateStatus);
             commitTransaction();
         }
@@ -605,7 +613,11 @@ public:
         {
             beginTransaction();
             auto doc = BSON("_id" << 1);
-            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize());
+            auto updateStatus = rs->updateRecord(&_opCtx,
+                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                 id1,
+                                                 doc.objdata(),
+                                                 doc.objsize());
             ASSERT_OK(updateStatus);
             commitTransaction();
         }
@@ -684,7 +696,11 @@ public:
         // Update a document's indexed field without updating the index.
         {
             beginTransaction();
-            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc1_b.objdata(), doc1_b.objsize());
+            auto updateStatus = rs->updateRecord(&_opCtx,
+                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                 id1,
+                                                 doc1_b.objdata(),
+                                                 doc1_b.objsize());
             ASSERT_OK(updateStatus);
             commitTransaction();
         }
@@ -697,7 +713,11 @@ public:
         // Index validation should still be valid.
         {
             beginTransaction();
-            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc1_c.objdata(), doc1_c.objsize());
+            auto updateStatus = rs->updateRecord(&_opCtx,
+                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                 id1,
+                                                 doc1_c.objdata(),
+                                                 doc1_c.objsize());
             ASSERT_OK(updateStatus);
             commitTransaction();
         }
@@ -748,7 +768,11 @@ public:
         {
             beginTransaction();
             auto doc = BSON("_id" << 2 << "a" << 3);
-            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize());
+            auto updateStatus = rs->updateRecord(&_opCtx,
+                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                 id1,
+                                                 doc.objdata(),
+                                                 doc.objsize());
             ASSERT_OK(updateStatus);
             commitTransaction();
         }
@@ -806,7 +830,11 @@ public:
         {
             beginTransaction();
             auto doc = BSON("_id" << 1);
-            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize());
+            auto updateStatus = rs->updateRecord(&_opCtx,
+                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                 id1,
+                                                 doc.objdata(),
+                                                 doc.objsize());
             ASSERT_OK(updateStatus);
             commitTransaction();
         }
@@ -917,7 +945,11 @@ public:
         {
             beginTransaction();
             auto doc = BSON("_id" << 1 << "a" << 1 << "b" << 3);
-            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize());
+            auto updateStatus = rs->updateRecord(&_opCtx,
+                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                 id1,
+                                                 doc.objdata(),
+                                                 doc.objsize());
             ASSERT_OK(updateStatus);
             commitTransaction();
         }
@@ -1307,7 +1339,11 @@ public:
         {
             beginTransaction();
             auto doc = BSON("_id" << 1 << "a" << 5);
-            auto updateStatus = rs->updateRecord(&_opCtx, rid, doc.objdata(), doc.objsize());
+            auto updateStatus = rs->updateRecord(&_opCtx,
+                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                 rid,
+                                                 doc.objdata(),
+                                                 doc.objsize());
             ASSERT_OK(updateStatus);
             commitTransaction();
         }
@@ -1604,10 +1640,18 @@ public:
             std::unique_ptr<SeekableRecordCursor> cursor = coll()->getCursor(&_opCtx);
             auto record = cursor->next();
             RecordId rid = record->id;
-            ASSERT_OK(rs->updateRecord(&_opCtx, rid, doc1.objdata(), doc1.objsize()));
+            ASSERT_OK(rs->updateRecord(&_opCtx,
+                                       *shard_role_details::getRecoveryUnit(&_opCtx),
+                                       rid,
+                                       doc1.objdata(),
+                                       doc1.objsize()));
             record = cursor->next();
             rid = record->id;
-            ASSERT_OK(rs->updateRecord(&_opCtx, rid, doc2.objdata(), doc2.objsize()));
+            ASSERT_OK(rs->updateRecord(&_opCtx,
+                                       *shard_role_details::getRecoveryUnit(&_opCtx),
+                                       rid,
+                                       doc2.objdata(),
+                                       doc2.objsize()));
             commitTransaction();
         }
         releaseDb();
@@ -3009,7 +3053,11 @@ public:
             {
                 beginTransaction();
                 auto updateStatus = coll()->getRecordStore()->updateRecord(
-                    &_opCtx, id1, mkDoc.objdata(), mkDoc.objsize());
+                    &_opCtx,
+                    *shard_role_details::getRecoveryUnit(&_opCtx),
+                    id1,
+                    mkDoc.objdata(),
+                    mkDoc.objsize());
                 ASSERT_OK(updateStatus);
                 commitTransaction();
             }
@@ -3763,7 +3811,11 @@ public:
             {
                 beginTransaction();
                 auto updateStatus = coll()->getRecordStore()->updateRecord(
-                    &_opCtx, id1, mkDoc.objdata(), mkDoc.objsize());
+                    &_opCtx,
+                    *shard_role_details::getRecoveryUnit(&_opCtx),
+                    id1,
+                    mkDoc.objdata(),
+                    mkDoc.objsize());
                 ASSERT_OK(updateStatus);
                 commitTransaction();
             }
@@ -4000,7 +4052,11 @@ public:
             {
                 beginTransaction();
                 auto updateStatus = coll()->getRecordStore()->updateRecord(
-                    &_opCtx, id1, doc2.objdata(), doc2.objsize());
+                    &_opCtx,
+                    *shard_role_details::getRecoveryUnit(&_opCtx),
+                    id1,
+                    doc2.objdata(),
+                    doc2.objsize());
                 ASSERT_OK(updateStatus);
                 commitTransaction();
             }
@@ -4397,7 +4453,11 @@ public:
         {
             beginTransaction();
             auto doc = BSON("_id" << firstRecordId << "a" << 5);
-            auto updateStatus = rs->updateRecord(&_opCtx, rid, doc.objdata(), doc.objsize());
+            auto updateStatus = rs->updateRecord(&_opCtx,
+                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                 rid,
+                                                 doc.objdata(),
+                                                 doc.objsize());
             ASSERT_OK(updateStatus);
             commitTransaction();
         }
@@ -4688,7 +4748,11 @@ public:
         {
             beginTransaction();
             auto doc = BSON("_id" << firstRecordId << "a" << 5);
-            auto updateStatus = rs->updateRecord(&_opCtx, rid, doc.objdata(), doc.objsize());
+            auto updateStatus = rs->updateRecord(&_opCtx,
+                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                 rid,
+                                                 doc.objdata(),
+                                                 doc.objsize());
             ASSERT_OK(updateStatus);
             commitTransaction();
         }
@@ -4846,8 +4910,11 @@ public:
         {
             beginTransaction();
             auto doc = BSON("a" << 1);
-            auto updateStatus =
-                rs->updateRecord(&_opCtx, ridMissingId, doc.objdata(), doc.objsize());
+            auto updateStatus = rs->updateRecord(&_opCtx,
+                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                 ridMissingId,
+                                                 doc.objdata(),
+                                                 doc.objsize());
             ASSERT_OK(updateStatus);
             commitTransaction();
         }
@@ -4855,8 +4922,11 @@ public:
         {
             beginTransaction();
             auto doc = BSON("_id" << OID::gen() << "a" << 2);
-            auto updateStatus =
-                rs->updateRecord(&_opCtx, ridMismatchedId, doc.objdata(), doc.objsize());
+            auto updateStatus = rs->updateRecord(&_opCtx,
+                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                 ridMismatchedId,
+                                                 doc.objdata(),
+                                                 doc.objsize());
             ASSERT_OK(updateStatus);
             commitTransaction();
         }

@@ -492,10 +492,7 @@ public:
     /**
      * Updates the record with id 'recordId', replacing its contents with those described by
      * 'data' and 'len'.
-     *
-     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
-    virtual Status updateRecord(OperationContext*, const RecordId&, const char* data, int len) = 0;
     virtual Status updateRecord(
         OperationContext*, RecoveryUnit&, const RecordId&, const char* data, int len) = 0;
 

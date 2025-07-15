@@ -713,8 +713,12 @@ void updateDocument(OperationContext* opCtx,
                 !LocalOplogInfo::get(opCtx)->getTruncateMarkers() ||
                     oldDoc.value().objsize() == newDoc.objsize());
     }
-    uassertStatusOK(collection->getRecordStore()->updateRecord(
-        opCtx, oldLocation, newDoc.objdata(), newDoc.objsize()));
+    uassertStatusOK(
+        collection->getRecordStore()->updateRecord(opCtx,
+                                                   *shard_role_details::getRecoveryUnit(opCtx),
+                                                   oldLocation,
+                                                   newDoc.objdata(),
+                                                   newDoc.objsize()));
 
     // don't update the indexes if kUpdateNoIndexes has been specified.
     if (opDiff != kUpdateNoIndexes) {
