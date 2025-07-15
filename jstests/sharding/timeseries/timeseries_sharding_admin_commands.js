@@ -232,15 +232,12 @@ const zoneShardingTestCases = [
     const isNssSharded = nss =>
         (nss in shardingStateColls &&
          timestampCmp(shardingStateColls[nss]["placementVersion"], Timestamp(0, 0)) !== 0);
+    assert(isNssSharded(getTimeseriesCollForDDLOps(db, coll).getFullName()));
 
-    // TODO SERVER-101784 Simplify these checks once only viewless timeseries exist.
-    // Note: for legacy timeseries `collNssIsSharded` corresponds to the view.
-    const collNssIsSharded = isNssSharded(collNss);
-    const bucketNssIsSharded = isNssSharded(getTimeseriesCollForDDLOps(db, coll).getFullName());
-    if (areViewlessTimeseriesEnabled(mongo.s.getDB(dbName))) {
-        assert(!bucketNssIsSharded && collNssIsSharded);
-    } else {
-        assert(bucketNssIsSharded && !collNssIsSharded);
+    // TODO SERVER-101784 Remove this check once only viewless timeseries exist.
+    // Note: for legacy timeseries this checks that the view namespace is not sharded.
+    if (!areViewlessTimeseriesEnabled(mongo.s.getDB(dbName))) {
+        assert(!isNssSharded(collNss));
     }
     assert(coll.drop());
 })();
