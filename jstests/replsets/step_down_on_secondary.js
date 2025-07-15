@@ -68,6 +68,11 @@ rst.waitForState(secondary, ReplSetTest.State.PRIMARY);
 rst.awaitSecondaryNodes(null, [primary]);
 const newPrimary = rst.getPrimary();
 
+// Clear the logs so that when we check for the stepdown's "Starting to kill user operations" log
+// below on the old primary, we won't be counting the one from stepping up the secondary (right
+// above this).
+clearRawMongoProgramOutput();
+
 jsTestLog("Prepare a transaction on the new primary");
 const session = newPrimary.startSession();
 const sessionDb = session.getDatabase(dbName);
