@@ -180,6 +180,7 @@ let testCases = {
     collStats: {skip: "does not return user data"},
     compact: {skip: "does not return user data"},
     compactStructuredEncryptionData: {skip: "does not return user data"},
+    configureBackgroundTask: {skip: "primary only"},
     configureFailPoint: {skip: "does not return user data"},
     configureQueryAnalyzer: {skip: "does not return user data"},
     connPoolStats: {skip: "does not return user data"},

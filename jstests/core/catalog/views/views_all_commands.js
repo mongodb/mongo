@@ -315,6 +315,7 @@ let viewsCommandTests = {
     commitTransaction: {skip: isUnrelated},
     compact: {command: {compact: "view", force: true}, expectFailure: true, skipSharded: true},
     compactStructuredEncryptionData: {skip: isUnrelated},
+    configureBackgroundTask: {skip: isUnrelated},
     configureFailPoint: {skip: isUnrelated},
     configureCollectionBalancing: {skip: isUnrelated},
     configureQueryAnalyzer: {

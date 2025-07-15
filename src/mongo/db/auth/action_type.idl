@@ -73,6 +73,7 @@ enums:
             closeAllDatabases: "closeAllDatabases" # Deprecated (backwards compatibility)
             collMod: "collMod"
             collStats: "collStats"
+            configureBackgroundTask: "configureBackgroundTask"
             compact: "compact"
             compactStructuredEncryptionData: "compactStructuredEncryptionData"
             configureQueryAnalyzer: "configureQueryAnalyzer"

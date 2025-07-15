@@ -9,6 +9,9 @@ filters:
   - "buildinfo_common.*":
     approvers:
       - 10gen/server-programmability
+  - "configure_background_task*":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "*cluster*parameter*":
     approvers:
       - 10gen/server-catalog-and-routing
