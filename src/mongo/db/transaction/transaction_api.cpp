@@ -86,6 +86,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 
 MONGO_FAIL_POINT_DEFINE(overrideTransactionApiMaxRetriesToThree);
+MONGO_FAIL_POINT_DEFINE(pauseAfterTxnStarted);
 
 namespace mongo {
 namespace txn_api {
@@ -558,75 +559,77 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
             "database versions without using router commands",
             !OperationShardingState::isComingFromRouter(opCtx) ||
                 _txnClient->runsClusterOperations());
+    {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+        // Extract session options and infer execution context from client's opCtx.
+        auto clientSession = opCtx->getLogicalSessionId();
+        auto clientTxnNumber = opCtx->getTxnNumber();
+        auto clientInMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
 
-    // Extract session options and infer execution context from client's opCtx.
-    auto clientSession = opCtx->getLogicalSessionId();
-    auto clientTxnNumber = opCtx->getTxnNumber();
-    auto clientInMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
+        if (!clientSession) {
+            const auto acquiredSession =
+                InternalSessionPool::get(opCtx)->acquireStandaloneSession(opCtx);
+            _acquiredSessionFromPool = true;
+            _setSessionInfo(lg,
+                            acquiredSession.getSessionId(),
+                            acquiredSession.getTxnNumber(),
+                            {true} /* startTransaction */);
+            _execContext = ExecutionContext::kOwnSession;
+        } else if (!clientTxnNumber) {
+            const auto acquiredSession =
+                InternalSessionPool::get(opCtx)->acquireChildSession(opCtx, *clientSession);
+            _acquiredSessionFromPool = true;
+            _setSessionInfo(lg,
+                            acquiredSession.getSessionId(),
+                            acquiredSession.getTxnNumber(),
+                            {true} /* startTransaction */);
+            _execContext = ExecutionContext::kClientSession;
+        } else if (!clientInMultiDocumentTransaction) {
+            _setSessionInfo(
+                lg,
+                makeLogicalSessionIdWithTxnNumberAndUUID(*clientSession, *clientTxnNumber),
+                0 /* txnNumber */,
+                {true} /* startTransaction */);
+            _execContext = ExecutionContext::kClientRetryableWrite;
+        } else {
+            // Note that we don't want to include startTransaction or any first transaction command
+            // fields because we assume that if we're in a client transaction the component tracking
+            // transactions on the process must have already been started (e.g. TransactionRouter or
+            // TransactionParticipant), so when the API sends commands for this transacion that
+            // component will attach the correct fields if targeting new participants. This assumes
+            // this case always uses a client that runs commands against the local process service
+            // entry point, which we verify with this invariant.
+            invariant(_txnClient->supportsClientTransactionContext());
 
-    if (!clientSession) {
-        const auto acquiredSession =
-            InternalSessionPool::get(opCtx)->acquireStandaloneSession(opCtx);
-        _acquiredSessionFromPool = true;
-        _setSessionInfo(lg,
-                        acquiredSession.getSessionId(),
-                        acquiredSession.getTxnNumber(),
-                        {true} /* startTransaction */);
-        _execContext = ExecutionContext::kOwnSession;
-    } else if (!clientTxnNumber) {
-        const auto acquiredSession =
-            InternalSessionPool::get(opCtx)->acquireChildSession(opCtx, *clientSession);
-        _acquiredSessionFromPool = true;
-        _setSessionInfo(lg,
-                        acquiredSession.getSessionId(),
-                        acquiredSession.getTxnNumber(),
-                        {true} /* startTransaction */);
-        _execContext = ExecutionContext::kClientSession;
-    } else if (!clientInMultiDocumentTransaction) {
-        _setSessionInfo(lg,
-                        makeLogicalSessionIdWithTxnNumberAndUUID(*clientSession, *clientTxnNumber),
-                        0 /* txnNumber */,
-                        {true} /* startTransaction */);
-        _execContext = ExecutionContext::kClientRetryableWrite;
-    } else {
-        // Note that we don't want to include startTransaction or any first transaction command
-        // fields because we assume that if we're in a client transaction the component tracking
-        // transactions on the process must have already been started (e.g. TransactionRouter or
-        // TransactionParticipant), so when the API sends commands for this transacion that
-        // component will attach the correct fields if targeting new participants. This assumes this
-        // case always uses a client that runs commands against the local process service entry
-        // point, which we verify with this invariant.
-        invariant(_txnClient->supportsClientTransactionContext());
+            uassert(6648101,
+                    "Cross-shard internal transactions are not supported when run under a client "
+                    "transaction directly on a shard.",
+                    !_txnClient->runsClusterOperations() ||
+                        serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
 
-        uassert(6648101,
-                "Cross-shard internal transactions are not supported when run under a client "
-                "transaction directly on a shard.",
-                !_txnClient->runsClusterOperations() ||
-                    serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
+            _setSessionInfo(
+                lg, *clientSession, *clientTxnNumber, boost::none /* startTransaction */);
+            _execContext = ExecutionContext::kClientTransaction;
 
-        _setSessionInfo(lg, *clientSession, *clientTxnNumber, boost::none /* startTransaction */);
-        _execContext = ExecutionContext::kClientTransaction;
+            // Skip directly to the started state since we assume the client already started this
+            // transaction.
+            _state.transitionTo(TransactionState::kStarted);
+        }
+        _sessionInfo.setAutocommit(false);
 
-        // Skip directly to the started state since we assume the client already started this
-        // transaction.
-        _state.transitionTo(TransactionState::kStarted);
+        // Extract non-session options. Strip provenance so it can be correctly inferred for the
+        // generated commands as if it came from an external client.
+        _readConcern = repl::ReadConcernArgs::get(opCtx).toBSONInner().removeField(
+            ReadWriteConcernProvenanceBase::kSourceFieldName);
+        _writeConcern = opCtx->getWriteConcern().toBSON().removeField(
+            ReadWriteConcernProvenanceBase::kSourceFieldName);
+        _apiParameters = APIParameters::get(opCtx);
+
+        if (opCtx->hasDeadline()) {
+            _opDeadline = opCtx->getDeadline();
+        }
     }
-    _sessionInfo.setAutocommit(false);
-
-    // Extract non-session options. Strip provenance so it can be correctly inferred for the
-    // generated commands as if it came from an external client.
-    _readConcern = repl::ReadConcernArgs::get(opCtx).toBSONInner().removeField(
-        ReadWriteConcernProvenanceBase::kSourceFieldName);
-    _writeConcern = opCtx->getWriteConcern().toBSON().removeField(
-        ReadWriteConcernProvenanceBase::kSourceFieldName);
-    _apiParameters = APIParameters::get(opCtx);
-
-    if (opCtx->hasDeadline()) {
-        _opDeadline = opCtx->getDeadline();
-    }
-
     LOGV2_DEBUG(5875901,
                 3,
                 "Started internal transaction",
@@ -635,6 +638,9 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
                 "writeConcern"_attr = _writeConcern,
                 "APIParameters"_attr = _apiParameters,
                 "execContext"_attr = execContextToString(_execContext));
+    if (MONGO_unlikely(pauseAfterTxnStarted.shouldFail())) {
+        pauseAfterTxnStarted.pauseWhileSet();
+    }
 }
 
 LogicalTime Transaction::getOperationTime() const {

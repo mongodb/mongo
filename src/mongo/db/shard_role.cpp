@@ -669,8 +669,8 @@ bool supportsLockFreeRead(OperationContext* opCtx) {
         !(shard_role_details::getRecoveryUnit(opCtx)->isActive() && !opCtx->isLockFreeReadsOp());
 }
 
-void stashTransactionResourcesFromOperationContextAndDontAttachNewOnes(
-    OperationContext* opCtx, TransactionResourcesStasher* stasher) {
+StashedTransactionResources buildStashedTransactionResourcesAndDetachFromOpCtx(
+    OperationContext* opCtx) {
     auto& transactionResources = TransactionResources::get(opCtx);
 
     (void)prepareForYieldingTransactionResources(opCtx);
@@ -698,9 +698,12 @@ void stashTransactionResourcesFromOperationContextAndDontAttachNewOnes(
     auto originalState =
         std::exchange(transactionResources.state, TransactionResources::State::STASHED);
 
-    auto stashedResources =
-        StashedTransactionResources{TransactionResources::detachFromOpCtx(opCtx), originalState};
+    return StashedTransactionResources{TransactionResources::detachFromOpCtx(opCtx), originalState};
+}
 
+void stashTransactionResourcesFromOperationContextAndDontAttachNewOnes(
+    OperationContext* opCtx, TransactionResourcesStasher* stasher) {
+    auto stashedResources = buildStashedTransactionResourcesAndDetachFromOpCtx(opCtx);
     stasher->stashTransactionResources(std::move(stashedResources));
 }
 
@@ -1825,28 +1828,12 @@ void restoreTransactionResourcesToOperationContext(
     scopeGuard.dismiss();
 }
 
-StashTransactionResourcesForDBDirect::StashTransactionResourcesForDBDirect(OperationContext* opCtx)
-    : _opCtx(opCtx) {
+std::unique_ptr<shard_role_details::TransactionResources>
+restoreStashedTransactionResourcesToOperationContext(
+    OperationContext* opCtx, StashedTransactionResources& stashedResources) {
+    std::unique_ptr<TransactionResources> outOriginalTransactionResources;
     if (TransactionResources::isPresent(opCtx)) {
-        _originalTransactionResources = TransactionResources::detachFromOpCtx(opCtx);
-        TransactionResources::attachToOpCtx(opCtx, std::make_unique<TransactionResources>());
-    }
-}
-
-StashTransactionResourcesForDBDirect::~StashTransactionResourcesForDBDirect() {
-    if (TransactionResources::isPresent(_opCtx)) {
-        TransactionResources::detachFromOpCtx(_opCtx);
-    }
-    TransactionResources::attachToOpCtx(_opCtx, std::move(_originalTransactionResources));
-}
-
-HandleTransactionResourcesFromStasher::HandleTransactionResourcesFromStasher(
-    OperationContext* opCtx, TransactionResourcesStasher* stasher)
-    : _opCtx(opCtx), _stasher(stasher) {
-    auto stashedResources = stasher->releaseStashedTransactionResources();
-
-    if (TransactionResources::isPresent(opCtx)) {
-        _originalTransactionResources = TransactionResources::detachFromOpCtx(opCtx);
+        outOriginalTransactionResources = TransactionResources::detachFromOpCtx(opCtx);
     }
 
     invariant(stashedResources._yieldedResources);
@@ -1860,8 +1847,7 @@ HandleTransactionResourcesFromStasher::HandleTransactionResourcesFromStasher(
         }
         stashedResources._yieldedResources->releaseAllResourcesOnCommitOrAbort();
         stashedResources._yieldedResources->state = TransactionResources::State::FAILED;
-        stasher->stashTransactionResources(std::move(stashedResources));
-        TransactionResources::attachToOpCtx(opCtx, std::move(_originalTransactionResources));
+        TransactionResources::attachToOpCtx(opCtx, std::move(outOriginalTransactionResources));
     });
 
     // Reacquire the locks requested by the acquisitions. All acquisitions with the same
@@ -1951,6 +1937,91 @@ HandleTransactionResourcesFromStasher::HandleTransactionResourcesFromStasher(
                                     stashedResources._originalState});
 
     restoreFailedGuard.dismiss();
+    return outOriginalTransactionResources;
+}
+
+StashTransactionResourcesForDBDirect::StashTransactionResourcesForDBDirect(OperationContext* opCtx)
+    : _opCtx(opCtx) {
+    if (TransactionResources::isPresent(opCtx)) {
+        _originalTransactionResources = TransactionResources::detachFromOpCtx(opCtx);
+        TransactionResources::attachToOpCtx(opCtx, std::make_unique<TransactionResources>());
+    }
+}
+
+StashTransactionResourcesForDBDirect::~StashTransactionResourcesForDBDirect() {
+    if (TransactionResources::isPresent(_opCtx)) {
+        TransactionResources::detachFromOpCtx(_opCtx);
+    }
+    TransactionResources::attachToOpCtx(_opCtx, std::move(_originalTransactionResources));
+}
+
+StashTransactionResourcesForMultiDocumentTransaction::
+    StashTransactionResourcesForMultiDocumentTransaction(OperationContext* opCtx)
+    : _opCtx(opCtx), _restored(false) {
+    if (TransactionResources::isPresent(_opCtx)) {
+        _stashedResources = buildStashedTransactionResourcesAndDetachFromOpCtx(opCtx);
+        // Re-attach an empty TransactionResources to the opCtx to prepare for the multi-document
+        // transaction for new acquisitions.
+        shard_role_details::TransactionResources::attachToOpCtx(
+            opCtx, std::make_unique<shard_role_details::TransactionResources>());
+        _stashed = true;
+    } else {
+        _stashed = false;
+    }
+}
+
+StashTransactionResourcesForMultiDocumentTransaction::
+    ~StashTransactionResourcesForMultiDocumentTransaction() {
+    if (!_restored) {
+        restoreOnAbort();
+    }
+}
+
+void StashTransactionResourcesForMultiDocumentTransaction::restoreOnCommit() {
+    // Nothing to do if we never stashed.
+    if (!_stashed || _restored)
+        return;
+    std::unique_ptr<shard_role_details::TransactionResources> originalTransactionResources =
+        restoreStashedTransactionResourcesToOperationContext(_opCtx, _stashedResources);
+    _restored = true;
+    // The original TransactionResources must be empty, as we are restoring from a successful
+    // multi-document transaction and we expect no active acquisitions to be left in scope at this
+    // point.
+    originalTransactionResources.reset();
+}
+
+void StashTransactionResourcesForMultiDocumentTransaction::restoreOnAbort() {
+    // Nothing to do if we never stashed.
+    if (!_stashed || _restored)
+        return;
+    // Free and destroy whatever transaction resources are active. Notice that this can throw if
+    // the attached resources are not empty. This would cause a crash (std::terminate, you can't
+    // throw in a destructor). We never expect this case to happen because those resorces are
+    // acquired by the multi-document transaction. Since at this stage the transaction participant
+    // has aborted and failed we expect no acquisitions to be still in scope.
+    TransactionResources::detachFromOpCtx(_opCtx);
+    // Reaching this point means that the transaction participant has aborted and threw an
+    // exception. We are therefore failing the entire operation and restoring the resources would
+    // not be logically sound. Additionally, attempting to restore would be problematic as acquiring
+    // locks (like GlobalLock) would likely fail or deadlock. We therefore re-attach the resources
+    // as failed, which indicates no locks are actually taken by acquisitions.
+    _stashedResources._yieldedResources->releaseAllResourcesOnCommitOrAbort();
+    _stashedResources._yieldedResources->state = TransactionResources::State::FAILED;
+    TransactionResources::attachToOpCtx(_opCtx, std::move(_stashedResources._yieldedResources));
+}
+
+HandleTransactionResourcesFromStasher::HandleTransactionResourcesFromStasher(
+    OperationContext* opCtx, TransactionResourcesStasher* stasher)
+    : _opCtx(opCtx), _stasher(stasher) {
+    auto stashedResources = stasher->releaseStashedTransactionResources();
+    try {
+        _originalTransactionResources =
+            restoreStashedTransactionResourcesToOperationContext(_opCtx, stashedResources);
+    } catch (const DBException& _) {
+        // If we failed to restore the resources, we stash them back to the stasher.
+        stasher->stashTransactionResources(std::move(stashedResources));
+        throw;
+    }
 }
 
 HandleTransactionResourcesFromStasher::~HandleTransactionResourcesFromStasher() {
