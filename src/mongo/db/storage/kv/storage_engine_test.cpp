@@ -177,7 +177,8 @@ TEST_F(StorageEngineTest, TemporaryRecordStoreClustered) {
 
     // Read the record back.
     RecordData rd;
-    ASSERT_TRUE(rs->findRecord(opCtx.get(), rid, &rd));
+    ASSERT_TRUE(
+        rs->findRecord(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), rid, &rd));
     ASSERT_EQ(0, memcmp(data, rd.data(), strlen(data)));
 }
 

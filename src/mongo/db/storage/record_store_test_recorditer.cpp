@@ -450,7 +450,8 @@ TEST(RecordStoreTest, SeekExactForMissingRecordReturnsNone) {
 
     // Similarly, findRecord() should not find the deleted record.
     RecordData outputData;
-    ASSERT_FALSE(recordStore->findRecord(opCtx.get(), recordIds[1], &outputData));
+    ASSERT_FALSE(recordStore->findRecord(
+        opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), recordIds[1], &outputData));
 }
 
 }  // namespace

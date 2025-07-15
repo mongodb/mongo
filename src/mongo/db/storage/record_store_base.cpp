@@ -77,11 +77,6 @@ RecordData RecordStoreBase::dataFor(OperationContext* opCtx,
 }
 
 bool RecordStoreBase::findRecord(OperationContext* opCtx,
-                                 const RecordId& loc,
-                                 RecordData* out) const {
-    return findRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), loc, out);
-}
-bool RecordStoreBase::findRecord(OperationContext* opCtx,
                                  RecoveryUnit& ru,
                                  const RecordId& loc,
                                  RecordData* out) const {

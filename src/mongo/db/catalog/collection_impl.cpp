@@ -544,7 +544,8 @@ bool CollectionImpl::findDoc(OperationContext* opCtx,
                              const RecordId& loc,
                              Snapshotted<BSONObj>* out) const {
     RecordData rd;
-    if (!_shared->_recordStore->findRecord(opCtx, loc, &rd))
+    if (!_shared->_recordStore->findRecord(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx), loc, &rd))
         return false;
     *out = Snapshotted<BSONObj>(shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId(),
                                 rd.releaseToBson());

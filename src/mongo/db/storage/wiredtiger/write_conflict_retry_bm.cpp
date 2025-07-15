@@ -76,7 +76,10 @@ protected:
         WriteUnitOfWork wuow(state.opCtx.get());
 
         RecordData unused;
-        ASSERT(rs->findRecord(state.opCtx.get(), RecordId(1), &unused));
+        ASSERT(rs->findRecord(state.opCtx.get(),
+                              *shard_role_details::getRecoveryUnit(state.opCtx.get()),
+                              RecordId(1),
+                              &unused));
 
         auto data = BSON("tid" << state.threadIndex << "inc" << state.committed);
         ASSERT_OK(rs->updateRecord(state.opCtx.get(), RecordId(1), data.objdata(), data.objsize()));

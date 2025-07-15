@@ -291,7 +291,8 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
 
     rs = _helper.getWiredTigerKVEngine()->getRecordStore(opCtxPtr.get(), nss, ident, options, uuid);
     RecordData data;
-    ASSERT_FALSE(rs->findRecord(opCtxPtr.get(), loc, &data));
+    ASSERT_FALSE(rs->findRecord(
+        opCtxPtr.get(), *storage_details::getRecoveryUnit(opCtxPtr.get()), loc, &data));
 #endif
 }
 

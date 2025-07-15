@@ -806,7 +806,8 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
 
         auto rehydratedObjId = key_string::rehydrateKey(BSON("_id" << 1), currentObjId);
 
-        if (!collPtr->getRecordStore()->findRecord(opCtx, currentRecordId, &record)) {
+        if (!collPtr->getRecordStore()->findRecord(
+                opCtx, *shard_role_details::getRecoveryUnit(opCtx), currentRecordId, &record)) {
             const auto msg = "Error fetching record from record id";
             const auto status = Status(ErrorCodes::KeyNotFound, msg);
             const auto logEntry = dbCheckErrorHealthLogEntry(

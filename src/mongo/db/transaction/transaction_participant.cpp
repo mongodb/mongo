@@ -506,7 +506,7 @@ void updateSessionEntry(OperationContext* opCtx,
 
     RecordData originalRecordData;
     if (!collection.getCollectionPtr()->getRecordStore()->findRecord(
-            opCtx, recordId, &originalRecordData)) {
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx), recordId, &originalRecordData)) {
         // Upsert case.
         auto status = collection_internal::insertDocument(
             opCtx, collectionPtr, InsertStatement(doc), nullptr, false);

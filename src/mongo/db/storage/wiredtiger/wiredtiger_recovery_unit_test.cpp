@@ -207,12 +207,14 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, NoOverlapReadSource) {
     // Read without a timestamp. The write should be visible.
     ASSERT_EQ(ru1->getTimestampReadSource(), RecoveryUnit::ReadSource::kNoTimestamp);
     RecordData unused;
-    ASSERT_TRUE(rs->findRecord(opCtx1, rid1, &unused));
+    ASSERT_TRUE(
+        rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid1, &unused));
 
     // Read with kNoOverlap. The write should be visible.
     ru1->abandonSnapshot();
     ru1->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
-    ASSERT_TRUE(rs->findRecord(opCtx1, rid1, &unused));
+    ASSERT_TRUE(
+        rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid1, &unused));
 
     RecordId rid2, rid3;
     {
@@ -240,18 +242,24 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, NoOverlapReadSource) {
         // Read without a timestamp, and we should see the first and third records.
         ru1->abandonSnapshot();
         ru1->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
-        ASSERT_TRUE(rs->findRecord(opCtx1, rid1, &unused));
-        ASSERT_FALSE(rs->findRecord(opCtx1, rid2, &unused));
-        ASSERT_TRUE(rs->findRecord(opCtx1, rid3, &unused));
+        ASSERT_TRUE(
+            rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid1, &unused));
+        ASSERT_FALSE(
+            rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid2, &unused));
+        ASSERT_TRUE(
+            rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid3, &unused));
 
         // Now read at kNoOverlap. Since the transaction at ts2 has not committed, all_durable is
         // held back to ts1. LastApplied has advanced to ts3, but because kNoOverlap is the minimum,
         // we should only see one record.
         ru1->abandonSnapshot();
         ru1->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
-        ASSERT_TRUE(rs->findRecord(opCtx1, rid1, &unused));
-        ASSERT_FALSE(rs->findRecord(opCtx1, rid2, &unused));
-        ASSERT_FALSE(rs->findRecord(opCtx1, rid3, &unused));
+        ASSERT_TRUE(
+            rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid1, &unused));
+        ASSERT_FALSE(
+            rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid2, &unused));
+        ASSERT_FALSE(
+            rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid3, &unused));
 
         txn.commit();
     }
@@ -259,9 +267,12 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, NoOverlapReadSource) {
     // Now that the hole has been closed, kNoOverlap should see all 3 records.
     ru1->abandonSnapshot();
     ru1->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
-    ASSERT_TRUE(rs->findRecord(opCtx1, rid1, &unused));
-    ASSERT_TRUE(rs->findRecord(opCtx1, rid2, &unused));
-    ASSERT_TRUE(rs->findRecord(opCtx1, rid3, &unused));
+    ASSERT_TRUE(
+        rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid1, &unused));
+    ASSERT_TRUE(
+        rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid2, &unused));
+    ASSERT_TRUE(
+        rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid3, &unused));
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture,
@@ -724,7 +735,8 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsCached) {
     int cachedCursorsBefore = ru1->getSession()->cachedCursors();
 
     RecordData rd;
-    ASSERT_TRUE(rs->findRecord(opCtx, s.getValue(), &rd));
+    ASSERT_TRUE(
+        rs->findRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), s.getValue(), &rd));
 
     // A cursor should have been checked out and released into the cache.
     ASSERT_GT(ru1->getSession()->cachedCursors(), cachedCursorsBefore);
@@ -743,7 +755,8 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsCached) {
     cachedCursorsBefore = ru1->getSession()->cachedCursors();
 
     // The subsequent read operation will create a new read_once cursor and release into the cache.
-    ASSERT_TRUE(rs->findRecord(opCtx, s.getValue(), &rd));
+    ASSERT_TRUE(
+        rs->findRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), s.getValue(), &rd));
 
     // A new cursor should have been released into the cache.
     ASSERT_GT(ru1->getSession()->cachedCursors(), cachedCursorsBefore);

@@ -683,7 +683,8 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     }
     // Read the record back.
     RecordData rd;
-    ASSERT_TRUE(rs->findRecord(opCtx.get(), rid, &rd));
+    ASSERT_TRUE(
+        rs->findRecord(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), rid, &rd));
     ASSERT_EQ(0, memcmp(data, rd.data(), strlen(data)));
     // Update the record.
     const auto dataUpdated = "updated";
@@ -693,7 +694,8 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
         ASSERT_EQUALS(1, rs->numRecords());
         txn.commit();
     }
-    ASSERT_TRUE(rs->findRecord(opCtx.get(), rid, &rd));
+    ASSERT_TRUE(
+        rs->findRecord(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), rid, &rd));
     ASSERT_EQ(0, memcmp(dataUpdated, rd.data(), strlen(dataUpdated)));
 }
 

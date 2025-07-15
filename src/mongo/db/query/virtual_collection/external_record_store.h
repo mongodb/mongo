@@ -112,10 +112,6 @@ public:
         return {};
     }
 
-    bool findRecord(OperationContext*, const RecordId&, RecordData*) const final {
-        unimplementedTasserted();
-        return false;
-    }
     bool findRecord(OperationContext*, RecoveryUnit&, const RecordId&, RecordData*) const final {
         unimplementedTasserted();
         return false;

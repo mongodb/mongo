@@ -99,22 +99,26 @@ private:
 TEST_F(RecoveryUnitTestHarness, CommitUnitOfWork) {
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
     ru->beginUnitOfWork(opCtx->readOnly());
-    StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
+    StatusWith<RecordId> s = rs->insertRecord(
+        opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), "data", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
     ASSERT_EQUALS(1, rs->numRecords());
     ru->commitUnitOfWork();
     RecordData rd;
-    ASSERT_TRUE(rs->findRecord(opCtx.get(), s.getValue(), &rd));
+    ASSERT_TRUE(rs->findRecord(
+        opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), s.getValue(), &rd));
 }
 
 TEST_F(RecoveryUnitTestHarness, AbortUnitOfWork) {
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
     ru->beginUnitOfWork(opCtx->readOnly());
-    StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
+    StatusWith<RecordId> s = rs->insertRecord(
+        opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), "data", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
     ASSERT_EQUALS(1, rs->numRecords());
     ru->abortUnitOfWork();
-    ASSERT_FALSE(rs->findRecord(opCtx.get(), s.getValue(), nullptr));
+    ASSERT_FALSE(rs->findRecord(
+        opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), s.getValue(), nullptr));
 }
 
 TEST_F(RecoveryUnitTestHarness, CommitAndRollbackChanges) {

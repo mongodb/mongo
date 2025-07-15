@@ -440,10 +440,7 @@ public:
      *
      * In general prefer RecordCursor::seekExact since it can avoid copying data in more
      * storageEngines.
-     *
-     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
-    virtual bool findRecord(OperationContext*, const RecordId&, RecordData*) const = 0;
     virtual bool findRecord(OperationContext*,
                             RecoveryUnit&,
                             const RecordId&,
