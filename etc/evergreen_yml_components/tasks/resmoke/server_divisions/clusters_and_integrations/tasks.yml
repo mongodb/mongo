@@ -2268,7 +2268,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
+        "release_critical",
         "sharding",
         "jscore",
         "common",
