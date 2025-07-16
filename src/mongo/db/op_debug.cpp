@@ -1243,6 +1243,12 @@ CursorMetrics OpDebug::getCursorMetrics() const {
         additiveMetrics.clusterWorkingTime.value_or(Milliseconds(0)).count());
     metrics.setCpuNanos(additiveMetrics.cpuNanos.value_or(Nanoseconds(0)).count());
 
+    metrics.setDelinquentAcquisitions(additiveMetrics.delinquentAcquisitions.value_or(0));
+    metrics.setTotalAcquisitionDelinquencyMillis(
+        additiveMetrics.totalAcquisitionDelinquencyMillis.value_or(Milliseconds(0)).count());
+    metrics.setMaxAcquisitionDelinquencyMillis(
+        additiveMetrics.maxAcquisitionDelinquencyMillis.value_or(Milliseconds(0)).count());
+
     metrics.setHasSortStage(additiveMetrics.hasSortStage);
     metrics.setUsedDisk(additiveMetrics.usedDisk);
     metrics.setFromMultiPlanner(additiveMetrics.fromMultiPlanner);
@@ -1339,6 +1345,16 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
     cpuNanos = addOptionals(cpuNanos, otherMetrics.cpuNanos);
     executionTime = addOptionals(executionTime, otherMetrics.executionTime);
 
+    delinquentAcquisitions =
+        addOptionals(delinquentAcquisitions, otherMetrics.delinquentAcquisitions);
+    totalAcquisitionDelinquencyMillis = addOptionals(
+        totalAcquisitionDelinquencyMillis, otherMetrics.totalAcquisitionDelinquencyMillis);
+    if (otherMetrics.maxAcquisitionDelinquencyMillis.has_value()) {
+        maxAcquisitionDelinquencyMillis =
+            Milliseconds{std::max(maxAcquisitionDelinquencyMillis.value_or(Milliseconds(0)).count(),
+                                  otherMetrics.maxAcquisitionDelinquencyMillis->count())};
+    }
+
     hasSortStage = hasSortStage || otherMetrics.hasSortStage;
     usedDisk = usedDisk || otherMetrics.usedDisk;
     fromMultiPlanner = fromMultiPlanner || otherMetrics.fromMultiPlanner;
@@ -1360,6 +1376,14 @@ void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
     clusterWorkingTime = clusterWorkingTime.value_or(Milliseconds(0)) + metrics.clusterWorkingTime;
     cpuNanos = cpuNanos.value_or(Nanoseconds(0)) + metrics.cpuNanos;
 
+    delinquentAcquisitions = delinquentAcquisitions.value_or(0) + metrics.delinquentAcquisitions;
+    totalAcquisitionDelinquencyMillis =
+        totalAcquisitionDelinquencyMillis.value_or(Milliseconds(0)) +
+        metrics.totalAcquisitionDelinquencyMillis;
+    maxAcquisitionDelinquencyMillis =
+        Milliseconds{std::max(maxAcquisitionDelinquencyMillis.value_or(Milliseconds(0)).count(),
+                              metrics.maxAcquisitionDelinquencyMillis.count())};
+
     hasSortStage = hasSortStage || metrics.hasSortStage;
     usedDisk = usedDisk || metrics.usedDisk;
     fromMultiPlanner = fromMultiPlanner || metrics.fromMultiPlanner;
@@ -1380,17 +1404,20 @@ void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
 }
 
 void OpDebug::AdditiveMetrics::aggregateCursorMetrics(const CursorMetrics& metrics) {
-    aggregateDataBearingNodeMetrics(
-        query_stats::DataBearingNodeMetrics{static_cast<uint64_t>(metrics.getKeysExamined()),
-                                            static_cast<uint64_t>(metrics.getDocsExamined()),
-                                            static_cast<uint64_t>(metrics.getBytesRead()),
-                                            Microseconds(metrics.getReadingTimeMicros()),
-                                            Milliseconds(metrics.getWorkingTimeMillis()),
-                                            Nanoseconds(metrics.getCpuNanos()),
-                                            metrics.getHasSortStage(),
-                                            metrics.getUsedDisk(),
-                                            metrics.getFromMultiPlanner(),
-                                            metrics.getFromPlanCache()});
+    aggregateDataBearingNodeMetrics(query_stats::DataBearingNodeMetrics{
+        static_cast<uint64_t>(metrics.getKeysExamined()),
+        static_cast<uint64_t>(metrics.getDocsExamined()),
+        static_cast<uint64_t>(metrics.getBytesRead()),
+        Microseconds(metrics.getReadingTimeMicros()),
+        Milliseconds(metrics.getWorkingTimeMillis()),
+        Nanoseconds(metrics.getCpuNanos()),
+        static_cast<uint64_t>(metrics.getDelinquentAcquisitions()),
+        Milliseconds(metrics.getTotalAcquisitionDelinquencyMillis()),
+        Milliseconds(metrics.getMaxAcquisitionDelinquencyMillis()),
+        metrics.getHasSortStage(),
+        metrics.getUsedDisk(),
+        metrics.getFromMultiPlanner(),
+        metrics.getFromPlanCache()});
 }
 
 void OpDebug::AdditiveMetrics::aggregateStorageStats(const StorageStats& stats) {

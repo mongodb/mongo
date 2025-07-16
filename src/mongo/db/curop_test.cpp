@@ -100,6 +100,12 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.clusterWorkingTime = Milliseconds{10};
     currentAdditiveMetrics.cpuNanos = Nanoseconds{1000};
     additiveMetricsToAdd.cpuNanos = Nanoseconds{21};
+    currentAdditiveMetrics.delinquentAcquisitions = 1;
+    additiveMetricsToAdd.delinquentAcquisitions = 2;
+    currentAdditiveMetrics.totalAcquisitionDelinquencyMillis = Milliseconds{300};
+    additiveMetricsToAdd.totalAcquisitionDelinquencyMillis = Milliseconds{200};
+    currentAdditiveMetrics.maxAcquisitionDelinquencyMillis = Milliseconds{300};
+    additiveMetricsToAdd.maxAcquisitionDelinquencyMillis = Milliseconds{100};
 
     // Save the current AdditiveMetrics object before adding.
     OpDebug::AdditiveMetrics additiveMetricsBeforeAdd;
@@ -136,6 +142,15 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
                   *additiveMetricsToAdd.clusterWorkingTime);
     ASSERT_EQ(*currentAdditiveMetrics.cpuNanos,
               *additiveMetricsBeforeAdd.cpuNanos + *additiveMetricsToAdd.cpuNanos);
+    ASSERT_EQ(*currentAdditiveMetrics.delinquentAcquisitions,
+              *additiveMetricsBeforeAdd.delinquentAcquisitions +
+                  *additiveMetricsToAdd.delinquentAcquisitions);
+    ASSERT_EQ(*currentAdditiveMetrics.totalAcquisitionDelinquencyMillis,
+              *additiveMetricsBeforeAdd.totalAcquisitionDelinquencyMillis +
+                  *additiveMetricsToAdd.totalAcquisitionDelinquencyMillis);
+    ASSERT_EQ(*currentAdditiveMetrics.maxAcquisitionDelinquencyMillis,
+              std::max(*additiveMetricsBeforeAdd.maxAcquisitionDelinquencyMillis,
+                       *additiveMetricsToAdd.maxAcquisitionDelinquencyMillis));
 }
 
 TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
@@ -154,6 +169,9 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     currentAdditiveMetrics.keysDeleted = 4;
     additiveMetricsToAdd.keysDeleted = 2;
     additiveMetricsToAdd.cpuNanos = Nanoseconds(1);
+    additiveMetricsToAdd.delinquentAcquisitions = 1;
+    additiveMetricsToAdd.totalAcquisitionDelinquencyMillis = Milliseconds(100);
+    additiveMetricsToAdd.maxAcquisitionDelinquencyMillis = Milliseconds(100);
 
     // Save the current AdditiveMetrics object before adding.
     OpDebug::AdditiveMetrics additiveMetricsBeforeAdd;
@@ -198,6 +216,15 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     // The 'cpuNanos' field for the current AdditiveMetrics object was not initialized, so it
     // should be treated as zero.
     ASSERT_EQ(*currentAdditiveMetrics.cpuNanos, *additiveMetricsToAdd.cpuNanos);
+
+    // The delinquency fields for the current AdditiveMetrics object were not initialized, so they
+    // should be treated as zero.
+    ASSERT_EQ(*currentAdditiveMetrics.delinquentAcquisitions,
+              *additiveMetricsToAdd.delinquentAcquisitions);
+    ASSERT_EQ(*currentAdditiveMetrics.totalAcquisitionDelinquencyMillis,
+              *additiveMetricsToAdd.totalAcquisitionDelinquencyMillis);
+    ASSERT_EQ(*currentAdditiveMetrics.maxAcquisitionDelinquencyMillis,
+              *additiveMetricsToAdd.maxAcquisitionDelinquencyMillis);
 }
 
 TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
@@ -234,6 +261,9 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     additiveMetrics.hasSortStage = false;
     additiveMetrics.usedDisk = false;
     additiveMetrics.cpuNanos = Nanoseconds(8);
+    additiveMetrics.delinquentAcquisitions = 2;
+    additiveMetrics.totalAcquisitionDelinquencyMillis = Milliseconds(400);
+    additiveMetrics.maxAcquisitionDelinquencyMillis = Milliseconds(300);
 
     CursorMetrics cursorMetrics(3 /* keysExamined */,
                                 4 /* docsExamined */,
@@ -245,6 +275,9 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
                                 true /* fromMultiPlanner */,
                                 false /* fromPlanCache */,
                                 9 /* cpuNanos */);
+    cursorMetrics.setDelinquentAcquisitions(3);
+    cursorMetrics.setTotalAcquisitionDelinquencyMillis(400);
+    cursorMetrics.setMaxAcquisitionDelinquencyMillis(200);
 
     additiveMetrics.aggregateCursorMetrics(cursorMetrics);
 
@@ -256,6 +289,9 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     ASSERT_EQ(additiveMetrics.hasSortStage, true);
     ASSERT_EQ(additiveMetrics.usedDisk, false);
     ASSERT_EQ(additiveMetrics.cpuNanos, Nanoseconds(17));
+    ASSERT_EQ(*additiveMetrics.delinquentAcquisitions, 5);
+    ASSERT_EQ(*additiveMetrics.totalAcquisitionDelinquencyMillis, Milliseconds(800));
+    ASSERT_EQ(*additiveMetrics.maxAcquisitionDelinquencyMillis, Milliseconds(300));
 }
 
 TEST(CurOpTest, AdditiveMetricsShouldAggregateNegativeCpuNanos) {
@@ -313,6 +349,9 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     additiveMetrics.hasSortStage = false;
     additiveMetrics.usedDisk = false;
     additiveMetrics.cpuNanos = Nanoseconds(5);
+    additiveMetrics.delinquentAcquisitions = 2;
+    additiveMetrics.totalAcquisitionDelinquencyMillis = Milliseconds(400);
+    additiveMetrics.maxAcquisitionDelinquencyMillis = Milliseconds(200);
 
     query_stats::DataBearingNodeMetrics remoteMetrics;
     remoteMetrics.keysExamined = 3;
@@ -321,6 +360,9 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     remoteMetrics.hasSortStage = true;
     remoteMetrics.usedDisk = false;
     remoteMetrics.cpuNanos = Nanoseconds(6);
+    remoteMetrics.delinquentAcquisitions = 1;
+    remoteMetrics.totalAcquisitionDelinquencyMillis = Milliseconds(300);
+    remoteMetrics.maxAcquisitionDelinquencyMillis = Milliseconds(300);
 
     additiveMetrics.aggregateDataBearingNodeMetrics(remoteMetrics);
 
@@ -330,6 +372,9 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     ASSERT_EQ(additiveMetrics.hasSortStage, true);
     ASSERT_EQ(additiveMetrics.usedDisk, false);
     ASSERT_EQ(additiveMetrics.cpuNanos, Nanoseconds(11));
+    ASSERT_EQ(*additiveMetrics.delinquentAcquisitions, 3);
+    ASSERT_EQ(*additiveMetrics.totalAcquisitionDelinquencyMillis, Milliseconds(700));
+    ASSERT_EQ(*additiveMetrics.maxAcquisitionDelinquencyMillis, Milliseconds(300));
 }
 
 TEST(CurOpTest, AdditiveMetricsAggregateDataBearingNodeMetricsTreatsNoneAsZero) {

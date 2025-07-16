@@ -17,6 +17,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {findMatchingLogLine, getMatchingLoglinesCount} from "jstests/libs/log.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
+import {getQueryStats} from "jstests/libs/query/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // The failpoint will wait for this long before yielding for every iteration.
@@ -118,7 +119,9 @@ function testDelinquencyOnShard(routerDb, shardDb) {
     // Run the find() command in a parallel shell to retrieve the $currentOp information.
     const joinShell = startParallelShell(
         funWithArgs(function(dbName, findComment) {
-            assert.eq(db.getSiblingDB(dbName).testColl.find().comment(findComment).itcount(), 4);
+            assert.eq(
+                db.getSiblingDB(dbName).testColl.find().batchSize(3).comment(findComment).itcount(),
+                4);
         }, routerDb.getName(), findComment), routerDb.getMongo().port);
 
     failPoint.wait({timesEntered: 3});
@@ -157,14 +160,36 @@ function testDelinquencyOnShard(routerDb, shardDb) {
     // Now examine the log for this find() command and ensure it has information
     // about the delinquent acquisitions checks.
     {
-        const globalLog = assert.commandWorked(shardDb.adminCommand({getLog: "global"}));
-        const line = findMatchingLogLine(globalLog.log, {msg: "Slow query", comment: findComment});
-        jsTestLog("Found log line " + tojson(line));
-        assert(line, globalLog);
+        const assertLine = (line, count) => {
+            jsTestLog("Found log line " + tojson(line));
+            assert(line, globalLog);
 
-        const parsedLine = JSON.parse(line);
-        const delinquencyInfo = parsedLine.attr.delinquencyInfo;
-        assertDelinquentStats(delinquencyInfo, 4, line);
+            const parsedLine = JSON.parse(line);
+            const delinquencyInfo = parsedLine.attr.delinquencyInfo;
+            assertDelinquentStats(delinquencyInfo, count, line);
+        };
+
+        const globalLog = assert.commandWorked(shardDb.adminCommand({getLog: "global"}));
+        const lineFind = findMatchingLogLine(
+            globalLog.log, {msg: "Slow query", comment: findComment, "command": "find"});
+        assertLine(lineFind, 3);
+        const lineGetMore = findMatchingLogLine(
+            globalLog.log, {msg: "Slow query", comment: findComment, "command": "getMore"});
+        assertLine(lineGetMore, 1);
+    }
+
+    {
+        const queryStats = getQueryStats(routerDb.getMongo(), {collName: "testColl"});
+        assert(
+            queryStats.length === 1,
+            "Expected to find exactly one query stats entry for 'testColl' " + tojson(queryStats));
+        assert.gte(queryStats[0].metrics.delinquentAcquisitions.sum, 4, tojson(queryStats));
+        assert.gte(queryStats[0].metrics.totalAcquisitionDelinquencyMillis.sum,
+                   waitPerIterationMs * 4,
+                   tojson(queryStats));
+        assert.gte(queryStats[0].metrics.maxAcquisitionDelinquencyMillis.max,
+                   waitPerIterationMs,
+                   tojson(queryStats));
     }
 
     {
@@ -223,6 +248,7 @@ function runTest(routerDb, shardDb) {
 const startupParameters = {
     featureFlagRecordDelinquentMetrics: true,
     delinquentAcquisitionIntervalMillis: delinquentIntervalMs,
+    internalQueryStatsRateLimit: -1,
     overdueInterruptCheckIntervalMillis: delinquentIntervalMs * 100,
 };
 

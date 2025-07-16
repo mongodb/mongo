@@ -50,6 +50,11 @@ BSONObj QueryStatsEntry::toBSON() const {
     readTimeMicros.appendTo(builder, "readTimeMicros");
     workingTimeMillis.appendTo(builder, "workingTimeMillis");
     cpuNanos.appendToIfNonNegative(builder, "cpuNanos");
+
+    delinquentAcquisitions.appendTo(builder, "delinquentAcquisitions");
+    totalAcquisitionDelinquencyMillis.appendTo(builder, "totalAcquisitionDelinquencyMillis");
+    maxAcquisitionDelinquencyMillis.appendTo(builder, "maxAcquisitionDelinquencyMillis");
+
     hasSortStage.appendTo(builder, "hasSortStage");
     usedDisk.appendTo(builder, "usedDisk");
     fromMultiPlanner.appendTo(builder, "fromMultiPlanner");

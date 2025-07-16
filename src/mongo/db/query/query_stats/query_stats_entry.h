@@ -119,6 +119,13 @@ struct QueryStatsEntry {
     AggregatedMetric<int64_t> cpuNanos;
 
     /**
+     * Aggregates the delinquent acquisitions stats including getMore requests.
+     */
+    AggregatedMetric<uint64_t> delinquentAcquisitions;
+    AggregatedMetric<int64_t> totalAcquisitionDelinquencyMillis;
+    AggregatedMetric<int64_t> maxAcquisitionDelinquencyMillis;
+
+    /**
      * Counts the frequency of the boolean value hasSortStage.
      */
     AggregatedBool hasSortStage;

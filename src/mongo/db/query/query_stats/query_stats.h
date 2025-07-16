@@ -225,6 +225,11 @@ struct QueryStatsSnapshot {
     int64_t readTimeMicros;
     int64_t workingTimeMillis;
     int64_t cpuNanos;
+
+    uint64_t delinquentAcquisitions;
+    int64_t totalAcquisitionDelinquencyMillis;
+    int64_t maxAcquisitionDelinquencyMillis;
+
     bool hasSortStage;
     bool usedDisk;
     bool fromMultiPlanner;

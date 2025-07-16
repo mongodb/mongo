@@ -90,6 +90,21 @@ structs:
                 description: "Amount of CPU time spent by a query operation. "
                 type: long
                 stability: unstable
+            delinquentAcquisitions:
+                description: "Number of times that execution ticket acquisition was overdue by a query operation."
+                type: long
+                stability: unstable
+                default: 0
+            totalAcquisitionDelinquencyMillis:
+                description: "Total time in milliseconds that execution ticket acquisition was overdue by a query operation."
+                type: long
+                stability: unstable
+                default: 0
+            maxAcquisitionDelinquencyMillis:
+                description: "Maximum time in milliseconds that execution ticket acquisition was overdue by a query operation."
+                type: long
+                stability: unstable
+                default: 0
 
     ResponseCursorBase:
         description: "Common fields of initial and subsequent cursor responses."

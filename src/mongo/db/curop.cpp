@@ -409,6 +409,18 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
         calculateCpuTime();
         metrics.cpuNanos = metrics.cpuNanos.value_or(Nanoseconds(0)) + _debug.cpuTime;
 
+        if (const auto& admCtx = ExecutionAdmissionContext::get(opCtx());
+            admCtx.getDelinquentAcquisitions() > 0) {
+            metrics.delinquentAcquisitions = metrics.delinquentAcquisitions.value_or(0) +
+                static_cast<uint64_t>(admCtx.getDelinquentAcquisitions());
+            metrics.totalAcquisitionDelinquencyMillis =
+                metrics.totalAcquisitionDelinquencyMillis.value_or(Milliseconds(0)) +
+                Milliseconds(admCtx.getTotalAcquisitionDelinquencyMillis());
+            metrics.maxAcquisitionDelinquencyMillis = Milliseconds{
+                std::max(metrics.maxAcquisitionDelinquencyMillis.value_or(Milliseconds(0)).count(),
+                         admCtx.getMaxAcquisitionDelinquencyMillis())};
+        }
+
         try {
             // If we need them, try to fetch the storage stats. We use an unlimited timeout here,
             // but the lock acquisition could still be interrupted, which we catch and log.
@@ -964,8 +976,8 @@ void CurOp::reportState(BSONObjBuilder* builder,
                         durationCount<Milliseconds>(elapsedTimeTotal));
     }
 
-    const auto& admCtx = ExecutionAdmissionContext::get(opCtx);
-    if (admCtx.getDelinquentAcquisitions() > 0) {
+    if (const auto& admCtx = ExecutionAdmissionContext::get(opCtx);
+        admCtx.getDelinquentAcquisitions() > 0) {
         BSONObjBuilder sub(builder->subobjStart("delinquencyInfo"));
         OpDebug::appendDelinquentInfo(opCtx, sub);
     }

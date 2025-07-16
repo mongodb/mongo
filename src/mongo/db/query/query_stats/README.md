@@ -154,7 +154,7 @@ db.adminCommand({
           hmacKey: BinData(
             8,
             "87c4082f169d3fef0eef34dc8e23458cbb457c3sf3n2",
-          ) /* bindata 
+          ) /* bindata
                 subtype 8 - a new type for sensitive data */,
         },
       },
@@ -239,6 +239,12 @@ following way:
 - `metrics.cpuNanos`: Estimated total CPU time spent by a query operation in nanoseconds. This value
   should always be greater than 0 and will not be returned on platforms other than Linux, since collecting
   cpu time is only supported on Linux.
+- `metrics.delinquentAcquisitions`: Numbers of time that an execution ticket acquisition overdue by
+  a query operation, including getMores.
+- `metrics.totalAcquisitionDelinquencyMillis`: Total time in milliseconds that an execution ticket
+  acquisition overdue by a query operation, including getMores.
+- `metrics.maxAcquisitionDelinquencyMillis`: Maximum time in milliseconds that an execution ticket
+  acquisition overdue by a query operation, including getMores.
 
 #### Permissions
 

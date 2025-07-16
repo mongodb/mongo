@@ -49,6 +49,11 @@ struct DataBearingNodeMetrics {
     // This value will be negative if we are not running on Linux since collecting cpu time is only
     // supported on Linux systems.
     Nanoseconds cpuNanos{0};
+
+    uint64_t delinquentAcquisitions{0};
+    Milliseconds totalAcquisitionDelinquencyMillis{0};
+    Milliseconds maxAcquisitionDelinquencyMillis{0};
+
     bool hasSortStage : 1 = false;
     bool usedDisk : 1 = false;
     bool fromMultiPlanner : 1 = false;
@@ -65,6 +70,11 @@ struct DataBearingNodeMetrics {
         readingTime += other.readingTime;
         clusterWorkingTime += other.clusterWorkingTime;
         cpuNanos += other.cpuNanos;
+        delinquentAcquisitions += other.delinquentAcquisitions;
+        totalAcquisitionDelinquencyMillis += other.totalAcquisitionDelinquencyMillis;
+        maxAcquisitionDelinquencyMillis =
+            Milliseconds{std::max(maxAcquisitionDelinquencyMillis.count(),
+                                  other.maxAcquisitionDelinquencyMillis.count())};
         hasSortStage = hasSortStage || other.hasSortStage;
         usedDisk = usedDisk || other.usedDisk;
         fromMultiPlanner = fromMultiPlanner || other.fromMultiPlanner;
@@ -88,6 +98,11 @@ struct DataBearingNodeMetrics {
         readingTime += Microseconds(metrics.getReadingTimeMicros());
         clusterWorkingTime += Milliseconds(metrics.getWorkingTimeMillis());
         cpuNanos += Nanoseconds(metrics.getCpuNanos());
+        delinquentAcquisitions += metrics.getDelinquentAcquisitions();
+        totalAcquisitionDelinquencyMillis +=
+            Milliseconds(metrics.getTotalAcquisitionDelinquencyMillis());
+        maxAcquisitionDelinquencyMillis = Milliseconds(std::max(
+            maxAcquisitionDelinquencyMillis.count(), metrics.getMaxAcquisitionDelinquencyMillis()));
         hasSortStage = hasSortStage || metrics.getHasSortStage();
         usedDisk = usedDisk || metrics.getUsedDisk();
         fromMultiPlanner = fromMultiPlanner || metrics.getFromMultiPlanner();

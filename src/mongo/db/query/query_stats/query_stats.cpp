@@ -267,6 +267,12 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
     toUpdate.readTimeMicros.aggregate(snapshot.readTimeMicros);
     toUpdate.workingTimeMillis.aggregate(snapshot.workingTimeMillis);
     toUpdate.cpuNanos.aggregate(snapshot.cpuNanos);
+
+    toUpdate.delinquentAcquisitions.aggregate(snapshot.delinquentAcquisitions);
+    toUpdate.totalAcquisitionDelinquencyMillis.aggregate(
+        snapshot.totalAcquisitionDelinquencyMillis);
+    toUpdate.maxAcquisitionDelinquencyMillis.aggregate(snapshot.maxAcquisitionDelinquencyMillis);
+
     toUpdate.hasSortStage.aggregate(snapshot.hasSortStage);
     toUpdate.usedDisk.aggregate(snapshot.usedDisk);
     toUpdate.fromMultiPlanner.aggregate(snapshot.fromMultiPlanner);
@@ -438,6 +444,9 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
         metrics.readingTime.value_or(Microseconds(0)).count(),
         metrics.clusterWorkingTime.value_or(Milliseconds(0)).count(),
         nanosecondsToInt64(metrics.cpuNanos),
+        metrics.delinquentAcquisitions.value_or(0),
+        metrics.totalAcquisitionDelinquencyMillis.value_or(Milliseconds(0)).count(),
+        metrics.maxAcquisitionDelinquencyMillis.value_or(Milliseconds(0)).count(),
         metrics.hasSortStage,
         metrics.usedDisk,
         metrics.fromMultiPlanner,

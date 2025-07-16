@@ -60,7 +60,10 @@ static const BSONObj basicMetricsObj = fromjson(R"({
     usedDisk: true,
     fromMultiPlanner: true,
     fromPlanCache: true,
-    cpuNanos: {"$numberLong": "18"}
+    cpuNanos: {"$numberLong": "18"},
+    delinquentAcquisitions: {"$numberLong": "0"},
+    totalAcquisitionDelinquencyMillis: {"$numberLong": "0"},
+    maxAcquisitionDelinquencyMillis: {"$numberLong": "0"}
 })");
 
 static const std::string defaultNssStr = "db.coll";
@@ -311,6 +314,9 @@ TEST(CursorResponseTest, parseFromBSONCursorMetrics) {
     ASSERT_TRUE(metrics.getFromMultiPlanner());
     ASSERT_TRUE(metrics.getFromPlanCache());
     ASSERT_EQ(metrics.getCpuNanos(), 18);
+    ASSERT_EQ(metrics.getDelinquentAcquisitions(), 0);
+    ASSERT_EQ(metrics.getTotalAcquisitionDelinquencyMillis(), 0);
+    ASSERT_EQ(metrics.getMaxAcquisitionDelinquencyMillis(), 0);
 }
 
 TEST(CursorResponseTest, parseFromBSONCursorMetricsWrongType) {
@@ -957,6 +963,9 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
     ASSERT_TRUE(parsedMetrics->getFromMultiPlanner());
     ASSERT_FALSE(parsedMetrics->getFromPlanCache());
     ASSERT_EQ(parsedMetrics->getCpuNanos(), -1);
+    ASSERT_EQ(parsedMetrics->getDelinquentAcquisitions(), 0);
+    ASSERT_EQ(parsedMetrics->getTotalAcquisitionDelinquencyMillis(), 0);
+    ASSERT_EQ(parsedMetrics->getMaxAcquisitionDelinquencyMillis(), 0);
 
     ASSERT_TRUE(response.getPartialResultsReturned());
     ASSERT_TRUE(response.getInvalidated());

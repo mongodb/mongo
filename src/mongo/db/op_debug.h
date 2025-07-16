@@ -217,6 +217,13 @@ public:
         // collecting cpu time is only supported Linux systems. If the value is greater than 0, the
         // cpu time reported is the cpu time collected.
         boost::optional<Nanoseconds> cpuNanos{0};
+
+        // If query stats are being collected for this operation, stores the delinquency information
+        // across the cluster. It's only collected in mongod shard and aggregated of all shard in
+        // mongos.
+        boost::optional<uint64_t> delinquentAcquisitions;
+        boost::optional<Milliseconds> totalAcquisitionDelinquencyMillis;
+        boost::optional<Milliseconds> maxAcquisitionDelinquencyMillis;
     };
 
     OpDebug() = default;
