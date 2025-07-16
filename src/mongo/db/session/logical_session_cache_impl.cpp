@@ -90,10 +90,11 @@ LogicalSessionCacheImpl::LogicalSessionCacheImpl(std::unique_ptr<ServiceLiaison>
     _stats.setLastSessionsCollectionJobTimestamp(_service->now());
     _stats.setLastTransactionReaperJobTimestamp(_service->now());
 
-    // Skip initializing this background thread when using 'recoverFromOplogAsStandalone=true' or
-    // --magicRestore as the server is put in read-only mode after oplog recovery.
+    // Skip initializing this background thread when using 'recoverFromOplogAsStandalone=true',
+    // --magicRestore, or --queryableBackupMode as the server is put in read-only mode after oplog
+    // recovery.
     if (repl::ReplSettings::shouldRecoverFromOplogAsStandalone() ||
-        storageGlobalParams.magicRestore) {
+        storageGlobalParams.magicRestore || storageGlobalParams.queryableBackupMode) {
         return;
     }
 
