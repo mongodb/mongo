@@ -67,10 +67,6 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    const SimpleMemoryUsageTracker& getMemoryTracker_forTest() {
-        return _memoryTracker;
-    }
-
     static const char* kStageType;
 
 private:
@@ -91,9 +87,6 @@ private:
 
     // Stats
     OrStats _specificStats;
-
-    // Track memory used by this stage for deduplicating.
-    SimpleMemoryUsageTracker _memoryTracker;
 };
 
 }  // namespace mongo

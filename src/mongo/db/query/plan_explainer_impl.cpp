@@ -494,9 +494,6 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("dupsTested", static_cast<long long>(spec->dupsTested));
             bob->appendNumber("dupsDropped", static_cast<long long>(spec->dupsDropped));
-            if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-                bob->appendNumber("maxUsedMemBytes", static_cast<long long>(spec->maxUsedMemBytes));
-            }
         }
     } else if (STAGE_LIMIT == stats.stageType) {
         LimitStats* spec = static_cast<LimitStats*>(stats.specific.get());

@@ -15,8 +15,6 @@
  * ]
  */
 import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
-
-const stageName = "$bucketAuto";
 const collName = jsTestName();
 const coll = db[collName];
 db[collName].drop();
@@ -53,7 +51,7 @@ assert.commandWorked(coll.insertMany(docs));
             comment: "memory stats bucketAuto test",
             allowDiskUse: false,
         },
-        stageName,
+        stageName: "bucketAuto",
         expectedNumGetMores: 5,
     });
 }
@@ -85,7 +83,7 @@ assert.commandWorked(coll.insertMany(docs));
             comment: "memory stats bucketAuto with limit test",
             allowDiskUse: false
         },
-        stageName,
+        stageName: "bucketAuto",
         expectedNumGetMores: 1,
         skipInUseMemBytesCheck: true,  // $limit will force execution to stop early, so
                                        // inUseMemBytes may not appear in CurOp.
@@ -127,7 +125,7 @@ assert.commandWorked(coll.insertMany(docs));
             comment: "memory stats bucketAuto with spilling test",
             allowDiskUse: true
         },
-        stageName,
+        stageName: "bucketAuto",
         expectedNumGetMores: 5
     });
 
