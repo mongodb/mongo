@@ -382,7 +382,8 @@ mongo_cc_library(
         "//bazel/config:gcov_enabled": ["MONGO_GCOV"],
         "//conditions:default": [],
     }) + select({
-        "//bazel/config:pgo_profile_enabled": ["MONGO_PGO_PROFILE"],
+        "//bazel/config:pgo_profile_generate_clang_enabled": ["MONGO_PGO_PROFILE"],
+        "//bazel/config:pgo_profile_generate_gcc_enabled": ["MONGO_GCOV"],
         "//conditions:default": [],
     }),
     deps = [

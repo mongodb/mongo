@@ -329,14 +329,6 @@ COVERAGE_FLAGS = select({
     "//conditions:default": [],
 })
 
-# Passed to both the compiler and linker
-PGO_PROFILE_FLAGS = select({
-    "//bazel/config:pgo_profile_enabled": [
-        "-fprofile-instr-generate",
-    ],
-    "//conditions:default": [],
-})
-
 # Hack to throw an error if the user isn't running bazel through bazelisk,
 # since we want to make sure the hook inside of tools/bazel gets run.
 RUNNING_THROUGH_BAZELISK_CHECK = select({
@@ -369,7 +361,6 @@ MONGO_LINUX_CC_COPTS = (
     THIN_LTO_FLAGS +
     SYMBOL_ORDER_COPTS +
     COVERAGE_FLAGS +
-    PGO_PROFILE_FLAGS +
     SHARED_ARCHIVE_COPTS +
     RUNNING_THROUGH_BAZELISK_CHECK
 )
@@ -389,7 +380,6 @@ MONGO_LINUX_CC_LINKFLAGS = (
     THIN_LTO_FLAGS +
     SYMBOL_ORDER_LINKFLAGS +
     COVERAGE_FLAGS +
-    PGO_PROFILE_FLAGS +
     SANITIZE_WITHOUT_TSAN_LINKFLAGS +
     SHARED_ARCHIVE_LINKFLAGS_GNU_UNIQUE +
     SHARED_ARCHIVE_LINKFLAGS_B_SYMBOLIC +

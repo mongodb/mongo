@@ -24,6 +24,38 @@ http_archive(
     ] * 5,
 )
 
+# TODO(SERVER-107519): Get these binaries from an actual pipeline build and not locally produced binaries
+http_archive(
+    name = "bolt_binaries",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "merge-fdata",
+    srcs = ["bolt/bin/merge-fdata"],
+)
+
+filegroup(
+    name = "bolt",
+    srcs = ["bolt/bin/llvm-bolt"],
+)
+
+filegroup(
+    name = "perf2bolt",
+    srcs = ["bolt/bin/perf2bolt"],
+)
+
+filegroup(
+    name = "libbolt_rt_instr",
+    srcs = ["bolt/lib/libbolt_rt_instr.a"],
+)
+    """,
+    sha256 = "3075be7271266550a02a0fce25622a7130a9fdf947d708e0abd45213ee17e0cf",
+    urls = [
+        "https://mdb-build-public.s3.us-east-1.amazonaws.com/andrew_pgo_scratch/bolt_good.tar.gz",
+    ] * 5,
+)
+
 # SourceGraph indexer
 http_file(
     name = "scip-clang",
@@ -207,6 +239,14 @@ setup_local_host_values(name = "local_host_values")
 setup_evergreen_variables = use_repo_rule("//bazel/repository_rules:evergreen_variables.bzl", "setup_evergreen_variables")
 
 setup_evergreen_variables(name = "evergreen_variables")
+
+setup_pgo_data = use_repo_rule("//bazel/repository_rules:pgo_data.bzl", "setup_pgo_data")
+
+setup_pgo_data(name = "pgo_data")
+
+setup_bolt_data = use_repo_rule("//bazel/repository_rules:bolt_data.bzl", "setup_bolt_data")
+
+setup_bolt_data(name = "bolt_data")
 
 setup_mongo_windows_toolchains_extension = use_extension("//bazel/toolchains/cc/mongo_windows:mongo_toolchain.bzl", "setup_mongo_windows_toolchain_extension")
 use_repo(setup_mongo_windows_toolchains_extension, "mongo_windows_toolchain")

@@ -8,6 +8,8 @@ load(
     "//bazel/config:configs.bzl",
     "allocator",
     "asan",
+    "bolt_profile_generate",
+    "bolt_profile_use",
     "build_enterprise",
     "build_otel",
     "compiler_type",
@@ -33,7 +35,10 @@ load(
     "mongo_toolchain_version",
     "msan",
     "opt",
-    "pgo_profile",
+    "pgo_profile_generate",
+    "pgo_profile_use",
+    "propeller_profile_generate",
+    "propeller_profile_use",
     "release",
     "sdkroot",
     "separate_debug",
@@ -2223,30 +2228,130 @@ config_setting(
 )
 
 # --------------------------------------
-# pgo_profile options
+# pgo_profile_generate options
 # --------------------------------------
 
-pgo_profile(
-    name = "pgo_profile",
+pgo_profile_generate(
+    name = "pgo_profile_generate",
     build_setting_default = False,
 )
 
 config_setting(
-    name = "pgo_profile_enabled",
+    name = "pgo_profile_generate_enabled",
     flag_values = {
-        "//bazel/config:pgo_profile": "True",
+        "//bazel/config:pgo_profile_generate": "True",
     },
 )
 
-bool_flag(
-    name = "bolt",
+selects.config_setting_group(
+    name = "pgo_profile_generate_clang_enabled",
+    match_all = [
+        ":linux_clang",
+        ":pgo_profile_generate_enabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "pgo_profile_generate_gcc_enabled",
+    match_all = [
+        ":linux_gcc",
+        ":pgo_profile_generate_enabled",
+    ],
+)
+
+# --------------------------------------
+# pgo_profile_use options
+# --------------------------------------
+
+pgo_profile_use(
+    name = "pgo_profile_use",
     build_setting_default = False,
 )
 
 config_setting(
-    name = "bolt_enabled",
+    name = "pgo_profile_use_enabled",
     flag_values = {
-        "//bazel/config:bolt": "True",
+        "//bazel/config:pgo_profile_use": "True",
+    },
+)
+
+selects.config_setting_group(
+    name = "pgo_profile_use_clang_enabled",
+    match_all = [
+        ":linux_clang",
+        ":pgo_profile_use_enabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "pgo_profile_use_gcc_enabled",
+    match_all = [
+        ":linux_gcc",
+        ":pgo_profile_use_enabled",
+    ],
+)
+
+# --------------------------------------
+# bolt_profile_generate options
+# --------------------------------------
+
+bool_flag(
+    name = "bolt_profile_generate",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "bolt_profile_generate_enabled",
+    flag_values = {
+        "//bazel/config:bolt_profile_generate": "True",
+    },
+)
+
+# --------------------------------------
+# bolt_profile_use options
+# --------------------------------------
+
+bool_flag(
+    name = "bolt_profile_use",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "bolt_profile_use_enabled",
+    flag_values = {
+        "//bazel/config:bolt_profile_use": "True",
+    },
+)
+
+# --------------------------------------
+# propeller_profile_generate options
+# --------------------------------------
+
+bool_flag(
+    name = "propeller_profile_generate",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "propeller_profile_generate_enabled",
+    flag_values = {
+        "//bazel/config:propeller_profile_generate": "True",
+    },
+)
+
+# --------------------------------------
+# propeller_profile_use options
+# --------------------------------------
+
+bool_flag(
+    name = "propeller_profile_use",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "propeller_profile_use_enabled",
+    flag_values = {
+        "//bazel/config:propeller_profile_use": "True",
     },
 )
 

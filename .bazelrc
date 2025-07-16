@@ -143,7 +143,12 @@ common --flag_alias=build_enterprise=//bazel/config:build_enterprise
 common --flag_alias=visibility_support=//bazel/config:visibility_support
 common --flag_alias=disable_warnings_as_errors=//bazel/config:disable_warnings_as_errors
 common --flag_alias=gcov=//bazel/config:gcov
-common --flag_alias=pgo_profile=//bazel/config:pgo_profile
+common --flag_alias=pgo_profile_generate=//bazel/config:pgo_profile_generate
+common --flag_alias=pgo_profile_use=//bazel/config:pgo_profile_use
+common --flag_alias=bolt_profile_generate=//bazel/config:bolt_profile_generate
+common --flag_alias=bolt_profile_use=//bazel/config:bolt_profile_use
+common --flag_alias=propeller_profile_generate=//bazel/config:propeller_profile_generate
+common --flag_alias=propeller_profile_use=//bazel/config:propeller_profile_use
 common --flag_alias=server_js=//bazel/config:server_js
 common --flag_alias=ssl=//bazel/config:ssl
 common --flag_alias=js_engine=//bazel/config:js_engine

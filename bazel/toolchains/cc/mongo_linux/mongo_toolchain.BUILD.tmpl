@@ -16,12 +16,6 @@ load(
 
 package(default_visibility = ["//visibility:public"])
 
-# Helper target for the toolchain (see below):
-filegroup(
-    name = "all_files",
-    srcs = glob(["**/*"]),
-)
-
 # Export headers used for clang-tidy checks.
 cc_library(
     name = "llvm_headers",
@@ -98,7 +92,33 @@ DISABLE_DEBUG_SYMBOLS = select({
     "@//conditions:default": False,
 })
 
+PGO_PROFILE_GENERATE_ENABLED = select({
+    "@//bazel/config:pgo_profile_generate_enabled": True,
+    "@//conditions:default": False,
+})
+
+PGO_PROFILE_USE_ENABLED = select({
+    "@//bazel/config:pgo_profile_use_clang_enabled": "@pgo_data//:clang_pgo_files",
+    "@//bazel/config:pgo_profile_use_gcc_enabled": "@pgo_data//:gcc_pgo_files",
+    "@//conditions:default": None,
+})
+
+PROPELLER_PROFILE_GENERATE_ENABLED = select({
+    "@//bazel/config:propeller_profile_generate_enabled": True,
+    "@//conditions:default": False,
+})
+
 LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS] + LINKER_LINKFLAGS
+
+# Helper target for the toolchain (see below):
+filegroup(
+    name = "all_files",
+    srcs = glob(["**/*"]) + select({
+        "@//bazel/config:pgo_profile_use_clang_enabled": ["@pgo_data//:clang_pgo_files"],
+        "@//bazel/config:pgo_profile_use_gcc_enabled": ["@pgo_data//:gcc_pgo_files"],
+        "@//conditions:default": [],
+    })
+)
 
 feature_attrs = get_common_features_attrs()
 
@@ -139,6 +159,8 @@ mongo_linux_cc_toolchain_config(
     debug_level = DEBUG_LEVEL,
     disable_debug_symbols = DISABLE_DEBUG_SYMBOLS,
     optimization_level = feature_attrs[FEATURES_ATTR_NAMES.OPT_LEVEL],
+    pgo_profile_generate = PGO_PROFILE_GENERATE_ENABLED,
+    pgo_profile_use = PGO_PROFILE_USE_ENABLED,
 )
 
 mongo_linux_cc_toolchain_config(
@@ -183,6 +205,9 @@ mongo_linux_cc_toolchain_config(
     debug_level = DEBUG_LEVEL,
     disable_debug_symbols = DISABLE_DEBUG_SYMBOLS,
     optimization_level = feature_attrs[FEATURES_ATTR_NAMES.OPT_LEVEL],
+    pgo_profile_generate = PGO_PROFILE_GENERATE_ENABLED,
+    pgo_profile_use = PGO_PROFILE_USE_ENABLED,
+    propeller_profile_generate = PROPELLER_PROFILE_GENERATE_ENABLED,
 )
 
 cc_toolchain(

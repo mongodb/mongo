@@ -3683,6 +3683,23 @@ mongo_cc_binary(
     srcs = [
         "mongod.cpp",
     ],
+    cxxopts = select({
+        "//bazel/config:pgo_profile_generate_clang_enabled": [
+            "-fprofile-generate=mongod_perf",
+            "-fno-data-sections",
+        ],
+        "//bazel/config:pgo_profile_generate_gcc_enabled": [
+            "-fprofile-generate=mongod_perf",
+            "-fno-data-sections",
+            "-fprofile-dir=mongod_perf",
+        ],
+        "//conditions:default": [],
+    }),
+    features = select({
+        # We want to pass our custom -fprofile-generate so we can specify the output directory of files
+        "//bazel/config:pgo_profile_generate_enabled": ["-pgo_profile_generate"],
+        "//conditions:default": [],
+    }),
     linkopts = select({
         "@platforms//os:linux": [
             "-ldl",
@@ -3692,6 +3709,21 @@ mongo_cc_binary(
         "@platforms//os:windows": [
             "-latomic",
         ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:pgo_profile_generate_clang_enabled": [
+            "-fprofile-generate=mongod_perf",
+            "-fno-data-sections",
+        ],
+        "//bazel/config:pgo_profile_generate_gcc_enabled": [
+            "-fprofile-generate=mongod_perf",
+            "-fno-data-sections",
+            "-fprofile-dir=mongod_perf",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:bolt_profile_generate_enabled": ["-Wl,--emit-relocs"],
+        "//bazel/config:bolt_profile_use_enabled": ["-Wl,--emit-relocs"],
         "//conditions:default": [],
     }),
     tags = [

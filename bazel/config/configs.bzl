@@ -625,16 +625,86 @@ gcov = rule(
 )
 
 # =========
-# pgo_profile
+# pgo_profile_generate
 # =========
 
-pgo_profile_provider = provider(
+pgo_profile_generate_provider = provider(
     doc = "Choose if pgo profiling should be generated",
     fields = ["enabled"],
 )
 
-pgo_profile = rule(
-    implementation = lambda ctx: pgo_profile_provider(enabled = ctx.build_setting_value),
+pgo_profile_generate = rule(
+    implementation = lambda ctx: pgo_profile_generate_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
+# pgo_profile_use
+# =========
+
+pgo_profile_use_provider = provider(
+    doc = "Choose if pgo profiling should be used",
+    fields = ["enabled"],
+)
+
+pgo_profile_use = rule(
+    implementation = lambda ctx: pgo_profile_use_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
+# bolt_profile_generate
+# =========
+
+bolt_profile_generate_provider = provider(
+    doc = "Choose if bolt profiling should be generated",
+    fields = ["enabled"],
+)
+
+bolt_profile_generate = rule(
+    implementation = lambda ctx: bolt_profile_generate_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
+# bolt_profile_use
+# =========
+
+bolt_profile_use_provider = provider(
+    doc = "Choose if bolt profiling should be used",
+    fields = ["enabled"],
+)
+
+bolt_profile_use = rule(
+    implementation = lambda ctx: bolt_profile_use_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
+# propeller_profile_generate
+# =========
+
+propeller_profile_generate_provider = provider(
+    doc = "Choose if binary should be prepared to be run under perf for propeller",
+    fields = ["enabled"],
+)
+
+propeller_profile_generate = rule(
+    implementation = lambda ctx: propeller_profile_generate_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
+# propeller_profile_use
+# =========
+
+propeller_profile_use_provider = provider(
+    doc = "Choose if propeller profiling should be used",
+    fields = ["enabled"],
+)
+
+propeller_profile_use = rule(
+    implementation = lambda ctx: propeller_profile_use_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
 

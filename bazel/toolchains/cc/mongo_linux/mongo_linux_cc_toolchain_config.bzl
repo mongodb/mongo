@@ -1118,6 +1118,130 @@ def _impl(ctx):
         ],
     )
 
+    pgo_profile_generate_feature = feature(
+        name = "pgo_profile_generate",
+        enabled = ctx.attr.pgo_profile_generate,
+        flag_sets = [
+            flag_set(
+                actions = [
+                    ACTION_NAMES.c_compile,
+                    ACTION_NAMES.cpp_compile,
+                ] + all_link_actions + lto_index_actions,
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            "-fprofile-generate",
+                            "-fno-data-sections",
+                        ] if ctx.attr.compiler == COMPILERS.CLANG else [
+                            "-fprofile-generate",
+                            "-fno-data-sections",
+                            "-fprofile-dir=mongod_perf",
+                            "-Wl,-S",
+                        ],
+                    ),
+                ],
+            ),
+            flag_set(
+                actions = [
+                    ACTION_NAMES.cpp_compile,
+                ],
+                flag_groups = [
+                    flag_group(
+                        flags = [""] if ctx.attr.compiler == COMPILERS.CLANG else ["-Wno-mismatched-new-delete"],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+    pgo_profile_use_feature = feature(
+        name = "pgo_profile_use",
+        enabled = ctx.attr.pgo_profile_use != None,
+        flag_sets = [
+            flag_set(
+                actions = [
+                    ACTION_NAMES.c_compile,
+                    ACTION_NAMES.cpp_compile,
+                ],
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            "-fprofile-use=" + ctx.attr.pgo_profile_use[DefaultInfo].files.to_list()[0].path if ctx.attr.pgo_profile_use != None else "",
+                            "-Wno-profile-instr-unprofiled",
+                            "-Wno-profile-instr-out-of-date",
+                            "-Wno-backend-plugin",
+                        ] if ctx.attr.compiler == COMPILERS.CLANG else [
+                            "-fprofile-use",
+                            "-Wno-missing-profile",
+                            "-fprofile-correction",
+                            "-Wno-coverage-mismatch",
+                            "-fprofile-dir=" + ctx.attr.pgo_profile_use[DefaultInfo].files.to_list()[0].dirname if ctx.attr.pgo_profile_use != None else "",
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+    propeller_profile_generate_feature = feature(
+        name = "propeller_profile_generate",
+        enabled = ctx.attr.propeller_profile_generate,
+        flag_sets = [
+            flag_set(
+                actions = [
+                    ACTION_NAMES.c_compile,
+                    ACTION_NAMES.cpp_compile,
+                ] + all_link_actions + lto_index_actions,
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            "-funique-internal-linkage-names",
+                            "-fbasic-block-address-map",
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+    propeller_profile_use_cc_feature = feature(
+        name = "propeller_profile_use_cc",
+        enabled = ctx.attr.propeller_profile_use != None,
+        flag_sets = [
+            flag_set(
+                actions = [
+                    ACTION_NAMES.c_compile,
+                    ACTION_NAMES.cpp_compile,
+                ],
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            "-funique-internal-linkage-names",
+                            "-fbasic-block-sections=list=CCprofile.txt",
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+    propeller_profile_use_link_feature = feature(
+        name = "propeller_profile_use_link",
+        enabled = ctx.attr.propeller_profile_use != None,
+        flag_sets = [
+            flag_set(
+                actions = all_link_actions + lto_index_actions,
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            "-Wl,--symbol-ordering-file=LINKERprofile.txt",
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
     features = [
         enable_all_warnings_feature,
         general_clang_or_gcc_warnings_feature,
@@ -1181,6 +1305,11 @@ def _impl(ctx):
         build_id_feature,
         gcc_no_ignored_attributes_features,
         mold_shared_libraries_feature,
+        pgo_profile_generate_feature,
+        pgo_profile_use_feature,
+        propeller_profile_generate_feature,
+        propeller_profile_use_cc_feature,
+        propeller_profile_use_link_feature,
     ] + get_common_features(ctx)
 
     return [
@@ -1232,6 +1361,11 @@ mongo_linux_cc_toolchain_config = rule(
         "debug_level": attr.int(mandatory = False),
         "disable_debug_symbols": attr.bool(mandatory = False),
         "optimization_level": attr.string(mandatory = False),
+        "pgo_profile_generate": attr.bool(default = False, mandatory = False),
+        "pgo_profile_use": attr.label(default = None, mandatory = False),
+        "bolt_enabled": attr.bool(default = False, mandatory = False),
+        "propeller_profile_generate": attr.bool(default = False, mandatory = False),
+        "propeller_profile_use": attr.label(default = None, allow_single_file = True, mandatory = False),
     },
     provides = [CcToolchainConfigInfo],
 )

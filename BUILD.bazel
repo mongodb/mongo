@@ -1,6 +1,7 @@
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@aspect_rules_js//npm:defs.bzl", "npm_link_package")
 load("//bazel/install_rules:install_rules.bzl", "TEST_TAGS", "mongo_install")
+load("//bazel/install_rules:bolt.bzl", "bolt_instrument", "bolt_optimize")
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary")
 load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain.bzl", "setup_mongo_toolchain_aliases")
 load("//bazel/config:render_template.bzl", "render_template")
@@ -209,12 +210,14 @@ mongo_install(
 mongo_install(
     name = "dist",
     srcs = [
-        "//src/mongo/db:mongod",
         "//src/mongo/installer/compass:compass_files",
         "//src/mongo/s:mongos",
     ] + select({
         "@platforms//os:windows": ["@local_windows_msvc//:vc_redist_x64"],
         "//conditions:default": [],
+    }) + select({
+        "//bazel/config:bolt_profile_use_enabled": ["//:bolt_optimized_mongod"],
+        "//conditions:default": ["//src/mongo/db:mongod"],
     }),
     package_extract_name = select({
         "//bazel/config:build_enterprise_linux_enabled": "mongodb-linux-{TARGET_CPU}-enterprise-{MONGO_DISTMOD}-{MONGO_VERSION}",
@@ -270,7 +273,6 @@ copy_to_directory(
 mongo_install(
     name = "dist-test",
     srcs = [
-        "//src/mongo/db:mongod",
         "//src/mongo/db:mongotrafficreader",
         "//src/mongo/db/query/query_tester:mongotest",
         "//src/mongo/db/query/search/mongotmock",
@@ -287,6 +289,9 @@ mongo_install(
     }) + select({
         "//bazel/config:include_mongot_enabled": ["//:mongot_folder"],
         "//conditions:default": [],
+    }) + select({
+        "//bazel/config:bolt_profile_use_enabled": ["//:bolt_optimized_mongod"],
+        "//conditions:default": ["//src/mongo/db:mongod"],
     }),
     pretty_printer_tests = {
         "//src/mongo/util:pretty_printer_test.py": "//src/mongo/util:pretty_printer_test_program",
@@ -478,4 +483,36 @@ sh_binary(
     env = {
         "BINARY_PATH": "$(location @scip-src//file)",
     },
+)
+
+# Unused for now due to instrumented mongod crashing on machines slightly different than the one
+# it gets built on
+bolt_instrument(
+    name = "bolt_instrumented_mongod",
+    binary_to_instrument = "//src/mongo/db:mongod",
+    exec_properties = {
+        "no-cache": "1",
+        "no-remote": "1",
+        "local": "1",
+    },
+    instrumentation_output_file = "/tmp/mongod_bolt/mongod.fdata",
+    target_compatible_with = select({
+        "//bazel/config:bolt_profile_generate_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
+bolt_optimize(
+    name = "bolt_optimized_mongod",
+    binary_to_optimize = "//src/mongo/db:mongod",
+    exec_properties = {
+        "no-cache": "1",
+        "no-remote": "1",
+        "local": "1",
+    },
+    perf_data = "@bolt_data//:bolt_fdata",
+    target_compatible_with = select({
+        "//bazel/config:bolt_profile_use_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
 )

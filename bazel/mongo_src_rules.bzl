@@ -757,7 +757,6 @@ def _mongo_cc_binary_and_test(
         "tags": tags,
         "linkopts": linkopts + rpath_flags + select({
             "//bazel/config:thin_lto_enabled": ["-Wl,--threads=" + str(NUM_CPUS)],
-            "//bazel/config:bolt_enabled": ["-Wl,--threads=" + str(NUM_CPUS)],
             "//conditions:default": [],
         }) + select({
             "//bazel/config:simple_build_id_enabled": ["-Wl,--build-id=0x" +
@@ -789,7 +788,6 @@ def _mongo_cc_binary_and_test(
             "//conditions:default": {"cpp_link.coefficient": "3.0"},
         }) | select({
             "//bazel/config:thin_lto_enabled": {"cpp_link.cpus": str(NUM_CPUS)},
-            "//bazel/config:bolt_enabled": {"cpp_link.cpus": str(NUM_CPUS)},
             "//conditions:default": {},
         }),
         "env": env | SANITIZER_ENV,
