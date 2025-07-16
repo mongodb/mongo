@@ -109,7 +109,11 @@ def test_runner_interface(
         generate_compiledb(args[0], persistent_compdb, enterprise)
 
     if lint_target:
-        command_start_index = args.index("lint") + 1
+        for lint_arg in lint_targets:
+            try:
+                command_start_index = args.index(lint_arg) + 1
+            except ValueError:
+                pass
         if run_rules_lint(args[0], args[command_start_index:]):
             return ["run", "lint", "--", "ALL_PASSING"]
         return args[1:command_start_index]
