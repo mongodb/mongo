@@ -820,6 +820,15 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "observation_token_test",
+    srcs = ["observation_token_test.cpp"],
+    tags = [
+        "mongo_unittest_second_group",
+        "networking-and-observability",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "tracing_support_test",
     srcs = [
         "tracing_support_test.cpp",
