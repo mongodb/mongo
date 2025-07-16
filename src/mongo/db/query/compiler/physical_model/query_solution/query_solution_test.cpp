@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -41,7 +41,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
-#include "mongo/db/query/eof_node_type.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/eof_node_type.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"

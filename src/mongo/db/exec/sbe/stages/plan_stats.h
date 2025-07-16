@@ -32,8 +32,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/plan_stats_visitor.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/tree_walker.h"
 
 #include <cstddef>

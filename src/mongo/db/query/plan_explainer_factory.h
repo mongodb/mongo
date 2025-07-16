@@ -31,11 +31,11 @@
 
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 

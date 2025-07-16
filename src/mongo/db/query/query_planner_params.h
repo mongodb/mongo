@@ -40,8 +40,6 @@
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/stats/collection_statistics.h"
-#include "mongo/s/shard_key_pattern_query_util.h"
-#include "mongo/s/shard_targeting_helpers.h"
 
 #include <vector>
 
@@ -365,35 +363,7 @@ struct QueryPlannerParams {
 
 private:
     bool requiresShardFiltering(const CanonicalQuery& canonicalQuery,
-                                const CollectionPtr& collection) {
-        if (!(mainCollectionInfo.options & INCLUDE_SHARD_FILTER)) {
-            // Shard filter was not requested; cmd may not be from a router.
-            return false;
-        }
-        // If the caller wants a shard filter, make sure we're actually sharded.
-        if (!collection.isSharded_DEPRECATED()) {
-            // Not actually sharded.
-            return false;
-        }
-
-        const auto& shardKeyPattern = collection.getShardKeyPattern();
-        // Shards cannot own orphans for the key ranges they own, so there is no need
-        // to include a shard filtering stage. By omitting the shard filter, it may be
-        // possible to get a more efficient plan (for example, a COUNT_SCAN may be used if
-        // the query is eligible).
-        const BSONObj extractedKey = extractShardKeyFromQuery(shardKeyPattern, canonicalQuery);
-
-        if (extractedKey.isEmpty()) {
-            // Couldn't extract all the fields of the shard key from the query,
-            // no way to target a single shard.
-            return true;
-        }
-
-        return !isSingleShardTargetable(
-            extractedKey,
-            shardKeyPattern,
-            CollatorInterface::isSimpleCollator(canonicalQuery.getCollator()));
-    }
+                                const CollectionPtr& collection);
 
     MONGO_COMPILER_ALWAYS_INLINE
     void fillOutPlannerParamsForExpressQuery(OperationContext* opCtx,

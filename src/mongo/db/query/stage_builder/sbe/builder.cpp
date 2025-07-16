@@ -69,6 +69,7 @@
 #include "mongo/db/pipeline/window_function/window_function_shift.h"
 #include "mongo/db/pipeline/window_function/window_function_top_bottom_n.h"
 #include "mongo/db/query/bind_input_params.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/projection.h"
@@ -84,7 +85,6 @@
 #include "mongo/db/query/stage_builder/sbe/gen_projection.h"
 #include "mongo/db/query/stage_builder/sbe/gen_window_function.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
-#include "mongo/db/query/stage_types.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -139,7 +139,7 @@ void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq)
     }
 
     // Build a SearchNode in order to retrieve the search info.
-    auto sn = SearchNode::getSearchNode(cq.cqPipeline().front().get());
+    auto sn = search_helpers::getSearchNode(cq.cqPipeline().front().get());
 
     auto& env = data->env;
 

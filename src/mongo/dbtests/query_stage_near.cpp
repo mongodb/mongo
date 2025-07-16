@@ -49,8 +49,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/stage_types.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep

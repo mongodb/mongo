@@ -29,58 +29,29 @@
 
 #pragma once
 
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/exec/requires_collection_stage.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/query/plan_executor.h"
-
-#include <memory>
+#include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/index_entry.h"
 
 namespace mongo {
-
+namespace wildcard_planning {
 /**
- * Implements "fast count" by asking the underlying RecordStore for its number of records, applying
- * the skip and limit it necessary. The result is stored in '_specificStats'. Only used to answer
- * count commands when both the query and hint are empty.
+ * Returns true if the given IndexScanNode is a $** scan whose bounds overlap the object type
+ * bracket. Scans whose bounds include the object bracket have certain limitations for planning
+ * purposes; for instance, they cannot provide covered results or be converted to DISTINCT_SCAN.
  */
-class RecordStoreFastCountStage final : public RequiresCollectionStage {
-public:
-    static const char* kStageType;
-
-    RecordStoreFastCountStage(ExpressionContext* expCtx,
-                              VariantCollectionPtrOrAcquisition collection,
-                              long long skip,
-                              long long limit);
-
-    bool isEOF() const override {
-        return _commonStats.isEOF;
+inline bool isWildcardObjectSubpathScan(const IndexEntry& index, const IndexBounds& bounds) {
+    // If the node is not a $** index scan, return false immediately.
+    if (index.type != IndexType::INDEX_WILDCARD) {
+        return false;
     }
 
-    StageState doWork(WorkingSetID* out) override;
+    // Check the bounds on the query field for any intersections with the object type bracket.
+    return bounds.fields[index.wildcardFieldPos].boundsOverlapObjectTypeBracket();
+}
 
-    StageType stageType() const override {
-        return StageType::STAGE_RECORD_STORE_FAST_COUNT;
-    }
-
-    std::unique_ptr<PlanStageStats> getStats() override;
-
-    const SpecificStats* getSpecificStats() const override {
-        return &_specificStats;
-    }
-
-protected:
-    void doSaveStateRequiresCollection() override {}
-
-    void doRestoreStateRequiresCollection() override {}
-
-private:
-    long long _skip = 0;
-    long long _limit = 0;
-
-    CountStats _specificStats;
-};
-
+inline bool isWildcardObjectSubpathScan(const IndexScanNode* node) {
+    return node && isWildcardObjectSubpathScan(node->index, node->bounds);
+}
+}  // namespace wildcard_planning
 }  // namespace mongo

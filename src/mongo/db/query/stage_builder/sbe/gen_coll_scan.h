@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 
 #include <string>

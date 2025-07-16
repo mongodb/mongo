@@ -31,9 +31,9 @@
 
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/query/ce/histogram/histogram_estimator.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/cost_based_ranker/heuristic_estimator.h"
 #include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/db/query/stage_types.h"
 
 #include <absl/container/flat_hash_map.h>
 

@@ -16,6 +16,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "cardinality_estimator.h",
+        "//src/mongo/db/query:query_planner_params.h",
     ],
     deps = [
         "ce_utils",
@@ -35,7 +36,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "cost_estimator.h",
-        "//src/mongo/db/query:query_solution.h",
+        "//src/mongo/db/query/compiler/physical_model/query_solution:query_solution.h",
     ],
     deps = [
         "cardinality_estimator",

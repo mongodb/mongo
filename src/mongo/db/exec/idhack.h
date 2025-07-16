@@ -37,8 +37,8 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/stage_types.h"
 #include "mongo/db/storage/record_store.h"
 
 #include <memory>

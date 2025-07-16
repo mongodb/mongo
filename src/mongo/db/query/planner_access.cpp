@@ -61,7 +61,9 @@
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
-#include "mongo/db/query/eof_node_type.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/eof_node_type.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_tag.h"
@@ -73,7 +75,6 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/record_id_range.h"
-#include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/optime.h"
@@ -1860,7 +1861,9 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
         const bool isTailable = query.getFindCommandRequest().getTailable();
         if (clusteredCollection) {
             auto clusteredScanDirection =
-                QueryPlannerCommon::determineClusteredScanDirection(query, params).value_or(1);
+                QueryPlannerCommon::determineClusteredScanDirection(
+                    query, params.clusteredInfo, params.clusteredCollectionCollator)
+                    .value_or(1);
             while (0 < root->numChildren()) {
                 usedClusteredCollScan = true;
                 MatchExpression* child = root->getChild(0);

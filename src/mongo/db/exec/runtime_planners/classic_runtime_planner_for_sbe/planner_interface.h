@@ -35,12 +35,12 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 
 namespace mongo::classic_runtime_planner_for_sbe {

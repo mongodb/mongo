@@ -34,9 +34,9 @@
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/stage_types.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -127,11 +127,12 @@ void QueryPlannerCommon::reverseScans(QuerySolutionNode* node, bool reverseCollS
 }
 
 boost::optional<int> QueryPlannerCommon::determineClusteredScanDirection(
-    const CanonicalQuery& query, const QueryPlannerParams& params) {
-    if (params.clusteredInfo && query.getSortPattern() &&
-        CollatorInterface::collatorsMatch(params.clusteredCollectionCollator,
-                                          query.getCollator())) {
-        BSONObj kp = clustered_util::getSortPattern(params.clusteredInfo->getIndexSpec());
+    const CanonicalQuery& query,
+    const boost::optional<ClusteredCollectionInfo>& clusteredInfo,
+    const CollatorInterface* clusteredCollectionCollator) {
+    if (clusteredInfo && query.getSortPattern() &&
+        CollatorInterface::collatorsMatch(clusteredCollectionCollator, query.getCollator())) {
+        BSONObj kp = clustered_util::getSortPattern(clusteredInfo->getIndexSpec());
         if (QueryPlannerCommon::providesSort(query, kp)) {
             return 1;
         } else if (QueryPlannerCommon::providesSort(query,

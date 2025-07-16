@@ -37,12 +37,12 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_ranking_decision.h"
-#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 
 #include <memory>

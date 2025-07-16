@@ -66,6 +66,8 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_command.h"
@@ -86,9 +88,7 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
-#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
-#include "mongo/db/query/stage_types.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep

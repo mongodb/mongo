@@ -41,9 +41,9 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
-#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/wildcard_test_utils.h"
 #include "mongo/unittest/unittest.h"
 

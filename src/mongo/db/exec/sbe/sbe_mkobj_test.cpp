@@ -39,8 +39,8 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
-#include "mongo/db/query/stage_types.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/unittest/unittest.h"
 

@@ -35,10 +35,10 @@
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
-#include "mongo/db/query/query_solution.h"
 #include "mongo/unittest/unittest.h"
 
 #include <set>

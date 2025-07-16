@@ -31,11 +31,12 @@
 
 #include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/exec/projection_executor_utils.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution_helpers.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/stage_types.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

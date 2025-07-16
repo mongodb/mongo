@@ -38,8 +38,8 @@
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/plan_ranker_util.h"
-#include "mongo/db/query/stage_types.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 

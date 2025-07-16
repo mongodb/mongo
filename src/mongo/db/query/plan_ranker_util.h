@@ -29,9 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_ranker.h"
-#include "mongo/db/query/stage_types.h"
 
 #include <algorithm>
 

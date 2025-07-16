@@ -34,7 +34,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/query/stage_types.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"

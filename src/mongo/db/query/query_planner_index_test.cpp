@@ -35,10 +35,10 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
-#include "mongo/db/query/query_solution.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 

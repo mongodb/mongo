@@ -39,7 +39,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/stage_types.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role.h"
 

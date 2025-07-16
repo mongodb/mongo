@@ -67,10 +67,12 @@
 #include "mongo/db/query/ce/exact/exact_cardinality.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/eof_node_type.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/cost_based_ranker/cardinality_estimator.h"
 #include "mongo/db/query/cost_based_ranker/cost_estimator.h"
 #include "mongo/db/query/distinct_access.h"
-#include "mongo/db/query/eof_node_type.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_tag.h"
@@ -87,10 +89,8 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
-#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/sort_pattern.h"
-#include "mongo/db/query/stage_types.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -248,7 +248,7 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
                 feature_flags::gFeatureFlagSearchInSbe.isEnabled());
 
         // Build a SearchNode in order to retrieve the search info.
-        auto searchNode = SearchNode::getSearchNode(query.cqPipeline().front().get());
+        auto searchNode = search_helpers::getSearchNode(query.cqPipeline().front().get());
 
         if (searchNode->searchQuery.getBoolField(mongot_cursor::kReturnStoredSourceArg) ||
             searchNode->isSearchMeta) {
@@ -479,7 +479,9 @@ static BSONObj finishMaxObj(const IndexEntry& indexEntry,
  * clustered collection and we have a sort that can be provided by the clustered index.
  */
 int determineCollscanDirection(const CanonicalQuery& query, const QueryPlannerParams& params) {
-    return QueryPlannerCommon::determineClusteredScanDirection(query, params).value_or(1);
+    return QueryPlannerCommon::determineClusteredScanDirection(
+               query, params.clusteredInfo, params.clusteredCollectionCollator)
+        .value_or(1);
 }
 
 /**
@@ -1539,7 +1541,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     if (!mustUseIndexedPlan && (collscanRequested || collScanRequired || clusteredCollection) &&
         !noTableAndClusteredIDXScan(params)) {
         boost::optional<int> clusteredScanDirection =
-            QueryPlannerCommon::determineClusteredScanDirection(query, params);
+            QueryPlannerCommon::determineClusteredScanDirection(
+                query, params.clusteredInfo, params.clusteredCollectionCollator);
         int direction = clusteredScanDirection.value_or(1);
         auto collscanSoln = buildCollscanSoln(query, isTailable, params, direction);
         if (!collscanSoln && collScanRequired) {

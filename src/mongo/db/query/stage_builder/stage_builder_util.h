@@ -34,10 +34,10 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 

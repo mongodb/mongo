@@ -41,7 +41,7 @@
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/stage_types.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/s/scoped_collection_metadata.h"

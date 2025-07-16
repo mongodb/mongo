@@ -34,12 +34,12 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/record_id_range.h"
 #include "mongo/util/assert_util.h"
 

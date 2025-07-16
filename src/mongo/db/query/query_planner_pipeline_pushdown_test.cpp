@@ -35,11 +35,11 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/db/query/query_planner_test_lib.h"
-#include "mongo/db/query/query_solution.h"
 #include "mongo/unittest/unittest.h"
 
 #include <map>

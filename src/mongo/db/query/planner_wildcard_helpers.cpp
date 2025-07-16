@@ -51,9 +51,9 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/index_multikey_helpers.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
-#include "mongo/db/query/stage_types.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -630,20 +630,6 @@ void finalizeWildcardIndexScanConfiguration(
             scan->shouldDedup = true;
         }
     }
-}
-
-bool isWildcardObjectSubpathScan(const IndexEntry& index, const IndexBounds& bounds) {
-    // If the node is not a $** index scan, return false immediately.
-    if (index.type != IndexType::INDEX_WILDCARD) {
-        return false;
-    }
-
-    // Check the bounds on the query field for any intersections with the object type bracket.
-    return bounds.fields[index.wildcardFieldPos].boundsOverlapObjectTypeBracket();
-}
-
-bool isWildcardObjectSubpathScan(const IndexScanNode* node) {
-    return node && isWildcardObjectSubpathScan(node->index, node->bounds);
 }
 
 std::vector<Interval> makeAllValuesForPath() {

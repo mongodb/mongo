@@ -170,9 +170,6 @@ filters:
   - "shard_key_diagnostic_printer.h":
     approvers:
       - 10gen/query-optimization
-  - "stage_types*":
-    approvers:
-      - 10gen/query-execution
   - "tailable_mode*":
     approvers:
       - 10gen/query-optimization
@@ -270,9 +267,6 @@ filters:
     approvers:
       - 10gen/query-optimization
   - "query_planner*":
-    approvers:
-      - 10gen/query-optimization
-  - "query_solution*":
     approvers:
       - 10gen/query-optimization
   - "planner*":

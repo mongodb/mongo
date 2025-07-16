@@ -55,7 +55,7 @@
 #include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/stage_types.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/id_generator.h"

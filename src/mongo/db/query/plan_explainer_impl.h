@@ -34,15 +34,15 @@
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
-#include "mongo/db/query/stage_types.h"
 #include "mongo/util/duration.h"
 
 #include <string>

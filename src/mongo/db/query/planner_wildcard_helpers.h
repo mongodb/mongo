@@ -31,10 +31,10 @@
 
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
-#include "mongo/db/query/query_solution.h"
 
 #include <cstddef>
 #include <memory>
@@ -81,15 +81,6 @@ bool canOnlyAnswerWildcardPrefixQuery(
  */
 void finalizeWildcardIndexScanConfiguration(
     IndexScanNode* scan, std::vector<interval_evaluation_tree::Builder>* ietBuilders);
-
-/**
- * Returns true if the given IndexScanNode is a $** scan whose bounds overlap the object type
- * bracket. Scans whose bounds include the object bracket have certain limitations for planning
- * purposes; for instance, they cannot provide covered results or be converted to DISTINCT_SCAN.
- */
-bool isWildcardObjectSubpathScan(const IndexScanNode* node);
-
-bool isWildcardObjectSubpathScan(const IndexEntry& index, const IndexBounds& bounds);
 
 /**
  * This helper generates index intervals for the "$_path" field to scan all keys indexing a

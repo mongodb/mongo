@@ -720,6 +720,7 @@ mongo_cc_library(
         "//src/mongo/db/query/client_cursor:generic_cursor",
         "//src/mongo/db/query/collation:collator_factory_interface",
         "//src/mongo/db/query/collation:collator_interface",
+        "//src/mongo/db/query/compiler/physical_model/query_solution",
         "//src/mongo/db/query/datetime:date_time_support",
         "//src/mongo/db/query/search:mongot_cursor",
         "//src/mongo/db/query/search:mongot_options",

@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/visitors/docs_needed_bounds_gen.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/search/internal_search_mongot_remote_spec_gen.h"
 #include "mongo/db/query/search/search_task_executors.h"
@@ -221,5 +222,10 @@ void promoteStoredSourceOrAddIdLookup(
     long long limit,
     boost::optional<SearchQueryViewSpec> view);
 
+/**
+ * Creates a Search QSN from the given DocumentSource stage, if isSearchStage(stage) or
+ * isSearchMetaStage(stage) return 'true'. Else, an error is thrown.
+ */
+std::unique_ptr<SearchNode> getSearchNode(DocumentSource* stage);
 }  // namespace search_helpers
 }  // namespace mongo

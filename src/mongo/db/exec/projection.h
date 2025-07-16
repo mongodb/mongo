@@ -37,8 +37,8 @@
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/projection.h"
-#include "mongo/db/query/stage_types.h"
 #include "mongo/util/string_map.h"
 
 #include <memory>

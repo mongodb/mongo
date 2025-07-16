@@ -72,7 +72,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/shard_filterer_factory_interface.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_accumulator.h"

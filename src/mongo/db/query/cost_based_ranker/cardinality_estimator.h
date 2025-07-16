@@ -38,11 +38,11 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/query/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/cost_based_ranker/ce_utils.h"
 #include "mongo/db/query/cost_based_ranker/estimates.h"
 #include "mongo/db/query/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/query_solution.h"
 
 namespace mongo::cost_based_ranker {
 

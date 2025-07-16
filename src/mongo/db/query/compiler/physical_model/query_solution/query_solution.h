@@ -55,7 +55,8 @@
 #include "mongo/db/pipeline/window_function/window_function_statement.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
-#include "mongo/db/query/eof_node_type.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/eof_node_type.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
@@ -65,7 +66,6 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/sort_pattern.h"
-#include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/timeseries/bucket_spec.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
@@ -2026,8 +2026,6 @@ struct SearchNode : public QuerySolutionNode {
           sortSpec(sortSpec),
           remoteCursorId(remoteCursorId),
           remoteCursorVars(remoteCursorVars) {}
-
-    static std::unique_ptr<SearchNode> getSearchNode(DocumentSource* stage);
 
     StageType getType() const override {
         return STAGE_SEARCH;

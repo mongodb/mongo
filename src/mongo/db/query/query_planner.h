@@ -38,11 +38,11 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/ce/exact/exact_cardinality.h"
 #include "mongo/db/query/ce/sampling/sampling_estimator.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/query_solution.h"
 
 #include <cstddef>
 #include <functional>

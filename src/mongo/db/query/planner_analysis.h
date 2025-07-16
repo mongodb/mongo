@@ -33,10 +33,10 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/query_solution.h"
 
 #include <map>
 #include <memory>

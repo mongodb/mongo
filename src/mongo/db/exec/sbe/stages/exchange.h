@@ -39,7 +39,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/stage_types.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/mutex.h"

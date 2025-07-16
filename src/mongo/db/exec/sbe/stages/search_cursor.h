@@ -37,7 +37,7 @@
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/pipeline/search/search_helper.h"
-#include "mongo/db/query/stage_types.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/executor/task_executor_cursor.h"
 
 #include <cstddef>

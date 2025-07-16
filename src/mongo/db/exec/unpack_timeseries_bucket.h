@@ -34,7 +34,7 @@
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/stage_types.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 
 #include <memory>
 

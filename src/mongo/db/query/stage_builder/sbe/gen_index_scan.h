@@ -35,9 +35,9 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
-#include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
-#include "mongo/db/query/stage_types.h"
 #include "mongo/db/storage/key_string/key_string.h"
 
 #include <memory>

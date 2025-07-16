@@ -42,6 +42,8 @@
 #include "mongo/db/query/wildcard_multikey_paths.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
+#include "mongo/s/shard_key_pattern_query_util.h"
+#include "mongo/s/shard_targeting_helpers.h"
 #include "mongo/util/assert_util.h"
 
 #include <boost/optional/optional.hpp>
@@ -697,4 +699,34 @@ bool shouldWaitForOplogVisibility(OperationContext* opCtx,
         replCoord->getSettings().isReplSet();
 }
 
+bool QueryPlannerParams::requiresShardFiltering(const CanonicalQuery& canonicalQuery,
+                                                const CollectionPtr& collection) {
+    if (!(mainCollectionInfo.options & INCLUDE_SHARD_FILTER)) {
+        // Shard filter was not requested; cmd may not be from a router.
+        return false;
+    }
+    // If the caller wants a shard filter, make sure we're actually sharded.
+    if (!collection.isSharded_DEPRECATED()) {
+        // Not actually sharded.
+        return false;
+    }
+
+    const auto& shardKeyPattern = collection.getShardKeyPattern();
+    // Shards cannot own orphans for the key ranges they own, so there is no need
+    // to include a shard filtering stage. By omitting the shard filter, it may be
+    // possible to get a more efficient plan (for example, a COUNT_SCAN may be used if
+    // the query is eligible).
+    const BSONObj extractedKey = extractShardKeyFromQuery(shardKeyPattern, canonicalQuery);
+
+    if (extractedKey.isEmpty()) {
+        // Couldn't extract all the fields of the shard key from the query,
+        // no way to target a single shard.
+        return true;
+    }
+
+    return !isSingleShardTargetable(
+        extractedKey,
+        shardKeyPattern,
+        CollatorInterface::isSimpleCollator(canonicalQuery.getCollator()));
+}
 }  // namespace mongo

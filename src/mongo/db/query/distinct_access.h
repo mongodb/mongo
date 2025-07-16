@@ -29,8 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/query_solution.h"
 
 namespace mongo {
 

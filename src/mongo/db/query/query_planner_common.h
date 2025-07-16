@@ -35,9 +35,8 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/query_solution.h"
 
 #include <cstddef>
 
@@ -131,8 +130,10 @@ public:
      * index, if so, which direction the scan should be. If the collection is not clustered, or the
      * sort cannot be provided, returns 'boost::none'.
      */
-    static boost::optional<int> determineClusteredScanDirection(const CanonicalQuery& query,
-                                                                const QueryPlannerParams& params);
+    static boost::optional<int> determineClusteredScanDirection(
+        const CanonicalQuery& query,
+        const boost::optional<ClusteredCollectionInfo>& clusteredInfo,
+        const CollatorInterface* clusteredCollectionCollator);
 };
 
 }  // namespace mongo

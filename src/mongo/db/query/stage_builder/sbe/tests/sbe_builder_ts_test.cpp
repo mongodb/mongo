@@ -36,9 +36,9 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/projection_policies.h"
-#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 

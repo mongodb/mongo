@@ -36,8 +36,8 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
-#include "mongo/db/query/stage_types.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 

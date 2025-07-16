@@ -715,5 +715,28 @@ void promoteStoredSourceOrAddIdLookup(
     }
 }
 
+std::unique_ptr<SearchNode> getSearchNode(DocumentSource* stage) {
+    if (search_helpers::isSearchStage(stage)) {
+        auto searchStage = dynamic_cast<mongo::DocumentSourceSearch*>(stage);
+        auto node = std::make_unique<SearchNode>(false,
+                                                 searchStage->getSearchQuery(),
+                                                 searchStage->getLimit(),
+                                                 searchStage->getSortSpec(),
+                                                 searchStage->getRemoteCursorId(),
+                                                 searchStage->getRemoteCursorVars());
+        return node;
+    } else if (search_helpers::isSearchMetaStage(stage)) {
+        auto searchStage = dynamic_cast<mongo::DocumentSourceSearchMeta*>(stage);
+        return std::make_unique<SearchNode>(true,
+                                            searchStage->getSearchQuery(),
+                                            boost::none /* limit */,
+                                            boost::none /* sortSpec */,
+                                            searchStage->getRemoteCursorId(),
+                                            searchStage->getRemoteCursorVars());
+    } else {
+        tasserted(7855801, str::stream() << "Unknown stage type" << stage->getSourceName());
+    }
+}
+
 }  // namespace search_helpers
 }  // namespace mongo

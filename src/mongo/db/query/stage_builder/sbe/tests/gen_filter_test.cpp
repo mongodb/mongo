@@ -45,7 +45,7 @@
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/expression_where.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/unittest/unittest.h"
