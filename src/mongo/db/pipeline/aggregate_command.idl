@@ -291,7 +291,7 @@ commands:
                 optional: true
                 stability: unstable
             $_passthroughToShard:
-                description: "An optional internal parameter for this request. If a shard key is specified, then that specific shard will be targeted."
+                description: "An optional internal parameter for this request. If a shard is specified, then that specific shard will be targeted."
                 type: PassthroughToShardOptions
                 cpp_name: passthroughToShard
                 optional: true
