@@ -3,40 +3,35 @@
 Most tests for MongoDB are run through resmoke, our test runner and orchestration tool.
 The entry point for resmoke can be found at `buildscripts/resmoke.py`
 
-## run
+## Concepts
 
-The run subcommand can run suites (list of tests and the MongoDB topology and
-configuration to run them against), and explicitly named test files.
+Learn more about related topics using their own targeted documentation:
 
-A single suite can be specified using the `--suite` flag, and multiple suites
-can be specified by providing a comma separated list to the `--suites` flag.
+- [resmoke](../../buildscripts/resmokelib/README.md), the test runner
+- [suites](../../buildscripts/resmokeconfig/suites/README.md), how tests are grouped and configured
+- [fixtures](../../buildscripts/resmokelib/testing/fixtures/README.md), specify the server topology that tests run against
+- [hooks](../../buildscripts/resmokelib/testing/hooks/README.md), logic to run before, after and/or between individual tests
 
-Additional parameters for the run subcommand can be found on the help page,
-accessible by running `buildscripts/resmoke.py run --help`
+## Basic Example
 
-Additional documentation on our suite configuration can be found on the
-[Suites configuration file page](../../buildscripts/docs/suites.md)
+First, ensure that your python `venv` is active and up to date:
 
-### Testable Installations (`--installDir`)
+```
+python3 -m venv python3-venv
+source python3-venv/bin/activate
+buildscripts/poetry_sync.sh
+```
 
-resmoke can run tests against any testable installation of MongoDB (such
-as ASAN, Debug, Release). When possible, resmoke will automatically locate and
-run with a locally built copy of MongoDB Server, so long as that build was
-installed to a subdirectory of the root of the git repository, and there is
-exactly one build. In other situations, the `--installDir` flag, passed to run
-subcommand, can be used to indicate the location of the mongod/mongos binaries.
+and you've built the source binaries to run against, eg:
 
-As an alternative, you may instead prefer to use the resmoke.py wrapper script
-located in the same directory as the mongod binary, which will automatically
-set `installDir` for you.
+```
+bazel build install-dist-test
+```
 
-Note that this wrapper is unavailable in packaged installations of MongoDB
-Server, such as those provided by Homebrew, and other package managers. If you
-would like to run tests against a packaged installation, you must explicitly
-pass `--installDir` to resmoke.py
+Now, **run the test content** from one test file:
 
-### Resmoke test telemetry
+```
+buildscripts/resmoke.py run --suites=no_passthrough jstests/noPassthrough/shell/js/string.js
+```
 
-We capture telemetry from resmoke using open telemetry.
-
-Using open telemetry (OTel) we capture more specific information about the internals of resmoke. This data is used for improvements specifically when running in evergreen. This data is captured on every resmoke invocation but only sent to honeycomb when running in evergreen. More info about how we use OTel in resmoke can be found [here](otel_resmoke.md).
+The suite defined in [buildscripts/resmokeconfig/suites/no_passthrough.yml](../../buildscripts/resmokeconfig/suites/no_passthrough.yml) includes that `string.js` file via glob selections, specifies no fixtures, no hooks, and a minimal config for the executor.

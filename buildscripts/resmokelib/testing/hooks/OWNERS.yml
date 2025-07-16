@@ -3,6 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/mongo-default-approvers
+  - "README.md":
+    approvers:
+      - 10gen/devprod-correctness
   - "analyze_shard_key.py":
     approvers:
       - 10gen/server-cluster-scalability

@@ -135,6 +135,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokeconfig/suites/OWNERS.yml
 /buildscripts/resmokeconfig/suites/**/* @10gen/mongo-default-approvers @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/README.md @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/aggregation* @10gen/query @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/aggregation_disabled_optimization.yml @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/aggregation_repeat_queries_multiplan_single_solutions.yml @10gen/query-optimization @svc-auto-approve-bot
@@ -193,6 +194,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokelib/testing/hooks/OWNERS.yml
 /buildscripts/resmokelib/testing/hooks/**/* @10gen/mongo-default-approvers @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/README.md @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/analyze_shard_key.py @10gen/server-cluster-scalability @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/queryable_server_hook.py @10gen/server-backup-restore @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/change_streams.py @10gen/query-execution-change-streams @svc-auto-approve-bot
@@ -259,6 +261,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /docs/**/linting.md @10gen/devprod-build @svc-auto-approve-bot
 /docs/owners/** @10gen/devprod-correctness @svc-auto-approve-bot
 /docs/**/golden_data_test_framework.md @10gen/query-optimization @svc-auto-approve-bot
+
+# The following patterns are parsed from ./docs/testing/OWNERS.yml
+/docs/testing/ @10gen/devprod-correctness @svc-auto-approve-bot
 
 # The following patterns are parsed from ./etc/OWNERS.yml
 /etc/backports_required_for_multiversion_tests.yml @10gen/devprod-correctness @svc-auto-approve-bot

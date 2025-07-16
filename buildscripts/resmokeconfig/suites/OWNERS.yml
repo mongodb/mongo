@@ -3,6 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/mongo-default-approvers
+  - "README.md":
+    approvers:
+      - 10gen/devprod-correctness
   - "aggregation*":
     approvers:
       - 10gen/query
