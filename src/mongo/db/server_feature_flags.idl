@@ -91,11 +91,6 @@ feature_flags:
         cpp_varname: gFeatureFlagRearchitectUserAcquisition
         default: true
         fcv_gated: false
-    featureFlagOIDCInternalAuthorization:
-        description: "Feature flag gating OIDC authentication with internal authorization"
-        cpp_varname: gFeatureFlagOIDCInternalAuthorization
-        default: true
-        fcv_gated: false
     featureFlagAutoCompact:
         description: "Feature flag to execute background compaction"
         cpp_varname: gFeatureFlagAutoCompact
