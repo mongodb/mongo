@@ -8,7 +8,7 @@
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const pathToExtensionFoo = "libfoo_extension.so";
+const pathToExtensionFoo = MongoRunner.getInstallPath("..", "lib", "libfoo_extension.so");
 
 // Create a ShardingTest so that we have a config DB for mongos to point to in our test. We don't
 // use ShardingTest directly because repeated failed ShardingTest startups causes issues in the test
@@ -22,7 +22,7 @@ function runTest({options, shouldFail = false, validateExitCode = true}) {
             startupFn();
             assert(!shouldFail, "Expected startup to fail but it succeeded");
         } catch (e) {
-            assert(shouldFail, "Expected startup to succeed but it failed");
+            assert(shouldFail, `Expected startup to succeed but it failed: ${e}`);
             assert(e instanceof MongoRunner.StopError, e);
             if (validateExitCode) {
                 assert.eq(e.returnCode, MongoRunner.EXIT_BADOPTIONS, e);
@@ -52,13 +52,14 @@ if (isLinux()) {
         shouldFail: true
     });
     // Extensions is a scalar, non-string.
-    runTest({options: {extensions: 1}, shouldFail: true});
+    runTest({options: {extensions: 12345}, shouldFail: true});
     // Path to extension does not exist.
     runTest({options: {extensions: "path/does/not/exist.so"}, shouldFail: true});
-    // TODO SERVER-107125 Uncomment these test cases once installing extensions is supported on
-    // evergreen. Single valid extension. runTest({options: {extensions: pathToExtensionFoo}}); List
-    // of valid extensions. runTest({options: {extensions: [pathToExtensionFoo,
-    // pathToExtensionFoo]}});
+    // TODO SERVER-106929 Enable these tests.
+    // Single valid extension.
+    // runTest({options: {extensions: pathToExtensionFoo}});
+    // List of valid extensions.
+    // runTest({options: {extensions: [pathToExtensionFoo, pathToExtensionFoo]}});
 } else {
     // Startup should fail because we are attempting to load an extension on a platform that is not
     // linux.

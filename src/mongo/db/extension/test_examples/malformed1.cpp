@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/extension/sdk/extension.h"
+#include "mongo/db/extension/public/api.h"
 
 // The initialization function is empty since the test should never reach initialization.
 void initialize_extension() {}

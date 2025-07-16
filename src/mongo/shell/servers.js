@@ -71,10 +71,22 @@ MongoRunner = function() {};
 MongoRunner.dataDir = "/data/db";
 MongoRunner.dataPath = "/data/db/";
 
+/**
+ * Get the absolute path of a relative path located in the install directory.
+ * Note that if the install directory is not defined, this returns the relative path.
+ *
+ * @param  {...any} parts string components of the relative path
+ * @returns joined path prefixed by the install directory
+ */
+MongoRunner.getInstallPath = function(...parts) {
+    const relativePath = pathJoin(...parts);
+    const installDir = _getEnv("INSTALL_DIR");
+    return installDir ? pathJoin(installDir, relativePath) : relativePath;
+};
+
 function getMongoSuffixPath(binary_name) {
-    let installDir = _getEnv("INSTALL_DIR");
-    if (installDir && !jsTestOptions().inEvergreen) {
-        return pathJoin(installDir, binary_name);
+    if (!jsTestOptions().inEvergreen) {
+        return MongoRunner.getInstallPath(binary_name);
     }
     return binary_name;
 }
