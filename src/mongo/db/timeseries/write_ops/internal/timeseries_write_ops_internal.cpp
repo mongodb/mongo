@@ -584,8 +584,8 @@ bucket_catalog::TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
     auto& measurementDocs = request.getDocuments();
 
     // Explicitly hold a reference to the CollectionCatalog, such that the corresponding
-    // Collection instances remain valid, and the collator is not invalidated.
-    auto catalog = CollectionCatalog::get(opCtx);
+    // Collection instances remain valid, and the bucketsColl is not invalidated.
+    std::shared_ptr<const CollectionCatalog> catalog;
     const Collection* bucketsColl = nullptr;
 
     Status collectionAcquisitionStatus = Status::OK();
@@ -601,11 +601,14 @@ bucket_catalog::TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
             CollectionAcquisitionRequest::fromOpCtx(
                 opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
             MODE_IS);
-        bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsAcq.nss());
-        // Check for the presence of the buckets collection
-        // TODO SERVER-101456 remove this check once we stop doing the lookup
-        // in addition to the acquireAndValidateBucketsCollection function.
-        timeseries::assertTimeseriesBucketsCollection(bucketsColl);
+
+        // We want to ensure that the catalog instance after the scope of the acquisition is the
+        // same as before the acquisition. Acquiring the collection involves stashing the
+        // current catalog instance, so assigning the catalog in scope of the try block ensures
+        // that we have a consistent catalog with the acquisition.
+        catalog = CollectionCatalog::get(opCtx);
+
+        bucketsColl = bucketsAcq.getCollectionPtr().get();
         // Process timeseriesOptions
         timeseriesOptions = bucketsColl->getTimeseriesOptions().get();
         rebuildOptionsWithGranularityFromConfigServer(opCtx, bucketsAcq.nss(), timeseriesOptions);
@@ -1205,7 +1208,9 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
 
     auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
 
-    auto catalog = CollectionCatalog::get(opCtx);
+    // Explicitly hold a reference to the CollectionCatalog, such that the corresponding
+    // Collection instances remain valid, and the bucketsColl is not invalidated.
+    std::shared_ptr<const CollectionCatalog> catalog;
     const Collection* bucketsColl = nullptr;
     TimeseriesOptions timeseriesOptions;
 
@@ -1219,11 +1224,14 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
             CollectionAcquisitionRequest::fromOpCtx(
                 opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
             MODE_IS);
-        bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsAcq.nss());
-        // Check for the presence of the buckets collection
-        // TODO SERVER-101456 remove this check once we stop doing the lookup
-        // in addition to the acquireAndValidateBucketsCollection function.
-        timeseries::assertTimeseriesBucketsCollection(bucketsColl);
+
+        // We want to ensure that the catalog instance after the scope of the acquisition is the
+        // same as before the acquisition. Acquiring the collection involves stashing the
+        // current catalog instance, so assigning the catalog in scope of the try block ensures
+        // that we have a consistent catalog with the acquisition.
+        catalog = CollectionCatalog::get(opCtx);
+
+        bucketsColl = bucketsAcq.getCollectionPtr().get();
         optUuid = bucketsColl->uuid();
         // Process timeseriesOptions
         timeseriesOptions = bucketsColl->getTimeseriesOptions().get();
@@ -1309,7 +1317,9 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalogUnopti
 
     auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
 
-    auto catalog = CollectionCatalog::get(opCtx);
+    // Explicitly hold a reference to the CollectionCatalog, such that the corresponding
+    // Collection instances remain valid, and the bucketsColl is not invalidated.
+    std::shared_ptr<const CollectionCatalog> catalog;
     const Collection* bucketsColl = nullptr;
     TimeseriesOptions timeseriesOptions;
 
@@ -1323,11 +1333,14 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalogUnopti
             CollectionAcquisitionRequest::fromOpCtx(
                 opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
             MODE_IS);
-        bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsAcq.nss());
-        // Check for the presence of the buckets collection
-        // TODO SERVER-101456 remove this check once we stop doing the lookup
-        // in addition to the acquireAndValidateBucketsCollection function.
-        timeseries::assertTimeseriesBucketsCollection(bucketsColl);
+
+        // We want to ensure that the catalog instance after the scope of the acquisition is the
+        // same as before the acquisition. Acquiring the collection involves stashing the
+        // current catalog instance, so assigning the catalog in scope of the try block ensures
+        // that we have a consistent catalog with the acquisition.
+        catalog = CollectionCatalog::get(opCtx);
+
+        bucketsColl = bucketsAcq.getCollectionPtr().get();
         optUuid = bucketsColl->uuid();
         // Process timeseriesOptions
         timeseriesOptions = bucketsColl->getTimeseriesOptions().get();
