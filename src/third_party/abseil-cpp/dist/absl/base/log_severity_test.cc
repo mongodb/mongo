@@ -146,7 +146,12 @@ INSTANTIATE_TEST_SUITE_P(
            std::make_tuple("fatal", absl::LogSeverity::kFatal),
            std::make_tuple("kFatal", absl::LogSeverity::kFatal),
            std::make_tuple("FaTaL", absl::LogSeverity::kFatal),
-           std::make_tuple("KfAtAl", absl::LogSeverity::kFatal)));
+           std::make_tuple("KfAtAl", absl::LogSeverity::kFatal),
+           std::make_tuple("DFATAL", absl::kLogDebugFatal),
+           std::make_tuple("dfatal", absl::kLogDebugFatal),
+           std::make_tuple("kLogDebugFatal", absl::kLogDebugFatal),
+           std::make_tuple("dFaTaL", absl::kLogDebugFatal),
+           std::make_tuple("kLoGdEbUgFaTaL", absl::kLogDebugFatal)));
 TEST_P(ParseFlagFromEnumeratorTest, YieldsExpectedValue) {
   const absl::string_view to_parse = std::get<0>(GetParam());
   const absl::LogSeverity expected = std::get<1>(GetParam());
@@ -158,7 +163,8 @@ TEST_P(ParseFlagFromEnumeratorTest, YieldsExpectedValue) {
 
 using ParseFlagFromGarbageTest = TestWithParam<absl::string_view>;
 INSTANTIATE_TEST_SUITE_P(Instantiation, ParseFlagFromGarbageTest,
-                         Values("", "\0", " ", "garbage", "kkinfo", "I"));
+                         Values("", "\0", " ", "garbage", "kkinfo", "I",
+                                "kDFATAL", "LogDebugFatal", "lOgDeBuGfAtAl"));
 TEST_P(ParseFlagFromGarbageTest, ReturnsError) {
   const absl::string_view to_parse = GetParam();
   absl::LogSeverity value;

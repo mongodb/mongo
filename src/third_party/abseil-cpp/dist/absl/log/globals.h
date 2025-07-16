@@ -24,6 +24,7 @@
 #include "absl/base/attributes.h"
 #include "absl/base/config.h"
 #include "absl/base/log_severity.h"
+#include "absl/log/internal/vlog_config.h"
 #include "absl/strings/string_view.h"
 
 namespace absl {
@@ -42,7 +43,7 @@ ABSL_NAMESPACE_BEGIN
 //
 // Returns the value of the Minimum Log Level parameter.
 // This function is async-signal-safe.
-ABSL_MUST_USE_RESULT absl::LogSeverityAtLeast MinLogLevel();
+[[nodiscard]] absl::LogSeverityAtLeast MinLogLevel();
 
 // SetMinLogLevel()
 //
@@ -81,7 +82,7 @@ class ScopedMinLogLevel final {
 //
 // Returns the value of the Stderr Threshold parameter.
 // This function is async-signal-safe.
-ABSL_MUST_USE_RESULT absl::LogSeverityAtLeast StderrThreshold();
+[[nodiscard]] absl::LogSeverityAtLeast StderrThreshold();
 
 // SetStderrThreshold()
 //
@@ -117,8 +118,7 @@ class ScopedStderrThreshold final {
 //
 // Returns true if we should log a backtrace at the specified location.
 namespace log_internal {
-ABSL_MUST_USE_RESULT bool ShouldLogBacktraceAt(absl::string_view file,
-                                               int line);
+[[nodiscard]] bool ShouldLogBacktraceAt(absl::string_view file, int line);
 }  // namespace log_internal
 
 // SetLogBacktraceLocation()
@@ -139,18 +139,53 @@ void ClearLogBacktraceLocation();
 //
 // This option tells the logging library that every logged message
 // should include the prefix (severity, date, time, PID, etc.)
-
+//
 // ShouldPrependLogPrefix()
 //
 // Returns the value of the Prepend Log Prefix option.
 // This function is async-signal-safe.
-ABSL_MUST_USE_RESULT bool ShouldPrependLogPrefix();
+[[nodiscard]] bool ShouldPrependLogPrefix();
 
 // EnableLogPrefix()
 //
 // Updates the value of the Prepend Log Prefix option.
 // This function is async-signal-safe.
 void EnableLogPrefix(bool on_off);
+
+//------------------------------------------------------------------------------
+// `VLOG` Configuration
+//------------------------------------------------------------------------------
+//
+// These methods set the `(ABSL_)VLOG(_IS_ON)` threshold.  They allow
+// programmatic control of the thresholds set by the --v and --vmodule flags.
+//
+// Only `VLOG`s with a severity level LESS THAN OR EQUAL TO the threshold will
+// be evaluated.
+//
+// For example, if the threshold is 2, then:
+//
+//   VLOG(2) << "This message will be logged.";
+//   VLOG(3) << "This message will NOT be logged.";
+//
+// The default threshold is 0. Since `VLOG` levels must not be negative, a
+// negative threshold value will turn off all VLOGs.
+
+// SetGlobalVLogLevel()
+//
+// Sets the global `VLOG` level to threshold. Returns the previous global
+// threshold.
+inline int SetGlobalVLogLevel(int threshold) {
+  return absl::log_internal::UpdateGlobalVLogLevel(threshold);
+}
+
+// SetVLogLevel()
+//
+// Sets the `VLOG` threshold for all files that match `module_pattern`,
+// overwriting any prior value. Files that don't match aren't affected.
+// Returns the threshold that previously applied to `module_pattern`.
+inline int SetVLogLevel(absl::string_view module_pattern, int threshold) {
+  return absl::log_internal::PrependVModule(module_pattern, threshold);
+}
 
 //------------------------------------------------------------------------------
 // Configure Android Native Log Tag

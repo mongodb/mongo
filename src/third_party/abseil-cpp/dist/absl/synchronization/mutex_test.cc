@@ -36,9 +36,16 @@
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/memory/memory.h"
+#include "absl/random/random.h"
+#include "absl/synchronization/internal/create_thread_identity.h"
 #include "absl/synchronization/internal/thread_pool.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+
+#ifdef ABSL_HAVE_PTHREAD_GETSCHEDPARAM
+#include <pthread.h>
+#include <string.h>
+#endif
 
 namespace {
 
@@ -65,6 +72,11 @@ static void ScheduleAfter(absl::synchronization_internal::ThreadPool *tp,
     func();
   });
 }
+
+struct ScopedInvariantDebugging {
+  ScopedInvariantDebugging() { absl::EnableMutexInvariantDebugging(true); }
+  ~ScopedInvariantDebugging() { absl::EnableMutexInvariantDebugging(false); }
+};
 
 struct TestContext {
   int iterations;
@@ -389,13 +401,12 @@ static int RunTestWithInvariantDebugging(void (*test)(TestContext *cxt, int),
                                          int threads, int iterations,
                                          int operations,
                                          void (*invariant)(void *)) {
-  absl::EnableMutexInvariantDebugging(true);
+  ScopedInvariantDebugging scoped_debugging;
   SetInvariantChecked(false);
   TestContext cxt;
   cxt.mu.EnableInvariantDebugging(invariant, &cxt);
   int ret = RunTestCommon(&cxt, test, threads, iterations, operations);
   CHECK(GetInvariantChecked()) << "Invariant not checked";
-  absl::EnableMutexInvariantDebugging(false);  // Restore.
   return ret;
 }
 #endif
@@ -971,6 +982,15 @@ TEST(Mutex, FunctionPointerConditionWithDerivedToBaseConversion) {
                                      const Derived *>::value));
 }
 
+struct Constable {
+  bool WotsAllThisThen() const { return true; }
+};
+
+TEST(Mutex, FunctionPointerConditionWithConstMethod) {
+  const Constable chapman;
+  EXPECT_TRUE(absl::Condition(&chapman, &Constable::WotsAllThisThen).Eval());
+}
+
 struct True {
   template <class... Args>
   bool operator()(Args...) const {
@@ -1019,6 +1039,19 @@ TEST(Mutex, FunctorCondition) {
   }
 }
 
+TEST(Mutex, ConditionSwap) {
+  // Ensure that Conditions can be swap'ed.
+  bool b1 = true;
+  absl::Condition c1(&b1);
+  bool b2 = false;
+  absl::Condition c2(&b2);
+  EXPECT_TRUE(c1.Eval());
+  EXPECT_FALSE(c2.Eval());
+  std::swap(c1, c2);
+  EXPECT_FALSE(c1.Eval());
+  EXPECT_TRUE(c2.Eval());
+}
+
 // --------------------------------------------------------
 // Test for bug with pattern of readers using a condvar.  The bug was that if a
 // reader went to sleep on a condition variable while one or more other readers
@@ -1032,8 +1065,7 @@ TEST(Mutex, FunctorCondition) {
 
 static void ReaderForReaderOnCondVar(absl::Mutex *mu, absl::CondVar *cv,
                                      int *running) {
-  std::random_device dev;
-  std::mt19937 gen(dev());
+  absl::InsecureBitGen gen;
   std::uniform_int_distribution<int> random_millis(0, 15);
   mu->ReaderLock();
   while (*running == 3) {
@@ -1325,7 +1357,7 @@ static absl::Duration TimeoutTestAllowedSchedulingDelay() {
 
 // Returns true if `actual_delay` is close enough to `expected_delay` to pass
 // the timeouts/deadlines test.  Otherwise, logs warnings and returns false.
-ABSL_MUST_USE_RESULT
+[[nodiscard]]
 static bool DelayIsWithinBounds(absl::Duration expected_delay,
                                 absl::Duration actual_delay) {
   bool pass = true;
@@ -1690,6 +1722,61 @@ TEST(Mutex, Logging) {
   logged_cv.SignalAll();
 }
 
+TEST(Mutex, LoggingAddressReuse) {
+  // Repeatedly re-create a Mutex with debug logging at the same address.
+  ScopedInvariantDebugging scoped_debugging;
+  alignas(absl::Mutex) unsigned char storage[sizeof(absl::Mutex)];
+  auto invariant =
+      +[](void *alive) { EXPECT_TRUE(*static_cast<bool *>(alive)); };
+  constexpr size_t kIters = 10;
+  bool alive[kIters] = {};
+  for (size_t i = 0; i < kIters; ++i) {
+    absl::Mutex *mu = new (storage) absl::Mutex;
+    alive[i] = true;
+    mu->EnableDebugLog("Mutex");
+    mu->EnableInvariantDebugging(invariant, &alive[i]);
+    mu->Lock();
+    mu->Unlock();
+    mu->~Mutex();
+    alive[i] = false;
+  }
+}
+
+TEST(Mutex, LoggingBankrupcy) {
+  // Test the case with too many live Mutexes with debug logging.
+  ScopedInvariantDebugging scoped_debugging;
+  std::vector<absl::Mutex> mus(1 << 20);
+  for (auto &mu : mus) {
+    mu.EnableDebugLog("Mutex");
+  }
+}
+
+TEST(Mutex, SynchEventRace) {
+  // Regression test for a false TSan race report in
+  // EnableInvariantDebugging/EnableDebugLog related to SynchEvent reuse.
+  ScopedInvariantDebugging scoped_debugging;
+  std::vector<std::thread> threads;
+  for (size_t i = 0; i < 5; i++) {
+    threads.emplace_back([&] {
+      for (size_t j = 0; j < (1 << 17); j++) {
+        {
+          absl::Mutex mu;
+          mu.EnableInvariantDebugging([](void *) {}, nullptr);
+          mu.Lock();
+          mu.Unlock();
+        }
+        {
+          absl::Mutex mu;
+          mu.EnableDebugLog("Mutex");
+        }
+      }
+    });
+  }
+  for (auto &thread : threads) {
+    thread.join();
+  }
+}
+
 // --------------------------------------------------------
 
 // Generate the vector of thread counts for tests parameterized on thread count.
@@ -1867,6 +1954,60 @@ TEST(Mutex, WriterPriority) {
   t3.join();
   EXPECT_TRUE(saw_wrote.load());
 }
+
+#ifdef ABSL_HAVE_PTHREAD_GETSCHEDPARAM
+TEST(Mutex, CondVarPriority) {
+  // A regression test for a bug in condition variable wait morphing,
+  // which resulted in the waiting thread getting priority of the waking thread.
+  int err = 0;
+  sched_param param;
+  param.sched_priority = 7;
+  std::thread test([&]() {
+    err = pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
+  });
+  test.join();
+  if (err) {
+    // Setting priority usually requires special privileges.
+    GTEST_SKIP() << "failed to set priority: " << strerror(err);
+  }
+  absl::Mutex mu;
+  absl::CondVar cv;
+  bool locked = false;
+  bool notified = false;
+  bool waiting = false;
+  bool morph = false;
+  std::thread th([&]() {
+    EXPECT_EQ(0, pthread_setschedparam(pthread_self(), SCHED_FIFO, &param));
+    mu.Lock();
+    locked = true;
+    mu.Await(absl::Condition(&notified));
+    mu.Unlock();
+    EXPECT_EQ(absl::synchronization_internal::GetOrCreateCurrentThreadIdentity()
+                  ->per_thread_synch.priority,
+              param.sched_priority);
+    mu.Lock();
+    mu.Await(absl::Condition(&waiting));
+    morph = true;
+    absl::SleepFor(absl::Seconds(1));
+    cv.Signal();
+    mu.Unlock();
+  });
+  mu.Lock();
+  mu.Await(absl::Condition(&locked));
+  notified = true;
+  mu.Unlock();
+  mu.Lock();
+  waiting = true;
+  while (!morph) {
+    cv.Wait(&mu);
+  }
+  mu.Unlock();
+  th.join();
+  EXPECT_NE(absl::synchronization_internal::GetOrCreateCurrentThreadIdentity()
+                ->per_thread_synch.priority,
+            param.sched_priority);
+}
+#endif
 
 TEST(Mutex, LockWhenWithTimeoutResult) {
   // Check various corner cases for Await/LockWhen return value

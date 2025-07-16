@@ -39,6 +39,9 @@
 #define ABSL_PLOG(severity) ABSL_LOG_INTERNAL_PLOG_IMPL(_##severity)
 #define ABSL_DLOG(severity) ABSL_LOG_INTERNAL_DLOG_IMPL(_##severity)
 
+#define ABSL_VLOG(verbose_level) ABSL_LOG_INTERNAL_VLOG_IMPL(verbose_level)
+#define ABSL_DVLOG(verbose_level) ABSL_LOG_INTERNAL_DVLOG_IMPL(verbose_level)
+
 #define ABSL_LOG_IF(severity, condition) \
   ABSL_LOG_INTERNAL_LOG_IF_IMPL(_##severity, condition)
 #define ABSL_PLOG_IF(severity, condition) \
@@ -72,6 +75,15 @@
   ABSL_LOG_INTERNAL_DLOG_EVERY_POW_2_IMPL(_##severity)
 #define ABSL_DLOG_EVERY_N_SEC(severity, n_seconds) \
   ABSL_LOG_INTERNAL_DLOG_EVERY_N_SEC_IMPL(_##severity, n_seconds)
+
+#define ABSL_VLOG_EVERY_N(verbose_level, n) \
+  ABSL_LOG_INTERNAL_VLOG_EVERY_N_IMPL(verbose_level, n)
+#define ABSL_VLOG_FIRST_N(verbose_level, n) \
+  ABSL_LOG_INTERNAL_VLOG_FIRST_N_IMPL(verbose_level, n)
+#define ABSL_VLOG_EVERY_POW_2(verbose_level, n) \
+  ABSL_LOG_INTERNAL_VLOG_EVERY_POW_2_IMPL(verbose_level, n)
+#define ABSL_VLOG_EVERY_N_SEC(verbose_level, n) \
+  ABSL_LOG_INTERNAL_VLOG_EVERY_N_SEC_IMPL(verbose_level, n)
 
 #define ABSL_LOG_IF_EVERY_N(severity, condition, n) \
   ABSL_LOG_INTERNAL_LOG_IF_EVERY_N_IMPL(_##severity, condition, n)

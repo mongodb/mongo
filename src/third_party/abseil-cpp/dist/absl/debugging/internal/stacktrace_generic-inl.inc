@@ -56,8 +56,9 @@ ABSL_ATTRIBUTE_UNUSED static int stacktraces_enabler = []() {
 }();
 
 template <bool IS_STACK_FRAMES, bool IS_WITH_CONTEXT>
-static int UnwindImpl(void** result, int* sizes, int max_depth, int skip_count,
-                      const void *ucp, int *min_dropped_frames) {
+static int UnwindImpl(void** result, uintptr_t* frames, int* sizes,
+                      int max_depth, int skip_count, const void* ucp,
+                      int* min_dropped_frames) {
   if (recursive || disable_stacktraces.load(std::memory_order_relaxed)) {
     return 0;
   }
@@ -79,8 +80,13 @@ static int UnwindImpl(void** result, int* sizes, int max_depth, int skip_count,
     result[i] = stack[i + skip_count];
 
   if (IS_STACK_FRAMES) {
-    // No implementation for finding out the stack frame sizes yet.
-    memset(sizes, 0, sizeof(*sizes) * static_cast<size_t>(result_count));
+    // No implementation for finding out the stack frames yet.
+    if (frames != nullptr) {
+      memset(frames, 0, sizeof(*frames) * static_cast<size_t>(result_count));
+    }
+    if (sizes != nullptr) {
+      memset(sizes, 0, sizeof(*sizes) * static_cast<size_t>(result_count));
+    }
   }
   if (min_dropped_frames != nullptr) {
     if (size - skip_count - max_depth > 0) {

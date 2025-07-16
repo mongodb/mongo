@@ -165,6 +165,16 @@ inline LogStreamer LogFatalStreamer(absl::string_view file, int line) {
   return absl::LogStreamer(absl::LogSeverity::kFatal, file, line);
 }
 
+// LogDebugFatalStreamer()
+//
+// Returns a LogStreamer that writes at level LogSeverity::kLogDebugFatal.
+//
+// In debug mode, the program will be terminated when this `LogStreamer` is
+// destroyed, regardless of whether any data were streamed in.
+inline LogStreamer LogDebugFatalStreamer(absl::string_view file, int line) {
+  return absl::LogStreamer(absl::kLogDebugFatal, file, line);
+}
+
 ABSL_NAMESPACE_END
 }  // namespace absl
 

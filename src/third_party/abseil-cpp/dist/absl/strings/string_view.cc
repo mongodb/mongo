@@ -21,6 +21,8 @@
 #include <cstring>
 #include <ostream>
 
+#include "absl/base/nullability.h"
+
 namespace absl {
 ABSL_NAMESPACE_BEGIN
 
@@ -28,8 +30,10 @@ namespace {
 
 // This is significantly faster for case-sensitive matches with very
 // few possible matches.
-const char* memmatch(const char* phaystack, size_t haylen, const char* pneedle,
-                     size_t neelen) {
+const char* absl_nullable memmatch(const char* absl_nullable phaystack,
+                                   size_t haylen,
+                                   const char* absl_nullable pneedle,
+                                   size_t neelen) {
   if (0 == neelen) {
     return phaystack;  // even if haylen is 0
   }
@@ -37,8 +41,8 @@ const char* memmatch(const char* phaystack, size_t haylen, const char* pneedle,
 
   const char* match;
   const char* hayend = phaystack + haylen - neelen + 1;
-  // A static cast is used here to work around the fact that memchr returns
-  // a void* on Posix-compliant systems and const void* on Windows.
+  // A static cast is used here as memchr returns a const void *, and pointer
+  // arithmetic is not allowed on pointers to void.
   while (
       (match = static_cast<const char*>(memchr(
            phaystack, pneedle[0], static_cast<size_t>(hayend - phaystack))))) {
@@ -229,13 +233,25 @@ string_view::size_type string_view::find_last_not_of(
   return npos;
 }
 
-
-#ifdef ABSL_INTERNAL_NEED_REDUNDANT_CONSTEXPR_DECL
-constexpr string_view::size_type string_view::npos;
-constexpr string_view::size_type string_view::kMaxSize;
-#endif
-
 ABSL_NAMESPACE_END
 }  // namespace absl
+
+#else
+
+// https://github.com/abseil/abseil-cpp/issues/1465
+// CMake builds on Apple platforms error when libraries are empty.
+// Our CMake configuration can avoid this error on header-only libraries,
+// but since this library is conditionally empty, including a single
+// variable is an easy workaround.
+#ifdef __APPLE__
+namespace absl {
+ABSL_NAMESPACE_BEGIN
+namespace strings_internal {
+extern const char kAvoidEmptyStringViewLibraryWarning;
+const char kAvoidEmptyStringViewLibraryWarning = 0;
+}  // namespace strings_internal
+ABSL_NAMESPACE_END
+}  // namespace absl
+#endif  // __APPLE__
 
 #endif  // ABSL_USES_STD_STRING_VIEW

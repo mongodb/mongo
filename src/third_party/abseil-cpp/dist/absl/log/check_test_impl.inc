@@ -31,12 +31,15 @@
 #include "absl/base/config.h"
 #include "absl/log/internal/test_helpers.h"
 #include "absl/status/status.h"
+#include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
 
 // NOLINTBEGIN(misc-definitions-in-headers)
 
 namespace absl_log_internal {
 
 using ::testing::AllOf;
+using ::testing::AnyOf;
 using ::testing::HasSubstr;
 using ::testing::Not;
 
@@ -62,7 +65,6 @@ TEST(CHECKTest, TestLogicExpressions) {
   ABSL_TEST_CHECK(i < 0 || i > 3);
 }
 
-#if ABSL_INTERNAL_CPLUSPLUS_LANG >= 201703L
 ABSL_CONST_INIT const auto global_var_check = [](int i) {
   ABSL_TEST_CHECK(i > 0);  // NOLINT
   return i + 1;
@@ -72,7 +74,6 @@ ABSL_CONST_INIT const auto global_var = [](int i) {
   ABSL_TEST_CHECK_GE(i, 0);  // NOLINT
   return i + 1;
 }(global_var_check);
-#endif  // ABSL_INTERNAL_CPLUSPLUS_LANG
 
 TEST(CHECKTest, TestPlacementsInCompoundStatements) {
   // check placement inside if/else clauses
@@ -87,13 +88,11 @@ TEST(CHECKTest, TestPlacementsInCompoundStatements) {
   case 0:
     ABSL_TEST_CHECK(true);  // NOLINT
 
-#if ABSL_INTERNAL_CPLUSPLUS_LANG >= 201703L
   constexpr auto var = [](int i) {
     ABSL_TEST_CHECK(i > 0);  // NOLINT
     return i + 1;
   }(global_var);
   (void)var;
-#endif  // ABSL_INTERNAL_CPLUSPLUS_LANG
 }
 
 TEST(CHECKTest, TestBoolConvertible) {
@@ -352,7 +351,6 @@ TEST(CHECKTest, TestComparisonPlacementsInCompoundStatements) {
   case 0:
     ABSL_TEST_CHECK_STRCASEEQ("A", "a");
 
-#if ABSL_INTERNAL_CPLUSPLUS_LANG >= 201703L
   constexpr auto var = [](int i) {
     ABSL_TEST_CHECK_GT(i, 0);
     return i + 1;
@@ -372,7 +370,6 @@ TEST(CHECKTest, TestComparisonPlacementsInCompoundStatements) {
   int var4 = (({ ABSL_TEST_CHECK_STREQ("a", "a"); }), global_var < 10) ? 1 : 0;
   (void)var4;
 #endif  // __GNUC__
-#endif  // ABSL_INTERNAL_CPLUSPLUS_LANG
 }
 
 TEST(CHECKTest, TestDCHECK) {
@@ -439,7 +436,6 @@ TEST(CHECKTest, TestQCHECKPlacementsInCompoundStatements) {
   case 0:
     ABSL_TEST_QCHECK(true);
 
-#if ABSL_INTERNAL_CPLUSPLUS_LANG >= 201703L
   constexpr auto var = [](int i) {
     ABSL_TEST_QCHECK(i > 0);  // NOLINT
     return i + 1;
@@ -450,7 +446,6 @@ TEST(CHECKTest, TestQCHECKPlacementsInCompoundStatements) {
   int var2 = (({ ABSL_TEST_CHECK_LE(1, 2); }), global_var < 10) ? 1 : 0;
   (void)var2;
 #endif  // __GNUC__
-#endif  // ABSL_INTERNAL_CPLUSPLUS_LANG
 }
 
 class ComparableType {
@@ -519,6 +514,160 @@ TEST(CHECKDeathTest, TestUserDefinedStreaming) {
       ABSL_TEST_CHECK_EQ(v1, v2),
       HasSubstr(
           "Check failed: v1 == v2 (ComparableType{1} vs. ComparableType{2})"));
+}
+
+// A type that can be printed using AbslStringify.
+struct StringifiableType {
+  int x = 0;
+  explicit StringifiableType(int x) : x(x) {}
+  friend bool operator==(const StringifiableType& lhs,
+                         const StringifiableType& rhs) {
+    return lhs.x == rhs.x;
+  }
+  friend bool operator!=(const StringifiableType& lhs,
+                         const StringifiableType& rhs) {
+    return lhs.x != rhs.x;
+  }
+  friend bool operator<(const StringifiableType& lhs,
+                        const StringifiableType& rhs) {
+    return lhs.x < rhs.x;
+  }
+  friend bool operator>(const StringifiableType& lhs,
+                        const StringifiableType& rhs) {
+    return lhs.x > rhs.x;
+  }
+  friend bool operator<=(const StringifiableType& lhs,
+                         const StringifiableType& rhs) {
+    return lhs.x <= rhs.x;
+  }
+  friend bool operator>=(const StringifiableType& lhs,
+                         const StringifiableType& rhs) {
+    return lhs.x >= rhs.x;
+  }
+  template <typename Sink>
+  friend void AbslStringify(Sink& sink, const StringifiableType& obj) {
+    absl::Format(&sink, "StringifiableType{%d}", obj.x);
+  }
+
+  // Make sure no unintended copy happens.
+  StringifiableType(const StringifiableType&) = delete;
+};
+
+TEST(CHECKTest, TestUserDefinedAbslStringify) {
+  const StringifiableType v1(1);
+  const StringifiableType v2(2);
+
+  ABSL_TEST_CHECK_EQ(v1, v1);
+  ABSL_TEST_CHECK_NE(v1, v2);
+  ABSL_TEST_CHECK_LT(v1, v2);
+  ABSL_TEST_CHECK_LE(v1, v2);
+  ABSL_TEST_CHECK_GT(v2, v1);
+  ABSL_TEST_CHECK_GE(v2, v1);
+}
+
+TEST(CHECKDeathTest, TestUserDefinedAbslStringify) {
+  const StringifiableType v1(1);
+  const StringifiableType v2(2);
+
+  // Returns a matcher for the expected check failure message when comparing two
+  // values.
+  auto expected_output = [](int lhs, absl::string_view condition, int rhs) {
+    return HasSubstr(
+        absl::Substitute("Check failed: v$0 $1 v$2 (StringifiableType{$0} vs. "
+                         "StringifiableType{$2})",
+                         lhs, condition, rhs));
+  };
+  // Test comparisons where the check fails.
+  EXPECT_DEATH(ABSL_TEST_CHECK_EQ(v1, v2), expected_output(1, "==", 2));
+  EXPECT_DEATH(ABSL_TEST_CHECK_NE(v1, v1), expected_output(1, "!=", 1));
+  EXPECT_DEATH(ABSL_TEST_CHECK_LT(v2, v1), expected_output(2, "<", 1));
+  EXPECT_DEATH(ABSL_TEST_CHECK_LE(v2, v1), expected_output(2, "<=", 1));
+  EXPECT_DEATH(ABSL_TEST_CHECK_GT(v1, v2), expected_output(1, ">", 2));
+  EXPECT_DEATH(ABSL_TEST_CHECK_GE(v1, v2), expected_output(1, ">=", 2));
+}
+
+// A type that can be printed using both AbslStringify and operator<<.
+struct StringifiableStreamableType {
+  int x = 0;
+  explicit StringifiableStreamableType(int x) : x(x) {}
+
+  friend bool operator==(const StringifiableStreamableType& lhs,
+                         const StringifiableStreamableType& rhs) {
+    return lhs.x == rhs.x;
+  }
+  friend bool operator!=(const StringifiableStreamableType& lhs,
+                         const StringifiableStreamableType& rhs) {
+    return lhs.x != rhs.x;
+  }
+  template <typename Sink>
+  friend void AbslStringify(Sink& sink,
+                            const StringifiableStreamableType& obj) {
+    absl::Format(&sink, "Strigified{%d}", obj.x);
+  }
+  friend std::ostream& operator<<(std::ostream& out,
+                                  const StringifiableStreamableType& obj) {
+    return out << "Streamed{" << obj.x << "}";
+  }
+
+  // Avoid unintentional copy.
+  StringifiableStreamableType(const StringifiableStreamableType&) = delete;
+};
+
+TEST(CHECKDeathTest, TestStreamingPreferredOverAbslStringify) {
+  StringifiableStreamableType v1(1);
+  StringifiableStreamableType v2(2);
+
+  EXPECT_DEATH(
+      ABSL_TEST_CHECK_EQ(v1, v2),
+      HasSubstr("Check failed: v1 == v2 (Streamed{1} vs. Streamed{2})"));
+}
+
+// A type whose pointer can be passed to AbslStringify.
+struct PointerIsStringifiable {};
+template <typename Sink>
+void AbslStringify(Sink& sink, const PointerIsStringifiable* var) {
+  sink.Append("PointerIsStringifiable");
+}
+
+// Verifies that a pointer is printed as a number despite having AbslStringify
+// defined. Users may implement AbslStringify that dereferences the pointer, and
+// doing so as part of DCHECK would not be good.
+TEST(CHECKDeathTest, TestPointerPrintedAsNumberDespiteAbslStringify) {
+  const auto* p = reinterpret_cast<const PointerIsStringifiable*>(0x1234);
+
+  EXPECT_DEATH(
+      ABSL_TEST_CHECK_EQ(p, nullptr),
+      AnyOf(
+        HasSubstr("Check failed: p == nullptr (0000000000001234 vs. (null))"),
+        HasSubstr("Check failed: p == nullptr (0x1234 vs. (null))")
+      ));
+}
+
+// An uncopyable object with operator<<.
+struct Uncopyable {
+  int x;
+  explicit Uncopyable(int x) : x(x) {}
+  Uncopyable(const Uncopyable&) = delete;
+  friend bool operator==(const Uncopyable& lhs, const Uncopyable& rhs) {
+    return lhs.x == rhs.x;
+  }
+  friend bool operator!=(const Uncopyable& lhs, const Uncopyable& rhs) {
+    return lhs.x != rhs.x;
+  }
+  friend std::ostream& operator<<(std::ostream& os, const Uncopyable& obj) {
+    return os << "Uncopyable{" << obj.x << "}";
+  }
+};
+
+// Test that an uncopyable object can be used.
+// Will catch us if implementation has an unintended copy.
+TEST(CHECKDeathTest, TestUncopyable) {
+  const Uncopyable v1(1);
+  const Uncopyable v2(2);
+
+  EXPECT_DEATH(
+      ABSL_TEST_CHECK_EQ(v1, v2),
+      HasSubstr("Check failed: v1 == v2 (Uncopyable{1} vs. Uncopyable{2})"));
 }
 
 }  // namespace absl_log_internal

@@ -19,6 +19,7 @@
 #include <regex>  // NOLINT
 #include <vector>
 
+#include "absl/base/no_destructor.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/internal/hash_function_defaults.h"
 #include "absl/container/internal/hashtable_debug.h"
@@ -29,6 +30,7 @@
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
+#include "absl/types/optional.h"
 
 namespace {
 
@@ -68,10 +70,15 @@ struct Policy {
       -> decltype(std::forward<F>(f)(arg, arg)) {
     return std::forward<F>(f)(arg, arg);
   }
+
+  template <class Hash>
+  static constexpr auto get_hash_slot_fn() {
+    return nullptr;
+  }
 };
 
 absl::BitGen& GlobalBitGen() {
-  static auto* value = new absl::BitGen;
+  static absl::NoDestructor<absl::BitGen> value;
   return *value;
 }
 
@@ -112,7 +119,7 @@ class RandomizedAllocator {
   static constexpr size_t kRandomPool = 20;
 
   static std::vector<T*>& GetPointers(size_t n) {
-    static auto* m = new absl::flat_hash_map<size_t, std::vector<T*>>();
+    static absl::NoDestructor<absl::flat_hash_map<size_t, std::vector<T*>>> m;
     return (*m)[n];
   }
 };
@@ -238,13 +245,28 @@ struct PtrIdentity {
   }
 };
 
-constexpr char kStringFormat[] = "/path/to/file/name-%07d-of-9999999.txt";
+enum class StringSize { kSmall, kMedium, kLarge, kExtraLarge };
+constexpr char kStringFormat[] = "%s/name-%07d-of-9999999.txt";
 
-template <bool small>
+template <StringSize size>
 struct String {
   std::string value;
   static std::string Make(uint32_t v) {
-    return {small ? absl::StrCat(v) : absl::StrFormat(kStringFormat, v)};
+    switch (size) {
+      case StringSize::kSmall:
+        return absl::StrCat(v);
+      case StringSize::kMedium:  // < 32 bytes
+        return absl::StrFormat(kStringFormat, "/path", v);
+      case StringSize::kLarge:  // 33-64 bytes
+        return absl::StrFormat(kStringFormat, "/path/to/file", v);
+      case StringSize::kExtraLarge:  // > 64 bytes
+        return absl::StrFormat(kStringFormat,
+                               "/path/to/a/very/long/file/name/so/that/total/"
+                               "length/is/larger/than/64/bytes",
+                               v);
+      default:
+        return "";
+    }
   }
 };
 
@@ -278,10 +300,9 @@ struct Sequential<Ptr<Align>*> {
   mutable uintptr_t current = PointerForAlignment<Align>();
 };
 
-
-template <bool small>
-struct Sequential<String<small>> {
-  std::string operator()() const { return String<small>::Make(current++); }
+template <StringSize size>
+struct Sequential<String<size>> {
+  std::string operator()() const { return String<size>::Make(current++); }
   mutable uint32_t current = 0;
 };
 
@@ -382,10 +403,10 @@ struct Random<PtrIdentity<Align>, Dist> {
   }
 };
 
-template <class Dist, bool small>
-struct Random<String<small>, Dist> {
+template <class Dist, StringSize size>
+struct Random<String<size>, Dist> {
   std::string operator()() const {
-    return String<small>::Make(Random<uint32_t, Dist>{}());
+    return String<size>::Make(Random<uint32_t, Dist>{}());
   }
 };
 
@@ -414,9 +435,20 @@ std::string Name(PtrIdentity<Align>*) {
   return absl::StrCat("PtrIdentity", Align);
 }
 
-template <bool small>
-std::string Name(String<small>*) {
-  return small ? "StrS" : "StrL";
+template <StringSize size>
+std::string Name(String<size>*) {
+  switch (size) {
+    case StringSize::kSmall:
+      return "StrS";
+    case StringSize::kMedium:
+      return "StrM";
+    case StringSize::kLarge:
+      return "StrL";
+    case StringSize::kExtraLarge:
+      return "StrXL";
+    default:
+      return "";
+  }
 }
 
 template <class T, class U>
@@ -460,12 +492,12 @@ constexpr int kNameWidth = 15;
 constexpr int kDistWidth = 16;
 
 bool CanRunBenchmark(absl::string_view name) {
-  static std::regex* const filter = []() -> std::regex* {
+  static const absl::NoDestructor<absl::optional<std::regex>> filter([] {
     return benchmarks.empty() || benchmarks == "all"
-               ? nullptr
-               : new std::regex(std::string(benchmarks));
-  }();
-  return filter == nullptr || std::regex_search(std::string(name), *filter);
+               ? absl::nullopt
+               : absl::make_optional(std::regex(std::string(benchmarks)));
+  }());
+  return !filter->has_value() || std::regex_search(std::string(name), **filter);
 }
 
 struct Result {
@@ -536,12 +568,18 @@ int main(int argc, char** argv) {
   RunForType<PtrIdentity<32>>(results);
   RunForType<PtrIdentity<64>>(results);
   RunForType<std::pair<uint32_t, uint32_t>>(results);
-  RunForType<String<true>>(results);
-  RunForType<String<false>>(results);
-  RunForType<std::pair<uint64_t, String<true>>>(results);
-  RunForType<std::pair<String<true>, uint64_t>>(results);
-  RunForType<std::pair<uint64_t, String<false>>>(results);
-  RunForType<std::pair<String<false>, uint64_t>>(results);
+  RunForType<String<StringSize::kSmall>>(results);
+  RunForType<String<StringSize::kMedium>>(results);
+  RunForType<String<StringSize::kLarge>>(results);
+  RunForType<String<StringSize::kExtraLarge>>(results);
+  RunForType<std::pair<uint64_t, String<StringSize::kSmall>>>(results);
+  RunForType<std::pair<String<StringSize::kSmall>, uint64_t>>(results);
+  RunForType<std::pair<uint64_t, String<StringSize::kMedium>>>(results);
+  RunForType<std::pair<String<StringSize::kMedium>, uint64_t>>(results);
+  RunForType<std::pair<uint64_t, String<StringSize::kLarge>>>(results);
+  RunForType<std::pair<String<StringSize::kLarge>, uint64_t>>(results);
+  RunForType<std::pair<uint64_t, String<StringSize::kExtraLarge>>>(results);
+  RunForType<std::pair<String<StringSize::kExtraLarge>, uint64_t>>(results);
 
   switch (output()) {
     case OutputStyle::kRegular:

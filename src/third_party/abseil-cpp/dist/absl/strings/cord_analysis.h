@@ -19,6 +19,7 @@
 #include <cstdint>
 
 #include "absl/base/config.h"
+#include "absl/base/nullability.h"
 #include "absl/strings/internal/cord_internal.h"
 
 namespace absl {
@@ -28,7 +29,7 @@ namespace cord_internal {
 // Returns the *approximate* number of bytes held in full or in part by this
 // Cord (which may not remain the same between invocations). Cords that share
 // memory could each be "charged" independently for the same shared memory.
-size_t GetEstimatedMemoryUsage(const CordRep* rep);
+size_t GetEstimatedMemoryUsage(const CordRep* absl_nonnull rep);
 
 // Returns the *approximate* number of bytes held in full or in part by this
 // Cord for the distinct memory held by this cord. This is similar to
@@ -46,13 +47,13 @@ size_t GetEstimatedMemoryUsage(const CordRep* rep);
 //
 // This is more expensive than `GetEstimatedMemoryUsage()` as it requires
 // deduplicating all memory references.
-size_t GetMorePreciseMemoryUsage(const CordRep* rep);
+size_t GetMorePreciseMemoryUsage(const CordRep* absl_nonnull rep);
 
 // Returns the *approximate* number of bytes held in full or in part by this
 // CordRep weighted by the sharing ratio of that data. For example, if some data
 // edge is shared by 4 different Cords, then each cord is attribute 1/4th of
 // the total memory usage as a 'fair share' of the total memory usage.
-size_t GetEstimatedFairShareMemoryUsage(const CordRep* rep);
+size_t GetEstimatedFairShareMemoryUsage(const CordRep* absl_nonnull rep);
 
 }  // namespace cord_internal
 ABSL_NAMESPACE_END

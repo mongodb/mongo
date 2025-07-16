@@ -31,9 +31,10 @@
 #include "gtest/gtest.h"
 #include "absl/base/attributes.h"
 #include "absl/base/internal/exception_testing.h"
+#include "absl/base/internal/iterator_traits_test_helper.h"
 #include "absl/base/macros.h"
 #include "absl/base/options.h"
-#include "absl/container/internal/counting_allocator.h"
+#include "absl/container/internal/test_allocator.h"
 #include "absl/container/internal/test_instance_tracker.h"
 #include "absl/hash/hash_testing.h"
 #include "absl/log/check.h"
@@ -304,6 +305,86 @@ TEST(UniquePtr, MoveAssign) {
   }
 }
 
+// Swapping containers of unique pointers should work fine, with no
+// leaks, despite the fact that unique pointers are trivially relocatable but
+// not trivially destructible.
+// TODO(absl-team): Using unique_ptr here is technically correct, but
+// a trivially relocatable struct would be less semantically confusing.
+TEST(UniquePtr, Swap) {
+  for (size_t size1 = 0; size1 < 5; ++size1) {
+    for (size_t size2 = 0; size2 < 5; ++size2) {
+      absl::InlinedVector<std::unique_ptr<size_t>, 2> a;
+      absl::InlinedVector<std::unique_ptr<size_t>, 2> b;
+      for (size_t i = 0; i < size1; ++i) {
+        a.push_back(std::make_unique<size_t>(i + 10));
+      }
+      for (size_t i = 0; i < size2; ++i) {
+        b.push_back(std::make_unique<size_t>(i + 20));
+      }
+      a.swap(b);
+      ASSERT_THAT(a, SizeIs(size2));
+      ASSERT_THAT(b, SizeIs(size1));
+      for (size_t i = 0; i < a.size(); ++i) {
+        ASSERT_THAT(a[i], Pointee(i + 20));
+      }
+      for (size_t i = 0; i < b.size(); ++i) {
+        ASSERT_THAT(b[i], Pointee(i + 10));
+      }
+    }
+  }
+}
+
+// Erasing from a container of unique pointers should work fine, with no
+// leaks, despite the fact that unique pointers are trivially relocatable but
+// not trivially destructible.
+// TODO(absl-team): Using unique_ptr here is technically correct, but
+// a trivially relocatable struct would be less semantically confusing.
+TEST(UniquePtr, EraseSingle) {
+  for (size_t size = 4; size < 16; ++size) {
+    absl::InlinedVector<std::unique_ptr<size_t>, 8> a;
+    for (size_t i = 0; i < size; ++i) {
+      a.push_back(std::make_unique<size_t>(i));
+    }
+    a.erase(a.begin());
+    ASSERT_THAT(a, SizeIs(size - 1));
+    for (size_t i = 0; i < size - 1; ++i) {
+      ASSERT_THAT(a[i], Pointee(i + 1));
+    }
+    a.erase(a.begin() + 2);
+    ASSERT_THAT(a, SizeIs(size - 2));
+    ASSERT_THAT(a[0], Pointee(1));
+    ASSERT_THAT(a[1], Pointee(2));
+    for (size_t i = 2; i < size - 2; ++i) {
+      ASSERT_THAT(a[i], Pointee(i + 2));
+    }
+  }
+}
+
+// Erasing from a container of unique pointers should work fine, with no
+// leaks, despite the fact that unique pointers are trivially relocatable but
+// not trivially destructible.
+// TODO(absl-team): Using unique_ptr here is technically correct, but
+// a trivially relocatable struct would be less semantically confusing.
+TEST(UniquePtr, EraseMulti) {
+  for (size_t size = 5; size < 16; ++size) {
+    absl::InlinedVector<std::unique_ptr<size_t>, 8> a;
+    for (size_t i = 0; i < size; ++i) {
+      a.push_back(std::make_unique<size_t>(i));
+    }
+    a.erase(a.begin(), a.begin() + 2);
+    ASSERT_THAT(a, SizeIs(size - 2));
+    for (size_t i = 0; i < size - 2; ++i) {
+      ASSERT_THAT(a[i], Pointee(i + 2));
+    }
+    a.erase(a.begin() + 1, a.begin() + 3);
+    ASSERT_THAT(a, SizeIs(size - 4));
+    ASSERT_THAT(a[0], Pointee(2));
+    for (size_t i = 1; i < size - 4; ++i) {
+      ASSERT_THAT(a[i], Pointee(i + 4));
+    }
+  }
+}
+
 // At the end of this test loop, the elements between [erase_begin, erase_end)
 // should have reference counts == 0, and all others elements should have
 // reference counts == 1.
@@ -569,6 +650,33 @@ TEST(IntVec, Insert) {
   }
 }
 
+TEST(IntPairVec, Insert) {
+  for (size_t len = 0; len < 20; len++) {
+    for (ptrdiff_t pos = 0; pos <= static_cast<ptrdiff_t>(len); pos++) {
+      // Iterator range (C++20 forward iterator)
+      const std::forward_list<int> unzipped_input = {9999, 8888, 7777};
+      const absl::base_internal::Cpp20ForwardZipIterator<
+          std::forward_list<int>::const_iterator>
+          begin(unzipped_input.cbegin(), unzipped_input.cbegin());
+      const absl::base_internal::Cpp20ForwardZipIterator<
+          std::forward_list<int>::const_iterator>
+          end(unzipped_input.cend(), unzipped_input.cend());
+
+      std::vector<std::pair<int, int>> std_v;
+      absl::InlinedVector<std::pair<int, int>, 8> v;
+      for (size_t i = 0; i < len; ++i) {
+        std_v.emplace_back(i, i);
+        v.emplace_back(i, i);
+      }
+
+      std_v.insert(std_v.begin() + pos, begin, end);
+      auto it = v.insert(v.cbegin() + pos, begin, end);
+      EXPECT_THAT(v, ElementsAreArray(std_v));
+      EXPECT_EQ(it, v.cbegin() + pos);
+    }
+  }
+}
+
 TEST(RefCountedVec, InsertConstructorDestructor) {
   // Make sure the proper construction/destruction happen during insert
   // operations.
@@ -783,7 +891,9 @@ TEST(OverheadTest, Storage) {
   // The union should be absorbing some of the allocation bookkeeping overhead
   // in the larger vectors, leaving only the size_ field as overhead.
 
-  struct T { void* val; };
+  struct T {
+    void* val;
+  };
   size_t expected_overhead = sizeof(T);
 
   EXPECT_EQ((2 * expected_overhead),
@@ -1108,6 +1218,7 @@ TYPED_TEST_P(InstanceTest, CountConstructorsDestructorsOnCopyConstruction) {
     tracker.ResetCopiesMovesSwaps();
     {  // Copy constructor should create 'len' more instances.
       InstanceVec v_copy(v);
+      EXPECT_EQ(v_copy.size(), v.size());
       EXPECT_EQ(tracker.instances(), len + len);
       EXPECT_EQ(tracker.copies(), len);
       EXPECT_EQ(tracker.moves(), 0);
@@ -1135,6 +1246,7 @@ TYPED_TEST_P(InstanceTest, CountConstructorsDestructorsOnMoveConstruction) {
     tracker.ResetCopiesMovesSwaps();
     {
       InstanceVec v_copy(std::move(v));
+      EXPECT_EQ(v_copy.size(), len);
       if (static_cast<size_t>(len) > inlined_capacity) {
         // Allocation is moved as a whole.
         EXPECT_EQ(tracker.instances(), len);
@@ -1665,61 +1777,80 @@ TEST(AllocatorSupportTest, CountAllocations) {
   using MyAlloc = CountingAllocator<int>;
   using AllocVec = absl::InlinedVector<int, 4, MyAlloc>;
   const int ia[] = {0, 1, 2, 3, 4, 5, 6, 7};
-  int64_t allocated = 0;
-  MyAlloc alloc(&allocated);
+  int64_t bytes_allocated = 0;
+  int64_t instance_count = 0;
+  MyAlloc alloc(&bytes_allocated, &instance_count);
   {
     AllocVec ABSL_ATTRIBUTE_UNUSED v(ia, ia + 4, alloc);
-    EXPECT_THAT(allocated, Eq(0));
+    EXPECT_THAT(bytes_allocated, Eq(0));
+    EXPECT_THAT(instance_count, Eq(4));
   }
-  EXPECT_THAT(allocated, Eq(0));
+  EXPECT_THAT(bytes_allocated, Eq(0));
+  EXPECT_THAT(instance_count, Eq(0));
   {
     AllocVec ABSL_ATTRIBUTE_UNUSED v(ia, ia + ABSL_ARRAYSIZE(ia), alloc);
-    EXPECT_THAT(allocated, Eq(static_cast<int64_t>(v.size() * sizeof(int))));
+    EXPECT_THAT(bytes_allocated,
+                Eq(static_cast<int64_t>(v.size() * sizeof(int))));
+    EXPECT_THAT(instance_count, Eq(static_cast<int64_t>(v.size())));
   }
-  EXPECT_THAT(allocated, Eq(0));
+  EXPECT_THAT(bytes_allocated, Eq(0));
+  EXPECT_THAT(instance_count, Eq(0));
   {
     AllocVec v(4, 1, alloc);
-    EXPECT_THAT(allocated, Eq(0));
+    EXPECT_THAT(bytes_allocated, Eq(0));
+    EXPECT_THAT(instance_count, Eq(4));
 
-    int64_t allocated2 = 0;
-    MyAlloc alloc2(&allocated2);
-    AllocVec v2(v, alloc2);
-    EXPECT_THAT(allocated2, Eq(0));
+    int64_t bytes_allocated2 = 0;
+    MyAlloc alloc2(&bytes_allocated2);
+    ABSL_ATTRIBUTE_UNUSED AllocVec v2(v, alloc2);
+    EXPECT_THAT(bytes_allocated2, Eq(0));
 
-    int64_t allocated3 = 0;
-    MyAlloc alloc3(&allocated3);
-    AllocVec v3(std::move(v), alloc3);
-    EXPECT_THAT(allocated3, Eq(0));
+    int64_t bytes_allocated3 = 0;
+    MyAlloc alloc3(&bytes_allocated3);
+    ABSL_ATTRIBUTE_UNUSED AllocVec v3(std::move(v), alloc3);
+    EXPECT_THAT(bytes_allocated3, Eq(0));
   }
-  EXPECT_THAT(allocated, 0);
+  EXPECT_THAT(bytes_allocated, Eq(0));
+  EXPECT_THAT(instance_count, Eq(0));
   {
     AllocVec v(8, 2, alloc);
-    EXPECT_THAT(allocated, Eq(static_cast<int64_t>(v.size() * sizeof(int))));
+    EXPECT_THAT(bytes_allocated,
+                Eq(static_cast<int64_t>(v.size() * sizeof(int))));
+    EXPECT_THAT(instance_count, Eq(static_cast<int64_t>(v.size())));
 
-    int64_t allocated2 = 0;
-    MyAlloc alloc2(&allocated2);
+    int64_t bytes_allocated2 = 0;
+    MyAlloc alloc2(&bytes_allocated2);
     AllocVec v2(v, alloc2);
-    EXPECT_THAT(allocated2, Eq(static_cast<int64_t>(v2.size() * sizeof(int))));
+    EXPECT_THAT(bytes_allocated2,
+                Eq(static_cast<int64_t>(v2.size() * sizeof(int))));
 
-    int64_t allocated3 = 0;
-    MyAlloc alloc3(&allocated3);
+    int64_t bytes_allocated3 = 0;
+    MyAlloc alloc3(&bytes_allocated3);
     AllocVec v3(std::move(v), alloc3);
-    EXPECT_THAT(allocated3, Eq(static_cast<int64_t>(v3.size() * sizeof(int))));
+    EXPECT_THAT(bytes_allocated3,
+                Eq(static_cast<int64_t>(v3.size() * sizeof(int))));
   }
-  EXPECT_EQ(allocated, 0);
+  EXPECT_EQ(bytes_allocated, 0);
+  EXPECT_EQ(instance_count, 0);
   {
     // Test shrink_to_fit deallocations.
     AllocVec v(8, 2, alloc);
-    EXPECT_EQ(allocated, static_cast<int64_t>(8 * sizeof(int)));
+    EXPECT_EQ(bytes_allocated, static_cast<int64_t>(8 * sizeof(int)));
+    EXPECT_EQ(instance_count, 8);
     v.resize(5);
-    EXPECT_EQ(allocated, static_cast<int64_t>(8 * sizeof(int)));
+    EXPECT_EQ(bytes_allocated, static_cast<int64_t>(8 * sizeof(int)));
+    EXPECT_EQ(instance_count, 5);
     v.shrink_to_fit();
-    EXPECT_EQ(allocated, static_cast<int64_t>(5 * sizeof(int)));
+    EXPECT_EQ(bytes_allocated, static_cast<int64_t>(5 * sizeof(int)));
+    EXPECT_EQ(instance_count, 5);
     v.resize(4);
-    EXPECT_EQ(allocated, static_cast<int64_t>(5 * sizeof(int)));
+    EXPECT_EQ(bytes_allocated, static_cast<int64_t>(5 * sizeof(int)));
+    EXPECT_EQ(instance_count, 4);
     v.shrink_to_fit();
-    EXPECT_EQ(allocated, 0);
+    EXPECT_EQ(bytes_allocated, 0);
+    EXPECT_EQ(instance_count, 4);
   }
+  EXPECT_EQ(instance_count, 0);
 }
 
 TEST(AllocatorSupportTest, SwapBothAllocated) {

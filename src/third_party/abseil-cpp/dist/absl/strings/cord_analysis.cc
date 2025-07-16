@@ -14,23 +14,17 @@
 
 #include "absl/strings/cord_analysis.h"
 
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <unordered_set>
 
-#include "absl/base/attributes.h"
 #include "absl/base/config.h"
-#include "absl/container/inlined_vector.h"
+#include "absl/base/nullability.h"
 #include "absl/strings/internal/cord_data_edge.h"
 #include "absl/strings/internal/cord_internal.h"
 #include "absl/strings/internal/cord_rep_btree.h"
 #include "absl/strings/internal/cord_rep_crc.h"
-#include "absl/strings/internal/cord_rep_flat.h"
-#include "absl/strings/internal/cord_rep_ring.h"
-//
-#include "absl/base/macros.h"
-#include "absl/base/port.h"
-#include "absl/functional/function_ref.h"
 
 namespace absl {
 ABSL_NAMESPACE_BEGIN
@@ -45,13 +39,15 @@ enum class Mode { kFairShare, kTotal, kTotalMorePrecise };
 template <Mode mode>
 struct CordRepRef {
   // Instantiates a CordRepRef instance.
-  explicit CordRepRef(const CordRep* r) : rep(r) {}
+  explicit CordRepRef(const CordRep* absl_nonnull r) : rep(r) {}
 
   // Creates a child reference holding the provided child.
   // Overloaded to add cumulative reference count for kFairShare.
-  CordRepRef Child(const CordRep* child) const { return CordRepRef(child); }
+  CordRepRef Child(const CordRep* absl_nonnull child) const {
+    return CordRepRef(child);
+  }
 
-  const CordRep* rep;
+  const CordRep* absl_nonnull rep;
 };
 
 // RawUsage holds the computed total number of bytes.
@@ -70,11 +66,10 @@ template <>
 struct RawUsage<Mode::kTotalMorePrecise> {
   size_t total = 0;
   // TODO(b/289250880): Replace this with a flat_hash_set.
-  std::unordered_set<const CordRep*> counted;
+  std::unordered_set<const CordRep* absl_nonnull> counted;
 
   void Add(size_t size, CordRepRef<Mode::kTotalMorePrecise> repref) {
-    if (counted.find(repref.rep) == counted.end()) {
-      counted.insert(repref.rep);
+    if (counted.insert(repref.rep).second) {
       total += size;
     }
   }
@@ -95,15 +90,15 @@ double MaybeDiv(double d, refcount_t refcount) {
 template <>
 struct CordRepRef<Mode::kFairShare> {
   // Creates a CordRepRef with the provided rep and top (parent) fraction.
-  explicit CordRepRef(const CordRep* r, double frac = 1.0)
+  explicit CordRepRef(const CordRep* absl_nonnull r, double frac = 1.0)
       : rep(r), fraction(MaybeDiv(frac, r->refcount.Get())) {}
 
   // Returns a CordRepRef with a fraction of `this->fraction / child.refcount`
-  CordRepRef Child(const CordRep* child) const {
+  CordRepRef Child(const CordRep* absl_nonnull child) const {
     return CordRepRef(child, fraction);
   }
 
-  const CordRep* rep;
+  const CordRep* absl_nonnull rep;
   double fraction;
 };
 
@@ -138,16 +133,6 @@ void AnalyzeDataEdge(CordRepRef<mode> rep, RawUsage<mode>& raw_usage) {
   raw_usage.Add(size, rep);
 }
 
-// Computes the memory size of the provided Ring tree.
-template <Mode mode>
-void AnalyzeRing(CordRepRef<mode> rep, RawUsage<mode>& raw_usage) {
-  const CordRepRing* ring = rep.rep->ring();
-  raw_usage.Add(CordRepRing::AllocSize(ring->capacity()), rep);
-  ring->ForEach([&](CordRepRing::index_type pos) {
-    AnalyzeDataEdge(rep.Child(ring->entry_child(pos)), raw_usage);
-  });
-}
-
 // Computes the memory size of the provided Btree tree.
 template <Mode mode>
 void AnalyzeBtree(CordRepRef<mode> rep, RawUsage<mode>& raw_usage) {
@@ -165,7 +150,7 @@ void AnalyzeBtree(CordRepRef<mode> rep, RawUsage<mode>& raw_usage) {
 }
 
 template <Mode mode>
-size_t GetEstimatedUsage(const CordRep* rep) {
+size_t GetEstimatedUsage(const CordRep* absl_nonnull rep) {
   // Zero initialized memory usage totals.
   RawUsage<mode> raw_usage;
 
@@ -175,6 +160,9 @@ size_t GetEstimatedUsage(const CordRep* rep) {
   // Consume the top level CRC node if present.
   if (repref.rep->tag == CRC) {
     raw_usage.Add(sizeof(CordRepCrc), repref);
+    if (repref.rep->crc()->child == nullptr) {
+      return static_cast<size_t>(raw_usage.total);
+    }
     repref = repref.Child(repref.rep->crc()->child);
   }
 
@@ -182,8 +170,6 @@ size_t GetEstimatedUsage(const CordRep* rep) {
     AnalyzeDataEdge(repref, raw_usage);
   } else if (repref.rep->tag == BTREE) {
     AnalyzeBtree(repref, raw_usage);
-  } else if (repref.rep->tag == RING) {
-    AnalyzeRing(repref, raw_usage);
   } else {
     assert(false);
   }
@@ -193,15 +179,15 @@ size_t GetEstimatedUsage(const CordRep* rep) {
 
 }  // namespace
 
-size_t GetEstimatedMemoryUsage(const CordRep* rep) {
+size_t GetEstimatedMemoryUsage(const CordRep* absl_nonnull rep) {
   return GetEstimatedUsage<Mode::kTotal>(rep);
 }
 
-size_t GetEstimatedFairShareMemoryUsage(const CordRep* rep) {
+size_t GetEstimatedFairShareMemoryUsage(const CordRep* absl_nonnull rep) {
   return GetEstimatedUsage<Mode::kFairShare>(rep);
 }
 
-size_t GetMorePreciseMemoryUsage(const CordRep* rep) {
+size_t GetMorePreciseMemoryUsage(const CordRep* absl_nonnull rep) {
   return GetEstimatedUsage<Mode::kTotalMorePrecise>(rep);
 }
 

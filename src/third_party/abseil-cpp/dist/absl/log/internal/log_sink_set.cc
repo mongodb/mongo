@@ -35,6 +35,7 @@
 #include "absl/base/config.h"
 #include "absl/base/internal/raw_logging.h"
 #include "absl/base/log_severity.h"
+#include "absl/base/no_destructor.h"
 #include "absl/base/thread_annotations.h"
 #include "absl/cleanup/cleanup.h"
 #include "absl/log/globals.h"
@@ -168,17 +169,16 @@ class GlobalLogSinkSet final {
 #if defined(__myriad2__) || defined(__Fuchsia__)
     // myriad2 and Fuchsia do not log to stderr by default.
 #else
-    static StderrLogSink* stderr_log_sink = new StderrLogSink;
-    AddLogSink(stderr_log_sink);
+    static absl::NoDestructor<StderrLogSink> stderr_log_sink;
+    AddLogSink(stderr_log_sink.get());
 #endif
 #ifdef __ANDROID__
-    static AndroidLogSink* android_log_sink = new AndroidLogSink;
-    AddLogSink(android_log_sink);
+    static absl::NoDestructor<AndroidLogSink> android_log_sink;
+    AddLogSink(android_log_sink.get());
 #endif
 #if defined(_WIN32)
-    static WindowsDebuggerLogSink* debugger_log_sink =
-        new WindowsDebuggerLogSink;
-    AddLogSink(debugger_log_sink);
+    static absl::NoDestructor<WindowsDebuggerLogSink> debugger_log_sink;
+    AddLogSink(debugger_log_sink.get());
 #endif  // !defined(_WIN32)
   }
 
@@ -268,7 +268,7 @@ class GlobalLogSinkSet final {
 
 // Returns reference to the global LogSinks set.
 GlobalLogSinkSet& GlobalSinks() {
-  static GlobalLogSinkSet* global_sinks = new GlobalLogSinkSet;
+  static absl::NoDestructor<GlobalLogSinkSet> global_sinks;
   return *global_sinks;
 }
 

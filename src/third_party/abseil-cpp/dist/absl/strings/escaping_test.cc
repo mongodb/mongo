@@ -15,17 +15,20 @@
 #include "absl/strings/escaping.h"
 
 #include <array>
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <initializer_list>
 #include <memory>
+#include <string>
 #include <vector>
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/container/fixed_array.h"
+#include "absl/log/check.h"
 #include "absl/strings/str_cat.h"
 
 #include "absl/strings/internal/escaping_test_common.h"
+#include "absl/strings/string_view.h"
 
 namespace {
 
@@ -166,15 +169,25 @@ TEST(Unescape, BasicFunction) {
     EXPECT_TRUE(absl::CUnescape(val.escaped, &out));
     EXPECT_EQ(out, val.unescaped);
   }
-  std::string bad[] = {"\\u1",         // too short
-                       "\\U1",         // too short
-                       "\\Uffffff",    // exceeds 0x10ffff (largest Unicode)
-                       "\\U00110000",  // exceeds 0x10ffff (largest Unicode)
-                       "\\uD835",      // surrogate character (D800-DFFF)
-                       "\\U0000DD04",  // surrogate character (D800-DFFF)
-                       "\\777",        // exceeds 0xff
-                       "\\xABCD"};     // exceeds 0xff
-  for (const std::string& e : bad) {
+  constexpr absl::string_view bad[] = {
+      "\\u1",         // too short
+      "\\U1",         // too short
+      "\\Uffffff",    // exceeds 0x10ffff (largest Unicode)
+      "\\U00110000",  // exceeds 0x10ffff (largest Unicode)
+      "\\uD835",      // surrogate character (D800-DFFF)
+      "\\U0000DD04",  // surrogate character (D800-DFFF)
+      "\\777",        // exceeds 0xff
+      "\\xABCD",      // exceeds 0xff
+      "endswith\\",   // ends with "\"
+      "endswith\\x",  // ends with "\x"
+      "endswith\\X",  // ends with "\X"
+      "\\x.2345678",  // non-hex follows "\x"
+      "\\X.2345678",  // non-hex follows "\X"
+      "\\u.2345678",  // non-hex follows "\U"
+      "\\U.2345678",  // non-hex follows "\U"
+      "\\.unknown",   // unknown escape sequence
+  };
+  for (const auto e : bad) {
     std::string error;
     std::string out;
     EXPECT_FALSE(absl::CUnescape(e, &out, &error));
@@ -684,6 +697,42 @@ TEST(Base64, DISABLED_HugeData) {
   std::string unescaped;
   EXPECT_TRUE(absl::Base64Unescape(escaped, &unescaped));
   EXPECT_EQ(huge, unescaped);
+}
+
+TEST(Escaping, HexStringToBytesBackToHex) {
+  std::string bytes, hex;
+
+  constexpr absl::string_view kTestHexLower =  "1c2f0032f40123456789abcdef";
+  constexpr absl::string_view kTestHexUpper =  "1C2F0032F40123456789ABCDEF";
+  constexpr absl::string_view kTestBytes = absl::string_view(
+      "\x1c\x2f\x00\x32\xf4\x01\x23\x45\x67\x89\xab\xcd\xef", 13);
+
+  EXPECT_TRUE(absl::HexStringToBytes(kTestHexLower, &bytes));
+  EXPECT_EQ(bytes, kTestBytes);
+
+  EXPECT_TRUE(absl::HexStringToBytes(kTestHexUpper, &bytes));
+  EXPECT_EQ(bytes, kTestBytes);
+
+  hex = absl::BytesToHexString(kTestBytes);
+  EXPECT_EQ(hex, kTestHexLower);
+
+  // Same buffer.
+  // We do not care if this works since we do not promise it in the contract.
+  // The purpose of this test is to to see if the program will crash or if
+  // sanitizers will catch anything.
+  bytes = std::string(kTestHexUpper);
+  (void)absl::HexStringToBytes(bytes, &bytes);
+
+  // Length not a multiple of two.
+  EXPECT_FALSE(absl::HexStringToBytes("1c2f003", &bytes));
+
+  // Not hex.
+  EXPECT_FALSE(absl::HexStringToBytes("1c2f00ft", &bytes));
+
+  // Empty input.
+  bytes = "abc";
+  EXPECT_TRUE(absl::HexStringToBytes("", &bytes));
+  EXPECT_EQ("", bytes);  // Results in empty output.
 }
 
 TEST(HexAndBack, HexStringToBytes_and_BytesToHexString) {

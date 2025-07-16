@@ -16,7 +16,11 @@
 
 #if !defined(_WIN32) || defined(__MINGW32__)
 #include <pthread.h>
+#ifndef __wasi__
+// WASI does not provide this header, either way we disable use
+// of signals with it below.
 #include <signal.h>
+#endif
 #endif
 
 #include <atomic>
@@ -80,10 +84,12 @@ void SetCurrentThreadIdentity(ThreadIdentity* identity,
   absl::call_once(init_thread_identity_key_once, AllocateThreadIdentityKey,
                   reclaimer);
 
-#if defined(__EMSCRIPTEN__) || defined(__MINGW32__) || defined(__hexagon__)
-  // Emscripten and MinGW pthread implementations does not support signals.
-  // See https://kripken.github.io/emscripten-site/docs/porting/pthreads.html
-  // for more information.
+#if defined(__wasi__) || defined(__EMSCRIPTEN__) || defined(__MINGW32__) || \
+    defined(__hexagon__)
+  // Emscripten, WASI and MinGW pthread implementations does not support
+  // signals. See
+  // https://kripken.github.io/emscripten-site/docs/porting/pthreads.html for
+  // more information.
   pthread_setspecific(thread_identity_pthread_key,
                       reinterpret_cast<void*>(identity));
 #else

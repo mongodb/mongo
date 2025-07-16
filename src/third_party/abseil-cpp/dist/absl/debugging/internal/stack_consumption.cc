@@ -185,4 +185,22 @@ int GetSignalHandlerStackConsumption(void (*signal_handler)(int)) {
 ABSL_NAMESPACE_END
 }  // namespace absl
 
+#else
+
+// https://github.com/abseil/abseil-cpp/issues/1465
+// CMake builds on Apple platforms error when libraries are empty.
+// Our CMake configuration can avoid this error on header-only libraries,
+// but since this library is conditionally empty, including a single
+// variable is an easy workaround.
+#ifdef __APPLE__
+namespace absl {
+ABSL_NAMESPACE_BEGIN
+namespace debugging_internal {
+extern const char kAvoidEmptyStackConsumptionLibraryWarning;
+const char kAvoidEmptyStackConsumptionLibraryWarning = 0;
+}  // namespace debugging_internal
+ABSL_NAMESPACE_END
+}  // namespace absl
+#endif  // __APPLE__
+
 #endif  // ABSL_INTERNAL_HAVE_DEBUGGING_STACK_CONSUMPTION

@@ -38,6 +38,7 @@
 #include "absl/base/config.h"
 #include "absl/base/macros.h"
 #include "absl/base/port.h"
+#include "absl/types/compare.h"
 
 #if defined(_MSC_VER)
 // In very old versions of MSVC and when the /Zc:wchar_t flag is off, wchar_t is
@@ -215,7 +216,11 @@ class
   // Support for absl::Hash.
   template <typename H>
   friend H AbslHashValue(H h, uint128 v) {
+#if defined(ABSL_HAVE_INTRINSIC_INT128)
+    return H::combine(std::move(h), static_cast<unsigned __int128>(v));
+#else
     return H::combine(std::move(h), Uint128High64(v), Uint128Low64(v));
+#endif
   }
 
   // Support for absl::StrCat() etc.
@@ -244,11 +249,6 @@ class
 #endif  // byte order
 };
 
-// Prefer to use the constexpr `Uint128Max()`.
-//
-// TODO(absl-team) deprecate kuint128max once migration tool is released.
-ABSL_DLL extern const uint128 kuint128max;
-
 // allow uint128 to be logged
 std::ostream& operator<<(std::ostream& os, uint128 v);
 
@@ -274,7 +274,9 @@ class numeric_limits<absl::uint128> {
   static constexpr bool has_infinity = false;
   static constexpr bool has_quiet_NaN = false;
   static constexpr bool has_signaling_NaN = false;
+  ABSL_INTERNAL_DISABLE_DEPRECATED_DECLARATION_WARNING
   static constexpr float_denorm_style has_denorm = denorm_absent;
+  ABSL_INTERNAL_RESTORE_DEPRECATED_DECLARATION_WARNING
   static constexpr bool has_denorm_loss = false;
   static constexpr float_round_style round_style = round_toward_zero;
   static constexpr bool is_iec559 = false;
@@ -460,7 +462,11 @@ class int128 {
   // Support for absl::Hash.
   template <typename H>
   friend H AbslHashValue(H h, int128 v) {
+#if defined(ABSL_HAVE_INTRINSIC_INT128)
+    return H::combine(std::move(h), v.v_);
+#else
     return H::combine(std::move(h), Int128High64(v), Int128Low64(v));
+#endif
   }
 
   // Support for absl::StrCat() etc.
@@ -517,7 +523,9 @@ class numeric_limits<absl::int128> {
   static constexpr bool has_infinity = false;
   static constexpr bool has_quiet_NaN = false;
   static constexpr bool has_signaling_NaN = false;
+  ABSL_INTERNAL_DISABLE_DEPRECATED_DECLARATION_WARNING
   static constexpr float_denorm_style has_denorm = denorm_absent;
+  ABSL_INTERNAL_RESTORE_DEPRECATED_DECLARATION_WARNING
   static constexpr bool has_denorm_loss = false;
   static constexpr float_round_style round_style = round_toward_zero;
   static constexpr bool is_iec559 = false;
@@ -781,16 +789,20 @@ constexpr uint128::operator unsigned __int128() const {
 // Conversion operators to floating point types.
 
 inline uint128::operator float() const {
-  return static_cast<float>(lo_) + std::ldexp(static_cast<float>(hi_), 64);
+  // Note: This method might return Inf.
+  constexpr float pow_2_64 = 18446744073709551616.0f;
+  return static_cast<float>(lo_) + static_cast<float>(hi_) * pow_2_64;
 }
 
 inline uint128::operator double() const {
-  return static_cast<double>(lo_) + std::ldexp(static_cast<double>(hi_), 64);
+  constexpr double pow_2_64 = 18446744073709551616.0;
+  return static_cast<double>(lo_) + static_cast<double>(hi_) * pow_2_64;
 }
 
 inline uint128::operator long double() const {
+  constexpr long double pow_2_64 = 18446744073709551616.0L;
   return static_cast<long double>(lo_) +
-         std::ldexp(static_cast<long double>(hi_), 64);
+         static_cast<long double>(hi_) * pow_2_64;
 }
 
 // Comparison operators.
@@ -823,6 +835,36 @@ constexpr bool operator>(uint128 lhs, uint128 rhs) { return rhs < lhs; }
 constexpr bool operator<=(uint128 lhs, uint128 rhs) { return !(rhs < lhs); }
 
 constexpr bool operator>=(uint128 lhs, uint128 rhs) { return !(lhs < rhs); }
+
+#ifdef __cpp_impl_three_way_comparison
+constexpr absl::strong_ordering operator<=>(uint128 lhs, uint128 rhs) {
+#if defined(ABSL_HAVE_INTRINSIC_INT128)
+  if (auto lhs_128 = static_cast<unsigned __int128>(lhs),
+      rhs_128 = static_cast<unsigned __int128>(rhs);
+      lhs_128 < rhs_128) {
+    return absl::strong_ordering::less;
+  } else if (lhs_128 > rhs_128) {
+    return absl::strong_ordering::greater;
+  } else {
+    return absl::strong_ordering::equal;
+  }
+#else
+  if (uint64_t lhs_high = Uint128High64(lhs), rhs_high = Uint128High64(rhs);
+      lhs_high < rhs_high) {
+    return absl::strong_ordering::less;
+  } else if (lhs_high > rhs_high) {
+    return absl::strong_ordering::greater;
+  } else if (uint64_t lhs_low = Uint128Low64(lhs), rhs_low = Uint128Low64(rhs);
+             lhs_low < rhs_low) {
+    return absl::strong_ordering::less;
+  } else if (lhs_low > rhs_low) {
+    return absl::strong_ordering::greater;
+  } else {
+    return absl::strong_ordering::equal;
+  }
+#endif
+}
+#endif
 
 // Unary operators.
 

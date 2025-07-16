@@ -96,7 +96,8 @@ class LogEntry final {
   // LogEntry::verbosity()
   //
   // Returns this entry's verbosity, or `kNoVerbosityLevel` for a non-verbose
-  // entry.  Verbosity control is not available outside of Google yet.
+  // entry. Taken from the argument to `VLOG` or from
+  // `LOG(...).WithVerbosity(...)`.
   int verbosity() const { return verbose_level_; }
 
   // LogEntry::timestamp()

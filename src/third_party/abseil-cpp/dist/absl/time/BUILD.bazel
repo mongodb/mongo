@@ -21,7 +21,14 @@ load(
     "ABSL_TEST_COPTS",
 )
 
-package(default_visibility = ["//visibility:public"])
+package(
+    default_visibility = ["//visibility:public"],
+    features = [
+        "header_modules",
+        "layering_check",
+        "parse_headers",
+    ],
+)
 
 licenses(["notice"])
 
@@ -50,6 +57,7 @@ cc_library(
         "//absl/base:raw_logging_internal",
         "//absl/numeric:int128",
         "//absl/strings",
+        "//absl/strings:string_view",
         "//absl/time/internal/cctz:civil_time",
         "//absl/time/internal/cctz:time_zone",
         "//absl/types:optional",
@@ -58,7 +66,7 @@ cc_library(
 
 cc_library(
     name = "test_util",
-    testonly = 1,
+    testonly = True,
     srcs = ["internal/test_util.cc"],
     hdrs = ["internal/test_util.h"],
     copts = ABSL_DEFAULT_COPTS,
@@ -83,17 +91,19 @@ cc_test(
     ],
     copts = ABSL_TEST_COPTS,
     data = ["//absl/time/internal/cctz:zoneinfo"],
-    env = {"TZDIR": "absl/time/internal/cctz/testdata/zoneinfo"},
     linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":test_util",
         ":time",
         "//absl/base:config",
         "//absl/base:core_headers",
+        "//absl/hash:hash_testing",
         "//absl/numeric:int128",
+        "//absl/random",
         "//absl/strings:str_format",
         "//absl/time/internal/cctz:time_zone",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -117,12 +127,14 @@ cc_test(
         ":time",
         "//absl/flags:flag",
         "//absl/flags:reflection",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
     ],
 )
 
-cc_test(
+cc_binary(
     name = "time_benchmark",
+    testonly = True,
     srcs = [
         "civil_time_benchmark.cc",
         "clock_benchmark.cc",
@@ -132,7 +144,6 @@ cc_test(
     ],
     copts = ABSL_TEST_COPTS,
     data = ["//absl/time/internal/cctz:zoneinfo"],
-    env = {"TZDIR": "absl/time/internal/cctz/testdata/zoneinfo"},
     linkopts = ABSL_DEFAULT_LINKOPTS,
     tags = [
         "benchmark",
@@ -144,6 +155,6 @@ cc_test(
         "//absl/base:core_headers",
         "//absl/flags:flag",
         "//absl/hash",
-        "@com_github_google_benchmark//:benchmark_main",
+        "@google_benchmark//:benchmark_main",
     ],
 )

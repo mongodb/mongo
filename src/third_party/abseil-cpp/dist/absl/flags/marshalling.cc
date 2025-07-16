@@ -247,6 +247,14 @@ bool AbslParseFlag(absl::string_view text, absl::LogSeverity* dst,
     *err = "no value provided";
     return false;
   }
+  if (absl::EqualsIgnoreCase(text, "dfatal")) {
+    *dst = absl::kLogDebugFatal;
+    return true;
+  }
+  if (absl::EqualsIgnoreCase(text, "klogdebugfatal")) {
+    *dst = absl::kLogDebugFatal;
+    return true;
+  }
   if (text.front() == 'k' || text.front() == 'K') text.remove_prefix(1);
   if (absl::EqualsIgnoreCase(text, "info")) {
     *dst = absl::LogSeverity::kInfo;
@@ -269,7 +277,8 @@ bool AbslParseFlag(absl::string_view text, absl::LogSeverity* dst,
     *dst = static_cast<absl::LogSeverity>(numeric_value);
     return true;
   }
-  *err = "only integers and absl::LogSeverity enumerators are accepted";
+  *err =
+      "only integers, absl::LogSeverity enumerators, and DFATAL are accepted";
   return false;
 }
 
