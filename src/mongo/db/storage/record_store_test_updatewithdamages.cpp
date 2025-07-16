@@ -71,7 +71,11 @@ TEST(RecordStoreTest, UpdateWithDamages) {
         {
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 rec.data(),
+                                 rec.size(),
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             txn.commit();
@@ -137,7 +141,11 @@ TEST(RecordStoreTest, UpdateWithOverlappingDamageEvents) {
         {
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 rec.data(),
+                                 rec.size(),
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             txn.commit();
@@ -200,7 +208,11 @@ TEST(RecordStoreTest, UpdateWithOverlappingDamageEventsReversed) {
         {
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 rec.data(),
+                                 rec.size(),
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             txn.commit();
@@ -261,7 +273,11 @@ TEST(RecordStoreTest, UpdateWithNoDamages) {
         {
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 rec.data(),
+                                 rec.size(),
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             txn.commit();
@@ -314,7 +330,11 @@ TEST(RecordStoreTest, UpdateWithDamagesScalar) {
         {
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), obj0Rec.data(), obj0Rec.size(), Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 obj0Rec.data(),
+                                 obj0Rec.size(),
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             txn.commit();
@@ -404,7 +424,11 @@ TEST(RecordStoreTest, UpdateWithDamagesNested) {
         {
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), obj0Rec.data(), obj0Rec.size(), Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 obj0Rec.data(),
+                                 obj0Rec.size(),
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             txn.commit();
@@ -463,7 +487,11 @@ TEST(RecordStoreTest, UpdateWithDamagesArray) {
         {
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), obj0Rec.data(), obj0Rec.size(), Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 obj0Rec.data(),
+                                 obj0Rec.size(),
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             txn.commit();

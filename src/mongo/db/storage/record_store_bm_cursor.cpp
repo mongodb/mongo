@@ -67,7 +67,11 @@ struct Fixture {
         while (inserted < nToInsert) {
             StorageWriteTransaction txn(ru);
             for (int i = 0; i < 100; i++) {
-                ASSERT_OK(rs->insertRecord(opCtx.get(), data, strlen(data), Timestamp()));
+                ASSERT_OK(rs->insertRecord(opCtx.get(),
+                                           *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                           data,
+                                           strlen(data),
+                                           Timestamp()));
                 inserted++;
             }
             txn.commit();

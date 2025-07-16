@@ -461,8 +461,11 @@ StatusWith<MDBCatalog::EntryIdentifier> MDBCatalog::_addEntry(OperationContext* 
                                                               const std::string& ident,
                                                               const NamespaceString& nss,
                                                               const BSONObj& catalogEntryObj) {
-    StatusWith<RecordId> res =
-        _rs->insertRecord(opCtx, catalogEntryObj.objdata(), catalogEntryObj.objsize(), Timestamp());
+    StatusWith<RecordId> res = _rs->insertRecord(opCtx,
+                                                 *shard_role_details::getRecoveryUnit(opCtx),
+                                                 catalogEntryObj.objdata(),
+                                                 catalogEntryObj.objsize(),
+                                                 Timestamp());
     if (!res.isOK())
         return res.getStatus();
 
@@ -497,8 +500,11 @@ StatusWith<MDBCatalog::EntryIdentifier> MDBCatalog::_importEntry(OperationContex
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_IX));
 
     auto ident = catalogEntry["ident"].String();
-    StatusWith<RecordId> res =
-        _rs->insertRecord(opCtx, catalogEntry.objdata(), catalogEntry.objsize(), Timestamp());
+    StatusWith<RecordId> res = _rs->insertRecord(opCtx,
+                                                 *shard_role_details::getRecoveryUnit(opCtx),
+                                                 catalogEntry.objdata(),
+                                                 catalogEntry.objsize(),
+                                                 Timestamp());
     if (!res.isOK())
         return res.getStatus();
 

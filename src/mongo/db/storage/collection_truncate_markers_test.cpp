@@ -73,7 +73,11 @@ public:
             auto now = Date_t::now();
             auto ts = Timestamp(now);
             auto recordIdStatus = coll.getCollection()->getRecordStore()->insertRecord(
-                opCtx, insertedData.data(), insertedData.length(), ts);
+                opCtx,
+                *shard_role_details::getRecoveryUnit(opCtx),
+                insertedData.data(),
+                insertedData.length(),
+                ts);
             ASSERT_OK(recordIdStatus);
             auto recordId = recordIdStatus.getValue();
             testMarkers.updateCurrentMarkerAfterInsertOnCommit(
@@ -103,7 +107,12 @@ public:
         const auto insertedData = std::string(dataLength, 'a');
         WriteUnitOfWork wuow(opCtx);
         auto recordIdStatus = coll.getCollection()->getRecordStore()->insertRecord(
-            opCtx, recordId, insertedData.data(), insertedData.length(), timestampToUse);
+            opCtx,
+            *shard_role_details::getRecoveryUnit(opCtx),
+            recordId,
+            insertedData.data(),
+            insertedData.length(),
+            timestampToUse);
         ASSERT_OK(recordIdStatus);
         ASSERT_EQ(recordIdStatus.getValue(), recordId);
         auto now = Date_t::fromMillisSinceEpoch(timestampToUse.asInt64());
@@ -125,7 +134,11 @@ public:
         WriteUnitOfWork wuow(opCtx);
         for (int i = 0; i < numElements; i++) {
             auto recordIdStatus = coll.getCollection()->getRecordStore()->insertRecord(
-                opCtx, objToInsert.objdata(), objToInsert.objsize(), timestampToUse);
+                opCtx,
+                *shard_role_details::getRecoveryUnit(opCtx),
+                objToInsert.objdata(),
+                objToInsert.objsize(),
+                timestampToUse);
             ASSERT_OK(recordIdStatus);
         }
         wuow.commit();

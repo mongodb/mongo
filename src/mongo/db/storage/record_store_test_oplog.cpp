@@ -67,7 +67,11 @@ StatusWith<RecordId> insertBSON(ServiceContext::UniqueOperationContext& opCtx,
         *shard_role_details::getRecoveryUnit(opCtx.get()), rs.get(), opTime, false);
     if (!status.isOK())
         return StatusWith<RecordId>(status);
-    StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), opTime);
+    StatusWith<RecordId> res = rs->insertRecord(opCtx.get(),
+                                                *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                                obj.objdata(),
+                                                obj.objsize(),
+                                                opTime);
     if (res.isOK())
         txn.commit();
     return res;
@@ -82,7 +86,8 @@ RecordId _oplogOrderInsertOplog(OperationContext* opCtx,
         *shard_role_details::getRecoveryUnit(opCtx), rs.get(), opTime, false);
     ASSERT_OK(status);
     BSONObj obj = BSON("ts" << opTime);
-    StatusWith<RecordId> res = rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), opTime);
+    StatusWith<RecordId> res = rs->insertRecord(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), obj.objdata(), obj.objsize(), opTime);
     ASSERT_OK(res.getStatus());
     return res.getValue();
 }
@@ -103,14 +108,22 @@ TEST(RecordStoreTest, SeekOplog) {
         {
             StorageWriteTransaction txn(ru);
             BSONObj obj = BSON("not_ts" << Timestamp(2, 1));
-            ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), Timestamp())
+            ASSERT_EQ(rs->insertRecord(opCtx.get(),
+                                       *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                       obj.objdata(),
+                                       obj.objsize(),
+                                       Timestamp())
                           .getStatus(),
                       ErrorCodes::BadValue);
         }
         {
             StorageWriteTransaction txn(ru);
             BSONObj obj = BSON("ts" << "not a Timestamp");
-            ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), Timestamp())
+            ASSERT_EQ(rs->insertRecord(opCtx.get(),
+                                       *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                       obj.objdata(),
+                                       obj.objsize(),
+                                       Timestamp())
                           .getStatus(),
                       ErrorCodes::BadValue);
         }
@@ -537,7 +550,11 @@ TEST(RecordStoreTest, OplogVisibilityStandalone) {
             BSONObj obj = BSON("ts" << ts);
             // However, the insert is not timestamped in standalone mode.
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 obj.objdata(),
+                                 obj.objsize(),
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             id1 = res.getValue();
             StatusWith<RecordId> expectedId = record_id_helpers::keyForOptime(ts, KeyFormat::Long);

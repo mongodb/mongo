@@ -443,7 +443,11 @@ public:
             beginTransaction();
             for (int j = 0; j < 2; j++) {
                 auto doc = BSON("_id" << j);
-                ASSERT_OK(rs->insertRecord(&_opCtx, doc.objdata(), doc.objsize(), timestampToUse));
+                ASSERT_OK(rs->insertRecord(&_opCtx,
+                                           *shard_role_details::getRecoveryUnit(&_opCtx),
+                                           doc.objdata(),
+                                           doc.objsize(),
+                                           timestampToUse));
             }
             commitTransaction();
         }
@@ -501,7 +505,11 @@ public:
             beginTransaction();
             for (int j = 0; j < 2; j++) {
                 auto doc = BSON("_id" << j);
-                ASSERT_OK(rs->insertRecord(&_opCtx, doc.objdata(), doc.objsize(), timestampToUse));
+                ASSERT_OK(rs->insertRecord(&_opCtx,
+                                           *shard_role_details::getRecoveryUnit(&_opCtx),
+                                           doc.objdata(),
+                                           doc.objsize(),
+                                           timestampToUse));
             }
             commitTransaction();
         }
@@ -633,7 +641,11 @@ public:
             beginTransaction();
             rs->deleteRecord(&_opCtx, *shard_role_details::getRecoveryUnit(&_opCtx), id1);
             auto doc = BSON("_id" << 3);
-            ASSERT_OK(rs->insertRecord(&_opCtx, doc.objdata(), doc.objsize(), timestampToUse)
+            ASSERT_OK(rs->insertRecord(&_opCtx,
+                                       *shard_role_details::getRecoveryUnit(&_opCtx),
+                                       doc.objdata(),
+                                       doc.objsize(),
+                                       timestampToUse)
                           .getStatus());
             commitTransaction();
         }
@@ -2144,7 +2156,11 @@ public:
             // because there are duplicate keys, and not just because there are keys without
             // corresponding records.
             auto swRecordId = coll()->getRecordStore()->insertRecord(
-                &_opCtx, dupObj.objdata(), dupObj.objsize(), timestampToUse);
+                &_opCtx,
+                *shard_role_details::getRecoveryUnit(&_opCtx),
+                dupObj.objdata(),
+                dupObj.objsize(),
+                timestampToUse);
             ASSERT_OK(swRecordId);
             rid = swRecordId.getValue();
 
@@ -2409,7 +2425,11 @@ public:
             // checking. Inserting a record without inserting keys results in the duplicate record
             // to be missing from both unique indexes.
             auto swRecordId = coll()->getRecordStore()->insertRecord(
-                &_opCtx, dupObj.objdata(), dupObj.objsize(), timestampToUse);
+                &_opCtx,
+                *shard_role_details::getRecoveryUnit(&_opCtx),
+                dupObj.objdata(),
+                dupObj.objsize(),
+                timestampToUse);
             ASSERT_OK(swRecordId);
             rid = swRecordId.getValue();
 
@@ -2730,7 +2750,11 @@ public:
             // because there are duplicate keys, and not just because there are keys without
             // corresponding records.
             auto swRecordId = coll()->getRecordStore()->insertRecord(
-                &_opCtx, dupObj.objdata(), dupObj.objsize(), timestampToUse);
+                &_opCtx,
+                *shard_role_details::getRecoveryUnit(&_opCtx),
+                dupObj.objdata(),
+                dupObj.objsize(),
+                timestampToUse);
             ASSERT_OK(swRecordId);
             rid2 = swRecordId.getValue();
 
@@ -3373,7 +3397,11 @@ public:
             // because there are duplicate keys, and not just because there are keys without
             // corresponding records.
             auto swRecordId = coll()->getRecordStore()->insertRecord(
-                &_opCtx, dupObj.objdata(), dupObj.objsize(), timestampToUse);
+                &_opCtx,
+                *shard_role_details::getRecoveryUnit(&_opCtx),
+                dupObj.objdata(),
+                dupObj.objsize(),
+                timestampToUse);
             ASSERT_OK(swRecordId);
 
             commitTransaction();
@@ -3518,8 +3546,11 @@ public:
         RecordId rid;
         {
             beginTransaction();
-            auto swRecordId =
-                rs->insertRecord(&_opCtx, obj.objdata(), obj.objsize(), timestampToUse);
+            auto swRecordId = rs->insertRecord(&_opCtx,
+                                               *shard_role_details::getRecoveryUnit(&_opCtx),
+                                               obj.objdata(),
+                                               obj.objsize(),
+                                               timestampToUse);
             ASSERT_OK(swRecordId);
             rid = swRecordId.getValue();
             commitTransaction();
@@ -3595,9 +3626,21 @@ public:
         RecordStore* rs = coll()->getRecordStore();
         {
             beginTransaction();
-            ASSERT_OK(rs->insertRecord(&_opCtx, obj1.objdata(), 12ULL, timestampToUse));
-            ASSERT_OK(rs->insertRecord(&_opCtx, obj2.objdata(), 12ULL, timestampToUse));
-            ASSERT_OK(rs->insertRecord(&_opCtx, obj3.objdata(), 12ULL, timestampToUse));
+            ASSERT_OK(rs->insertRecord(&_opCtx,
+                                       *shard_role_details::getRecoveryUnit(&_opCtx),
+                                       obj1.objdata(),
+                                       12ULL,
+                                       timestampToUse));
+            ASSERT_OK(rs->insertRecord(&_opCtx,
+                                       *shard_role_details::getRecoveryUnit(&_opCtx),
+                                       obj2.objdata(),
+                                       12ULL,
+                                       timestampToUse));
+            ASSERT_OK(rs->insertRecord(&_opCtx,
+                                       *shard_role_details::getRecoveryUnit(&_opCtx),
+                                       obj3.objdata(),
+                                       12ULL,
+                                       timestampToUse));
             commitTransaction();
         }
         releaseDb();
@@ -4350,7 +4393,12 @@ public:
         RecordId rid({OID::gen().view().view(), OID::kOIDSize});
         {
             beginTransaction();
-            ASSERT_OK(rs->insertRecord(&_opCtx, rid, obj.objdata(), obj.objsize(), timestampToUse));
+            ASSERT_OK(rs->insertRecord(&_opCtx,
+                                       *shard_role_details::getRecoveryUnit(&_opCtx),
+                                       rid,
+                                       obj.objdata(),
+                                       obj.objsize(),
+                                       timestampToUse));
             commitTransaction();
         }
         releaseDb();
@@ -4610,12 +4658,13 @@ public:
             // checking. Inserting a record and all of its keys ensures that validation fails
             // because there are duplicate keys, and not just because there are keys without
             // corresponding records.
-            auto swRecordId =
-                coll()->getRecordStore()->insertRecord(&_opCtx,
-                                                       record_id_helpers::keyForObj(secondDoc),
-                                                       secondDoc.objdata(),
-                                                       secondDoc.objsize(),
-                                                       timestampToUse);
+            auto swRecordId = coll()->getRecordStore()->insertRecord(
+                &_opCtx,
+                *shard_role_details::getRecoveryUnit(&_opCtx),
+                record_id_helpers::keyForObj(secondDoc),
+                secondDoc.objdata(),
+                secondDoc.objsize(),
+                timestampToUse);
             ASSERT_OK(swRecordId);
             commitTransaction();
 

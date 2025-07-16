@@ -124,11 +124,20 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
         {
             StorageWriteTransaction txn(ru);
 
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 "a",
+                                 2,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             id1 = res.getValue();
 
-            res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
+            res = rs->insertRecord(opCtx.get(),
+                                   *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                   "a",
+                                   2,
+                                   Timestamp());
             ASSERT_OK(res.getStatus());
             id2 = res.getValue();
 
@@ -183,11 +192,20 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
         {
             StorageWriteTransaction txn(ru);
 
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 "a",
+                                 2,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             id1 = res.getValue();
 
-            res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
+            res = rs->insertRecord(opCtx.get(),
+                                   *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                   "a",
+                                   2,
+                                   Timestamp());
             ASSERT_OK(res.getStatus());
             id2 = res.getValue();
 
@@ -239,7 +257,8 @@ RecordId oplogOrderInsertOplog(OperationContext* opCtx,
         *shard_role_details::getRecoveryUnit(opCtx), rs.get(), opTime, false);
     ASSERT_OK(status);
     BSONObj obj = BSON("ts" << opTime);
-    StatusWith<RecordId> res = rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), opTime);
+    StatusWith<RecordId> res = rs->insertRecord(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), obj.objdata(), obj.objsize(), opTime);
     ASSERT_OK(res.getStatus());
     return res.getValue();
 }
@@ -405,7 +424,8 @@ StatusWith<RecordId> insertBSONWithSize(
     if (!status.isOK()) {
         return StatusWith<RecordId>(status);
     }
-    StatusWith<RecordId> res = rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), opTime);
+    StatusWith<RecordId> res = rs->insertRecord(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), obj.objdata(), obj.objsize(), opTime);
     if (res.isOK()) {
         txn.commit();
     }
@@ -545,11 +565,13 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterNext) {
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
         StorageWriteTransaction txn(ru);
-        StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
+        StatusWith<RecordId> res = rs->insertRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), "a", 2, Timestamp());
         ASSERT_OK(res.getStatus());
         rid1 = res.getValue();
 
-        res = rs->insertRecord(opCtx.get(), "b", 2, Timestamp());
+        res = rs->insertRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), "b", 2, Timestamp());
         ASSERT_OK(res.getStatus());
 
         txn.commit();
@@ -587,11 +609,13 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
         StorageWriteTransaction txn(ru);
-        StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
+        StatusWith<RecordId> res = rs->insertRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), "a", 2, Timestamp());
         ASSERT_OK(res.getStatus());
         rid1 = res.getValue();
 
-        res = rs->insertRecord(opCtx.get(), "b", 2, Timestamp());
+        res = rs->insertRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), "b", 2, Timestamp());
         ASSERT_OK(res.getStatus());
 
         txn.commit();
@@ -682,8 +706,12 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     const auto data = "data";
     {
         StorageWriteTransaction txn(ru);
-        StatusWith<RecordId> s =
-            rs->insertRecord(opCtx.get(), rid, data, strlen(data), Timestamp());
+        StatusWith<RecordId> s = rs->insertRecord(opCtx.get(),
+                                                  *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                                  rid,
+                                                  data,
+                                                  strlen(data),
+                                                  Timestamp());
         ASSERT_TRUE(s.isOK());
         ASSERT_EQUALS(1, rs->numRecords());
         txn.commit();
@@ -723,7 +751,9 @@ TEST(WiredTigerRecordStoreTest, SizeInfoAccurateAfterRollbackWithDelete) {
 
     {
         StorageWriteTransaction txn(ru);
-        rid = rs->insertRecord(ctx.get(), "a", 2, Timestamp()).getValue();
+        rid = rs->insertRecord(
+                    ctx.get(), *shard_role_details::getRecoveryUnit(ctx.get()), "a", 2, Timestamp())
+                  .getValue();
         txn.commit();
     }
 
@@ -782,7 +812,13 @@ TEST(WiredTigerRecordStoreTest, LargestRecordIdSeenIsCorrectWhenGivenRecordIds) 
     {
         // Insert a single record with recordId 7.
         StorageWriteTransaction txn(ru);
-        rid = rs->insertRecord(ctx.get(), RecordId(7), "a", 2, Timestamp()).getValue();
+        rid = rs->insertRecord(ctx.get(),
+                               *shard_role_details::getRecoveryUnit(ctx.get()),
+                               RecordId(7),
+                               "a",
+                               2,
+                               Timestamp())
+                  .getValue();
         txn.commit();
     }
 
@@ -799,7 +835,10 @@ TEST(WiredTigerRecordStoreTest, LargestRecordIdSeenIsCorrectWhenGivenRecordIds) 
     recordsToInsert.push_back(Record{RecordId(13), RecordData()});
     {
         StorageWriteTransaction txn(ru);
-        ASSERT_OK(rs->insertRecords(ctx.get(), &recordsToInsert, timestamps));
+        ASSERT_OK(rs->insertRecords(ctx.get(),
+                                    *shard_role_details::getRecoveryUnit(ctx.get()),
+                                    &recordsToInsert,
+                                    timestamps));
         txn.commit();
     }
 
@@ -816,7 +855,10 @@ TEST(WiredTigerRecordStoreTest, LargestRecordIdSeenIsCorrectWhenGivenRecordIds) 
     recordsToInsert.push_back(Record{RecordId(20), RecordData()});
     {
         StorageWriteTransaction txn(ru);
-        ASSERT_OK(rs->insertRecords(ctx.get(), &recordsToInsert, timestamps));
+        ASSERT_OK(rs->insertRecords(ctx.get(),
+                                    *shard_role_details::getRecoveryUnit(ctx.get()),
+                                    &recordsToInsert,
+                                    timestamps));
         txn.commit();
     }
 

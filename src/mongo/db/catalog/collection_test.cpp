@@ -900,7 +900,11 @@ TEST_F(CatalogTestFixture, CappedVisibilityEmptyInitialState) {
     auto doInsert = [&](OperationContext* opCtx) -> RecordId {
         Lock::GlobalLock globalLock{opCtx, MODE_IX};
         std::string data = "data";
-        return uassertStatusOK(rs->insertRecord(opCtx, data.c_str(), data.size(), Timestamp()));
+        return uassertStatusOK(rs->insertRecord(opCtx,
+                                                *shard_role_details::getRecoveryUnit(opCtx),
+                                                data.c_str(),
+                                                data.size(),
+                                                Timestamp()));
     };
 
     auto longLivedClient = getServiceContext()->getService()->makeClient("longLived");
@@ -961,7 +965,11 @@ TEST_F(CatalogTestFixture, CappedVisibilityNonEmptyInitialState) {
     auto doInsert = [&](OperationContext* opCtx) -> RecordId {
         Lock::GlobalLock globalLock{opCtx, MODE_IX};
         std::string data = "data";
-        return uassertStatusOK(rs->insertRecord(opCtx, data.c_str(), data.size(), Timestamp()));
+        return uassertStatusOK(rs->insertRecord(opCtx,
+                                                *shard_role_details::getRecoveryUnit(opCtx),
+                                                data.c_str(),
+                                                data.size(),
+                                                Timestamp()));
     };
 
     auto longLivedClient = getServiceContext()->getService()->makeClient("longLived");
@@ -1091,7 +1099,11 @@ TEST_F(CollectionTest, BoundedSeek) {
     auto doInsert = [&](OperationContext* opCtx) -> RecordId {
         Lock::GlobalLock globalLock{opCtx, MODE_IX};
         std::string data = "data";
-        return uassertStatusOK(rs->insertRecord(opCtx, data.c_str(), data.size(), Timestamp()));
+        return uassertStatusOK(rs->insertRecord(opCtx,
+                                                *shard_role_details::getRecoveryUnit(opCtx),
+                                                data.c_str(),
+                                                data.size(),
+                                                Timestamp()));
     };
 
     // Insert 5 records and delete the first one.
@@ -1164,7 +1176,11 @@ TEST_F(CatalogTestFixture, CappedCursorYieldFirst) {
         WriteUnitOfWork wuow(operationContext());
         std::string data = "data";
         StatusWith<RecordId> res =
-            rs->insertRecord(operationContext(), data.c_str(), data.size(), Timestamp());
+            rs->insertRecord(operationContext(),
+                             *shard_role_details::getRecoveryUnit(operationContext()),
+                             data.c_str(),
+                             data.size(),
+                             Timestamp());
         ASSERT_OK(res.getStatus());
         recordId = res.getValue();
         wuow.commit();

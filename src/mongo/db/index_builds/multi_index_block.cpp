@@ -1229,7 +1229,11 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
 
     WriteUnitOfWork wuow(opCtx);
 
-    auto status = rs->rs()->insertRecord(opCtx, obj.objdata(), obj.objsize(), Timestamp());
+    auto status = rs->rs()->insertRecord(opCtx,
+                                         *shard_role_details::getRecoveryUnit(opCtx),
+                                         obj.objdata(),
+                                         obj.objsize(),
+                                         Timestamp());
     if (!status.isOK()) {
         LOGV2_ERROR(4841501,
                     "Index build: failed to write resumable state to disk",

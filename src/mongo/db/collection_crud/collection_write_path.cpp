@@ -323,7 +323,8 @@ Status insertDocumentsImpl(OperationContext* opCtx,
         timestamps.emplace_back(it->oplogSlot.getTimestamp());
     }
 
-    Status status = collection->getRecordStore()->insertRecords(opCtx, &records, timestamps);
+    Status status = collection->getRecordStore()->insertRecords(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), &records, timestamps);
 
     if (!status.isOK()) {
         if (auto extraInfo = status.extraInfo<DuplicateKeyErrorInfo>();
@@ -445,8 +446,13 @@ Status insertDocumentForBulkLoader(OperationContext* opCtx,
 
     // Using timestamp 0 for these inserts, which are non-oplog so we don't have an appropriate
     // timestamp to use.
-    StatusWith<RecordId> loc = collection->getRecordStore()->insertRecord(
-        opCtx, recordId, doc.objdata(), doc.objsize(), Timestamp());
+    StatusWith<RecordId> loc =
+        collection->getRecordStore()->insertRecord(opCtx,
+                                                   *shard_role_details::getRecoveryUnit(opCtx),
+                                                   recordId,
+                                                   doc.objdata(),
+                                                   doc.objsize(),
+                                                   Timestamp());
 
     if (!loc.isOK())
         return loc.getStatus();

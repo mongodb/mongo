@@ -242,7 +242,8 @@ TEST_F(KVEngineTestHarness, SimpleRS1) {
     {
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork uow(opCtx.get());
-        StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "abc", 4, Timestamp());
+        StatusWith<RecordId> res = rs->insertRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), "abc", 4, Timestamp());
         ASSERT_OK(res.getStatus());
         loc = res.getValue();
         uow.commit();
@@ -283,7 +284,12 @@ TEST_F(KVEngineTestHarness, Restart1) {
         {
             auto opCtx = _makeOperationContext(engine);
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "abc", 4, Timestamp());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 "abc",
+                                 4,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -378,7 +384,8 @@ TEST_F(KVEngineTestHarness, TemporaryRecordStoreSimple) {
     {
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork uow(opCtx.get());
-        StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "abc", 4, Timestamp());
+        StatusWith<RecordId> res = rs->insertRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), "abc", 4, Timestamp());
         ASSERT_OK(res.getStatus());
         loc = res.getValue();
         uow.commit();
@@ -423,18 +430,21 @@ TEST_F(KVEngineTestHarness, AllDurableTimestamp) {
 
     auto opCtx1 = opCtxs[0].second.get();
     WriteUnitOfWork uow1(opCtx1);
-    ASSERT_OK(rs->insertRecord(opCtx1, "abc", 4, t51));
+    ASSERT_OK(
+        rs->insertRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), "abc", 4, t51));
 
     ASSERT_EQ(engine->getAllDurableTimestamp(), Timestamp(StorageEngine::kMinimumTimestamp));
 
     auto opCtx2 = opCtxs[1].second.get();
     WriteUnitOfWork uow2(opCtx2);
-    ASSERT_OK(rs->insertRecord(opCtx2, "abc", 4, t61));
+    ASSERT_OK(
+        rs->insertRecord(opCtx2, *shard_role_details::getRecoveryUnit(opCtx2), "abc", 4, t61));
     uow2.commit();
 
     ASSERT_EQ(engine->getAllDurableTimestamp(), t51 - 1);
 
-    ASSERT_OK(rs->insertRecord(opCtx1, "abc", 4, t52));
+    ASSERT_OK(
+        rs->insertRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), "abc", 4, t52));
 
     ASSERT_EQ(engine->getAllDurableTimestamp(), t51 - 1);
 
@@ -470,7 +480,8 @@ TEST_F(KVEngineTestHarness, PinningOldestWithAnotherSession) {
     auto opCtx1 = opCtxs[0].second.get();
     Lock::GlobalLock globalLk1(opCtx1, MODE_IX);
     WriteUnitOfWork uow1(opCtx1);
-    StatusWith<RecordId> res = rs->insertRecord(opCtx1, "abc", 4, Timestamp(10, 10));
+    StatusWith<RecordId> res = rs->insertRecord(
+        opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), "abc", 4, Timestamp(10, 10));
     RecordId rid = res.getValue();
     uow1.commit();
 
@@ -537,7 +548,8 @@ TEST_F(KVEngineTestHarness, AllDurable) {
 
     auto opCtx1 = opCtxs[0].second.get();
     WriteUnitOfWork uow1(opCtx1);
-    auto swRid = rs->insertRecord(opCtx1, "abc", 4, kInsertTimestamp1);
+    auto swRid = rs->insertRecord(
+        opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), "abc", 4, kInsertTimestamp1);
     ASSERT_OK(swRid);
     uow1.commit();
 
@@ -545,14 +557,16 @@ TEST_F(KVEngineTestHarness, AllDurable) {
 
     auto opCtx2 = opCtxs[1].second.get();
     WriteUnitOfWork uow2(opCtx2);
-    swRid = rs->insertRecord(opCtx2, "abc", 4, kInsertTimestamp2);
+    swRid = rs->insertRecord(
+        opCtx2, *shard_role_details::getRecoveryUnit(opCtx2), "abc", 4, kInsertTimestamp2);
     ASSERT_OK(swRid);
 
     ASSERT_EQ(engine->getAllDurableTimestamp(), kInsertTimestamp1);
 
     auto opCtx3 = opCtxs[2].second.get();
     WriteUnitOfWork uow3(opCtx3);
-    swRid = rs->insertRecord(opCtx3, "abc", 4, kInsertTimestamp3);
+    swRid = rs->insertRecord(
+        opCtx3, *shard_role_details::getRecoveryUnit(opCtx3), "abc", 4, kInsertTimestamp3);
     ASSERT_OK(swRid);
     uow3.commit();
 
@@ -564,7 +578,8 @@ TEST_F(KVEngineTestHarness, AllDurable) {
 
     auto opCtx4 = opCtxs[3].second.get();
     WriteUnitOfWork uow4(opCtx4);
-    swRid = rs->insertRecord(opCtx4, "abc", 4, kInsertTimestamp4);
+    swRid = rs->insertRecord(
+        opCtx4, *shard_role_details::getRecoveryUnit(opCtx4), "abc", 4, kInsertTimestamp4);
     ASSERT_OK(swRid);
 
     ASSERT_EQ(engine->getAllDurableTimestamp(), kInsertTimestamp4 - 1);
@@ -612,7 +627,8 @@ TEST_F(KVEngineTestHarness, BasicTimestampSingle) {
         auto opCtx2 = opCtxs[1].second.get();
         Lock::GlobalLock globalLk(opCtx2, MODE_IX);
         WriteUnitOfWork wuow(opCtx2);
-        auto swRid = rs->insertRecord(opCtx2, "abc", 4, kInsertTimestamp);
+        auto swRid = rs->insertRecord(
+            opCtx2, *shard_role_details::getRecoveryUnit(opCtx2), "abc", 4, kInsertTimestamp);
         ASSERT_OK(swRid);
         rid = swRid.getValue();
         wuow.commit();
@@ -665,7 +681,8 @@ TEST_F(KVEngineTestHarness, BasicTimestampMultiple) {
         auto opCtx = _makeOperationContext(engine);
         Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
         WriteUnitOfWork wuow(opCtx.get());
-        auto swRid = rs->insertRecord(opCtx.get(), "abc", 4, t10);
+        auto swRid = rs->insertRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), "abc", 4, t10);
         ASSERT_OK(swRid);
         rid = swRid.getValue();
 
@@ -716,7 +733,8 @@ DEATH_TEST_REGEX_F(KVEngineTestHarness, SnapshotHidesVisibility, ".*item not fou
     auto opCtx1 = opCtxs[0].second.get();
     Lock::GlobalLock globalLk1(opCtx1, MODE_IX);
     WriteUnitOfWork uow1(opCtx1);
-    StatusWith<RecordId> res = rs->insertRecord(opCtx1, "abc", 4, Timestamp(10, 10));
+    StatusWith<RecordId> res = rs->insertRecord(
+        opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), "abc", 4, Timestamp(10, 10));
     ASSERT_OK(res);
     RecordId loc = res.getValue();
     uow1.commit();
@@ -783,15 +801,19 @@ TEST_F(KVEngineTestHarness, SingleReadWithConflictWithOplog) {
         WriteUnitOfWork uow(opCtx.get());
 
         // Insert into collectionRs.
-        StatusWith<RecordId> res = collectionRs->insertRecord(opCtx.get(), "abc", 4, t10);
+        StatusWith<RecordId> res = collectionRs->insertRecord(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), "abc", 4, t10);
         ASSERT_OK(res);
         locCollection = res.getValue();
 
         // Insert into oplogRs.
         auto t11Doc = BSON("ts" << t10);
 
-        ASSERT_EQ(invariant(oplogRs->insertRecord(
-                      opCtx.get(), t11Doc.objdata(), t11Doc.objsize(), Timestamp::min())),
+        ASSERT_EQ(invariant(oplogRs->insertRecord(opCtx.get(),
+                                                  *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                                  t11Doc.objdata(),
+                                                  t11Doc.objsize(),
+                                                  Timestamp::min())),
                   RecordId(10, 10));
         locOplog = RecordId(10, 10);
         uow.commit();
@@ -838,7 +860,11 @@ TEST_F(KVEngineTestHarness, PinningOldestTimestampWithReadConflict) {
 
     Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
     WriteUnitOfWork uow(opCtx.get());
-    StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "abc", 4, Timestamp(10, 10));
+    StatusWith<RecordId> res = rs->insertRecord(opCtx.get(),
+                                                *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                                "abc",
+                                                4,
+                                                Timestamp(10, 10));
     RecordId rid = res.getValue();
     uow.commit();
 
@@ -879,7 +905,12 @@ DEATH_TEST_REGEX_F(KVEngineTestHarness,
         engine->setOldestTimestamp(Timestamp(2, 2), false);
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork uow2(opCtx.get());
-        StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "abc", 4, Timestamp(1, 1));
+        StatusWith<RecordId> res =
+            rs->insertRecord(opCtx.get(),
+                             *shard_role_details::getRecoveryUnit(opCtx.get()),
+                             "abc",
+                             4,
+                             Timestamp(1, 1));
         uow2.commit();
     }
 }
@@ -911,7 +942,11 @@ TEST_F(KVEngineTestHarness, RollingBackToLastStable) {
     {
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork uow(opCtx.get());
-        auto res = rs->insertRecord(opCtx.get(), "abc", 4, Timestamp(1, 1));
+        auto res = rs->insertRecord(opCtx.get(),
+                                    *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                    "abc",
+                                    4,
+                                    Timestamp(1, 1));
         ASSERT_OK(res);
         ridA = res.getValue();
         uow.commit();
@@ -937,7 +972,12 @@ TEST_F(KVEngineTestHarness, RollingBackToLastStable) {
         // Insert a record after the stable timestamp.
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork uow(opCtx.get());
-        StatusWith<RecordId> swRid = rs->insertRecord(opCtx.get(), "def", 4, Timestamp(3, 3));
+        StatusWith<RecordId> swRid =
+            rs->insertRecord(opCtx.get(),
+                             *shard_role_details::getRecoveryUnit(opCtx.get()),
+                             "def",
+                             4,
+                             Timestamp(3, 3));
         ASSERT_OK(swRid);
         ridB = swRid.getValue();
         ASSERT_EQUALS(2, rs->numRecords());
@@ -998,7 +1038,11 @@ DEATH_TEST_REGEX_F(KVEngineTestHarness, CommitBehindStable, "Fatal assertion.*39
         // Committing at or behind the stable timestamp is not allowed.
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork uow(opCtx.get());
-        auto swRid = rs->insertRecord(opCtx.get(), "abc", 4, Timestamp(1, 1));
+        auto swRid = rs->insertRecord(opCtx.get(),
+                                      *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                      "abc",
+                                      4,
+                                      Timestamp(1, 1));
         uow.commit();
     }
 }

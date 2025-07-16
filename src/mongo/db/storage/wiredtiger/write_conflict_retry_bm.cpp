@@ -133,8 +133,12 @@ private:
         auto opCtx = harness->newOperationContext(client.get());
         Lock::GlobalLock lk(opCtx.get(), MODE_IS);
         WriteUnitOfWork uow(opCtx.get());
-        ASSERT_OK(rs->insertRecord(
-            opCtx.get(), RecordId(1), data.objdata(), data.objsize(), Timestamp()));
+        ASSERT_OK(rs->insertRecord(opCtx.get(),
+                                   *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                   RecordId(1),
+                                   data.objdata(),
+                                   data.objsize(),
+                                   Timestamp()));
         uow.commit();
 
         _threads.store(state.threads);

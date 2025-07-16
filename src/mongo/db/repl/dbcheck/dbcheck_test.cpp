@@ -190,8 +190,13 @@ TEST_F(DbCheckClusteredCollectionTest, DbCheckIdRecordIdMismatch) {
                                                      collection->getDefaultCollator()));
     auto ts = Timestamp();
     WriteUnitOfWork wuow(opCtx);
-    auto recordIdStatus = collection->getRecordStore()->insertRecord(
-        opCtx, mismatchedRecordId, doc.objdata(), doc.objsize(), ts);
+    auto recordIdStatus =
+        collection->getRecordStore()->insertRecord(opCtx,
+                                                   *shard_role_details::getRecoveryUnit(opCtx),
+                                                   mismatchedRecordId,
+                                                   doc.objdata(),
+                                                   doc.objsize(),
+                                                   ts);
     wuow.commit();
     ASSERT_OK(recordIdStatus);
 

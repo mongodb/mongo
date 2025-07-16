@@ -171,7 +171,12 @@ TEST_F(StorageEngineTest, TemporaryRecordStoreClustered) {
     const auto rid = RecordId(id);
     const auto data = "data";
     WriteUnitOfWork wuow(opCtx.get());
-    StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), rid, data, strlen(data), Timestamp());
+    StatusWith<RecordId> s = rs->insertRecord(opCtx.get(),
+                                              *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                              rid,
+                                              data,
+                                              strlen(data),
+                                              Timestamp());
     ASSERT_TRUE(s.isOK());
     wuow.commit();
 
@@ -249,8 +254,11 @@ protected:
                                                                                  KeyFormat::Long);
             BSONObj resInfo = makePretendResumeInfo(pretendSideTable, indexSpec);
             WriteUnitOfWork wuow(opCtx);
-            ASSERT_OK(
-                ret->rs()->insertRecord(opCtx, resInfo.objdata(), resInfo.objsize(), Timestamp()));
+            ASSERT_OK(ret->rs()->insertRecord(opCtx,
+                                              *shard_role_details::getRecoveryUnit(opCtx),
+                                              resInfo.objdata(),
+                                              resInfo.objsize(),
+                                              Timestamp()));
             wuow.commit();
         }
         ASSERT_TRUE(identExists(opCtx, ret->rs()->getIdent()));
@@ -488,8 +496,12 @@ TEST_F(StorageEngineTest, TemporaryRecordStoreDoesNotTrackSizeAdjustments) {
         const auto data = "data";
 
         WriteUnitOfWork wuow(opCtx.get());
-        StatusWith<RecordId> s =
-            rs->insertRecord(opCtx.get(), rid, data, strlen(data), Timestamp());
+        StatusWith<RecordId> s = rs->insertRecord(opCtx.get(),
+                                                  *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                                  rid,
+                                                  data,
+                                                  strlen(data),
+                                                  Timestamp());
         ASSERT_TRUE(s.isOK());
         wuow.commit();
 

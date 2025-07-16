@@ -107,10 +107,13 @@ void SkippedRecordTracker::record(OperationContext* opCtx, const RecordId& recor
     writeConflictRetry(
         opCtx, "recordSkippedRecordTracker", NamespaceString::kIndexBuildEntryNamespace, [&]() {
             WriteUnitOfWork wuow(opCtx);
-            uassertStatusOK(
-                _skippedRecordsTable->rs()
-                    ->insertRecord(opCtx, toInsert.objdata(), toInsert.objsize(), Timestamp::min())
-                    .getStatus());
+            uassertStatusOK(_skippedRecordsTable->rs()
+                                ->insertRecord(opCtx,
+                                               *shard_role_details::getRecoveryUnit(opCtx),
+                                               toInsert.objdata(),
+                                               toInsert.objsize(),
+                                               Timestamp::min())
+                                .getStatus());
             wuow.commit();
         });
 }

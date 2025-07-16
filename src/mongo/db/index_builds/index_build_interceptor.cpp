@@ -486,7 +486,8 @@ Status IndexBuildInterceptor::_finishSideWrite(OperationContext* opCtx,
     // By passing a vector of null timestamps, these inserts are not timestamped individually, but
     // rather with the timestamp of the owning operation.
     std::vector<Timestamp> timestamps(records.size());
-    return _sideWritesTable->rs()->insertRecords(opCtx, &records, timestamps);
+    return _sideWritesTable->rs()->insertRecords(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), &records, timestamps);
 }
 
 Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,

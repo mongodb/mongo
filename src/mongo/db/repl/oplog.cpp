@@ -235,7 +235,8 @@ Status insertDocumentsForOplog(OperationContext* opCtx,
                                const std::vector<Timestamp>& timestamps) {
     invariant(shard_role_details::getLocker(opCtx)->isWriteLocked());
 
-    Status status = oplogCollection->getRecordStore()->insertRecords(opCtx, records, timestamps);
+    Status status = oplogCollection->getRecordStore()->insertRecords(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), records, timestamps);
     if (!status.isOK())
         return status;
 

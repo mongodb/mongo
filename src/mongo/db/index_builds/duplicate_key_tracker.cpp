@@ -105,7 +105,11 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
     key.serializeWithoutRecordId(builder);
 
     auto status =
-        _keyConstraintsTable->rs()->insertRecord(opCtx, builder.buf(), builder.len(), Timestamp());
+        _keyConstraintsTable->rs()->insertRecord(opCtx,
+                                                 *shard_role_details::getRecoveryUnit(opCtx),
+                                                 builder.buf(),
+                                                 builder.len(),
+                                                 Timestamp());
     if (!status.isOK())
         return status.getStatus();
 

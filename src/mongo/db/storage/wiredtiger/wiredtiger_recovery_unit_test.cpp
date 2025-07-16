@@ -198,7 +198,8 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, NoOverlapReadSource) {
     RecordId rid1;
     {
         StorageWriteTransaction txn(*ru1);
-        StatusWith<RecordId> res = rs->insertRecord(opCtx1, str.c_str(), str.size() + 1, ts1);
+        StatusWith<RecordId> res = rs->insertRecord(
+            opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), str.c_str(), str.size() + 1, ts1);
         ASSERT_OK(res);
         txn.commit();
         rid1 = res.getValue();
@@ -223,8 +224,11 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, NoOverlapReadSource) {
         // creates a hole. kNoOverlap, which is a function of all_durable, will only be able to read
         // at the time immediately before.
         StorageWriteTransaction txn(*ru2);
-        StatusWith<RecordId> res =
-            rs->insertRecord(opCtx2, str.c_str(), str.size() + 1, Timestamp());
+        StatusWith<RecordId> res = rs->insertRecord(opCtx2,
+                                                    *shard_role_details::getRecoveryUnit(opCtx2),
+                                                    str.c_str(),
+                                                    str.size() + 1,
+                                                    Timestamp());
         ASSERT_OK(ru2->setTimestamp(ts2));
         ASSERT_OK(res);
         rid2 = res.getValue();
@@ -233,7 +237,12 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, NoOverlapReadSource) {
         // creates a "hole".
         {
             StorageWriteTransaction txn(*ru1);
-            StatusWith<RecordId> res = rs->insertRecord(opCtx1, str.c_str(), str.size() + 1, ts3);
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx1,
+                                 *shard_role_details::getRecoveryUnit(opCtx1),
+                                 str.c_str(),
+                                 str.size() + 1,
+                                 ts3);
             ASSERT_OK(res);
             txn.commit();
             rid3 = res.getValue();
@@ -688,7 +697,8 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, StorageStatsSubsequentTransactions) {
 
     // Insert a record.
     StorageWriteTransaction txn1(*ru1);
-    StatusWith<RecordId> s = rs->insertRecord(opCtx, "rec1", 4, Timestamp());
+    StatusWith<RecordId> s = rs->insertRecord(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), "rec1", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
     ASSERT_EQUALS(1, rs->numRecords());
 
@@ -724,7 +734,8 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsCached) {
 
     // Insert a record.
     StorageWriteTransaction txn(*ru1);
-    StatusWith<RecordId> s = rs->insertRecord(opCtx, "data", 4, Timestamp());
+    StatusWith<RecordId> s = rs->insertRecord(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), "data", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
     ASSERT_EQUALS(1, rs->numRecords());
     txn.commit();
@@ -1010,7 +1021,11 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CacheSizeEstimatesTransactionBytes) {
 
     // Write some data, now the txn is at least as large as the write.
     std::string data(1024, 'a');  // 1MB.
-    ASSERT_OK(rs->insertRecord(opCtx, data.c_str(), data.size(), Timestamp(13, 37)));
+    ASSERT_OK(rs->insertRecord(opCtx,
+                               *shard_role_details::getRecoveryUnit(opCtx),
+                               data.c_str(),
+                               data.size(),
+                               Timestamp(13, 37)));
     ASSERT_GTE(ru1->getCacheDirtyBytes(), data.size());
 
     // Rolling back returns us to zero.

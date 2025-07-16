@@ -72,22 +72,13 @@ public:
     void deleteRecord(OperationContext*, RecoveryUnit&, const RecordId&) final;
 
     Status insertRecords(OperationContext*,
-                         std::vector<Record>*,
-                         const std::vector<Timestamp>&) final;
-    Status insertRecords(OperationContext*,
                          RecoveryUnit&,
                          std::vector<Record>*,
                          const std::vector<Timestamp>&) final;
 
-    StatusWith<RecordId> insertRecord(OperationContext*,
-                                      const char* data,
-                                      int len,
-                                      Timestamp) final;
     StatusWith<RecordId> insertRecord(
         OperationContext*, RecoveryUnit&, const char* data, int len, Timestamp) final;
 
-    StatusWith<RecordId> insertRecord(
-        OperationContext*, const RecordId&, const char* data, int len, Timestamp) final;
     StatusWith<RecordId> insertRecord(OperationContext*,
                                       RecoveryUnit&,
                                       const RecordId&,

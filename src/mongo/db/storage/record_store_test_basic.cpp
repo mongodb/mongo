@@ -73,7 +73,11 @@ TEST(RecordStoreTest, Simple1) {
         {
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 s.c_str(),
+                                 s.size() + 1,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             loc1 = res.getValue();
             txn.commit();
@@ -108,7 +112,11 @@ TEST(RecordStoreTest, Simple1) {
         {
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 s.c_str(),
+                                 s.size() + 1,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             txn.commit();
         }
@@ -133,7 +141,11 @@ TEST(RecordStoreTest, Delete1) {
         {
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 s.c_str(),
+                                 s.size() + 1,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             txn.commit();
@@ -174,9 +186,17 @@ TEST(RecordStoreTest, Delete2) {
         {
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 s.c_str(),
+                                 s.size() + 1,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
-            res = rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp());
+            res = rs->insertRecord(opCtx.get(),
+                                   *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                   s.c_str(),
+                                   s.size() + 1,
+                                   Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             txn.commit();
@@ -222,7 +242,11 @@ TEST(RecordStoreTest, Update1) {
         {
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), s1.c_str(), s1.size() + 1, Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 s1.c_str(),
+                                 s1.size() + 1,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             txn.commit();
@@ -277,7 +301,11 @@ TEST(RecordStoreTest, UpdateInPlace1) {
         {
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), s1Rec.data(), s1Rec.size(), Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 s1Rec.data(),
+                                 s1Rec.size(),
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             txn.commit();
@@ -336,7 +364,11 @@ TEST(RecordStoreTest, Truncate1) {
         {
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 s.c_str(),
+                                 s.size() + 1,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             txn.commit();
@@ -382,7 +414,11 @@ TEST(RecordStoreTest, Cursor1) {
             StorageWriteTransaction txn(ru);
             for (int i = 0; i < N; i++) {
                 std::string s = str::stream() << "eliot" << i;
-                ASSERT_OK(rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp())
+                ASSERT_OK(rs->insertRecord(opCtx.get(),
+                                           *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                           s.c_str(),
+                                           s.size() + 1,
+                                           Timestamp())
                               .getStatus());
             }
             txn.commit();
@@ -429,9 +465,13 @@ TEST(RecordStoreTest, CursorRestoreForward) {
         StorageWriteTransaction txn(ru);
         std::string s = "test";
         for (int i = 1; i <= 3; i++) {
-            ASSERT_OK(
-                rs->insertRecord(opCtx.get(), RecordId(i), s.c_str(), s.size() + 1, Timestamp())
-                    .getStatus());
+            ASSERT_OK(rs->insertRecord(opCtx.get(),
+                                       *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                       RecordId(i),
+                                       s.c_str(),
+                                       s.size() + 1,
+                                       Timestamp())
+                          .getStatus());
         }
         txn.commit();
     }
@@ -473,9 +513,13 @@ TEST(RecordStoreTest, CursorRestoreReverse) {
         StorageWriteTransaction txn(ru);
         std::string s = "test";
         for (int i = 1; i <= 3; i++) {
-            ASSERT_OK(
-                rs->insertRecord(opCtx.get(), RecordId(i), s.c_str(), s.size() + 1, Timestamp())
-                    .getStatus());
+            ASSERT_OK(rs->insertRecord(opCtx.get(),
+                                       *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                       RecordId(i),
+                                       s.c_str(),
+                                       s.size() + 1,
+                                       Timestamp())
+                          .getStatus());
         }
         txn.commit();
     }
@@ -517,9 +561,13 @@ TEST(RecordStoreTest, CursorRestoreDeletedDoc) {
         StorageWriteTransaction txn(ru);
         std::string s = "test";
         for (int i = 1; i <= 3; i++) {
-            ASSERT_OK(
-                rs->insertRecord(opCtx.get(), RecordId(i), s.c_str(), s.size() + 1, Timestamp())
-                    .getStatus());
+            ASSERT_OK(rs->insertRecord(opCtx.get(),
+                                       *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                       RecordId(i),
+                                       s.c_str(),
+                                       s.size() + 1,
+                                       Timestamp())
+                          .getStatus());
         }
         txn.commit();
     }
@@ -586,9 +634,13 @@ TEST(RecordStoreTest, CursorSaveRestoreSeek) {
         StorageWriteTransaction txn(ru);
         std::string s = "test";
         for (int i = 1; i <= 2; i++) {
-            ASSERT_OK(
-                rs->insertRecord(opCtx.get(), RecordId(i), s.c_str(), s.size() + 1, Timestamp())
-                    .getStatus());
+            ASSERT_OK(rs->insertRecord(opCtx.get(),
+                                       *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                       RecordId(i),
+                                       s.c_str(),
+                                       s.size() + 1,
+                                       Timestamp())
+                          .getStatus());
         }
         txn.commit();
     }
@@ -622,9 +674,13 @@ TEST(RecordStoreTest, CursorSaveUnpositionedRestoreSeek) {
         StorageWriteTransaction txn(ru);
         std::string s = "test";
         for (int i = 1; i <= 2; i++) {
-            ASSERT_OK(
-                rs->insertRecord(opCtx.get(), RecordId(i), s.c_str(), s.size() + 1, Timestamp())
-                    .getStatus());
+            ASSERT_OK(rs->insertRecord(opCtx.get(),
+                                       *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                       RecordId(i),
+                                       s.c_str(),
+                                       s.size() + 1,
+                                       Timestamp())
+                          .getStatus());
         }
         txn.commit();
     }
@@ -670,7 +726,8 @@ TEST(RecordStoreTest, ClusteredRecordStore) {
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
     {
         StorageWriteTransaction txn(ru);
-        ASSERT_OK(rs->insertRecords(opCtx.get(), &records, timestamps));
+        ASSERT_OK(rs->insertRecords(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), &records, timestamps));
         txn.commit();
     }
 
@@ -800,7 +857,10 @@ TEST(RecordStoreTest, ClusteredCappedRecordStoreSeek) {
         std::vector<Record> recVec = {record};
 
         StorageWriteTransaction txn(ru);
-        ASSERT_OK(rs->insertRecords(opCtx.get(), &recVec, {timestamps[i]}));
+        ASSERT_OK(rs->insertRecords(opCtx.get(),
+                                    *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                    &recVec,
+                                    {timestamps[i]}));
         txn.commit();
 
         records.push_back(record);
@@ -846,7 +906,11 @@ DEATH_TEST_REGEX(RecordStoreTest, FailedRestoreDoesNotSetFlag, "Invariant failur
 
         char data[] = "data";
         StorageWriteTransaction txn(ru);
-        ASSERT_OK(rs->insertRecord(opCtx.get(), data, strlen(data) + 1, Timestamp()));
+        ASSERT_OK(rs->insertRecord(opCtx.get(),
+                                   *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                   data,
+                                   strlen(data) + 1,
+                                   Timestamp()));
         txn.commit();
 
         auto cursor = rs->getCursor(opCtx.get());

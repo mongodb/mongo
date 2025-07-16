@@ -121,7 +121,11 @@ public:
 
     RecordId insertRecord(OperationContext* opCtx, std::string contents = "abcd") {
         Lock::GlobalLock globalLock(opCtx, MODE_IX);
-        auto id = rs->insertRecord(opCtx, contents.c_str(), contents.length() + 1, _counter);
+        auto id = rs->insertRecord(opCtx,
+                                   *shard_role_details::getRecoveryUnit(opCtx),
+                                   contents.c_str(),
+                                   contents.length() + 1,
+                                   _counter);
         ASSERT_OK(id);
         return id.getValue();
     }

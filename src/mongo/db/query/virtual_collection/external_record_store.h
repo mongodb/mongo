@@ -122,12 +122,6 @@ public:
     }
 
     Status insertRecords(OperationContext*,
-                         std::vector<Record>*,
-                         const std::vector<Timestamp>&) final {
-        unimplementedTasserted();
-        return {ErrorCodes::Error::UnknownError, "Unknown error"};
-    }
-    Status insertRecords(OperationContext*,
                          RecoveryUnit&,
                          std::vector<Record>*,
                          const std::vector<Timestamp>&) final {
@@ -135,24 +129,12 @@ public:
         return {ErrorCodes::Error::UnknownError, "Unknown error"};
     }
 
-    StatusWith<RecordId> insertRecord(OperationContext*,
-                                      const char* data,
-                                      int len,
-                                      Timestamp) final {
-        unimplementedTasserted();
-        return {ErrorCodes::Error::UnknownError, "Unknown error"};
-    }
     StatusWith<RecordId> insertRecord(
         OperationContext*, RecoveryUnit&, const char* data, int len, Timestamp) final {
         unimplementedTasserted();
         return {ErrorCodes::Error::UnknownError, "Unknown error"};
     }
 
-    StatusWith<RecordId> insertRecord(
-        OperationContext*, const RecordId&, const char* data, int len, Timestamp) final {
-        unimplementedTasserted();
-        return {ErrorCodes::Error::UnknownError, "Unknown error"};
-    }
     StatusWith<RecordId> insertRecord(OperationContext*,
                                       RecoveryUnit&,
                                       const RecordId&,

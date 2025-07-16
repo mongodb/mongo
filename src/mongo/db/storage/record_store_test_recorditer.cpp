@@ -70,7 +70,11 @@ TEST(RecordStoreTest, IterateOverMultipleRecords) {
 
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 data.c_str(),
+                                 data.size() + 1,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             datas[i] = data;
@@ -115,7 +119,11 @@ TEST(RecordStoreTest, IterateOverMultipleRecordsReversed) {
 
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 data.c_str(),
+                                 data.size() + 1,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             datas[i] = data;
@@ -160,7 +168,11 @@ TEST(RecordStoreTest, IterateStartFromMiddle) {
 
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 data.c_str(),
+                                 data.size() + 1,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             datas[i] = data;
@@ -206,7 +218,11 @@ TEST(RecordStoreTest, IterateStartFromMiddleReversed) {
 
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 data.c_str(),
+                                 data.size() + 1,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             datas[i] = data;
@@ -253,7 +269,11 @@ TEST(RecordStoreTest, RecordIteratorEOF) {
 
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 data.c_str(),
+                                 data.size() + 1,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             datas[i] = data;
@@ -288,7 +308,11 @@ TEST(RecordStoreTest, RecordIteratorEOF) {
 
         StorageWriteTransaction txn(ru);
         StatusWith<RecordId> res =
-            rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
+            rs->insertRecord(opCtx.get(),
+                             *shard_role_details::getRecoveryUnit(opCtx.get()),
+                             data.c_str(),
+                             data.size() + 1,
+                             Timestamp());
         ASSERT_OK(res.getStatus());
         txn.commit();
 
@@ -320,7 +344,11 @@ TEST(RecordStoreTest, RecordIteratorSaveRestore) {
 
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 data.c_str(),
+                                 data.size() + 1,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             datas[i] = data;
@@ -373,7 +401,11 @@ TEST(RecordStoreTest, SeekAfterEofAndContinue) {
 
         StorageWriteTransaction txn(ru);
         StatusWith<RecordId> res =
-            rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
+            rs->insertRecord(opCtx.get(),
+                             *shard_role_details::getRecoveryUnit(opCtx.get()),
+                             data.c_str(),
+                             data.size() + 1,
+                             Timestamp());
         ASSERT_OK(res.getStatus());
         locs[i] = res.getValue();
         datas[i] = data;
@@ -426,8 +458,11 @@ TEST(RecordStoreTest, SeekExactForMissingRecordReturnsNone) {
         std::string data = sb.str();
 
         StorageWriteTransaction txn(ru);
-        auto res =
-            recordStore->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp{});
+        auto res = recordStore->insertRecord(opCtx.get(),
+                                             *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                             data.c_str(),
+                                             data.size() + 1,
+                                             Timestamp{});
         ASSERT_OK(res.getStatus());
         recordIds[i] = res.getValue();
         txn.commit();

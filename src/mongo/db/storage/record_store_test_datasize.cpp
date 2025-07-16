@@ -78,7 +78,11 @@ TEST(RecordStoreTest, DataSizeNonEmpty) {
 
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 data.c_str(),
+                                 data.size() + 1,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             txn.commit();
         }

@@ -451,12 +451,7 @@ public:
     /**
      * Inserts the specified records into this RecordStore by copying the passed-in record data and
      * updates 'inOutRecords' to contain the ids of the inserted records.
-     *
-     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
-    virtual Status insertRecords(OperationContext*,
-                                 std::vector<Record>*,
-                                 const std::vector<Timestamp>&) = 0;
     virtual Status insertRecords(OperationContext*,
                                  RecoveryUnit&,
                                  std::vector<Record>*,
@@ -464,24 +459,14 @@ public:
 
     /**
      * A thin wrapper around insertRecords() to simplify handling of single document inserts.
-     *
-     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
-    virtual StatusWith<RecordId> insertRecord(OperationContext*,
-                                              const char* data,
-                                              int len,
-                                              Timestamp) = 0;
     virtual StatusWith<RecordId> insertRecord(
         OperationContext*, RecoveryUnit&, const char* data, int len, Timestamp) = 0;
 
     /**
      * A thin wrapper around insertRecords() to simplify handling of single document inserts.
      * If RecordId is null, the storage engine will generate one and return it.
-     *
-     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
-    virtual StatusWith<RecordId> insertRecord(
-        OperationContext*, const RecordId&, const char* data, int len, Timestamp) = 0;
     virtual StatusWith<RecordId> insertRecord(OperationContext*,
                                               RecoveryUnit&,
                                               const RecordId&,

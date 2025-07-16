@@ -96,11 +96,6 @@ void RecordStoreBase::deleteRecord(OperationContext* opCtx, RecoveryUnit& ru, co
 }
 
 Status RecordStoreBase::insertRecords(OperationContext* opCtx,
-                                      std::vector<Record>* records,
-                                      const std::vector<Timestamp>& timestamps) {
-    return insertRecords(opCtx, *shard_role_details::getRecoveryUnit(opCtx), records, timestamps);
-}
-Status RecordStoreBase::insertRecords(OperationContext* opCtx,
                                       RecoveryUnit& ru,
                                       std::vector<Record>* records,
                                       const std::vector<Timestamp>& timestamps) {
@@ -108,25 +103,14 @@ Status RecordStoreBase::insertRecords(OperationContext* opCtx,
     return _insertRecords(opCtx, ru, records, timestamps);
 }
 
-StatusWith<RecordId> RecordStoreBase::insertRecord(OperationContext* opCtx,
-                                                   const char* data,
-                                                   int len,
-                                                   Timestamp timestamp) {
-    return insertRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), data, len, timestamp);
-}
 StatusWith<RecordId> RecordStoreBase::insertRecord(
     OperationContext* opCtx, RecoveryUnit& ru, const char* data, int len, Timestamp timestamp) {
     // Record stores with the Long key format accept a null RecordId, as the storage engine will
     // generate one.
     invariant(keyFormat() == KeyFormat::Long);
-    return insertRecord(opCtx, RecordId(), data, len, timestamp);
+    return insertRecord(opCtx, ru, RecordId(), data, len, timestamp);
 }
 
-StatusWith<RecordId> RecordStoreBase::insertRecord(
-    OperationContext* opCtx, const RecordId& id, const char* data, int len, Timestamp timestamp) {
-    return insertRecord(
-        opCtx, *shard_role_details::getRecoveryUnit(opCtx), id, data, len, timestamp);
-}
 StatusWith<RecordId> RecordStoreBase::insertRecord(OperationContext* opCtx,
                                                    RecoveryUnit& ru,
                                                    const RecordId& id,

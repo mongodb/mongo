@@ -211,7 +211,11 @@ int setUpInvalidData(OperationContext* opCtx) {
     {
         WriteUnitOfWork wuow(opCtx);
         auto invalidBson = "\0\0\0\0\0"_sd;
-        ASSERT_OK(rs->insertRecord(opCtx, invalidBson.data(), invalidBson.size(), Timestamp::min())
+        ASSERT_OK(rs->insertRecord(opCtx,
+                                   *shard_role_details::getRecoveryUnit(opCtx),
+                                   invalidBson.data(),
+                                   invalidBson.size(),
+                                   Timestamp::min())
                       .getStatus());
         wuow.commit();
     }

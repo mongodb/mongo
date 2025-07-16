@@ -185,7 +185,11 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     {
         StorageWriteTransaction txn(ru);
         StatusWith<RecordId> res =
-            rs->insertRecord(opCtxPtr.get(), record.c_str(), record.length() + 1, Timestamp());
+            rs->insertRecord(opCtxPtr.get(),
+                             *shard_role_details::getRecoveryUnit(opCtxPtr.get()),
+                             record.c_str(),
+                             record.length() + 1,
+                             Timestamp());
         ASSERT_OK(res.getStatus());
         loc = res.getValue();
         txn.commit();
@@ -247,7 +251,11 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     {
         StorageWriteTransaction txn(ru);
         StatusWith<RecordId> res =
-            rs->insertRecord(opCtxPtr.get(), record.c_str(), record.length() + 1, Timestamp());
+            rs->insertRecord(opCtxPtr.get(),
+                             *shard_role_details::getRecoveryUnit(opCtxPtr.get()),
+                             record.c_str(),
+                             record.length() + 1,
+                             Timestamp());
         ASSERT_OK(res.getStatus());
         loc = res.getValue();
         txn.commit();

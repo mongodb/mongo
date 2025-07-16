@@ -67,7 +67,11 @@ TEST(RecordStoreTest, InsertRecord) {
         {
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 data.c_str(),
+                                 data.size() + 1,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             txn.commit();
@@ -97,7 +101,11 @@ TEST(RecordStoreTest, InsertMultipleRecords) {
 
             StorageWriteTransaction txn(ru);
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 data.c_str(),
+                                 data.size() + 1,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             txn.commit();

@@ -142,7 +142,8 @@ TEST_F(RecoveryUnitTestHarness, CheckIsActiveWithCommit) {
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
     ru->beginUnitOfWork(opCtx->readOnly());
     ASSERT_TRUE(ru->isActive());
-    StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
+    StatusWith<RecordId> s = rs->insertRecord(
+        opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), "data", 4, Timestamp());
     ru->commitUnitOfWork();
     ASSERT_FALSE(ru->isActive());
 }
@@ -151,7 +152,8 @@ TEST_F(RecoveryUnitTestHarness, CheckIsActiveWithAbort) {
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
     ru->beginUnitOfWork(opCtx->readOnly());
     ASSERT_TRUE(ru->isActive());
-    StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
+    StatusWith<RecordId> s = rs->insertRecord(
+        opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), "data", 4, Timestamp());
     ru->abortUnitOfWork();
     ASSERT_FALSE(ru->isActive());
 }
@@ -196,8 +198,10 @@ TEST_F(RecoveryUnitTestHarness, AbandonSnapshotCommitMode) {
 
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
     ru->beginUnitOfWork(opCtx->readOnly());
-    StatusWith<RecordId> rid1 = rs->insertRecord(opCtx.get(), "ABC", 3, Timestamp());
-    StatusWith<RecordId> rid2 = rs->insertRecord(opCtx.get(), "123", 3, Timestamp());
+    StatusWith<RecordId> rid1 = rs->insertRecord(
+        opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), "ABC", 3, Timestamp());
+    StatusWith<RecordId> rid2 = rs->insertRecord(
+        opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), "123", 3, Timestamp());
     ASSERT_TRUE(rid1.isOK());
     ASSERT_TRUE(rid2.isOK());
     ASSERT_EQUALS(2, rs->numRecords());

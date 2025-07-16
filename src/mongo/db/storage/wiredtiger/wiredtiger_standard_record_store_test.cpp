@@ -93,7 +93,12 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
 
         StorageWriteTransaction txn(ru);
         for (int i = 0; i < N; i++) {
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
+            StatusWith<RecordId> res =
+                rs->insertRecord(opCtx.get(),
+                                 *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                 "a",
+                                 2,
+                                 Timestamp());
             ASSERT_OK(res.getStatus());
         }
         txn.commit();
@@ -205,7 +210,11 @@ TEST_F(SizeStorerUpdateTest, DataSizeModification) {
     RecordId recordId;
     {
         StorageWriteTransaction txn(ru);
-        auto rId = rs->insertRecord(opCtx.get(), "12345", 5, Timestamp{1});
+        auto rId = rs->insertRecord(opCtx.get(),
+                                    *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                    "12345",
+                                    5,
+                                    Timestamp{1});
         ASSERT_TRUE(rId.isOK());
         recordId = rId.getValue();
         txn.commit();
@@ -264,7 +273,11 @@ TEST_F(SizeStorerUpdateTest, ReloadAfterRollbackAndFlush) {
     // Do an op for which the sizeInfo is persisted, for safety so we don't check against 0.
     {
         StorageWriteTransaction txn(ru);
-        auto rId = rs->insertRecord(opCtx.get(), "12345", 5, Timestamp{1});
+        auto rId = rs->insertRecord(opCtx.get(),
+                                    *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                    "12345",
+                                    5,
+                                    Timestamp{1});
         ASSERT_TRUE(rId.isOK());
 
         txn.commit();
@@ -273,7 +286,11 @@ TEST_F(SizeStorerUpdateTest, ReloadAfterRollbackAndFlush) {
     // An operation to rollback, with a flush between the original modification and the rollback.
     {
         StorageWriteTransaction txn(ru);
-        auto rId = rs->insertRecord(opCtx.get(), "12345", 5, Timestamp{2});
+        auto rId = rs->insertRecord(opCtx.get(),
+                                    *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                    "12345",
+                                    5,
+                                    Timestamp{2});
         ASSERT_TRUE(rId.isOK());
 
         ASSERT_EQ(getNumRecords(), 2);
