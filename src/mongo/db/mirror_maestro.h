@@ -94,12 +94,17 @@ std::shared_ptr<executor::TaskExecutor> getMirroringTaskExecutor_forTest(
     ServiceContext* serviceContext);
 
 /**
- * Returns the list of hosts that will be targeted for targeted mirrored reads.
+ * Returns the list of hosts that will be used for general mirrored reads.
+ */
+std::vector<HostAndPort> getCachedHostsForGeneralMirroring_forTest(ServiceContext* serviceContext);
+
+/**
+ * Returns the list of hosts that will be used for targeted mirrored reads.
  */
 std::vector<HostAndPort> getCachedHostsForTargetedMirroring_forTest(ServiceContext* serviceContext);
 
 /**
- * Updates the list of hosts that will be targeted by targeted mirrored reads.
+ * Updates the list of hosts that will be used by targeted mirrored reads.
  *
  * The function will update the list of hosts to target on config version changes, or if the repl
  * set tag used to target hosts is updated (tagChanged).

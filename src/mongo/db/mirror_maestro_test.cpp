@@ -56,9 +56,29 @@ public:
     const BSONObj kWestTag = BSON("dc" << "west");
     constexpr static auto kHost1 = "host1:27017";
     constexpr static auto kHost2 = "host2:27017";
-    const BSONObj kDefaultServerParam = BSON(
-        "samplingRate" << 0.0 << "targetedMirroring"
-                       << BSON("samplingRate" << 0.1 << "maxTimeMS" << 500 << "tag" << kEastTag));
+    const BSONArray kFiveHosts = BSON_ARRAY(BSON("_id" << 0 << "host" << "hostname:10001")
+                                            << BSON("_id" << 1 << "host" << "hostname:10002")
+                                            << BSON("_id" << 2 << "host" << "hostname:10003")
+                                            << BSON("_id" << 3 << "host" << "hostname:10004")
+                                            << BSON("_id" << 4 << "host" << "hostname:10005"));
+    const BSONArray kTwoHostsEW =
+        BSON_ARRAY(BSON("_id" << 0 << "host" << kHost1 << "tags" << kEastTag)
+                   << BSON("_id" << 1 << "host" << kHost2 << "tags" << kWestTag));
+    const BSONArray kTwoHostsWE =
+        BSON_ARRAY(BSON("_id" << 0 << "host" << kHost1 << "tags" << kWestTag)
+                   << BSON("_id" << 1 << "host" << kHost2 << "tags" << kEastTag));
+    const BSONArray kTwoHostsEE =
+        BSON_ARRAY(BSON("_id" << 0 << "host" << kHost1 << "tags" << kEastTag)
+                   << BSON("_id" << 1 << "host" << kHost2 << "tags" << kEastTag));
+    const BSONArray kZeroHosts = BSONArrayBuilder().arr();
+
+    virtual bool initMaestro() const {
+        return true;
+    };
+
+    virtual bool initReplCoord() const {
+        return true;
+    }
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();
@@ -69,13 +89,14 @@ public:
         _executor = executor::ThreadPoolTaskExecutor::create(
             std::make_unique<executor::ThreadPoolMock>(_net.get(), 1, std::move(opts)), _net);
         _executor->startup();
-        _networkTestEnv = std::make_shared<executor::NetworkTestEnv>(_executor.get(), _net.get());
 
-        auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
-        _replCoord = replCoord.get();
-        auto config = makeConfig(kInitialConfigVersion, kInitialTermVersion, kEastTag, kWestTag);
-        _replCoord->setGetConfigReturnValue(config);
-        repl::ReplicationCoordinator::set(service, std::move(replCoord));
+        if (initReplCoord()) {
+            auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
+            _replCoord = replCoord.get();
+            auto config = makeConfig(kInitialConfigVersion, kInitialTermVersion, kTwoHostsEW);
+            _replCoord->setGetConfigReturnValue(config);
+            repl::ReplicationCoordinator::set(service, std::move(replCoord));
+        }
 
         if (initMaestro()) {
             MirrorMaestro::init(service);
@@ -84,8 +105,12 @@ public:
     }
 
     void tearDown() override {
-        _networkTestEnv.reset();
         _executor->shutdown();
+        // Drain all unfinished operations before resetting the executor.
+        {
+            executor::NetworkInterfaceMock::InNetworkGuard guard(_net.get());
+            _net->drainUnfinishedNetworkOperations();
+        };
         _executor->join();
         _executor.reset();
         _net.reset();
@@ -94,18 +119,50 @@ public:
         ServiceContextTest::tearDown();
     }
 
-    virtual bool initMaestro() const {
-        return true;
-    };
+    void makeCommandAndMirror(OperationContext* opCtx,
+                              BSONObj cmdObj,
+                              size_t expNumMirrors,
+                              bool supportsMirroring = true) {
+        OpMsgRequest request = OpMsgRequestBuilder::create(
+            auth::ValidatedTenancyScope::kNotRequired,
+            DatabaseName::createDatabaseName_forTest(boost::none, "testDB"),
+            cmdObj);
+        Command* cmd = getCommandRegistry(opCtx)->findCommand(request.getCommandName());
+        ASSERT(cmd);
 
-    void onCommand(executor::NetworkTestEnv::OnCommandFunction func) {
-        _networkTestEnv->onCommand(func);
+        std::shared_ptr<CommandInvocation> invocation = cmd->parse(opCtx, request);
+        ASSERT_EQ(invocation->isReadOperation(), supportsMirroring);
+        ASSERT_EQ(invocation->supportsReadMirroring(), supportsMirroring);
+
+        // Set the command we're "mirroring" on the opCtx.
+        CommandInvocation::set(opCtx, invocation);
+
+        // Mirror the command.
+        MirrorMaestro::tryMirrorRequest(opCtx);
     }
 
-    template <typename Lambda>
-    executor::NetworkTestEnv::FutureHandle<typename std::invoke_result<Lambda>::type> launchAsync(
-        Lambda&& func) const {
-        return _networkTestEnv->launchAsync(std::forward<Lambda>(func));
+    void assertNumReqs(size_t expNumReqs) {
+        ClockSource::StopWatch stopwatch;
+        auto timeout = Milliseconds(1000);
+
+        // The MirrorMaestro schedules the command on a separate thread. To ensure that we don't
+        // have a race condition between when the commands are being sent and when we are checking
+        // for the number of ready requests, we have the get-call in a timed loop.
+        while (stopwatch.elapsed() < timeout && getNumReadyRequests() != expNumReqs) {
+            sleepmillis(10);
+        }
+
+        ASSERT_EQ(getNumReadyRequests(), expNumReqs);
+    }
+
+    size_t getNumReadyRequests() {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(_net.get());
+        return _net->getNumReadyRequests();
+    }
+
+    executor::RemoteCommandRequest getNthRequest(int n) {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(_net.get());
+        return _net->getNthReadyRequest(n)->getRequest();
     }
 
 protected:
@@ -113,35 +170,235 @@ protected:
     repl::ReplicationCoordinatorMock* _replCoord = nullptr;
     std::shared_ptr<executor::TaskExecutor> _executor;
 
-    repl::ReplSetConfig makeConfig(int version, int term, BSONObj host1Tag, BSONObj host2Tag) {
+    virtual repl::ReplSetConfig makeConfig(int version, int term, BSONArray members) {
         BSONObjBuilder configBuilder;
         configBuilder << "_id" << "_rs";
         configBuilder << "version" << version;
         configBuilder << "term" << term;
-        configBuilder << "members"
-                      << BSON_ARRAY(BSON("_id" << 0 << "host" << kHost1 << "tags" << host1Tag)
-                                    << BSON("_id" << 1 << "host" << kHost2 << "tags" << host2Tag));
+        configBuilder << "members" << members;
         configBuilder << "protocolVersion" << 1;
         return repl::ReplSetConfig::parse(configBuilder.obj());
     }
+
+    virtual repl::ReplSetConfig setAndVerifyConfig(int version,
+                                                   int term,
+                                                   BSONArray members,
+                                                   size_t expNumMembers) {
+        auto config = makeConfig(version, term, members);
+        ASSERT_EQ(config.getNumMembers(), expNumMembers);
+        _replCoord->setGetConfigReturnValue(config);
+        ASSERT_EQ(_replCoord->getConfig().getNumMembers(), expNumMembers);
+
+        if (!initMaestro() || !initReplCoord()) {
+            return config;
+        }
+
+        auto serviceContext = getServiceContext();
+        auto fetchedHosts = getCachedHostsForGeneralMirroring_forTest(serviceContext);
+        ClockSource::StopWatch stopwatch;
+        auto timeout = Milliseconds(1000);
+
+        while (stopwatch.elapsed() < timeout && fetchedHosts.size() != expNumMembers) {
+            // The MirrorMaestro's view of the server topology may not be updated immediately.
+            sleepmillis(10);
+            fetchedHosts = getCachedHostsForGeneralMirroring_forTest(serviceContext);
+        }
+
+        return config;
+    }
+
+private:
+    std::shared_ptr<executor::NetworkInterfaceMock> _net;
+};
+
+class GeneralMirrorMaestroTest : public MirrorMaestroTest {
+protected:
+    void setServerParams(double generalSamplingRate) {
+        _serverParameterController = ServerParameterControllerForTest(
+            "mirrorReads",
+            BSON("samplingRate" << generalSamplingRate << "maxTimeMS" << 500 << "targetedMirroring"
+                                << BSON("samplingRate" << 0.0 << "maxTimeMS" << 500)));
+    }
+};
+
+// When the general sample rate is 0%, we want no hosts to be targeted.
+TEST_F(GeneralMirrorMaestroTest, GeneralSampleRateZero) {
+    // Set the server parameters to have sampling rate = 0%.
+    setServerParams(0.0);
+
+    // Set the config and verify the number of members in the ReplSet.
+    setAndVerifyConfig(2, 1, kFiveHosts, 5);
+
+    // Try to mirror a command.
+    auto opCtx = makeOperationContext();
+    BSONObj cmdObj = BSON("find" << "test");
+    makeCommandAndMirror(opCtx.get(), cmdObj, 0);
+
+    // Check that we have no requests ready to be processed.
+    assertNumReqs(0);
+}
+
+// Testing properties of mirrored requests when the sampling rate is 100%.
+TEST_F(GeneralMirrorMaestroTest, GeneralProps) {
+    // Set the server parameters to have sampling rate = 100%.
+    setServerParams(1.0);
+
+    // Set the config and verify the number of members in the ReplSet.
+    setAndVerifyConfig(2, 1, kFiveHosts, 5);
+
+    // Try to mirror a command.
+    auto opCtx = makeOperationContext();
+    BSONObj cmdObj = BSON("find" << "test");
+    size_t expNumReqs = 4;
+    makeCommandAndMirror(opCtx.get(), cmdObj, expNumReqs);
+
+    // Check that we have 4 requests ready to process.
+    assertNumReqs(expNumReqs);
+
+    // Verify properties of the requests.
+    for (size_t i = 0; i < expNumReqs; i += 1) {
+        auto req = getNthRequest(i);
+
+        ASSERT(req.fireAndForget);
+        ASSERT(req.cmdObj.getBoolField("mirrored"));
+
+        ASSERT_BSONOBJ_EQ_UNORDERED(BSON("mode" << "secondaryPreferred"),
+                                    req.cmdObj.getField("$readPreference").embeddedObject());
+        ASSERT_BSONOBJ_EQ_UNORDERED(BSON("level" << "local"),
+                                    req.cmdObj.getField("readConcern").embeddedObject());
+    }
+}
+
+// When the operation is not mirror-supported, we want no hosts to be targeted.
+TEST_F(GeneralMirrorMaestroTest, GeneralUnsupportedOperation) {
+    // Set the server parameter to have sampling rate = 100%.
+    setServerParams(1.0);
+
+    // Set the config and verify the number of members in the ReplSet.
+    setAndVerifyConfig(2, 1, kFiveHosts, 5);
+
+    // Try to mirror a command.
+    auto opCtx = makeOperationContext();
+    BSONObj cmdObj = BSON("insert" << "test" << "documents" << BSON_ARRAY(BSON("_id" << 0)));
+    makeCommandAndMirror(opCtx.get(), cmdObj, 0, false);
+
+    // Check that we have mirrored the command to no other node.
+    assertNumReqs(0);
+}
+
+// No hosts should be targeted when the command is already mirrored.
+TEST_F(GeneralMirrorMaestroTest, GeneralMirroredOperation) {
+    // Set sampling rate to 100% to always catch that we don't send requests when the command is
+    // already mirrored.
+    setServerParams(1.0);
+
+    // Set the config and verify the number of members in the ReplSet.
+    setAndVerifyConfig(2, 1, kFiveHosts, 5);
+
+    // Try to mirror a command.
+    auto opCtx = makeOperationContext();
+    BSONObj cmdObj = BSON("find" << "test" << "mirrored" << true);
+    makeCommandAndMirror(opCtx.get(), cmdObj, 0);
+
+    // Check that we have not mirrored the command.
+    assertNumReqs(0);
+}
+
+// No requests sent when the host list is empty.
+TEST_F(GeneralMirrorMaestroTest, GeneralEmptyHostsList) {
+    // Set the server parameters to have some default sampling rate.
+    setServerParams(1.0);
+
+    // Set the config to have no members.
+    setAndVerifyConfig(2, 1, kZeroHosts, 0);
+
+    // Try to mirror a command.
+    auto opCtx = makeOperationContext();
+    BSONObj cmdObj = BSON("find" << "test");
+    makeCommandAndMirror(opCtx.get(), cmdObj, 0);
+
+    // Check that we have not mirrored the command.
+    assertNumReqs(0);
+}
+
+// Invariant should be triggered when there is no invocation.
+DEATH_TEST_F(GeneralMirrorMaestroTest, GeneralNoInvocation, "invariant") {
+    // Set the server parameter to have sampling rate = 0%.
+    setServerParams(0.0);
+
+    // Set the config and verify the number of members in the ReplSet.
+    setAndVerifyConfig(2, 1, kFiveHosts, 5);
+
+    auto opCtx = makeOperationContext();
+
+    // Try to mirror without a command invocation.
+    MirrorMaestro::tryMirrorRequest(opCtx.get());
+}
+class NoInitGeneralMirrorTest : public GeneralMirrorMaestroTest {
+public:
+    bool initMaestro() const override {
+        return false;
+    }
+};
+
+// When the Impl is not initialised.
+TEST_F(NoInitGeneralMirrorTest, GeneralUninitImpl) {
+    // Set sampling rate to 100% to always check that we don't send requests when Impl is
+    // not initialised.
+    setServerParams(1.0);
+
+    // Set the config and verify the number of members in the ReplSet.
+    setAndVerifyConfig(2, 1, kFiveHosts, 5);
+
+    // Try to mirror a command.
+    auto opCtx = makeOperationContext();
+    BSONObj cmdObj = BSON("find" << "test");
+    makeCommandAndMirror(opCtx.get(), cmdObj, 0);
+
+    // Check that we have no requests ready to be processed.
+    assertNumReqs(0);
+}
+
+class NoReplCoordGeneralMirrorTest : public GeneralMirrorMaestroTest {
+public:
+    bool initReplCoord() const override {
+        return false;
+    }
+
+    // We override this because we don't want the ServiceContextMongoDTest to initialise the Maestro
+    // with a default ReplicationCoordinator.
+    bool initMaestro() const override {
+        return false;
+    };
+};
+
+// Invariant should be triggered on absent replication coordinator.
+DEATH_TEST_F(NoReplCoordGeneralMirrorTest, GeneralNoReplCoord, "invariant") {
+    // Set up the Mirror Maestro to not have a replication coordinator.
+    repl::ReplicationCoordinator::set(getServiceContext(), nullptr);
+    MirrorMaestro::init(getServiceContext());
+}
+
+class TargetedMirrorMaestroTest : public MirrorMaestroTest {
+public:
+    const BSONObj kDefaultServerParam = BSON(
+        "samplingRate" << 0.0 << "targetedMirroring"
+                       << BSON("samplingRate" << 0.1 << "maxTimeMS" << 500 << "tag" << kEastTag));
 
 private:
     FailPointEnableBlock _skipRegisteringMirroredReadsTopologyObserverCallback{
         "skipRegisteringMirroredReadsTopologyObserverCallback"};
     RAIIServerParameterControllerForTest _featureFlagController{"featureFlagTargetedMirrorReads",
                                                                 true};
-
-    std::shared_ptr<executor::NetworkTestEnv> _networkTestEnv;
-    std::shared_ptr<executor::NetworkInterfaceMock> _net;
 };
 
-TEST_F(MirrorMaestroTest, BasicInitializationEmptyHostsCache) {
+TEST_F(TargetedMirrorMaestroTest, BasicInitializationEmptyHostsCache) {
     // Verify hosts cache is initially empty
     auto hosts = getCachedHostsForTargetedMirroring_forTest(getServiceContext());
     ASSERT(hosts.empty());
 }
 
-TEST_F(MirrorMaestroTest, UpdateCachedHostsOnUpdatedTag) {
+TEST_F(TargetedMirrorMaestroTest, UpdateCachedHostsOnUpdatedTag) {
     // Turn the failpoint on so we can directly test the update function when the tag has changed,
     // without testing the server parameter update path calls into this path correctly
     FailPointEnableBlock skipTriggeringTargetedHostsListRefreshOnServerParamChange{
@@ -153,8 +410,7 @@ TEST_F(MirrorMaestroTest, UpdateCachedHostsOnUpdatedTag) {
 
     auto version = kInitialConfigVersion + 1;
     auto term = kInitialTermVersion;
-    auto config = makeConfig(version, term, kEastTag, kWestTag);
-    _replCoord->setGetConfigReturnValue(config);
+    auto config = setAndVerifyConfig(version, term, kTwoHostsEW, 2);
 
     // Update cached hosts
     updateCachedHostsForTargetedMirroring_forTest(
@@ -181,15 +437,14 @@ TEST_F(MirrorMaestroTest, UpdateCachedHostsOnUpdatedTag) {
     ASSERT_EQ((hosts)[0].toString(), kHost2);
 }
 
-TEST_F(MirrorMaestroTest, AssertCachedHostsUpdatedOnServerParameterChange) {
+TEST_F(TargetedMirrorMaestroTest, AssertCachedHostsUpdatedOnServerParameterChange) {
     // First, set the server parameter and update the cached hosts list
     _serverParameterController =
         ServerParameterControllerForTest("mirrorReads", kDefaultServerParam);
 
     auto version = kInitialConfigVersion + 1;
     auto term = kInitialTermVersion;
-    auto config = makeConfig(version, term, kEastTag, kWestTag);
-    _replCoord->setGetConfigReturnValue(config);
+    auto config = setAndVerifyConfig(version, term, kTwoHostsEW, 2);
 
     // Update cached hosts
     updateCachedHostsForTargetedMirroring_forTest(
@@ -215,13 +470,12 @@ TEST_F(MirrorMaestroTest, AssertCachedHostsUpdatedOnServerParameterChange) {
     ASSERT_EQ((hosts)[0].toString(), kHost2);
 }
 
-TEST_F(MirrorMaestroTest, UpdateCachedHostsOnTopologyVersionChange) {
+TEST_F(TargetedMirrorMaestroTest, UpdateCachedHostsOnTopologyVersionChange) {
     ServerParameterControllerForTest controller("mirrorReads", kDefaultServerParam);
 
     int version = 2;
     int term = 1;
-    auto config = makeConfig(version, term, kEastTag, kWestTag);
-    _replCoord->setGetConfigReturnValue(config);
+    auto config = setAndVerifyConfig(version, term, kTwoHostsEW, 2);
 
     // Update cached hosts
     updateCachedHostsForTargetedMirroring_forTest(
@@ -234,8 +488,7 @@ TEST_F(MirrorMaestroTest, UpdateCachedHostsOnTopologyVersionChange) {
 
     // Now change the tags for host2 and bump the configVersion
     version++;
-    config = makeConfig(version, term, kEastTag, kEastTag);
-    _replCoord->setGetConfigReturnValue(config);
+    config = setAndVerifyConfig(version, term, kTwoHostsEE, 2);
 
     updateCachedHostsForTargetedMirroring_forTest(
         getServiceContext(), config, false /* tagChanged */);
@@ -247,13 +500,12 @@ TEST_F(MirrorMaestroTest, UpdateCachedHostsOnTopologyVersionChange) {
     ASSERT_EQ((hosts)[1].toString(), kHost2);
 }
 
-TEST_F(MirrorMaestroTest, NoUpdateToCachedHostsIfTopologyVersionUnchanged) {
+TEST_F(TargetedMirrorMaestroTest, NoUpdateToCachedHostsIfTopologyVersionUnchanged) {
     ServerParameterControllerForTest controller("mirrorReads", kDefaultServerParam);
 
     int version = 1;
     int term = 1;
-    auto config = makeConfig(version, term, kEastTag, kWestTag);
-    _replCoord->setGetConfigReturnValue(config);
+    auto config = setAndVerifyConfig(version, term, kTwoHostsEW, 2);
 
     // Update cached hosts
     updateCachedHostsForTargetedMirroring_forTest(
@@ -267,8 +519,7 @@ TEST_F(MirrorMaestroTest, NoUpdateToCachedHostsIfTopologyVersionUnchanged) {
     // Now call update with an unchanged config version, but changed tags. This is just a sanity
     // check that we don't try to update if the config version hasn't changed - it should never
     // happen in production that tags are changed without a change in version.
-    config = makeConfig(version, term, kEastTag, kEastTag);
-    _replCoord->setGetConfigReturnValue(config);
+    config = setAndVerifyConfig(version, term, kTwoHostsEE, 2);
 
     updateCachedHostsForTargetedMirroring_forTest(
         getServiceContext(), config, false /* tagChanged */);
@@ -279,13 +530,12 @@ TEST_F(MirrorMaestroTest, NoUpdateToCachedHostsIfTopologyVersionUnchanged) {
     ASSERT_EQ((hosts)[0].toString(), kHost1);
 }
 
-DEATH_TEST_F(MirrorMaestroTest, InvariantOnDecreasedConfigVersionForSameTerm, "invariant") {
+DEATH_TEST_F(TargetedMirrorMaestroTest, InvariantOnDecreasedConfigVersionForSameTerm, "invariant") {
     ServerParameterControllerForTest controller("mirrorReads", kDefaultServerParam);
 
     auto version = 2;
     auto term = 1;
-    auto config = makeConfig(version, term, kEastTag, kWestTag);
-    _replCoord->setGetConfigReturnValue(config);
+    auto config = setAndVerifyConfig(version, term, kTwoHostsEW, 2);
 
     // Update cached hosts
     updateCachedHostsForTargetedMirroring_forTest(
@@ -298,20 +548,18 @@ DEATH_TEST_F(MirrorMaestroTest, InvariantOnDecreasedConfigVersionForSameTerm, "i
 
     // Now call update again but with a lower config version and same term, which should crash
     version--;
-    config = makeConfig(version, term, kWestTag, kEastTag);
-    _replCoord->setGetConfigReturnValue(config);
+    config = setAndVerifyConfig(version, term, kTwoHostsWE, 2);
 
     updateCachedHostsForTargetedMirroring_forTest(
         getServiceContext(), config, false /* tagChanged */);
 }
 
-TEST_F(MirrorMaestroTest, UpdateHostsOnNewTermEvenIfLowerConfigVersion) {
+TEST_F(TargetedMirrorMaestroTest, UpdateHostsOnNewTermEvenIfLowerConfigVersion) {
     ServerParameterControllerForTest controller("mirrorReads", kDefaultServerParam);
 
     auto version = 2;
     auto term = 1;
-    auto config = makeConfig(version, term, kEastTag, kWestTag);
-    _replCoord->setGetConfigReturnValue(config);
+    auto config = setAndVerifyConfig(version, term, kTwoHostsEW, 2);
 
     // Update cached hosts
     updateCachedHostsForTargetedMirroring_forTest(
@@ -326,8 +574,7 @@ TEST_F(MirrorMaestroTest, UpdateHostsOnNewTermEvenIfLowerConfigVersion) {
     // indicates the more up to date config, so we should update.
     version--;
     term++;
-    config = makeConfig(version, term, kEastTag, kEastTag);
-    _replCoord->setGetConfigReturnValue(config);
+    config = setAndVerifyConfig(version, term, kTwoHostsEE, 2);
 
     updateCachedHostsForTargetedMirroring_forTest(
         getServiceContext(), config, false /* tagChanged */);
@@ -339,7 +586,7 @@ TEST_F(MirrorMaestroTest, UpdateHostsOnNewTermEvenIfLowerConfigVersion) {
     ASSERT_EQ((hosts)[1].toString(), kHost2);
 }
 
-TEST_F(MirrorMaestroTest, AssertExpectedHostsTargeted) {
+TEST_F(TargetedMirrorMaestroTest, AssertExpectedHostsTargeted) {
     // Set the sampling rate for targeted mirroring to always mirror
     auto param = BSON("samplingRate"
                       << 0.0 << "targetedMirroring"
@@ -348,8 +595,7 @@ TEST_F(MirrorMaestroTest, AssertExpectedHostsTargeted) {
 
     int version = 2;
     int term = 1;
-    auto config = makeConfig(version, term, kEastTag, kWestTag);
-    _replCoord->setGetConfigReturnValue(config);
+    auto config = setAndVerifyConfig(version, term, kTwoHostsEW, 2);
 
     // Update cached hosts
     updateCachedHostsForTargetedMirroring_forTest(
@@ -360,46 +606,16 @@ TEST_F(MirrorMaestroTest, AssertExpectedHostsTargeted) {
     ASSERT_EQ(hosts.size(), 1);
     ASSERT_EQ((hosts)[0].toString(), kHost1);
 
-    // We don't really care about the response in this case, but otherwise we send the request as a
-    // fireAndForget request, which the mock network env will cancel at the end of the test and will
-    // try to wait for a response to the cancelation. To avoid having to mock a cancellation
-    // response, we can instead have the mirroring thread just exeucte the commands as
-    // non-fireAndForget.
     auto opCtx = makeOperationContext();
-    FailPointEnableBlock mirrorMaestroExpectsResponseFp{"mirrorMaestroExpectsResponse"};
 
-    // Now send mirror requests
-    auto future = launchAsync([&] {
-        // Set the client on this thread.
-        Client::setCurrent(getServiceContext()->getService()->makeClient("MirrorMaestroTest"));
+    // Try to mirror a command.
+    BSONObj cmdObj = BSON("find" << "test");
+    makeCommandAndMirror(opCtx.get(), cmdObj, hosts.size());
 
-        // Set the command we're "mirroring" on the opCtx
-        auto cmdObj = BSON("find" << "test");
-        auto request = OpMsgRequestBuilder::create(
-            auth::ValidatedTenancyScope::kNotRequired,
-            DatabaseName::createDatabaseName_forTest(boost::none, "testDB"),
-            cmdObj);
-        auto cmd = getCommandRegistry(opCtx.get())->findCommand(request.getCommandName());
-        ASSERT(cmd);
-        std::shared_ptr<CommandInvocation> invocation = cmd->parse(opCtx.get(), request);
-        CommandInvocation::set(opCtx.get(), invocation);
-
-        // Now, actually mirror
-        MirrorMaestro::tryMirrorRequest(opCtx.get());
-        auto client = Client::releaseCurrent();
-        client.reset(nullptr);
-    });
-
-    // Check the correct hosts were targeted - it should only be the one host with the kEast tag.
-    std::vector<HostAndPort> targetedHosts;
-    onCommand([&](const executor::RemoteCommandRequest& request) {
-        targetedHosts.push_back(request.target);
-        return BSONObj();
-    });
-
-    future.default_timed_get();
-
-    ASSERT_EQ(hosts, targetedHosts);
+    // Verify that we have reached the right host.
+    assertNumReqs(1);
+    auto req = getNthRequest(0);
+    ASSERT_EQ(req.target, hosts.at(0));
 }
 
 TEST_F(MirrorMaestroTest, UninitializedConfigDefersHostCompute) {
@@ -420,8 +636,7 @@ TEST_F(MirrorMaestroTest, UninitializedConfigDefersHostCompute) {
     ASSERT_EQ(0, getCachedHostsForTargetedMirroring_forTest(service).size());
 
     // Update the config to be initialized.
-    auto newConfig = makeConfig(2 /* version */, 1 /* term */, kEastTag, kWestTag);
-    _replCoord->setGetConfigReturnValue(newConfig);
+    setAndVerifyConfig(2 /* version */, 1 /* term */, kTwoHostsEW, 2);
 
     // Host list should be computed upon getting.
     auto hosts = getCachedHostsForTargetedMirroring_forTest(service);
@@ -429,16 +644,15 @@ TEST_F(MirrorMaestroTest, UninitializedConfigDefersHostCompute) {
     ASSERT_EQ((hosts)[0].toString(), kHost1);
 }
 
-class NoInitMirrorTest : public MirrorMaestroTest {
+class NoInitMirrorTest : public TargetedMirrorMaestroTest {
 public:
     bool initMaestro() const override {
         return false;
     }
 };
 
-TEST_F(NoInitMirrorTest, UninitMirrorMaestorDoesNotTargetHosts) {
-    auto config = makeConfig(2 /* version */, 1 /* term */, kEastTag, kWestTag);
-    _replCoord->setGetConfigReturnValue(config);
+TEST_F(NoInitMirrorTest, UninitMirrorMaestroDoesNotTargetHosts) {
+    setAndVerifyConfig(2 /* version */, 1 /* term */, kTwoHostsEW, 2);
 
     auto param = BSON("samplingRate"
                       << 0.0 << "targetedMirroring"

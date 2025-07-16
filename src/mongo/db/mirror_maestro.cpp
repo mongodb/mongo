@@ -159,6 +159,11 @@ public:
     void updateMirroringOptions(MirroredReadsParameters params);
 
     /**
+     * Returns the list of hosts to send mirrored reads to for general mirroring.
+     */
+    std::vector<HostAndPort> getCachedHostsForGeneralMirroring();
+
+    /**
      * Returns the list of hosts to send mirrored reads to for targeted mirroring.
      */
     std::vector<HostAndPort> getCachedHostsForTargetedMirroring();
@@ -658,6 +663,10 @@ void MirrorMaestroImpl::updateMirroringOptions(MirroredReadsParameters params) {
     }
 }
 
+std::vector<HostAndPort> MirrorMaestroImpl::getCachedHostsForGeneralMirroring() {
+    return _topologyVersionObserver.getCached()->getHosts();
+}
+
 std::vector<HostAndPort> MirrorMaestroImpl::getCachedHostsForTargetedMirroring() {
     if (MONGO_unlikely(_cachedHostsForTargetedMirroring.consumeDeferHostCompute())) {
         auto config = _topologyVersionObserver.getReplSetConfig();
@@ -1020,6 +1029,11 @@ std::shared_ptr<executor::TaskExecutor> getMirroringTaskExecutor_forTest(
     ServiceContext* serviceContext) {
     auto& impl = getMirrorMaestroImpl(serviceContext);
     return impl.getExecutor();
+}
+
+std::vector<HostAndPort> getCachedHostsForGeneralMirroring_forTest(ServiceContext* serviceContext) {
+    auto& impl = getMirrorMaestroImpl(serviceContext);
+    return impl.getCachedHostsForGeneralMirroring();
 }
 
 std::vector<HostAndPort> getCachedHostsForTargetedMirroring_forTest(
