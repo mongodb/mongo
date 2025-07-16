@@ -127,6 +127,7 @@ ReshardingCoordinator::ReshardingCoordinator(
       _metrics{ReshardingMetrics::initializeFrom(coordinatorDoc, _serviceContext)},
       _metadata(coordinatorDoc.getCommonReshardingMetadata()),
       _coordinatorDoc(coordinatorDoc),
+      _coordinatorDao(resharding::ReshardingCoordinatorDao(coordinatorDoc.getReshardingUUID())),
       _markKilledExecutor{resharding::makeThreadPoolForMarkKilledExecutor(
           "ReshardingCoordinatorCancelableOpCtxPool")},
       _reshardingCoordinatorExternalState(externalState) {
@@ -945,8 +946,8 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
 
     resharding::PhaseTransitionFn phaseTransitionFn = [=, this](OperationContext* opCtx,
                                                                 TxnNumber txnNumber) {
-        auto updatedDocument = _coordinatorDao.transitionToPreparingToDonatePhase(
-            opCtx, shardsAndChunks, _coordinatorDoc.getReshardingUUID(), txnNumber);
+        auto updatedDocument =
+            _coordinatorDao.transitionToPreparingToDonatePhase(opCtx, shardsAndChunks, txnNumber);
         return updatedDocument;
     };
 
@@ -1002,8 +1003,7 @@ ReshardingApproxCopySize computeApproxCopySize(OperationContext* opCtx,
 ExecutorFuture<void> ReshardingCoordinator::_awaitAllDonorsReadyToDonate(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-    if (_coordinatorDao.getPhase(opCtx.get(), _coordinatorDoc.getReshardingUUID()) >
-        CoordinatorStateEnum::kPreparingToDonate) {
+    if (_coordinatorDao.getPhase(opCtx.get()) > CoordinatorStateEnum::kPreparingToDonate) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
@@ -1025,19 +1025,14 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllDonorsReadyToDonate(
                 return computeApproxCopySize(opCtx.get(), coordinatorDocChangedOnDisk);
             }();
 
-            _updateCoordinatorDocStateAndCatalogEntries([=, this](OperationContext* opCtx,
-                                                                  TxnNumber txnNumber) {
-                auto now = resharding::getCurrentTime();
-                auto updatedDocument =
-                    _coordinatorDao.transitionToCloningPhase(opCtx,
-                                                             now,
-                                                             highestMinFetchTimestamp,
-                                                             approxCopySize,
-                                                             _coordinatorDoc.getReshardingUUID(),
-                                                             txnNumber);
-                _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCloning, now);
-                return updatedDocument;
-            });
+            _updateCoordinatorDocStateAndCatalogEntries(
+                [=, this](OperationContext* opCtx, TxnNumber txnNumber) {
+                    auto now = resharding::getCurrentTime();
+                    auto updatedDocument = _coordinatorDao.transitionToCloningPhase(
+                        opCtx, now, highestMinFetchTimestamp, approxCopySize, txnNumber);
+                    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCloning, now);
+                    return updatedDocument;
+                });
         })
         .then([this] {
             return resharding::waitForMajority(_ctHolder->getAbortToken(),
@@ -1161,8 +1156,7 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneF
 ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-    if (_coordinatorDao.getPhase(opCtx.get(), _coordinatorDoc.getReshardingUUID()) >
-        CoordinatorStateEnum::kCloning) {
+    if (_coordinatorDao.getPhase(opCtx.get()) > CoordinatorStateEnum::kCloning) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
@@ -1191,8 +1185,8 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
             this->_updateCoordinatorDocStateAndCatalogEntries(
                 [=, this](OperationContext* opCtx, TxnNumber txnNumber) {
                     auto now = resharding::getCurrentTime();
-                    auto updatedDocument = _coordinatorDao.transitionToApplyingPhase(
-                        opCtx, now, _coordinatorDoc.getReshardingUUID(), txnNumber);
+                    auto updatedDocument =
+                        _coordinatorDao.transitionToApplyingPhase(opCtx, now, txnNumber);
 
                     _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCloning, now);
                     _metrics->setStartFor(ReshardingMetrics::TimedPhase::kApplying, now);
@@ -1285,11 +1279,7 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedApplying(
             _updateCoordinatorDocStateAndCatalogEntries(
                 [=, this](OperationContext* opCtx, TxnNumber txnNumber) {
                     auto updatedDocument = _coordinatorDao.transitionToBlockingWritesPhase(
-                        opCtx,
-                        now,
-                        criticalSectionExpiresAt,
-                        _coordinatorDoc.getReshardingUUID(),
-                        txnNumber);
+                        opCtx, now, criticalSectionExpiresAt, txnNumber);
                     _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection, now);
                     return updatedDocument;
                 });

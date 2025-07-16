@@ -111,14 +111,19 @@ ReshardingCoordinatorDocument TransactionalDaoStorageClientImpl::readState(
 using resharding_metrics::getIntervalEndFieldName;
 using resharding_metrics::getIntervalStartFieldName;
 
+CoordinatorStateEnum ReshardingCoordinatorDao::getPhase(OperationContext* opCtx,
+                                                        boost::optional<TxnNumber> txnNumber) {
+    auto client = _clientFactory->createDaoStorageClient(txnNumber);
+    return client->readState(opCtx, _reshardingUUID).getState();
+}
+
 ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToPreparingToDonatePhase(
     OperationContext* opCtx,
     resharding::ParticipantShardsAndChunks shardsAndChunks,
-    const UUID& reshardingUUID,
     boost::optional<TxnNumber> txnNumber) {
 
     auto client = _clientFactory->createDaoStorageClient(txnNumber);
-    auto doc = client->readState(opCtx, reshardingUUID);
+    auto doc = client->readState(opCtx, _reshardingUUID);
     invariant(doc.getState() == CoordinatorStateEnum::kInitializing);
 
     BSONObjBuilder updateBuilder;
@@ -151,13 +156,7 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToPreparingToD
         unsetBuilder.doneFast();
     }
 
-    return buildAndExecuteRequest(opCtx, std::move(client), reshardingUUID, updateBuilder);
-}
-CoordinatorStateEnum ReshardingCoordinatorDao::getPhase(OperationContext* opCtx,
-                                                        const UUID& reshardingUUID,
-                                                        boost::optional<TxnNumber> txnNumber) {
-    auto client = _clientFactory->createDaoStorageClient(txnNumber);
-    return client->readState(opCtx, reshardingUUID).getState();
+    return buildAndExecuteRequest(opCtx, std::move(client), _reshardingUUID, updateBuilder);
 }
 
 ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToCloningPhase(
@@ -165,11 +164,10 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToCloningPhase
     Date_t now,
     Timestamp cloneTimestamp,
     ReshardingApproxCopySize approxCopySize,
-    const UUID& reshardingUUID,
     boost::optional<TxnNumber> txnNumber) {
 
     auto client = _clientFactory->createDaoStorageClient(txnNumber);
-    auto doc = client->readState(opCtx, reshardingUUID);
+    auto doc = client->readState(opCtx, _reshardingUUID);
     invariant(doc.getState() == CoordinatorStateEnum::kPreparingToDonate);
 
     // We know these values exist, so doc will contain these fields after the function calls.
@@ -196,18 +194,17 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToCloningPhase
                           now);
     }
 
-    return buildAndExecuteRequest(opCtx, std::move(client), reshardingUUID, updateBuilder);
+    return buildAndExecuteRequest(opCtx, std::move(client), _reshardingUUID, updateBuilder);
 }
 
 ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToBlockingWritesPhase(
     OperationContext* opCtx,
     Date_t now,
     Date_t criticalSectionExpireTime,
-    const UUID& reshardingUUID,
     boost::optional<TxnNumber> txnNumber) {
 
     auto client = _clientFactory->createDaoStorageClient(txnNumber);
-    auto doc = client->readState(opCtx, reshardingUUID);
+    auto doc = client->readState(opCtx, _reshardingUUID);
     invariant(doc.getState() == CoordinatorStateEnum::kApplying);
 
     BSONObjBuilder updateBuilder;
@@ -225,17 +222,14 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToBlockingWrit
                           criticalSectionExpireTime);
     }
 
-    return buildAndExecuteRequest(opCtx, std::move(client), reshardingUUID, updateBuilder);
+    return buildAndExecuteRequest(opCtx, std::move(client), _reshardingUUID, updateBuilder);
 }
 
 ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToApplyingPhase(
-    OperationContext* opCtx,
-    Date_t now,
-    const UUID& reshardingUUID,
-    boost::optional<TxnNumber> txnNumber) {
+    OperationContext* opCtx, Date_t now, boost::optional<TxnNumber> txnNumber) {
 
     auto client = _clientFactory->createDaoStorageClient(txnNumber);
-    auto doc = client->readState(opCtx, reshardingUUID);
+    auto doc = client->readState(opCtx, _reshardingUUID);
     invariant(doc.getState() == CoordinatorStateEnum::kCloning);
 
     BSONObjBuilder updateBuilder;
@@ -255,7 +249,7 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToApplyingPhas
                           now);
     }
 
-    return buildAndExecuteRequest(opCtx, std::move(client), reshardingUUID, updateBuilder);
+    return buildAndExecuteRequest(opCtx, std::move(client), _reshardingUUID, updateBuilder);
 }
 
 }  // namespace resharding

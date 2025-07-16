@@ -70,7 +70,6 @@ public:
 class DaoStorageClientFactory {
 public:
     virtual ~DaoStorageClientFactory() = default;
-
     virtual std::unique_ptr<DaoStorageClient> createDaoStorageClient(
         boost::optional<TxnNumber> txnNumber) = 0;
 };
@@ -88,19 +87,18 @@ public:
 
 class ReshardingCoordinatorDao {
 public:
-    explicit ReshardingCoordinatorDao(std::unique_ptr<DaoStorageClientFactory> clientFactory =
+    explicit ReshardingCoordinatorDao(const UUID& reshardingUUID,
+                                      std::unique_ptr<DaoStorageClientFactory> clientFactory =
                                           std::make_unique<DaoStorageClientFactoryImpl>())
-        : _clientFactory(std::move(clientFactory)) {}
+        : _reshardingUUID(reshardingUUID), _clientFactory(std::move(clientFactory)) {}
     ~ReshardingCoordinatorDao() = default;
 
     CoordinatorStateEnum getPhase(OperationContext* opCtx,
-                                  const UUID& reshardingUUID,
                                   boost::optional<TxnNumber> txnNumber = boost::none);
 
     ReshardingCoordinatorDocument transitionToPreparingToDonatePhase(
         OperationContext* opCtx,
         ParticipantShardsAndChunks shardsAndChunks,
-        const UUID& reshardingUUID,
         boost::optional<TxnNumber> txnNumber = boost::none);
 
     ReshardingCoordinatorDocument transitionToCloningPhase(
@@ -108,23 +106,19 @@ public:
         Date_t now,
         Timestamp cloneTimestamp,
         ReshardingApproxCopySize approxCopySize,
-        const UUID& reshardingUUID,
         boost::optional<TxnNumber> txnNumber = boost::none);
 
     ReshardingCoordinatorDocument transitionToApplyingPhase(
-        OperationContext* opCtx,
-        Date_t now,
-        const UUID& reshardingUUID,
-        boost::optional<TxnNumber> txnNumber = boost::none);
+        OperationContext* opCtx, Date_t now, boost::optional<TxnNumber> txnNumber = boost::none);
 
     ReshardingCoordinatorDocument transitionToBlockingWritesPhase(
         OperationContext* opCtx,
         Date_t now,
         Date_t criticalSectionExpireTime,
-        const UUID& reshardingUUID,
         boost::optional<TxnNumber> txnNumber = boost::none);
 
 private:
+    const UUID _reshardingUUID;
     std::unique_ptr<DaoStorageClientFactory> _clientFactory;
 };
 

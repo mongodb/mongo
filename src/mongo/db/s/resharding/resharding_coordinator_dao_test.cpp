@@ -92,7 +92,7 @@ protected:
     void setUp() override {
         auto [clientFactory, state] = SpyingDaoStorageClientFactory::create();
         _state = std::move(state);
-        _dao = std::make_unique<ReshardingCoordinatorDao>(std::move(clientFactory));
+        _dao = std::make_unique<ReshardingCoordinatorDao>(_uuid, std::move(clientFactory));
     }
 
     void runPhaseTransition(CoordinatorStateEnum initialPhase,
@@ -110,12 +110,12 @@ protected:
 
 TEST_F(ReshardingCoordinatorDaoFixture, GetPhase) {
     _state->document.setState(CoordinatorStateEnum::kCloning);
-    auto phase = _dao->getPhase(_opCtx, _uuid);
+    auto phase = _dao->getPhase(_opCtx);
     ASSERT_EQUALS(phase, CoordinatorStateEnum::kCloning);
 
     // Test with a different phase.
     _state->document.setState(CoordinatorStateEnum::kApplying);
-    phase = _dao->getPhase(_opCtx, _uuid);
+    phase = _dao->getPhase(_opCtx);
     ASSERT_EQUALS(phase, CoordinatorStateEnum::kApplying);
 }
 
@@ -136,7 +136,7 @@ TEST_F(ReshardingCoordinatorDaoFixture, TransitionToPreparingToDonatePhaseSuccee
         ParticipantShardsAndChunks({donorShards, recipientShards, initialChunks});
 
     runPhaseTransition(CoordinatorStateEnum::kInitializing, [&]() {
-        _dao->transitionToPreparingToDonatePhase(_opCtx, shardsAndChunks, _uuid);
+        _dao->transitionToPreparingToDonatePhase(_opCtx, shardsAndChunks);
     });
 
     BSONArrayBuilder donorShardsArrayBuilder;
@@ -186,7 +186,7 @@ DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
         ParticipantShardsAndChunks({donorShards, recipientShards, initialChunks});
 
     runPhaseTransition(CoordinatorStateEnum::kPreparingToDonate, [&]() {
-        _dao->transitionToPreparingToDonatePhase(_opCtx, shardsAndChunks, _uuid);
+        _dao->transitionToPreparingToDonatePhase(_opCtx, shardsAndChunks);
     });
 }
 
@@ -201,8 +201,7 @@ TEST_F(ReshardingCoordinatorDaoFixture, TransitionToCloningPhaseSucceeds) {
     auto cloneStartTime = _clock->now();
 
     runPhaseTransition(CoordinatorStateEnum::kPreparingToDonate, [&]() {
-        _dao->transitionToCloningPhase(
-            _opCtx, cloneStartTime, cloneTimestamp, approxCopySize, _uuid);
+        _dao->transitionToCloningPhase(_opCtx, cloneStartTime, cloneTimestamp, approxCopySize);
     });
 
     auto expectedUpdates = BSON_ARRAY(
@@ -232,8 +231,7 @@ DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
     auto cloneStartTime = _clock->now();
 
     runPhaseTransition(CoordinatorStateEnum::kCloning, [&]() {
-        _dao->transitionToCloningPhase(
-            _opCtx, cloneStartTime, cloneTimestamp, approxCopySize, _uuid);
+        _dao->transitionToCloningPhase(_opCtx, cloneStartTime, cloneTimestamp, approxCopySize);
     });
 }
 
@@ -241,7 +239,7 @@ TEST_F(ReshardingCoordinatorDaoFixture, TransitionToApplyingPhaseSucceeds) {
     auto applyStartTime = _clock->now();
 
     runPhaseTransition(CoordinatorStateEnum::kCloning,
-                       [&]() { _dao->transitionToApplyingPhase(_opCtx, applyStartTime, _uuid); });
+                       [&]() { _dao->transitionToApplyingPhase(_opCtx, applyStartTime); });
 
     auto expectedUpdates = BSON_ARRAY(BSON(
         "q" << BSON("_id" << _uuid) << "u"
@@ -263,7 +261,7 @@ DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
     auto applyStartTime = _clock->now();
 
     runPhaseTransition(CoordinatorStateEnum::kApplying,
-                       [&]() { _dao->transitionToApplyingPhase(_opCtx, applyStartTime, _uuid); });
+                       [&]() { _dao->transitionToApplyingPhase(_opCtx, applyStartTime); });
 }
 
 TEST_F(ReshardingCoordinatorDaoFixture, TransitionToBlockingWritesPhaseSucceeds) {
@@ -271,7 +269,7 @@ TEST_F(ReshardingCoordinatorDaoFixture, TransitionToBlockingWritesPhaseSucceeds)
     auto criticalSectionExpiresAt = now + Seconds(5);
 
     runPhaseTransition(CoordinatorStateEnum::kApplying, [&]() {
-        _dao->transitionToBlockingWritesPhase(_opCtx, now, criticalSectionExpiresAt, _uuid);
+        _dao->transitionToBlockingWritesPhase(_opCtx, now, criticalSectionExpiresAt);
     });
 
     auto expectedUpdates = BSON_ARRAY(BSON(
@@ -295,7 +293,7 @@ DEATH_TEST_F(ReshardingCoordinatorDaoFixture,
     auto criticalSectionExpiresAt = now + Seconds(5);
 
     runPhaseTransition(CoordinatorStateEnum::kAborting, [&]() {
-        _dao->transitionToBlockingWritesPhase(_opCtx, now, criticalSectionExpiresAt, _uuid);
+        _dao->transitionToBlockingWritesPhase(_opCtx, now, criticalSectionExpiresAt);
     });
 }
 
