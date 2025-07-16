@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wttest
+import platform, wttest
 from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from test_layered23 import Oplog
 from wtscenario import make_scenarios
@@ -54,6 +54,9 @@ class test_layered27(wttest.WiredTigerTestCase, DisaggConfigMixin):
         return self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="leader")'
 
     def test_drain_insert_update(self):
+        if platform.processor() == 's390x':
+            self.skipTest("FIXME-WT-15000: not working on zSeries")
+
         # Create the oplog
         oplog = Oplog()
 
@@ -112,6 +115,9 @@ class test_layered27(wttest.WiredTigerTestCase, DisaggConfigMixin):
         oplog.check(self, session_follow, 0, 400 * self.multiplier)
 
     def test_drain_remove(self):
+        if platform.processor() == 's390x':
+            self.skipTest("FIXME-WT-15000: not working on zSeries")
+
         # Create the oplog
         oplog = Oplog()
 

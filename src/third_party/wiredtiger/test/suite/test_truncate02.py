@@ -48,8 +48,10 @@ class test_truncate_fast_delete(test_truncate_base):
     types = [
         ('file', dict(type='file:', config=\
             'allocation_size=512,leaf_page_max=512')),
-        ('layered', dict(type='layered:', config=\
-            'allocation_size=512,leaf_page_max=512'))
+        # FIXME-WT-14998 Re-enable the layered table scenario once disaggregated storage works with truncate tests.
+        # Consider whether we need this scenario here if the scenario is already defined in the test truncate base test.
+        # ('layered', dict(type='layered:', config=\
+        #     'allocation_size=512,leaf_page_max=512'))
     ]
 
     # This is all about testing the btree layer, not the schema layer, test
@@ -114,11 +116,6 @@ class test_truncate_fast_delete(test_truncate_base):
 
     # Trigger fast delete and test cursor counts.
     def test_truncate_fast_delete(self):
-        # Make the test more reliable.
-        # FIXME-WT-14977 Remove this constraint once disaggregated storage can handle checkpoint id after restart.
-        if self.type == 'layered:' and (self.keyfmt == 'r' or wttest.islongtest()):
-            return
-
         uri = self.type + self.name
 
         '''

@@ -1376,13 +1376,13 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
              * and should never be here. */
             WT_ASSERT(session, prev_upd->type == WT_UPDATE_STANDARD);
             WT_ASSERT(session,
-              tw.stop_txn <= prev_upd->txnid && tw.stop_ts <= prev_upd->start_ts &&
-                tw.durable_stop_ts <= prev_upd->durable_ts);
+              tw.stop_txn <= prev_upd->txnid && tw.stop_ts <= prev_upd->upd_start_ts &&
+                tw.durable_stop_ts <= prev_upd->upd_durable_ts);
             WT_ASSERT(session,
-              tw.start_txn <= prev_upd->txnid && tw.start_ts <= prev_upd->start_ts &&
-                tw.durable_start_ts <= prev_upd->durable_ts);
-            if (tw.stop_txn != prev_upd->txnid || tw.stop_ts != prev_upd->start_ts ||
-              tw.durable_stop_ts != prev_upd->durable_ts)
+              tw.start_txn <= prev_upd->txnid && tw.start_ts <= prev_upd->upd_start_ts &&
+                tw.durable_start_ts <= prev_upd->upd_durable_ts);
+            if (tw.stop_txn != prev_upd->txnid || tw.stop_ts != prev_upd->upd_start_ts ||
+              tw.durable_stop_ts != prev_upd->upd_durable_ts)
                 WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, NULL));
         } else if (WT_TIME_WINDOW_HAS_STOP(&tw))
             WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, NULL));
@@ -1405,8 +1405,8 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
             } else
                 WT_ERR(__wt_upd_alloc(session, value, WT_UPDATE_STANDARD, &upd, NULL));
             upd->txnid = tw.start_txn;
-            upd->start_ts = tw.start_ts;
-            upd->durable_ts = tw.durable_start_ts;
+            upd->upd_start_ts = tw.start_ts;
+            upd->upd_durable_ts = tw.durable_start_ts;
         } else
             WT_ASSERT(session, tombstone != NULL);
 
@@ -1414,11 +1414,11 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
          * ingest table. */
         if (tombstone != NULL) {
             tombstone->txnid = tw.stop_txn;
-            tombstone->start_ts = tw.start_ts;
-            tombstone->durable_ts = tw.durable_start_ts;
+            tombstone->upd_start_ts = tw.start_ts;
+            tombstone->upd_durable_ts = tw.durable_start_ts;
             tombstone->next = upd;
 
-            WT_ASSERT(session, tombstone->durable_ts > last_checkpoint_timestamp);
+            WT_ASSERT(session, tombstone->upd_durable_ts > last_checkpoint_timestamp);
 
             if (prev_upd != NULL)
                 prev_upd->next = tombstone;

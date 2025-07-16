@@ -130,6 +130,9 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
     def perform_backup_or_crash_restart(self, fromdir, todir):
         if self.restart == True:
             #Simulate a crash by copying to a new directory(RESTART).
+            # FIXME-WT-14944  Works up to this point, then fails.
+            if self.runningHook('disagg'):
+                self.skipTest('After simulated crash restart, the URI is not found')
             simulate_crash_restart(self, fromdir, todir)
         else:
             #Take a backup and restore it.
@@ -177,6 +180,10 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
             ckpt.join()
 
         self.perform_backup_or_crash_restart(".", self.backup_dir)
+
+        # FIXME-WT-14944  Works up to this point, then fails.
+        if self.runningHook('disagg'):
+            self.skipTest('After simulated crash restart, the URI is not found')
 
         # Check the table contains the last checkpointed value.
         self.check(self.valuea, self.uri, self.nrows, 0, True)

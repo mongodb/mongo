@@ -44,8 +44,10 @@ __bmd_checkpoint_pack_raw(WT_BLOCK_DISAGG *block_disagg, WT_SESSION_IMPL *sessio
         /* Copy the checkpoint information into the checkpoint. */
         WT_RET(__wt_buf_init(session, &ckpt->raw, WT_BLOCK_CHECKPOINT_BUFFER));
         endp = ckpt->raw.mem;
+        __wt_page_header_byteswap((void *)root_image->data);
         WT_RET(__wti_block_disagg_write_internal(
           session, block_disagg, root_image, block_meta, &size, &checksum, true, true));
+        __wt_page_header_byteswap((void *)root_image->data);
         WT_RET(__wti_block_disagg_ckpt_pack(block_disagg, &endp, block_meta->page_id,
           block_meta->disagg_lsn, block_meta->checkpoint_id, block_meta->reconciliation_id, size,
           checksum));

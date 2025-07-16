@@ -418,7 +418,7 @@ __wt_modify_reconstruct_from_upd_list(WT_SESSION_IMPL *session, WT_CURSOR_BTREE 
 
     cursor = &cbt->iface;
     /* While we have a pointer to our original modify, grab this information. */
-    upd_value->tw.durable_start_ts = modify->durable_ts;
+    upd_value->tw.durable_start_ts = modify->upd_durable_ts;
     upd_value->tw.start_txn = modify->txnid;
     onpage_retry = true;
 

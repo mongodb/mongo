@@ -39,6 +39,7 @@ from wtscenario import make_scenarios
 #
 # - You may not regen or drop a named checkpoint with a cursor open.
 
+@wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'

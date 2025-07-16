@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wttest, wiredtiger
+import platform, wttest, wiredtiger
 from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from test_layered23 import Oplog
 from wtscenario import make_scenarios
@@ -137,6 +137,9 @@ class test_layered38(wttest.WiredTigerTestCase, DisaggConfigMixin):
         self.assertEqual(count, 0)
 
     def test_gc_ingest_table_with_remove(self):
+        if platform.processor() == 's390x':
+            self.skipTest("FIXME-WT-15000: not working on zSeries")
+
         # Create the oplog
         oplog = Oplog(value_size=500)
 

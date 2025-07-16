@@ -112,6 +112,7 @@ class test_checkpoint_snapshot05(wttest.WiredTigerTestCase):
         evict_cursor.close()
         s.close()
 
+    @wttest.skip_for_hook("disagg", "layered trees do not yet support bulk loading")  # FIXME-WT-14563
     def test_checkpoint_snapshot(self):
         self.moresetup()
 

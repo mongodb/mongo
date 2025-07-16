@@ -194,7 +194,7 @@ __wt_delta_header_byteswap(WT_DELTA_HEADER *dsk)
 {
 #ifdef WORDS_BIGENDIAN
     dsk->write_gen = __wt_bswap64(dsk->write_gen);
-    dsk->mem_size = __wt_bswap64(dsk->mem_size);
+    dsk->mem_size = __wt_bswap32(dsk->mem_size);
     dsk->u.entries = __wt_bswap32(dsk->u.entries);
 #else
     WT_UNUSED(dsk);
@@ -315,6 +315,7 @@ struct __wt_save_upd {
     WT_ROW *rip;    /* Original on-page reference */
     WT_UPDATE *onpage_upd;
     WT_UPDATE *onpage_tombstone;
+    WT_TIME_WINDOW tw;
     bool restore; /* Whether to restore this saved update chain */
 };
 
@@ -1154,8 +1155,22 @@ struct __wt_page_deleted {
      */
     wt_shared volatile uint64_t txnid; /* Transaction ID */
 
-    wt_timestamp_t timestamp; /* Timestamps */
-    wt_timestamp_t durable_timestamp;
+    union {
+        struct {
+            wt_timestamp_t durable_ts; /* timestamps */
+            wt_timestamp_t start_ts;
+        } commit;
+
+        struct {
+            wt_timestamp_t rollback_ts; /* rollback timestamp */
+            uint64_t saved_txnid;       /* transaction id before rollback */
+        } prepare_rollback;
+    } u;
+
+#define pg_del_durable_ts u.commit.durable_ts
+#define pg_del_start_ts u.commit.start_ts
+#define pg_del_rollback_ts u.prepare_rollback.rollback_ts
+#define pg_del_saved_txnid u.prepare_rollback.saved_txnid
 
     /* Prepared transaction fields */
     uint64_t prepared_id;
@@ -1574,8 +1589,26 @@ struct __wt_update {
      */
     wt_shared volatile uint64_t txnid; /* transaction ID */
 
-    wt_timestamp_t durable_ts; /* timestamps */
-    wt_timestamp_t start_ts;
+    union {
+        struct {
+            wt_timestamp_t durable_ts; /* timestamps */
+            wt_timestamp_t start_ts;
+        } commit;
+
+        struct {
+            wt_timestamp_t rollback_ts; /* rollback timestamp */
+            uint64_t saved_txnid;       /* transaction id before rollback */
+        } prepare_rollback;
+    } u;
+
+#undef upd_durable_ts
+#define upd_durable_ts u.commit.durable_ts
+#undef upd_start_ts
+#define upd_start_ts u.commit.start_ts
+#undef upd_rollback_ts
+#define upd_rollback_ts u.prepare_rollback.rollback_ts
+#undef upd_saved_txnid
+#define upd_saved_txnid u.prepare_rollback.saved_txnid
 
     /* Prepared transaction fields */
     uint64_t prepared_id;
@@ -1611,16 +1644,18 @@ struct __wt_update {
 
 /* When introducing a new flag, consider adding it to WT_UPDATE_SELECT_FOR_DS. */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_UPDATE_DS 0x001u                       /* Update has been chosen to the data store. */
-#define WT_UPDATE_DURABLE 0x002u                  /* Update has been durable. */
-#define WT_UPDATE_HS 0x004u                       /* Update has been written to history store. */
-#define WT_UPDATE_PREPARE_RESTORED_FROM_DS 0x008u /* Prepared update restored from data store. */
-#define WT_UPDATE_RESTORED_FAST_TRUNCATE 0x010u   /* Fast truncate instantiation */
-#define WT_UPDATE_RESTORED_FROM_DELTA 0x020u      /* Update restored from delta. */
-#define WT_UPDATE_RESTORED_FROM_DS 0x040u         /* Update restored from data store. */
-#define WT_UPDATE_RESTORED_FROM_HS 0x080u         /* Update restored from history store. */
-#define WT_UPDATE_RTS_DRYRUN_ABORT 0x100u         /* Used by dry run to mark a would-be abort. */
-#define WT_UPDATE_TO_DELETE_FROM_HS 0x200u /* Update needs to be deleted from history store */
+#define WT_UPDATE_DELETE_DURABLE 0x001u           /* Key has been removed from disk image */
+#define WT_UPDATE_DS 0x002u                       /* Update has been chosen to the data store. */
+#define WT_UPDATE_DURABLE 0x004u                  /* Update has been durable. */
+#define WT_UPDATE_HS 0x008u                       /* Update has been written to history store. */
+#define WT_UPDATE_PREPARE_DURABLE 0x010u          /* Prepared update has been durable. */
+#define WT_UPDATE_PREPARE_RESTORED_FROM_DS 0x020u /* Prepared update restored from data store. */
+#define WT_UPDATE_RESTORED_FAST_TRUNCATE 0x040u   /* Fast truncate instantiation */
+#define WT_UPDATE_RESTORED_FROM_DELTA 0x080u      /* Update restored from delta. */
+#define WT_UPDATE_RESTORED_FROM_DS 0x100u         /* Update restored from data store. */
+#define WT_UPDATE_RESTORED_FROM_HS 0x200u         /* Update restored from history store. */
+#define WT_UPDATE_RTS_DRYRUN_ABORT 0x400u         /* Used by dry run to mark a would-be abort. */
+#define WT_UPDATE_TO_DELETE_FROM_HS 0x800u /* Update needs to be deleted from history store */
                                            /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
     uint16_t flags;
 

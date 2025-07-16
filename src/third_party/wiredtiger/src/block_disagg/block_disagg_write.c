@@ -251,10 +251,18 @@ __wti_block_disagg_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf
      * place to catch all callers. After the write, swap values back to native order so callers
      * never see anything other than their original content.
      */
-    __wt_page_header_byteswap(buf->mem);
+    if (block_meta->delta_count == 0)
+        __wt_page_header_byteswap(buf->mem);
+    else
+        __wt_delta_header_byteswap(buf->mem);
+
     WT_RET(__wti_block_disagg_write_internal(
       session, block_disagg, buf, block_meta, &size, &checksum, data_checksum, checkpoint_io));
-    __wt_page_header_byteswap(buf->mem);
+
+    if (block_meta->delta_count == 0)
+        __wt_page_header_byteswap(buf->mem);
+    else
+        __wt_delta_header_byteswap(buf->mem);
 
     endp = addr;
     WT_RET(__wti_block_disagg_addr_pack(&endp, block_meta->page_id, block_meta->disagg_lsn,

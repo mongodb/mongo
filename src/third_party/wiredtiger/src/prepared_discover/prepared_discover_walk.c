@@ -124,7 +124,7 @@ __prepared_discover_process_prepared_update(WT_SESSION_IMPL *session, WT_ITEM *k
       session, upd->prepare_state != WT_PREPARE_INIT && upd->prepare_state != WT_PREPARE_RESOLVED);
 
     /* TODO: at the moment the prepare time is overloaded, eventually this will be different */
-    prepare_timestamp = upd->start_ts;
+    prepare_timestamp = upd->upd_start_ts;
     WT_RET(__wti_prepared_discover_add_artifact_upd(session, prepare_timestamp, key, upd));
     return (0);
 }

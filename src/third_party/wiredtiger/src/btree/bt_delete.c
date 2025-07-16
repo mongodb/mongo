@@ -308,8 +308,10 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
              */
             for (; *updp != NULL; ++updp) {
                 /* The ref is locked, no need to pay attention to memory ordering here. */
-                if (F_ISSET(txn, WT_TXN_HAS_TS_ROLLBACK))
-                    (*updp)->start_ts = txn->rollback_timestamp;
+                if (F_ISSET(txn, WT_TXN_HAS_TS_ROLLBACK)) {
+                    (*updp)->upd_rollback_ts = txn->rollback_timestamp;
+                    (*updp)->upd_saved_txnid = (*updp)->txnid;
+                }
                 (*updp)->txnid = WT_TXN_ABORTED;
             }
             /* Now discard the updates. */
@@ -474,8 +476,8 @@ __tombstone_update_alloc(
      */
     if (page_del != NULL) {
         upd->txnid = page_del->txnid;
-        upd->durable_ts = page_del->durable_timestamp;
-        upd->start_ts = page_del->timestamp;
+        upd->upd_durable_ts = page_del->pg_del_durable_ts;
+        upd->upd_start_ts = page_del->pg_del_start_ts;
         upd->prepare_state = page_del->prepare_state;
     }
     *updp = upd;

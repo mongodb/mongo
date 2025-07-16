@@ -449,7 +449,7 @@ typedef struct {
       ((r)->ref->page->modify->rec_result == WT_PM_REC_MULTIBLOCK &&             \
         (r)->ref->page->modify->mod_multi_entries == 1))
 
-/* Called when writing the leaf disk image. */
+/* Called after building the disk image. */
 #define WT_BUILD_DELTA_LEAF(session, r)                                           \
     F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) &&                             \
       F_ISSET(&S2C(session)->disaggregated_storage, WT_DISAGG_LEAF_PAGE_DELTA) && \

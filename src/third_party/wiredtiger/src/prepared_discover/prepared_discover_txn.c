@@ -100,8 +100,8 @@ __wti_prepared_discover_add_artifact_ondisk_row(
      */
     WT_RET(__wt_upd_alloc(session, NULL, WT_UPDATE_STANDARD, &upd, NULL));
     upd->txnid = session->txn->id;
-    upd->durable_ts = tw->durable_start_ts;
-    upd->start_ts = tw->start_ts;
+    upd->upd_durable_ts = tw->durable_start_ts;
+    upd->upd_start_ts = tw->start_ts;
     upd->prepare_state = WT_PREPARE_INPROGRESS;
 
     WT_ERR(__wti_prepared_discover_add_artifact_upd(session, prepare_transaction_id, key, upd));

@@ -48,6 +48,8 @@ class test_checkpoint35(wttest.WiredTigerTestCase):
 
     scenarios = make_scenarios(format_values)
 
+    # FIXME-WT-14982
+    @wttest.skip_for_hook("disagg", "PALM environment mapsize limitation")
     def test_checkpoint(self):
         uri = 'table:checkpoint35'
         nrows = 1000000

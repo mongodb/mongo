@@ -63,6 +63,7 @@ class test_truncate_arguments(test_truncate_base):
     scenarios = make_scenarios(test_truncate_base.disagg_storages, [
         ('file', dict(type='file:')),
         ('table', dict(type='table:')),
+        # FIXME-WT-14998 Re-enable layered tables on truncate tests.
         # ('layered', dict(type='layered:'))
     ])
 
@@ -107,6 +108,7 @@ class test_truncate_uri(test_truncate_base):
     scenarios = make_scenarios(test_truncate_base.disagg_storages, [
         ('file', dict(type='file:')),
         ('table', dict(type='table:')),
+        # FIXME-WT-14998 Re-enable layered tables on truncate tests.
         # ('layered', dict(type='layered:'))
     ])
 
@@ -175,6 +177,7 @@ class test_truncate_cursor_end(test_truncate_base):
     types = [
         ('file', dict(type='file:')),
         ('table', dict(type='table:')),
+        # FIXME-WT-14998 Re-enable layered tables on truncate tests.
         # ('layered', dict(type='layered:'))
     ]
     keyfmt = [
@@ -225,6 +228,7 @@ class test_truncate_empty(test_truncate_base):
     types = [
         ('file', dict(type='file:')),
         ('table', dict(type='table:')),
+        # FIXME-WT-14998 Re-enable layered tables on truncate tests.
         # ('layered', dict(type='layered:'))
     ]
     keyfmt = [
@@ -265,6 +269,7 @@ class test_truncate_timestamp(test_truncate_base):
     scenarios = make_scenarios(test_truncate_base.disagg_storages, [
         ('file', dict(type='file:')),
         ('table', dict(type='table:')),
+        # FIXME-WT-14998 Re-enable layered tables on truncate tests.
         # ('layered', dict(type='layered:'))
     ])
 
@@ -308,6 +313,7 @@ class test_truncate_cursor(test_truncate_base):
             config='allocation_size=512,leaf_page_max=512', P=0.25)),
         ('table', dict(type='table:', valuefmt='S',
             config='allocation_size=512,leaf_page_max=512', P=0.5)),
+        # FIXME-WT-14998 Re-enable layered tables on truncate tests.
         # ('layered', dict(type='layered:', valuefmt='S',
         #     config='allocation_size=512,leaf_page_max=512', P=0.25)),
     ]

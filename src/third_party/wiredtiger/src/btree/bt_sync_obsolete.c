@@ -207,7 +207,7 @@ __sync_obsolete_deleted_cleanup(WT_SESSION_IMPL *session, WT_REF *ref)
 
     page_del = ref->page_del;
     if (page_del == NULL ||
-      __wt_txn_visible_all(session, page_del->txnid, page_del->durable_timestamp)) {
+      __wt_txn_visible_all(session, page_del->txnid, page_del->pg_del_durable_ts)) {
         WT_RET(__wt_page_parent_modify_set(session, ref, false));
         __wt_verbose_debug2(session, WT_VERB_CHECKPOINT_CLEANUP,
           "%p: marking obsolete deleted page parent dirty", (void *)ref);

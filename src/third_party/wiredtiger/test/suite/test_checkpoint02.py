@@ -60,6 +60,8 @@ class test_checkpoint02(wttest.WiredTigerTestCase):
     def conn_config(self):
         return self.ckpt_config
 
+    # FIXME-WT-14981
+    @wttest.skip_for_hook("disagg", "disagg hook does not handle multithreaded tests correctly")
     def test_checkpoint02(self):
         # Avoid checkpoint error with precise checkpoint
         if self.ckpt_config == 'checkpoint=(precise=true)':

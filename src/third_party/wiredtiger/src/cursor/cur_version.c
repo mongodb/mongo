@@ -194,7 +194,7 @@ __curversion_next_single_key(WT_CURSOR *cursor)
             F_SET(version_cursor, WT_CURVERSION_UPDATE_EXHAUSTED);
         } else {
             if (version_cursor->start_timestamp != WT_TS_NONE &&
-              upd->durable_ts <= version_cursor->start_timestamp)
+              upd->upd_durable_ts <= version_cursor->start_timestamp)
                 goto done;
 
             if (upd->type == WT_UPDATE_TOMBSTONE) {
@@ -206,8 +206,8 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                  * the last update in the update list, retrieve the ondisk value.
                  */
                 version_cursor->upd_stop_txnid = upd->txnid;
-                version_cursor->upd_durable_stop_ts = upd->durable_ts;
-                version_cursor->upd_stop_ts = upd->start_ts;
+                version_cursor->upd_durable_stop_ts = upd->upd_durable_ts;
+                version_cursor->upd_stop_ts = upd->upd_start_ts;
 
                 /* No need to check the next update if the tombstone is globally visible. */
                 if (__wt_txn_upd_visible_all(session, upd))
@@ -245,13 +245,14 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                  * that particular version of the update.
                  */
                 WT_ERR(__curversion_set_value_with_format(cursor, WT_CURVERSION_METADATA_FORMAT,
-                  upd->txnid, upd->start_ts, upd->durable_ts, version_cursor->upd_stop_txnid,
-                  version_cursor->upd_stop_ts, version_cursor->upd_durable_stop_ts, upd->type,
-                  version_prepare_state, upd->flags, WT_CURVERSION_UPDATE_CHAIN));
+                  upd->txnid, upd->upd_start_ts, upd->upd_durable_ts,
+                  version_cursor->upd_stop_txnid, version_cursor->upd_stop_ts,
+                  version_cursor->upd_durable_stop_ts, upd->type, version_prepare_state, upd->flags,
+                  WT_CURVERSION_UPDATE_CHAIN));
 
                 version_cursor->upd_stop_txnid = upd->txnid;
-                version_cursor->upd_durable_stop_ts = upd->durable_ts;
-                version_cursor->upd_stop_ts = upd->start_ts;
+                version_cursor->upd_durable_stop_ts = upd->upd_durable_ts;
+                version_cursor->upd_stop_ts = upd->upd_start_ts;
 
                 upd_found = true;
 
@@ -281,15 +282,15 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                           !__wt_txn_visible_all(session, version_cursor->upd_stop_txnid,
                             version_cursor->upd_durable_stop_ts));
                         if (next_upd->txnid > version_cursor->upd_stop_txnid ||
-                          next_upd->start_ts > version_cursor->upd_stop_ts ||
-                          next_upd->durable_ts > version_cursor->upd_durable_stop_ts)
+                          next_upd->upd_start_ts > version_cursor->upd_stop_ts ||
+                          next_upd->upd_durable_ts > version_cursor->upd_durable_stop_ts)
                             WT_ERR_PANIC(session, WT_PANIC, "out of order updates detected.");
 
                         /* Ignore the update with the same transaction id and timestamp. */
                         if (F_ISSET(version_cursor, WT_CURVERSION_TIMESTAMP_ORDER) &&
                           next_upd->txnid == version_cursor->upd_stop_txnid &&
-                          next_upd->start_ts == version_cursor->upd_stop_ts &&
-                          next_upd->durable_ts == version_cursor->upd_durable_stop_ts)
+                          next_upd->upd_start_ts == version_cursor->upd_stop_ts &&
+                          next_upd->upd_durable_ts == version_cursor->upd_durable_stop_ts)
                             continue;
                         break;
                     }

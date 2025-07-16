@@ -1595,7 +1595,7 @@ __wt_ref_addr_copy(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY *copy)
         else {
             /* It's a legacy page; create default delete information. */
             copy->del.txnid = WT_TXN_NONE;
-            copy->del.timestamp = copy->del.durable_timestamp = WT_TS_NONE;
+            copy->del.pg_del_start_ts = copy->del.pg_del_durable_ts = WT_TS_NONE;
             copy->del.prepare_state = 0;
             copy->del.committed = true;
         }
@@ -1696,7 +1696,7 @@ __wt_page_del_visible_all(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, b
             return (false);
     }
 
-    return (__wt_txn_visible_all(session, page_del->txnid, page_del->durable_timestamp));
+    return (__wt_txn_visible_all(session, page_del->txnid, page_del->pg_del_durable_ts));
 }
 
 /*
@@ -1722,8 +1722,8 @@ __wt_page_del_visible(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, bool 
             return (false);
     }
 
-    return (
-      __wt_txn_visible(session, page_del->txnid, page_del->timestamp, page_del->durable_timestamp));
+    return (__wt_txn_visible(
+      session, page_del->txnid, page_del->pg_del_start_ts, page_del->pg_del_durable_ts));
 }
 
 /*

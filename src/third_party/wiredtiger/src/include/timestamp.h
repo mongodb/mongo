@@ -29,14 +29,15 @@
 struct __wt_time_window {
     wt_timestamp_t durable_start_ts; /* default value: WT_TS_NONE */
     wt_timestamp_t start_ts;         /* default value: WT_TS_NONE */
+    wt_timestamp_t start_prepare_ts; /* default value: WT_TS_NONE */
     uint64_t start_txn;              /* default value: WT_TXN_NONE */
+    uint64_t start_prepared_id;      /* default value: WT_PREPARED_ID_NONE */
 
     wt_timestamp_t durable_stop_ts; /* default value: WT_TS_NONE */
     wt_timestamp_t stop_ts;         /* default value: WT_TS_MAX */
+    wt_timestamp_t stop_prepare_ts; /* default value: WT_TS_NONE */
     uint64_t stop_txn;              /* default value: WT_TXN_MAX */
-
-    wt_timestamp_t prepare_ts; /* default value: WT_TS_NONE */
-    uint64_t prepared_id;      /* default value: WT_TXN_NONE */
+    uint64_t stop_prepared_id;      /* default value: WT_PREPARED_ID_NONE */
     /*
      * Prepare information isn't really part of a time window, but we need to aggregate it to the
      * internal page information in reconciliation, and this is the simplest place to put it.

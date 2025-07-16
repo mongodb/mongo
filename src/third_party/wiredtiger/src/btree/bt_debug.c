@@ -569,8 +569,8 @@ __debug_cell_int(WT_DBG *ds, const WT_PAGE_HEADER *dsk, WT_CELL_UNPACK_ADDR *unp
         if (F_ISSET(dsk, WT_PAGE_FT_UPDATE)) {
             page_del = &unpack->page_del;
             WT_RET(ds->f(ds, " | page_del : %s",
-              __wt_time_point_to_string(
-                page_del->timestamp, page_del->durable_timestamp, page_del->txnid, time_string)));
+              __wt_time_point_to_string(page_del->pg_del_start_ts, page_del->pg_del_durable_ts,
+                page_del->txnid, time_string)));
         }
     /* FALLTHROUGH */
     case WT_CELL_ADDR_INT:
@@ -1667,10 +1667,10 @@ __debug_update(WT_DBG *ds, WT_UPDATE *upd, bool hexbyte)
               "txn_id %" PRIu64,
               upd->txnid));
 
-        WT_RET(ds->f(ds, ", start_ts %s", __wt_timestamp_to_string(upd->start_ts, ts_string)));
-        if (upd->durable_ts != WT_TS_NONE)
-            WT_RET(
-              ds->f(ds, ", durable_ts %s", __wt_timestamp_to_string(upd->durable_ts, ts_string)));
+        WT_RET(ds->f(ds, ", start_ts %s", __wt_timestamp_to_string(upd->upd_start_ts, ts_string)));
+        if (upd->upd_durable_ts != WT_TS_NONE)
+            WT_RET(ds->f(
+              ds, ", durable_ts %s", __wt_timestamp_to_string(upd->upd_durable_ts, ts_string)));
 
         prepare_state = NULL;
         switch (upd->prepare_state) {
@@ -1759,7 +1759,7 @@ __debug_ref(WT_DBG *ds, WT_REF *ref)
         page_del = ref->page_del;
         WT_RET(ds->f(ds, " | page_del: %s",
           __wt_time_point_to_string(
-            page_del->timestamp, page_del->durable_timestamp, page_del->txnid, time_string)));
+            page_del->pg_del_start_ts, page_del->pg_del_durable_ts, page_del->txnid, time_string)));
     }
     return (ds->f(ds, "\n"));
 }

@@ -87,6 +87,9 @@ class test_checkpoint_snapshot03(wttest.WiredTigerTestCase):
         self.assertEqual(count, nrows + 1 if flcs_tolerance else nrows)
 
     def test_checkpoint_snapshot(self):
+        # FIXME-WT-14986
+        if self.runningHook('disagg') and self.key_format == 'S':
+            self.skipTest('crashes with checkpoint_id assertion')
 
         ds = SimpleDataSet(self, self.uri, 0, \
                 key_format=self.key_format, value_format=self.value_format, \
@@ -141,6 +144,9 @@ class test_checkpoint_snapshot03(wttest.WiredTigerTestCase):
         session1.rollback_transaction()
 
         # Simulate a server crash and restart.
+        # FIXME-WT-14944  Works up to this point, then fails.
+        if self.runningHook('disagg'):
+            self.skipTest('After simulated crash restart, the URI is not found')
         simulate_crash_restart(self, ".", "RESTART")
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)

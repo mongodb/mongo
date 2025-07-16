@@ -125,7 +125,7 @@ __wti_rts_visibility_page_needs_abort(
     } else if (mod != NULL && mod->instantiated && !__wt_page_is_modified(ref->page) &&
       ref->page_del != NULL) {
         tag = "page_del info";
-        durable_ts = ref->page_del->durable_timestamp;
+        durable_ts = ref->page_del->pg_del_durable_ts;
         prepared = ref->page_del->prepare_state == WT_PREPARE_INPROGRESS ||
           ref->page_del->prepare_state == WT_PREPARE_LOCKED;
         newest_txn = ref->page_del->txnid;

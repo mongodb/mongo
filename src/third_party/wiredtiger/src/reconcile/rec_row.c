@@ -656,7 +656,7 @@ __rec_row_garbage_collect_fixup_update_list(WT_SESSION_IMPL *session, WTI_RECONC
         return (0);
 
     if (WT_TXNID_LT(upd->txnid, r->last_running) && r->rec_prune_timestamp != WT_TS_NONE &&
-      upd->durable_ts <= r->rec_prune_timestamp) {
+      upd->upd_durable_ts <= r->rec_prune_timestamp) {
         WT_RET(__wt_upd_alloc_tombstone(session, &tombstone, NULL));
         tombstone->next = first_upd;
         upd_entry = &mod->mod_row_update[WT_ROW_SLOT(page, rip)];
@@ -699,7 +699,7 @@ __rec_row_garbage_collect_fixup_insert_list(
         return (0);
 
     if (WT_TXNID_LT(upd->txnid, r->last_running) && r->rec_prune_timestamp != WT_TS_NONE &&
-      upd->durable_ts <= r->rec_prune_timestamp) {
+      upd->upd_durable_ts <= r->rec_prune_timestamp) {
         WT_RET(__wt_upd_alloc_tombstone(session, &tombstone, NULL));
         tombstone->next = first_upd;
         ins->upd = tombstone;

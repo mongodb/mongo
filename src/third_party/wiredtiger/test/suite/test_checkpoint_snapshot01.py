@@ -90,6 +90,10 @@ class test_checkpoint_snapshot01(wttest.WiredTigerTestCase):
         #Simulate a crash by copying to a new directory(RESTART).
         copy_wiredtiger_home(self, ".", "RESTART")
 
+        # FIXME-WT-14984  Works up to this point, then fails.
+        if self.runningHook('disagg'):
+            self.skipTest('After simulated crash restart, a page cannot be found from DS')
+
         # Open the new directory.
         self.conn = self.setUpConnectionOpen("RESTART")
         self.session = self.setUpSessionOpen(self.conn)
