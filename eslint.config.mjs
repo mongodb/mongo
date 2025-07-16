@@ -105,7 +105,7 @@ export default [
                 testingReplication: true,
                 uncheckedParallelShellPidsString: true,
 
-                // src/mongo/shell/session.d.ts
+                // src/mongo/shell/session_global.js
                 DriverSession: true,
                 SessionOptions: true,
                 _DelegatingDriverSession: true,

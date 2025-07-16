@@ -289,6 +289,7 @@ MONGOJS_CPP_JSFILES = [
     "prelude.js",
     "query.js",
     "session.js",
+    "session_global.js",
     "types.js",
     "utils.js",
     "utils_auth.js",
