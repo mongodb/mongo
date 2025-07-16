@@ -12,7 +12,11 @@
 import {
     checkSbeFullyEnabled,
 } from "jstests/libs/query/sbe_util.js";
-import {padNumber, trimPlanToStagesAndIndexes} from 'jstests/query_golden/libs/utils.js';
+import {
+    extractSortEffort,
+    padNumber,
+    trimPlanToStagesAndIndexes
+} from 'jstests/query_golden/libs/utils.js';
 import {pipelines} from 'jstests/query_golden/test_inputs/plan_stability_pipelines.js';
 import {
     populateSimplePlanStabilityDataset
@@ -32,6 +36,13 @@ if (db.getServerBuildInfo().isAddressSanitizerActive() ||
 }
 
 const collName = "plan_stability";
+
+/**
+ * We use a dataset with 100K rows so that:
+ * 1. Queries still complete in a reasonable time.
+ * 2. There will be sufficient difference between plans,
+ *    rather than simple "off-by-one" counter increments/decrements.
+ */
 const collSize = 100_000;
 
 populateSimplePlanStabilityDataset(collName, collSize);
@@ -39,6 +50,7 @@ populateSimplePlanStabilityDataset(collName, collSize);
 let totalPlans = 0;
 let totalKeys = 0;
 let totalDocs = 0;
+let totalSorts = 0;
 let totalRows = 0;
 let totalErrors = 0;
 
@@ -52,16 +64,20 @@ let totalErrors = 0;
  *                 "winningPlan": <winningPlan>,
  *                 "keys"       : <totalKeysExamined>,
  *                 "docs"       : <totalDocsExamined>,
+ *                 "sorts"      : <sortEffort>,
  *                 "plans"      : <numberOfPlans>,
  *                 "rows"       : <nReturned>
  *         },
  *         ...
  *     ],
  *     ">>>totals": {
- *         "keys": <totalKeysExamined>, "docs": <totalDocsExamined>, "plans":
- * <numberOfPlans>, "rows": <nReturned>
+ *         "keys": <totalKeysExamined>, "docs": <totalDocsExamined>, "sortEffort":
+ * <totalSortEffort>, "plans": <numberOfPlans>, "rows": <nReturned>
  *     }
  * }
+ *
+ * The sortEffort is an abstract measure of the complexity of any SORT stages, and is
+ * defined as (LOG(nReturned) + 1) * inputStage.nReturned.
  */
 
 print('{">>>pipelines":[');
@@ -99,9 +115,13 @@ pipelines.forEach((pipeline, index) => {
     const nReturned = executionStats.nReturned;
     totalRows += nReturned;
 
+    const sorts = extractSortEffort(executionStats.executionStages);
+    totalSorts += sorts;
+
     print(`    "winningPlan": ${JSON.stringify(winningPlan)},`);
     print(`    "keys" : ${padNumber(keys)},`);
     print(`    "docs" : ${padNumber(docs)},`);
+    print(`    "sorts": ${padNumber(sorts)},`);
     print(`    "plans": ${padNumber(plans)},`);
     print(`    "rows" : ${padNumber(nReturned)}}${separator}`);
 });
@@ -111,6 +131,7 @@ print('">>>totals": {' +
       `"plans": ${padNumber(totalPlans)}, ` +
       `"keys": ${padNumber(totalKeys)}, ` +
       `"docs": ${padNumber(totalDocs)}, ` +
+      `"sorts": ${padNumber(totalSorts)}, ` +
       `"rows": ${padNumber(totalRows)}, ` +
       `"errors": ${padNumber(totalErrors)}},`);
 

@@ -55,3 +55,29 @@ export function trimPlanToStagesAndIndexes(obj) {
 export function padNumber(num) {
     return num.toString().padStart(6, ' ');
 }
+/**
+ * Computes an abstract sort effort for the query, defined as
+ * (LOG(nReturned) + 1) * inputStage.nReturned
+ */
+export function extractSortEffort(stage) {
+    let effort = 0;
+
+    if (stage.stage === "SORT") {
+        if (stage.inputStage.nReturned > 0) {
+            // We +1 here because log(1) = 0 but the effort is still non-zero.
+            effort += (Math.log(stage.nReturned) + 1) * stage.inputStage.nReturned;
+        }
+    }
+
+    if (stage.inputStage) {
+        effort += extractSortEffort(stage.inputStage);
+    }
+
+    if (stage.inputStages) {
+        for (const inputStage of stage.inputStages) {
+            effort += extractSortEffort(inputStage);
+        }
+    }
+
+    return Math.round(effort);
+}
