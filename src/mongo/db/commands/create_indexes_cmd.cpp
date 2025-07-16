@@ -441,7 +441,7 @@ void runCreateIndexesOnNewCollection(OperationContext* opCtx,
     // already been created, and there is no more work to be done.
     if (!filteredSpecs.empty()) {
         IndexBuildsCoordinator::createIndexesOnEmptyCollection(
-            opCtx, collection, filteredSpecs, idents, false);
+            opCtx, collection, filteredSpecs, filteredIdents, false);
     }
 
     const int numIndexesAfter = IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection.get());
