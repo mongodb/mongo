@@ -1086,11 +1086,9 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
                     str::stream() << "Type '" << typeName(el.type())
                                   << "' is not a valid type for Queryable Encryption",
                     isFLE2UnindexedSupportedType(el.type()));
-
-            auto payload = FLE2UnindexedEncryptedValueV2::serialize(userKey, el);
-            builder->appendBinData(
-                fieldNameToSerialize, payload.size(), BinDataType::Encrypt, payload.data());
-
+            uasserted(
+                7133900,
+                "Can't do FLE2UnindexedEncryptedValueV2 encryption in server. Use libmongocrypt");
         } else {
             uasserted(6338603,
                       "Only Queryable Encryption style encryption placeholders are supported");
@@ -2999,67 +2997,6 @@ StatusWith<std::vector<uint8_t>> FLE2IndexedEqualityEncryptedValueV2::serialize(
     }
     return *_cachedSerializedPayload;
 }
-
-template <class UnindexedValue>
-std::vector<uint8_t> serializeUnindexedEncryptedValue(const FLEUserKeyAndId& userKey,
-                                                      const BSONElement& element) {
-    BSONType bsonType = element.type();
-    uassert(6379107,
-            "Invalid BSON data type for Queryable Encryption",
-            isFLE2UnindexedSupportedType(bsonType));
-
-    auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
-    auto cdrKeyId = userKey.keyId.toCDR();
-    auto cdrKey = userKey.key.toCDR();
-
-    auto cipherTextSize = crypto::fle2AeadCipherOutputLength(value.length(), UnindexedValue::mode);
-    std::vector<uint8_t> buf(UnindexedValue::assocDataSize + cipherTextSize);
-    DataRangeCursor adc(buf);
-    adc.writeAndAdvance(static_cast<uint8_t>(UnindexedValue::fleType));
-    adc.writeAndAdvance(cdrKeyId);
-    adc.writeAndAdvance(static_cast<uint8_t>(bsonType));
-
-    ConstDataRange assocData(buf.data(), UnindexedValue::assocDataSize);
-    auto cipherText = uassertStatusOK(
-        encryptDataWithAssociatedData(cdrKey, assocData, value, UnindexedValue::mode));
-    uassert(6379106, "Cipher text size mismatch", cipherTextSize == cipherText.size());
-    adc.writeAndAdvance(ConstDataRange(cipherText));
-
-    return buf;
-}
-
-std::vector<uint8_t> FLE2UnindexedEncryptedValueV2::serialize(const FLEUserKeyAndId& userKey,
-                                                              const BSONElement& element) {
-    return serializeUnindexedEncryptedValue<FLE2UnindexedEncryptedValueV2>(userKey, element);
-}
-
-template <class UnindexedValue>
-std::pair<BSONType, std::vector<uint8_t>> deserializeUnindexedEncryptedValue(FLEKeyVault* keyVault,
-                                                                             ConstDataRange blob) {
-    auto [assocDataCdr, cipherTextCdr] = blob.split(UnindexedValue::assocDataSize);
-    ConstDataRangeCursor adc(assocDataCdr);
-
-    uint8_t marker = adc.readAndAdvance<uint8_t>();
-    uassert(6379110, "Invalid data type", static_cast<uint8_t>(UnindexedValue::fleType) == marker);
-
-    UUID keyId = UUID::fromCDR(adc.readAndAdvance<UUIDBuf>());
-    auto userKey = keyVault->getUserKeyById(keyId);
-
-    BSONType bsonType = static_cast<BSONType>(adc.read<uint8_t>());
-    uassert(6379111,
-            "Invalid BSON data type for Queryable Encryption",
-            isFLE2UnindexedSupportedType(bsonType));
-
-    auto data = uassertStatusOK(decryptDataWithAssociatedData(
-        userKey.key.toCDR(), assocDataCdr, cipherTextCdr, UnindexedValue::mode));
-    return {bsonType, data};
-}
-
-std::pair<BSONType, std::vector<uint8_t>> FLE2UnindexedEncryptedValueV2::deserialize(
-    FLEKeyVault* keyVault, ConstDataRange blob) {
-    return deserializeUnindexedEncryptedValue<FLE2UnindexedEncryptedValueV2>(keyVault, blob);
-}
-
 
 FLE2IndexedRangeEncryptedValueV2::FLE2IndexedRangeEncryptedValueV2(
     const FLE2InsertUpdatePayloadV2& payload,

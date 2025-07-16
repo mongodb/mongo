@@ -34,7 +34,6 @@
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bson_depth.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -51,6 +50,7 @@
 #include "mongo/crypto/fle_testing_util.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/basic_types.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -69,8 +69,6 @@
 #include <cstdint>
 #include <initializer_list>
 #include <iostream>
-#include <iterator>
-#include <limits>
 #include <stack>
 #include <string>
 #include <tuple>
@@ -515,24 +513,6 @@ TEST_F(ServiceContextTest, FLETokens_TestVectors) {
                       "8d8d41ac0618b0e98b086d662a2466f4aa1527d6536acdbcf220c724073331eb"_sd)),
                   serverTextPrefixDerivedFromDataToken);
 }
-
-TEST_F(ServiceContextTest, FLETokens_TestVectorUnindexedValueDecryption) {
-    // Unindexed field decryption
-    // Encryption can not be generated using test vectors because IV is random
-    TestKeyVault keyVault;
-
-    {
-        const std::string uxCiphertext = hexblob::decode(
-            "10ABCDEFAB1234987612341234567890120274E15D9477DA66394DF17BBA08FBEBB76A8BAFA63E6A7E7DCDDF9415B39877CE537469BB98A6B2B57E89AAC2CBBB5D5184DDE0111CD325E409739EF1C5C53AA917149FCF2EA2F6CB6BC8E11A7783E142FECC1570448837E6A295FCE6F16730B3"_sd);
-        auto [uxBsonType, uxPlaintext] =
-            FLE2UnindexedEncryptedValueV2::deserialize(&keyVault, ConstDataRange(uxCiphertext));
-        ASSERT_EQUALS(uxBsonType, BSONType::string);
-        ASSERT_EQUALS(
-            hexblob::encode(uxPlaintext.data(), uxPlaintext.size()),
-            "260000004C6F7279207761732061206D6F75736520696E2061206269672062726F776E20686F75736500");
-    }
-}
-
 
 TEST_F(ServiceContextTest, FLETokens_TestVectorESCCollectionDecryptDocument) {
     ESCTwiceDerivedTagToken escTwiceTag(
@@ -996,6 +976,45 @@ TEST_F(ServiceContextTest, FLE_ESC_EmuBinaryV2_AllRecordTypes_NullAnchorHasOldAn
 
 enum class Operation { kFind, kInsert };
 
+EncryptedFieldConfig getTestEncryptedFieldConfig() {
+
+    constexpr auto schema = R"({
+        "escCollection": "enxcol_.coll.esc",
+        "ecocCollection": "enxcol_.coll.ecoc",
+        "fields": [
+            {
+                "keyId": {
+                    "$uuid": "12345678-1234-9876-1234-123456789012"
+                },
+                "path": "encrypted",
+                "bsonType": "string",
+                "queries": {
+                    "queryType": "equality"
+                }
+            },
+            {
+                "keyId": {
+                    "$uuid": "12345678-1234-9876-1234-123456789013"
+                },
+                "path": "nested.encrypted",
+                "bsonType": "string",
+                "queries": {
+                    "queryType": "equality"
+                }
+            },
+            {
+                "keyId": {
+                    "$uuid": "12345678-1234-9876-1234-123456789014"
+                },
+                "path": "nested.notindexed",
+                "bsonType": "string"
+            }
+        ]
+    })";
+
+    return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(schema));
+}
+
 std::vector<char> generatePlaceholder(
     BSONElement value,
     Operation operation,
@@ -1048,13 +1067,8 @@ std::vector<char> generatePlaceholder(
             break;
     }
     insertSpec.setValue(value);
-    if (value.type() == BSONType::numberDouble || value.type() == BSONType::numberDecimal) {
-        insertSpec.setMinBound(boost::none);
-        insertSpec.setMaxBound(boost::none);
-    } else {
-        insertSpec.setMinBound(boost::optional<IDLAnyType>(lowerDoc.firstElement()));
-        insertSpec.setMaxBound(boost::optional<IDLAnyType>(upperDoc.firstElement()));
-    }
+    insertSpec.setMinBound(boost::optional<IDLAnyType>(lowerDoc.firstElement()));
+    insertSpec.setMaxBound(boost::optional<IDLAnyType>(upperDoc.firstElement()));
     auto specDoc = BSON("s" << insertSpec.toBSON());
 
     FLE2RangeFindSpecEdgesInfo edgesInfo;
@@ -1145,11 +1159,47 @@ void assertPayload(BSONElement elem, Operation operation) {
     }
 }
 
+BSONObj transformElementForInsertUpdate(BSONElement element,
+                                        const std::vector<char>& placeholder,
+                                        const EncryptedFieldConfig& efc,
+                                        const NamespaceString& edcNs,
+                                        FLEKeyVault* kv) {
+    // Wrap the element in a document in an insert command, so libmongocrypt can transform
+    // the placeholders.
+    auto origCmd = write_ops::InsertCommandRequest(edcNs, {element.wrap()}).toBSON();
+    auto cryptdResponse = [&]() {
+        BSONObjBuilder docbob;
+        docbob.appendBinData(element.fieldNameStringData(),
+                             placeholder.size(),
+                             BinDataType::Encrypt,
+                             placeholder.data());
+        BSONObjBuilder bob;
+        bob.append("hasEncryptionPlaceholders", true);
+        bob.append("schemaRequiresEncryption", true);
+        bob.append("result", write_ops::InsertCommandRequest(edcNs, {docbob.obj()}).toBSON());
+        return bob.obj();
+    }();
+    auto finalCmd =
+        FLEClientCrypto::transformPlaceholders(origCmd,
+                                               cryptdResponse,
+                                               BSON(edcNs.toString_forTest() << efc.toBSON()),
+                                               kv,
+                                               edcNs.db_forTest())
+            .addField(BSON("$db" << edcNs.db_forTest()).firstElement());
+    return write_ops::InsertCommandRequest::parse(IDLParserContext("finalCmd"), finalCmd)
+        .getDocuments()
+        .front()
+        .getOwned();
+}
+
 void roundTripTest(BSONObj doc, BSONType type, Operation opType, Fle2AlgorithmInt algorithm) {
     auto element = doc.firstElement();
     ASSERT_EQ(element.type(), type);
 
     TestKeyVault keyVault;
+
+    auto efc = getTestEncryptedFieldConfig();
+    auto edcNs = NamespaceString::createNamespaceString_forTest("test.coll");
 
     auto inputDoc = BSON("plainText" << "sample"
                                      << "encrypted" << element);
@@ -1157,9 +1207,29 @@ void roundTripTest(BSONObj doc, BSONType type, Operation opType, Fle2AlgorithmIn
     auto buf = generatePlaceholder(element, opType, algorithm);
     BSONObjBuilder builder;
     builder.append("plainText", "sample");
-    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+    builder.appendAs(
+        transformElementForInsertUpdate(element, buf, efc, edcNs, &keyVault).firstElement(),
+        "encrypted");
+    auto transformedDoc = builder.obj();
 
-    auto finalDoc = encryptDocument(builder.obj(), &keyVault);
+    auto finalDoc = [&]() {
+        auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(transformedDoc);
+
+        for (auto& payload : serverPayload) {
+            if (payload.payload.getEdgeTokenSet().has_value()) {
+                for (size_t i = 0; i < payload.payload.getEdgeTokenSet()->size(); i++) {
+                    payload.counts.push_back(1);
+                }
+            } else {
+                payload.counts.push_back(1);
+            }
+        }
+
+        // Finalize document for insert
+        auto finalDoc = EDCServerCollection::finalizeForInsert(transformedDoc, serverPayload);
+        ASSERT_EQ(finalDoc[kSafeContent].type(), BSONType::array);
+        return finalDoc;
+    }();
 
     ASSERT_EQ(finalDoc["plainText"].type(), BSONType::string);
     ASSERT_EQ(finalDoc["encrypted"].type(), BSONType::binData);
@@ -2538,45 +2608,6 @@ bool vectorContains(const std::vector<T>& vec, Func func) {
     return std::find_if(vec.begin(), vec.end(), func) != vec.end();
 }
 
-EncryptedFieldConfig getTestEncryptedFieldConfig() {
-
-    constexpr auto schema = R"({
-        "escCollection": "enxcol_.coll.esc",
-        "ecocCollection": "enxcol_.coll.ecoc",
-        "fields": [
-            {
-                "keyId": {
-                    "$uuid": "12345678-1234-9876-1234-123456789012"
-                },
-                "path": "encrypted",
-                "bsonType": "string",
-                "queries": {
-                    "queryType": "equality"
-                }
-            },
-            {
-                "keyId": {
-                    "$uuid": "12345678-1234-9876-1234-123456789013"
-                },
-                "path": "nested.encrypted",
-                "bsonType": "string",
-                "queries": {
-                    "queryType": "equality"
-                }
-            },
-            {
-                "keyId": {
-                    "$uuid": "12345678-1234-9876-1234-123456789014"
-                },
-                "path": "nested.notindexed",
-                "bsonType": "string"
-            }
-        ]
-    })";
-
-    return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(schema));
-}
-
 TEST_F(ServiceContextTest, EncryptionInformation_RoundTrip) {
     NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
 
@@ -3055,31 +3086,6 @@ TEST_F(ServiceContextTest, TagDelta_Basic) {
         ASSERT_EQ(removedFields.size(), 2);
         ASSERT_EQ(removedFields[0].fieldPathName, "a");
         ASSERT_EQ(removedFields[1].fieldPathName, "b");
-    }
-}
-
-TEST_F(ServiceContextTest, EDC_UnindexedEncryptDecrypt) {
-    TestKeyVault keyVault;
-    FLEUserKeyAndId userKey = keyVault.getUserKeyById(indexKey2Id);
-
-    auto inputDoc = BSON("a" << "sample");
-    auto element = inputDoc.firstElement();
-    auto const elementData =
-        std::vector<uint8_t>(element.value(), element.value() + element.valuesize());
-
-    {
-        auto blob = FLE2UnindexedEncryptedValueV2::serialize(userKey, element);
-        ASSERT_EQ(blob[0], 16);
-
-        // assert length of ciphertext (including HMAC & IV) is consistent with CBC mode
-        auto cipherTextLen = blob.size() - FLE2UnindexedEncryptedValueV2::assocDataSize;
-        ASSERT_EQ(cipherTextLen,
-                  crypto::fle2AeadCipherOutputLength(elementData.size(), crypto::aesMode::cbc));
-
-        auto [type, plainText] = FLE2UnindexedEncryptedValueV2::deserialize(&keyVault, {blob});
-        ASSERT_EQ(type, element.type());
-        ASSERT_TRUE(
-            std::equal(plainText.begin(), plainText.end(), elementData.begin(), elementData.end()));
     }
 }
 
