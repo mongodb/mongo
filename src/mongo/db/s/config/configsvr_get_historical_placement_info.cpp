@@ -103,7 +103,8 @@ public:
                                shardsWithOpTime.value.end(),
                                std::back_inserter(shardIds),
                                [](const ShardType& s) { return s.getName(); });
-                HistoricalPlacement historicalPlacement{std::move(shardIds), false /*isExact*/};
+                HistoricalPlacement historicalPlacement{std::move(shardIds),
+                                                        HistoricalPlacementStatus::OK};
                 ConfigsvrGetHistoricalPlacementResponse response(std::move(historicalPlacement));
                 return response;
             }

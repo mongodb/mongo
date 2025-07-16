@@ -191,8 +191,7 @@ private:
 };  // CatalogClientAggregationsTest
 
 void assertSameHistoricalPlacement(HistoricalPlacement historicalPlacement,
-                                   std::vector<std::string> expectedSet,
-                                   bool expectedIsExact = true) {
+                                   std::vector<std::string> expectedSet) {
     auto retrievedSet = historicalPlacement.getShards();
     ASSERT_EQ(retrievedSet.size(), expectedSet.size());
     std::sort(retrievedSet.begin(), retrievedSet.end());
@@ -200,7 +199,7 @@ void assertSameHistoricalPlacement(HistoricalPlacement historicalPlacement,
     for (size_t i = 0; i < retrievedSet.size(); i++) {
         ASSERT_EQ(retrievedSet[i], expectedSet[i]);
     }
-    ASSERT_EQ(historicalPlacement.getIsExact(), expectedIsExact);
+    ASSERT_EQ(historicalPlacement.getStatus(), HistoricalPlacementStatus::OK);
 }
 }  // namespace
 
@@ -475,18 +474,17 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_W
     // marker of the fcv upgrade. As result, "isExact" is expected to be false
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
         opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(2, 0));
-    assertSameHistoricalPlacement(
-        historicalPlacement, {"shard1", "shard2", "shard3", "shard4", "shard5"}, false);
+    assertSameHistoricalPlacement(historicalPlacement,
+                                  {"shard1", "shard2", "shard3", "shard4", "shard5"});
 
     // Asking for a timestamp after the closing marker should return the expected shards
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
         opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(3, 0));
-    assertSameHistoricalPlacement(
-        historicalPlacement, {"shard1", "shard2", "shard3", "shard4"}, true);
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
         opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(6, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, true);
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1"});
 }
 
 // ######################## PlacementHistory: Query by database ############################
@@ -708,18 +706,17 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForDbAtClusterTime_Wit
     // marker of the fcv upgrade. As result, "isExact" is expected to be false
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
         opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(2, 0));
-    assertSameHistoricalPlacement(
-        historicalPlacement, {"shard1", "shard2", "shard3", "shard4", "shard5"}, false);
+    assertSameHistoricalPlacement(historicalPlacement,
+                                  {"shard1", "shard2", "shard3", "shard4", "shard5"});
 
     // Asking for a timestamp after the closing marker should return the expected shards
     historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
         opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(3, 0));
-    assertSameHistoricalPlacement(
-        historicalPlacement, {"shard1", "shard2", "shard3", "shard4"}, true);
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
         opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(7, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"}, true);
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 }
 
 // ######################## PlacementHistory: Query the entire cluster ##################
@@ -904,17 +901,16 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_WithMark
     // marker of the fcv upgrade
     auto historicalPlacement =
         catalogClient()->getShardsThatOwnDataAtClusterTime(opCtx, Timestamp(2, 0));
-    assertSameHistoricalPlacement(
-        historicalPlacement, {"shard1", "shard2", "shard3", "shard4"}, false);
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3", "shard4"});
 
     // Asking for a timestamp after the closing marker should return the expected shards
     historicalPlacement =
         catalogClient()->getShardsThatOwnDataAtClusterTime(opCtx, Timestamp(3, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"}, true);
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 
     historicalPlacement =
         catalogClient()->getShardsThatOwnDataAtClusterTime(opCtx, Timestamp(5, 0));
-    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"}, true);
+    assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"});
 }
 
 // ######################## PlacementHistory: Regex Stage #####################
@@ -1120,8 +1116,7 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_CleanUp)
     assertSameHistoricalPlacement(
         catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
             opCtx, NamespaceString::createNamespaceString_forTest("db"), earliestClusterTime - 1),
-        approximatedPlacement,
-        false /* expectedIsExact*/);
+        approximatedPlacement);
 
     // db.collection1
     assertSameHistoricalPlacement(
@@ -1135,8 +1130,7 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_CleanUp)
             opCtx,
             NamespaceString::createNamespaceString_forTest("db.collection1"),
             earliestClusterTime - 1),
-        approximatedPlacement,
-        false /* expectedIsExact*/);
+        approximatedPlacement);
 
     // db.collection2
     assertSameHistoricalPlacement(
@@ -1150,8 +1144,7 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_CleanUp)
             opCtx,
             NamespaceString::createNamespaceString_forTest("db.collection2"),
             Timestamp(11, 0)),
-        approximatedPlacement,
-        false /* expectedIsExact*/);
+        approximatedPlacement);
 
     // Whole cluster
     assertSameHistoricalPlacement(
@@ -1159,8 +1152,7 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_CleanUp)
         {"shard1", "shard2", "shard3", "shard4"});
     assertSameHistoricalPlacement(
         catalogClient()->getShardsThatOwnDataAtClusterTime(opCtx, Timestamp(11, 0)),
-        approximatedPlacement,
-        false /* expectedIsExact*/);
+        approximatedPlacement);
 }
 
 TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_CleanUp_NewMarkers) {
@@ -1202,10 +1194,10 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_CleanUp_
             earliestClusterTime - 1);
 
     // before cleanup
-    assertSameHistoricalPlacement(historicalPlacement_coll1, {"shard1", "shard2"}, true /*exact*/);
+    assertSameHistoricalPlacement(historicalPlacement_coll1, {"shard1", "shard2"});
+
     // after cleanup
-    assertSameHistoricalPlacement(
-        historicalPlacement_cleanup_coll1, {"shard1", "shard2"}, false /*exact*/);
+    assertSameHistoricalPlacement(historicalPlacement_cleanup_coll1, {"shard1", "shard2"});
 }
 
 }  // namespace mongo

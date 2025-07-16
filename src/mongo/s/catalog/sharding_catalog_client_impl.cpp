@@ -1510,9 +1510,12 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
     OperationContext* opCtx,
     const Timestamp& atClusterTime,
     const boost::optional<NamespaceString>& nss) {
+    // TODO (SERVER-107191): Refactor the existing methods to access the content of
+    // config.placementHistory.
+    tassert(10748900,
+            "Fetching placement history information is only possible on the configsvr",
+            serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
-    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
-    auto configShard = _getConfigShard(opCtx);
     /*
     The aggregation pipeline is split in 2 sub pipelines:
     - one pipeline "exactPlacementData" describing the list of shards currently active in the
@@ -1637,6 +1640,7 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
                       .ns(NamespaceString::kConfigsvrPlacementHistoryNamespace)
                       .resolvedNamespace(std::move(resolvedNamespaces))
                       .build();
+
     // Build the pipeline for the exact placement data.
     // 1. Get all the history entries prior to the requested time concerning either the collection
     // or the parent database.
@@ -1663,29 +1667,34 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
 
     // 2 & 3. Sort by timestamp and extract the first document for collection and database
     auto sortStage = DocumentSourceSort::create(expCtx, BSON("timestamp" << -1));
-    auto groupStageBson = BSON("_id" << "$nss"
-                                     << "shards" << BSON("$first" << "$shards"));
+    constexpr auto kShardsFieldName = "shards"_sd;
+    constexpr auto kDollarShardsFieldName = "$shards"_sd;
+    auto groupByExpressionBson =
+        BSON("_id" << "$nss" << kShardsFieldName << BSON("$first" << kDollarShardsFieldName));
     auto groupStage = DocumentSourceGroup::createFromBson(
-        Document{{"$group", std::move(groupStageBson)}}.toBson().firstElement(), expCtx);
+        BSON(DocumentSourceGroup::kStageName << std::move(groupByExpressionBson)).firstElement(),
+        expCtx);
 
     // Stage 4. Discard the entries with empty shards (i.e. the collection was dropped or renamed)
-    auto noShardsFilter =
-        DocumentSourceMatch::create(BSON("shards" << BSON("$not" << BSON("$size" << 0))), expCtx);
+    auto noShardsFilter = DocumentSourceMatch::create(
+        BSON(kShardsFieldName << BSON("$not" << BSON("$size" << 0))), expCtx);
 
     // Stage 5. Group all documents and concat shards (this will generate an array of arrays)
-    auto groupStageBson2 = BSON("_id" << ""
-                                      << "shards" << BSON("$push" << "$shards"));
+    auto groupByExpressionBson2 =
+        BSON("_id" << "" << kShardsFieldName << BSON("$push" << kDollarShardsFieldName));
     auto groupStageConcat = DocumentSourceGroup::createFromBson(
-        Document{{"$group", std::move(groupStageBson2)}}.toBson().firstElement(), expCtx);
+        BSON(DocumentSourceGroup::kStageName << std::move(groupByExpressionBson2)).firstElement(),
+        expCtx);
 
     // Stage 6. Flatten the array of arrays into a set (this will also remove duplicates)
-    auto projectStageBson = BSON(
-        "shards" << BSON(
-            "$reduce" << BSON("input" << "$shards"
-                                      << "initialValue" << BSONArray() << "in"
-                                      << BSON("$setUnion" << BSON_ARRAY("$$this" << "$$value")))));
+    auto projectStageSpecBson =
+        BSON(kShardsFieldName << BSON(
+                 "$reduce" << BSON(
+                     "input" << kDollarShardsFieldName << "initialValue" << BSONArray() << "in"
+                             << BSON("$setUnion" << BSON_ARRAY("$$this" << "$$value")))));
     auto projectStageFlatten = DocumentSourceProject::createFromBson(
-        Document{{"$project", std::move(projectStageBson)}}.toBson().firstElement(), expCtx);
+        BSON(DocumentSourceProject::kStageName << std::move(projectStageSpecBson)).firstElement(),
+        expCtx);
 
     DocumentSourceContainer stages;
     stages.emplace_back(std::move(matchStage));
@@ -1707,13 +1716,15 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
     stages2.emplace_back(std::move(limitFcvMarkerStage));
     auto approximateDataPipeline = Pipeline::create(stages2, expCtx);
 
-
     // Build the facet pipeline
-    auto facetStageBson = BSON("approximatePlacementData"
-                               << approximateDataPipeline->serializeToBson() << "exactPlacementData"
-                               << exactDataPipeline->serializeToBson());
+    constexpr auto kApproximatePlacementDataFieldName = "approximatePlacementData"_sd;
+    constexpr auto kExactPlacementDataFieldName = "exactPlacementData"_sd;
+    auto facetStageBson =
+        BSON(kApproximatePlacementDataFieldName << approximateDataPipeline->serializeToBson()
+                                                << kExactPlacementDataFieldName
+                                                << exactDataPipeline->serializeToBson());
     auto facetStage = DocumentSourceFacet::createFromBson(
-        Document{{"$facet", std::move(facetStageBson)}}.toBson().firstElement(), expCtx);
+        BSON(DocumentSourceFacet::kStageName << std::move(facetStageBson)).firstElement(), expCtx);
 
     const auto pipeline = Pipeline::create({facetStage}, expCtx);
     auto aggRequest = AggregateCommandRequest(NamespaceString::kConfigsvrPlacementHistoryNamespace,
@@ -1724,40 +1735,34 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
         const auto vcTime = VectorClock::get(opCtx)->getTime();
         return {vcTime.configTime(), repl::ReadConcernLevel::kSnapshotReadConcern};
     }();
-
     auto aggrResult = runCatalogAggregation(opCtx, aggRequest, readConcern);
+    tassert(10748901,
+            "GetHistoricalPlacement command must return a single document",
+            aggrResult.size() == 1);
 
-    auto extractShardIds = [](const BSONObj& obj, const std::string& pipelineName) {
-        // each sub-pipeline of $facet produces an array with a single element containing a 'shards'
-        // field. for this aggregation, every pipeline result is an array of one element
-        auto pipelineResult = obj[pipelineName].Array();
+    auto extractShardIds = [&](const auto& fieldName) {
+        auto pipelineResult = aggrResult.front()[fieldName].Array();
         if (pipelineResult.empty()) {
             return std::vector<ShardId>{};
-        } else {
-            auto shards = pipelineResult[0]["shards"].Obj();
-            std::vector<ShardId> activeShards;
-            for (const auto& shard : shards) {
-                activeShards.push_back(shard.String());
-            }
-            return activeShards;
         }
+
+        // Every pipeline result is an array of one element, while containing a single element
+        // 'shards' field.
+        auto shards = pipelineResult[0][kShardsFieldName].Obj();
+        std::vector<ShardId> activeShards;
+        for (const auto& shard : shards) {
+            activeShards.push_back(shard.String());
+        }
+        return activeShards;
     };
 
-    invariant(aggrResult.size() == 1);
-    // if there is an fcv marker and the shards array is not empty, return the shards
-    // array, declaring the retrieved data as "not exact".
-    auto fcvMarkerShards = extractShardIds(aggrResult.front(), "approximatePlacementData");
-    if (!fcvMarkerShards.empty()) {
-        return HistoricalPlacement{fcvMarkerShards, false};
-    }
-
-    // if the fcv marker shards array is empty, return the shards array from the exact data
-    auto exactShards = extractShardIds(aggrResult.front(), "exactPlacementData");
-    if (exactShards.empty()) {
-        return HistoricalPlacement{{}, true};
-    }
-
-    return HistoricalPlacement{exactShards, true};
+    // If there is an fcv marker and the shards array is not empty, return it (the retrieved data as
+    // not exact). If the fcv marker shards array is empty, return the shards array from the exact
+    // data.
+    auto fcvMarkerShards = extractShardIds(kApproximatePlacementDataFieldName);
+    auto&& shards = !fcvMarkerShards.empty() ? std::move(fcvMarkerShards)
+                                             : extractShardIds(kExactPlacementDataFieldName);
+    return HistoricalPlacement{std::move(shards), HistoricalPlacementStatus::OK};
 }
 
 bool ShardingCatalogClientImpl::anyShardRemovedSince(OperationContext* opCtx,

@@ -33,6 +33,26 @@ imports:
     - "mongo/db/basic_types.idl"
     - "mongo/s/sharding_types.idl"
 
+enums:
+    HistoricalPlacementStatus:
+        description: "The status of historical placement information"
+        type: int
+        values:
+            OK:
+                description:
+                    The historical shard placement information is available for a given
+                    cluster time, and the cluster time is in the past. The historical shard
+                    placement information is present in shards attribute.
+                value: 0
+            NotAvailable:
+                description:
+                    The historical shard placement information is not available for a given
+                    cluster time.
+                value: 1
+            FutureClusterTime:
+                description: Given cluster time is in the future.
+                value: 2
+
 structs:
     NamespacePlacementType:
         description:
@@ -75,10 +95,6 @@ structs:
                 description:
                     "The set of shard IDs containing data on the requested nss/cluster at
                     the point in time"
-            isExact:
-                type: bool
-                description:
-                    "When true, the returned list of shards is an accurate recording of
-                    the placement info at the requested point in time.
-                    When false, the result value represents an approximation based on
-                    a present/past reading of config.shards"
+            status:
+                type: HistoricalPlacementStatus
+                description: "The status of historical placement information"
