@@ -39,7 +39,6 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/query_stats/key.h"
-#include "mongo/db/storage/storage_metrics.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
 #include "mongo/util/duration.h"

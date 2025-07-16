@@ -163,7 +163,7 @@ TEST(RecordStoreTest, GetRandomIteratorSingleton) {
         opCtx.reset();
         opCtx = harnessHelper->newOperationContext();
         cursor->reattachToOperationContext(opCtx.get());
-        ASSERT_TRUE(cursor->restore(*storage_details::getRecoveryUnit(opCtx.get())));
+        ASSERT_TRUE(cursor->restore(*shard_role_details::getRecoveryUnit(opCtx.get())));
 
         auto record = cursor->next();
         ASSERT_EQUALS(record->id, idToRetrieve);

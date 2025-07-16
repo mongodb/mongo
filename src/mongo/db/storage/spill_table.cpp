@@ -144,7 +144,7 @@ Status SpillTable::insertRecords(OperationContext* opCtx, std::vector<Record>* r
     if (!_ru) {
         std::vector<Timestamp> timestamps(records->size());
         return _rs->insertRecords(
-            opCtx, *storage_details::getRecoveryUnit(opCtx), records, timestamps);
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx), records, timestamps);
     }
 
     _ru->setOperationContext(opCtx);
@@ -205,7 +205,7 @@ Status SpillTable::insertRecords(OperationContext* opCtx, std::vector<Record>* r
 bool SpillTable::findRecord(OperationContext* opCtx, const RecordId& rid, RecordData* out) const {
     // TODO (SERVER-106716): Remove this case.
     if (!_ru) {
-        return _rs->findRecord(opCtx, *storage_details::getRecoveryUnit(opCtx), rid, out);
+        return _rs->findRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), rid, out);
     }
 
     _ru->setOperationContext(opCtx);
@@ -224,7 +224,8 @@ Status SpillTable::updateRecord(OperationContext* opCtx,
 
     // TODO (SERVER-106716): Remove this case.
     if (!_ru) {
-        return _rs->updateRecord(opCtx, *storage_details::getRecoveryUnit(opCtx), rid, data, len);
+        return _rs->updateRecord(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx), rid, data, len);
     }
 
     _ru->setOperationContext(opCtx);
@@ -247,7 +248,7 @@ void SpillTable::deleteRecord(OperationContext* opCtx, const RecordId& rid) {
 
     // TODO (SERVER-106716): Remove this case.
     if (!_ru) {
-        _rs->deleteRecord(opCtx, *storage_details::getRecoveryUnit(opCtx), rid);
+        _rs->deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), rid);
         return;
     }
 
@@ -266,7 +267,7 @@ std::unique_ptr<SpillTable::Cursor> SpillTable::getCursor(OperationContext* opCt
     // TODO (SERVER-106716): Remove this case.
     if (!_ru) {
         return std::make_unique<SpillTable::Cursor>(
-            _ru.get(), _rs->getCursor(opCtx, *storage_details::getRecoveryUnit(opCtx), forward));
+            _ru.get(), _rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), forward));
     }
 
     _ru->setOperationContext(opCtx);
@@ -280,7 +281,7 @@ Status SpillTable::truncate(OperationContext* opCtx) {
 
     // TODO (SERVER-106716): Remove this case.
     if (!_ru) {
-        return _rs->truncate(opCtx, *storage_details::getRecoveryUnit(opCtx));
+        return _rs->truncate(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     }
 
     _ru->setOperationContext(opCtx);
@@ -309,7 +310,7 @@ Status SpillTable::rangeTruncate(OperationContext* opCtx,
     // TODO (SERVER-106716): Remove this case.
     if (!_ru) {
         return _rs->rangeTruncate(opCtx,
-                                  *storage_details::getRecoveryUnit(opCtx),
+                                  *shard_role_details::getRecoveryUnit(opCtx),
                                   minRecordId,
                                   maxRecordId,
                                   hintDataSizeIncrement,

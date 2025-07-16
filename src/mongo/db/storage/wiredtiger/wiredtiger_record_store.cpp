@@ -66,6 +66,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/validate/validate_options.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/logv2/log.h"

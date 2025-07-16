@@ -29,11 +29,11 @@
 
 #include "mongo/db/storage/recovery_unit.h"
 
-#include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/scopeguard.h"
 
+#include <exception>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -45,9 +45,6 @@
 
 namespace mongo {
 namespace {
-const auto getRecoveryUnitDecoration =
-    OperationContext::declareDecoration<std::unique_ptr<RecoveryUnit>>();
-
 // SnapshotIds need to be globally unique, as they are used in a WorkingSetMember to
 // determine if documents changed, but a different recovery unit may be used across a getMore,
 // so there is a chance the snapshot ID will be reused.
@@ -57,25 +54,6 @@ SnapshotId getNextSnapshotId() {
     return SnapshotId(nextSnapshotId.fetchAndAdd(1));
 }
 }  // namespace
-
-namespace storage_details {
-RecoveryUnit* getRecoveryUnit(OperationContext* opCtx) {
-    return getRecoveryUnitDecoration(opCtx).get();
-}
-
-const RecoveryUnit* getRecoveryUnit(const OperationContext* opCtx) {
-    return getRecoveryUnitDecoration(opCtx).get();
-}
-
-void setRecoveryUnit(OperationContext* opCtx, std::unique_ptr<RecoveryUnit> newRu) {
-    getRecoveryUnitDecoration(opCtx) = std::move(newRu);
-}
-
-std::unique_ptr<RecoveryUnit> swapRecoveryUnit(OperationContext* opCtx,
-                                               std::unique_ptr<RecoveryUnit> newRu) {
-    return std::exchange(getRecoveryUnitDecoration(opCtx), std::move(newRu));
-}
-}  // namespace storage_details
 
 const RecoveryUnit::OpenSnapshotOptions RecoveryUnit::kDefaultOpenSnapshotOptions =
     RecoveryUnit::OpenSnapshotOptions();

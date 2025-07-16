@@ -41,6 +41,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/service_entry_point.h"
@@ -315,6 +317,12 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
 
     {
         ClientLock lk(client);
+
+        if (!opCtx->recoveryUnit_DO_NOT_USE()) {
+            opCtx->setRecoveryUnit_DO_NOT_USE(std::make_unique<RecoveryUnitNoop>(),
+                                              WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
+                                              lk);
+        }
 
         // If we have a previous operation context, it's not worth crashing the process in
         // production. However, we do want to prevent it from doing more work and complain

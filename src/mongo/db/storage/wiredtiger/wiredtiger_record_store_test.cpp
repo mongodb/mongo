@@ -49,6 +49,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
@@ -119,7 +120,7 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto& ru = *storage_details::getRecoveryUnit(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
             StorageWriteTransaction txn(ru);
 
@@ -138,11 +139,11 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
     {
         auto client1 = harnessHelper->serviceContext()->getService()->makeClient("c1");
         auto t1 = harnessHelper->newOperationContext(client1.get());
-        auto& ru1 = *storage_details::getRecoveryUnit(t1.get());
+        auto& ru1 = *shard_role_details::getRecoveryUnit(t1.get());
 
         auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
         auto t2 = harnessHelper->newOperationContext(client2.get());
-        auto& ru2 = *storage_details::getRecoveryUnit(t2.get());
+        auto& ru2 = *shard_role_details::getRecoveryUnit(t2.get());
 
         auto w1 = std::make_unique<StorageWriteTransaction>(ru1);
         auto w2 = std::make_unique<StorageWriteTransaction>(ru2);
@@ -178,7 +179,7 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto& ru = *storage_details::getRecoveryUnit(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
             StorageWriteTransaction txn(ru);
 
@@ -197,11 +198,11 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
     {
         auto client1 = harnessHelper->serviceContext()->getService()->makeClient("c1");
         auto t1 = harnessHelper->newOperationContext(client1.get());
-        auto& ru1 = *storage_details::getRecoveryUnit(t1.get());
+        auto& ru1 = *shard_role_details::getRecoveryUnit(t1.get());
 
         auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
         auto t2 = harnessHelper->newOperationContext(client2.get());
-        auto& ru2 = *storage_details::getRecoveryUnit(t2.get());
+        auto& ru2 = *shard_role_details::getRecoveryUnit(t2.get());
 
         // ensure we start transactions
         rs->dataFor(t1.get(), ru1, id2);
@@ -235,7 +236,7 @@ RecordId oplogOrderInsertOplog(OperationContext* opCtx,
                                int inc) {
     Timestamp opTime = Timestamp(5, inc);
     Status status = engine->oplogDiskLocRegister(
-        *storage_details::getRecoveryUnit(opCtx), rs.get(), opTime, false);
+        *shard_role_details::getRecoveryUnit(opCtx), rs.get(), opTime, false);
     ASSERT_OK(status);
     BSONObj obj = BSON("ts" << opTime);
     StatusWith<RecordId> res = rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), opTime);
@@ -260,7 +261,7 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto& ru = *storage_details::getRecoveryUnit(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         StorageWriteTransaction txn(ru);
         RecordId id = oplogOrderInsertOplog(opCtx.get(), engine, rs, 1);
         ASSERT(isOpHidden(id));
@@ -270,7 +271,7 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto& ru = *storage_details::getRecoveryUnit(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         StorageWriteTransaction txn(ru);
         RecordId id = oplogOrderInsertOplog(opCtx.get(), engine, rs, 2);
         ASSERT(isOpHidden(id));
@@ -295,7 +296,7 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
     };
 
     ServiceContext::UniqueOperationContext longLivedOp(harnessHelper->newOperationContext());
-    auto& longLivedRu = *storage_details::getRecoveryUnit(longLivedOp.get());
+    auto& longLivedRu = *shard_role_details::getRecoveryUnit(longLivedOp.get());
     StorageWriteTransaction txn(longLivedRu);
     RecordId id1 = oplogOrderInsertOplog(longLivedOp.get(), engine, rs, 1);
     ASSERT(isOpHidden(id1));
@@ -306,7 +307,7 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
         auto innerClient = harnessHelper->serviceContext()->getService()->makeClient("inner");
         ServiceContext::UniqueOperationContext opCtx(
             harnessHelper->newOperationContext(innerClient.get()));
-        auto& ru = *storage_details::getRecoveryUnit(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         StorageWriteTransaction txn(ru);
         id2 = oplogOrderInsertOplog(opCtx.get(), engine, rs, 2);
         ASSERT(isOpHidden(id2));
@@ -334,7 +335,7 @@ TEST(WiredTigerRecordStoreTest, AppendCustomStatsMetadata) {
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore("a.b"));
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-    auto& ru = *storage_details::getRecoveryUnit(opCtx.get());
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
     BSONObjBuilder builder;
     rs->appendAllCustomStats(ru, &builder, 1.0);
     BSONObj customStats = builder.obj();
@@ -359,7 +360,7 @@ TEST(WiredTigerRecordStoreTest, AppendCustomNumericStats) {
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore("a.c"));
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-    auto& ru = *storage_details::getRecoveryUnit(opCtx.get());
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
     BSONObjBuilder builder;
     rs->appendNumericCustomStats(ru, &builder, 1.0);
     BSONObj customStats = builder.obj();
@@ -395,12 +396,12 @@ StatusWith<RecordId> insertBSONWithSize(
     OperationContext* opCtx, KVEngine* engine, RecordStore* rs, const Timestamp& opTime, int size) {
     BSONObj obj = makeBSONObjWithSize(opTime, size);
 
-    auto& ru = *storage_details::getRecoveryUnit(opCtx);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     StorageWriteTransaction txn(ru);
     WiredTigerRecordStore* wtRS = checked_cast<WiredTigerRecordStore*>(rs);
     invariant(wtRS);
-    Status status =
-        engine->oplogDiskLocRegister(*storage_details::getRecoveryUnit(opCtx), rs, opTime, false);
+    Status status = engine->oplogDiskLocRegister(
+        *shard_role_details::getRecoveryUnit(opCtx), rs, opTime, false);
     if (!status.isOK()) {
         return StatusWith<RecordId>(status);
     }
@@ -423,7 +424,7 @@ void testTruncateRange(int64_t numRecordsToInsert,
     std::vector<RecordId> recordIds;
 
     auto opCtx = harnessHelper->newOperationContext();
-    auto& ru = *storage_details::getRecoveryUnit(opCtx.get());
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
     for (int i = 0; i < numRecordsToInsert; i++) {
         auto recordId = insertBSONWithSize(opCtx.get(), engine, wtRS, Timestamp(1, i), 100);
@@ -487,7 +488,7 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
 
     // 1) Initialize the top of oplog to "1".
     ServiceContext::UniqueOperationContext op1(harnessHelper->newOperationContext());
-    auto& ru1 = *storage_details::getRecoveryUnit(op1.get());
+    auto& ru1 = *shard_role_details::getRecoveryUnit(op1.get());
 
     Timestamp tsOne = [&] {
         StorageWriteTransaction op1Txn(ru1);
@@ -509,7 +510,7 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
     Client::initThread("client2", getGlobalServiceContext()->getService());
 
     ServiceContext::UniqueOperationContext op2(harnessHelper->newOperationContext());
-    auto& ru2 = *storage_details::getRecoveryUnit(op2.get());
+    auto& ru2 = *shard_role_details::getRecoveryUnit(op2.get());
     // Should not see uncommitted write from op1.
     ASSERT_EQ(tsOne, wtRS->getLatestTimestamp(ru2));
 
@@ -541,7 +542,7 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterNext) {
     RecordId rid1;
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto& ru = *storage_details::getRecoveryUnit(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
         StorageWriteTransaction txn(ru);
         StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
@@ -558,7 +559,7 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterNext) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        auto& ru = *WiredTigerRecoveryUnit::get(storage_details::getRecoveryUnit(opCtx.get()));
+        auto& ru = *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx.get()));
 
         auto cursor = rs->getCursor(opCtx.get());
         ASSERT(cursor->next());
@@ -583,7 +584,7 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
     RecordId rid1;
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto& ru = *storage_details::getRecoveryUnit(opCtx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
         StorageWriteTransaction txn(ru);
         StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
@@ -601,7 +602,7 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        auto& ru = *WiredTigerRecoveryUnit::get(storage_details::getRecoveryUnit(opCtx.get()));
+        auto& ru = *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx.get()));
 
         auto cursor = rs->getCursor(opCtx.get());
         ASSERT(cursor->seekExact(rid1));
@@ -634,7 +635,7 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
 TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     const std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-    auto& ru = *storage_details::getRecoveryUnit(opCtx.get());
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
     const std::string ns = "testRecordStore";
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
@@ -651,7 +652,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     {
         StorageWriteTransaction txn(ru);
         WiredTigerRecoveryUnit* ru =
-            checked_cast<WiredTigerRecoveryUnit*>(storage_details::getRecoveryUnit(opCtx.get()));
+            checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
         WiredTigerSession* s = ru->getSession();
         invariantWTOK(s->create(uri.c_str(), config.c_str()), *s);
         txn.commit();
@@ -673,7 +674,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     const auto wtKvEngine = static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
     auto rs = std::make_unique<WiredTigerRecordStore>(
         wtKvEngine,
-        WiredTigerRecoveryUnit::get(*storage_details::getRecoveryUnit(opCtx.get())),
+        WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
         params);
 
     const auto id = StringData{"1"};
@@ -718,7 +719,7 @@ TEST(WiredTigerRecordStoreTest, SizeInfoAccurateAfterRollbackWithDelete) {
     RecordId rid;  // This record will be deleted by two transactions.
 
     ServiceContext::UniqueOperationContext ctx(harnessHelper->newOperationContext());
-    auto& ru = *storage_details::getRecoveryUnit(ctx.get());
+    auto& ru = *shard_role_details::getRecoveryUnit(ctx.get());
 
     {
         StorageWriteTransaction txn(ru);
@@ -740,20 +741,18 @@ TEST(WiredTigerRecordStoreTest, SizeInfoAccurateAfterRollbackWithDelete) {
     stdx::thread abortedThread([&harnessHelper, &rs, &rid, aborted, deleted]() {
         auto client = harnessHelper->serviceContext()->getService()->makeClient("c1");
         auto ctx = harnessHelper->newOperationContext(client.get());
-        auto& ru = *storage_details::getRecoveryUnit(ctx.get());
+        auto& ru = *shard_role_details::getRecoveryUnit(ctx.get());
         StorageWriteTransaction txn(ru);
         // Registered changes are executed in reverse order.
-        rs->deleteRecord(ctx.get(), *storage_details::getRecoveryUnit(ctx.get()), rid);
-        storage_details::getRecoveryUnit(ctx.get())->onRollback(
-            [&](OperationContext*) { deleted->countDownAndWait(); });
-        storage_details::getRecoveryUnit(ctx.get())->onRollback(
-            [&](OperationContext*) { aborted->countDownAndWait(); });
+        rs->deleteRecord(ctx.get(), ru, rid);
+        ru.onRollback([&](OperationContext*) { deleted->countDownAndWait(); });
+        ru.onRollback([&](OperationContext*) { aborted->countDownAndWait(); });
     });
 
     // Wait for the other thread to abort.
     aborted->countDownAndWait();
 
-    rs->deleteRecord(ctx.get(), *storage_details::getRecoveryUnit(ctx.get()), rid);
+    rs->deleteRecord(ctx.get(), ru, rid);
 
     // Notify the other thread we have deleted, let it complete the rollback.
     deleted->countDownAndWait();
@@ -778,7 +777,7 @@ TEST(WiredTigerRecordStoreTest, LargestRecordIdSeenIsCorrectWhenGivenRecordIds) 
     RecordId rid;
 
     ServiceContext::UniqueOperationContext ctx(harnessHelper->newOperationContext());
-    auto& ru = *storage_details::getRecoveryUnit(ctx.get());
+    auto& ru = *shard_role_details::getRecoveryUnit(ctx.get());
 
     {
         // Insert a single record with recordId 7.
@@ -845,7 +844,7 @@ TEST(WiredTigerRecordStoreTest, EnforceTableCreateExclusiveSameConfiguration) {
 
     // First creation of table with the ident succeeds.
     WiredTigerRecoveryUnit* ru =
-        checked_cast<WiredTigerRecoveryUnit*>(storage_details::getRecoveryUnit(opCtx.get()));
+        checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
     WiredTigerSession* s = ru->getSession();
     invariantWTOK(s->create(uri.c_str(), config.c_str()), *s);
 
@@ -871,7 +870,7 @@ TEST(WiredTigerRecordStoreTest, EnforceTableCreateExclusiveDifferentConfiguratio
 
     // First creation of a table with the ident succeeds.
     WiredTigerRecoveryUnit* ru =
-        checked_cast<WiredTigerRecoveryUnit*>(storage_details::getRecoveryUnit(opCtx.get()));
+        checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
     WiredTigerSession* s = ru->getSession();
     invariantWTOK(s->create(uri.c_str(), config.c_str()), *s);
 

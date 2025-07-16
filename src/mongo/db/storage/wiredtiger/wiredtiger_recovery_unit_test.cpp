@@ -45,6 +45,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
@@ -141,9 +142,9 @@ public:
         auto sc = harnessHelper->serviceContext();
         auto client = sc->getService()->makeClient(clientName);
         auto opCtx = client->makeOperationContext();
-        auto ru = harnessHelper->newRecoveryUnit();
-        ru->setOperationContext(opCtx.get());
-        storage_details::setRecoveryUnit(opCtx.get(), std::move(ru));
+        shard_role_details::setRecoveryUnit(opCtx.get(),
+                                            harnessHelper->newRecoveryUnit(),
+                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         return std::make_pair(std::move(client), std::move(opCtx));
     }
 
@@ -158,10 +159,10 @@ public:
         clientAndCtx1 = makeClientAndOpCtx(harnessHelper.get(), "writer");
         clientAndCtx2 = makeClientAndOpCtx(harnessHelper.get(), "reader");
         ru1 = checked_cast<WiredTigerRecoveryUnit*>(
-            storage_details::getRecoveryUnit(clientAndCtx1.second.get()));
+            shard_role_details::getRecoveryUnit(clientAndCtx1.second.get()));
         ru1->setOperationContext(clientAndCtx1.second.get());
         ru2 = checked_cast<WiredTigerRecoveryUnit*>(
-            storage_details::getRecoveryUnit(clientAndCtx2.second.get()));
+            shard_role_details::getRecoveryUnit(clientAndCtx2.second.get()));
         ru2->setOperationContext(clientAndCtx2.second.get());
         snapshotManager = static_cast<WiredTigerSnapshotManager*>(
             harnessHelper->getEngine()->getSnapshotManager());
@@ -876,7 +877,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, OptionalEvictionCanBeInterrupted) {
         auto clientAndCtx =
             makeClientAndOpCtx(harnessHelper.get(), "test" + std::to_string(enableFeature));
         OperationContext* opCtx = clientAndCtx.second.get();
-        auto ru = WiredTigerRecoveryUnit::get(storage_details::getRecoveryUnit(opCtx));
+        auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
 
         WiredTigerEventHandler eventHandler;
         WT_SESSION* session = ru->getSessionNoTxn()->with([](WT_SESSION* arg) { return arg; });

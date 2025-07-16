@@ -424,7 +424,7 @@ TEST(RecordStoreTest, CursorRestoreForward) {
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
 
-    auto& ru = *storage_details::getRecoveryUnit(opCtx.get());
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
     {
         StorageWriteTransaction txn(ru);
         std::string s = "test";

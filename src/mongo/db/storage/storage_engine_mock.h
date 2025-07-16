@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
@@ -40,7 +39,7 @@ namespace mongo {
 class StorageEngineMock : public StorageEngine {
 public:
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
-        return std::make_unique<RecoveryUnitNoop>();
+        return nullptr;
     }
     bool supportsCappedCollections() const final {
         return true;

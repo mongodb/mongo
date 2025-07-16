@@ -30,7 +30,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/transaction_resources.h"
 
 #include <memory>
@@ -50,9 +49,6 @@ public:
 
     void onCreateOperationContext(OperationContext* opCtx) final {
         shard_role_details::makeLockerOnOperationContext(opCtx);
-        shard_role_details::setRecoveryUnit(opCtx,
-                                            std::make_unique<RecoveryUnitNoop>(),
-                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     }
 
     void onDestroyOperationContext(OperationContext* opCtx) final {}

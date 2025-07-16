@@ -21,6 +21,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:record_id_helpers",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:shard_role_api",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:write_stage_common",
         "//src/mongo/db/catalog:document_validation",
         "//src/mongo/db/catalog:local_oplog_info",

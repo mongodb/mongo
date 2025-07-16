@@ -31,7 +31,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
@@ -66,16 +65,13 @@ public:
         //    engine.
         // 3. Unit tests that use an operation context but don't require a storage engine for their
         //    testing purpose.
-
-        std::unique_ptr<RecoveryUnit> ru;
-        if (auto eng = service->getStorageEngine()) {
-            ru = eng->newRecoveryUnit();
-        } else {
-            ru = std::make_unique<RecoveryUnitNoop>();
+        auto storageEngine = service->getStorageEngine();
+        if (storageEngine) {
+            shard_role_details::setRecoveryUnit(
+                opCtx,
+                storageEngine->newRecoveryUnit(),
+                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         }
-
-        shard_role_details::setRecoveryUnit(
-            opCtx, std::move(ru), WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     }
 
     void onDestroyOperationContext(OperationContext* opCtx) final {}

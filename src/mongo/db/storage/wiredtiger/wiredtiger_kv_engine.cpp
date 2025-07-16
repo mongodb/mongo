@@ -83,6 +83,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
@@ -1660,7 +1661,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
     if (options.isOplog) {
         ret = std::make_unique<WiredTigerRecordStore::Oplog>(
             this,
-            WiredTigerRecoveryUnit::get(*storage_details::getRecoveryUnit(opCtx)),
+            WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)),
             WiredTigerRecordStore::Oplog::Params{.uuid = *uuid,
                                                  .ident = std::string{ident},
                                                  .engineName = _canonicalName,
@@ -1699,16 +1700,16 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
         ret = options.isCapped
             ? std::make_unique<WiredTigerRecordStore::Capped>(
                   this,
-                  WiredTigerRecoveryUnit::get(*storage_details::getRecoveryUnit(opCtx)),
+                  WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)),
                   params)
             : std::make_unique<WiredTigerRecordStore>(
                   this,
-                  WiredTigerRecoveryUnit::get(*storage_details::getRecoveryUnit(opCtx)),
+                  WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)),
                   params);
     }
 
     if (sizeRecoveryState(opCtx->getServiceContext()).shouldRecordStoresAlwaysCheckSize()) {
-        ret->checkSize(opCtx, *storage_details::getRecoveryUnit(opCtx));
+        ret->checkSize(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     }
 
     return std::move(ret);
@@ -2711,12 +2712,12 @@ void WiredTigerKVEngine::waitForAllEarlierOplogWritesToBeVisible(
 }
 
 bool WiredTigerKVEngine::waitUntilDurable(OperationContext* opCtx) {
-    invariant(
-        !storage_details::getRecoveryUnit(opCtx)->isActive(),
-        str::stream() << "Unexpected open storage txn. RecoveryUnit state: "
-                      << RecoveryUnit::toString(storage_details::getRecoveryUnit(opCtx)->getState())
-                      << ", inMultiDocumentTransaction:"
-                      << (opCtx->inMultiDocumentTransaction() ? "true" : "false"));
+    invariant(!shard_role_details::getRecoveryUnit(opCtx)->isActive(),
+              str::stream() << "Unexpected open storage txn. RecoveryUnit state: "
+                            << RecoveryUnit::toString(
+                                   shard_role_details::getRecoveryUnit(opCtx)->getState())
+                            << ", inMultiDocumentTransaction:"
+                            << (opCtx->inMultiDocumentTransaction() ? "true" : "false"));
 
     // Flushes the journal log to disk. Checkpoints all data if journaling is disabled.
     waitUntilDurable(opCtx, Fsync::kJournal, UseJournalListener::kUpdate);
@@ -2725,12 +2726,12 @@ bool WiredTigerKVEngine::waitUntilDurable(OperationContext* opCtx) {
 
 bool WiredTigerKVEngine::waitUntilUnjournaledWritesDurable(OperationContext* opCtx,
                                                            bool stableCheckpoint) {
-    invariant(
-        !storage_details::getRecoveryUnit(opCtx)->inUnitOfWork(),
-        str::stream() << "Unexpected open storage txn. RecoveryUnit state: "
-                      << RecoveryUnit::toString(storage_details::getRecoveryUnit(opCtx)->getState())
-                      << ", inMultiDocumentTransaction:"
-                      << (opCtx->inMultiDocumentTransaction() ? "true" : "false"));
+    invariant(!shard_role_details::getRecoveryUnit(opCtx)->inUnitOfWork(),
+              str::stream() << "Unexpected open storage txn. RecoveryUnit state: "
+                            << RecoveryUnit::toString(
+                                   shard_role_details::getRecoveryUnit(opCtx)->getState())
+                            << ", inMultiDocumentTransaction:"
+                            << (opCtx->inMultiDocumentTransaction() ? "true" : "false"));
 
     // Take a checkpoint, rather than only flush the (oplog) journal, in order to lock in stable
     // writes to unjournaled tables.

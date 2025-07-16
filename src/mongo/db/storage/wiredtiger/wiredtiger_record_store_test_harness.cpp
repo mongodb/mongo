@@ -37,6 +37,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/unittest.h"
 
 #include <utility>
@@ -110,7 +111,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
     return std::make_unique<WiredTigerRecordStore::Oplog>(
         _engine.get(),
-        WiredTigerRecoveryUnit::get(*storage_details::getRecoveryUnit(opCtx.get())),
+        WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
         WiredTigerRecordStore::Oplog::Params{.uuid = UUID::gen(),
                                              .ident = ident,
                                              .engineName = std::string{kWiredTigerEngineName},
