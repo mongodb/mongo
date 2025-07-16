@@ -69,12 +69,27 @@ RET=$?
 
 set -o errexit
 
-# For a target //path:test, the undeclared test outputs are in
-# bazel-testlogs/path/test/test.outputs/outputs.zip. Extract them
-# to the root of the task working directory
-find bazel-testlogs/$(sed "s|//||;s|:|/|" <<<${targets}) -name outputs.zip | xargs -I {} unzip -qo {} -d ../
+# Symlink data directories to where Resmoke normally puts them for compatability with post tasks
+# that run for all Resmoke tasks.
+find bazel-testlogs/ -path '*data/job*' -name 'job*' -print0 |
+    while IFS= read -r -d '' test_outputs; do
+        source=${workdir}/src/$test_outputs
+        target=${workdir}/$(sed 's/.*\.outputs\///' <<<$test_outputs)
+        mkdir -p $(dirname $target)
+        ln -sf $source $target
+    done
+
+# Symlink test logs to where Evergreen expects them. Evergreen won't read into a symlinked directory,
+# so symlink each log file individually.
+find bazel-testlogs/ -type f -path "*TestLogs/*" -print0 |
+    while IFS= read -r -d '' test_outputs; do
+        source=${workdir}/src/$test_outputs
+        target=${workdir}/$(sed 's/.*\.outputs\///' <<<$test_outputs)
+        mkdir -p $(dirname $target)
+        ln -sf $source $target
+    done
 
 # Combine reports from potentially multiple tests/shards.
-find ../ -name report*.json | xargs $python buildscripts/combine_reports.py --no-report-exit -o report.json
+find bazel-testlogs/ -name report*.json | xargs $python buildscripts/combine_reports.py --no-report-exit -o report.json
 
 exit $RET

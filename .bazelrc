@@ -70,6 +70,9 @@ common --experimental_remote_downloader_local_fallback
 # not filtered due to their size, timeout, tag, or language.
 test --build_tests_only
 
+# Skip zipping test outputs, to save the extra step of unzipping to investigate them.
+test --nozip_undeclared_test_outputs
+
 # This is a major bottleneck on remote execution concurrency and does not appear to have
 # any negative affects on local RAM usage.
 common --noexperimental_throttle_remote_action_building
