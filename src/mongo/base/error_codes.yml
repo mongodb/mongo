@@ -903,13 +903,6 @@ error_codes:
       name: StreamProcessorS3TokenExpired,
       categories: [StreamProcessorRetryableError],
     }
-  #Replay client errors.
-  - {code: 900, name: ReplayClientConfigurationError}
-  - {code: 901, name: ReplayClientNotConnected}
-  - {code: 902, name: ReplayClientFailedToProcessBSON}
-  - {code: 903, name: ReplayClientInternalError}
-  - {code: 904, name: ReplayClientSessionSchedulerError}
-  - {code: 905, name: ReplayClientSessionSimulationError}
 
   - {code: 452, name: ReleaseMemoryShardError}
 
@@ -918,6 +911,14 @@ error_codes:
       name: InterruptedDueToReshardingCriticalSection,
       categories: [Interruption, RetriableError],
     }
+
+  #Replay client errors.
+  - {code: 454, name: ReplayClientConfigurationError}
+  - {code: 455, name: ReplayClientNotConnected}
+  - {code: 456, name: ReplayClientFailedToProcessBSON}
+  - {code: 457, name: ReplayClientInternalError}
+  - {code: 458, name: ReplayClientSessionSchedulerError}
+  - {code: 459, name: ReplayClientSessionSimulationError}
 
   # Error codes 4000-8999 are reserved.
 
