@@ -6696,12 +6696,6 @@ TEST_F(TransactionRouterTest, RouterMetricsCurrent_ReapForUnstartedTxn) {
 // can't be called for an unstarted one.
 
 DEATH_TEST_REGEX_F(TransactionRouterMetricsTest,
-                   ImplicitlyAbortingUnstartedTxnCrashes,
-                   R"#(Invariant failure.*isInitialized\(\))#") {
-    txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus);
-}
-
-DEATH_TEST_REGEX_F(TransactionRouterMetricsTest,
                    AbortingUnstartedTxnCrashes,
                    R"#(Invariant failure.*isInitialized\(\))#") {
     txnRouter().abortTransaction(operationContext());

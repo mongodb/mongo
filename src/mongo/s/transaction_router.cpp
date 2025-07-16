@@ -1791,7 +1791,12 @@ BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
 
 void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opCtx,
                                                            const Status& status) {
-    invariant(isInitialized());
+    if (!isInitialized()) {
+        // If the transaction hasn't even started then there is nothing to implicitly abort. This
+        // can occur in some cases where the transaction hasn't been initialized as it tried to
+        // start during a shutdown.
+        return;
+    }
     uassert(ErrorCodes::IllegalOperation,
             "Transaction sub-router on shard cannot execute implicit abort.",
             !o().subRouter);
