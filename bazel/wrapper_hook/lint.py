@@ -201,8 +201,8 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
     ):
         return False
 
-    lint_all = False
-    if len([arg for arg in args if not arg.startswith("--")]) == 0:
+    lint_all = "..." in args or "--all" in args or "//..." in args
+    if not lint_all and len([arg for arg in args if not arg.startswith("--")]) == 0:
         origin_branch = "origin/master"
         for arg in args:
             if arg.startswith("--origin-branch="):
@@ -215,7 +215,6 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
             print(
                 f"The number of commits between current branch and origin branch ({origin_branch}) is too large: {distance} commits (> {max_distance} commits)."
             )
-            print("WARNING!!! Defaulting to formatting all files, this may take a while.")
             print(
                 "Please update your local branch with the latest changes from origin, or use `bazel run lint -- --origin-branch=other_branch` to select a different origin branch"
             )
@@ -227,6 +226,9 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
                 if file.endswith((".cpp", ".c", ".h", ".py", ".js", ".mjs", ".json"))
             ]
             args = files_to_format + args + ["--compile_one_dependency"]
+    
+    if lint_all:
+        print("WARNING!!! Defaulting to formatting all files, this may take a while.")
 
     if lint_all or "sbom.json" in args:
         subprocess.run([bazel_bin, "run", "//buildscripts:sbom_linter"], check=True)
