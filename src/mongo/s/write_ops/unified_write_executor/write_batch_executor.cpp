@@ -34,6 +34,8 @@
 
 #include <boost/optional.hpp>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 namespace mongo {
 namespace unified_write_executor {
 WriteBatchResponse WriteBatchExecutor::execute(OperationContext* opCtx, const WriteBatch& batch) {
@@ -43,9 +45,9 @@ WriteBatchResponse WriteBatchExecutor::execute(OperationContext* opCtx, const Wr
                       batch);
 }
 
-WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
-                                                const SimpleWriteBatch& batch) {
-    std::vector<AsyncRequestsSender::Request> requestsToSent;
+std::vector<AsyncRequestsSender::Request> WriteBatchExecutor::buildBulkWriteRequests(
+    OperationContext* opCtx, const SimpleWriteBatch& batch) const {
+    std::vector<AsyncRequestsSender::Request> requestsToSend;
     for (auto& [shardId, shardRequest] : batch.requestByShardId) {
         std::vector<BulkWriteOpVariant> bulkOps;
         std::vector<NamespaceInfoEntry> nsInfos;
@@ -67,7 +69,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
             }
             auto nsIndex = nsIndexMap[nsInfo.getNs()];
 
-            // Reassigns the namespace index for the list of ops
+            // Reassigns the namespace index for the list of ops.
             auto bulkOp = op.getBulkWriteOp();
             visit(
                 OverloadedVisitor{
@@ -82,17 +84,30 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         BSONObjBuilder builder;
         bulkRequest.serialize(&builder);
         logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &builder);
-        if (auto writeConcern = getWriteConcernForShardRequest(opCtx); writeConcern) {
+        auto writeConcern = getWriteConcernForShardRequest(opCtx);
+        if (writeConcern) {
             builder.append(WriteConcernOptions::kWriteConcernField, writeConcern->toBSON());
         }
-        requestsToSent.emplace_back(shardId, builder.obj());
+        auto bulkRequestObj = builder.obj();
+        LOGV2_DEBUG(10605503,
+                    4,
+                    "Constructed request for shard",
+                    "request"_attr = bulkRequestObj,
+                    "shardId"_attr = shardId);
+        requestsToSend.emplace_back(shardId, std::move(bulkRequestObj));
     }
+    return requestsToSend;
+}
+
+WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
+                                                const SimpleWriteBatch& batch) {
+    std::vector<AsyncRequestsSender::Request> requestsToSend = buildBulkWriteRequests(opCtx, batch);
 
     auto sender = MultiStatementTransactionRequestsSender(
         opCtx,
         Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
         DatabaseName::kAdmin,
-        std::move(requestsToSent),
+        std::move(requestsToSend),
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         Shard::RetryPolicy::kNoRetry);
 

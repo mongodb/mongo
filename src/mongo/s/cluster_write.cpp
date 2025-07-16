@@ -38,6 +38,7 @@
 #include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/write_ops/bulk_write_exec.h"
+#include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 #include "mongo/util/decorable.h"
 
 #include <memory>
@@ -87,8 +88,15 @@ void write(OperationContext* opCtx,
     LOGV2_DEBUG_OPTIONS(
         4817400, 2, {logv2::LogComponent::kShardMigrationPerf}, "Starting batch write");
 
-    BatchWriteExec::executeBatch(opCtx, targeter, request, response, stats);
-
+    // TODO SERVER-104131: Enable insert/update/delete commands in transactions.
+    // TODO SERVER-104145: Enable insert/update/delete commands from internal clients.
+    if (internalQueryUnifiedWriteExecutor.load() && !opCtx->inMultiDocumentTransaction()) {
+        *response =
+            unified_write_executor::execWriteRequest<BatchedCommandResponse, BatchedCommandRequest>(
+                opCtx, request);
+    } else {
+        BatchWriteExec::executeBatch(opCtx, targeter, request, response, stats);
+    }
     LOGV2_DEBUG_OPTIONS(
         4817401, 2, {logv2::LogComponent::kShardMigrationPerf}, "Finished batch write");
 }

@@ -77,7 +77,8 @@ TEST_F(WriteBatchResponseProcessorTest, OKReplies) {
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
     RemoteCommandResponse rcr2(host2, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
-    WriteBatchResponseProcessor processor;
+    WriteOpContext ctx(request);
+    WriteBatchResponseProcessor processor(ctx);
 
     processor.onWriteBatchResponse(
         {{shard1Name, Response{rcr1, {}}},
@@ -87,6 +88,12 @@ TEST_F(WriteBatchResponseProcessorTest, OKReplies) {
     ASSERT_EQ(clientReply.getNInserted(), 2);
     ASSERT_EQ(clientReply.getNMatched(), 6);
     ASSERT_EQ(clientReply.getNModified(), 6);
+
+    // Generating a 'BatchedCommandResponse' should output the same statistics, save for 'n', which
+    // is the combination of 'nInserted' and 'nMatched'.
+    auto batchedCommandReply = processor.generateClientResponse<BatchedCommandResponse>();
+    ASSERT_EQ(batchedCommandReply.getN(), 8);
+    ASSERT_EQ(batchedCommandReply.getNModified(), 6);
 }
 
 TEST_F(WriteBatchResponseProcessorTest, AllStatisticsCopied) {
@@ -103,7 +110,8 @@ TEST_F(WriteBatchResponseProcessorTest, AllStatisticsCopied) {
         1);
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
-    WriteBatchResponseProcessor processor;
+    WriteOpContext ctx(request);
+    WriteBatchResponseProcessor processor(ctx);
 
     processor.onWriteBatchResponse({{shard1Name, Response{rcr1, {WriteOp(request, 0)}}}});
     auto clientReply = processor.generateClientResponse<BulkWriteCommandReply>();
@@ -163,8 +171,8 @@ TEST_F(WriteBatchResponseProcessorTest, MixedErrorsAndOk) {
         BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, nss1));
     RemoteCommandResponse rcr3(host3, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
-    WriteBatchResponseProcessor processor;
-
+    WriteOpContext ctx(request);
+    WriteBatchResponseProcessor processor(ctx);
 
     processor.onWriteBatchResponse({{shard1Name, Response{rcr1, {op1}}},
                                     {shard2Name, Response{rcr2, {op2, op3}}},
@@ -207,7 +215,8 @@ TEST_F(WriteBatchResponseProcessorTest, CreateCollection) {
         nss1));
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
-    WriteBatchResponseProcessor processor;
+    WriteOpContext ctx(request);
+    WriteBatchResponseProcessor processor(ctx);
     auto result = processor.onWriteBatchResponse({{shard1Name,
                                                    Response{
                                                        rcr1,
@@ -281,7 +290,8 @@ TEST_F(WriteBatchResponseProcessorTest, SingleReplyItemForBatchOfThree) {
         0, {BulkWriteReplyItem{0, Status(CannotImplicitlyCreateCollectionInfo(nss1), "")}}, nss1));
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
-    WriteBatchResponseProcessor processor;
+    WriteOpContext ctx(request);
+    WriteBatchResponseProcessor processor(ctx);
     auto result = processor.onWriteBatchResponse({{shard1Name,
                                                    Response{
                                                        rcr1,
@@ -350,7 +360,8 @@ TEST_F(WriteBatchResponseProcessorTest, TwoShardMixedNamespaceExistence) {
         nss1));
     RemoteCommandResponse rcr2(host2, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
-    WriteBatchResponseProcessor processor;
+    WriteOpContext ctx(request);
+    WriteBatchResponseProcessor processor(ctx);
     auto result = processor.onWriteBatchResponse({{shard1Name,
                                                    Response{
                                                        rcr1,
@@ -424,7 +435,8 @@ TEST_F(WriteBatchResponseProcessorTest, IdxsCorrectlyRewrittenInReplyItems) {
                                        nss1));
     RemoteCommandResponse rcr2(host1, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
-    WriteBatchResponseProcessor processor;
+    WriteOpContext ctx(request);
+    WriteBatchResponseProcessor processor(ctx);
     auto result = processor.onWriteBatchResponse({
         {shard2Name,
          Response{
@@ -494,7 +506,8 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesSingleWriteConcernError) {
         BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, nss1));
     RemoteCommandResponse rcr2(host1, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
-    WriteBatchResponseProcessor processor;
+    WriteOpContext ctx(request);
+    WriteBatchResponseProcessor processor(ctx);
     auto result = processor.onWriteBatchResponse({
         {shard1Name,
          Response{
@@ -559,7 +572,8 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesMultipleWriteConcernErrors) {
         BulkWriteWriteConcernError(ErrorCodes::NotWritablePrimary, "NotWritablePrimary"));
     RemoteCommandResponse rcr2(host1, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
 
-    WriteBatchResponseProcessor processor;
+    WriteOpContext ctx(request);
+    WriteBatchResponseProcessor processor(ctx);
     auto result = processor.onWriteBatchResponse({
         {shard1Name,
          Response{

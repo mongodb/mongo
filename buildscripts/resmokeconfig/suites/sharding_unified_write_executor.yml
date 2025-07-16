@@ -1,5 +1,6 @@
-# Tests the unified write executor. Currently, this includes tests that run bulkWrite commands directly.
-# Many of them are currently commented out and we will work to re-enable them as development continues.
+# Tests the unified write executor. Specifically, this suite runs tests which start their own
+# sharded cluster. Currently, this includes tests that run bulkWrite commands directly. Many of them
+# are currently commented out and we will work to re-enable them as development continues.
 
 test_kind: js_test
 

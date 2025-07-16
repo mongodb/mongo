@@ -92,6 +92,15 @@ write_ops::InsertCommandRequest makeInsertCommandRequestForFLE(
 write_ops::UpdateOpEntry makeUpdateOpEntryFromUpdateOp(const BulkWriteUpdateOp* op);
 
 /**
+ * Helper function to build an BulkWriteUpdateOp based off the UpdateOpEntry passed in.
+ */
+BulkWriteUpdateOp toBulkWriteUpdate(const write_ops::UpdateOpEntry& op);
+
+/**
+ * Helper function to build an BulkWriteDeleteOp based off the DeleteOpEntry passed in.
+ */
+BulkWriteDeleteOp toBulkWriteDelete(const write_ops::DeleteOpEntry& op);
+/**
  * Helper function to build an UpdateRequest based off the BulkWriteUpdateOp passed in and its
  * namespace and top-level 'let' parameter.
  */

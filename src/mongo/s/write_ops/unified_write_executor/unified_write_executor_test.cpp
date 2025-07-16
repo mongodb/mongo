@@ -144,7 +144,8 @@ TEST_F(UnifiedWriteExecutorTest, BulkWriteBasic) {
         {NamespaceInfoEntry(nss1), NamespaceInfoEntry(nss2)});
 
     auto future = launchAsync([&]() {
-        auto reply = bulkWrite(operationContext(), request);
+        auto reply = execWriteRequest<BulkWriteCommandReply, BulkWriteCommandRequest>(
+            operationContext(), request);
         auto replyItems = reply.getCursor().getFirstBatch();
         ASSERT_EQ(replyItems.size(), 2);
         ASSERT_BSONOBJ_EQ(replyItems[0].toBSON(), BSON("ok" << 1.0 << "idx" << 0 << "n" << 1));
@@ -191,6 +192,136 @@ TEST_F(UnifiedWriteExecutorTest, BulkWriteBasic) {
     future.default_timed_get();
 }
 
+TEST_F(UnifiedWriteExecutorTest, BatchWriteBasic) {
+    const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(dbName, "coll1");
+
+    // Insert two documents
+    BatchedCommandRequest insertRequest([&] {
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
+        return insertOp;
+    }());
+
+
+    auto future = launchAsync([&]() {
+        auto resp = execWriteRequest<BatchedCommandResponse, BatchedCommandRequest>(
+            operationContext(), insertRequest);
+        ASSERT(resp.getOk());
+        ASSERT_FALSE(resp.isErrDetailsSet());
+        ASSERT_EQ(resp.getN(), 2);
+        ASSERT_EQ(resp.getNModified(), 0);
+        ASSERT_FALSE(resp.isUpsertDetailsSet());
+    });
+
+
+    // Load catalog cache from the config server
+    expectDatabaseRoutingRequest(dbName, shardId1);
+    expectCollectionRoutingRequest(nss, shardId1);
+
+    // Single insert batch.
+    expectBulkWriteShardRequest({BSON("insert" << 0 << "document" << BSON("x" << 1)),
+                                 BSON("insert" << 0 << "document" << BSON("x" << 2))} /* opList */,
+                                {nss} /* nssList */,
+                                shardId1 /* shardId */,
+                                {BSON("ok" << 1.0 << "idx" << 0 << "n" << 1),
+                                 BSON("ok" << 1.0 << "idx" << 1 << "n" << 1)} /* replyItems */,
+                                0 /* nErrors */,
+                                2 /* nInserted */,
+                                0 /* nMatched */,
+                                0 /* nModified */,
+                                0 /* nUpserted */,
+                                0 /* nDelete */
+    );
+
+    future.default_timed_get();
+
+    // Now, update one doc.
+    BatchedCommandRequest updateRequest([&] {
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        updateOp.setUpdates(std::vector{write_ops::UpdateOpEntry(
+            BSON("x" << 2),
+            write_ops::UpdateModification::parseFromClassicUpdate(BSON("x" << 3)))});
+        return updateOp;
+    }());
+
+
+    auto updateFuture = launchAsync([&]() {
+        auto resp = execWriteRequest<BatchedCommandResponse, BatchedCommandRequest>(
+            operationContext(), updateRequest);
+        ASSERT(resp.getOk());
+        ASSERT_FALSE(resp.isErrDetailsSet());
+        ASSERT_EQ(resp.getN(), 0);
+        ASSERT_EQ(resp.getNModified(), 1);
+        ASSERT_FALSE(resp.isUpsertDetailsSet());
+    });
+
+    // Single update batch.
+    expectBulkWriteShardRequest(
+        {BSON("update" << 0 << "filter" << BSON("x" << 2) << "multi" << false << "updateMods"
+                       << BSON("x" << 3) << "upsert" << false)} /* opList */,
+        {nss} /* nssList */,
+        shardId1 /* shardId */,
+        {BSON("ok" << 1.0 << "idx" << 0 << "n" << 1)} /* replyItems */,
+        0 /* nErrors */,
+        0 /* nInserted */,
+        0 /* nMatched */,
+        1 /* nModified */,
+        0 /* nUpserted */,
+        0 /* nDelete */
+    );
+
+    updateFuture.default_timed_get();
+
+    // Delete the updated doc.
+    BatchedCommandRequest deleteRequest([&] {
+        write_ops::DeleteCommandRequest deleteOp(nss);
+        deleteOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        deleteOp.setDeletes(std::vector{write_ops::DeleteOpEntry(BSON("x" << 3), false)});
+        return deleteOp;
+    }());
+
+    auto deleteFuture = launchAsync([&]() {
+        auto resp = execWriteRequest<BatchedCommandResponse, BatchedCommandRequest>(
+            operationContext(), deleteRequest);
+        ASSERT(resp.getOk());
+        ASSERT_FALSE(resp.isErrDetailsSet());
+        ASSERT_EQ(resp.getN(), 1);
+        ASSERT_EQ(resp.getNModified(), 0);
+        ASSERT_FALSE(resp.isUpsertDetailsSet());
+    });
+
+    // Single delete batch.
+    expectBulkWriteShardRequest(
+        {BSON("delete" << 0 << "filter" << BSON("x" << 3) << "multi" << false)} /* opList */,
+        {nss} /* nssList */,
+        shardId1 /* shardId */,
+        {BSON("ok" << 1.0 << "idx" << 0 << "n" << 1)} /* replyItems */,
+        0 /* nErrors */,
+        0 /* nInserted */,
+        0 /* nMatched */,
+        0 /* nModified */,
+        0 /* nUpserted */,
+        1 /* nDelete */
+    );
+
+    deleteFuture.default_timed_get();
+}
+
 TEST_F(UnifiedWriteExecutorTest, BulkWriteImplicitCollectionCreation) {
     const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
     const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest(dbName, "coll");
@@ -198,7 +329,8 @@ TEST_F(UnifiedWriteExecutorTest, BulkWriteImplicitCollectionCreation) {
                                     {NamespaceInfoEntry(nss1)});
 
     auto future = launchAsync([&]() {
-        auto reply = bulkWrite(operationContext(), request);
+        auto reply = execWriteRequest<BulkWriteCommandReply, BulkWriteCommandRequest>(
+            operationContext(), request);
         auto replyItems = reply.getCursor().getFirstBatch();
         ASSERT_EQ(replyItems.size(), 1);
         ASSERT_BSONOBJ_EQ(replyItems[0].toBSON(), BSON("ok" << 1.0 << "idx" << 0 << "n" << 1));
@@ -268,7 +400,8 @@ TEST_F(UnifiedWriteExecutorTest, OrderedBulkWriteErrorsAndStops) {
     request.setOrdered(true);
 
     auto future = launchAsync([&]() {
-        auto reply = bulkWrite(operationContext(), request);
+        auto reply = execWriteRequest<BulkWriteCommandReply, BulkWriteCommandRequest>(
+            operationContext(), request);
         auto replyItems = reply.getCursor().getFirstBatch();
         ASSERT_EQ(replyItems.size(), 1);
         ASSERT_BSONOBJ_EQ(replyItems[0].toBSON(),

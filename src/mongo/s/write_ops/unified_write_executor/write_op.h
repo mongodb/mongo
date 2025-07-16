@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include "mongo/db/commands/query_cmd/bulk_write_common.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 
 #include <variant>
 
 #include <boost/optional.hpp>
-
 
 namespace mongo {
 namespace unified_write_executor {
@@ -98,8 +98,23 @@ public:
     }
 
     BulkWriteOpVariant getBulkWriteOp() const {
-        tassert(10412802, "_bulkWriteRequest is not initialized", _bulkWriteRequest != nullptr);
-        return _bulkWriteRequest->getOps()[_index];
+        if (_bulkWriteRequest) {
+            return _bulkWriteRequest->getOps()[_index];
+        } else {
+            tassert(10605500, "_batchedRequest is not initialized", _batchedRequest != nullptr);
+            switch (_batchedRequest->getBatchType()) {
+                case BatchedCommandRequest::BatchType_Insert:
+                    return BulkWriteInsertOp(0, getRef().getDocument());
+                case BatchedCommandRequest::BatchType_Update:
+                    return bulk_write_common::toBulkWriteUpdate(
+                        _batchedRequest->getUpdateRequest().getUpdates()[_index]);
+                case BatchedCommandRequest::BatchType_Delete:
+                    return bulk_write_common::toBulkWriteDelete(
+                        _batchedRequest->getDeleteRequest().getDeletes()[_index]);
+                default:
+                    MONGO_UNREACHABLE_TASSERT(10605502);
+            }
+        }
     }
 
     bool isMulti() const {

@@ -187,6 +187,7 @@ write_ops::InsertCommandRequest makeInsertCommandRequestForFLE(
 }
 
 write_ops::UpdateOpEntry makeUpdateOpEntryFromUpdateOp(const BulkWriteUpdateOp* op) {
+    // TODO SERVER-107545: Move this check to parse time and potentially convert this to a tassert.
     uassert(ErrorCodes::FailedToParse,
             "Cannot specify sort with multi=true",
             !op->getSort() || !op->getMulti());
@@ -206,6 +207,40 @@ write_ops::UpdateOpEntry makeUpdateOpEntryFromUpdateOp(const BulkWriteUpdateOp* 
     update.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
         op->getAllowShardKeyUpdatesWithoutFullShardKeyInQuery());
     return update;
+}
+
+BulkWriteUpdateOp toBulkWriteUpdate(const write_ops::UpdateOpEntry& op) {
+    // TODO SERVER-107545: Move this check to parse time and potentially convert this to a tassert.
+    uassert(ErrorCodes::FailedToParse,
+            "Cannot specify sort with multi=true",
+            !op.getSort() || !op.getMulti());
+
+    BulkWriteUpdateOp update;
+    update.setFilter(op.getQ());
+    update.setMulti(op.getMulti());
+    update.setConstants(op.getC());
+    update.setUpdateMods(op.getU());
+    update.setSort(op.getSort());
+    update.setHint(op.getHint());
+    update.setCollation(op.getCollation());
+    update.setArrayFilters(op.getArrayFilters());
+    update.setUpsert(op.getUpsert());
+    update.setUpsertSupplied(op.getUpsertSupplied());
+    update.setSampleId(op.getSampleId());
+    update.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
+        op.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery());
+    return update;
+}
+
+BulkWriteDeleteOp toBulkWriteDelete(const write_ops::DeleteOpEntry& op) {
+    BulkWriteDeleteOp deleteOp;
+    if (op.getCollation()) {
+        deleteOp.setCollation(op.getCollation());
+    }
+    deleteOp.setHint(op.getHint());
+    deleteOp.setMulti(op.getMulti());
+    deleteOp.setFilter(op.getQ());
+    return deleteOp;
 }
 
 UpdateRequest makeUpdateRequestFromUpdateOp(OperationContext* opCtx,

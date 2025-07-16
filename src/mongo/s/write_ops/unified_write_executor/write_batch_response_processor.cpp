@@ -28,6 +28,9 @@
  */
 
 #include "mongo/s/write_ops/unified_write_executor/write_batch_response_processor.h"
+
+#include "mongo/s/write_ops/batched_command_response.h"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::unified_write_executor {
@@ -199,6 +202,54 @@ BulkWriteCommandReply WriteBatchResponseProcessor::generateClientResponse<BulkWr
     }
 
     return reply;
+}
+
+template <>
+BatchedCommandResponse
+WriteBatchResponseProcessor::generateClientResponse<BatchedCommandResponse>() {
+    BatchedCommandResponse resp;
+    resp.setStatus(Status::OK());
+
+    for (const auto& [id, item] : _results) {
+        auto status = item.getStatus();
+        if (!status.isOK()) {
+            resp.addToErrDetails(write_ops::WriteError(id, status));
+        }
+
+        // Verify that the id matches the one from the original client request.
+        tassert(10605504,
+                fmt::format(
+                    "expected id in reply ({}) to match id of operation from original request ({})",
+                    item.getIdx(),
+                    id),
+                static_cast<WriteOpId>(item.getIdx()) == id);
+        // TODO SERVER-104123 Handle multi: true case where we have multiple reply items for the
+        // same op id from the original client request.
+
+        // Handle propagating 'upsertedId' information.
+        if (const auto& upserted = item.getUpserted(); upserted) {
+            auto detail = std::make_unique<BatchedUpsertDetail>();
+
+            detail->setIndex(id);
+
+            BSONObjBuilder upsertedObjBuilder;
+            upserted->serializeToBSON("_id", &upsertedObjBuilder);
+            detail->setUpsertedID(upsertedObjBuilder.done());
+
+            resp.addToUpsertDetails(detail.release());
+        }
+    }
+
+    const int nValue = _nInserted + _nUpserted + _nMatched + _nDeleted;
+    resp.setN(nValue);
+    resp.setNModified(_nModified);
+
+    // Aggregate all the write concern errors from the shards.
+    if (auto totalWcError = mergeWriteConcernErrors(_wcErrors); totalWcError) {
+        resp.setWriteConcernError(new WriteConcernErrorDetail{totalWcError->toStatus()});
+    }
+
+    return resp;
 }
 
 }  // namespace mongo::unified_write_executor

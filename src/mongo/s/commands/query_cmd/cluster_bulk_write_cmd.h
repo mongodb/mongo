@@ -386,7 +386,9 @@ public:
             }
 
             if (internalQueryUnifiedWriteExecutor.load()) {
-                response = unified_write_executor::bulkWrite(opCtx, bulkRequest);
+                response = unified_write_executor::execWriteRequest<BulkWriteCommandReply,
+                                                                    BulkWriteCommandRequest>(
+                    opCtx, bulkRequest);
             } else {
                 // Dispatch the bulk write through the cluster.
                 // - To ensure that possible writeErrors are properly managed, a "fire and forget"

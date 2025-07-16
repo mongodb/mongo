@@ -55,6 +55,7 @@ namespace mongo::unified_write_executor {
  */
 class WriteBatchResponseProcessor {
 public:
+    WriteBatchResponseProcessor(const WriteOpContext& context) : _context(context) {}
     using CollectionsToCreate =
         stdx::unordered_map<NamespaceString,
                             std::shared_ptr<const mongo::CannotImplicitlyCreateCollectionInfo>>;
@@ -100,6 +101,7 @@ private:
                                                    const std::vector<BulkWriteReplyItem>&,
                                                    std::vector<WriteOp>&& toRetry);
 
+    const WriteOpContext& _context;
     size_t _nErrors{0};
     size_t _nInserted{0};
     size_t _nMatched{0};

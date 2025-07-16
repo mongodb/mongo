@@ -55,6 +55,8 @@ public:
 
 private:
     WriteBatchResponse _execute(OperationContext* opCtx, const SimpleWriteBatch& batch);
+    std::vector<AsyncRequestsSender::Request> buildBulkWriteRequests(
+        OperationContext* opCtx, const SimpleWriteBatch& batch) const;
 
     const WriteOpContext& _context;
 };

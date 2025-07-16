@@ -38,27 +38,43 @@
 namespace mongo {
 namespace unified_write_executor {
 
-BulkWriteCommandReply bulkWrite(OperationContext* opCtx, const BulkWriteCommandRequest& request) {
+template <typename ResponseType, typename RequestType>
+ResponseType execWriteRequest(OperationContext* opCtx, const RequestType& request) {
     WriteOpContext context(request);
-    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
+    MultiWriteOpProducer<RequestType> producer(request);
     WriteOpAnalyzer analyzer;
+
+    std::set<NamespaceString> nssSet;
+    bool ordered = false;
+    if constexpr (std::is_same_v<RequestType, BatchedCommandRequest>) {
+        nssSet.insert(request.getNS());
+        ordered = request.getWriteCommandRequestBase().getOrdered();
+    } else {
+        static_assert(std::is_same_v<RequestType, BulkWriteCommandRequest>);
+        for (const auto& nsInfo : request.getNsInfo()) {
+            nssSet.insert(nsInfo.getNs());
+        }
+        ordered = request.getOrdered();
+    }
+
     std::unique_ptr<WriteOpBatcher> batcher{nullptr};
-    if (request.getOrdered()) {
+    if (ordered) {
         batcher = std::make_unique<OrderedWriteOpBatcher>(producer, analyzer);
     } else {
         batcher = std::make_unique<UnorderedWriteOpBatcher>(producer, analyzer);
     }
     WriteBatchExecutor executor(context);
-    WriteBatchResponseProcessor processor;
+    WriteBatchResponseProcessor processor(context);
     WriteBatchScheduler scheduler(*batcher, executor, processor);
 
-    std::set<NamespaceString> nssSet;
-    for (const auto& nsInfo : request.getNsInfo()) {
-        nssSet.insert(nsInfo.getNs());
-    }
+
     scheduler.run(opCtx, nssSet);
-    return processor.generateClientResponse<BulkWriteCommandReply>();
+    return processor.generateClientResponse<ResponseType>();
 }
 
+template BatchedCommandResponse execWriteRequest<BatchedCommandResponse, BatchedCommandRequest>(
+    OperationContext*, const BatchedCommandRequest&);
+template BulkWriteCommandReply execWriteRequest<BulkWriteCommandReply, BulkWriteCommandRequest>(
+    OperationContext*, const BulkWriteCommandRequest&);
 }  // namespace unified_write_executor
 }  // namespace mongo

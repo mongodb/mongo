@@ -31,11 +31,31 @@
 
 #include "mongo/db/commands/query_cmd/bulk_write_gen.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
 namespace unified_write_executor {
 
-BulkWriteCommandReply bulkWrite(OperationContext* opCtx, const BulkWriteCommandRequest& request);
+/**
+ * Function template to execute a request of type 'RequestType' and return a response of type
+ * 'ResponseType'.
+ */
+template <typename ResponseType, typename RequestType>
+ResponseType execWriteRequest(OperationContext* opCtx, const RequestType& request);
 
+/**
+ * Function template instantiation declaration for executing insert/update/delete commands.
+ */
+extern template BatchedCommandResponse
+execWriteRequest<BatchedCommandResponse, BatchedCommandRequest>(OperationContext*,
+                                                                const BatchedCommandRequest&);
+
+/**
+ * Function template instantiation declaration for executing bulk commands.
+ */
+extern template BulkWriteCommandReply
+execWriteRequest<BulkWriteCommandReply, BulkWriteCommandRequest>(OperationContext*,
+                                                                 const BulkWriteCommandRequest&);
 }  // namespace unified_write_executor
 }  // namespace mongo
