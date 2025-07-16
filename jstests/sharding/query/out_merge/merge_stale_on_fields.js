@@ -1,5 +1,9 @@
 // Tests that an $merge stage is able to default the "on" fields to the correct value - even if one
 // or more of the involved nodes has a stale cache of the routing information.
+// @tags: [
+//    requires_fcv_82,
+// ]
+
 import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -49,7 +53,7 @@ assert.commandWorked(source.insert({_id: 'seed'}));
 
 // Test that if the collection is dropped and re-sharded during the course of the aggregation that
 // the operation will fail rather than proceed with the old shard key.
-function testEpochChangeDuringAgg({mergeSpec, failpoint, failpointData}) {
+function testEpochChangeDuringAgg({mergeSpec, failpoint, failpointData, expectedError}) {
     // Converts a single string or an array of strings into it's object spec form. For instance, for
     // input ["a", "b"] the returned object would be {a: 1, b: 1}.
     function indexSpecFromOnFields(onFields) {
@@ -91,7 +95,7 @@ function testEpochChangeDuringAgg({mergeSpec, failpoint, failpointData}) {
                     {$addFields: {sk: "$_id"}},
                     {$merge: ${tojsononeline(mergeSpec)}}
                 ]));
-                assert.eq(error.code, ErrorCodes.StaleEpoch);
+                assert.eq(error.code, ${expectedError});
             `;
 
         if (mergeSpec.hasOwnProperty("on")) {
@@ -163,7 +167,8 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
             whenNotMatched: whenNotMatchedMode
         },
         failpoint: "waitWithPinnedCursorDuringGetMoreBatch",
-        failpointData: {nss: source.getFullName()}
+        failpointData: {nss: source.getFullName()},
+        expectedError: ErrorCodes.StaleEpoch
     });
     testEpochChangeDuringAgg({
         mergeSpec: {
@@ -173,21 +178,26 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
             on: "sk"
         },
         failpoint: "waitWithPinnedCursorDuringGetMoreBatch",
-        failpointData: {nss: source.getFullName()}
+        failpointData: {nss: source.getFullName()},
+        expectedError: ErrorCodes.StaleEpoch
     });
 });
 
 // Test with some different failpoints to prove we will detect an epoch change in the middle of the
 // inserts or updates.
+// In these case we expect the operation to fail with QueryPlanKilled, as the operation will fail
+// when the $merge operation has been partially executed.
 testEpochChangeDuringAgg({
     mergeSpec: {into: target.getName(), whenMatched: "fail", whenNotMatched: "insert"},
     failpoint: "hangDuringBatchInsert",
-    failpointData: {nss: target.getFullName()}
+    failpointData: {nss: target.getFullName()},
+    expectedError: ErrorCodes.QueryPlanKilled
 });
 testEpochChangeDuringAgg({
     mergeSpec: {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert"},
     failpoint: "hangDuringBatchUpdate",
-    failpointData: {nss: target.getFullName()}
+    failpointData: {nss: target.getFullName()},
+    expectedError: ErrorCodes.QueryPlanKilled
 });
 
 st.stop();

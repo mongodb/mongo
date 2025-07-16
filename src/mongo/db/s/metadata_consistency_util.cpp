@@ -455,50 +455,48 @@ std::vector<BSONObj> _runExhaustiveAggregation(OperationContext* opCtx,
     std::vector<BSONObj> results;
 
     try {
-        sharding::router::CollectionRouter router(opCtx->getServiceContext(), nss);
-        router.route(opCtx, reason, [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-            auto cursor = [&] {
-                BSONObjBuilder responseBuilder;
-                auto status = ClusterAggregate::runAggregate(opCtx,
-                                                             ClusterAggregate::Namespaces{nss, nss},
-                                                             aggRequest,
-                                                             PrivilegeVector(),
-                                                             boost::none, /*verbosity*/
-                                                             &responseBuilder);
-                uassertStatusOKWithContext(
-                    status, str::stream() << "Failed to execute aggregation for: " << reason);
-                return uassertStatusOK(CursorResponse::parseFromBSON(responseBuilder.obj()));
-            }();
+        auto cursor = [&] {
+            BSONObjBuilder responseBuilder;
+            auto status = ClusterAggregate::runAggregate(opCtx,
+                                                         ClusterAggregate::Namespaces{nss, nss},
+                                                         aggRequest,
+                                                         PrivilegeVector(),
+                                                         boost::none, /*verbosity*/
+                                                         &responseBuilder,
+                                                         reason);
+            uassertStatusOKWithContext(
+                status, str::stream() << "Failed to execute aggregation for: " << reason);
+            return uassertStatusOK(CursorResponse::parseFromBSON(responseBuilder.obj()));
+        }();
 
-            results = cursor.releaseBatch();
+        results = cursor.releaseBatch();
 
-            if (!cursor.getCursorId()) {
-                return;
+        if (!cursor.getCursorId()) {
+            return results;
+        }
+
+        const auto authzSession = AuthorizationSession::get(opCtx->getClient());
+        AuthzCheckFn authChecker = [&authzSession](AuthzCheckFnInputType userName) -> Status {
+            return authzSession->isCoauthorizedWith(userName)
+                ? Status::OK()
+                : Status(ErrorCodes::Unauthorized, "User not authorized to access cursor");
+        };
+
+        // Check out the cursor. If the cursor is not found, all data was retrieve in the
+        // first batch.
+        const auto cursorManager = Grid::get(opCtx)->getCursorManager();
+        auto pinnedCursor = uassertStatusOK(
+            cursorManager->checkOutCursor(cursor.getCursorId(), opCtx, authChecker));
+        while (true) {
+            auto next = pinnedCursor->next();
+            if (!next.isOK() || next.getValue().isEOF()) {
+                break;
             }
 
-            const auto authzSession = AuthorizationSession::get(opCtx->getClient());
-            AuthzCheckFn authChecker = [&authzSession](AuthzCheckFnInputType userName) -> Status {
-                return authzSession->isCoauthorizedWith(userName)
-                    ? Status::OK()
-                    : Status(ErrorCodes::Unauthorized, "User not authorized to access cursor");
-            };
-
-            // Check out the cursor. If the cursor is not found, all data was retrieve in the
-            // first batch.
-            const auto cursorManager = Grid::get(opCtx)->getCursorManager();
-            auto pinnedCursor = uassertStatusOK(
-                cursorManager->checkOutCursor(cursor.getCursorId(), opCtx, authChecker));
-            while (true) {
-                auto next = pinnedCursor->next();
-                if (!next.isOK() || next.getValue().isEOF()) {
-                    break;
-                }
-
-                if (auto data = next.getValue().getResult()) {
-                    results.emplace_back(data.get().getOwned());
-                }
+            if (auto data = next.getValue().getResult()) {
+                results.emplace_back(data.get().getOwned());
             }
-        });
+        }
     } catch (const ExceptionFor<ErrorCodes::ChunkMetadataInconsistency>& e) {
         // In presence on metadata inconsistency within the config catalog, the refresh of the
         // routing information cache may fail.

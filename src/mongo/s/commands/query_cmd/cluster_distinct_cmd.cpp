@@ -568,16 +568,16 @@ public:
                 routingCtx.skipValidation();
             } else {
                 // Viewless timeseries, similar idea.
-                uassertStatusOK(
-                    ClusterAggregate::runAggregate(opCtx,
-                                                   &routingCtx,
-                                                   ClusterAggregate::Namespaces{nss, nss},
-                                                   distinctAggRequest,
-                                                   {distinctAggRequest},
-                                                   PrivilegeVector{},
-                                                   boost::none,
-                                                   verbosity,
-                                                   &bob));
+                uassertStatusOK(ClusterAggregate::runAggregateWithRoutingCtx(
+                    opCtx,
+                    routingCtx,
+                    ClusterAggregate::Namespaces{nss, nss},
+                    distinctAggRequest,
+                    {distinctAggRequest},
+                    PrivilegeVector{},
+                    boost::none,
+                    verbosity,
+                    &bob));
             }
             return;
         }
@@ -596,15 +596,16 @@ public:
             routingCtx.skipValidation();
         } else {
             // Query against viewless timeseries.
-            uassertStatusOK(ClusterAggregate::runAggregate(opCtx,
-                                                           &routingCtx,
-                                                           ClusterAggregate::Namespaces{nss, nss},
-                                                           distinctAggRequest,
-                                                           {distinctAggRequest},
-                                                           privileges,
-                                                           boost::none,
-                                                           verbosity,
-                                                           &bob));
+            uassertStatusOK(
+                ClusterAggregate::runAggregateWithRoutingCtx(opCtx,
+                                                             routingCtx,
+                                                             ClusterAggregate::Namespaces{nss, nss},
+                                                             distinctAggRequest,
+                                                             {distinctAggRequest},
+                                                             privileges,
+                                                             boost::none,
+                                                             verbosity,
+                                                             &bob));
         }
 
         // Copy the result from the aggregate command.

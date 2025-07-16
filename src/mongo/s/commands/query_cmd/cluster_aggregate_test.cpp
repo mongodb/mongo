@@ -165,28 +165,32 @@ TEST_F(ClusterAggregateTest, SnapshotReadConcernWithAfterClusterTime) {
 TEST_F(ClusterAggregateTest, ShouldFailWhenFromRouterIsTrue) {
     const BSONObj inputBson =
         fromjson("{aggregate: 'coll', pipeline: [], cursor: {}, fromRouter: true, $db: 'test'}");
-    ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51089);
+    const Status& res = testRunAggregateEarlyExit(inputBson);
+    ASSERT_EQ(51089, res.code());
 }
 
 TEST_F(ClusterAggregateTest, ShouldFailWhenNeedsMergeIstrueAndFromRouterIsFalse) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'coll', pipeline: [], cursor: {}, needsMerge: true, fromRouter: false, $db: "
         "'test'}");
-    ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51089);
+    const Status& res = testRunAggregateEarlyExit(inputBson);
+    ASSERT_EQ(51089, res.code());
 }
 
 TEST_F(ClusterAggregateTest, ShouldFailWhenNeedsMergeIstrueAndFromRouterIsTrue) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'coll', pipeline: [], cursor: {}, needsMerge: true, fromRouter: true, $db: "
         "'test'}");
-    ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51089);
+    const Status& res = testRunAggregateEarlyExit(inputBson);
+    ASSERT_EQ(51089, res.code());
 }
 
 TEST_F(ClusterAggregateTest, ShouldFailWhenExchengeIsPresent) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'coll', pipeline: [], cursor: {}, exchange: {policy: 'roundrobin', consumers: "
         "NumberInt(2)}, $db: 'test'}");
-    ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51028);
+    const Status& res = testRunAggregateEarlyExit(inputBson);
+    ASSERT_EQ(51028, res.code());
 }
 
 }  // namespace

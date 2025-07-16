@@ -472,6 +472,10 @@ void DocumentSourceMerge::flush(BatchedCommandRequest bcr, BatchedObjects batch)
         } else {
             uassertStatusOKWithContext(ex.toStatus(), "$merge failed due to a DuplicateKey error");
         }
+    } catch (const ExceptionFor<ErrorCodes::StaleEpoch>& ex) {
+        // Convert a StaleEpoch into a QueryPlanKilled error to avoid automatically retrying the
+        // operation from a router role loop.
+        uasserted(ErrorCodes::QueryPlanKilled, ex.toStatus().reason());
     }
 }
 

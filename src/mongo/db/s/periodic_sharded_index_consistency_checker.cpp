@@ -190,33 +190,24 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                     auto request = aggregation_request_helper::parseFromBSON(
                         requestBuilder.obj(), auth::ValidatedTenancyScope::get(opCtx), boost::none);
 
-                    sharding::router::CollectionRouter router(opCtx->getServiceContext(), nss);
-                    router.route(
+                    BSONObjBuilder responseBuilder;
+                    auto status = ClusterAggregate::runAggregate(
                         opCtx,
-                        "pipeline to detect inconsistent sharded indexes"_sd,
-                        [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                            BSONObjBuilder responseBuilder;
-                            auto routingCtxPtr = RoutingContext::createSynthetic({{nss, cri}});
-                            auto status = ClusterAggregate::runAggregate(
-                                opCtx,
-                                routingCtxPtr.get(),
-                                ClusterAggregate::Namespaces{nss, nss},
-                                request,
-                                LiteParsedPipeline{request},
-                                PrivilegeVector(),
-                                boost::none /* ResolvedView */,
-                                boost::none /* verbosity */,
-                                &responseBuilder);
+                        ClusterAggregate::Namespaces{nss, nss},
+                        request,
+                        PrivilegeVector(),
+                        boost::none /* verbosity */,
+                        &responseBuilder,
+                        "pipeline to detect inconsistent sharded indexes"_sd);
 
-                            // Stop counting if the agg command failed for one of the
-                            // collections to avoid recording a false count.
-                            uassertStatusOKWithContext(
-                                status, str::stream() << "nss " << nss.toStringForErrorMsg());
+                    // Stop counting if the agg command failed for one of the
+                    // collections to avoid recording a false count.
+                    uassertStatusOKWithContext(
+                        status, str::stream() << "nss " << nss.toStringForErrorMsg());
 
-                            if (!responseBuilder.obj()["cursor"]["firstBatch"].Array().empty()) {
-                                numShardedCollsWithInconsistentIndexes++;
-                            }
-                        });
+                    if (!responseBuilder.obj()["cursor"]["firstBatch"].Array().empty()) {
+                        numShardedCollsWithInconsistentIndexes++;
+                    }
                 }
 
                 if (numShardedCollsWithInconsistentIndexes) {

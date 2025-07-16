@@ -90,9 +90,9 @@ inline bool convertAndRunAggregateIfViewlessTimeseries(
         bodyBuilder.resetToEmpty();
         auto aggRequest = query_request_conversion::asAggregateCommandRequest(request, hasExplain);
 
-        uassertStatusOK(ClusterAggregate::runAggregate(
+        uassertStatusOK(ClusterAggregate::runAggregateWithRoutingCtx(
             opCtx,
-            &routingCtx,
+            routingCtx,
             ClusterAggregate::Namespaces{nss, nss},
             aggRequest,
             {aggRequest},

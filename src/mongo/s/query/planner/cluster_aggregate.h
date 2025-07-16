@@ -88,19 +88,9 @@ public:
      * internally.
      *
      * On success, fills out 'result' with the command response.
-     */
-    static Status runAggregate(OperationContext* opCtx,
-                               RoutingContext* routingCtx,
-                               const Namespaces& namespaces,
-                               AggregateCommandRequest& request,
-                               const LiteParsedPipeline& liteParsedPipeline,
-                               const PrivilegeVector& privileges,
-                               boost::optional<ResolvedView> resolvedView,
-                               boost::optional<ExplainOptions::Verbosity> verbosity,
-                               BSONObjBuilder* result);
-
-    /**
-     * Convenience version that requests routing table internally.
+     *
+     * It manages the collection routing, meaning that the aggregation may be implicitly retried by
+     * `runAggregate` if the placement of the collection has changed.
      */
     static Status runAggregate(OperationContext* opCtx,
                                const Namespaces& namespaces,
@@ -108,7 +98,8 @@ public:
                                const LiteParsedPipeline& liteParsedPipeline,
                                const PrivilegeVector& privileges,
                                boost::optional<ExplainOptions::Verbosity> verbosity,
-                               BSONObjBuilder* result);
+                               BSONObjBuilder* result,
+                               StringData comment = "ClusterAggregate::runAggregate"_sd);
 
 
     /**
@@ -119,7 +110,23 @@ public:
                                AggregateCommandRequest& request,
                                const PrivilegeVector& privileges,
                                boost::optional<ExplainOptions::Verbosity> verbosity,
-                               BSONObjBuilder* result);
+                               BSONObjBuilder* result,
+                               StringData comment = "ClusterAggregate::runAggregate"_sd);
+
+    /**
+     * Convenience version to inject the routingCtx by the caller. This function skips the
+     * collection routing management, therefore it has to be managed by the caller.
+     * Avoid calling this function unless it's strictly necessary.
+     */
+    static Status runAggregateWithRoutingCtx(OperationContext* opCtx,
+                                             RoutingContext& routingCtx,
+                                             const Namespaces& namespaces,
+                                             AggregateCommandRequest& request,
+                                             const LiteParsedPipeline& liteParsedPipeline,
+                                             const PrivilegeVector& privileges,
+                                             boost::optional<ResolvedView> resolvedView,
+                                             boost::optional<ExplainOptions::Verbosity> verbosity,
+                                             BSONObjBuilder* result);
 
     /**
      * Retries a command that was previously run on a view by resolving the view as an aggregation
@@ -129,6 +136,8 @@ public:
      * later for re-checking privileges for GetMore commands.
      *
      * On success, populates 'result' with the command response.
+     *
+     * This function doesn't throw, it return a Status object instead.
      */
     static Status retryOnViewError(OperationContext* opCtx,
                                    const AggregateCommandRequest& request,

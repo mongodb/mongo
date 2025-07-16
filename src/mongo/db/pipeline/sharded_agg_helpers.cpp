@@ -1626,6 +1626,16 @@ bool checkIfMustRunOnAllShards(const NamespaceString& nss, PipelineDataSource pi
          pipelineDataSource == PipelineDataSource::kChangeStream);
 }
 
+PipelineDataSource getPipelineDataSource(const LiteParsedPipeline& liteParsedPipeline) {
+    if (liteParsedPipeline.hasChangeStream()) {
+        return PipelineDataSource::kChangeStream;
+    }
+    if (liteParsedPipeline.generatesOwnDataOnce()) {
+        return PipelineDataSource::kGeneratesOwnDataOnce;
+    }
+    return PipelineDataSource::kNormal;
+}
+
 std::unique_ptr<Pipeline, PipelineDeleter> dispatchTargetedPipelineAndAddMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     RoutingContext& routingCtx,

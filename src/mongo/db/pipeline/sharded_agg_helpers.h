@@ -217,6 +217,11 @@ StatusWith<std::unique_ptr<RoutingContext>> getExecutionNsRoutingCtx(
 bool checkIfMustRunOnAllShards(const NamespaceString& nss, PipelineDataSource pipelineDataSource);
 
 /**
+ * Returns the PipelineDataSource given a parsed pipeline.
+ */
+PipelineDataSource getPipelineDataSource(const LiteParsedPipeline& liteParsedPipeline);
+
+/**
  * Retrieves the desired retry policy based on whether the default writeConcern is set on 'opCtx'.
  */
 Shard::RetryPolicy getDesiredRetryPolicy(OperationContext* opCtx);

@@ -74,9 +74,9 @@ inline boost::optional<CursorId> convertFindAndRunAggregateIfViewlessTimeseries(
         bodyBuilder.resetToEmpty();
         auto aggRequest = query_request_conversion::asAggregateCommandRequest(request, hasExplain);
         aggRequest.setQuerySettings(querySettings);
-        uassertStatusOK(ClusterAggregate::runAggregate(
+        uassertStatusOK(ClusterAggregate::runAggregateWithRoutingCtx(
             opCtx,
-            &routingCtx,
+            routingCtx,
             ClusterAggregate::Namespaces{origNss, origNss},
             aggRequest,
             {aggRequest} /* liteParsedPipeline */,
