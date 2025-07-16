@@ -111,18 +111,6 @@ py_binary(
     ],
 )
 
-sh_binary(
-    name = "shellscripts_linters",
-    srcs = ["shellscripts-linters.sh"],
-    data = [
-        "@shfmt",
-    ],
-    env = {
-        "SHFMT_PATH": "$(rootpath @shfmt//:shfmt)",
-    },
-    visibility = ["//visibility:public"],
-)
-
 py_library(
     name = "mongo_toolchain",
     srcs = [

@@ -1,14 +1,14 @@
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/../prelude.sh"
 
 cd src
 
 set -o errexit
 
-cat << EOF > notary_env.sh
+cat <<EOF >notary_env.sh
 export NOTARY_TOKEN=${signing_auth_token_70}
 export BARQUE_USERNAME=${barque_user}
 export BARQUE_API_KEY=${barque_api_key}
 EOF
 
-echo "${signing_auth_token_70}" > signing_auth_token
+echo "${signing_auth_token_70}" >signing_auth_token

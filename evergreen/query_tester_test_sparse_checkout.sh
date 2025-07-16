@@ -6,7 +6,7 @@
 # complete and execution can begin.
 # This test directory is then copied to the directory detected by resmoke's root selector.
 
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
 set -o errexit
@@ -14,8 +14,8 @@ set -o verbose
 
 # Ensure that repo_name has been defined in evergreen tasks.
 if [ -z "$1" ]; then
-  echo "Error: No repository name provided."
-  exit 1
+    echo "Error: No repository name provided."
+    exit 1
 fi
 
 repo_name="$1"
@@ -28,19 +28,19 @@ cd src/src/mongo/db/query/query_tester/tests
 cd $repo_name_local
 
 ls ../${repo_name}/generated_tests | while read i; do
-  TEST_DIR=generated_tests/$i
-  echo "Checking out $TEST_DIR at $(date)"
+    TEST_DIR=generated_tests/$i
+    echo "Checking out $TEST_DIR at $(date)"
 
-  for i in {1..5}; do
-    git sparse-checkout add $TEST_DIR && RET=0 && break || RET=$? && sleep 5
-    echo "git sparse-checkout add $TEST_DIR failed, retrying..."
-  done
+    for i in {1..5}; do
+        git sparse-checkout add $TEST_DIR && RET=0 && break || RET=$? && sleep 5
+        echo "git sparse-checkout add $TEST_DIR failed, retrying..."
+    done
 
-  if [ $RET -ne 0 ]; then
-    echo "Failed to git sparse-checkout add $TEST_DIR"
-    exit $RET
-  fi
+    if [ $RET -ne 0 ]; then
+        echo "Failed to git sparse-checkout add $TEST_DIR"
+        exit $RET
+    fi
 
-  touch $TEST_DIR/.sparse-checkout-done
-  cp $TEST_DIR/* $TEST_DIR/.sparse-checkout-done ../$repo_name/$TEST_DIR/
+    touch $TEST_DIR/.sparse-checkout-done
+    cp $TEST_DIR/* $TEST_DIR/.sparse-checkout-done ../$repo_name/$TEST_DIR/
 done

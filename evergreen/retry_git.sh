@@ -14,17 +14,17 @@ RETRIES=5
 DELAY=2
 COUNT=0
 while [ $COUNT -lt $RETRIES ]; do
-  "$REALGIT" "$@"
-  CODE=$?
-  if [ $CODE -eq 0 ]; then
-    RETRIES=0
-    break
-  fi
-  ((COUNT = COUNT + 1))
-  if [ $COUNT -lt $RETRIES ]; then
-    echo "Git command failed, retrying in $DELAY seconds..." >&2
-  fi
-  sleep $DELAY
+    "$REALGIT" "$@"
+    CODE=$?
+    if [ $CODE -eq 0 ]; then
+        RETRIES=0
+        break
+    fi
+    ((COUNT = COUNT + 1))
+    if [ $COUNT -lt $RETRIES ]; then
+        echo "Git command failed, retrying in $DELAY seconds..." >&2
+    fi
+    sleep $DELAY
 done
 
 exit "$CODE"

@@ -1,6 +1,6 @@
 #!/bin/env bash
 
-cat << EOF > ${WORK_DIR}/sast_report_generation_credentials.env
+cat <<EOF >${WORK_DIR}/sast_report_generation_credentials.env
 COVERITY_USERNAME=${SAST_REPORT_COVERITY_USERNAME}
 COVERITY_PASSWORD=${SAST_REPORT_COVERITY_PASSWORD}
 GOOGLE_CLIENT_ID=${SAST_REPORT_UPLOAD_GOOGLE_CLIENT_ID}

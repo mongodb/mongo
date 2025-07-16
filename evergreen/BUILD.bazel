@@ -297,11 +297,6 @@ sh_binary(
 )
 
 sh_binary(
-    name = "lint_shellscripts",
-    srcs = ["lint_shellscripts.sh"],
-)
-
-sh_binary(
     name = "lint_yaml",
     srcs = ["lint_yaml.sh"],
 )

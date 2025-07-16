@@ -3,7 +3,7 @@
 # This script verifies that specific symbols, and specific symbols only are
 # exported in mongo_crypt_v1.so
 
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
 cd src
@@ -12,8 +12,8 @@ set -o errexit
 set -o verbose
 
 if [ "$(uname)" != "Linux" ]; then
-  echo "Skipping test, this is for linux only"
-  exit 0
+    echo "Skipping test, this is for linux only"
+    exit 0
 fi
 
 EXTRACT_DIR="bazel-bin/install"
@@ -25,8 +25,8 @@ GDB_PATH="/opt/mongodbtoolchain/v5/bin/gdb"
 find $EXTRACT_DIR
 
 if [ ! -f "$SOPATH" ]; then
-  echo "Error: can not find library at: $SOPATH"
-  exit 1
+    echo "Error: can not find library at: $SOPATH"
+    exit 1
 fi
 
 #
@@ -51,10 +51,10 @@ mongo_crypt_v1_status_get_explanation@@MONGO_CRYPT_1.0'
 actual="$(readelf -W --dyn-syms "$SOPATH" | awk '$5 == "GLOBAL" && $7 != "UND" && $7 != "ABS" {print $8}' | sort)"
 
 if [ "$actual" != "$expect" ]; then
-  echo "Error: symbols are not as expected in: $SOPATH"
-  echo "Diff:"
-  diff <(echo "$actual") <(echo "$expect")
-  exit 1
+    echo "Error: symbols are not as expected in: $SOPATH"
+    echo "Diff:"
+    diff <(echo "$actual") <(echo "$expect")
+    exit 1
 fi
 
 echo "Mongo Crypt Shared Library exported symbols test succeeded!"
@@ -64,8 +64,8 @@ echo "Mongo Crypt Shared Library exported symbols test succeeded!"
 # and the verify it can be debugged with gdb
 #
 if [ ! -f "$UNITTEST_PATH" ]; then
-  echo "Skipping Mongo Crypt Shared Library unit test. Test not found at $UNITTEST_PATH"
-  exit 0
+    echo "Skipping Mongo Crypt Shared Library unit test. Test not found at $UNITTEST_PATH"
+    exit 0
 fi
 
 echo "Running Mongo Crypt Shared Library unit test"
@@ -73,8 +73,8 @@ $UNITTEST_PATH
 echo "Mongo Crypt Shared Library unit test succeeded!"
 
 if [ ! -f "$GDB_PATH" ]; then
-  echo "Skipping Mongo Crypt Shared Library debuggability test. No gdb found at $GDB_PATH"
-  exit 0
+    echo "Skipping Mongo Crypt Shared Library debuggability test. No gdb found at $GDB_PATH"
+    exit 0
 fi
 
 echo "Running Mongo Crypt Shared Library debuggability test"

@@ -1,4 +1,4 @@
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
 set -o errexit
@@ -8,19 +8,19 @@ antithesis_repo="us-central1-docker.pkg.dev/molten-verve-216720/mongodb-reposito
 
 # tag images as evergreen[-${antithesis_build_type}]-{latest,patch} or just ${antithesis_image_tag}
 if [ -n "${antithesis_image_tag:-}" ]; then
-  echo "Using provided tag: '$antithesis_image_tag' for docker pushes"
-  tag=$antithesis_image_tag
+    echo "Using provided tag: '$antithesis_image_tag' for docker pushes"
+    tag=$antithesis_image_tag
 else
-  tag="evergreen"
-  if [[ -n "${antithesis_build_type}" ]]; then
-    tag="${tag}-${antithesis_build_type}"
-  fi
+    tag="evergreen"
+    if [[ -n "${antithesis_build_type}" ]]; then
+        tag="${tag}-${antithesis_build_type}"
+    fi
 
-  if [ "${is_patch}" = "true" ]; then
-    tag="${tag}-patch"
-  else
-    tag="${tag}-latest-${branch_name}"
-  fi
+    if [ "${is_patch}" = "true" ]; then
+        tag="${tag}-patch"
+    else
+        tag="${tag}-latest-${branch_name}"
+    fi
 fi
 
 # Clean up any leftover docker artifacts
@@ -33,9 +33,9 @@ sudo docker network prune --force
 sudo service docker stop
 sudo mkdir -p /data/mci/docker
 if ! sudo jq -e . /etc/docker/daemon.json; then
-  echo "docker daemon.json did not exist or was invalid"
-  echo "setting docker daemon.json to {}"
-  sudo sh -c 'echo "{}" > /etc/docker/daemon.json'
+    echo "docker daemon.json did not exist or was invalid"
+    echo "setting docker daemon.json to {}"
+    sudo sh -c 'echo "{}" > /etc/docker/daemon.json'
 fi
 MODIFIED_JSON=$(sudo jq '."data-root" |= "/data/mci/docker"' /etc/docker/daemon.json)
 sudo echo "${MODIFIED_JSON}" | sudo tee /etc/docker/daemon.json
@@ -43,7 +43,7 @@ echo "docker daemon.json: set data-root to /data/mci/docker"
 sudo service docker start
 
 # Login
-echo "${antithesis_repo_key}" > mongodb.key.json
+echo "${antithesis_repo_key}" >mongodb.key.json
 cat mongodb.key.json | sudo docker login -u _json_key https://us-central1-docker.pkg.dev --password-stdin
 rm mongodb.key.json
 
@@ -64,15 +64,15 @@ timeout -v 1800 docker exec workload buildscripts/resmoke.py run --suite ${suite
 RET=$?
 set -o errexit
 
-docker-compose -f docker_compose/${suite}/docker-compose.yml logs > docker_logs.txt
+docker-compose -f docker_compose/${suite}/docker-compose.yml logs >docker_logs.txt
 docker-compose -f docker_compose/${suite}/docker-compose.yml down
 
 # Change the permissions of all of the files in the docker compose directory to the current user.
 # Some of the data files cannot be archived otherwise.
 sudo chown -R $USER docker_compose/${suite}/
 if [ $RET -ne 0 ]; then
-  echo "Resmoke sanity check has failed"
-  exit $RET
+    echo "Resmoke sanity check has failed"
+    exit $RET
 fi
 
 # Push Image

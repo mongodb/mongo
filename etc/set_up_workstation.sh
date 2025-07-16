@@ -1,5 +1,5 @@
 silent_grep() {
-    command grep -q  > /dev/null 2>&1 "$@"
+    command grep -q "$@" >/dev/null 2>&1
 }
 
 idem_file_append() {
@@ -19,10 +19,10 @@ idem_file_append() {
     local end_marker="# END $2"
     if ! silent_grep "^$start_marker" "$1"; then
         {
-            echo -e "\n$start_marker";
-            echo -e "$3";
-            echo -e "$end_marker";
-        } >> "$1"
+            echo -e "\n$start_marker"
+            echo -e "$3"
+            echo -e "$end_marker"
+        } >>"$1"
     fi
 }
 
@@ -30,7 +30,8 @@ setup_bash() {
     # Bash profile should source .bashrc
     echo "################################################################################"
     echo "Setting up bash..."
-    local block=$(cat <<BLOCK
+    local block=$(
+        cat <<BLOCK
 if [[ -f ~/.bashrc ]]; then
     source ~/.bashrc
 fi
@@ -67,7 +68,7 @@ setup_poetry() {
     echo "################################################################################"
     echo "Installing 'poetry' command..."
     export PATH="$PATH:$HOME/.local/bin"
-    if command -v poetry &> /dev/null; then
+    if command -v poetry &>/dev/null; then
         echo "'poetry' command exists; skipping setup"
     else
         pipx install poetry --pip-args="-r $(pwd)/poetry_requirements.txt"
@@ -78,7 +79,7 @@ setup_poetry() {
 setup_pipx() {
     echo "################################################################################"
     echo "Installing 'pipx' command..."
-    if command -v pipx &> /dev/null; then
+    if command -v pipx &>/dev/null; then
         echo "'pipx' command exists; skipping setup"
     else
         export PATH="$PATH:$HOME/.local/bin"
@@ -112,7 +113,7 @@ setup_db_contrib_tool() {
     echo "################################################################################"
     echo "Installing 'db-contrib-tool' command..."
     export PATH="$PATH:$HOME/.local/bin"
-    if command -v db-contrib-tool &> /dev/null; then
+    if command -v db-contrib-tool &>/dev/null; then
         echo "'db-contrib-tool' command exists; skipping setup"
     else
         pipx install db-contrib-tool
@@ -125,7 +126,7 @@ setup_clang_config() {
     echo "Installing clang config..."
 
     bazel build compiledb
-    
+
     echo "Finished installing clang config..."
 }
 
@@ -155,14 +156,14 @@ run_setup() {
     set +o nounset
     source ~/.bashrc
     set -o nounset
-    
+
     setup_bash
 
     setup_clang_config
     setup_gdb
     setup_pipx
-    setup_db_contrib_tool  # This step requires `setup_pipx` to have been run.
-    setup_poetry # This step requires `setup_pipx` to have been run.
+    setup_db_contrib_tool # This step requires `setup_pipx` to have been run.
+    setup_poetry          # This step requires `setup_pipx` to have been run.
 
     setup_mongo_venv # This step requires `setup_poetry` to have been run.
 

@@ -1,4 +1,4 @@
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
 cd src
@@ -7,7 +7,7 @@ set -o errexit
 
 # Create the config file, which will contain the GCE project/zone information along with
 # the expected audience that will appear on the VM's ID token.
-cat << EOF > $HOME/gce_vm_config.json
+cat <<EOF >$HOME/gce_vm_config.json
 {
     "audience" : "${oidc_gcp_vm_id_token_audience}",
     "projectID" : "${oidc_gcp_project_id}",
@@ -19,7 +19,7 @@ EOF
 # Create the SSH key file. Note that the SSH key has been base64 encoded and stored into an EVG
 # environment variable, so it is first trimmed of any whitespace via sed and base64 decoded before
 # being output to the file.
-echo ${oidc_gcp_ssh_key} | sed "s/[[:space:]]//g" | base64 --decode > $HOME/gcp_ssh_key
+echo ${oidc_gcp_ssh_key} | sed "s/[[:space:]]//g" | base64 --decode >$HOME/gcp_ssh_key
 
 # Reduce SSH keyfile privileges so that it is secure enough for OpenSSH.
 chmod 600 $HOME/gcp_ssh_key
@@ -34,7 +34,7 @@ ls -al $HOME/gcp_ssh_key
 # The contents of this file are expected to exist in base64 encoded format in
 # $oidc_gcp_service_account_key, so the same steps are taken as above before dumping it into a
 # newly-created JSON file.
-echo ${oidc_gcp_service_account_key} | sed "s/[[:space:]]//g" | base64 --decode > ${GOOGLE_APPLICATION_CREDENTIALS}
+echo ${oidc_gcp_service_account_key} | sed "s/[[:space:]]//g" | base64 --decode >${GOOGLE_APPLICATION_CREDENTIALS}
 chmod 600 ${GOOGLE_APPLICATION_CREDENTIALS}
 ls -al ${GOOGLE_APPLICATION_CREDENTIALS}
 

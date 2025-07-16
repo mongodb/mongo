@@ -7,32 +7,32 @@
 # Requires Java 11. You can set the JAVA_BINARY environment variable to the full path to java.
 
 if [ "$#" -ne 1 ]; then
-  echo "Usage: $0 SPEC_DIRECTORY" >&2
-  exit 1
+    echo "Usage: $0 SPEC_DIRECTORY" >&2
+    exit 1
 fi
 if ! [ -e "$1" ]; then
-  echo "Directory $1 not found" >&2
-  exit 1
+    echo "Directory $1 not found" >&2
+    exit 1
 fi
 if ! [ -d "$1" ]; then
-  echo "$1 not a directory" >&2
-  exit 1
+    echo "$1 not a directory" >&2
+    exit 1
 fi
 if ! [ -f "tla2tools.jar" ]; then
-  echo "No tla2tools.jar, run download-tlc.sh first"
-  exit 1
+    echo "No tla2tools.jar, run download-tlc.sh first"
+    exit 1
 fi
 
 TLA_FILE="MC$(echo $1 | sed 's/.*\///').tla"
 if ! [ -f "$1/$TLA_FILE" ]; then
-  echo "$1/$TLA_FILE does not exist" >&2
-  exit 1
+    echo "$1/$TLA_FILE does not exist" >&2
+    exit 1
 fi
 
 if [ -z "$JAVA_BINARY" ]; then
-  JAVA_BINARY=java
+    JAVA_BINARY=java
 else
-  echo "Using java binary [$JAVA_BINARY]"
+    echo "Using java binary [$JAVA_BINARY]"
 fi
 
 cd "$1"

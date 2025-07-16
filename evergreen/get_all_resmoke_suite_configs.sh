@@ -4,7 +4,7 @@
 # Usage:
 #   bash get_all_resmoke_suite_configs.sh
 
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
 cd src
@@ -20,5 +20,5 @@ BAZEL_BINARY=$(bazel_get_binary_path)
 #   str(target.label).replace('@@','') -> the target name, like //buildscripts/resmokeconfig:core_config
 #   f.path for f in target.files.to_list() -> the path to the config file, like bazel-out/k8-fastbuild/bin/buildscripts/resmokeconfig/core.yml
 ${BAZEL_BINARY} cquery ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} \
-  --define=MONGO_VERSION=${version} ${patch_compile_flags} "kind(resmoke_config, //...)" \
-  --output=starlark --starlark:expr "': '.join([str(target.label).replace('@@','')] + [f.path for f in target.files.to_list()])" > resmoke_suite_configs.yml
+    --define=MONGO_VERSION=${version} ${patch_compile_flags} "kind(resmoke_config, //...)" \
+    --output=starlark --starlark:expr "': '.join([str(target.label).replace('@@','')] + [f.path for f in target.files.to_list()])" >resmoke_suite_configs.yml

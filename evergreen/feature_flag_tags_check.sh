@@ -1,4 +1,4 @@
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
 cd src
@@ -18,7 +18,7 @@ mv all_feature_flags.txt patch_all_feature_flags.txt
 # get the list of feature flags from the base commit
 git --no-pager diff "$(git merge-base origin/${branch_name} HEAD)" --output="$diff_file_name" --binary
 if [ -s "$diff_file_name" ]; then
-  git apply -R "$diff_file_name"
+    git apply -R "$diff_file_name"
 fi
 
 $python buildscripts/idl/gen_all_feature_flag_list.py turned-on-by-default

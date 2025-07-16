@@ -82,21 +82,6 @@ def run_rules_lint(
     return True
 
 
-def run_shellscripts_linters(shellscripts_linters: pathlib.Path, check: bool) -> bool:
-    try:
-        command = [str(shellscripts_linters)]
-        if not check:
-            print("Running shellscripts formatter")
-            command.append("fix")
-        else:
-            print("Running shellscripts linter")
-        repo_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        subprocess.run(command, check=True, env=os.environ, cwd=repo_path)
-    except subprocess.CalledProcessError:
-        return False
-    return True
-
-
 def run_prettier(
     prettier: pathlib.Path, check: bool, files_to_format: Union[List[str], str] = "all"
 ) -> bool:
@@ -170,12 +155,6 @@ def main() -> int:
         "--prettier", help="Set the path to prettier", required=True, type=pathlib.Path
     )
     parser.add_argument(
-        "--shellscripts-linters",
-        help="Set the path to shellscripts_linters",
-        required=True,
-        type=pathlib.Path,
-    )
-    parser.add_argument(
         "--rules-lint-format",
         help="Set the path to rules_lint's formatter",
         required=True,
@@ -200,7 +179,6 @@ def main() -> int:
 
     args = parser.parse_args()
     prettier_path: pathlib.Path = args.prettier.resolve()
-    shellscripts_linters_path: pathlib.Path = args.shellscripts_linters.resolve()
 
     os.chdir(default_dir)
 
@@ -235,7 +213,6 @@ def main() -> int:
         if run_rules_lint(
             args.rules_lint_format, args.rules_lint_format_check, args.check, files_to_format
         )
-        and run_shellscripts_linters(shellscripts_linters_path, args.check)
         and run_prettier(prettier_path, args.check, files_to_format)
         else 1
     )

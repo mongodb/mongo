@@ -8,7 +8,7 @@
 # * ${args} - Extra command line args to pass to "bazel coverage"
 
 # Needed for evergreen scripts that use evergreen expansions and utility methods.
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
 cd src
@@ -24,7 +24,7 @@ eval echo "Execution environment: Args: ${args} Target: ${target}"
 BAZEL_BINARY=bazel
 
 # Print command being run to file that can be uploaded
-echo "python buildscripts/install_bazel.py" > bazel-invocation.txt
+echo "python buildscripts/install_bazel.py" >bazel-invocation.txt
 
-echo "  bazel coverage ${args} ${target}" >> bazel-invocation.txt
+echo "  bazel coverage ${args} ${target}" >>bazel-invocation.txt
 $BAZEL_BINARY coverage ${args} ${target}

@@ -3,7 +3,7 @@
 # This script is used as a workspace status command
 #    bazel test --workspace_status_command=bazel/resmoke/volatile_status.sh
 # to populate key-value pairs in bazel-out/volatile-status.txt.
-# This file and the key-values can be consumed by bazel rules, but bazel 
+# This file and the key-values can be consumed by bazel rules, but bazel
 # pretends this file never changes when deciding what to rebuild.
 
 # Evergreen expansions used primarily for Resmoke telemetry

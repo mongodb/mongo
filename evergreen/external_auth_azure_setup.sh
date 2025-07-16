@@ -1,10 +1,10 @@
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
 cd src
 
 set -o errexit
-cat << EOF > $HOME/azure_e2e_config.json
+cat <<EOF >$HOME/azure_e2e_config.json
 {
     "tD548GwE1@outlook.com" : "${oidc_azure_test_user_account_one_secret}",
     "tD548GwE2@outlook.com" : "${oidc_azure_test_user_account_two_secret}",
@@ -24,12 +24,12 @@ cat << EOF > $HOME/azure_e2e_config.json
     "oidc_azure_managed_identity_api_version": "${oidc_azure_managed_identity_api_version}"
 }
 EOF
-cat << EOF > $HOME/oidc_azure_container_key
+cat <<EOF >$HOME/oidc_azure_container_key
 ${oidc_azure_container_key}
 EOF
 
 # EVG project variables do not preserve line breaks so we store them as base64 and decode here
-sed s/[[:space:]]//g $HOME/oidc_azure_container_key | base64 --decode > $HOME/azure_remote_key
+sed s/[[:space:]]//g $HOME/oidc_azure_container_key | base64 --decode >$HOME/azure_remote_key
 
 # Clean up temp file
 rm -f $HOME/oidc_azure_container_key

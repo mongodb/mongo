@@ -1,4 +1,4 @@
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/../prelude.sh"
 
 cd src
@@ -10,13 +10,13 @@ MONGO_VERSION=$(git describe --abbrev=7)
 
 # If the project is sys-perf (or related), add the string -sys-perf to the version
 if [[ "${project}" == sys-perf* ]]; then
-  MONGO_VERSION="$MONGO_VERSION-sys-perf"
+    MONGO_VERSION="$MONGO_VERSION-sys-perf"
 fi
 
 # If this is a patch build, we add the patch version id to the version string so we know
 # this build was a patch, and which evergreen task it came from
 if [ "${is_patch}" = "true" ]; then
-  MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+    MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
 fi
 echo "MONGO_VERSION = ${MONGO_VERSION}"
 

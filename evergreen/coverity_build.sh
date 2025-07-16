@@ -10,7 +10,7 @@ python buildscripts/install_bazel.py
 bazel_bin="$HOME/.local/bin/bazelisk"
 # number of parallel jobs to use for build.
 # Even with scale=0 (the default), bc command adds decimal digits in case of multiplication. Division by 1 gives us a whole number with scale=0
-bazel_jobs=$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) * .85 / 1")
+bazel_jobs=$(bc <<<"$(grep -c '^processor' /proc/cpuinfo) * .85 / 1")
 build_config="--config=local --jobs=$bazel_jobs --compiler_type=gcc --opt=off --dbg=False --allocator=system"
 bazel_query='mnemonic("CppCompile|LinkCompile", filter(//src/mongo, deps(//:install-core)) except //src/mongo/db/modules/enterprise/src/streams/third_party/...)'
 bazel_cache="--output_user_root=$workdir/bazel_cache"
@@ -21,14 +21,14 @@ bazelBuildCommand="$bazel_bin $bazel_cache build $build_config //src/mongo/db/mo
 echo "Bazel Build Command: $bazelBuildCommand"
 covIdir="$workdir/covIdir"
 if [ -d "$covIdir" ]; then
-  echo "covIdir already exists, meaning idir extracted after download from S3"
+    echo "covIdir already exists, meaning idir extracted after download from S3"
 else
-  mkdir $workdir/covIdir
+    mkdir $workdir/covIdir
 fi
 $workdir/coverity/bin/cov-build --dir "$covIdir" --verbose 0 -j $bazel_jobs --return-emit-failures --parse-error-threshold=99 --bazel $bazelBuildCommand
 ret=$?
 if [ $ret -ne 0 ]; then
-  echo "cov-build faild with exit code $ret"
+    echo "cov-build faild with exit code $ret"
 else
-  echo "cov-build was successful"
+    echo "cov-build was successful"
 fi

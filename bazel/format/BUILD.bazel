@@ -6,8 +6,6 @@ py_binary(
     args = [
         "--prettier",
         "$(location //:prettier)",
-        "--shellscripts-linters",
-        "$(location //buildscripts:shellscripts_linters)",
         "--rules-lint-format",
         "$(location :rules_lint_format)",
         "--rules-lint-format-check",
@@ -17,7 +15,6 @@ py_binary(
         ":rules_lint_format",
         ":rules_lint_format.check",
         "//:prettier",
-        "//buildscripts:shellscripts_linters",
         "@shfmt",
     ],
     env = {
@@ -38,9 +35,8 @@ format_multirun(
     graphql = "//:prettier",
     html = "//:prettier",
     markdown = "//:prettier",
+    shell = "@shfmt//:shfmt",
     sql = "//:prettier",
     starlark = "@buildifier_prebuilt//:buildifier",
     visibility = ["//visibility:public"],
-    # TODO(SERVER-101034): Enable rules_lint shfmt after sh files are reformatted with .editorconfig
-    #   shell = "@shfmt//:shfmt",
 )

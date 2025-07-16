@@ -18,7 +18,7 @@ openssl enc -aes-256-${MODE:-ctr} -in M.bin -K $(xxd -c 100 -p Ke.bin) -iv $(xxd
 # echo -n "what do ya want for nothing?" | openssl dgst -sha256 -mac hmac -macopt hexkey:4a656665 -hex
 cat AD.bin IV.bin S.bin | openssl dgst -sha256 -mac hmac -macopt hexkey:$(xxd -c 100 -p Km.bin) -binary -out T.bin
 
-cat IV.bin S.bin T.bin > C.bin
+cat IV.bin S.bin T.bin >C.bin
 
 cat <<EOF
     // clang-format off

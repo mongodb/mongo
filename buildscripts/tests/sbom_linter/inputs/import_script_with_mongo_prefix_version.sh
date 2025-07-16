@@ -8,4 +8,3 @@ set -vx
 
 NAME=protobuf
 VERSION="mongo/v4.25.0"
-

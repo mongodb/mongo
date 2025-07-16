@@ -1,4 +1,4 @@
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
 cd src
@@ -6,7 +6,7 @@ cd src
 set -o errexit
 
 # Should output contents to new file in home directory.
-cat << EOF > $HOME/oidc_e2e_setup.json
+cat <<EOF >$HOME/oidc_e2e_setup.json
 {
     "testserversecurityone@ping-test.com" : "${oidc_ping_test_user_account_one_secret}",
     "testserversecuritytwo@ping-test.com" : "${oidc_ping_test_user_account_two_secret}",

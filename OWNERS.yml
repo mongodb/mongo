@@ -18,6 +18,9 @@ filters:
   - ".clang-tidy.in":
     approvers:
       - 10gen/server-programmability
+  - "/.editorconfig":
+    approvers:
+      - 10gen/devprod-build
   - ".git*":
     approvers:
       - 10gen/devprod-build

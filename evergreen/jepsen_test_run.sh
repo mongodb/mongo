@@ -1,4 +1,4 @@
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
 cd src/jepsen-mongodb
@@ -22,22 +22,22 @@ start_time=$(date +%s)
 # will need to adopt buildscripts/jepsen_report.py to support the log output
 # of older-style Jepsen tests
 lein run test --test ${jepsen_test_name} \
-  --mongodb-dir ../ \
-  --working-dir ${workdir}/src/jepsen-workdir \
-  --clock-skew faketime \
-  --libfaketime-path ${workdir}/src/libfaketime/build/libfaketime.so.1 \
-  --virtualization none \
-  --nodes-file ../nodes.txt \
-  ${mongod_conf} \
-  ${jepsen_key_time_limit} \
-  ${jepsen_protocol_version} \
-  ${jepsen_read_concern} \
-  ${jepsen_read_with_find_and_modify} \
-  ${jepsen_storage_engine} \
-  ${jepsen_time_limit} \
-  ${jepsen_write_concern} \
-  2>&1 \
-  | tee jepsen_${task_name}_${execution}.log
+    --mongodb-dir ../ \
+    --working-dir ${workdir}/src/jepsen-workdir \
+    --clock-skew faketime \
+    --libfaketime-path ${workdir}/src/libfaketime/build/libfaketime.so.1 \
+    --virtualization none \
+    --nodes-file ../nodes.txt \
+    ${mongod_conf} \
+    ${jepsen_key_time_limit} \
+    ${jepsen_protocol_version} \
+    ${jepsen_read_concern} \
+    ${jepsen_read_with_find_and_modify} \
+    ${jepsen_storage_engine} \
+    ${jepsen_time_limit} \
+    ${jepsen_write_concern} \
+    2>&1 |
+    tee jepsen_${task_name}_${execution}.log
 end_time=$(date +%s)
 elapsed_secs=$((end_time - start_time))
 . ../evergreen/jepsen_report.sh

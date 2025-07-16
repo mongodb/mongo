@@ -5,8 +5,8 @@ GREEN='\033[0;32m'
 NO_COLOR='\033[0m'
 
 if [[ $1 == "ALL_PASSING" ]]; then
-  echo -e "${GREEN}INFO:${NO_COLOR} No linter errors found!"
-  exit 0
+    echo -e "${GREEN}INFO:${NO_COLOR} No linter errors found!"
+    exit 0
 fi
 
 echo -e "${RED}ERROR:${NO_COLOR} Linter run failed, see details above"

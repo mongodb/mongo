@@ -1,10 +1,10 @@
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
 cd src
 
 set -o errexit
-cat << EOF > aws_e2e_setup.json
+cat <<EOF >aws_e2e_setup.json
 {
     "iam_auth_ecs_account" : "${iam_auth_ecs_account}",
     "iam_auth_ecs_secret_access_key" : "${iam_auth_ecs_secret_access_key}",

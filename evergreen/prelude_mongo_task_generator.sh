@@ -1,8 +1,8 @@
 function setup_mongo_task_generator {
-  if [ ! -f mongo-task-generator ]; then
-    curl -L https://github.com/mongodb/mongo-task-generator/releases/download/v3.4.1/mongo-task-generator --output mongo-task-generator
-    chmod +x mongo-task-generator
-  fi
+    if [ ! -f mongo-task-generator ]; then
+        curl -L https://github.com/mongodb/mongo-task-generator/releases/download/v3.4.1/mongo-task-generator --output mongo-task-generator
+        chmod +x mongo-task-generator
+    fi
 }
 
 ## Comment above and uncomment below to test unreleased mongo-task-generator changes that are

@@ -3,13 +3,11 @@
 SCRIPT_DIR=$(dirname $0)
 SOURCE_ROOT="$SCRIPT_DIR/.."
 
-function merged_decls_headers
-{
+function merged_decls_headers {
     jq -r 'map(select(.mod as $mod | any(.used_from[]; .mod != $mod)) | .loc | split(":") | .[0]) | unique[]' $SOURCE_ROOT/merged_decls.json
 }
 
-function all_headers
-{
+function all_headers {
     cd $SOURCE_ROOT && find src/mongo -name '*.h' | sort
 }
 

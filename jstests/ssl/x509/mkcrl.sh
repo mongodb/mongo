@@ -7,7 +7,7 @@ OUTPUT_PATH="jstests/libs/"
 CA_PEM_PATH="${OUTPUT_PATH}/ca.pem"
 TRUSTED_CA_PEM_PATH="${OUTPUT_PATH}/trusted-ca.pem"
 
-die () {
+die() {
     [ $# -gt 0 ] && [ ! -z "$1" ] && echo "$1" >&2
     exit 1
 }
@@ -24,11 +24,11 @@ crl() {
     CA="$1"
     CONFIG="${CADB}/config"
     DEST="${OUTPUT_PATH}/$2"
-    echo '01' > "$CADB/serial"
+    echo '01' >"$CADB/serial"
     touch "$CADB/index.txt" "$CADB/index.txt.attr"
-    echo -e "[ ca ]\ndefault_ca	= CA_default\n" > "$CONFIG"
-    echo -e "[ CA_default ]\ndatabase = ${CADB}/index.txt\n" >> "$CONFIG"
-    echo -e "certificate = $CA\nprivate_key = $CA\ndefault_md = sha256" >> "$CONFIG"
+    echo -e "[ ca ]\ndefault_ca	= CA_default\n" >"$CONFIG"
+    echo -e "[ CA_default ]\ndatabase = ${CADB}/index.txt\n" >>"$CONFIG"
+    echo -e "certificate = $CA\nprivate_key = $CA\ndefault_md = sha256" >>"$CONFIG"
 
     VALIDITY_OPTIONS="-days 824 -crldays 823"
     if [ "$3" = "expired" ]; then
