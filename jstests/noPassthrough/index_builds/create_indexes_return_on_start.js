@@ -1,10 +1,5 @@
 /**
  * Tests the returnOnStart option of the createIndexes command.
- *
- * @tags: [
- *   # TODO SERVER-107530 re-enable this test
- *   __TEMPORARILY_DISABLED__,
- * ]
  */
 
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
@@ -91,7 +86,7 @@ const runTest = function(db, replSets, timeseries, setUp) {
 
     const restartReplication = function() {
         for (const replSet of replSets) {
-            restartServerReplication(replSet.getSecondary());
+            restartServerReplication(replSet.getSecondaries());
         }
     };
 
@@ -192,12 +187,16 @@ const runTest = function(db, replSets, timeseries, setUp) {
     assertCreateIndexesWorked(db.runCommand(cmdAB));
 };
 
+const reduceOplogMaxTimeParam = {
+    setParameter: {'failpoint.setSmallOplogGetMoreMaxTimeMS': {mode: "alwaysOn"}}
+};
+
 const replSetConfig = {
     nodes: 3,
     settings: {chainingAllowed: false},
 };
 
-const replTest = new ReplSetTest(replSetConfig);
+const replTest = new ReplSetTest({...replSetConfig, nodeOptions: reduceOplogMaxTimeParam});
 replTest.startSet();
 replTest.initiate();
 const replDb = replTest.getPrimary().getDB(jsTestName());
@@ -205,7 +204,8 @@ runTest(replDb, [replTest], false);
 runTest(replDb, [replTest], true);
 replTest.stopSet();
 
-const shardingTest = new ShardingTest({shards: 2, rs: replSetConfig});
+const shardingTest =
+    new ShardingTest({shards: 2, rs: {...replSetConfig, ...reduceOplogMaxTimeParam}});
 const shardingDb = shardingTest.s.getDB(jsTestName());
 runTest(shardingDb, [shardingTest.rs0, shardingTest.rs1], false, (coll) => {
     assert.commandWorked(
