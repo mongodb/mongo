@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/filter.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 
 #include <iterator>
 #include <memory>
@@ -55,7 +56,9 @@ OrStage::OrStage(ExpressionContext* expCtx,
       _filter(filter),
       _currentChild(0),
       _dedup(dedup),
-      _recordIdDeduplicator(expCtx) {}
+      _recordIdDeduplicator(expCtx),
+      _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx)) {
+}
 
 void OrStage::addChild(std::unique_ptr<PlanStage> child) {
     _children.emplace_back(std::move(child));
@@ -84,6 +87,8 @@ PlanStage::StageState OrStage::doWork(WorkingSetID* out) {
 
         // If we're deduping (and there's something to dedup by)
         if (_dedup && member->hasRecordId()) {
+            uint64_t dedupBytesPrev = _recordIdDeduplicator.getApproximateSize();
+
             ++_specificStats.dupsTested;
 
             // ...and we've seen the RecordId before
@@ -92,6 +97,10 @@ PlanStage::StageState OrStage::doWork(WorkingSetID* out) {
                 ++_specificStats.dupsDropped;
                 _ws->free(id);
                 return PlanStage::NEED_TIME;
+            } else {
+                uint64_t dedupBytes = _recordIdDeduplicator.getApproximateSize();
+                _memoryTracker.add(dedupBytes - dedupBytesPrev);
+                _specificStats.maxUsedMemBytes = _memoryTracker.maxMemoryBytes();
             }
         }
 

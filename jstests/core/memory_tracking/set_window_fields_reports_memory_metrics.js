@@ -71,7 +71,7 @@ assert.commandWorked(coll.insertMany(docs));
             cursor: {batchSize: 1},
             allowDiskUse: false
         },
-        stageName: "_internalSetWindowFields",
+        stageName: "$_internalSetWindowFields",
         expectedNumGetMores: 10,
         checkInUseMemBytesResets: false
     });

@@ -249,10 +249,9 @@ function verifyExplainMetrics({db, collName, pipeline, stageName, featureFlagEna
 
     // If a query uses sbe, the explain version will be 2.
     const isSbeExplain = explainRes.explainVersion === "2";
-    const stageKey = isSbeExplain ? stageName : '$' + stageName;
 
-    function getStagesFromExplain(explainRes, stageKey) {
-        let stages = getAggPlanStages(explainRes, stageKey);
+    function getStagesFromExplain(explainRes, stageName) {
+        let stages = getAggPlanStages(explainRes, stageName);
         // Even if SBE is enabled, there are some stages that are not supported in SBE and will
         // still run on classic. We should also check for the classic pipeline stage name.
         if (isSbeExplain && stages.length == 0) {
@@ -261,29 +260,29 @@ function verifyExplainMetrics({db, collName, pipeline, stageName, featureFlagEna
         assert.eq(stages.length,
                   numStages,
                   " Found " + stages.length + " but expected to find " + numStages + " " +
-                      stageKey + " stages " +
+                      stageName + " stages " +
                       "in explain: " + tojson(explainRes));
         return stages;
     }
 
-    function assertNoMemoryMetricsInStages(explainRes, stageKey) {
-        let stages = getStagesFromExplain(explainRes, stageKey);
+    function assertNoMemoryMetricsInStages(explainRes, stageName) {
+        let stages = getStagesFromExplain(explainRes, stageName);
         for (let stage of stages) {
             assert(!stage.hasOwnProperty("maxUsedMemBytes"),
-                   `Unexpected maxUsedMemBytes in ${stageKey} stage: ` + tojson(explainRes));
+                   `Unexpected maxUsedMemBytes in ${stageName} stage: ` + tojson(explainRes));
         }
     }
 
-    function assertHasMemoryMetricsInStages(explainRes, stageKey) {
-        let stages = getStagesFromExplain(explainRes, stageKey);
+    function assertHasMemoryMetricsInStages(explainRes, stageName) {
+        let stages = getStagesFromExplain(explainRes, stageName);
         for (let stage of stages) {
             assert(stage.hasOwnProperty("maxUsedMemBytes"),
-                   `Expected maxUsedMemBytes in ${stageKey} stage: ` + tojson(explainRes));
+                   `Expected maxUsedMemBytes in ${stageName} stage: ` + tojson(explainRes));
             // TODO SERVER-106000 Remove explicit check for $_internalSetWindowFields.
-            if (stageKey != "$_internalSetWindowFields") {
+            if (stageName != "$_internalSetWindowFields") {
                 assert.gt(stage.maxUsedMemBytes,
                           0,
-                          `Expected maxUsedMemBytes to be positive in ${stageKey} stage: ` +
+                          `Expected maxUsedMemBytes to be positive in ${stageName} stage: ` +
                               tojson(explainRes));
             }
         }
@@ -297,7 +296,7 @@ function verifyExplainMetrics({db, collName, pipeline, stageName, featureFlagEna
 
         // Memory usage metrics do not appear in the stage's statistics. Verify that the stage
         // exists in the explain output.
-        assertNoMemoryMetricsInStages(explainRes, stageKey);
+        assertNoMemoryMetricsInStages(explainRes, stageName);
         return;
     }
 
@@ -314,7 +313,7 @@ function verifyExplainMetrics({db, collName, pipeline, stageName, featureFlagEna
     }
 
     // Memory usage metrics appear within the stage's statistics.
-    assertHasMemoryMetricsInStages(explainRes, stageKey);
+    assertHasMemoryMetricsInStages(explainRes, stageName);
 
     jsTestLog(
         "Test that memory usage metrics do not appear in the explain output when the verbosity is lower than executionStats.");
@@ -322,9 +321,9 @@ function verifyExplainMetrics({db, collName, pipeline, stageName, featureFlagEna
     assert(!explainQueryPlannerRes.hasOwnProperty("maxUsedMemBytes"),
            "Unexpected maxUsedMemBytes in explain: " + tojson(explainQueryPlannerRes));
     // SBE stage metrics aren't outputted in queryPlanner explain, so checking
-    // the stageKey may result in no stages.
+    // the stageName may result in no stages.
     if (!isSbeExplain) {
-        assertNoMemoryMetricsInStages(explainQueryPlannerRes, stageKey);
+        assertNoMemoryMetricsInStages(explainQueryPlannerRes, stageName);
     }
 }
 

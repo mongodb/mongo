@@ -42,7 +42,7 @@ runShardedMemoryStatsTest({
         cursor: {batchSize: 1},
         allowDiskUse: false
     },
-    stageName: "group",
+    stageName: "$group",
     expectedNumGetMores: 2,
     numShards: 2
 });

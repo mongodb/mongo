@@ -49,6 +49,6 @@ runMemoryStatsTest({
         allowDiskUse: false,
         cursor: {batchSize: 1}
     },
-    stageName: "graphLookup",
+    stageName: "$graphLookup",
     expectedNumGetMores: 8
 });
