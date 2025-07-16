@@ -45,6 +45,7 @@ evergreen_args="--installDir /data/install \
   --evgVersionsFile multiversion-downloads.json"
 local_args="--edition $edition \
   --debug \
+  --fallbackToMaster \
   ${last_lts_arg} \
   ${last_continuous_arg} 6.0 7.0"
 
