@@ -165,7 +165,7 @@ feature_flags:
     featureFlagRecordDelinquentMetrics:
         description: "Enables delinquent metrics recording"
         cpp_varname: gFeatureFlagRecordDelinquentMetrics
-        default: false
+        default: true
         fcv_gated: false
     featureFlagRateLimitIngressConnectionEstablishment:
         description: "Queues connection establishment after exceeding the maximum rate"
