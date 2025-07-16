@@ -202,6 +202,7 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
         return False
 
     lint_all = "..." in args or "--all" in args or "//..." in args
+    files_to_format = args
     if not lint_all and len([arg for arg in args if not arg.startswith("--")]) == 0:
         origin_branch = "origin/master"
         for arg in args:
@@ -225,15 +226,11 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
                 for file in _get_files_changed_since_fork_point(origin_branch)
                 if file.endswith((".cpp", ".c", ".h", ".py", ".js", ".mjs", ".json"))
             ]
-            args = files_to_format + args + ["--compile_one_dependency"]
-    
-    if lint_all:
-        print("WARNING!!! Defaulting to formatting all files, this may take a while.")
 
-    if lint_all or "sbom.json" in args:
+    if lint_all or "sbom.json" in files_to_format:
         subprocess.run([bazel_bin, "run", "//buildscripts:sbom_linter"], check=True)
 
-    if lint_all or any(file.endswith(".h") or file.endswith(".cpp") for file in args):
+    if lint_all or any(file.endswith(".h") or file.endswith(".cpp") for file in files_to_format):
         subprocess.run(
             [bazel_bin, "run", "//buildscripts:quickmongolint", "--", "lint"], check=True
         )
@@ -244,7 +241,7 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
         or file.endswith(".h")
         or file.endswith(".py")
         or file.endswith(".idl")
-        for file in args
+        for file in files_to_format
     ):
         subprocess.run([bazel_bin, "run", "//buildscripts:errorcodes", "--", "--quiet"], check=True)
 
