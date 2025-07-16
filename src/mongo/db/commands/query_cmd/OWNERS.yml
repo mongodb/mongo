@@ -42,7 +42,7 @@ filters:
   - "mr_*":
     approvers:
       - 10gen/query-integration-extensions
-  - "release_memory_cmd.cpp":
+  - "release_memory_cmd.*":
     approvers:
       - 10gen/query-execution
   - "update_metrics.*":

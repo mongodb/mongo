@@ -321,3 +321,19 @@ mongo_cc_unit_test(
         "//src/mongo/db/query:query_test_service_context",
     ],
 )
+
+mongo_cc_library(
+    name = "release_memory_cmd",
+    srcs = [
+        "release_memory_cmd.cpp",
+    ],
+    hdrs = [
+        "release_memory_cmd.h",
+    ],
+    deps = [
+        "//src/mongo/db:commands",
+        "//src/mongo/db/auth:auth_checks",
+        "//src/mongo/db/query:plan_yield_policy_release_memory",
+        "//src/mongo/db/query/client_cursor",
+    ],
+)

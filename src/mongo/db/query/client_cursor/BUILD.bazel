@@ -29,6 +29,7 @@ mongo_cc_library(
         "//src/mongo/db:shard_role",
         "//src/mongo/db/auth:auth_checks",
         "//src/mongo/db/memory_tracking",
+        "//src/mongo/db/pipeline",
     ],
 )
 

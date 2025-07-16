@@ -35,17 +35,25 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/access_checks_gen.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_contract.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session_test_fixture.h"
+#include "mongo/db/auth/builtin_roles.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_request_x509.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/query_cmd/release_memory_cmd.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/list_collections_gen.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/client_cursor/cursor_manager.h"
+#include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
@@ -55,6 +63,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/time_support.h"
@@ -82,6 +91,22 @@ public:
     using AuthorizationSessionTestFixture::AuthorizationSessionTestFixture;
 
     void testInvalidateUser();
+
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeFakePlanExecutor(
+        OperationContext* _opCtx, NamespaceString nss) {
+        // Create a mock ExpressionContext.
+        auto expCtx = ExpressionContextBuilder{}.opCtx(_opCtx).ns(nss).build();
+        auto workingSet = std::make_unique<WorkingSet>();
+        auto queuedDataStage = std::make_unique<QueuedDataStage>(expCtx.get(), workingSet.get());
+        return unittest::assertGet(
+            plan_executor_factory::make(expCtx,
+                                        std::move(workingSet),
+                                        std::move(queuedDataStage),
+                                        &CollectionPtr::null,
+                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                        QueryPlannerParams::DEFAULT,
+                                        nss));
+    }
 };
 
 class AuthorizationSessionTestWithoutAuth : public AuthorizationSessionTest {
@@ -1799,6 +1824,195 @@ TEST_F(AuthorizationSessionTest, CheckBuiltInRolesForBypassDefaultMaxTimeMS) {
     authzSession->grantInternalAuthorization();
     ASSERT_TRUE(authzSession->isAuthorizedForClusterAction(ActionType::bypassDefaultMaxTimeMS,
                                                            boost::none));
+}
+
+TEST_F(AuthorizationSessionTest, CheckAuthorizationForReleaseMemoryAuthorizedUser) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", false);
+    authzManager->setAuthEnabled(true);
+
+    UserName username("spencer", "admin", boost::none);
+    const std::unique_ptr<UserRequest> usernameTestRequest =
+        std::make_unique<UserRequestGeneral>(username, boost::none);
+
+    // Get the authorization session that will be used when running the command.
+    auto authzSessionForCommand = AuthorizationSession::get(_opCtx->getClient());
+    ASSERT_OK(createUser(username, {{"readWrite", "test"}, {"dbAdmin", "test"}}));
+    ASSERT_OK(authzSessionForCommand->addAndAuthorizeUser(
+        _opCtx.get(), usernameTestRequest->clone(), boost::none));
+
+
+    // Assume privileges for the database to allow releaseMemoryAnyCursor action.
+    PrivilegeVector privileges;
+    auth::generateUniversalPrivileges(&privileges, boost::none /* tenantId */);
+    auto user = authzSessionForCommand->getAuthenticatedUser();
+    ASSERT(user != boost::none);
+    (*user)->addPrivileges(privileges);
+    ASSERT_TRUE(authzSessionForCommand->isAuthorizedForActionsOnResource(
+        CommandHelpers::resourcePatternForNamespace(testFooNss),
+        ActionType::releaseMemoryAnyCursor));
+
+    // Get the cursor manager and register a cursor. We need to detach it from the operation context
+    // to allow releaseMemory to reattach it later during execution.
+    CursorManager* cursorManager = CursorManager::get(_opCtx.get());
+    auto exec = makeFakePlanExecutor(_opCtx.get(), testFooNss);
+    exec->saveState();
+    exec->detachFromOperationContext();
+
+    auto cursorPin = cursorManager->registerCursor(
+        _opCtx.get(),
+        {
+            std::move(exec),
+            testFooNss,
+            username,
+            APIParameters(),
+            _opCtx->getWriteConcern(),
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            BSONObj(),
+            PrivilegeVector(),
+        });
+    const auto cursorId = cursorPin->cursorid();
+    cursorPin.release();
+
+    const IDLParserContext ctxt("releaseMemory");
+    auto bsonObj = BSON("releaseMemory" << BSON_ARRAY(cursorId) << "$db"
+                                        << "test");
+    ReleaseMemoryCommandRequest request = ReleaseMemoryCommandRequest::parse(ctxt, bsonObj);
+    ReleaseMemoryCmd commandInstance;
+    ReleaseMemoryCmd::Invocation invocation(_opCtx.get(), &commandInstance, request.serialize());
+    ReleaseMemoryCommandReply reply = invocation.typedRun(_opCtx.get());
+
+    // We expect the cursor to be released successfully.
+    ASSERT_EQ(reply.getCursorsReleased().size(), 1);
+    ASSERT_EQ(reply.getCursorsReleased()[0], cursorId);
+    ASSERT_TRUE(reply.getCursorsNotFound().empty());
+    ASSERT_TRUE(reply.getCursorsCurrentlyPinned().empty());
+}
+
+TEST_F(AuthorizationSessionTest, CheckAuthorizationForReleaseMemoryUnauthorizedUser) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", false);
+    authzManager->setAuthEnabled(true);
+    UserName usernameUnauth("fakeSpencer", "admin");
+
+    // Get the cursor manager and register a cursor. We need to detach it from the operation context
+    // to allow releaseMemory to reattach it later during execution.
+    CursorManager* cursorManager = CursorManager::get(_opCtx.get());
+    auto exec = makeFakePlanExecutor(_opCtx.get(), testFooNss);
+    exec->saveState();
+    exec->detachFromOperationContext();
+
+    auto cursorPin = cursorManager->registerCursor(
+        _opCtx.get(),
+        {
+            std::move(exec),
+            testFooNss,
+            usernameUnauth,
+            APIParameters(),
+            _opCtx->getWriteConcern(),
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            BSONObj(),
+            PrivilegeVector(),
+        });
+    const auto cursorId = cursorPin->cursorid();
+    cursorPin.release();
+
+    const IDLParserContext ctxt("releaseMemory");
+    auto bsonObj = BSON("releaseMemory" << BSON_ARRAY(cursorId) << "$db"
+                                        << "test");
+    ReleaseMemoryCommandRequest request = ReleaseMemoryCommandRequest::parse(ctxt, bsonObj);
+    ReleaseMemoryCmd commandInstance;
+    ReleaseMemoryCmd::Invocation invocation(_opCtx.get(), &commandInstance, request.serialize());
+    ASSERT_THROWS_CODE(invocation.typedRun(_opCtx.get()), DBException, ErrorCodes::Unauthorized);
+}
+
+TEST_F(AuthorizationSessionTest, CheckAuthorizationForKillCursorsAuthorizedUser) {
+    authzManager->setAuthEnabled(true);
+
+    UserName username("spencer", "admin", boost::none);
+    const std::unique_ptr<UserRequest> usernameTestRequest =
+        std::make_unique<UserRequestGeneral>(username, boost::none);
+
+    // Get the authorization session that will be used when running the command.
+    auto authzSessionForCommand = AuthorizationSession::get(_opCtx->getClient());
+    ASSERT_OK(createUser(username, {{"readWrite", "test"}, {"dbAdmin", "test"}}));
+    ASSERT_OK(authzSessionForCommand->addAndAuthorizeUser(
+        _opCtx.get(), usernameTestRequest->clone(), boost::none));
+
+
+    // Assume privileges for the database to allow killAnyCursor action.
+    PrivilegeVector privileges;
+    auth::generateUniversalPrivileges(&privileges, boost::none /* tenantId */);
+    auto user = authzSessionForCommand->getAuthenticatedUser();
+    ASSERT(user != boost::none);
+    (*user)->addPrivileges(privileges);
+    ASSERT_TRUE(authzSessionForCommand->isAuthorizedForActionsOnResource(
+        CommandHelpers::resourcePatternForNamespace(testFooNss), ActionType::killAnyCursor));
+
+    // Get the cursor manager and register a cursor. We need to detach it from the operation context
+    // to allow killCursors to reattach it later during execution.
+    CursorManager* _cursorManager = CursorManager::get(_opCtx.get());
+    auto exec = makeFakePlanExecutor(_opCtx.get(), testFooNss);
+    exec->saveState();
+    exec->detachFromOperationContext();
+
+    auto cursorPin = _cursorManager->registerCursor(
+        _opCtx.get(),
+        {
+            std::move(exec),
+            testFooNss,
+            username,
+            APIParameters(),
+            _opCtx->getWriteConcern(),
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            BSONObj(),
+            PrivilegeVector(),
+        });
+    const auto cursorId = cursorPin->cursorid();
+    cursorPin.release();
+
+    auto authCheck = [&](const ClientCursor& cc) {
+        uassertStatusOK(auth::checkAuthForKillCursors(
+            AuthorizationSession::get(_opCtx->getClient()), cc.nss(), cc.getAuthenticatedUser()));
+    };
+    ASSERT_OK(_cursorManager->killCursorWithAuthCheck(_opCtx.get(), cursorId, authCheck));
+}
+
+TEST_F(AuthorizationSessionTest, CheckAuthorizationForKillCursorsUnauthorizedUser) {
+    authzManager->setAuthEnabled(true);
+    UserName usernameUnauth("fakeSpencer", "admin");
+
+    // Get the cursor manager and register a cursor. We need to detach it from the operation context
+    // to allow killCursors to reattach it later during execution.
+    CursorManager* _cursorManager = CursorManager::get(_opCtx.get());
+    auto exec = makeFakePlanExecutor(_opCtx.get(), testFooNss);
+    exec->saveState();
+    exec->detachFromOperationContext();
+
+    auto cursorPin = _cursorManager->registerCursor(
+        _opCtx.get(),
+        {
+            std::move(exec),
+            testFooNss,
+            usernameUnauth,
+            APIParameters(),
+            _opCtx->getWriteConcern(),
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            BSONObj(),
+            PrivilegeVector(),
+        });
+    const auto cursorId = cursorPin->cursorid();
+    cursorPin.release();
+
+    auto authCheck = [&](const ClientCursor& cc) {
+        uassertStatusOK(auth::checkAuthForKillCursors(
+            AuthorizationSession::get(_opCtx->getClient()), cc.nss(), cc.getAuthenticatedUser()));
+    };
+    ASSERT_THROWS_CODE(_cursorManager->killCursorWithAuthCheck(_opCtx.get(), cursorId, authCheck),
+                       DBException,
+                       ErrorCodes::Unauthorized);
 }
 
 class SystemBucketsTest : public AuthorizationSessionTest {

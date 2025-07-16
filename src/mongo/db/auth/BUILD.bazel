@@ -556,11 +556,11 @@ mongo_cc_library(
         ":user",
         ":user_document_parser",
         "//src/mongo/db:audit",
+        "//src/mongo/db:commands",
         "//src/mongo/db:common",
         "//src/mongo/db:server_base",
         "//src/mongo/db/catalog:document_validation",
         "//src/mongo/db/pipeline:lite_parsed_document_source",
-        "//src/mongo/db/update:update_driver",
     ],
 )
 

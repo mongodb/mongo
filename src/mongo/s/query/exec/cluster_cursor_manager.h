@@ -492,9 +492,10 @@ public:
      * Does not block.
      */
     enum AuthCheck { kCheckSession = true, kNoCheckSession = false };
+    template <typename T>
     StatusWith<PinnedCursor> checkOutCursor(CursorId cursorId,
                                             OperationContext* opCtx,
-                                            AuthzCheckFn authChecker,
+                                            std::function<Status(T)> authChecker,
                                             AuthCheck checkSessionAuth = kCheckSession,
                                             StringData commandName = "");
 
@@ -538,6 +539,14 @@ public:
      * May block waiting for other threads to finish, but does not block on the network.
      */
     Status killCursor(OperationContext* opCtx, CursorId cursorId);
+
+    /**
+     * Same as 'killCursor' but with an 'authChecker' callback that can be used to recheck
+     * authorization before the cursor is killed.
+     */
+    Status killCursorWithAuthCheck(OperationContext* opCtx,
+                                   CursorId cursorId,
+                                   AuthzCheckFn authChecker);
 
     /**
      * Kill the cursors satisfying the given predicate. Returns the number of cursors killed.
@@ -647,6 +656,8 @@ private:
      * Flags the OperationContext that's using the given cursor as interrupted.
      */
     void killOperationUsingCursor(WithLock, CursorEntry* entry);
+
+    Status _killCursor(OperationContext* opCtx, CursorId cursorId, AuthzCheckFn authChecker);
 
     // Clock source.  Used when the 'last active' time for a cursor needs to be set/updated.  May be
     // concurrently accessed by multiple threads.

@@ -725,6 +725,7 @@ mongo_cc_library(
         "cluster_ddl.h",
         "collection_routing_info_targeter.h",
         "ns_targeter.h",
+        "//src/mongo/db/query/write_ops:update_request.h",
     ],
     deps = [
         ":sharding_router_api",

@@ -32,6 +32,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/curop.h"
@@ -121,6 +122,21 @@ template Status ClusterCursorManager::checkAuthCursor<AuthzCheckFnInputType>(
 
 template Status ClusterCursorManager::checkAuthCursor<ReleaseMemoryAuthzCheckFnInputType>(
     OperationContext* opCtx, CursorId cursorId, ReleaseMemoryAuthzCheckFn func);
+
+template StatusWith<ClusterCursorManager::PinnedCursor>
+ClusterCursorManager::checkOutCursor<AuthzCheckFnInputType>(CursorId cursorId,
+                                                            OperationContext* opCtx,
+                                                            AuthzCheckFn authChecker,
+                                                            AuthCheck checkSessionAuth,
+                                                            StringData commandName);
+
+template StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCursor<
+    ReleaseMemoryAuthzCheckFnInputType>(CursorId cursorId,
+                                        OperationContext* opCtx,
+                                        ReleaseMemoryAuthzCheckFn authChecker,
+                                        AuthCheck checkSessionAuth,
+                                        StringData commandName);
+
 
 ClusterCursorManager::PinnedCursor::PinnedCursor(ClusterCursorManager* manager,
                                                  ClusterClientCursorGuard&& cursorGuard,
@@ -242,10 +258,11 @@ StatusWith<CursorId> ClusterCursorManager::registerCursor(
     return cursorId;
 }
 
+template <typename T>
 StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCursor(
     CursorId cursorId,
     OperationContext* opCtx,
-    AuthzCheckFn authChecker,
+    std::function<Status(T)> authChecker,
     AuthCheck checkSessionAuth,
     StringData commandName) {
 
@@ -261,7 +278,7 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
         return cursorNotFoundStatus(cursorId);
     }
 
-    auto authCheckStatus = authChecker(entry->getAuthenticatedUser());
+    auto authCheckStatus = AuthzCheckPolicy<T>::authzCheck(entry, authChecker);
     if (!authCheckStatus.isOK()) {
         return authCheckStatus.withContext(str::stream()
                                            << "cursor id " << cursorId
@@ -401,6 +418,21 @@ void ClusterCursorManager::killOperationUsingCursor(WithLock, CursorEntry* entry
 }
 
 Status ClusterCursorManager::killCursor(OperationContext* opCtx, CursorId cursorId) {
+    AuthzCheckFn passingAuthChecker = [](AuthzCheckFnInputType) -> Status {
+        return Status::OK();
+    };
+    return _killCursor(opCtx, cursorId, passingAuthChecker);
+}
+
+Status ClusterCursorManager::killCursorWithAuthCheck(OperationContext* opCtx,
+                                                     CursorId cursorId,
+                                                     AuthzCheckFn authChecker) {
+    return _killCursor(opCtx, cursorId, std::move(authChecker));
+}
+
+Status ClusterCursorManager::_killCursor(OperationContext* opCtx,
+                                         CursorId cursorId,
+                                         AuthzCheckFn authChecker) {
     invariant(opCtx);
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
@@ -408,6 +440,13 @@ Status ClusterCursorManager::killCursor(OperationContext* opCtx, CursorId cursor
     CursorEntry* entry = _getEntry(lk, cursorId);
     if (!entry) {
         return cursorNotFoundStatus(cursorId);
+    }
+
+    auto authCheckStatus = authChecker(entry->getAuthenticatedUser());
+    if (!authCheckStatus.isOK()) {
+        return authCheckStatus.withContext(str::stream()
+                                           << "cursor id " << cursorId
+                                           << " was not created by the authenticated user");
     }
 
     generic_cursor::validateKillInTransaction(

@@ -40,6 +40,7 @@
 #include "mongo/db/query/client_cursor/release_memory_util.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
+#include "mongo/util/assert_util.h"
 
 #include <memory>
 #include <set>
@@ -110,8 +111,18 @@ public:
             };
 
             for (CursorId id : cursorIds) {
+                auto const authzSession = AuthorizationSession::get(opCtx->getClient());
+                ReleaseMemoryAuthzCheckFn authChecker =
+                    [&authzSession](ReleaseMemoryAuthzCheckFnInputType ns) -> Status {
+                    return auth::checkAuthForReleaseMemory(authzSession, ns);
+                };
+
                 auto pinnedCursor =
-                    cursorManager->checkOutCursorNoAuthCheck(id, opCtx, definition()->getName());
+                    cursorManager->checkOutCursor(id,
+                                                  opCtx,
+                                                  authChecker,
+                                                  ClusterCursorManager::AuthCheck::kCheckSession,
+                                                  definition()->getName());
 
                 if (pinnedCursor.isOK()) {
                     ScopeGuard killCursorGuard([&pinnedCursor] {

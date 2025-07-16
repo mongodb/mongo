@@ -65,6 +65,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db:commands",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/auth:auth_checks",
         "//src/mongo/db/auth:authprivilege",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/memory_tracking",
         "//src/mongo/db/query:command_request_response",

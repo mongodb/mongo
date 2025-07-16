@@ -165,6 +165,14 @@ public:
     Status killCursor(OperationContext* opCtx, CursorId id);
 
     /**
+     * Same as 'killCursor' but with an 'authChecker' callback. This is used to recheck
+     * authorization before the cursor is killed.
+     */
+    Status killCursorWithAuthCheck(OperationContext* opCtx,
+                                   CursorId id,
+                                   const std::function<void(const ClientCursor&)>& authChecker);
+
+    /**
      * Returns an OK status if we're authorized to erase the cursor. Otherwise, returns
      * ErrorCodes::Unauthorized.
      */
@@ -269,6 +277,10 @@ private:
         }
         map->erase(cursor->cursorid());
     }
+
+    Status _killCursor(OperationContext* opCtx,
+                       CursorId id,
+                       const std::function<void(const ClientCursor&)>& authChecker);
 
     ClockSource* _preciseClockSource;
 
