@@ -102,39 +102,26 @@ void KVDropPendingIdentReaper::addDropPendingIdent(
 
 std::shared_ptr<Ident> KVDropPendingIdentReaper::markIdentInUse(StringData ident) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    auto identToTimestampIt = _identToTimestamp.find(ident);
-    if (identToTimestampIt == _identToTimestamp.end()) {
-        // Ident is not known to the reaper.
+    auto dropPendingIdent = _getDropPendingTSAndInfo(lock, ident);
+    if (!dropPendingIdent) {
+        return nullptr;
+    }
+    auto& [_, info] = *dropPendingIdent;
+
+    if (info->identState == IdentInfo::State::kBeingDropped) {
+        // The ident is being dropped or was already dropped. Cannot mark the ident as in use.
         return nullptr;
     }
 
-    auto beginEndPair = _dropPendingIdents.equal_range(identToTimestampIt->second);
-    for (auto dropPendingIdentsIt = beginEndPair.first; dropPendingIdentsIt != beginEndPair.second;
-         dropPendingIdentsIt++) {
-        auto info = dropPendingIdentsIt->second;
-        if (info->identName != ident) {
-            continue;
-        }
-
-        if (info->identState == IdentInfo::State::kBeingDropped ||
-            info->identState == IdentInfo::State::kDropped) {
-            // The ident is being dropped or was already dropped. Cannot mark the ident as in use.
-            return nullptr;
-        }
-
-        if (auto existingIdent = info->dropToken.lock()) {
-            // This function can be called concurrently and we need to share the same ident at any
-            // given time to prevent the reaper from removing idents prematurely.
-            return existingIdent;
-        }
-
-        std::shared_ptr<Ident> newIdent = std::make_shared<Ident>(info->identName);
-        info->dropToken = newIdent;
-        return newIdent;
+    if (auto existingIdent = info->dropToken.lock()) {
+        // This function can be called concurrently and we need to share the same ident at any
+        // given time to prevent the reaper from removing idents prematurely.
+        return existingIdent;
     }
 
-    // The ident was found in _identToTimestamp earlier, so it must exist in _dropPendingIdents.
-    MONGO_UNREACHABLE;
+    std::shared_ptr<Ident> newIdent = std::make_shared<Ident>(info->identName);
+    info->dropToken = newIdent;
+    return newIdent;
 }
 
 bool KVDropPendingIdentReaper::hasExpiredIdents(const Timestamp& ts) const {
@@ -160,8 +147,7 @@ boost::optional<Timestamp> KVDropPendingIdentReaper::getEarliestDropTimestamp() 
 std::set<std::string> KVDropPendingIdentReaper::getAllIdentNames() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     std::set<std::string> identNames;
-    for (const auto& entry : _dropPendingIdents) {
-        const auto& identInfo = entry.second;
+    for (const auto& [_, identInfo] : _dropPendingIdents) {
         const auto& identName = identInfo->identName;
         identNames.insert(identName);
     }
@@ -219,6 +205,7 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
 
                 stdx::lock_guard<stdx::mutex> lock(_mutex);
                 identInfo->identState = IdentInfo::State::kNotDropped;
+                _identStateResetOrRemovedCV.notify_all();
                 continue;
             }
             LOGV2_FATAL_NOTRACE(51022,
@@ -230,44 +217,13 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
 
         {
             stdx::lock_guard<stdx::mutex> lock(_mutex);
-            identInfo->identState = IdentInfo::State::kDropped;
+            _stopTrackingIdentAndNotify(lock, dropTimestamp, identInfo);
         }
 
         LOGV2(6776600,
               "The ident was successfully dropped",
               "ident"_attr = identName,
               "dropTimestamp"_attr = dropTimestamp);
-    }
-
-    {
-        // Entries must be removed AFTER drops are completed, so that getEarliestDropTimestamp()
-        // returns correct results while the success of the drop operations above are uncertain.
-
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
-        for (const auto& timestampAndIdentInfo : toDrop) {
-            // The ident was either dropped or put back in a not dropped state.
-            invariant(timestampAndIdentInfo.second->identState != IdentInfo::State::kBeingDropped);
-
-            if (timestampAndIdentInfo.second->identState == IdentInfo::State::kNotDropped) {
-                // This ident was not dropped. Skip removing it from the drop pending list.
-                continue;
-            }
-
-            // Some idents with drop timestamps safe to drop may not have been dropped because they
-            // are still in use by another operation. Therefore, we must iterate the entries in the
-            // multimap matching a particular timestamp and erase only the entry with a match on the
-            // ident as well as the timestamp.
-            auto beginEndPair = _dropPendingIdents.equal_range(timestampAndIdentInfo.first);
-            for (auto it = beginEndPair.first; it != beginEndPair.second;) {
-                if (it->second == timestampAndIdentInfo.second) {
-                    invariant(_identToTimestamp.erase(it->second->identName) == 1);
-                    it = _dropPendingIdents.erase(it);
-                    break;
-                } else {
-                    ++it;
-                }
-            }
-        }
     }
 }
 
@@ -283,6 +239,60 @@ void KVDropPendingIdentReaper::clearDropPendingState(OperationContext* opCtx) {
     _dropPendingIdents.erase(firstElem, _dropPendingIdents.end());
     absl::erase_if(_identToTimestamp,
                    [&](const auto& kv) { return kv.second != Timestamp::min(); });
+    _identStateResetOrRemovedCV.notify_all();
+}
+
+void KVDropPendingIdentReaper::clearDropPendingStateForIdent(OperationContext* opCtx,
+                                                             StringData ident) {
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    opCtx->waitForConditionOrInterrupt(_identStateResetOrRemovedCV, lock, [&] {
+        auto tsAndInfo = _getDropPendingTSAndInfo(lock, ident);
+        if (!tsAndInfo) {
+            return true;
+        }
+        auto& [timestamp, identInfo] = *tsAndInfo;
+        if (identInfo->identState != IdentInfo::State::kBeingDropped) {
+            _stopTrackingIdentAndNotify(lock, timestamp, identInfo);
+        }
+
+        // 'kBeingDropped' means the reaper is actively removing the ident from disk. Wait until the
+        // drop completes to ensure that, when this method returns, the reaper will not continue
+        // removing the ident in the background. This is especially important for replicated idents,
+        // which may need to be reused after a rollback to stable.
+        return identInfo->identState != IdentInfo::State::kBeingDropped;
+    });
+}
+
+boost::optional<std::pair<Timestamp, std::shared_ptr<KVDropPendingIdentReaper::IdentInfo>>>
+KVDropPendingIdentReaper::_getDropPendingTSAndInfo(WithLock, StringData ident) const {
+    const auto tsIter = _identToTimestamp.find(ident);
+    if (tsIter == _identToTimestamp.end()) {
+        // Ident is not known to the reaper.
+        return boost::none;
+    }
+
+    auto ts = tsIter->second;
+    const auto identRange = _dropPendingIdents.equal_range(ts);
+    auto it = std::find_if(identRange.first, identRange.second, [&](const auto& entry) {
+        return entry.second->identName == ident;
+    });
+
+    // The ident was found in '_identToTimestamp' earlier, so it must exist in '_dropPendingIdents'.
+    invariant(it != identRange.second);
+    return std::make_pair(ts, it->second);
+}
+
+void KVDropPendingIdentReaper::_stopTrackingIdentAndNotify(
+    WithLock, const Timestamp& dropTimestamp, const std::shared_ptr<IdentInfo>& identInfo) {
+    auto begin = _dropPendingIdents.lower_bound(dropTimestamp);
+    for (auto it = begin; it != _dropPendingIdents.end() && it->first == dropTimestamp; ++it) {
+        if (it->second == identInfo) {
+            invariant(_identToTimestamp.erase(identInfo->identName) == 1);
+            _dropPendingIdents.erase(it);
+            _identStateResetOrRemovedCV.notify_all();
+            return;
+        }
+    }
 }
 
 }  // namespace mongo

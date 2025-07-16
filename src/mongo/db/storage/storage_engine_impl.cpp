@@ -778,6 +778,10 @@ void StorageEngineImpl::clearDropPendingState(OperationContext* opCtx) {
     _dropPendingIdentReaper.clearDropPendingState(opCtx);
 }
 
+void StorageEngineImpl::clearDropPendingStateForIdent(OperationContext* opCtx, StringData ident) {
+    _dropPendingIdentReaper.clearDropPendingStateForIdent(opCtx, ident);
+}
+
 Timestamp StorageEngineImpl::getAllDurableTimestamp() const {
     return _engine->getAllDurableTimestamp();
 }

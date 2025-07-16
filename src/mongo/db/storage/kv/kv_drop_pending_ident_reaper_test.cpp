@@ -531,5 +531,96 @@ DEATH_TEST_F(KVDropPendingIdentReaperTest,
     reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(dropTimestamp));
 }
 
+TEST_F(KVDropPendingIdentReaperTest, ClearDropPendingStateForIdentWithTimestamp) {
+    const std::string identName = "ident";
+    const Timestamp dropTimestamp = Timestamp(50, 50);
+    auto engine = getEngine();
+
+    KVDropPendingIdentReaper reaper(engine);
+    {
+        // The reaper will have an expired weak_ptr to the ident.
+        std::shared_ptr<Ident> ident = std::make_shared<Ident>(identName);
+        reaper.addDropPendingIdent(dropTimestamp, ident);
+    }
+    ASSERT_FALSE(reaper.getAllIdentNames().empty());
+
+    auto opCtx = makeOpCtx();
+    ASSERT_EQUALS(dropTimestamp, *reaper.getEarliestDropTimestamp());
+    reaper.clearDropPendingStateForIdent(opCtx.get(), identName);
+    ASSERT_EQUALS(0U, engine->droppedIdents.size());
+
+    ASSERT_TRUE(reaper.getAllIdentNames().empty());
+}
+
+TEST_F(KVDropPendingIdentReaperTest, ClearDropPendingStateForIdentNoTimestamp) {
+    const std::string identName = "ident";
+    const Timestamp dropTimestamp = Timestamp::min();
+    auto engine = getEngine();
+
+    KVDropPendingIdentReaper reaper(engine);
+    {
+        std::shared_ptr<Ident> ident = std::make_shared<Ident>(identName);
+        reaper.addDropPendingIdent(dropTimestamp, ident);
+    }
+    ASSERT_FALSE(reaper.getAllIdentNames().empty());
+
+    auto opCtx = makeOpCtx();
+    ASSERT_EQUALS(dropTimestamp, *reaper.getEarliestDropTimestamp());
+    reaper.clearDropPendingStateForIdent(opCtx.get(), identName);
+    ASSERT_EQUALS(0U, engine->droppedIdents.size());
+
+    ASSERT_TRUE(reaper.getAllIdentNames().empty());
+}
+
+TEST_F(KVDropPendingIdentReaperTest, ClearDropPendingStateForIdentNoMatch) {
+    const std::string identName = "ident";
+    auto engine = getEngine();
+
+    KVDropPendingIdentReaper reaper(engine);
+    ASSERT_TRUE(reaper.getAllIdentNames().empty());
+
+    auto opCtx = makeOpCtx();
+    reaper.clearDropPendingStateForIdent(opCtx.get(), identName);
+    ASSERT_TRUE(reaper.getAllIdentNames().empty());
+}
+
+TEST_F(KVDropPendingIdentReaperTest, ClearDropPendingStateForIdentMultiIdentsOneTS) {
+    const std::string identToClearName = "identToClear";
+    const std::string identOtherName = "identOther";
+    const Timestamp dropTimestamp = Timestamp(50, 50);
+    auto engine = getEngine();
+
+    KVDropPendingIdentReaper reaper(engine);
+    {
+        std::shared_ptr<Ident> identToClearSharedPtr = std::make_shared<Ident>(identToClearName);
+        reaper.addDropPendingIdent(dropTimestamp, identToClearSharedPtr);
+
+        // Create an ident at the same timestamp that shouldn't be cleared.
+        std::shared_ptr<Ident> identOtherSharedPtr = std::make_shared<Ident>(identOtherName);
+        reaper.addDropPendingIdent(dropTimestamp, identOtherSharedPtr);
+    }
+    auto identNames = reaper.getAllIdentNames();
+    ASSERT_TRUE(identNames.contains(identToClearName));
+    ASSERT_TRUE(identNames.contains(identOtherName));
+    ASSERT_EQUALS(0, engine->droppedIdents.size());
+
+    auto opCtx = makeOpCtx();
+    ASSERT_EQUALS(dropTimestamp, *reaper.getEarliestDropTimestamp());
+
+    // Clear one ident at'dropTimestamp'
+    reaper.clearDropPendingStateForIdent(opCtx.get(), identToClearName);
+    ASSERT_EQUALS(reaper.getAllIdentNames(), std::set<std::string>{identOtherName});
+    ASSERT_EQUALS(0, engine->droppedIdents.size());
+
+    // Clearing the in-memory state does not imply removal from the storage engine on disk.
+    ASSERT_EQUALS(reaper.getAllIdentNames(), std::set<std::string>{identOtherName});
+    ASSERT_EQUALS(0, engine->droppedIdents.size());
+
+    // Validate clearDropPendingStateForIdent is a no-op when called twice.
+    reaper.clearDropPendingStateForIdent(opCtx.get(), identToClearName);
+    ASSERT_EQUALS(reaper.getAllIdentNames(), std::set<std::string>{identOtherName});
+    ASSERT_EQUALS(0, engine->droppedIdents.size());
+}
+
 }  // namespace
 }  // namespace mongo

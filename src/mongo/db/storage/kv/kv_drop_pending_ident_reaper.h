@@ -97,9 +97,9 @@ public:
     /**
      * Marks the ident as in use and prevents the reaper from dropping the ident.
      *
-     * Returns nullptr if the ident is not found, or if the ident state is `kBeingDropped` or
-     * `kDropped`. Returns a shared_ptr to the `dropToken` if it isn't expired, otherwise a new
-     * shared_ptr is generated, stored in `dropToken`, and returned.
+     * Returns nullptr if the ident is not found, or if the ident state is `kBeingDropped`. Returns
+     * a shared_ptr to the `dropToken` if it isn't expired, otherwise a new shared_ptr is generated,
+     * stored in `dropToken`, and returned.
      */
     std::shared_ptr<Ident> markIdentInUse(StringData ident);
 
@@ -141,6 +141,12 @@ public:
      */
     void clearDropPendingState(OperationContext* opCtx);
 
+    /**
+     * Ensures 'ident' is no longer tracked as drop-pending. If reaper is in the process of
+     * dropping the ident from the storage engine, waits until the drop is complete.
+     */
+    void clearDropPendingStateForIdent(OperationContext* opCtx, StringData ident);
+
 private:
     // Contains information identifying what collection/index data to drop as well as determining
     // when to do so.
@@ -149,7 +155,9 @@ private:
         std::string identName;
 
         // Ident drop state.
-        enum class State { kNotDropped, kBeingDropped, kDropped };
+        // - 'kNotDropped': The ident is pending removal, but no progress has been made.
+        // - 'kBeingDropped': The ident is in the process of being dropped by the storage engine.
+        enum class State { kNotDropped, kBeingDropped };
         State identState;
 
         // The collection or index data can be safely dropped when no references to this token
@@ -164,6 +172,14 @@ private:
         bool isExpired(const KVEngine* engine, const Timestamp& ts) const;
     };
 
+    boost::optional<std::pair<Timestamp, std::shared_ptr<IdentInfo>>> _getDropPendingTSAndInfo(
+        WithLock, StringData ident) const;
+
+    // Removes the ident from both maps and notifies '_identStateResetOrRemovedCV' waiters.
+    void _stopTrackingIdentAndNotify(WithLock,
+                                     const Timestamp& dropTimestamp,
+                                     const std::shared_ptr<IdentInfo>& identInfo);
+
     // Container type for drop-pending namespaces. We use a multimap so that we can order the
     // namespaces by drop optime. Additionally, it is possible for certain user operations (such
     // as renameCollection across databases) to generate more than one drop-pending namespace for
@@ -175,6 +191,9 @@ private:
 
     // Guards access to member variables below.
     mutable stdx::mutex _mutex;
+
+    // Notifies when ident states are reset to 'kNotDropped' or idents are removed from the map.
+    stdx::condition_variable _identStateResetOrRemovedCV;
 
     // Drop-pending idents. Ordered by drop timestamp.
     DropPendingIdents _dropPendingIdents;

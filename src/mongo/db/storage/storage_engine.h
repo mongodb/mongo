@@ -597,10 +597,20 @@ public:
     virtual size_t getNumDropPendingIdents() const = 0;
 
     /**
-     * Clears list of drop-pending idents in the storage engine.
-     * Used primarily by rollback after recovering to a stable timestamp.
+     * Removes the drop-pending state for indexes / collections with a timestamped drop time.
+     * Effectively aborts the second phase of a two phase table drop for eligible idents.
+     *
+     * This function is primarily used for rollback after recovering to a stable timestamp - and
+     * clears drop-pending entries in case drops were rolled back. Because of this, only timestamped
+     * drops are affected as non-timestamped drops cannot be rolled back.
      */
     virtual void clearDropPendingState(OperationContext* opCtx) = 0;
+
+    /**
+     * Ensures the ident is not in a drop-pending state. If the second phase of a two-phase
+     * table drop is in progress, this either aborts that process or waits until it completes.
+     */
+    virtual void clearDropPendingStateForIdent(OperationContext* opCtx, StringData ident) = 0;
 
     BOOST_STRONG_TYPEDEF(uint64_t, CheckpointIteration);
 
