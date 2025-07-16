@@ -74,6 +74,11 @@ protected:
     virtual ActionSet getAuthActionSet() const {
         return ActionSet{ActionType::internal};
     }
+
+public:
+    bool enableDiagnosticPrintingOnFailure() const override {
+        return true;
+    }
 };
 
 }  // namespace repl
