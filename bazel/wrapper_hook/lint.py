@@ -126,6 +126,59 @@ def list_files_without_targets(
     return True
 
 
+def _git_distance(args: list) -> int:
+    command = ["git", "rev-list", "--count"] + args
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error running git command: {' '.join(command)}")
+        print(f"stderr: {e.stderr.strip()}")
+        print(f"stdout: {e.stdout.strip()}")
+        raise
+    return int(result.stdout.strip())
+
+
+def _get_merge_base(args: list) -> str:
+    command = ["git", "merge-base"] + args
+    result = subprocess.run(command, capture_output=True, text=True, check=True)
+    return result.stdout.strip()
+
+
+def _git_diff(args: list) -> str:
+    command = ["git", "diff"] + args
+    result = subprocess.run(command, capture_output=True, text=True, check=True)
+    return result.stdout.strip() + os.linesep
+
+
+def _git_unstaged_files() -> str:
+    command = ["git", "ls-files", "--others", "--exclude-standard"]
+    result = subprocess.run(command, capture_output=True, text=True, check=True)
+    return result.stdout.strip() + os.linesep
+
+
+def _get_files_changed_since_fork_point(origin_branch: str = "origin/master") -> List[str]:
+    """Query git to get a list of files in the repo from a diff."""
+    # There are 3 diffs we run:
+    # 1. List of commits between origin/master and HEAD of current branch
+    # 2. Cached/Staged files (--cached)
+    # 3. Working Tree files git tracks
+
+    fork_point = _get_merge_base(["HEAD", origin_branch])
+
+    diff_files = _git_diff(["--name-only", f"{fork_point}..HEAD"])
+    diff_files += _git_diff(["--name-only", "--cached"])
+    diff_files += _git_diff(["--name-only"])
+    diff_files += _git_unstaged_files()
+
+    file_set = {
+        os.path.normpath(os.path.join(os.curdir, line.rstrip()))
+        for line in diff_files.splitlines()
+        if line
+    }
+
+    return list(file_set)
+
+
 def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
     if platform.system() == "Windows":
         print("eslint not supported on windows")
@@ -148,9 +201,50 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
     ):
         return False
 
-    # Default to linting everything if no path was passed in
+    lint_all = False
     if len([arg for arg in args if not arg.startswith("--")]) == 0:
-        args = ["//..."] + args
+        origin_branch = "origin/master"
+        for arg in args:
+            if arg.startswith("--origin-branch="):
+                origin_branch = arg.split("=")[1]
+                args.remove(arg)
+
+        max_distance = 100
+        distance = _git_distance([f"{origin_branch}..HEAD"])
+        if distance > max_distance:
+            print(
+                f"The number of commits between current branch and origin branch ({origin_branch}) is too large: {distance} commits (> {max_distance} commits)."
+            )
+            print("WARNING!!! Defaulting to formatting all files, this may take a while.")
+            print(
+                "Please update your local branch with the latest changes from origin, or use `bazel run lint -- --origin-branch=other_branch` to select a different origin branch"
+            )
+            lint_all = True
+        else:
+            files_to_format = [
+                file
+                for file in _get_files_changed_since_fork_point(origin_branch)
+                if file.endswith((".cpp", ".c", ".h", ".py", ".js", ".mjs", ".json"))
+            ]
+            args = files_to_format + args + ["--compile_one_dependency"]
+
+    if lint_all or "sbom.json" in args:
+        subprocess.run([bazel_bin, "run", "//buildscripts:sbom_linter"], check=True)
+
+    if lint_all or any(file.endswith(".h") or file.endswith(".cpp") for file in args):
+        subprocess.run(
+            [bazel_bin, "run", "//buildscripts:quickmongolint", "--", "lint"], check=True
+        )
+
+    if lint_all or any(
+        file.endswith(".cpp")
+        or file.endswith(".c")
+        or file.endswith(".h")
+        or file.endswith(".py")
+        or file.endswith(".idl")
+        for file in args
+    ):
+        subprocess.run([bazel_bin, "run", "//buildscripts:errorcodes", "--", "--quiet"], check=True)
 
     fix = ""
     with tempfile.NamedTemporaryFile(delete=False) as buildevents:

@@ -79,6 +79,8 @@ def lint_my(origin_branch: List[str]) -> None:
 def main() -> None:
     """Execute Main entry point."""
 
+    os.chdir(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "."))
+
     parser = argparse.ArgumentParser(description="Quick C++ Lint frontend.")
 
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")

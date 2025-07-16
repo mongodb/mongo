@@ -184,10 +184,11 @@ def main() -> int:
 
     files_to_format = "all"
     if not args.all:
+        max_distance = 100
         distance = _git_distance([f"{args.origin_branch}..HEAD"])
-        if distance > 100:
+        if distance > max_distance:
             print(
-                f"The number of commits between current branch and origin branch ({args.origin_branch}) is too large: {distance} commits"
+                f"The number of commits between current branch and origin branch ({args.origin_branch}) is too large: {distance} commits (> {max_distance} commits)."
             )
             print("WARNING!!! Defaulting to formatting all files, this may take a while.")
             print(

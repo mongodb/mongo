@@ -737,36 +737,6 @@ tasks:
             - "buildscripts/quickmongolint.py"
             - "lint"
 
-  - name: lint_errorcodes
-    tags:
-      [
-        "assigned_to_jira_team_devprod_build",
-        "development_critical_single_variant",
-        "lint",
-      ]
-    commands:
-      - command: timeout.update
-        params:
-          # 20 mins
-          exec_timeout_secs: 1200
-      - func: "f_expansions_write"
-      - command: manifest.load
-      - func: "git get project and add git tag"
-      - func: "f_expansions_write"
-      - func: "kill processes"
-      - func: "cleanup environment"
-      - func: "set up venv"
-      - func: "upload pip requirements"
-      - command: subprocess.exec
-        type: test
-        params:
-          binary: bash
-          args:
-            - "./src/evergreen/run_python_script_with_report.sh"
-            - "lint-errorcodes"
-            - "buildscripts/errorcodes.py"
-            - "--quiet"
-
   - name: bazel_run_lint
     tags:
       [
@@ -794,7 +764,7 @@ tasks:
       - func: "bazel run"
         vars:
           target: >-
-            lint
+            lint //...
 
   # Check that the mutational fuzzer can parse all JS filess.
   - name: lint_fuzzer_sanity_all
@@ -883,34 +853,6 @@ tasks:
             - "src/evergreen/run_python_script_with_report.sh"
             - "lint-poetry-lock"
             - "evergreen/functions/poetry_lock_check.py"
-
-  # TODO: DEVPROD-9047 Enable after the issue with getting third party file is resolved
-  - name: lint_sbom
-    tags:
-      [
-        "assigned_to_jira_team_devprod_correctness",
-        "development_critical_single_variant",
-        "lint",
-      ]
-    commands:
-      - command: timeout.update
-        params:
-          # 20 mins
-          exec_timeout_secs: 1200
-      - func: "f_expansions_write"
-      - command: manifest.load
-      - func: "git get project and add git tag"
-      - func: "f_expansions_write"
-      - func: "kill processes"
-      - func: "cleanup environment"
-      - func: "set up venv"
-      - command: subprocess.exec
-        params:
-          binary: bash
-          args:
-            - "src/evergreen/run_python_script_with_report.sh"
-            - "lint-sbom"
-            - "buildscripts/sbom_linter.py"
 
   - name: lint_pyright
     tags:

@@ -153,6 +153,29 @@ py_binary(
     ],
 )
 
+py_binary(
+    name = "quickmongolint",
+    srcs = [
+        "quickmongolint.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/linter",
+    ],
+)
+
+py_binary(
+    name = "errorcodes",
+    srcs = ["errorcodes.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "regex",
+            group = "compile",
+        ),
+    ],
+)
+
 bin.eslint_binary(
     name = "eslint_binary",
     # Allow the binary to be run outside bazel

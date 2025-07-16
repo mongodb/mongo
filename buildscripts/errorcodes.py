@@ -290,6 +290,9 @@ def coerce_to_number(ticket_value):
 
 def main():
     """Validate error codes."""
+
+    os.chdir(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "."))
+
     parser = OptionParser(description=__doc__.strip())
     parser.add_option(
         "--fix",
