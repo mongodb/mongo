@@ -1516,6 +1516,13 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
             "Fetching placement history information is only possible on the configsvr",
             serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
+    // If 'atClusterTime' is greater than current config time, then we can not return correct
+    // placement history and early exit with HistoricalPlacementStatus::FutureClusterTime.
+    const auto vcTime = VectorClock::get(opCtx)->getTime();
+    if (atClusterTime > vcTime.configTime().asTimestamp()) {
+        return HistoricalPlacement{{}, HistoricalPlacementStatus::FutureClusterTime};
+    }
+
     /*
     The aggregation pipeline is split in 2 sub pipelines:
     - one pipeline "exactPlacementData" describing the list of shards currently active in the
@@ -1731,10 +1738,8 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
                                               pipeline->serializeToBson());
 
     // Run the aggregation
-    const auto readConcern = [&]() -> repl::ReadConcernArgs {
-        const auto vcTime = VectorClock::get(opCtx)->getTime();
-        return {vcTime.configTime(), repl::ReadConcernLevel::kSnapshotReadConcern};
-    }();
+    const repl::ReadConcernArgs readConcern{vcTime.configTime(),
+                                            repl::ReadConcernLevel::kSnapshotReadConcern};
     auto aggrResult = runCatalogAggregation(opCtx, aggRequest, readConcern);
     tassert(10748901,
             "GetHistoricalPlacement command must return a single document",

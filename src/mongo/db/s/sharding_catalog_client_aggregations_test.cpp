@@ -49,6 +49,7 @@
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -117,11 +118,16 @@ public:
     }
 
     /* Generate and insert the entries into the config.shards collection */
-    void setupConfigShard(OperationContext* opCtx, int nShards) {
+    void setupConfigShard(OperationContext* opCtx,
+                          int nShards,
+                          Timestamp configTime = Timestamp(1000000, 0)) {
         for (auto& doc : _generateConfigShardSampleData(nShards)) {
             ASSERT_OK(
                 insertToConfigCollection(opCtx, NamespaceString::kConfigsvrShardsNamespace, doc));
         }
+
+        // Advance the config time to 'configTime'.
+        VectorClock::get(opCtx)->advanceConfigTime_forTest(LogicalTime(configTime));
     }
 
     /* Insert the entries into the config.placementHistory collection
@@ -1027,6 +1033,8 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_EmptyHis
     // Quering an empty placementHistory must return an empty vector
     auto opCtx = operationContext();
 
+    setupConfigShard(opCtx, 1 /* nShards */);
+
     // no shards must be returned
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
         opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(4, 0));
@@ -1198,6 +1206,62 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_CleanUp_
 
     // after cleanup
     assertSameHistoricalPlacement(historicalPlacement_cleanup_coll1, {"shard1", "shard2"});
+}
+
+TEST_F(
+    CatalogClientAggregationsTest,
+    Given_CurrentClusterTime_When_PlacementhHistoryRequestedInTheFuture_Then_ReturnPlacementHistoryStatusFutureClusterTime) {
+    auto opCtx = operationContext();
+
+    // Set up config shard and placement history information.
+    Timestamp placementHistoryTs(10, 0);
+    setupConfigPlacementHistory(opCtx,
+                                {{placementHistoryTs, "db", {"shard1"}},
+                                 {placementHistoryTs, "db.collection1", {"shard1", "shard2"}}});
+    setupConfigShard(opCtx, 3 /*nShards*/);
+
+    const auto& vcTime = VectorClock::get(opCtx)->getTime();
+    Timestamp currentConfigTime = vcTime.configTime().asTimestamp();
+
+    // Ensure that fetching placement history returns a set of active shards when requesting
+    // placement history from the 'currentConfigTime'.
+    {
+        ASSERT_GREATER_THAN_OR_EQUALS(currentConfigTime, placementHistoryTs);
+
+        auto collNss = NamespaceString::createNamespaceString_forTest("db.collection1");
+        auto dbOnlyNss = NamespaceString::createNamespaceString_forTest("db");
+        assertSameHistoricalPlacement(catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
+                                          opCtx, collNss, currentConfigTime),
+                                      {"shard1", "shard2"});
+        assertSameHistoricalPlacement(catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
+                                          opCtx, dbOnlyNss, currentConfigTime),
+                                      {"shard1", "shard2"});
+        assertSameHistoricalPlacement(
+            catalogClient()->getShardsThatOwnDataAtClusterTime(opCtx, currentConfigTime),
+            {"shard1", "shard2"});
+    }
+
+    // Ensure that fetching placement history returns HistoricalPlacementStatus::FutureClusterTime,
+    // when requesting placement history from the future config time.
+    {
+        // Ensure 'tsInTheFuture' is greater than 'currentConfigTime'.
+        Timestamp timeInTheFuture = currentConfigTime + 1;
+        ASSERT_GREATER_THAN(timeInTheFuture, currentConfigTime);
+
+        auto collNss = NamespaceString::createNamespaceString_forTest("db.collection1");
+        auto dbOnlyNss = NamespaceString::createNamespaceString_forTest("db");
+        ASSERT_EQ(catalogClient()
+                      ->getShardsThatOwnDataForCollAtClusterTime(opCtx, collNss, timeInTheFuture)
+                      .getStatus(),
+                  HistoricalPlacementStatus::FutureClusterTime);
+        ASSERT_EQ(catalogClient()
+                      ->getShardsThatOwnDataForDbAtClusterTime(opCtx, dbOnlyNss, timeInTheFuture)
+                      .getStatus(),
+                  HistoricalPlacementStatus::FutureClusterTime);
+        ASSERT_EQ(
+            catalogClient()->getShardsThatOwnDataAtClusterTime(opCtx, timeInTheFuture).getStatus(),
+            HistoricalPlacementStatus::FutureClusterTime);
+    }
 }
 
 }  // namespace mongo
