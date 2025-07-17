@@ -498,14 +498,7 @@ public:
      *
      * @return the updated version of the record. If unowned data is returned, then it is valid
      * until the next modification of this Record or the lock on the collection has been released.
-     *
-     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
-    virtual StatusWith<RecordData> updateWithDamages(OperationContext*,
-                                                     const RecordId&,
-                                                     const RecordData&,
-                                                     const char* damageSource,
-                                                     const DamageVector&) = 0;
     virtual StatusWith<RecordData> updateWithDamages(OperationContext*,
                                                      RecoveryUnit&,
                                                      const RecordId&,

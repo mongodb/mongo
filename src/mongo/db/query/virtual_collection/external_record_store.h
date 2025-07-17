@@ -156,14 +156,6 @@ public:
     }
 
     StatusWith<RecordData> updateWithDamages(OperationContext* opCtx,
-                                             const RecordId& loc,
-                                             const RecordData& oldRec,
-                                             const char* damageSource,
-                                             const DamageVector& damages) final {
-        unimplementedTasserted();
-        return {ErrorCodes::Error::UnknownError, "Unknown error"};
-    }
-    StatusWith<RecordData> updateWithDamages(OperationContext* opCtx,
                                              RecoveryUnit&,
                                              const RecordId& loc,
                                              const RecordData& oldRec,

@@ -90,11 +90,6 @@ public:
         OperationContext*, RecoveryUnit&, const RecordId&, const char* data, int len) final;
 
     StatusWith<RecordData> updateWithDamages(OperationContext*,
-                                             const RecordId&,
-                                             const RecordData&,
-                                             const char* damageSource,
-                                             const DamageVector&) final;
-    StatusWith<RecordData> updateWithDamages(OperationContext*,
                                              RecoveryUnit&,
                                              const RecordId&,
                                              const RecordData&,

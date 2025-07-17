@@ -104,7 +104,7 @@ TEST(RecordStoreTest, UpdateWithDamages) {
             dv[2].targetSize = 3;
 
             StorageWriteTransaction txn(ru);
-            auto newRecStatus = rs->updateWithDamages(opCtx.get(), loc, rec, data.c_str(), dv);
+            auto newRecStatus = rs->updateWithDamages(opCtx.get(), ru, loc, rec, data.c_str(), dv);
             ASSERT_OK(newRecStatus.getStatus());
             ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
             txn.commit();
@@ -170,7 +170,7 @@ TEST(RecordStoreTest, UpdateWithOverlappingDamageEvents) {
             dv[1].targetSize = 5;
 
             StorageWriteTransaction txn(ru);
-            auto newRecStatus = rs->updateWithDamages(opCtx.get(), loc, rec, data.c_str(), dv);
+            auto newRecStatus = rs->updateWithDamages(opCtx.get(), ru, loc, rec, data.c_str(), dv);
             ASSERT_OK(newRecStatus.getStatus());
             ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
             txn.commit();
@@ -237,7 +237,7 @@ TEST(RecordStoreTest, UpdateWithOverlappingDamageEventsReversed) {
             dv[1].targetSize = 5;
 
             StorageWriteTransaction txn(ru);
-            auto newRecStatus = rs->updateWithDamages(opCtx.get(), loc, rec, data.c_str(), dv);
+            auto newRecStatus = rs->updateWithDamages(opCtx.get(), ru, loc, rec, data.c_str(), dv);
             ASSERT_OK(newRecStatus.getStatus());
             ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
             txn.commit();
@@ -293,7 +293,7 @@ TEST(RecordStoreTest, UpdateWithNoDamages) {
             DamageVector dv;
 
             StorageWriteTransaction txn(ru);
-            auto newRecStatus = rs->updateWithDamages(opCtx.get(), loc, rec, "", dv);
+            auto newRecStatus = rs->updateWithDamages(opCtx.get(), ru, loc, rec, "", dv);
             ASSERT_OK(newRecStatus.getStatus());
             ASSERT_EQUALS(data, newRecStatus.getValue().data());
             txn.commit();
@@ -358,7 +358,7 @@ TEST(RecordStoreTest, UpdateWithDamagesScalar) {
             ASSERT(diffOutput);
             auto [_, damageSource, damages] = doc_diff::computeDamages(obj0, *diffOutput, false);
             auto newRecStatus1 =
-                rs->updateWithDamages(opCtx.get(), loc, obj0Rec, damageSource.get(), damages);
+                rs->updateWithDamages(opCtx.get(), ru, loc, obj0Rec, damageSource.get(), damages);
             ASSERT_OK(newRecStatus1.getStatus());
             ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
             txn.commit();
@@ -381,8 +381,12 @@ TEST(RecordStoreTest, UpdateWithDamagesScalar) {
             auto diffOutput = doc_diff::computeOplogDiff(obj1, obj2, 0);
             ASSERT(diffOutput);
             auto [_, damageSource, damages] = doc_diff::computeDamages(obj1, *diffOutput, false);
-            auto newRecStatus2 = rs->updateWithDamages(
-                opCtx.get(), loc, rs->dataFor(opCtx.get(), ru, loc), damageSource.get(), damages);
+            auto newRecStatus2 = rs->updateWithDamages(opCtx.get(),
+                                                       ru,
+                                                       loc,
+                                                       rs->dataFor(opCtx.get(), ru, loc),
+                                                       damageSource.get(),
+                                                       damages);
             ASSERT_OK(newRecStatus2.getStatus());
             ASSERT(obj2.binaryEqual(newRecStatus2.getValue().toBson()));
             txn.commit();
@@ -452,7 +456,7 @@ TEST(RecordStoreTest, UpdateWithDamagesNested) {
             ASSERT(diffOutput);
             auto [_, damageSource, damages] = doc_diff::computeDamages(obj0, *diffOutput, true);
             auto newRecStatus1 =
-                rs->updateWithDamages(opCtx.get(), loc, obj0Rec, damageSource.get(), damages);
+                rs->updateWithDamages(opCtx.get(), ru, loc, obj0Rec, damageSource.get(), damages);
             ASSERT_OK(newRecStatus1.getStatus());
             ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
             txn.commit();
@@ -515,7 +519,7 @@ TEST(RecordStoreTest, UpdateWithDamagesArray) {
             ASSERT(diffOutput);
             auto [_, damageSource, damages] = doc_diff::computeDamages(obj0, *diffOutput, true);
             auto newRecStatus1 =
-                rs->updateWithDamages(opCtx.get(), loc, obj0Rec, damageSource.get(), damages);
+                rs->updateWithDamages(opCtx.get(), ru, loc, obj0Rec, damageSource.get(), damages);
             ASSERT_OK(newRecStatus1.getStatus());
             ASSERT(obj1.binaryEqual(newRecStatus1.getValue().toBson()));
             txn.commit();

@@ -131,14 +131,6 @@ Status RecordStoreBase::updateRecord(
 }
 
 StatusWith<RecordData> RecordStoreBase::updateWithDamages(OperationContext* opCtx,
-                                                          const RecordId& id,
-                                                          const RecordData& data,
-                                                          const char* damageSource,
-                                                          const DamageVector& damages) {
-    return updateWithDamages(
-        opCtx, *shard_role_details::getRecoveryUnit(opCtx), id, data, damageSource, damages);
-}
-StatusWith<RecordData> RecordStoreBase::updateWithDamages(OperationContext* opCtx,
                                                           RecoveryUnit& ru,
                                                           const RecordId& id,
                                                           const RecordData& data,

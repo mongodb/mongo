@@ -804,8 +804,13 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
     }
 
     RecordData oldRecordData(oldDoc.value().objdata(), oldDoc.value().objsize());
-    StatusWith<RecordData> recordData = collection->getRecordStore()->updateWithDamages(
-        opCtx, loc, oldRecordData, damageSource, damages);
+    StatusWith<RecordData> recordData =
+        collection->getRecordStore()->updateWithDamages(opCtx,
+                                                        *shard_role_details::getRecoveryUnit(opCtx),
+                                                        loc,
+                                                        oldRecordData,
+                                                        damageSource,
+                                                        damages);
     if (!recordData.isOK())
         return recordData.getStatus();
     BSONObj newDoc = std::move(recordData.getValue()).releaseToBson().getOwned();

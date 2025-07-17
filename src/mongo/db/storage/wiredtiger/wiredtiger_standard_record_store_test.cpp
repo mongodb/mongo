@@ -242,8 +242,12 @@ TEST_F(SizeStorerUpdateTest, DataSizeModification) {
         const auto damageSource = "";
         DamageVector damageVector;
         damageVector.push_back(DamageEvent(0, 0, 0, 1));
-        auto newDoc =
-            rs->updateWithDamages(opCtx.get(), recordId, oldRecordData, damageSource, damageVector);
+        auto newDoc = rs->updateWithDamages(opCtx.get(),
+                                            *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                            recordId,
+                                            oldRecordData,
+                                            damageSource,
+                                            damageVector);
         ASSERT_TRUE(newDoc.isOK());
         oldRecordData = newDoc.getValue().getOwned();
         ASSERT_EQ(std::memcmp(oldRecordData.data(), "234", 3), 0);
@@ -255,9 +259,13 @@ TEST_F(SizeStorerUpdateTest, DataSizeModification) {
         const auto damageSource = "3456";
         DamageVector damageVector;
         damageVector.push_back(DamageEvent(0, 4, 1, 2));
-        ASSERT_TRUE(
-            rs->updateWithDamages(opCtx.get(), recordId, oldRecordData, damageSource, damageVector)
-                .isOK());
+        ASSERT_TRUE(rs->updateWithDamages(opCtx.get(),
+                                          *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                          recordId,
+                                          oldRecordData,
+                                          damageSource,
+                                          damageVector)
+                        .isOK());
         ASSERT_EQ(getDataSize(), 5);
         txn.commit();
     }
