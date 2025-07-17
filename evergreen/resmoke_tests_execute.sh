@@ -136,6 +136,8 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     done
 
     path_value="$PATH:/data/multiversion"
+    # Needed for disaggregated storage tasks that download grpcurl to this directory.
+    path_value="$PATH:${workdir}/utils/bin"
 
     # Set the suite name to be the task name by default; unless overridden with the `suite` expansion.
     suite_name=${task_name}
