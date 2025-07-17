@@ -90,25 +90,6 @@ public:
 
             const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
 
-            // TODO (SERVER-83704) remove the following code block once 8.0 becomes last LTS.
-            if (!feature_flags::gPlacementHistoryPostFCV3.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                // The content of config.placementHistory is pending to be reset and may not be
-                // reliable. Use the current content of config.shards to compose an approximate
-                // response.
-                auto shardsWithOpTime = catalogClient->getAllShards(
-                    opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
-                std::vector<ShardId> shardIds;
-                std::transform(shardsWithOpTime.value.begin(),
-                               shardsWithOpTime.value.end(),
-                               std::back_inserter(shardIds),
-                               [](const ShardType& s) { return s.getName(); });
-                HistoricalPlacement historicalPlacement{std::move(shardIds),
-                                                        HistoricalPlacementStatus::OK};
-                ConfigsvrGetHistoricalPlacementResponse response(std::move(historicalPlacement));
-                return response;
-            }
-
             boost::optional<NamespaceString> targetedNs = request().getTargetWholeCluster()
                 ? (boost::optional<NamespaceString>)boost::none
                 : nss;

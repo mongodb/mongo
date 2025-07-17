@@ -1009,7 +1009,6 @@ private:
 
         if (role && role->has(ClusterRole::ConfigServer)) {
             _setShardedClusterCardinalityParameter(opCtx, requestedVersion);
-            _initializePlacementHistory(opCtx, requestedVersion);
         }
 
         // TODO SERVER-103046: Remove once 9.0 becomes last lts.
@@ -1020,18 +1019,6 @@ private:
         }
 
         _cleanUpDeprecatedCatalogMetadata(opCtx);
-    }
-
-    // TODO (SERVER-83704): Remove this function once 8.0 becomes last LTS.
-    void _initializePlacementHistory(OperationContext* opCtx, const FCV requestedVersion) {
-        const auto originalVersion =
-            getTransitionFCVInfo(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion())
-                .from;
-        if (feature_flags::gPlacementHistoryPostFCV3.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
-                requestedVersion, originalVersion)) {
-            ShardingCatalogManager::get(opCtx)->initializePlacementHistory(opCtx);
-        }
     }
 
     // TODO(SERVER-100328): remove after 9.0 is branched.

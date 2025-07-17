@@ -63,17 +63,6 @@ feature_flags:
         cpp_varname: feature_flags::gBalanceUnshardedCollections
         default: false
         fcv_gated: true
-    # TODO (SERVER-83704): Remove once 8.0 becomes last LTS.
-    featureFlagPlacementHistoryPostFCV73:
-        description:
-            "Feature flag that marks a version change in the logic that generates config.placementHistory;
-            it causes such a collection to be reinitialized on FCV upgrade and placement history queries
-            to be redirected to config.shards prior to the reinitialization."
-        cpp_varname: feature_flags::gPlacementHistoryPostFCV3
-        default: true
-        version: 7.3
-        fcv_gated: true
-        fcv_context_unaware: true
     featureFlagShardedAggregationCatalogCacheGossiping:
         description:
             "Feature flag that makes routers executing distributed aggregations that involve
