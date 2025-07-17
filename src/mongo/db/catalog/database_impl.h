@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -43,7 +42,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/platform/atomic_word.h"
 
 #include <memory>
 
@@ -141,12 +139,12 @@ private:
     Collection* _createCollection(
         OperationContext* opCtx,
         const NamespaceString& nss,
-        const CollectionOptions& opts = CollectionOptions(),
-        bool createDefaultIndexes = true,
-        const BSONObj& idIndex = BSONObj(),
-        bool fromMigrate = false,
-        const boost::optional<VirtualCollectionOptions>& vopts = boost::none,
-        const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier = boost::none) const;
+        const CollectionOptions& opts,
+        const std::variant<VirtualCollectionOptions, CreateCollCatalogIdentifier>&
+            voptsOrCatalogIdentifier,
+        bool createDefaultIndexes,
+        const BSONObj& idIndex,
+        bool fromMigrate) const;
 
     /**
      * Throws if there is a reason 'ns' cannot be created as a user collection. Namespace pattern

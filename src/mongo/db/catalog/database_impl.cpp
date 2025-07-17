@@ -29,22 +29,6 @@
 
 #include "mongo/db/catalog/database_impl.h"
 
-#include <algorithm>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -65,9 +49,11 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/index_builds/index_build_block.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -110,6 +96,19 @@
 #include "mongo/util/uuid.h"
 #include "mongo/util/version/releases.h"
 
+#include <algorithm>
+#include <memory>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
@@ -151,42 +150,19 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString cons
     }
 }
 
-/**
- * Returns the underlying 'ident' for 'sharedIdent'. Returns an empty string if 'sharedIdent' is
- * unexpectedly null.
- * TODO SERVER-106410: Use explicitly defined idents.
- */
-std::string getIdentSafe(std::shared_ptr<Ident> sharedIdent) {
-    if (sharedIdent == nullptr) {
-        return "";
-    }
-    return sharedIdent->getIdent();
-}
-
-void appendIdIndexIdentToIdentifier(OperationContext* opCtx,
-                                    IndexCatalog* indexCatalog,
-                                    CreateCollCatalogIdentifier& createCollCatalogIdentifierOut) {
-    invariant(indexCatalog);
-    if (auto idIndexDescriptor = indexCatalog->findIdIndex(opCtx)) {
-        auto idIndexEntry = idIndexDescriptor->getEntry();
-        invariant(idIndexEntry);
-        // TODO SERVER-106410: Use explicitly generated ident over lazily retrieved ident.
-        createCollCatalogIdentifierOut.idIndexIdent = getIdentSafe(idIndexEntry->getSharedIdent());
-    }
-}
-
-// Utilizes the durable_catalog to allocate and track storage resources for the new collection.
-std::pair<RecordId, std::unique_ptr<RecordStore>> durablyTrackNewCollection(
+std::shared_ptr<Collection> makeCollectionInstance(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const CollectionOptions& collectionOptions,
-    const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier) {
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    const CreateCollCatalogIdentifier& catalogIdentifier) {
+    if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
+        throwWriteConflictException(str::stream() << "Namespace '" << nss.toStringForErrorMsg()
+                                                  << "' is already in use.");
+    }
 
-    // TODO SERVER-105262: Use 'catalogIdentifier' ident.
-    const auto ident = storageEngine->generateNewCollectionIdent(nss.dbName());
+    auto mdbCatalog = opCtx->getServiceContext()->getStorageEngine()->getMDBCatalog();
     auto createResult = durable_catalog::createCollection(
-        opCtx, nss, ident, collectionOptions, storageEngine->getMDBCatalog());
+        opCtx, nss, catalogIdentifier.ident, collectionOptions, mdbCatalog);
     if (createResult == ErrorCodes::ObjectAlreadyExists) {
         // Each new ident must uniquely identify the collection's underlying table in the storage
         // engine. A scenario where the ident collides with a pre-existing ident should never happen
@@ -195,42 +171,23 @@ std::pair<RecordId, std::unique_ptr<RecordStore>> durablyTrackNewCollection(
                     "Generated ident cannot uniquely identify a new collection's storage table. "
                     "The ident maps to an occupied file",
                     "nss"_attr = nss.toStringForErrorMsg(),
-                    "ident"_attr = ident);
+                    "ident"_attr = catalogIdentifier.ident);
     }
-    return uassertStatusOK(std::move(createResult));
+
+    auto [catalogId, recordStore] = uassertStatusOK(std::move(createResult));
+    auto catalogEntry = durable_catalog::getParsedCatalogEntry(opCtx, catalogId, mdbCatalog);
+    invariant(catalogEntry);
+    auto& metadata = catalogEntry->metadata;
+    return Collection::Factory::get(opCtx)->make(
+        opCtx, nss, catalogId, metadata, std::move(recordStore));
 }
 
-std::pair<std::shared_ptr<Collection>, boost::optional<CreateCollCatalogIdentifier>>
-makeCollectionInstance(OperationContext* opCtx,
-                       const NamespaceString& nss,
-                       const CollectionOptions& collectionOptions,
-                       const boost::optional<VirtualCollectionOptions>& virtualOptions,
-                       const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier) {
-    if (virtualOptions) {
-        // Virtual collection stays only in memory and its metadata need not persist on disk and
-        // therefore we bypass durable_catalog.
-        invariant(!catalogIdentifier.has_value());
-        return {VirtualCollectionImpl::make(opCtx, nss, collectionOptions, *virtualOptions),
-                boost::none};
-    }
-
-    if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
-        throwWriteConflictException(str::stream() << "Namespace '" << nss.toStringForErrorMsg()
-                                                  << "' is already in use.");
-    }
-
-    auto [catalogId, recordStore] =
-        durablyTrackNewCollection(opCtx, nss, collectionOptions, catalogIdentifier);
-    CreateCollCatalogIdentifier createCollCatalogIdentifier{
-        .catalogId = catalogId, .ident = std::string(recordStore->getIdent())};
-
-
-    auto catalogEntry =
-        durable_catalog::getParsedCatalogEntry(opCtx, catalogId, MDBCatalog::get(opCtx));
-    auto metadata = catalogEntry->metadata;
-    return {Collection::Factory::get(opCtx)->make(
-                opCtx, nss, catalogId, metadata, std::move(recordStore)),
-            std::move(createCollCatalogIdentifier)};
+CreateCollCatalogIdentifier makeIdents(OperationContext* opCtx, const NamespaceString& nss) {
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    CreateCollCatalogIdentifier catalogIdentifiers;
+    catalogIdentifiers.ident = storageEngine->generateNewCollectionIdent(nss.dbName());
+    catalogIdentifiers.idIndexIdent = storageEngine->generateNewIndexIdent(nss.dbName());
+    return catalogIdentifiers;
 }
 
 }  // namespace
@@ -696,14 +653,9 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                                            bool createIdIndex,
                                            const BSONObj& idIndex,
                                            bool fromMigrate) const {
-    return _createCollection(opCtx,
-                             nss,
-                             options,
-                             createIdIndex,
-                             idIndex,
-                             fromMigrate,
-                             /*vopts=*/boost::none,
-                             /*catalogIdentifier=*/boost::none);
+
+    return _createCollection(
+        opCtx, nss, options, makeIdents(opCtx, nss), createIdIndex, idIndex, fromMigrate);
 }
 
 Collection* DatabaseImpl::createVirtualCollection(OperationContext* opCtx,
@@ -713,22 +665,21 @@ Collection* DatabaseImpl::createVirtualCollection(OperationContext* opCtx,
     return _createCollection(opCtx,
                              nss,
                              opts,
+                             vopts,
                              /*createIdIndex=*/false,
                              /*idIndex=*/BSONObj(),
-                             /*fromMigrate=*/false,
-                             vopts,
-                             /*catalogIdentifier=*/boost::none);
+                             /*fromMigrate=*/false);
 }
 
 Collection* DatabaseImpl::_createCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const CollectionOptions& options,
+    const std::variant<VirtualCollectionOptions, CreateCollCatalogIdentifier>&
+        voptsOrCatalogIdentifier,
     bool createIdIndex,
     const BSONObj& idIndex,
-    bool fromMigrate,
-    const boost::optional<VirtualCollectionOptions>& vopts,
-    const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier) const {
+    bool fromMigrate) const {
     invariant(!options.isView());
 
     invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX));
@@ -813,7 +764,7 @@ Collection* DatabaseImpl::_createCollection(
     audit::logCreateCollection(opCtx->getClient(), nss);
 
     // Reduce log verbosity for virtual collections
-    auto debugLevel = vopts ? 1 : 0;
+    int debugLevel = std::holds_alternative<VirtualCollectionOptions>(voptsOrCatalogIdentifier);
 
     LOGV2_DEBUG(20320,
                 debugLevel,
@@ -823,8 +774,24 @@ Collection* DatabaseImpl::_createCollection(
                 "uuid"_attr = optionsWithUUID.uuid.value(),
                 "options"_attr = options);
 
-    auto [ownedCollection, createCollCatalogIdentifier] =
-        makeCollectionInstance(opCtx, nss, optionsWithUUID, vopts, catalogIdentifier);
+    boost::optional<CreateCollCatalogIdentifier> catalogIdentifierWithCatalogId;
+    auto ownedCollection = std::visit(
+        OverloadedVisitor{
+            [&](const VirtualCollectionOptions& vopts) {
+                return VirtualCollectionImpl::make(opCtx, nss, optionsWithUUID, vopts);
+            },
+            [&](const CreateCollCatalogIdentifier& catalogIdentifier) {
+                auto coll = makeCollectionInstance(opCtx, nss, optionsWithUUID, catalogIdentifier);
+
+                // The newly created collection may not have used the catalogId we told it to use
+                // (if any), so we need to use the actual catalogId from here on
+                catalogIdentifierWithCatalogId = catalogIdentifier;
+                catalogIdentifierWithCatalogId->catalogId = coll->getCatalogId();
+
+                return coll;
+            }},
+        voptsOrCatalogIdentifier);
+
     auto collection = ownedCollection.get();
     ownedCollection->init(opCtx);
 
@@ -839,22 +806,23 @@ Collection* DatabaseImpl::_createCollection(
     BSONObj fullIdIndexSpec;
 
     if (createIdIndex && collection->requiresIdIndex()) {
-        if (optionsWithUUID.autoIndexId == CollectionOptions::YES ||
-            optionsWithUUID.autoIndexId == CollectionOptions::DEFAULT) {
-            auto* ic = collection->getIndexCatalog();
-            // TODO(SERVER-103398): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            fullIdIndexSpec = uassertStatusOK(ic->createIndexOnEmptyCollection(
-                opCtx,
-                collection,
-                !idIndex.isEmpty()
-                    ? idIndex
-                    : ic->getDefaultIdIndexSpec(CollectionPtr::CollectionPtr_UNSAFE(collection))));
-
+        if (optionsWithUUID.autoIndexId != CollectionOptions::NO) {
             // Creating an index requires touching disk, which means there must be catalog
             // identifiers associated with the newly created collection.
-            invariant(createCollCatalogIdentifier.has_value());
-            appendIdIndexIdentToIdentifier(opCtx, ic, *createCollCatalogIdentifier);
+            invariant(catalogIdentifierWithCatalogId);
+            invariant(catalogIdentifierWithCatalogId->idIndexIdent);
+
+            // TODO(SERVER-103398): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            auto collectionPtr = CollectionPtr::CollectionPtr_UNSAFE(collection);
+            auto* ic = collection->getIndexCatalog();
+            fullIdIndexSpec = uassertStatusOK(ic->prepareSpecForCreate(
+                opCtx,
+                collectionPtr,
+                !idIndex.isEmpty() ? idIndex : ic->getDefaultIdIndexSpec(collectionPtr),
+                boost::none));
+            uassertStatusOK(IndexBuildBlock::buildEmptyIndex(
+                opCtx, collection, fullIdIndexSpec, *catalogIdentifierWithCatalogId->idIndexIdent));
         } else {
             // autoIndexId: false is only allowed on unreplicated collections.
             uassert(50001,
@@ -871,7 +839,7 @@ Collection* DatabaseImpl::_createCollection(
                                                                     optionsWithUUID,
                                                                     fullIdIndexSpec,
                                                                     createOplogSlot,
-                                                                    createCollCatalogIdentifier,
+                                                                    catalogIdentifierWithCatalogId,
                                                                     fromMigrate);
 
     // It is necessary to create the system index *after* running the onCreateCollection so that
@@ -1009,17 +977,20 @@ Status DatabaseImpl::userCreateNS(
                 "View name cannot start with 'system.', which is reserved for system namespaces");
         return createView(opCtx, nss, collectionOptions);
     } else {
-        invariant(_createCollection(opCtx,
-                                    nss,
-                                    collectionOptions,
-                                    createDefaultIndexes,
-                                    idIndex,
-                                    fromMigrate,
-                                    /*vopts=*/boost::none,
-                                    catalogIdentifier),
-                  str::stream() << "Collection creation failed after validating options: "
-                                << nss.toStringForErrorMsg()
-                                << ". Options: " << collectionOptions.toBSON());
+        invariant(
+            _createCollection(opCtx,
+                              nss,
+                              collectionOptions,
+                              // TODO(SERVER-105262): Use the replicated idents rather
+                              // than always generating new ones
+                              // catalogIdentifier ? *catalogIdentifier : makeIdents(opCtx, nss),
+                              makeIdents(opCtx, nss),
+                              createDefaultIndexes,
+                              idIndex,
+                              fromMigrate),
+            str::stream() << "Collection creation failed after validating options: "
+                          << nss.toStringForErrorMsg()
+                          << ". Options: " << collectionOptions.toBSON());
     }
 
     return Status::OK();
@@ -1046,11 +1017,10 @@ Status DatabaseImpl::userCreateVirtualNS(OperationContext* opCtx,
     invariant(_createCollection(opCtx,
                                 nss,
                                 opts,
+                                vopts,
                                 /*createDefaultIndexes=*/false,
                                 /*idIndex=*/BSONObj(),
-                                /*fromMigrate=*/false,
-                                vopts,
-                                /*catalogIdentifier=*/boost::none),
+                                /*fromMigrate=*/false),
               str::stream() << "Collection creation failed after validating options: "
                             << nss.toStringForErrorMsg() << ". Options: " << opts.toBSON());
 
