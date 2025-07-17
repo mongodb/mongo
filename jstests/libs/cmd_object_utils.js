@@ -1,5 +1,47 @@
 import {sysCollNamePrefix} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 
+export const kGenericArgFieldNames = [
+    "apiVersion",
+    "apiStrict",
+    "apiDeprecationErrors",
+    "maxTimeMS",
+    "readConcern",
+    "writeConcern",
+    "lsid",
+    "clientOperationKey",
+    "txnNumber",
+    "autocommit",
+    "startTransaction",
+    "stmtId",
+    "comment",
+    "$readPreference",
+    "$clusterTime",
+    "$audit",
+    "$client",
+    "$configServerState",
+    "allowImplicitCollectionCreation",
+    "$oplogQueryData",
+    "$queryOptions",
+    "$replData",
+    "databaseVersion",
+    "help",
+    "shardVersion",
+    "tracking_info",
+    "coordinator",
+    "maxTimeMSOpOnly",
+    "usesDefaultMaxTimeMS",
+    "$configTime",
+    "$topologyTime",
+    "txnRetryCounter",
+    "versionContext",
+    "mayBypassWriteBlocking",
+    "expectPrefix",
+    "requestGossipRoutingCache",
+    "startOrContinueTransaction",
+    "rawData",
+    "serialization_context"
+];
+
 /**
  * Resolves the command name for the given 'cmdObj'.
  */
@@ -30,10 +72,9 @@ export function getInnerCommand(cmdObj) {
  * Splits 'cmdObj' into a pair of [<command without generic args>, <generic args>].
  */
 function extractGenericArgs(cmdObj) {
-    const kGenericArgs = ["apiVersion", "apiStrict"];
     let cmd = {}, genericArgs = {};
     for (const [key, value] of Object.entries(cmdObj)) {
-        const isGenericArg = kGenericArgs.includes(key);
+        const isGenericArg = kGenericArgFieldNames.includes(key);
         if (isGenericArg) {
             genericArgs[key] = value;
         } else {
@@ -51,8 +92,25 @@ export function getExplainCommand(cmdObj, verbosity = "queryPlanner") {
     // explain command.
     const [cmd, genericArgs] = extractGenericArgs(cmdObj);
 
-    // Ensure there's no 'writeConcern' as it can't be passed to the final explain command.
-    delete cmd["writeConcern"];
+    if ('rawData' in genericArgs) {
+        // Unlike the rest of the generic arguments, 'rawData' must be passed to the inner command.
+        cmd.rawData = genericArgs.rawData;
+        delete genericArgs.rawData;
+    }
+
+    // Remove explain incompatible generic arguments.
+    const explainIncompatibleGenericArgs = [
+        // Cannot run 'explain' with "writeConcern".
+        "writeConcern",
+        // Cannot run 'explain' in a multi-document transaction.
+        "txnNumber",
+        "autocommit",
+        "startTransaction",
+        "stmtId",
+    ];
+    for (const arg of explainIncompatibleGenericArgs) {
+        delete genericArgs[arg];
+    }
 
     // Explained aggregate commands require a cursor argument.
     const isAggregateCmd = getCommandName(cmdObj) === "aggregate";

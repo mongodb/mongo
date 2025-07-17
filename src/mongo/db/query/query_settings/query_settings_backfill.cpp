@@ -142,6 +142,12 @@ std::vector<QueryShapeHash> flattenVector(std::vector<std::vector<QueryShapeHash
     }
     return buffer;
 }
+
+std::unique_ptr<async_rpc::Targeter> makeAsyncRpcTargeterAdaptor(
+    std::shared_ptr<RemoteCommandTargeter> remoteCommandTargeter) {
+    return std::make_unique<async_rpc::AsyncRemoteCommandTargeterAdapter>(
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly), std::move(remoteCommandTargeter));
+}
 }  // namespace
 
 ExecutorFuture<std::vector<query_shape::QueryShapeHash>> insertRepresentativeQueriesToCollection(
@@ -189,20 +195,62 @@ ExecutorFuture<std::vector<query_shape::QueryShapeHash>> insertRepresentativeQue
     return whenAllSucceed(std::move(futures)).thenRunOn(executor).then(flattenVector);
 }
 
+/**
+ * The Backfill Coordinator implementation for sharded clusters deployments. Always targets the
+ * config server primary when inserting query shape representative queries.
+ */
+class ShardedClusterBackfillCoordinator : public BackfillCoordinator {
+public:
+    using BackfillCoordinator::BackfillCoordinator;
+
+private:
+    std::unique_ptr<async_rpc::Targeter> makeTargeter(OperationContext* opCtx) final;
+};
+
+/**
+ * The Backfill Coordinator implementation for replica set deployments. Always targets the replica
+ * set primary when inserting representative queries.
+ */
+class ReplicaSetBackfillCoordinator : public BackfillCoordinator {
+public:
+    using BackfillCoordinator::BackfillCoordinator;
+
+private:
+    std::unique_ptr<async_rpc::Targeter> makeTargeter(OperationContext* opCtx) final;
+};
+
+std::unique_ptr<BackfillCoordinator> BackfillCoordinator::create(
+    OnCompletionHook onCompletionHook) {
+    auto&& role = serverGlobalParams.clusterRole;
+    if (role.hasExclusively(ClusterRole::None)) {
+        return std::make_unique<ReplicaSetBackfillCoordinator>(std::move(onCompletionHook));
+    }
+    return std::make_unique<ShardedClusterBackfillCoordinator>(std::move(onCompletionHook));
+}
+
 BackfillCoordinator::BackfillCoordinator(OnCompletionHook onCompletionHook)
     : _state(std::make_unique<BackfillCoordinator::State>()),
       _onCompletionHook(std::move(onCompletionHook)) {}
 
-bool BackfillCoordinator::shouldBackfill(OperationContext* opCtx, bool hasRepresentativeQuery) {
+bool BackfillCoordinator::shouldBackfill(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         bool hasRepresentativeQuery) {
     // Nothing to do if the representative query is already present.
     if (hasRepresentativeQuery) {
         return false;
     }
 
     // We shouldn't attempt the backfill if it's not enabled.
-    return feature_flags::gFeatureFlagPQSBackfill.isEnabledUseLatestFCVWhenUninitialized(
-        VersionContext::getDecoration(opCtx),
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const bool isPQSBackfillEnabled =
+        feature_flags::gFeatureFlagPQSBackfill.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(expCtx->getOperationContext()),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    if (!isPQSBackfillEnabled) {
+        return false;
+    }
+
+    // Do not attempt to backfill explain commands.
+    const bool isExplain = expCtx->getExplain().has_value();
+    return !isExplain;
 }
 
 void BackfillCoordinator::markForBackfillAndScheduleIfNeeded(
@@ -369,6 +417,28 @@ std::unique_ptr<BackfillCoordinator::State> BackfillCoordinator::consume() {
     auto newState = std::make_unique<BackfillCoordinator::State>();
     stdx::lock_guard lk{_mutex};
     return std::exchange(_state, std::move(newState));
+}
+
+std::shared_ptr<executor::TaskExecutor> BackfillCoordinator::makeExecutor(OperationContext* opCtx) {
+    return MongoProcessInterface::create(opCtx)->taskExecutor;
+}
+
+std::unique_ptr<async_rpc::Targeter> ShardedClusterBackfillCoordinator::makeTargeter(
+    OperationContext* opCtx) {
+    return makeAsyncRpcTargeterAdaptor(
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->getTargeter());
+}
+
+std::unique_ptr<async_rpc::Targeter> ReplicaSetBackfillCoordinator::makeTargeter(
+    OperationContext* opCtx) {
+    auto&& config = mongo::repl::ReplicationCoordinator::get(opCtx)->getConfig();
+    uassert(ErrorCodes::NotYetInitialized,
+            "Replication has not yet been configured",
+            config.isInitialized());
+    std::unique_ptr<RemoteCommandTargeter> uniqueRemoteCommandTargeter =
+        RemoteCommandTargeterFactoryImpl{}.create(config.getConnectionString());
+    return makeAsyncRpcTargeterAdaptor(
+        std::shared_ptr<RemoteCommandTargeter>(uniqueRemoteCommandTargeter.release()));
 }
 
 }  // namespace mongo::query_settings

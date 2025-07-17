@@ -1,7 +1,10 @@
 /**
  * Utility class for testing query settings.
  */
-import {getCommandName, getExplainCommand} from "jstests/libs/cmd_object_utils.js";
+import {
+    getCommandName,
+    getExplainCommand,
+} from "jstests/libs/cmd_object_utils.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {
@@ -11,6 +14,10 @@ import {
     getQueryPlanners,
     getWinningPlanFromExplain
 } from "jstests/libs/query/analyze_plan.js";
+import {
+    getParameter,
+    setParameterOnAllHosts
+} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 export class QuerySettingsUtils {
     /**
@@ -95,6 +102,7 @@ export class QuerySettingsUtils {
         showDebugQueryShape = false,
         showQueryShapeHash = false,
         showRepresentativeQuery = true,
+        ignoreRepresentativeQueryFields = [],
         filter = undefined
     } = {}) {
         const pipeline = [{$querySettings: showDebugQueryShape ? {showDebugQueryShape} : {}}];
@@ -103,6 +111,24 @@ export class QuerySettingsUtils {
         }
         if (!showQueryShapeHash) {
             pipeline.push({$project: {queryShapeHash: 0}});
+        }
+        for (const ignoredField of ignoreRepresentativeQueryFields) {
+            pipeline.push({
+                $replaceWith: {
+                    $setField: {
+                        field: "representativeQuery",
+                        input: "$$ROOT",
+                        value: {
+                            $unsetField: {
+                                field: {$literal: ignoredField},
+                                input: {
+                                    $getField: "representativeQuery",
+                                }
+                            }
+                        }
+                    }
+                }
+            });
         }
         pipeline.push({$sort: {representativeQuery: 1}});
         if (!showRepresentativeQuery) {
@@ -151,12 +177,14 @@ export class QuerySettingsUtils {
      *
      * The settings list is not expected to be in any particular order.
      */
-    assertQueryShapeConfiguration(expectedQueryShapeConfigurations, shouldRunExplain = true) {
+    assertQueryShapeConfiguration(expectedQueryShapeConfigurations,
+                                  shouldRunExplain = true,
+                                  ignoreRepresentativeQueryFields = []) {
         const isRunningFCVUpgradeDowngradeSuite =
             TestData.isRunningFCVUpgradeDowngradeSuite || false;
 
         // In case 'expectedQueryShapeConfigurations' has no 'representativeQuery' attribute, we do
-        // not perform queryShapeHash assertions.
+        // not perform 'queryShapeHash' assertions.
         const expectedQueryShapeConfigurationsHaveRepresentativeQuery =
             expectedQueryShapeConfigurations.every(
                 config => config.hasOwnProperty("representativeQuery"));
@@ -183,7 +211,8 @@ export class QuerySettingsUtils {
             () => {
                 const actualQueryShapeConfigurations = this.getQuerySettings({
                     showQueryShapeHash,
-                    showRepresentativeQuery: !isRunningFCVUpgradeDowngradeSuite
+                    ignoreRepresentativeQueryFields,
+                    showRepresentativeQuery: !isRunningFCVUpgradeDowngradeSuite,
                 });
                 assert.sameMembers(actualQueryShapeConfigurations,
                                    rewrittenExpectedQueryShapeConfigurations);
@@ -195,7 +224,8 @@ export class QuerySettingsUtils {
                 toJsonForLog(rewrittenExpectedQueryShapeConfigurations)}`);
 
         if (shouldRunExplain && expectedQueryShapeConfigurationsHaveRepresentativeQuery) {
-            const settingsArray = this.getQuerySettings({showQueryShapeHash: true});
+            const settingsArray =
+                this.getQuerySettings({showQueryShapeHash, ignoreRepresentativeQueryFields});
             for (const {representativeQuery, settings, queryShapeHash} of settingsArray) {
                 if (representativeQuery) {
                     this.assertExplainQuerySettings(representativeQuery, settings, queryShapeHash);
@@ -326,6 +356,30 @@ export class QuerySettingsUtils {
             return fn(failpoint, coordinator.port);
         } finally {
             failpoint.off();
+        }
+    }
+
+    /**
+     * Helper method for temporarely setting the 'internalQuerySettingsBackfillDelaySeconds' server
+     * parameter to 'delaySeconds' while executing the provided 'fn'. Restores the original value
+     * upon completion.
+     */
+    withBackfillDelaySeconds(delaySeconds, fn) {
+        let originalDelaySeconds = null;
+        let hostList = [];
+        try {
+            const conn = this._db.getMongo();
+            hostList = DiscoverTopology.findNonConfigNodes(conn);
+            assert.gt(hostList.length, 0, "No hosts found");
+            originalDelaySeconds = getParameter(conn, "internalQuerySettingsBackfillDelaySeconds");
+            setParameterOnAllHosts(
+                hostList, "internalQuerySettingsBackfillDelaySeconds", delaySeconds);
+            return fn();
+        } finally {
+            if (hostList.length > 0 && originalDelaySeconds !== null) {
+                setParameterOnAllHosts(
+                    hostList, "internalQuerySettingsBackfillDelaySeconds", originalDelaySeconds);
+            }
         }
     }
 
