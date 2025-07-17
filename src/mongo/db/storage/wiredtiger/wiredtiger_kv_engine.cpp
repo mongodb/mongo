@@ -82,6 +82,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_storage_options_config_string_flags_parser.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
@@ -2932,6 +2933,18 @@ bool WiredTigerKVEngine::underCachePressure(int concurrentWriteOuts, int concurr
     return _cachePressureMonitor->isUnderCachePressure(
         *permit, concurrentWriteOuts, concurrentReadOuts);
 }
+
+BSONObj WiredTigerKVEngine::setFlagToStorageOptions(const BSONObj& storageEngineOptions,
+                                                    StringData flagName,
+                                                    boost::optional<bool> flagValue) const {
+    return setFlagToWiredTigerStorageOptions(storageEngineOptions, flagName, flagValue);
+}
+
+boost::optional<bool> WiredTigerKVEngine::getFlagFromStorageOptions(
+    const BSONObj& storageEngineOptions, StringData flagName) const {
+    return getFlagFromWiredTigerStorageOptions(storageEngineOptions, flagName);
+}
+
 BSONObj WiredTigerKVEngine::getSanitizedStorageOptionsForSecondaryReplication(
     const BSONObj& options) const {
 

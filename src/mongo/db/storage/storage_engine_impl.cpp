@@ -1063,6 +1063,17 @@ const MDBCatalog* StorageEngineImpl::getMDBCatalog() const {
     return _catalog.get();
 }
 
+boost::optional<bool> StorageEngineImpl::getFlagFromStorageOptions(
+    const BSONObj& storageEngineOptions, StringData flagName) const {
+    return _engine->getFlagFromStorageOptions(storageEngineOptions, flagName);
+}
+
+BSONObj StorageEngineImpl::setFlagToStorageOptions(const BSONObj& storageEngineOptions,
+                                                   StringData flagName,
+                                                   boost::optional<bool> flagValue) const {
+    return _engine->setFlagToStorageOptions(storageEngineOptions, flagName, flagValue);
+}
+
 BSONObj StorageEngineImpl::getSanitizedStorageOptionsForSecondaryReplication(
     const BSONObj& options) const {
     return _engine->getSanitizedStorageOptionsForSecondaryReplication(options);

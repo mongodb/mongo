@@ -489,6 +489,7 @@ mongo_cc_library(
     hdrs = [
         "deferred_drop_record_store.h",
         "journal_listener.h",
+        "snapshot_manager.h",
         "storage_engine_impl.h",
     ],
     deps = [

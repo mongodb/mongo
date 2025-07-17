@@ -283,6 +283,13 @@ public:
 
     bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx, bool stableCheckpoint) override;
 
+    BSONObj setFlagToStorageOptions(const BSONObj& storageEngineOptions,
+                                    StringData flagName,
+                                    boost::optional<bool> flagValue) const override;
+
+    boost::optional<bool> getFlagFromStorageOptions(const BSONObj& storageEngineOptions,
+                                                    StringData flagName) const override;
+
     BSONObj getSanitizedStorageOptionsForSecondaryReplication(
         const BSONObj& options) const override;
 

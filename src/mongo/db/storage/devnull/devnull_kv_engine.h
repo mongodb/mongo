@@ -213,6 +213,17 @@ public:
         return false;
     }
 
+    BSONObj setFlagToStorageOptions(const BSONObj& storageEngineOptions,
+                                    StringData flagName,
+                                    boost::optional<bool> flagValue) const override {
+        return storageEngineOptions;
+    }
+
+    boost::optional<bool> getFlagFromStorageOptions(const BSONObj& storageEngineOptions,
+                                                    StringData flagName) const override {
+        return boost::none;
+    }
+
     void dump() const override {}
 
     // This sets the results of the backup cursor for unit tests.

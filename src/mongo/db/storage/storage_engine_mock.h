@@ -247,6 +247,17 @@ public:
         return true;
     }
 
+    BSONObj setFlagToStorageOptions(const BSONObj& storageEngineOptions,
+                                    StringData flagName,
+                                    boost::optional<bool> flagValue) const final {
+        return storageEngineOptions;
+    }
+
+    boost::optional<bool> getFlagFromStorageOptions(const BSONObj& storageEngineOptions,
+                                                    StringData flagName) const final {
+        return boost::none;
+    }
+
     BSONObj getSanitizedStorageOptionsForSecondaryReplication(const BSONObj& options) const final {
         return options;
     }

@@ -38,26 +38,29 @@
 namespace mongo {
 
 /**
- * Utility functions to get or set boolean flags from/to a storage engine options object
- * (see `CollectionOptions::storageEngine`).
+ * Utility functions to get or set boolean flags associated to an arbitrary flag name from/to a
+ * WiredTiger storage engine options BSON object.
  *
  * The idea is that for exceptional (workaround) purposes, we can use the storage engine
  * options object as a flexible structure where new fields can be added retroactively,
  * unlike the other parts of the catalog which generally have non-flexible / strict validations.
  * For more information, see: SERVER-91195, SERVER-92186.
+ *
+ * Flags are persisted in the application-owned metadata (`app_metadata`) key of the WiredTiger
+ * configuration string; e.g. setting flag "abc" to true sets it in the BSON object like:
+ * {storageEngine: {wiredTiger: {configString: 'app_metadata=(abc=true)'}}}
  */
-
-std::map<StringData, boost::optional<bool>> getFlagsFromStorageEngineBson(
+std::map<StringData, boost::optional<bool>> getFlagsFromWiredTigerStorageOptions(
     const BSONObj& storageEngineOptions, const std::vector<StringData>& flagNames);
 
-boost::optional<bool> getFlagFromStorageEngineBson(const BSONObj& storageEngineOptions,
-                                                   StringData flagName);
+boost::optional<bool> getFlagFromWiredTigerStorageOptions(const BSONObj& storageEngineOptions,
+                                                          StringData flagName);
 
-[[nodiscard]] BSONObj setFlagsToStorageEngineBson(
+BSONObj setFlagsToWiredTigerStorageOptions(
     const BSONObj& storageEngineOptions, const std::map<StringData, boost::optional<bool>>& flags);
 
-[[nodiscard]] BSONObj setFlagToStorageEngineBson(const BSONObj& storageEngineOptions,
-                                                 StringData flagName,
-                                                 boost::optional<bool> flagValue);
+BSONObj setFlagToWiredTigerStorageOptions(const BSONObj& storageEngineOptions,
+                                          StringData flagName,
+                                          boost::optional<bool> flagValue);
 
 }  // namespace mongo

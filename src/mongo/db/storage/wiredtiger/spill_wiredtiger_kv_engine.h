@@ -178,6 +178,17 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    BSONObj setFlagToStorageOptions(const BSONObj& storageEngineOptions,
+                                    StringData flagName,
+                                    boost::optional<bool> flagValue) const override {
+        MONGO_UNREACHABLE;
+    }
+
+    boost::optional<bool> getFlagFromStorageOptions(const BSONObj& storageEngineOptions,
+                                                    StringData flagName) const override {
+        MONGO_UNREACHABLE;
+    }
+
     void dump() const override {
         MONGO_UNREACHABLE;
     }

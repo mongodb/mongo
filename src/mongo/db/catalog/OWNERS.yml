@@ -104,9 +104,6 @@ filters:
   - "snapshot_helper*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "storage_engine_collection_options_flags_parser*":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "uncommitted_catalog_updates*":
     approvers:
       - 10gen/server-catalog-and-routing

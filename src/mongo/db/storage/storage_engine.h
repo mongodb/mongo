@@ -937,6 +937,31 @@ public:
                                                    bool stableCheckpoint) = 0;
 
     /**
+     * Sets an optional boolean value (true / false / unset) associated to an arbitrary
+     * `flagName` key on the storage engine options BSON object of a collection / index.
+     * The way the flag is stored in the BSON object is engine-specific, and callers should only
+     * assume that the persisted value can be later recovered using `getFlagFromStorageOptions`.
+     *
+     * This method only exists to support a critical fix (SERVER-91195), which required introducing
+     * a backportable way to persist boolean flags; do not add new usages.
+     * TODO SERVER-92265 evaluate getting rid of this method.
+     */
+    virtual BSONObj setFlagToStorageOptions(const BSONObj& storageEngineOptions,
+                                            StringData flagName,
+                                            boost::optional<bool> flagValue) const = 0;
+
+    /**
+     * Gets an optional boolean flag (true / false / unset) associated to an arbitrary
+     * `flagName` key on the storage engine options BSON object of a collection / index,
+     * as previously set by `setFlagToStorageOptions`.
+     * The default value, if one has not been previously set, is the unset state (`boost::none`).
+     *
+     * TODO SERVER-92265 evaluate getting rid of this method.
+     */
+    virtual boost::optional<bool> getFlagFromStorageOptions(const BSONObj& storageEngineOptions,
+                                                            StringData flagName) const = 0;
+
+    /**
      * Returns the input storage engine options, sanitized to remove options that may not apply to
      * this node, such as encryption. Might be called for both collection and index options. See
      * SERVER-68122.

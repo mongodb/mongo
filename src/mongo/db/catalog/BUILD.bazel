@@ -583,24 +583,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "storage_engine_collection_options_flags_parser",
-    srcs = [
-        "storage_engine_collection_options_flags_parser.cpp",
-    ],
-    hdrs = [
-        "storage_engine_collection_options_flags_parser.h",
-    ],
-    target_compatible_with = select({
-        "//bazel/config:use_wiredtiger_enabled": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
-    deps = [
-        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
-        "//src/mongo/util:pcre_wrapper",
-    ],
-)
-
-mongo_cc_library(
     name = "collection_record_store_options",
     srcs = [
         "collection_record_store_options.cpp",
@@ -646,7 +628,6 @@ mongo_cc_library(
         "index_key_validate",
         "index_repair",
         "local_oplog_info",
-        "storage_engine_collection_options_flags_parser",
         "throttle_cursor",
         "//src/mongo/db:audit",
         "//src/mongo/db:collection_index_usage_tracker",
@@ -759,13 +740,8 @@ mongo_cc_unit_test(
         "index_catalog_impl_test.cpp",
         "index_signature_test.cpp",
         "rename_collection_test.cpp",
-        "storage_engine_collection_options_flags_parser_test.cpp",
     ],
     tags = ["mongo_unittest_third_group"],
-    target_compatible_with = select({
-        "//bazel/config:use_wiredtiger_enabled": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
     deps = [
         ":catalog_control",
         ":catalog_helpers",
@@ -776,7 +752,6 @@ mongo_cc_unit_test(
         ":collection_options",
         ":database_holder",
         ":index_key_validate",
-        ":storage_engine_collection_options_flags_parser",
         ":throttle_cursor",
         "//src/mongo/db:coll_mod_command_idl",
         "//src/mongo/db:dbhelpers",
@@ -809,7 +784,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/repl:storage_interface_impl",
-        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
         "//src/mongo/db/timeseries:timeseries_collmod",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/validate:collection_validation",
@@ -851,10 +825,6 @@ mongo_cc_unit_test(
         "mongo_unittest_seventh_group",
         "server-integration-smoke",
     ],
-    target_compatible_with = select({
-        "//bazel/config:use_wiredtiger_enabled": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
     deps = [
         ":catalog_control",
         ":catalog_helpers",
@@ -874,7 +844,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/repl:storage_interface_impl",
-        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
         "//src/mongo/db/validate:collection_validation",
         "//src/mongo/db/validate:validate_idl",
         "//src/mongo/db/validate:validate_state",

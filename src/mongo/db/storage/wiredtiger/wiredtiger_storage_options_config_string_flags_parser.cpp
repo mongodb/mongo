@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/storage_engine_collection_options_flags_parser.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_storage_options_config_string_flags_parser.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -76,18 +76,18 @@ static std::map<StringData, boost::optional<bool>> getFlagsFromWtConfigStringApp
     return flags;
 }
 
-std::map<StringData, boost::optional<bool>> getFlagsFromStorageEngineBson(
+std::map<StringData, boost::optional<bool>> getFlagsFromWiredTigerStorageOptions(
     const BSONObj& storageEngineOptions, const std::vector<StringData>& flagNames) {
     auto configString = WiredTigerUtil::getConfigStringFromStorageOptions(storageEngineOptions);
     return getFlagsFromWtConfigStringAppMetadata(configString.value_or(""), flagNames);
 }
 
-boost::optional<bool> getFlagFromStorageEngineBson(const BSONObj& storageEngineOptions,
-                                                   StringData flagName) {
+boost::optional<bool> getFlagFromWiredTigerStorageOptions(const BSONObj& storageEngineOptions,
+                                                          StringData flagName) {
     if (storageEngineOptions.isEmpty()) {
         return boost::none;
     }
-    return getFlagsFromStorageEngineBson(storageEngineOptions, {flagName})[flagName];
+    return getFlagsFromWiredTigerStorageOptions(storageEngineOptions, {flagName})[flagName];
 }
 
 // Finds or adds the 'app_metadata=(...)' struct inside a WiredTiger config string
@@ -137,8 +137,8 @@ static void setFlagsToWtConfigStringAppMetadata(
     }
 }
 
-BSONObj setFlagsToStorageEngineBson(const BSONObj& storageEngineOptions,
-                                    const std::map<StringData, boost::optional<bool>>& flags) {
+BSONObj setFlagsToWiredTigerStorageOptions(
+    const BSONObj& storageEngineOptions, const std::map<StringData, boost::optional<bool>>& flags) {
     auto configString =
         WiredTigerUtil::getConfigStringFromStorageOptions(storageEngineOptions).value_or("");
     setFlagsToWtConfigStringAppMetadata(configString, flags);
@@ -153,10 +153,10 @@ BSONObj setFlagsToStorageEngineBson(const BSONObj& storageEngineOptions,
     return WiredTigerUtil::setConfigStringToStorageOptions(storageEngineOptions, configString);
 }
 
-BSONObj setFlagToStorageEngineBson(const BSONObj& storageEngineOptions,
-                                   StringData flagName,
-                                   boost::optional<bool> flagValue) {
-    return setFlagsToStorageEngineBson(storageEngineOptions, {{flagName, flagValue}});
+BSONObj setFlagToWiredTigerStorageOptions(const BSONObj& storageEngineOptions,
+                                          StringData flagName,
+                                          boost::optional<bool> flagValue) {
+    return setFlagsToWiredTigerStorageOptions(storageEngineOptions, {{flagName, flagValue}});
 }
 
 }  // namespace mongo

@@ -36,7 +36,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/durable_catalog.h"
-#include "mongo/db/catalog/storage_engine_collection_options_flags_parser.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/coll_mod_gen.h"
@@ -232,7 +231,8 @@ TEST_F(CollModTest, CollModTimeseriesWithFixedBucket) {
     auto catalogEntry = durable_catalog::getParsedCatalogEntry(
         opCtx.get(), coll->getCatalogId(), MDBCatalog::get(opCtx.get()));
     auto metadata = catalogEntry->metadata;
-    boost::optional<bool> optBackwardsCompatibleFlag = getFlagFromStorageEngineBson(
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    boost::optional<bool> optBackwardsCompatibleFlag = storageEngine->getFlagFromStorageOptions(
         metadata->options.storageEngine,
         backwards_compatible_collection_options::kTimeseriesBucketingParametersHaveChanged);
     ASSERT_TRUE(optBackwardsCompatibleFlag);
@@ -345,7 +345,8 @@ TEST_F(CollModTest, CollModTimeseriesMixedSchemaData) {
     auto catalogEntry = durable_catalog::getParsedCatalogEntry(
         opCtx.get(), coll->getCatalogId(), MDBCatalog::get(opCtx.get()));
     auto metadata = catalogEntry->metadata;
-    boost::optional<bool> optBackwardsCompatibleFlag = getFlagFromStorageEngineBson(
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    boost::optional<bool> optBackwardsCompatibleFlag = storageEngine->getFlagFromStorageOptions(
         metadata->options.storageEngine,
         backwards_compatible_collection_options::kTimeseriesBucketsMayHaveMixedSchemaData);
     ASSERT_TRUE(optBackwardsCompatibleFlag);

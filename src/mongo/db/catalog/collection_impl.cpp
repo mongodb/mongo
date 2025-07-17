@@ -61,7 +61,6 @@
 #include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/local_oplog_info.h"
-#include "mongo/db/catalog/storage_engine_collection_options_flags_parser.h"
 #include "mongo/db/catalog/uncommitted_multikey.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -324,7 +323,7 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
       _shared(
           std::make_shared<SharedState>(opCtx, this, std::move(recordStore), metadata->options)),
       _indexCatalog(std::make_unique<IndexCatalogImpl>()) {
-    _setMetadata(std::move(metadata));
+    _setMetadata(opCtx, std::move(metadata));
 }
 
 CollectionImpl::~CollectionImpl() = default;
@@ -487,13 +486,16 @@ void CollectionImpl::_initCommon(OperationContext* opCtx) {
 }
 
 void CollectionImpl::_setMetadata(
-    std::shared_ptr<durable_catalog::CatalogEntryMetaData>&& metadata) {
+    OperationContext* opCtx, std::shared_ptr<durable_catalog::CatalogEntryMetaData>&& metadata) {
     if (metadata->options.timeseries) {
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+
         // If present, reuse the storageEngine options to work around the issue described in
         // SERVER-91194.
-        metadata->_durableTimeseriesBucketsMayHaveMixedSchemaData = getFlagFromStorageEngineBson(
-            metadata->options.storageEngine,
-            backwards_compatible_collection_options::kTimeseriesBucketsMayHaveMixedSchemaData);
+        metadata->_durableTimeseriesBucketsMayHaveMixedSchemaData =
+            storageEngine->getFlagFromStorageOptions(
+                metadata->options.storageEngine,
+                backwards_compatible_collection_options::kTimeseriesBucketsMayHaveMixedSchemaData);
         if (metadata->_durableTimeseriesBucketsMayHaveMixedSchemaData.has_value()) {
             metadata->timeseriesBucketsMayHaveMixedSchemaData =
                 *metadata->_durableTimeseriesBucketsMayHaveMixedSchemaData;
@@ -501,9 +503,10 @@ void CollectionImpl::_setMetadata(
 
         // If present, reuse storageEngine options to work around the issue described in
         // SERVER-91193
-        metadata->_durableTimeseriesBucketingParametersHaveChanged = getFlagFromStorageEngineBson(
-            metadata->options.storageEngine,
-            backwards_compatible_collection_options::kTimeseriesBucketingParametersHaveChanged);
+        metadata->_durableTimeseriesBucketingParametersHaveChanged =
+            storageEngine->getFlagFromStorageOptions(
+                metadata->options.storageEngine,
+                backwards_compatible_collection_options::kTimeseriesBucketingParametersHaveChanged);
     }
     _metadata = std::move(metadata);
 }
@@ -859,9 +862,11 @@ void CollectionImpl::setTimeseriesBucketingParametersChanged(OperationContext* o
 
     // TODO SERVER-92265 properly set this catalog option
     _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+
         // Reuse storageEngine options to work around the issue described in SERVER-91193
         md._durableTimeseriesBucketingParametersHaveChanged = value;
-        md.options.storageEngine = setFlagToStorageEngineBson(
+        md.options.storageEngine = storageEngine->setFlagToStorageOptions(
             md.options.storageEngine,
             backwards_compatible_collection_options::kTimeseriesBucketingParametersHaveChanged,
             value);
@@ -887,12 +892,14 @@ void CollectionImpl::setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext
 
     // TODO SERVER-92265 properly set this catalog option
     _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+
         // Reuse storageEngine options to work around the issue described in SERVER-91194
         if (setting.has_value()) {
             md._durableTimeseriesBucketsMayHaveMixedSchemaData =
                 MONGO_unlikely(simulateLegacyTimeseriesMixedSchemaFlag.shouldFail()) ? boost::none
                                                                                      : setting;
-            md.options.storageEngine = setFlagToStorageEngineBson(
+            md.options.storageEngine = storageEngine->setFlagToStorageOptions(
                 md.options.storageEngine,
                 backwards_compatible_collection_options::kTimeseriesBucketsMayHaveMixedSchemaData,
                 md._durableTimeseriesBucketsMayHaveMixedSchemaData);
@@ -1958,7 +1965,7 @@ bool CollectionImpl::isIndexReady(StringData indexName) const {
 void CollectionImpl::replaceMetadata(OperationContext* opCtx,
                                      std::shared_ptr<durable_catalog::CatalogEntryMetaData> md) {
     durable_catalog::putMetaData(opCtx, getCatalogId(), *md, MDBCatalog::get(opCtx));
-    _setMetadata(std::move(md));
+    _setMetadata(opCtx, std::move(md));
 }
 
 bool CollectionImpl::isMetadataEqual(const BSONObj& otherMetadata) const {
