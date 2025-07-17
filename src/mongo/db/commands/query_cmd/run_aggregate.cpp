@@ -892,22 +892,25 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     // Pipeline::parse() will first check if a view exists directly on the stage specification and
     // if none is found, will then check for the view using the expCtx. As such, it's necessary to
     // add the resolved namespace to the expCtx prior to any call to Pipeline::parse().
+    const bool isRankFusionPipeline = aggExState.isRankFusionPipeline();
+    if (isRankFusionPipeline) {
+        uassert(10557301,
+                "$rankFusion is unsupported on timeseries collections",
+                !aggCatalogState.isTimeseries());
+    }
     if (aggExState.isView()) {
         search_helpers::checkAndSetViewOnExpCtx(expCtx,
                                                 aggExState.getOriginalRequest().getPipeline(),
                                                 aggExState.getResolvedView(),
                                                 aggExState.getOriginalNss());
 
-        if (aggExState.isRankFusionPipeline()) {
+        if (isRankFusionPipeline) {
             uassert(ErrorCodes::OptionNotSupportedOnView,
                     "$rankFusion is currently unsupported on views",
                     feature_flags::gFeatureFlagSearchHybridScoringFull
                         .isEnabledUseLatestFCVWhenUninitialized(
                             VersionContext::getDecoration(expCtx->getOperationContext()),
                             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-            uassert(ErrorCodes::OptionNotSupportedOnView,
-                    "$rankFusion is unsupported on timeseries collections",
-                    !aggExState.isTimeseries());
 
             // This insertion into the ExpressionContext ResolvedNamespaceMap is to handle cases
             // where the original query desugars into a $unionWith that runs on a view (like
@@ -940,7 +943,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     expCtx->startExpressionCounters();
     auto pipeline = Pipeline::parse(requestForQueryStats.getPipeline(), expCtx);
     expCtx->stopExpressionCounters();
-
 
     // Perform the query settings lookup and attach it to 'expCtx'.
     query_shape::DeferredQueryShape deferredShape{[&]() {

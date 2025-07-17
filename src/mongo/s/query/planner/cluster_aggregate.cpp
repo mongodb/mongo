@@ -436,6 +436,15 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
                               hasChangeStream,
                               verbosity);
 
+    // If the routing table exists, then the collection is tracked in the router role and we can
+    // validate if it is timeseries. If the collection is untracked, this validation will happen in
+    // the shard role.
+    if (request.getIsRankFusion() && cri && cri->hasRoutingTable()) {
+        uassert(10557300,
+                "$rankFusion is unsupported on timeseries collections",
+                !(cri->getChunkManager().isTimeseriesCollection()));
+    }
+
     if (resolvedView) {
         const auto& viewName = nsStruct.requestedNss;
         // If applicable, ensure that the resolved namespace is added to the resolvedNamespaces map
@@ -1084,7 +1093,7 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
 
     uassert(ErrorCodes::OptionNotSupportedOnView,
             "$rankFusion is unsupported on timeseries collections",
-            !(nsStruct.executionNss.isTimeseriesBucketsCollection() && request.getIsRankFusion()));
+            !(resolvedView.timeseries() && request.getIsRankFusion()));
 
     sharding::router::CollectionRouter router(opCtx->getServiceContext(), nsStruct.executionNss);
     try {

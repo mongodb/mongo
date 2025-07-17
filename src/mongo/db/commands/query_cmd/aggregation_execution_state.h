@@ -262,14 +262,6 @@ public:
     }
 
     /**
-     * Returns whether the query is on a timeseries or not. This can only occur
-     * for ResolvedViewAggExState (as timeseries are views), so it's always false in the base class.
-     */
-    virtual bool isTimeseries() const {
-        return false;
-    }
-
-    /**
      * Returns the total aggregation pipeline for a view. If called on the base class, returns the
      * normal pipeline (no op).
      */
@@ -396,13 +388,6 @@ public:
         return _resolvedView;
     }
 
-    /**
-     * Returns whether the query is on a timeseries or not.
-     */
-    bool isTimeseries() const override {
-        return _resolvedView.timeseries();
-    }
-
     std::unique_ptr<Pipeline, PipelineDeleter> handleViewHelper(
         boost::intrusive_ptr<ExpressionContext> expCtx,
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
@@ -527,6 +512,8 @@ public:
      * Get the UUID, if any, for the main collection of the pipeline.
      */
     virtual boost::optional<UUID> getUUID() const = 0;
+
+    virtual bool isTimeseries() const = 0;
 
     /**
      * Free any catalog resources acquired by the constructor.

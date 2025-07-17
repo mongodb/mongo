@@ -117,6 +117,23 @@ public:
         return _uuid;
     }
 
+    /**
+     * Returns true if the collection is a viewful or viewless timeseries collection.
+     */
+    bool isTimeseries() const override {
+        if (!lockAcquired()) {
+            return false;
+        }
+        if (_mainAcq->isView() && _mainAcq->getView().getViewDefinition().timeseries()) {
+            return true;
+        }
+        if (_mainAcq->collectionExists() &&
+            _mainAcq->getCollectionPtr()->isTimeseriesCollection()) {
+            return true;
+        }
+        return false;
+    }
+
     void relinquishResources() override {
         _mainAcq.reset();
         _collections.clear();
@@ -336,6 +353,10 @@ public:
 
     boost::optional<UUID> getUUID() const override {
         return boost::none;
+    }
+
+    bool isTimeseries() const final {
+        return false;
     }
 
     void relinquishResources() override {}
@@ -818,10 +839,11 @@ void AggCatalogState::validate() const {
  * classified as a view).
  */
 query_shape::CollectionType AggCatalogState::determineCollectionType() const {
+    if (isTimeseries()) {
+        return query_shape::CollectionType::kTimeseries;
+    }
+
     if (_aggExState.isView()) {
-        if (_aggExState.isTimeseries()) {
-            return query_shape::CollectionType::kTimeseries;
-        }
         return query_shape::CollectionType::kView;
     }
 

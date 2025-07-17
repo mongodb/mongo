@@ -1,6 +1,7 @@
 /**
- * Tests that $rankFusion can't be used on a view namespace if the namespace is timeseries, or if
- * the $rankFusion query has mongot input pipelines.
+ * Tests that $rankFusion can't be used on a view namespace or if the $rankFusion query has mongot
+ * input pipelines. A corresponding test for timeseries collections is in
+ * jstests/core/timeseries/query/timeseries_rank_fusion_disallowed.js.
  *
  * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_81]
  */
@@ -35,17 +36,6 @@ const matchViewPipeline = {
     $match: {a: "foo"}
 };
 
-const rankFusionPipeline = [{
-    $rankFusion: {
-        input: {
-            pipelines: {
-                a: [{$sort: {x: -1}}],
-                b: [{$sort: {x: 1}}],
-            }
-        }
-    }
-}];
-
 // Create a view with $match.
 assert.commandWorked(db.createView(matchViewName, coll.getName(), [matchViewPipeline]));
 
@@ -65,30 +55,5 @@ assert.throwsWithCode(
         matchExprView, {name: vectorSearchIndexName, definition: {"mappings": {"dynamic": true}}}),
     ErrorCodes.BadValue);
 
-// Now test on a timeseries collection (which is modeled as a view under-the-hood).
-const timeFieldName = "time";
-const metaFieldName = "tags";
-const timeseriesCollName = "rank_fusion_timeseries";
-
-assert.commandWorked(db.createCollection(
-    timeseriesCollName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-const tsColl = db.getCollection(timeseriesCollName);
-
-const nDocs = 50;
-const bulk = tsColl.initializeUnorderedBulkOp();
-for (let i = 0; i < nDocs; i++) {
-    const docToInsert = {
-        time: ISODate(),
-        tags: {loc: [40, 40], descr: i.toString()},
-        value: i + nDocs,
-    };
-    bulk.insert(docToInsert);
-}
-assert.commandWorked(bulk.execute());
-
-// Running $rankFusion on timeseries collection is disallowed.
-assert.commandFailedWithCode(
-    tsColl.runCommand("aggregate", {pipeline: rankFusionPipeline, cursor: {}}),
-    ErrorCodes.OptionNotSupportedOnView);
 dropSearchIndex(coll, {name: searchIndexName});
 dropSearchIndex(coll, {name: vectorSearchIndexName});

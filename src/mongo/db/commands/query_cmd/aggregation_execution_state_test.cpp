@@ -33,6 +33,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/collection_type.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
@@ -354,6 +355,9 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogState) {
     ASSERT_TRUE(aggCatalogState->getCollections().hasMainCollection());
 
     ASSERT_TRUE(aggCatalogState->getUUID().has_value());
+    ASSERT_FALSE(aggCatalogState->isTimeseries());
+
+    ASSERT_EQ(aggCatalogState->determineCollectionType(), query_shape::CollectionType::kCollection);
 
     ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
 }
@@ -388,6 +392,8 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryC
     ASSERT_FALSE(aggCatalogState->getCollections().isAnySecondaryNamespaceAViewOrNotFullyLocal());
 
     ASSERT_TRUE(aggCatalogState->getUUID().has_value());
+
+    ASSERT_FALSE(aggCatalogState->isTimeseries());
 
     ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
 }
@@ -427,6 +433,8 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryS
 
     ASSERT_TRUE(aggCatalogState->getUUID().has_value());
 
+    ASSERT_EQ(aggCatalogState->determineCollectionType(), query_shape::CollectionType::kCollection);
+
     ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
 }
 
@@ -463,6 +471,8 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryV
     ASSERT_TRUE(aggCatalogState->getCollections().isAnySecondaryNamespaceAViewOrNotFullyLocal());
 
     ASSERT_TRUE(aggCatalogState->getUUID().has_value());
+
+    ASSERT_EQ(aggCatalogState->determineCollectionType(), query_shape::CollectionType::kCollection);
 
     ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
 }
@@ -502,6 +512,41 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateView) {
     ASSERT_FALSE(aggCatalogState->getCollections().hasMainCollection());
 
     ASSERT_FALSE(aggCatalogState->getUUID().has_value());
+
+    ASSERT_EQ(aggCatalogState->determineCollectionType(), query_shape::CollectionType::kView);
+
+    ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
+}
+
+TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateViewlessTimeseries) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+
+    StringData timeseriesColl{"timeseries"};
+    createTimeseriesCollection(
+        timeseriesColl, false /*sharded*/, false /*requiresExtendedRangeSupport*/);
+    std::unique_ptr<AggExState> aggExState = createDefaultAggExState(timeseriesColl);
+    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
+
+    ASSERT_DOES_NOT_THROW(aggCatalogState->validate());
+
+    ASSERT_FALSE(aggCatalogState->getMainCollectionOrView().isView());
+    ASSERT_TRUE(aggCatalogState->lockAcquired());
+
+    boost::optional<AutoStatsTracker> tracker;
+    aggCatalogState->getStatsTrackerIfNeeded(tracker);
+    ASSERT_FALSE(tracker.has_value());
+
+    auto [collator, matchesDefault] = aggCatalogState->resolveCollator();
+    ASSERT_TRUE(CollatorInterface::isSimpleCollator(collator.get()));
+    ASSERT_EQ(matchesDefault, ExpressionContextCollationMatchesDefault::kYes);
+
+    ASSERT_TRUE(aggCatalogState->getCollections().hasMainCollection());
+
+    ASSERT_TRUE(aggCatalogState->getUUID().has_value());
+
+    ASSERT_TRUE(aggCatalogState->isTimeseries());
+    ASSERT_EQ(aggCatalogState->determineCollectionType(), query_shape::CollectionType::kTimeseries);
 
     ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
 }
@@ -574,6 +619,9 @@ TEST_F(AggregationExecutionStateTest, CreateOplogAggCatalogState) {
     // UUIDs are not used for change stream queries.
     ASSERT_FALSE(aggCatalogState->getUUID().has_value());
 
+    ASSERT_EQ(aggCatalogState->determineCollectionType(),
+              query_shape::CollectionType::kChangeStream);
+
     ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
 }
 
@@ -590,6 +638,21 @@ TEST_F(AggregationExecutionStateTest, CreateOplogAggCatalogStateFailsOnView) {
     ASSERT_THROWS_CODE(
         aggExState->createAggCatalogState(), DBException, ErrorCodes::CommandNotSupportedOnView);
 }
+
+TEST_F(AggregationExecutionStateTest, CreateOplogAggCatalogStateFailsOnTimeseriesCollection) {
+    StringData timeseriesColl{"timeseries"};
+
+    createTimeseriesCollection(
+        timeseriesColl, false /*sharded*/, false /*requiresExtendedRangeSupport*/);
+
+    std::unique_ptr<AggExState> aggExState = createOplogAggExState(timeseriesColl);
+
+    // This will call the validate() method which will fail because you cannot open a change
+    // stream on a timeseries collection.
+    ASSERT_THROWS_CODE(
+        aggExState->createAggCatalogState(), DBException, ErrorCodes::CommandNotSupportedOnView);
+}
+
 
 }  // namespace
 }  // namespace mongo
