@@ -453,7 +453,7 @@ public:
 
     private:
         // Encrypted payloads should be 48, 49, or 51 bytes in length.
-        // IV(16) + PrfBlock(32) + optional-range-flag(1)
+        // IV(16) + PrfBlock(32) + optional-range-flag(1) + optional-msize(3)
         static constexpr std::size_t kCTRIVSize = 16;
         static constexpr std::size_t kCipherLengthESCOnly = kCTRIVSize + sizeof(PrfBlock);
         static constexpr std::size_t kCipherLengthESCAndLeafFlag = kCipherLengthESCOnly + 1;
