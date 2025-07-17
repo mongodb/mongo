@@ -166,6 +166,15 @@ public:
         return !scoreDetailsElem.eoo() && scoreDetailsElem.Bool();
     }
 
+    auto hasReturnScope() const {
+        auto returnScopeElem = _spec.getMongotQuery()[mongot_cursor::kReturnScopeArg];
+        return !returnScopeElem.eoo() && returnScopeElem.isABSONObj();
+    }
+
+    auto hasSearchRootDocumentId() const {
+        return isStoredSource() && hasReturnScope();
+    }
+
     void setDocsNeededBounds(DocsNeededBounds bounds) {
         // The bounds may have already been set when mongos walked the entire user pipeline. In that
         // case, we shouldn't override the existing bounds.

@@ -103,6 +103,7 @@ const StringDataSet Document::allMetadataFieldNames{Document::metaFieldTextScore
                                                     Document::metaFieldSearchSortValues,
                                                     Document::metaFieldIndexKey,
                                                     Document::metaFieldSearchScoreDetails,
+                                                    Document::metaFieldSearchRootDocumentId,
                                                     Document::metaFieldVectorSearchScore,
                                                     Document::metaFieldSearchSequenceToken,
                                                     Document::metaFieldScore,
@@ -511,6 +512,8 @@ void DocumentStorage::loadLazyMetadata() const {
                 _metadataFields.setIndexKey(elem.Obj());
             } else if (fieldName == Document::metaFieldSearchScoreDetails) {
                 _metadataFields.setSearchScoreDetails(elem.Obj());
+            } else if (fieldName == Document::metaFieldSearchRootDocumentId) {
+                _metadataFields.setSearchRootDocumentId(elem.OID());
             } else if (fieldName == Document::metaFieldSearchSortValues) {
                 _metadataFields.setSearchSortValues(elem.Obj());
             } else if (fieldName == Document::metaFieldVectorSearchScore) {
@@ -594,6 +597,7 @@ constexpr StringData Document::metaFieldGeoNearPoint;
 constexpr StringData Document::metaFieldSearchScore;
 constexpr StringData Document::metaFieldSearchHighlights;
 constexpr StringData Document::metaFieldSearchScoreDetails;
+constexpr StringData Document::metaFieldSearchRootDocumentId;
 constexpr StringData Document::metaFieldSearchSortValues;
 constexpr StringData Document::metaFieldVectorSearchScore;
 constexpr StringData Document::metaFieldScore;
@@ -626,6 +630,8 @@ void Document::toBsonWithMetaData(BSONObjBuilder* builder) const {
         builder->append(metaFieldIndexKey, metadata().getIndexKey());
     if (metadata().hasSearchScoreDetails())
         builder->append(metaFieldSearchScoreDetails, metadata().getSearchScoreDetails());
+    if (metadata().hasSearchRootDocumentId())
+        builder->append(metaFieldSearchRootDocumentId, metadata().getSearchRootDocumentId());
     if (metadata().hasSearchSortValues()) {
         builder->append(metaFieldSearchSortValues, metadata().getSearchSortValues());
     }

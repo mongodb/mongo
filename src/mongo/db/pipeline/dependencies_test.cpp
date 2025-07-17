@@ -126,6 +126,7 @@ TEST(DependenciesNeedsMetadataTest, OnlyChosenMetadataFieldsShouldThrowIfUnavail
         DocumentMetadataFields::MetaType::kSearchScore,
         DocumentMetadataFields::MetaType::kVectorSearchScore,
         DocumentMetadataFields::MetaType::kScoreDetails,
+        DocumentMetadataFields::MetaType::kSearchRootDocumentId,
     };
 
     DepsTracker deps(DepsTracker::kNoMetadata);

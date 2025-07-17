@@ -53,8 +53,10 @@ static constexpr StringData kDocsRequestedField = "docsRequested"_sd;
 static constexpr StringData kBatchSizeField = "batchSize"_sd;
 static constexpr StringData kRequiresSearchSequenceToken = "requiresSearchSequenceToken"_sd;
 static constexpr StringData kReturnStoredSourceArg = "returnStoredSource"_sd;
+static constexpr StringData kReturnScopeArg = "returnScope"_sd;
 static constexpr StringData kSlowQueryLogFieldName = "slowQueryLog"_sd;
 static constexpr StringData kScoreDetailsFieldName = "scoreDetails"_sd;
+static constexpr StringData kSearchRootDocumentIdFieldName = "searchRootDocumentId"_sd;
 static constexpr StringData kOptimizationFlagsField = "optimizationFlags"_sd;
 static constexpr StringData kOmitSearchDocumentResultsField = "omitSearchDocumentResults"_sd;
 

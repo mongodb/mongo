@@ -113,6 +113,7 @@ void DepsTracker::setNeedsMetadata(DocumentMetadataFields::MetaType type) {
         DocumentMetadataFields::MetaType::kScoreDetails,
         DocumentMetadataFields::MetaType::kSearchScore,
         DocumentMetadataFields::MetaType::kVectorSearchScore,
+        DocumentMetadataFields::MetaType::kSearchRootDocumentId,
     };
 
     // Perform validation if necessary.

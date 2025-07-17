@@ -276,6 +276,11 @@ DepsTracker::State DocumentSourceSearch::getDependencies(DepsTracker* deps) cons
     if (hasScoreDetails()) {
         deps->setMetadataAvailable(DocumentMetadataFields::kSearchScoreDetails);
     }
+
+    if (hasSearchRootDocumentId()) {
+        deps->setMetadataAvailable(DocumentMetadataFields::kSearchRootDocumentId);
+    }
+
     return DepsTracker::State::NOT_SUPPORTED;
 }
 

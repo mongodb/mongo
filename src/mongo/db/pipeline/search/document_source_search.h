@@ -102,6 +102,15 @@ public:
         return !scoreDetailsElem.eoo() && scoreDetailsElem.Bool();
     }
 
+    auto hasReturnScope() const {
+        auto returnScopeElem = _spec.getMongotQuery()[mongot_cursor::kReturnScopeArg];
+        return !returnScopeElem.eoo() && returnScopeElem.isABSONObj();
+    }
+
+    auto hasSearchRootDocumentId() const {
+        return isStoredSource() && hasReturnScope();
+    }
+
     std::list<boost::intrusive_ptr<DocumentSource>> desugar();
 
     BSONObj getSearchQuery() const {

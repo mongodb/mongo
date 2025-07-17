@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -83,6 +84,7 @@ public:
         kScoreDetails,
         kStream,
         kChangeStreamControlEvent,
+        kSearchRootDocumentId,
 
         // New fields must be added before the kNumFields sentinel.
         kNumFields
@@ -326,6 +328,21 @@ public:
         setScoreDetails(Value(details));
     }
 
+    bool hasSearchRootDocumentId() const {
+        return _holder && _holder->metaFields.test(MetaType::kSearchRootDocumentId);
+    }
+
+    OID getSearchRootDocumentId() const {
+        invariant(hasSearchRootDocumentId());
+        return _holder->searchRootDocumentId;
+    }
+
+    void setSearchRootDocumentId(OID rootDocId) {
+        _setCommon(MetaType::kSearchRootDocumentId);
+        _holder->searchRootDocumentId = std::move(rootDocId);
+    }
+
+
     bool hasTimeseriesBucketMinTime() const {
         return _holder && _holder->metaFields.test(MetaType::kTimeseriesBucketMinTime);
     }
@@ -502,6 +519,7 @@ private:
         BSONObj indexKey;
         RecordId recordId;
         BSONObj searchScoreDetails;
+        OID searchRootDocumentId;
         Date_t timeseriesBucketMinTime;
         Date_t timeseriesBucketMaxTime;
         BSONObj searchSortValues;

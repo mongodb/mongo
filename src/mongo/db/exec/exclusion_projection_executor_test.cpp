@@ -374,7 +374,8 @@ TEST(ExclusionProjectionExecutionTest, ShouldEvaluateMetaExpressions) {
                                                             "k: {$meta: 'sortKey'}, "
                                                             "l: {$meta: 'searchScoreDetails'}, "
                                                             "m: {$meta: 'vectorSearchScore'}, "
-                                                            "n: {$meta: 'score'}}"));
+                                                            "n: {$meta: 'score'}, "
+                                                            "o: {$meta: 'searchRootDocumentId'}}"));
 
     MutableDocument inputDocBuilder(Document{{"a", 1}, {"b", 2}});
     inputDocBuilder.metadata().setTextScore(0.0);
@@ -415,6 +416,7 @@ TEST(ExclusionProjectionExecutionTest, MetaDependenciesFalseWhenNotIncluded) {
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kIndexKey]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSortKey]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScore]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchRootDocumentId]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchHighlights]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScoreDetails]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kVectorSearchScore]);
@@ -440,6 +442,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldAddSingleMetaExpressionDependency) 
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kIndexKey]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSortKey]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScore]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchRootDocumentId]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchHighlights]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScoreDetails]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kVectorSearchScore]);
@@ -461,7 +464,8 @@ TEST(ExclusionProjectionExecutionTest, ShouldAddMetaExpressionsToDependencies) {
                                                             "k: {$meta: 'sortKey'}, "
                                                             "l: {$meta: 'searchScoreDetails'}, "
                                                             "m: {$meta: 'vectorSearchScore'}, "
-                                                            "n: {$meta: 'score'}}"));
+                                                            "n: {$meta: 'score'}, "
+                                                            "o: {$meta: 'searchRootDocumentId'}}"));
 
     DepsTracker deps;
     exclusion->addDependencies(&deps);
@@ -476,6 +480,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldAddMetaExpressionsToDependencies) {
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kIndexKey]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSortKey]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSearchScore]);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSearchRootDocumentId]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSearchHighlights]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSearchScoreDetails]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kVectorSearchScore]);

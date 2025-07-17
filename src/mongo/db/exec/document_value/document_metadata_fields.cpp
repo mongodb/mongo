@@ -57,6 +57,7 @@ static const std::string recordIdName = "recordId";
 static const std::string indexKeyName = "indexKey";
 static const std::string sortKeyName = "sortKey";
 static const std::string searchScoreDetailsName = "searchScoreDetails";
+static const std::string searchRootDocumentIdName = "searchRootDocumentId";
 static const std::string searchSequenceTokenName = "searchSequenceToken";
 static const std::string timeseriesBucketMinTimeName = "timeseriesBucketMinTime";
 static const std::string timeseriesBucketMaxTimeName = "timeseriesBucketMaxTime";
@@ -87,6 +88,7 @@ static const StringMap<MetaType> kMetaNameToMetaType = {
     {timeseriesBucketMinTimeName, MetaType::kTimeseriesBucketMinTime},
     {timeseriesBucketMaxTimeName, MetaType::kTimeseriesBucketMaxTime},
     {scoreDetailsName, MetaType::kScoreDetails},
+    {searchRootDocumentIdName, MetaType::kSearchRootDocumentId},
     {streamName, MetaType::kStream},
     {changeStreamControlEventName, MetaType::kChangeStreamControlEvent},
 };
@@ -108,6 +110,7 @@ static const std::unordered_map<MetaType, StringData> kMetaTypeToMetaName = {
     {MetaType::kTimeseriesBucketMinTime, timeseriesBucketMinTimeName},
     {MetaType::kTimeseriesBucketMaxTime, timeseriesBucketMaxTimeName},
     {MetaType::kScoreDetails, scoreDetailsName},
+    {MetaType::kSearchRootDocumentId, searchRootDocumentIdName},
     {MetaType::kStream, streamName},
     {MetaType::kChangeStreamControlEvent, changeStreamControlEventName},
 };
@@ -196,6 +199,10 @@ void DocumentMetadataFields::setMetaFieldFromValue(MetaType type, Value val) {
         case DocumentMetadataFields::kSearchScoreDetails:
             assertType(BSONType::object);
             setSearchScoreDetails(val.getDocument().toBson());
+            break;
+        case DocumentMetadataFields::kSearchRootDocumentId:
+            assertType(BSONType::oid);
+            setSearchRootDocumentId(val.getOid());
             break;
         case DocumentMetadataFields::kTimeseriesBucketMinTime:
             assertType(BSONType::date);
@@ -305,6 +312,9 @@ void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {
     if (!hasSearchScoreDetails() && other.hasSearchScoreDetails()) {
         setSearchScoreDetails(other.getSearchScoreDetails());
     }
+    if (!hasSearchRootDocumentId() && other.hasSearchRootDocumentId()) {
+        setSearchRootDocumentId(other.getSearchRootDocumentId());
+    }
     if (!hasSearchSequenceToken() && other.hasSearchSequenceToken()) {
         setSearchSequenceToken(other.getSearchSequenceToken());
     }
@@ -361,6 +371,9 @@ void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
     }
     if (other.hasSearchScoreDetails()) {
         setSearchScoreDetails(other.getSearchScoreDetails());
+    }
+    if (other.hasSearchRootDocumentId()) {
+        setSearchRootDocumentId(other.getSearchRootDocumentId());
     }
     if (other.hasSearchSequenceToken()) {
         setSearchSequenceToken(other.getSearchSequenceToken());
@@ -463,6 +476,10 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
         buf.appendNum(static_cast<char>(MetaType::kSearchScoreDetails + 1));
         getSearchScoreDetails().appendSelfToBufBuilder(buf);
     }
+    if (hasSearchRootDocumentId()) {
+        buf.appendNum(static_cast<char>(MetaType::kSearchRootDocumentId + 1));
+        buf.appendStruct(getSearchRootDocumentId());
+    }
     if (hasSearchSequenceToken()) {
         buf.appendNum(static_cast<char>(MetaType::kSearchSequenceToken + 1));
         getSearchSequenceToken().serializeForSorter(buf);
@@ -532,6 +549,8 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
         } else if (marker == static_cast<char>(MetaType::kSearchScoreDetails) + 1) {
             out->setSearchScoreDetails(
                 BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
+        } else if (marker == static_cast<char>(MetaType::kSearchRootDocumentId) + 1) {
+            out->setSearchRootDocumentId(OID::from(buf.skip(OID::kOIDSize)));
         } else if (marker == static_cast<char>(MetaType::kTimeseriesBucketMinTime) + 1) {
             out->setTimeseriesBucketMinTime(
                 Date_t::fromMillisSinceEpoch(buf.read<LittleEndian<long long>>()));
@@ -612,6 +631,8 @@ const char* DocumentMetadataFields::typeNameToDebugString(DocumentMetadataFields
             return "text score";
         case DocumentMetadataFields::kSearchScoreDetails:
             return "$search score details";
+        case DocumentMetadataFields::kSearchRootDocumentId:
+            return "$search root document id";
         case DocumentMetadataFields::kTimeseriesBucketMinTime:
             return "timeseries bucket min time";
         case DocumentMetadataFields::kTimeseriesBucketMaxTime:
