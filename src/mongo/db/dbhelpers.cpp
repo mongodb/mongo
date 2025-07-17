@@ -217,33 +217,17 @@ RecordId Helpers::findById(OperationContext* opCtx,
         idquery["_id"].wrap());
 }
 
-// Acquires necessary locks to read the collection with the given namespace. If this is an oplog
-// read, use AutoGetOplogFastPath for simplified locking.
-const CollectionPtr& getCollectionForRead(
-    OperationContext* opCtx,
-    const NamespaceString& ns,
-    boost::optional<AutoGetCollectionForReadCommand>& autoColl,
-    boost::optional<AutoGetOplogFastPath>& autoOplog) {
-    if (ns.isOplog()) {
-        // Simplify locking rules for oplog collection.
-        autoOplog.emplace(opCtx, OplogAccessMode::kRead);
-        return autoOplog->getCollection();
-    } else {
-        autoColl.emplace(opCtx, NamespaceString(ns));
-        return autoColl->getCollection();
-    }
-}
-
 bool Helpers::getSingleton(OperationContext* opCtx, const NamespaceString& nss, BSONObj& result) {
-    boost::optional<AutoGetCollectionForReadCommand> autoColl;
-    boost::optional<AutoGetOplogFastPath> autoOplog;
-    const auto& collection = getCollectionForRead(opCtx, nss, autoColl, autoOplog);
-    if (!collection) {
+    const auto collection = acquireCollectionMaybeLockFree(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, nss, AcquisitionPrerequisites::OperationType::kRead));
+    if (!collection.exists()) {
         return false;
     }
 
     auto exec = InternalPlanner::collectionScan(
-        opCtx, &collection, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+        opCtx, collection, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
     PlanExecutor::ExecState state = exec->getNext(&result, nullptr);
 
     CurOp::get(opCtx)->done();
@@ -260,17 +244,26 @@ bool Helpers::getSingleton(OperationContext* opCtx, const NamespaceString& nss, 
 }
 
 bool Helpers::getLast(OperationContext* opCtx, const NamespaceString& nss, BSONObj& result) {
-    boost::optional<AutoGetCollectionForReadCommand> autoColl;
-    boost::optional<AutoGetOplogFastPath> autoOplog;
-    const auto& collection = getCollectionForRead(opCtx, nss, autoColl, autoOplog);
-    if (!collection) {
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+    boost::optional<DisableLockerRuntimeOrderingChecks> disableOrderingCheck;
+    if (nss.isOplog()) {
+        // This helper can violate the ordering of locks in case of index build for collections in
+        // the local db. We only do that in our testing, and we do not expect users to
+        // to do the same. In general, this lock ordering violation is safe because is
+        // non-blocking.
+        disableOrderingCheck.emplace(opCtx);
+    }
+#endif  // MONGO_CONFIG_DEBUG_BUILD
+    const auto collection = acquireCollectionMaybeLockFree(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, nss, AcquisitionPrerequisites::OperationType::kRead));
+    if (!collection.exists()) {
         return false;
     }
 
-    auto exec = InternalPlanner::collectionScan(opCtx,
-                                                &collection,
-                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                                InternalPlanner::BACKWARD);
+    auto exec = InternalPlanner::collectionScan(
+        opCtx, collection, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY, InternalPlanner::BACKWARD);
     PlanExecutor::ExecState state = exec->getNext(&result, nullptr);
 
     // Non-yielding collection scans from InternalPlanner will never error.
