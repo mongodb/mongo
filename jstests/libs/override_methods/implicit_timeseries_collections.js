@@ -363,9 +363,7 @@ QuerySettingsUtils.prototype.assertQueryFramework = function({query, settings, e
 const assertQueryShapeConfigurationInit =
     QuerySettingsUtils.prototype.assertQueryShapeConfiguration;
 QuerySettingsUtils.prototype.assertQueryShapeConfiguration = function(
-    expectedQueryShapeConfigurations,
-    shouldRunExplain = true,
-    ignoreRepresentativeQueryFields = []) {
+    expectedQueryShapeConfigurations, shouldRunExplain = true) {
     const transformedQueryShapeConfigurations = expectedQueryShapeConfigurations.map(config => {
         if (!config["representativeQuery"]) {
             return config;
@@ -376,10 +374,8 @@ QuerySettingsUtils.prototype.assertQueryShapeConfiguration = function(
                 applyTimefieldProjectionToRepresentativeQuery(config['representativeQuery'])
         };
     });
-    return assertQueryShapeConfigurationInit.call(this,
-                                                  transformedQueryShapeConfigurations,
-                                                  shouldRunExplain,
-                                                  ignoreRepresentativeQueryFields);
+    return assertQueryShapeConfigurationInit.call(
+        this, transformedQueryShapeConfigurations, shouldRunExplain);
 };
 
 const getQueryShapeHashFromQuerySettingsInit =
@@ -396,13 +392,21 @@ QuerySettingsUtils.prototype.getQueryShapeHashFromExplain = function(representat
 };
 
 const getQuerySettingsInit = QuerySettingsUtils.prototype.getQuerySettings;
-QuerySettingsUtils.prototype.getQuerySettings = function(args) {
-    return getQuerySettingsInit.call(this, args).map(settings => {
-        if (settings.hasOwnProperty("debugQueryShape")) {
-            settings.debugQueryShape = removeTimefieldProjectionFromQuery(settings.debugQueryShape);
+QuerySettingsUtils.prototype.getQuerySettings = function(
+    {showDebugQueryShape = false, showQueryShapeHash = false, filter = undefined} = {}) {
+    const settingsArr =
+        getQuerySettingsInit.call(this, {showDebugQueryShape, showQueryShapeHash, filter});
+    if (!showDebugQueryShape) {
+        return settingsArr;
+    }
+    const newarr = settingsArr.map(settings => {
+        const debugQueryShape = settings.debugQueryShape;
+        if (!debugQueryShape) {
+            return settings;
         }
-        return settings;
+        return {...settings, debugQueryShape: removeTimefieldProjectionFromQuery(debugQueryShape)};
     });
+    return newarr;
 };
 
 /**

@@ -116,7 +116,6 @@ export const OverrideHelpers = (function() {
         isAggregationWithInternalListCollections:
             makeIsAggregationWithFirstStage("$_internalListCollections"),
         isAggregationWithListClusterCatalog: makeIsAggregationWithFirstStage("$listClusterCatalog"),
-        isAggregationWithQuerySettings: makeIsAggregationWithFirstStage("$querySettings"),
         isMapReduceWithInlineOutput: isMapReduceWithInlineOutput,
         prependOverrideInParallelShell: prependOverrideInParallelShell,
         overrideRunCommand: overrideRunCommand,

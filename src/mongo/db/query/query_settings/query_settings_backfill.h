@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/executor/async_rpc_targeter.h"
@@ -65,22 +65,13 @@ public:
     using OnCompletionHook = std::function<void(
         std::vector<query_shape::QueryShapeHash>, LogicalTime, boost::optional<TenantId>)>;
 
-    /**
-     * Creates the appropriate 'BackfillCoordinator' implementation based on the current
-     * deployment configuration.
-     */
-    static std::unique_ptr<BackfillCoordinator> create(OnCompletionHook onCompletionHook);
-
     explicit BackfillCoordinator(OnCompletionHook onCompletionHook);
     virtual ~BackfillCoordinator() = default;
 
     /*
-     * Check if a representative query needs to be backfilled. The system doesn't attempt to
-     * backfill explain originating commands as it would additionally imply altering the original
-     * command object.
+     * Check if a representative query needs to be backfilled.
      */
-    static bool shouldBackfill(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                               bool hasRepresentativeQuery);
+    static bool shouldBackfill(OperationContext* opCtx, bool hasRepresentativeQuery);
 
     /*
      * Marks the representative query and schedules a future backfill overation asynchronously.
@@ -133,7 +124,7 @@ private:
      */
     std::unique_ptr<State> consume();
 
-    virtual std::shared_ptr<executor::TaskExecutor> makeExecutor(OperationContext* opCtx);
+    virtual std::shared_ptr<executor::TaskExecutor> makeExecutor(OperationContext* opCtx) = 0;
     virtual std::unique_ptr<async_rpc::Targeter> makeTargeter(OperationContext* opCtx) = 0;
 
     OnCompletionHook _onCompletionHook;

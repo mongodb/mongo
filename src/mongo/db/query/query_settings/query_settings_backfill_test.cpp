@@ -126,13 +126,6 @@ public:
             std::make_unique<BackfillCoordinatorForTest>(std::move(setPromise), executor());
     }
 
-    boost::intrusive_ptr<ExpressionContext> expressionContext() {
-        return ExpressionContext::makeBlankExpressionContext(
-            operationContext(),
-            NamespaceString::createNamespaceString_forTest(
-                /* tenantId */ boost::none, "test", "test"));
-    }
-
     BackfillCoordinator* coordinator() {
         return _backfiilCoordinator.get();
     }
@@ -183,22 +176,20 @@ private:
 TEST_F(BackfillCoordinatorTest, ShouldmarkForBackfillAndScheduleIfNeeded) {
     // First ensure that BackfillCoordinator::shouldBackfill() always returns false if
     // "featureFlagPQSBackfill" is not enabled.
-    auto expCtx = expressionContext();
-    ASSERT_FALSE(BackfillCoordinator::shouldBackfill(expCtx,
+    ASSERT_FALSE(BackfillCoordinator::shouldBackfill(operationContext(),
                                                      /* hasRepresentativeQuery*/ false));
 
     // Enable "featureFlagPQSBackfill" for the rest of the scope.
     RAIIServerParameterControllerForTest featureFlagScope{"featureFlagPQSBackfill", true};
 
-    // It should backfill queries with missing representative queries.
-    ASSERT_TRUE(BackfillCoordinator::shouldBackfill(expCtx, /* hasRepresentativeQuery*/ false));
+    // It should markForBackfillAndScheduleIfNeeded queries with missing representative queries.
+    ASSERT_TRUE(BackfillCoordinator::shouldBackfill(operationContext(),
+                                                    /* hasRepresentativeQuery*/ false));
 
-    // It should skip backfilling queries which already have representative queries.
-    ASSERT_FALSE(BackfillCoordinator::shouldBackfill(expCtx, /* hasRepresentativeQuery*/ true));
-
-    // It should skip backfilling queries if they originate from an explain command.
-    expCtx->setExplain(ExplainOptions::Verbosity::kQueryPlanner);
-    ASSERT_FALSE(BackfillCoordinator::shouldBackfill(expCtx, /* hasRepresentativeQuery*/ false));
+    // It should skip markForBackfillAndScheduleIfNeededing queries which already have
+    // representative queries.
+    ASSERT_FALSE(BackfillCoordinator::shouldBackfill(operationContext(),
+                                                     /* hasRepresentativeQuery*/ true));
 }
 
 TEST_F(BackfillCoordinatorTest, markForBackfillAndScheduleIfNeededShouldWaitBufferAndExecute) {
