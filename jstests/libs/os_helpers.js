@@ -95,20 +95,33 @@ export function isRHEL8() {
     return isRHELMajorVerison("8");
 }
 
-export function isSUSE15SP1() {
+export function isSUSE15SPVersion(servicePack) {
     if (_isWindows()) {
         return false;
     }
 
-    // SUSE 15 SP1 FIPS module does not work. SP2 does work.
-    // The FIPS code returns FIPS_R_IN_ERROR_STATE in what is likely a race condition
-    // since it only happens in sharded clusters.
-    const grep_result = runProgram('grep', '15-SP1', '/etc/os-release');
+    const grep_result = runProgram('grep', '15-SP' + servicePack, '/etc/os-release');
     if (grep_result == 0) {
         return true;
     }
 
     return false;
+}
+
+export function isSUSE15SP1() {
+    // SUSE 15 SP1 FIPS module does not work. SP2 does work.
+    // The FIPS code returns FIPS_R_IN_ERROR_STATE in what is likely a race condition
+    // since it only happens in sharded clusters.
+    return isSUSE15SPVersion("1");
+}
+
+export function isSUSE15SP5() {
+    // SUSE 15 SP5 FIPS module does not work since the OpenSSL 1.1 HMAC package is not included
+    // on that distro without purchasing a subscription. This prevents the FIPS module from
+    // initializing during server startup. Since this is a subscription-related issue, we can simply
+    // disable the tests on AMIs using SUSE 15 SP5 while leaving FIPs support in SUSE builds of the
+    // server so that customers can still use FIPs after purchasing the subscription.
+    return isSUSE15SPVersion("5");
 }
 
 export function isUbuntu() {
