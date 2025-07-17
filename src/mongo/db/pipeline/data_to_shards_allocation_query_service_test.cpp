@@ -40,9 +40,9 @@
 
 namespace mongo {
 
-class DataToShardsAllocationQueryServiceMockTest : public ServiceContextTest {
+class DataToShardsAllocationQueryServiceTest : public ServiceContextTest {
 public:
-    DataToShardsAllocationQueryServiceMockTest()
+    DataToShardsAllocationQueryServiceTest()
         : ServiceContextTest(
               std::make_unique<ScopedGlobalServiceContextForTest>(false /* shouldSetupTL */)) {
         _opCtx = makeOperationContext();
@@ -58,7 +58,7 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
-TEST_F(DataToShardsAllocationQueryServiceMockTest, MockReturnsCorrectStatuses) {
+TEST_F(DataToShardsAllocationQueryServiceTest, MockReturnsCorrectStatuses) {
     ASSERT_TRUE(mock.empty());
 
     // Fill the buffer with 4 expected responses.
@@ -89,13 +89,13 @@ TEST_F(DataToShardsAllocationQueryServiceMockTest, MockReturnsCorrectStatuses) {
     ASSERT_TRUE(mock.empty());
 }
 
-TEST_F(DataToShardsAllocationQueryServiceMockTest, MockFailsOnEmptyQueue) {
+TEST_F(DataToShardsAllocationQueryServiceTest, MockFailsOnEmptyQueue) {
     ASSERT_THROWS_CODE(mock.getAllocationToShardsStatus(getOpCtx(), Timestamp(42, 0)),
                        AssertionException,
                        10612400);
 }
 
-TEST_F(DataToShardsAllocationQueryServiceMockTest, MockThrowsOnUnexpectedClusterTime) {
+TEST_F(DataToShardsAllocationQueryServiceTest, MockThrowsOnUnexpectedClusterTime) {
     ASSERT_TRUE(mock.empty());
 
     std::vector<DataToShardsAllocationQueryServiceMock::Response> responses;
@@ -123,7 +123,7 @@ TEST_F(DataToShardsAllocationQueryServiceMockTest, MockThrowsOnUnexpectedCluster
               mock.getAllocationToShardsStatus(getOpCtx(), Timestamp(40, 2)));
 }
 
-TEST_F(DataToShardsAllocationQueryServiceMockTest, DecorationsOnServiceContextWork) {
+TEST_F(DataToShardsAllocationQueryServiceTest, DecorationsOnServiceContextWork) {
     std::vector<DataToShardsAllocationQueryServiceMock::Response> responses;
     responses.push_back(std::make_pair(Timestamp(40, 1), AllocationToShardsStatus::kNotAvailable));
     responses.push_back(std::make_pair(Timestamp(40, 2), AllocationToShardsStatus::kOk));

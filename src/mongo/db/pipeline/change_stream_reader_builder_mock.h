@@ -50,11 +50,6 @@ public:
     using GetControlEventTypesFunction = std::function<std::set<std::string>(
         OperationContext* opCtx, const ChangeStream& changeStream)>;
 
-    // Stubs for usage in tests.
-    static const BuildShardTargeterFunction emptyShardTargeter;
-    static const BuildControlEventFunction emptyControlEvents;
-    static const GetControlEventTypesFunction emptyControlEventTypes;
-
     /**
      * Create a 'ChangeStreamReaderBuilder' mock object.
      * By default, all functions are mocked to return nothing (i.e. a nullptr shard targeter, empty
@@ -62,41 +57,63 @@ public:
      * overridden as necessary.
      */
     ChangeStreamReaderBuilderMock(
-        BuildShardTargeterFunction buildShardTargeterFunction = emptyShardTargeter,
-        BuildControlEventFunction controlEventFilterForDataShard = emptyControlEvents,
-        GetControlEventTypesFunction controlEventTypesOnDataShard = emptyControlEventTypes,
-        BuildControlEventFunction controlEventFilterForConfigServer = emptyControlEvents,
-        GetControlEventTypesFunction controlEventTypesOnConfigServer = emptyControlEventTypes);
+        BuildShardTargeterFunction buildShardTargeter =
+            [](OperationContext*, const ChangeStream&) {
+                return std::unique_ptr<ChangeStreamShardTargeter>();
+            },
+        BuildControlEventFunction controlEventFilterForDataShard =
+            [](OperationContext*, const ChangeStream&) { return BSONObj(); },
+        GetControlEventTypesFunction controlEventTypesOnDataShard =
+            [](OperationContext*, const ChangeStream&) { return std::set<std::string>{}; },
+        BuildControlEventFunction controlEventFilterForConfigServer =
+            [](OperationContext*, const ChangeStream&) { return BSONObj(); },
+        GetControlEventTypesFunction controlEventTypesOnConfigServer =
+            [](OperationContext*, const ChangeStream&) { return std::set<std::string>{}; })
+        : _buildShardTargeter(std::move(buildShardTargeter)),
+          _controlEventFilterForDataShard(std::move(controlEventFilterForDataShard)),
+          _controlEventTypesOnDataShard(std::move(controlEventTypesOnDataShard)),
+          _controlEventFilterForConfigServer(std::move(controlEventFilterForConfigServer)),
+          _controlEventTypesOnConfigServer(std::move(controlEventTypesOnConfigServer)) {}
 
     /**
      * Invokes '_buildShardTargeterFunction' with the specified parameters.
      */
     std::unique_ptr<ChangeStreamShardTargeter> buildShardTargeter(
-        OperationContext* opCtx, const ChangeStream& changeStream) override;
+        OperationContext* opCtx, const ChangeStream& changeStream) override {
+        return _buildShardTargeter(opCtx, changeStream);
+    }
 
     /**
      * Invokes '_buildControlEventFilterForDataShard' with the specified parameters.
      */
     BSONObj buildControlEventFilterForDataShard(OperationContext* opCtx,
-                                                const ChangeStream& changeStream) override;
+                                                const ChangeStream& changeStream) override {
+        return _controlEventFilterForDataShard(opCtx, changeStream);
+    }
 
     /**
      * Invokes '_getControlEventTypesOnDataShard' with the specified parameters.
      */
     std::set<std::string> getControlEventTypesOnDataShard(
-        OperationContext* opCtx, const ChangeStream& changeStream) override;
+        OperationContext* opCtx, const ChangeStream& changeStream) override {
+        return _controlEventTypesOnDataShard(opCtx, changeStream);
+    }
 
     /**
      * Invokes '_buildControlEventFilterForConfigServer' with the specified parameters.
      */
     BSONObj buildControlEventFilterForConfigServer(OperationContext* opCtx,
-                                                   const ChangeStream& changeStream) override;
+                                                   const ChangeStream& changeStream) override {
+        return _controlEventFilterForConfigServer(opCtx, changeStream);
+    }
 
     /**
      * Invokes '_getControlEventTypesOnConfigServer' with the specified parameters.
      */
     std::set<std::string> getControlEventTypesOnConfigServer(
-        OperationContext* opCtx, const ChangeStream& changeStream) override;
+        OperationContext* opCtx, const ChangeStream& changeStream) override {
+        return _controlEventTypesOnConfigServer(opCtx, changeStream);
+    }
 
 private:
     BuildShardTargeterFunction _buildShardTargeter;

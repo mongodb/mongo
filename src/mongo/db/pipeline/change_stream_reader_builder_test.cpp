@@ -43,9 +43,9 @@ using BuildShardTargeterFunction = Mock::BuildShardTargeterFunction;
 using BuildControlEventFunction = Mock::BuildControlEventFunction;
 using GetControlEventTypesFunction = Mock::GetControlEventTypesFunction;
 
-class ChangeStreamReaderBuilderMockTest : public ServiceContextTest {
+class ChangeStreamReaderBuilderTest : public ServiceContextTest {
 public:
-    ChangeStreamReaderBuilderMockTest()
+    ChangeStreamReaderBuilderTest()
         : ServiceContextTest(
               std::make_unique<ScopedGlobalServiceContextForTest>(false /* shouldSetupTL */)) {
         _opCtx = makeOperationContext();
@@ -61,7 +61,7 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
-TEST_F(ChangeStreamReaderBuilderMockTest, DefaultMockReturnsEmptyValues) {
+TEST_F(ChangeStreamReaderBuilderTest, DefaultMockReturnsEmptyValues) {
     ChangeStream changeStream(
         ChangeStreamReadMode::kStrict, ChangeStreamType::kAllDatabases, {} /* nss */);
 
@@ -77,8 +77,7 @@ TEST_F(ChangeStreamReaderBuilderMockTest, DefaultMockReturnsEmptyValues) {
               mock->getControlEventTypesOnConfigServer(getOpCtx(), changeStream));
 }
 
-TEST_F(ChangeStreamReaderBuilderMockTest,
-       OperationContextAndChangeStreamAreCorrectlyPassedThrough) {
+TEST_F(ChangeStreamReaderBuilderTest, OperationContextAndChangeStreamAreCorrectlyPassedThrough) {
     ChangeStream changeStream(
         ChangeStreamReadMode::kStrict,
         ChangeStreamType::kCollection,
@@ -94,23 +93,33 @@ TEST_F(ChangeStreamReaderBuilderMockTest,
     mock = std::make_unique<ChangeStreamReaderBuilderMock>(
         [&](OperationContext* opCtx, const ChangeStream& changeStream) {
             validate(opCtx, changeStream);
-            return Mock::emptyShardTargeter(opCtx, changeStream);
+            return [](OperationContext*, const ChangeStream&) {
+                return std::unique_ptr<ChangeStreamShardTargeter>();
+            }(opCtx, changeStream);
         },
         [&](OperationContext* opCtx, const ChangeStream& changeStream) {
             validate(opCtx, changeStream);
-            return Mock::emptyControlEvents(opCtx, changeStream);
+            return [](OperationContext*, const ChangeStream&) {
+                return BSONObj();
+            }(opCtx, changeStream);
         },
         [&](OperationContext* opCtx, const ChangeStream& changeStream) {
             validate(opCtx, changeStream);
-            return Mock::emptyControlEventTypes(opCtx, changeStream);
+            return [](OperationContext*, const ChangeStream&) {
+                return std::set<std::string>{};
+            }(opCtx, changeStream);
         },
         [&](OperationContext* opCtx, const ChangeStream& changeStream) {
             validate(opCtx, changeStream);
-            return Mock::emptyControlEvents(opCtx, changeStream);
+            return [](OperationContext*, const ChangeStream&) {
+                return BSONObj();
+            }(opCtx, changeStream);
         },
         [&](OperationContext* opCtx, const ChangeStream& changeStream) {
             validate(opCtx, changeStream);
-            return Mock::emptyControlEventTypes(opCtx, changeStream);
+            return [](OperationContext*, const ChangeStream&) {
+                return std::set<std::string>{};
+            }(opCtx, changeStream);
         });
 
     ASSERT_EQ(nullptr, mock->buildShardTargeter(getOpCtx(), changeStream));
@@ -124,7 +133,7 @@ TEST_F(ChangeStreamReaderBuilderMockTest,
               mock->getControlEventTypesOnConfigServer(getOpCtx(), changeStream));
 }
 
-TEST_F(ChangeStreamReaderBuilderMockTest, DecorationsOnServiceContextWork) {
+TEST_F(ChangeStreamReaderBuilderTest, DecorationsOnServiceContextWork) {
     ChangeStream changeStream(
         ChangeStreamReadMode::kStrict, ChangeStreamType::kAllDatabases, {} /* nss */);
 
@@ -137,7 +146,9 @@ TEST_F(ChangeStreamReaderBuilderMockTest, DecorationsOnServiceContextWork) {
     std::set<std::string> controlEventTypesOnConfigServer = {"insert"};
 
     auto decoratedMock = std::make_unique<ChangeStreamReaderBuilderMock>(
-        Mock::emptyShardTargeter,
+        [](OperationContext*, const ChangeStream&) {
+            return std::unique_ptr<ChangeStreamShardTargeter>();
+        },
         [&](OperationContext*, const ChangeStream&) { return controlEventFilterForDataShard; },
         [&](OperationContext*, const ChangeStream&) { return controlEventTypesOnDataShard; },
         [&](OperationContext*, const ChangeStream&) { return controlEventFilterForConfigServer; },

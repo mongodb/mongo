@@ -61,10 +61,13 @@ public:
      * Preconditions:
      * - None of the other methods have been invoked before.
      * - The change stream is read in Strict mode.
-     *
-     * Returns value 'ShardTargeterDecision::kSwitchToV1' if precise information about
-     * collection/database allocation to shards is not available for the given change stream open
-     * cluster time.
+     * Postconditions:
+     * - Requests to open cursors through context at a time >= 'atClusterTime' are made (may skip
+     *   scanning of irrelevant oplog segments by using cluster time greater than 'atClusterTime' if
+     *   shard placement history indicates that it is correct to do so).
+     * - Returns value 'ShardTargeterDecision::kSwitchToV1' if precise information about
+     *   collection/database allocation to shards is not available for the given change stream open
+     *   cluster time.
      */
     virtual ShardTargeterDecision initialize(Timestamp atClusterTime,
                                              ChangeStreamReaderContext& context) = 0;
@@ -96,9 +99,14 @@ public:
 
     /**
      * Processes and reacts to a control change event.
-     * Requires
+     * Preconditions:
      * - 'initialize()' to have been invoked if the change stream is read in Strict mode.
      * - 'startChangeStreamSegment()' to have been invoked if in Ignore-Removed-Shards mode.
+     * Postconditions:
+     * - In Normal mode requests to open and/or close cursors are made. The targeter should assume
+     *   that opening/closing of cursors will happen after this method returns.
+     * - In Degraded mode requests to open and/or close cursors cannot be made - the set of tracked
+     *   shards for a bounded change stream segment is fixed.
      */
     virtual ShardTargeterDecision handleEvent(const Document& event,
                                               ChangeStreamReaderContext& context) = 0;

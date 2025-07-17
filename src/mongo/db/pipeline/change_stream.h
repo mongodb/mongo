@@ -31,8 +31,10 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream_read_mode.h"
+#include "mongo/db/pipeline/expression_context.h"
 
 #include <boost/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 
@@ -75,6 +77,12 @@ public:
      * - Nothing, if the change stream is of type 'ChangeStreamType::kAllDatabases'.
      */
     boost::optional<NamespaceString> getNamespace() const;
+
+    /**
+     * Builds a 'ChangeStream' object from the parameters stored in the 'ExpressionContext'.
+     */
+    static ChangeStream buildFromExpressionContext(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 private:
     const ChangeStreamReadMode _mode;
