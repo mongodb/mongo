@@ -257,12 +257,6 @@ feature_flags:
         version: 8.2
         fcv_gated: true
 
-    featureFlagPushdownFilterToIXScanWhenUsingIndexForSort:
-        description: "Enables the query planner to push predicates down to the IXScan stage whenever possible in those queries where an index is leveraged to provide sorting"
-        cpp_varname: gFeatureFlagPushdownFilterToIXScanWhenUsingIndexForSort
-        fcv_gated: false
-        incremental_rollout_phase: rollout
-
     featureFlagExtensionsAPI:
         description: "Feature flag to enable loading extensions via the Extensions API."
         cpp_varname: gFeatureFlagExtensionsAPI
