@@ -157,7 +157,12 @@ void truncateRange(OperationContext* opCtx,
                    int64_t docsDeleted) {
     WriteUnitOfWork wuow(opCtx);
     auto rs = preImagesColl->getRecordStore();
-    auto status = rs->rangeTruncate(opCtx, minRecordId, maxRecordId, -bytesDeleted, -docsDeleted);
+    auto status = rs->rangeTruncate(opCtx,
+                                    *shard_role_details::getRecoveryUnit(opCtx),
+                                    minRecordId,
+                                    maxRecordId,
+                                    -bytesDeleted,
+                                    -docsDeleted);
     invariantStatusOK(status);
     wuow.commit();
 }

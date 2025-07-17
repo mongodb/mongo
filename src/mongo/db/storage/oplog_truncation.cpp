@@ -101,6 +101,7 @@ RecordId reclaimOplog(OperationContext* opCtx, RecordStore& oplog, RecordId mayT
                 }
 
                 auto status = oplog.rangeTruncate(opCtx,
+                                                  *shard_role_details::getRecoveryUnit(opCtx),
                                                   RecordId(),
                                                   truncateMarker->lastRecord,
                                                   -truncateMarker->bytes,

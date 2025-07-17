@@ -569,14 +569,7 @@ public:
      * order to update numRecords and dataSize correctly. Implementations are free to ignore the
      * hints if they have a way of obtaining the correct values without the help of external
      * callers.
-     *
-     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
-    virtual Status rangeTruncate(OperationContext*,
-                                 const RecordId& minRecordId = RecordId(),
-                                 const RecordId& maxRecordId = RecordId(),
-                                 int64_t hintDataSizeIncrement = 0,
-                                 int64_t hintNumRecordsIncrement = 0) = 0;
     virtual Status rangeTruncate(OperationContext*,
                                  RecoveryUnit&,
                                  const RecordId& minRecordId = RecordId(),

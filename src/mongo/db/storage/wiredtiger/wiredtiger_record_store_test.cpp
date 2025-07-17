@@ -463,8 +463,12 @@ void testTruncateRange(int64_t numRecordsToInsert,
 
         auto numRecordsDeleted = deletionPosEnd - deletionPosBegin + 1;
 
-        ASSERT_OK(wtRS->rangeTruncate(
-            opCtx.get(), beginId, endId, -(sizePerRecord * numRecordsDeleted), -numRecordsDeleted));
+        ASSERT_OK(wtRS->rangeTruncate(opCtx.get(),
+                                      *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                      beginId,
+                                      endId,
+                                      -(sizePerRecord * numRecordsDeleted),
+                                      -numRecordsDeleted));
 
         ASSERT_EQ(wtRS->dataSize(), sizePerRecord * (numRecordsToInsert - numRecordsDeleted));
         ASSERT_EQ(wtRS->numRecords(), (numRecordsToInsert - numRecordsDeleted));

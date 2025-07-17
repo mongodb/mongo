@@ -115,11 +115,6 @@ public:
     Status truncate(OperationContext*, RecoveryUnit&) final;
 
     Status rangeTruncate(OperationContext*,
-                         const RecordId& minRecordId = RecordId(),
-                         const RecordId& maxRecordId = RecordId(),
-                         int64_t hintDataSizeIncrement = 0,
-                         int64_t hintNumRecordsIncrement = 0) final;
-    Status rangeTruncate(OperationContext*,
                          RecoveryUnit&,
                          const RecordId& minRecordId = RecordId(),
                          const RecordId& maxRecordId = RecordId(),

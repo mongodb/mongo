@@ -122,7 +122,12 @@ DEATH_TEST(RecordStoreTest,
 
     auto opCtx = harnessHelper->newOperationContext();
 
-    auto result = rs->rangeTruncate(opCtx.get(), RecordId(), RecordId(), 0, 0);
+    auto result = rs->rangeTruncate(opCtx.get(),
+                                    *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                    RecordId(),
+                                    RecordId(),
+                                    0,
+                                    0);
 }
 }  // namespace
 }  // namespace mongo

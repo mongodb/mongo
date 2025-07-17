@@ -481,7 +481,12 @@ void cleanupChangeCollectionAfterUncleanShutdown(OperationContext* opCtx,
             // meaning there isn't a good estimate of the number of bytes and
             // documents to be truncated, so default to 0.
             auto rs = tenantChangeCollection->getRecordStore();
-            auto status = rs->rangeTruncate(opCtx, RecordId(), maxExpiredRecordIdEstimate, 0, 0);
+            auto status = rs->rangeTruncate(opCtx,
+                                            *shard_role_details::getRecoveryUnit(opCtx),
+                                            RecordId(),
+                                            maxExpiredRecordIdEstimate,
+                                            0,
+                                            0);
             invariantStatusOK(status);
             wuow.commit();
         });

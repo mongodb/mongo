@@ -203,14 +203,6 @@ public:
     }
 
     Status rangeTruncate(OperationContext*,
-                         const RecordId& minRecordId = RecordId(),
-                         const RecordId& maxRecordId = RecordId(),
-                         int64_t hintDataSizeIncrement = 0,
-                         int64_t hintNumRecordsIncrement = 0) final {
-        unimplementedTasserted();
-        return {ErrorCodes::Error::UnknownError, "Unknown error"};
-    }
-    Status rangeTruncate(OperationContext*,
                          RecoveryUnit&,
                          const RecordId& minRecordId = RecordId(),
                          const RecordId& maxRecordId = RecordId(),

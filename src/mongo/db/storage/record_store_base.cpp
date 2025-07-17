@@ -166,18 +166,6 @@ Status RecordStoreBase::truncate(OperationContext* opCtx, RecoveryUnit& ru) {
 }
 
 Status RecordStoreBase::rangeTruncate(OperationContext* opCtx,
-                                      const RecordId& minRecordId,
-                                      const RecordId& maxRecordId,
-                                      int64_t hintDataSizeIncrement,
-                                      int64_t hintNumRecordsIncrement) {
-    return rangeTruncate(opCtx,
-                         *shard_role_details::getRecoveryUnit(opCtx),
-                         minRecordId,
-                         maxRecordId,
-                         hintDataSizeIncrement,
-                         hintNumRecordsIncrement);
-}
-Status RecordStoreBase::rangeTruncate(OperationContext* opCtx,
                                       RecoveryUnit& ru,
                                       const RecordId& minRecordId,
                                       const RecordId& maxRecordId,
