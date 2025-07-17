@@ -244,7 +244,7 @@ export default [
                 // src/mongo/shell/utils_auth.d.ts
                 authutil: true,
 
-                // src/mongo/shell/utils_sh.d.ts
+                // src/mongo/shell/utils_sh_global.js
                 printShardingStatus: true,
 
                 // src/mongo/scripting/mozjs/bindata.d.ts

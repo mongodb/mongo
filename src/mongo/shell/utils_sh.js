@@ -1037,3 +1037,8 @@ function printShardingSizes(configDB) {
 
     print(raw);
 }
+
+export {
+    sh,
+    printShardingStatus,
+};
