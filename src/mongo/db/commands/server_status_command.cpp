@@ -177,10 +177,10 @@ public:
             } catch (...) {
                 auto status = exceptionToStatus();
                 if (!ErrorCodes::isA<ErrorCategory::ShutdownError>(status.code())) {
-                    LOGV2_ERROR(9761501,
-                                "Section threw an error",
-                                "error"_attr = status,
-                                "section"_attr = section->getSectionName());
+                    LOGV2_INFO(9761501,
+                               "Section threw an error",
+                               "error"_attr = status,
+                               "section"_attr = section->getSectionName());
                 }
                 throw;
             }
