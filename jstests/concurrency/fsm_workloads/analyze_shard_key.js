@@ -9,8 +9,9 @@
  *  resource_intensive,
  *  incompatible_with_concurrency_simultaneous,
  *  assumes_stable_shard_list,
- *  # This test performs explicit calls to shardCollection
- *  assumes_unsharded_collection,
+ *  # TODO SERVER-107683 adjust the following tags based on the outcome of the investigation
+ *  incompatible_aubsan,
+ *  incompatible_tsan,
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
@@ -728,6 +729,21 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             // metrics are calculated.
             print(`Failed to analyze the shard key due to a stale config error ${
                 tojsononeline(err)}`);
+            return true;
+        }
+        if (err.code == ErrorCodes.QueryPlanKilled && TestData.runningWithBalancer) {
+            // analyzeShardKey uses secondary reads, which can be terminated by the node if the
+            // targeted data belongs to a deleted range.
+            print(
+                `Failed to analyze the shard key due to a cursor terminated by a secondary node: ${
+                    tojsononeline(err)}`);
+            return true;
+        }
+        // TODO SERVER-107475: Keep or remove this acceptable error based on the outcome of the
+        // investigation.
+        if (err.code == 7826505) {
+            print(`Failed to analyze the shard key: no samples could be collected due to low ` +
+                  `sample rate + insufficient documents within the shard. ${tojsononeline(err)}`);
             return true;
         }
         if (err.code == 28799 || err.code == 4952606) {
