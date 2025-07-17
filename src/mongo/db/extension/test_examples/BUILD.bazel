@@ -38,5 +38,7 @@ package(default_visibility = ["//visibility:public"])
         "foo",
         "hostVersionSucceeds",
         "hostVersionFails",
+        "initializeVersionFails",
+        "nullStageDescriptor",
     ]
 ]

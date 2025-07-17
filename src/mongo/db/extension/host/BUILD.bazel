@@ -38,6 +38,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo:core_headers_library",
+        "//src/mongo/db/extension/host:api",
         "//src/mongo/db/extension/public:api",
         "//src/mongo/db/extension/sdk:sdk_cpp",
         "//src/mongo/db/query:query_knobs",
@@ -55,12 +56,14 @@ mongo_cc_unit_test(
         "//src/mongo/db/extension/test_examples:foo_extension",
         "//src/mongo/db/extension/test_examples:hostVersionFails_extension",
         "//src/mongo/db/extension/test_examples:hostVersionSucceeds_extension",
+        "//src/mongo/db/extension/test_examples:initializeVersionFails_extension",
         "//src/mongo/db/extension/test_examples:malformed1_extension",
         "//src/mongo/db/extension/test_examples:malformed2_extension",
         "//src/mongo/db/extension/test_examples:malformed3_extension",
         "//src/mongo/db/extension/test_examples:malformed4_extension",
         "//src/mongo/db/extension/test_examples:malformed5_extension",
         "//src/mongo/db/extension/test_examples:malformed6_extension",
+        "//src/mongo/db/extension/test_examples:nullStageDescriptor_extension",
     ],
     tags = ["mongo_unittest_seventh_group"],
     target_compatible_with = select({

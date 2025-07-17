@@ -29,6 +29,7 @@
 
 #include "mongo/db/extension/host/load_extension.h"
 
+#include "mongo/db/extension/host/stage_registry.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
@@ -37,6 +38,8 @@
 #include "mongo/platform/shared_library.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
+#include "mongo/util/version.h"
 
 #include <iostream>
 #include <stdexcept>
@@ -145,7 +148,19 @@ void ExtensionLoader::load(const std::string& extensionPath) {
                           << "' failed: initialize function is not defined",
             extension->initialize != nullptr);
 
-    extension->initialize();
+    // Retrieve the VersionInfoInterface and convert to MongoDBVersion to pass across the API
+    // header. During unit testing, use FallbackVersionInfo.
+    const auto& serverVersion = mongo::VersionInfoInterface::instance(
+        TestingProctor::instance().isEnabled()
+            ? VersionInfoInterface::NotEnabledAction::kFallback
+            : VersionInfoInterface::NotEnabledAction::kAbortProcess);
+
+    MongoExtensionHostPortal portal{extension->version,
+                                    MongoDBVersion{serverVersion.majorVersion(),
+                                                   serverVersion.minorVersion(),
+                                                   serverVersion.patchVersion()},
+                                    registerStageDescriptor};
+    sdk::enterC([&]() { return extension->initialize(&portal); });
 
     // Add the 'SharedLibrary' pointer to our loaded extensions array to keep it alive for the
     // lifetime of the server.

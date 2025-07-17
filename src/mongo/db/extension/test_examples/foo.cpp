@@ -28,11 +28,11 @@
  */
 
 
-#include "mongo/db/extension/sdk/extension.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 
-void initialize_extension() {
+MongoExtensionStatus* initialize_extension(MongoExtensionHostPortal* portal) {
     // TODO SERVER-106242 Test initialization logic.
+    return mongo::extension::sdk::enterCXX([&]() {});
 }
 
 static const MongoExtension my_extension = {

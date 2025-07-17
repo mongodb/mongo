@@ -29,6 +29,7 @@
 
 #include "mongo/db/extension/host/load_extension.h"
 
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <filesystem>
@@ -103,5 +104,16 @@ TEST(LoadExtensionTest, LoadExtensionHostVersionParameterFails) {
     ASSERT_THROWS_CODE(ExtensionLoader::load(getExtensionPath("libhostVersionFails_extension.so")),
                        AssertionException,
                        10615503);
+}
+
+TEST(LoadExtensionTest, LoadExtensionInitializeVersionFails) {
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::load(getExtensionPath("libinitializeVersionFails_extension.so")),
+        AssertionException,
+        10726600);
+}
+
+DEATH_TEST(LoadExtensionTest, LoadExtensionNullStageDescriptor, "10596400") {
+    ExtensionLoader::load(getExtensionPath("libnullStageDescriptor_extension.so"));
 }
 }  // namespace mongo::extension::host

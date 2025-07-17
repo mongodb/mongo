@@ -27,11 +27,30 @@
  *    it in the license file.
  */
 
+
 #include "mongo/db/extension/sdk/extension_status.h"
+
+MongoExtensionStatus* initialize_extension(MongoExtensionHostPortal* portal) {
+    return mongo::extension::sdk::enterCXX([&]() {
+        const bool extensionAPIVersionValid =
+            portal->hostExtensionsAPIVersion.major == MONGODB_EXTENSION_API_MAJOR_VERSION &&
+            portal->hostExtensionsAPIVersion.minor <= MONGODB_EXTENSION_API_MINOR_VERSION;
+        // Does not align with FallbackVersionInfo and errors out, for testing purposes only.
+        const bool serverVersionValid = portal->hostMongoDBVersion.major > 0;
+        uassert(10726600,
+                "MongoExtensionHostPortal contains incompatible versions",
+                extensionAPIVersionValid && serverVersionValid);
+    });
+}
+
+static const MongoExtension my_extension = {
+    .version = MONGODB_EXTENSION_API_VERSION,
+    .initialize = initialize_extension,
+};
 
 extern "C" {
 MongoExtensionStatus* get_mongodb_extension(const MongoExtensionAPIVersionVector* hostVersions,
                                             const MongoExtension** extension) {
-    return mongo::extension::sdk::enterCXX([&]() {});
+    return mongo::extension::sdk::enterCXX([&]() { *extension = &my_extension; });
 }
 }

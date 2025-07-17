@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/extension/sdk/extension.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 
 // The initialization function is empty since the test should never reach initialization.
-void initialize_extension() {}
+MongoExtensionStatus* initialize_extension(MongoExtensionHostPortal* portal) {
+    return mongo::extension::sdk::enterCXX([&]() {});
+}
 
 static const MongoExtension my_extension = {
     // Major version is one less than the currently-supported version.

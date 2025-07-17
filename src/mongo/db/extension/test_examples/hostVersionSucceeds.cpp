@@ -31,7 +31,10 @@
 #include "mongo/db/extension/sdk/extension_helper.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 
-void initialize_extension() {}
+MongoExtensionStatus* initialize_extension(MongoExtensionHostPortal* portal) {
+    return mongo::extension::sdk::enterCXX([&]() {});
+}
+
 static const MongoExtension extensionA = {
     .version = {MONGODB_EXTENSION_API_MAJOR_VERSION + 1,
                 MONGODB_EXTENSION_API_MINOR_VERSION,
