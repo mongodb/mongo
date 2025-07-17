@@ -227,7 +227,6 @@ void NoopWriter::_writeNoop(OperationContext* opCtx) {
         LOGV2_DEBUG(21223, 1, "Set last known op time", "lastKnownOpTime"_attr = _lastKnownOpTime);
     } catch (const ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
         // Skip performing the write if not primary.
-        // TODO SERVER-103635 Replace the log number with 21220 and remove the other check.
         LOGV2_DEBUG(10262301, 1, "Not a primary, skipping the noop write");
         return;
     } catch (const DBException&) {

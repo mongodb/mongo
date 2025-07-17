@@ -333,10 +333,12 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
             } else {
                 totalErrorCount += 1;
 
-                nextRefreshInterval =
-                    Milliseconds(kRefreshIntervalIfErrored.count() * totalErrorCount);
-                if (nextRefreshInterval > kMaxRefreshWaitTimeIfErrored) {
-                    nextRefreshInterval = kMaxRefreshWaitTimeIfErrored;
+                if (latestKeyStatus != ErrorCodes::NotWritablePrimary) {
+                    nextRefreshInterval =
+                        Milliseconds(kRefreshIntervalIfErrored.count() * totalErrorCount);
+                    if (nextRefreshInterval > kMaxRefreshWaitTimeIfErrored) {
+                        nextRefreshInterval = kMaxRefreshWaitTimeIfErrored;
+                    }
                 }
                 LOGV2(4939300,
                       "Failed to refresh key cache",

@@ -7,6 +7,7 @@
  *   requires_wiredtiger,
  *   requires_sharding,
  *   requires_replication,
+ *   featureFlagIntentRegistration_incompatible
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";

@@ -323,16 +323,13 @@ void ReplicaSetNodeProcessInterface::_attachGenericCommandArgs(OperationContext*
 
 bool ReplicaSetNodeProcessInterface::_canWriteLocally(OperationContext* opCtx,
                                                       const NamespaceString& ns) const {
-    Lock::ResourceLock rstl(opCtx, resourceIdReplicationStateTransitionLock, MODE_IX);
-    boost::optional<rss::consensus::WriteIntentGuard> write_guard;
     if (gFeatureFlagIntentRegistration.isEnabled()) {
-        try {
-            write_guard.emplace(opCtx);
-        } catch (const ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
-            return false;
-        }
+        return rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+            .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx);
+    } else {
+        Lock::ResourceLock rstl(opCtx, resourceIdReplicationStateTransitionLock, MODE_IX);
+        return repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns);
     }
-    return repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns);
 }
 
 }  // namespace mongo

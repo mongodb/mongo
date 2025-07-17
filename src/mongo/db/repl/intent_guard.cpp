@@ -41,22 +41,11 @@ void IntentGuard::reset() {
     }
 }
 
-IntentGuard::~IntentGuard() {
-    reset();
-}
-
-const OperationContext* IntentGuard::getOperationContext() const {
-    return _opCtx;
-}
-
 boost::optional<IntentRegistry::Intent> IntentGuard::intent() const {
     if (!_opCtx) {
         return boost::none;
     }
     return _token.intent();
 }
-
-WriteIntentGuard::WriteIntentGuard(OperationContext* opCtx)
-    : IntentGuard(IntentRegistry::Intent::Write, opCtx) {}
 
 }  // namespace mongo::rss::consensus

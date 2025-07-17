@@ -30,6 +30,7 @@
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 
@@ -64,6 +65,9 @@ ReplicationStateTransitionLockGuard::~ReplicationStateTransitionLockGuard() {
 
 void ReplicationStateTransitionLockGuard::waitForLockUntil(
     mongo::Date_t deadline, const Locker::LockTimeoutCallback& onTimeout) {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
     // We can return early if the lock request was already satisfied.
     if (_result == LOCK_OK) {
         return;
@@ -85,11 +89,17 @@ void ReplicationStateTransitionLockGuard::reacquire() {
 }
 
 void ReplicationStateTransitionLockGuard::_enqueueLock() {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
     // Enqueue a lock request for the RSTL.
     _result = shard_role_details::getLocker(_opCtx)->lockRSTLBegin(_opCtx, _mode);
 }
 
 void ReplicationStateTransitionLockGuard::_unlock() {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
     if (_result == LockResult::LOCK_INVALID) {
         return;
     }

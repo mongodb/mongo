@@ -97,7 +97,10 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
         intent = Intent::LocalWrite;
     }
 
-    if (opCtx != _interruptionCtx) {
+    // Do not interrupt if the killing opCtx is performing work or we are inside an
+    // UninterruptibleLockGuard.
+    if (opCtx != _interruptionCtx &&
+        !opCtx->uninterruptibleLocksRequested_DO_NOT_USE()) {  // NOLINT
         auto validIntent = _validIntent(intent);
         if (_lastInterruption == InterruptionType::Shutdown) {
             uassert(ErrorCodes::InterruptedAtShutdown,
@@ -121,12 +124,23 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
     }
 
     auto& tokenMap = _tokenMaps[(size_t)intent];
+    if (intent == Intent::BlockingWrite) {
+        if (opCtx->uninterruptibleLocksRequested_DO_NOT_USE()) {  // NOLINT
+            // Do not check for interrupt if we are in an uninterruptible lock guard.
+            _pendingStateChangeCV.wait(lock, [&] { return _pendingStateChange.load() == 0; });
+        } else {
+            opCtx->waitForConditionOrInterrupt(
+                _pendingStateChangeCV, lock, [&] { return _pendingStateChange.load() == 0; });
+        }
+    }
+
     IntentToken token(intent);
     LOGV2_DEBUG(9945004,
                 3,
                 "Register Intent",
                 "token"_attr = token.id(),
-                "intent"_attr = intentToString(intent));
+                "intent"_attr = intentToString(intent),
+                "opCtx"_attr = opCtx->getOpID());
     {
         stdx::unique_lock<stdx::mutex> lockTokenMap(tokenMap.lock);
         tokenMap.map.insert({token.id(), opCtx});
@@ -152,15 +166,8 @@ bool IntentRegistry::canDeclareIntent(Intent intent, OperationContext* opCtx) {
     // mutex.
     bool isReplSet =
         repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getSettings().isReplSet();
-    auto state = repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getMemberState();
 
     std::shared_lock lock(_stateMutex);
-
-    // Downgrade Write intent to LocalWrite during initial sync.
-    if (intent == Intent::Write && isReplSet &&
-        (state == repl::MemberState::RS_STARTUP2 || state == repl::MemberState::RS_REMOVED)) {
-        intent = Intent::LocalWrite;
-    }
 
     if (opCtx != _interruptionCtx) {
         if (!_validIntent(intent)) {
@@ -182,24 +189,18 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
     OperationContext* opCtx,
     boost::optional<uint32_t> timeout_sec) {
     LOGV2(9945003, "Intent Registry killConflictingOperations", "interrupt"_attr = interrupt);
+    _pendingStateChange.fetchAndAdd(1);
     auto timeOutSec = stdx::chrono::seconds(
         timeout_sec ? *timeout_sec : repl::fassertOnLockTimeoutForStepUpDown.load());
+
+    _waitForDrain(Intent::BlockingWrite, stdx::chrono::milliseconds(0));
     {
         stdx::unique_lock lock(_stateMutex);
         if (_interruptionCtx) {
             LOGV2(9945001, "Existing kill ongoing. Blocking until it is finished.");
         }
-        if (timeOutSec.count() && !_activeInterruptionCV.wait_for(lock, timeOutSec, [this] {
-                return !_interruptionCtx;
-            })) {
-            LOGV2(9945005,
-                  "Timeout while waiting on a previous interrupt to drain.",
-                  "last"_attr = _lastInterruption,
-                  "new"_attr = interrupt);
-            fasserted(9945002);
-        } else if (!timeOutSec.count()) {
-            _activeInterruptionCV.wait(lock, [this] { return !_interruptionCtx; });
-        }
+
+        _activeInterruptionCV.wait(lock, [this] { return !_interruptionCtx; });
         _lastInterruption = interrupt;
         _interruptionCtx = opCtx;
     }
@@ -226,11 +227,9 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
                 break;
         }
 
-        _waitForDrain(Intent::PreparedTransaction, stdx::chrono::milliseconds(0));
-
         if (intents) {
             for (auto intent : *intents) {
-                _killOperationsByIntent(intent, interrupt == InterruptionType::Shutdown);
+                _killOperationsByIntent(intent, interrupt);
             }
             Timer timer;
             auto timeout = stdx::chrono::duration_cast<stdx::chrono::milliseconds>(timeOutSec);
@@ -255,6 +254,9 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
             _interruptionCtx = nullptr;
             _lastInterruption = InterruptionType::None;
             _activeInterruptionCV.notify_one();
+            if (_pendingStateChange.subtractAndFetch(1) == 0) {
+                _pendingStateChangeCV.notify_all();
+            }
         });
     });
 }
@@ -296,20 +298,36 @@ bool IntentRegistry::_validIntent(IntentRegistry::Intent intent) const {
         case InterruptionType::Rollback:
             return intent == Intent::LocalWrite;
         case InterruptionType::StepDown:
-            return intent != Intent::Write && intent != Intent::PreparedTransaction;
+            return intent != Intent::Write;
         default:
             return true;
     }
 }
 
-void IntentRegistry::_killOperationsByIntent(IntentRegistry::Intent intent, bool forShutdown) {
+void IntentRegistry::_killOperationsByIntent(IntentRegistry::Intent intent,
+                                             InterruptionType interruption) {
     auto& tokenMap = _tokenMaps[(size_t)intent];
     stdx::lock_guard<stdx::mutex> lock(tokenMap.lock);
     for (auto& [token, toKill] : tokenMap.map) {
         auto serviceCtx = toKill->getServiceContext();
         auto client = toKill->getClient();
+        if (interruption == InterruptionType::StepDown && !client->canKillOperationInStepdown()) {
+            LOGV2(10336502,
+                  "Skipping killing intent for stepdown due to unkillable client",
+                  "name"_attr = client->desc(),
+                  "registered_token"_attr = token);
+            continue;
+        }
+        // Do not kill opCtx's that are inside an UninterruptibleLockGuard.
+        if (toKill->uninterruptibleLocksRequested_DO_NOT_USE()) {  // NOLINT
+            LOGV2(10336500,
+                  "Skipping killing intent due to UninterruptibleLockGuard",
+                  "name"_attr = client->desc(),
+                  "registered_token"_attr = token);
+            continue;
+        }
         ClientLock lock(client);
-        if (forShutdown) {
+        if (interruption == InterruptionType::Shutdown) {
             serviceCtx->killOperation(lock, toKill, ErrorCodes::InterruptedAtShutdown);
         } else {
             serviceCtx->killOperation(lock, toKill, ErrorCodes::InterruptedDueToReplStateChange);
@@ -332,7 +350,10 @@ void IntentRegistry::_waitForDrain(IntentRegistry::Intent intent,
         LOGV2(
             9795403, "There are still registered intents", "Intent"_attr = intentToString(intent));
         for (auto& [token, opCtx] : tokenMap.map) {
-            LOGV2(9795402, "Registered token:", "token_id"_attr = token);
+            LOGV2(9795402,
+                  "Registered token:",
+                  "token_id"_attr = token,
+                  "client"_attr = opCtx->getClient()->desc());
         }
         LOGV2(9795404, "Timeout while waiting on intent queue to drain");
         fasserted(9795401);
@@ -355,7 +376,7 @@ std::vector<size_t> IntentRegistry::getTotalIntentsDeclared() const {
     res.emplace_back(getTotalIntents(IntentRegistry::Intent::Read));
     res.emplace_back(getTotalIntents(IntentRegistry::Intent::Write));
     res.emplace_back(getTotalIntents(IntentRegistry::Intent::LocalWrite));
-    res.emplace_back(getTotalIntents(IntentRegistry::Intent::PreparedTransaction));
+    res.emplace_back(getTotalIntents(IntentRegistry::Intent::BlockingWrite));
     return res;
 }
 
@@ -367,8 +388,8 @@ std::string IntentRegistry::intentToString(IntentRegistry::Intent intent) {
             return "READ";
         case Intent::Write:
             return "WRITE";
-        case Intent::PreparedTransaction:
-            return "PREPARED_TRANSACTION";
+        case Intent::BlockingWrite:
+            return "BLOCKING_WRITE";
         default:
             return "UNKNOWN";
     }

@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_replication,
+ *   featureFlagIntentRegistration_incompatible
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

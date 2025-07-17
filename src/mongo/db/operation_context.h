@@ -595,7 +595,7 @@ public:
      * TODO SERVER-68868: Remove this once UninterruptibleLockGuard is removed from the codebase.
      */
     bool uninterruptibleLocksRequested_DO_NOT_USE() const {
-        return _interruptibleLocksRequested < 0;
+        return _interruptibleLocksRequested.load() < 0;
     }
 
     /**
@@ -973,7 +973,7 @@ private:
      * UninterruptibleLockGuard. It is > 0 on the first case and < 0 in the other. The absolute
      * number specifies how many requesters there are for each type.
      */
-    int _interruptibleLocksRequested = 0;
+    Atomic<int> _interruptibleLocksRequested = 0;
 
     // Max operation time requested by the user or by the cursor in the case of a getMore with no
     // user-specified maxTimeMS. This is tracked with microsecond granularity for the purpose of
@@ -1055,16 +1055,14 @@ class UninterruptibleLockGuard {
 public:
     explicit UninterruptibleLockGuard(OperationContext* opCtx) : _opCtx(opCtx) {
         invariant(_opCtx);
-        invariant(_opCtx->_interruptibleLocksRequested <= 0);
-        _opCtx->_interruptibleLocksRequested--;
+        invariant(_opCtx->_interruptibleLocksRequested.fetchAndSubtract(1) <= 0);
     }
 
     UninterruptibleLockGuard(const UninterruptibleLockGuard& other) = delete;
     UninterruptibleLockGuard& operator=(const UninterruptibleLockGuard&) = delete;
 
     ~UninterruptibleLockGuard() {
-        invariant(_opCtx->_interruptibleLocksRequested < 0);
-        _opCtx->_interruptibleLocksRequested++;
+        invariant(_opCtx->_interruptibleLocksRequested.fetchAndAdd(1) < 0);
     }
 
 private:
@@ -1081,16 +1079,14 @@ class InterruptibleLockGuard {
 public:
     explicit InterruptibleLockGuard(OperationContext* opCtx) : _opCtx(opCtx) {
         invariant(_opCtx);
-        invariant(_opCtx->_interruptibleLocksRequested >= 0);
-        _opCtx->_interruptibleLocksRequested++;
+        invariant(_opCtx->_interruptibleLocksRequested.fetchAndAdd(1) >= 0);
     }
 
     InterruptibleLockGuard(const InterruptibleLockGuard& other) = delete;
     InterruptibleLockGuard& operator=(const InterruptibleLockGuard&) = delete;
 
     ~InterruptibleLockGuard() {
-        invariant(_opCtx->_interruptibleLocksRequested > 0);
-        _opCtx->_interruptibleLocksRequested--;
+        invariant(_opCtx->_interruptibleLocksRequested.fetchAndSubtract(1) > 0);
     }
 
 private:

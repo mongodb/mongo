@@ -53,7 +53,7 @@ function runStepDownTest({description, failpoint, operation, errorCode}) {
         data: {shouldContinueOnInterrupt: true}
     }));
 
-    errorCode = errorCode || ErrorCodes.InterruptedDueToReplStateChange;
+    errorCode = [ErrorCodes.InterruptedDueToReplStateChange, ErrorCodes.NotWritablePrimary];
     const writeCommand = `assert.commandFailedWithCode(${operation}, ${errorCode});
                               assert.commandWorked(db.adminCommand({ping:1}));`;
 
@@ -63,7 +63,7 @@ function runStepDownTest({description, failpoint, operation, errorCode}) {
     rst.awaitSecondaryNodes(null, [primary]);
     assert.commandWorked(primaryAdmin.adminCommand({configureFailPoint: failpoint, mode: "off"}));
     try {
-        waitForShell();
+        waitForShell({checkExitSuccess: false});
     } catch (ex) {
         print("Failed trying to write or ping in " + description + ", possibly disconnected.");
         throw ex;

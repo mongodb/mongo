@@ -48,15 +48,28 @@ public:
     IntentGuard(IntentRegistry::Intent intent, OperationContext* opctx);
 
     IntentGuard(const IntentGuard&) = delete;
+    IntentGuard& operator=(const IntentGuard&) = delete;
 
-    IntentGuard(IntentGuard&&) = delete;
+    IntentGuard(IntentGuard&& o) noexcept : _opCtx(std::exchange(o._opCtx, {})), _token(o._token) {}
+
+    IntentGuard& operator=(IntentGuard&& o) noexcept {
+        if (this != &o) {
+            _opCtx = std::exchange(o._opCtx, {});
+            _token = o._token;
+        }
+        return *this;
+    }
 
     /**
      * Deregisters the intent.
      */
-    ~IntentGuard();
+    ~IntentGuard() {
+        reset();
+    }
 
-    const OperationContext* getOperationContext() const;
+    OperationContext* getOperationContext() const {
+        return _opCtx;
+    }
 
     /**
      * Returns the type of intent that was granted, or boost::none if no intent was granted.
@@ -76,12 +89,9 @@ private:
 /**
  * A wrapper class around IntentGuard that is only used for Write Intents.
  */
-class WriteIntentGuard final : public IntentGuard {
+class WriteIntentGuard : public IntentGuard {
 public:
-    WriteIntentGuard(OperationContext* opCtx);
-
-    WriteIntentGuard(const WriteIntentGuard&) = delete;
-
-    WriteIntentGuard(WriteIntentGuard&&) = delete;
+    explicit WriteIntentGuard(OperationContext* opCtx)
+        : IntentGuard(IntentRegistry::Intent::Write, opCtx) {}
 };
 }  // namespace mongo::rss::consensus

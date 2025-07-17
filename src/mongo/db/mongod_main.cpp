@@ -1826,9 +1826,17 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         LOGV2_OPTIONS(4784911,
                       {LogComponent::kReplication},
                       "Enqueuing the ReplicationStateTransitionLock for shutdown");
+        boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
+        if (gFeatureFlagIntentRegistration.isEnabled()) {
+            rstg.emplace(rss::consensus::IntentRegistry::get(serviceContext)
+                             .killConflictingOperations(
+                                 rss::consensus::IntentRegistry::InterruptionType::Shutdown,
+                                 opCtx,
+                                 0 /* no timeout */)
+                             .get());
+        }
         repl::ReplicationStateTransitionLockGuard rstl(
             opCtx, MODE_X, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
-        boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
 
         // Kill all operations except FTDC to continue gathering metrics. This makes all newly
         // created opCtx to be immediately interrupted. After this point, the opCtx will have been
@@ -1867,20 +1875,12 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                           {LogComponent::kReplication},
                           "Acquiring the ReplicationStateTransitionLock for shutdown");
             rstl.waitForLockUntil(Date_t::max());
-            if (gFeatureFlagIntentRegistration.isEnabled()) {
-                rstg.emplace(rss::consensus::IntentRegistry::get(serviceContext)
-                                 .killConflictingOperations(
-                                     rss::consensus::IntentRegistry::InterruptionType::Shutdown,
-                                     opCtx,
-                                     0 /* no timeout */)
-                                 .get());
-            }
         }
 
         // Release the rstl before waiting for the index build threads to join as index build
         // reacquires rstl in uninterruptible lock guard to finish their cleanup process.
-        rstg = boost::none;
         rstl.release();
+        rstg = boost::none;
 
         // Shuts down the thread pool and waits for index builds to finish.
         // Depends on setKillAllOperations() above to interrupt the index build operations.

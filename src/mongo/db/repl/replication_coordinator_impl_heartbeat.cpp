@@ -598,6 +598,14 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     // kill all write operations which are no longer safe to run on step down. Also, operations that
     // have taken global lock in S mode and operations blocked on prepare conflict will be killed to
     // avoid 3-way deadlock between read, prepared transaction and step down thread.
+    boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
+    const Date_t startTimeKillConflictingOperations = _replExecutor->now();
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        rstg.emplace(_killConflictingOperations(
+            rss::consensus::IntentRegistry::InterruptionType::StepDown, opCtx.get()));
+    }
+    const Date_t endTimeKillConflictingOperations = _replExecutor->now();
+
     const Date_t startTimeAcquireRSTL = _replExecutor->now();
     AutoGetRstlForStepUpStepDown arsd(
         this, opCtx.get(), ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);
@@ -605,13 +613,6 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     LOGV2(962665,
           "Acquired RSTL during stepDown",
           "timeToAcquire"_attr = (endTimeAcquireRSTL - startTimeAcquireRSTL));
-    const Date_t startTimeKillConflictingOperations = _replExecutor->now();
-    boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
-    if (gFeatureFlagIntentRegistration.isEnabled()) {
-        rstg.emplace(_killConflictingOperations(
-            rss::consensus::IntentRegistry::InterruptionType::StepDown, opCtx.get()));
-    }
-    const Date_t endTimeKillConflictingOperations = _replExecutor->now();
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     // This node has already stepped down due to reconfig. So, signal anyone who is waiting on the
@@ -932,22 +933,15 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     }
     const Date_t startTime = _replExecutor->now();
     auto opCtx = cc().makeOperationContext();
-    boost::optional<AutoGetRstlForStepUpStepDown> arsd;
     boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
+    boost::optional<AutoGetRstlForStepUpStepDown> arsd;
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     auto rsc = _rsConfig.unsafePeek();
     if (_shouldStepDownOnReconfig(lk, newConfig, myIndex)) {
         _topCoord->prepareForUnconditionalStepDown();
         lk.unlock();
-        const Date_t startTimeAcquireRSTL = _replExecutor->now();
         // Primary node will be either unelectable or removed after the configuration change.
         // So, finish the reconfig under RSTL, so that the step down occurs safely.
-        arsd.emplace(
-            this, opCtx.get(), ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);
-        const Date_t endTimeAcquireRSTL = _replExecutor->now();
-        LOGV2(962668,
-              "Acquired RSTL for stepDown",
-              "totalTimeToAcquire"_attr = (endTimeAcquireRSTL - startTimeAcquireRSTL));
         const Date_t startTimeKillConflictingOperations = _replExecutor->now();
         if (gFeatureFlagIntentRegistration.isEnabled()) {
             rstg.emplace(_killConflictingOperations(
@@ -958,9 +952,19 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
               "killConflictingOperations in stepDown completed",
               "totalTime"_attr =
                   (endTimeKillConflictingOperations - startTimeKillConflictingOperations));
+
+        const Date_t startTimeAcquireRSTL = _replExecutor->now();
+        arsd.emplace(
+            this, opCtx.get(), ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);
+        const Date_t endTimeAcquireRSTL = _replExecutor->now();
+        LOGV2(962668,
+              "Acquired RSTL for stepDown",
+              "totalTimeToAcquire"_attr = (endTimeAcquireRSTL - startTimeAcquireRSTL));
+
         lk.lock();
         if (_topCoord->isSteppingDownUnconditionally()) {
-            invariant(shard_role_details::getLocker(opCtx.get())->isRSTLExclusive());
+            invariant(shard_role_details::getLocker(opCtx.get())->isRSTLExclusive() ||
+                      gFeatureFlagIntentRegistration.isEnabled());
             LOGV2(21481,
                   "Stepping down from primary, because we received a new config via heartbeat");
             // We need to release the mutex before yielding locks for prepared transactions, which
@@ -984,7 +988,6 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
             // Update _canAcceptNonLocalWrites.
             _updateWriteAbilityFromTopologyCoordinator(lk, opCtx.get());
         } else {
-            rstg = boost::none;
             // Release the rstl lock as the node might have stepped down due to
             // other unconditional step down code paths like learning new term via heartbeat &
             // liveness timeout. And, no new election can happen as we have already set our
@@ -996,6 +999,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
             LOGV2(9626617,
                   "Released RSTL during stepDown",
                   "timeToRelease"_attr = (endTimeReleaseRSTL - startTimeReleaseRSTL));
+            rstg = boost::none;
         }
     }
 

@@ -226,7 +226,8 @@ void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::rstlRelease() {
 
 void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::rstlReacquire() {
     // Ensure that we are not holding the RSTL lock in any mode.
-    invariant(!shard_role_details::getLocker(_opCtx)->isRSTLLocked());
+    invariant(!shard_role_details::getLocker(_opCtx)->isRSTLLocked() ||
+              gFeatureFlagIntentRegistration.isEnabled());
 
     // Since we have released the RSTL lock at this point, there can be some conflicting
     // operations sneaked in here. We need to kill those operations to acquire the RSTL lock.
@@ -276,20 +277,14 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &stepdownHangBeforeRSTLEnqueue, opCtx, "stepdownHangBeforeRSTLEnqueue");
 
-    boost::optional<AutoGetRstlForStepUpStepDown> arsd;
     boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
+    boost::optional<AutoGetRstlForStepUpStepDown> arsd;
 
     // Using 'force' sets the default for the wait time to zero, which means the stepdown will
     // fail if it does not acquire the lock immediately. In such a scenario, we use the
     // stepDownUntil deadline instead.
     auto deadline = force ? stepDownUntil : waitUntil;
-    const Date_t startTimeAcquireRSTL = _replExecutor->now();
-    arsd.emplace(
-        this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown, deadline);
-    const Date_t endTimeAcquireRSTL = _replExecutor->now();
-    LOGV2(962661,
-          "Acquired RSTL for stepDown",
-          "totalTimeToAcquire"_attr = (endTimeAcquireRSTL - startTimeAcquireRSTL));
+
     const Date_t startTimeKillConflictingOperations = _replExecutor->now();
     if (gFeatureFlagIntentRegistration.isEnabled()) {
         rstg.emplace(_killConflictingOperations(
@@ -300,6 +295,15 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
           "killConflictingOperations in stepDown completed",
           "totalTime"_attr =
               (endTimeKillConflictingOperations - startTimeKillConflictingOperations));
+
+    const Date_t startTimeAcquireRSTL = _replExecutor->now();
+    arsd.emplace(
+        this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown, deadline);
+    const Date_t endTimeAcquireRSTL = _replExecutor->now();
+    LOGV2(962661,
+          "Acquired RSTL for stepDown",
+          "totalTimeToAcquire"_attr = (endTimeAcquireRSTL - startTimeAcquireRSTL));
+
     stepdownHangAfterGrabbingRSTL.pauseWhileSet();
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
@@ -323,7 +327,8 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     const Date_t startTimeUpdateMemberState = _replExecutor->now();
     auto updateMemberState = [this, &lk](OperationContext* opCtx) {
         invariant(lk.owns_lock());
-        invariant(shard_role_details::getLocker(opCtx)->isRSTLExclusive());
+        invariant(shard_role_details::getLocker(opCtx)->isRSTLExclusive() ||
+                  gFeatureFlagIntentRegistration.isEnabled());
 
         // Make sure that we leave _canAcceptNonLocalWrites in the proper state.
         _updateWriteAbilityFromTopologyCoordinator(lk, opCtx);
@@ -357,7 +362,8 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
             // we should not holding the RSTL and _mutex. We need to create a new client and opCtx
             // for the cleanup since the cleanup is a must do.
             invariant(!lk.owns_lock());
-            invariant(!shard_role_details::getLocker(opCtx)->isRSTLExclusive());
+            invariant(!shard_role_details::getLocker(opCtx)->isRSTLExclusive() ||
+                      gFeatureFlagIntentRegistration.isEnabled());
             while (true) {
                 try {
                     auto newClient = opCtx->getServiceContext()
@@ -402,7 +408,6 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         termAtStart, _replExecutor->now(), waitUntil, stepDownUntil, force)) {
         // The stepdown attempt failed. We now release the RSTL to allow secondaries to read the
         // oplog, then wait until enough secondaries are caught up for us to finish stepdown.
-        rstg = boost::none;
         const Date_t startTimeReleaseRSTL = _replExecutor->now();
         if (arsd) {
             arsd->rstlRelease();
@@ -411,6 +416,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         LOGV2(962662,
               "Released RSTL during stepDown",
               "timeToRelease"_attr = (endTimeReleaseRSTL - startTimeReleaseRSTL));
+        rstg = boost::none;
         invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
         auto lastAppliedOpTime = _getMyLastAppliedOpTime(lk);
@@ -456,14 +462,6 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
             // operations that gets sneaked in here will fail as we have updated
             // _canAcceptNonLocalWrites to false after our first successful RSTL lock
             // acquisition. So, we won't get into problems like SERVER-27534.
-            const Date_t startTimeReacquireRSTL = _replExecutor->now();
-            if (arsd) {
-                arsd->rstlReacquire();
-            }
-            const Date_t endTimeReacquireRSTL = _replExecutor->now();
-            LOGV2(962663,
-                  "Reacquired RSTL during stepDown",
-                  "timeToReacquire"_attr = (endTimeReacquireRSTL - startTimeReacquireRSTL));
             const Date_t startTimeKillConflictingOps = _replExecutor->now();
             if (gFeatureFlagIntentRegistration.isEnabled()) {
                 rstg.emplace(_killConflictingOperations(
@@ -473,6 +471,15 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
             LOGV2(962667,
                   "killConflictingOperations for stepDown",
                   "totalTime"_attr = (endTimeKillConflictingOps - startTimeKillConflictingOps));
+
+            const Date_t startTimeReacquireRSTL = _replExecutor->now();
+            if (arsd) {
+                arsd->rstlReacquire();
+            }
+            const Date_t endTimeReacquireRSTL = _replExecutor->now();
+            LOGV2(962663,
+                  "Reacquired RSTL during stepDown",
+                  "timeToReacquire"_attr = (endTimeReacquireRSTL - startTimeReacquireRSTL));
             lk.lock();
         } catch (const DBException& ex) {
             // We can get interrupted when reacquiring the RSTL. If that happens, the

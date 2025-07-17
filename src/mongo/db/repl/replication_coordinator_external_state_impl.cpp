@@ -610,7 +610,8 @@ void ReplicationCoordinatorExternalStateImpl::onApplierDrainComplete(OperationCo
 }
 
 OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationContext* opCtx) {
-    invariant(shard_role_details::getLocker(opCtx)->isRSTLExclusive());
+    invariant(shard_role_details::getLocker(opCtx)->isRSTLExclusive() ||
+              gFeatureFlagIntentRegistration.isEnabled());
     invariant(ExecutionAdmissionContext::get(opCtx).getPriority() ==
                   AdmissionContext::Priority::kExempt,
               "Replica Set state changes are critical to the cluster and should not be throttled");

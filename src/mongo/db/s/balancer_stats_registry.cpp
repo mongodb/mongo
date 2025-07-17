@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -52,6 +53,7 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/log_and_backoff.h"
 #include "mongo/util/scopeguard.h"
 
 #include <algorithm>
@@ -142,7 +144,37 @@ void BalancerStatsRegistry::_initializeAsync(OperationContext* opCtx) {
             auto opCtx{_initOpCtxHolder.get()};
 
             LOGV2_DEBUG(6419601, 2, "Initializing BalancerStatsRegistry");
+            // TODO SERVER-107512 Remove this code when it is no longer necessary.
+            // We are not yet a write accepting primary when onStepUpComplete is called so even
+            // though this is an async task we can get rejected due to not being a writable primary,
+            // we expect to eventually become a writable primary and should retry until we are (or
+            // until our state changes).
             try {
+                if (gFeatureFlagIntentRegistration.isEnabled()) {
+                    int retryAttempts = 0;
+                    for (;;) {
+                        if (_state.load() != State::kInitializing) {
+                            // We are being interrupted, error out to avoid infinite looping in this
+                            // function.
+                            uasserted(ErrorCodes::InterruptedDueToReplStateChange,
+                                      "BalancerStatsRegistry initialization interrupted");
+                        }
+                        if (!rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                                 .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write,
+                                                   opCtx)) {
+                            ++retryAttempts;
+                            logAndBackoff(10363501,
+                                          MONGO_LOGV2_DEFAULT_COMPONENT,
+                                          logv2::LogSeverity::Debug(3),
+                                          retryAttempts,
+                                          "Waiting until node is writable primary to continue with "
+                                          "BalancerStatsRegistry initialization");
+                            continue;
+                        }
+                        break;
+                    }
+                }
+
                 // Lock the range deleter to prevent concurrent modifications of orphans count
                 ScopedRangeDeleterLock rangeDeleterLock(opCtx, LockMode::MODE_S);
                 // The collection lock is needed to serialize with direct writes to

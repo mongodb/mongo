@@ -315,16 +315,21 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                 // to fail later on when locks are reacquired. Therefore, this assertion is not
                 // required for correctness, but only intended to rate limit index builds started on
                 // primaries.
-                Lock::GlobalLockOptions options = {};
-                if (!nss.isReplicated()) {
-                    options.explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite;
+                if (gFeatureFlagIntentRegistration.isEnabled()) {
+                    auto intent = nss.isReplicated()
+                        ? rss::consensus::IntentRegistry::Intent::Write
+                        : rss::consensus::IntentRegistry::Intent::LocalWrite;
+                    uassert(ErrorCodes::NotWritablePrimary,
+                            "Not primary while waiting to start an index build",
+                            rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                                .canDeclareIntent(intent, opCtx));
+                } else {
+                    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+                    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+                    uassert(ErrorCodes::NotWritablePrimary,
+                            "Not primary while waiting to start an index build",
+                            replCoord->canAcceptWritesFor(opCtx, nssOrUuid));
                 }
-                Lock::GlobalLock globalLk(opCtx, MODE_IX, options);
-
-                auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-                uassert(ErrorCodes::NotWritablePrimary,
-                        "Not primary while waiting to start an index build",
-                        replCoord->canAcceptWritesFor(opCtx, nssOrUuid));
             }
 
             // The checks here catch empty index builds and also allow us to stop index
@@ -688,16 +693,16 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
                  .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx)) {
             return false;
         }
-    }
+    } else {
+        const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
+        repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
 
-    const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
-
-    // Secondaries should always try to vote even if the commit quorum is disabled. Secondaries
-    // must not read the on-disk commit quorum value as it may not be present at all times, such as
-    // during initial sync.
-    if (!replCoord->canAcceptWritesFor(opCtx, dbAndUUID)) {
-        return false;
+        // Secondaries should always try to vote even if the commit quorum is disabled. Secondaries
+        // must not read the on-disk commit quorum value as it may not be present at all times, such
+        // as during initial sync.
+        if (!replCoord->canAcceptWritesFor(opCtx, dbAndUUID)) {
+            return false;
+        }
     }
 
     // TODO SERVER-99706: Investigate if this is safe. Other commit quorum operations take the
@@ -1089,7 +1094,8 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
                           << " providedCommitQuorum: " << newCommitQuorum.toBSON());
     }
 
-    invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked());
+    invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked() ||
+              gFeatureFlagIntentRegistration.isEnabled());
     // About to update the commit quorum value on-disk. So, take the lock in exclusive mode to
     // prevent readers from reading the commit quorum value and making decision on commit quorum
     // satisfied with the stale read commit quorum value.

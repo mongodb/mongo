@@ -56,6 +56,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/ident.h"
@@ -159,7 +160,8 @@ auto makeOnSuppressedErrorFn(const std::function<void()>& saveCursorBeforeWrite,
 }
 
 bool shouldRelaxConstraints(OperationContext* opCtx, const CollectionPtr& collection) {
-    invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked());
+    invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked() ||
+              gFeatureFlagIntentRegistration.isEnabled());
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     bool isPrimary = replCoord->canAcceptWritesFor(opCtx, collection->ns());
 

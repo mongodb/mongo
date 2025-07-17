@@ -38,6 +38,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -198,8 +199,7 @@ public:
                 lockTarget = cmdObj["lockTarget"].checkAndGetStringData();
             }
 
-            // TODO: remove in SERVER-103635
-            if (lockTarget == "RSTL") {
+            if (!gFeatureFlagIntentRegistration.isEnabled() && lockTarget == "RSTL") {
                 _sleepInRSTL(opCtx, msRemaining.count());
                 continue;
             }

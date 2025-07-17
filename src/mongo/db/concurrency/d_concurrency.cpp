@@ -107,7 +107,7 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
         ScopeGuard unlockMultiDocTxnBarrier([this] { _multiDocTxnBarrier.reset(); });
 
         _result = LOCK_INVALID;
-        if (options.skipRSTLLock) {
+        if (gFeatureFlagIntentRegistration.isEnabled() || options.skipRSTLLock) {
             _declareIntent(lockMode, options.explicitIntent);
             _takeGlobalLockOnly(lockMode, deadline);
         } else {
@@ -175,9 +175,11 @@ Lock::GlobalLock::GlobalLock(GlobalLock&& otherLock)
       _result(otherLock._result),
       _multiDocTxnBarrier(std::move(otherLock._multiDocTxnBarrier)),
       _interruptBehavior(otherLock._interruptBehavior),
-      _skipRSTLLock(otherLock._skipRSTLLock) {
+      _skipRSTLLock(otherLock._skipRSTLLock),
+      _guard(std::move(otherLock._guard)) {
     // Mark as moved so the destructor doesn't invalidate the newly-constructed lock.
     otherLock._result = LOCK_INVALID;
+    otherLock._guard = boost::none;
 }
 
 Lock::GlobalLock::~GlobalLock() {

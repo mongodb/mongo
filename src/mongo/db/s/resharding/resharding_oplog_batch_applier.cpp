@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/intent_guard.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
@@ -40,6 +41,7 @@
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_version.h"
@@ -91,6 +93,11 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                    for (auto& i = chainCtx->nextToApply; i < chainCtx->batch.size(); ++i) {
                        const auto& oplogEntry = *chainCtx->batch[i];
                        auto opCtx = factory.makeOperationContext(&cc());
+
+                       boost::optional<rss::consensus::WriteIntentGuard> writeGuard;
+                       if (gFeatureFlagIntentRegistration.isEnabled()) {
+                           writeGuard.emplace(opCtx.get());
+                       }
 
                        if constexpr (IsForSessionApplication) {
                            auto conflictingTxnCompletionFuture =

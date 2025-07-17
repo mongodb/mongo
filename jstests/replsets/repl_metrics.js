@@ -95,7 +95,7 @@ const expectedIntentRegistrySection = {
     "intentsDeclaredForREAD": 0,
     "intentsDeclaredForWRITE": 0,
     "intentsDeclaredForLOCAL_WRITE": 0,
-    "intentsDeclaredForPREPARED_TRANSACTION": 0
+    "intentsDeclaredForBLOCKING_WRITE": 0
 };
 assert(serverStatusResponse.metrics.hasOwnProperty("repl"),
        () => (`The serverStatus response did not have the repl \

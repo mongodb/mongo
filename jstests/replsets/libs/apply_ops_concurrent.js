@@ -19,6 +19,7 @@
  *     Fully qualified namespace of second set of CRUD operations. This may be the same namespace as
  *     ns1. As with ns1, only insert operations will be used.
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 export var ApplyOpsConcurrentTest = function(options) {
@@ -172,7 +173,11 @@ export var ApplyOpsConcurrentTest = function(options) {
         try {
             let insertOpCount = 0;
             // Expecting two HMAC inserts and two applyOps in-progress.
-            const expectedFinalOpCount = 4;
+            let expectedFinalOpCount = 4;
+            // We end up with 3 HMAC inserts due to timing changes without the RSTL.
+            if (FeatureFlagUtil.isPresentAndEnabled(adminDb, "IntentRegistration")) {
+                expectedFinalOpCount = 5;
+            }
             assert.soon(
                 function() {
                     const serverStatus = adminDb.serverStatus();
@@ -205,8 +210,12 @@ export var ApplyOpsConcurrentTest = function(options) {
         primary.setLogLevel(previousLogLevel, 'replication');
 
         const serverStatus = adminDb.serverStatus();
+        let expectedOpCount = 202;
+        if (FeatureFlagUtil.isPresentAndEnabled(adminDb, "IntentRegistration")) {
+            expectedOpCount = 203;
+        }
         // insert opCount will include insertions of two HMAC signing keys generated at RS initiate.
-        assert.eq(202,
+        assert.eq(expectedOpCount,
                   getInsertOpCount(serverStatus),
                   'incorrect number of insert operations in server status after applyOps: ' +
                       tojson(serverStatus));

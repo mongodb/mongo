@@ -573,7 +573,8 @@ ExecutorFuture<void> QueryAnalysisWriter::createTTLIndexes(OperationContext* opC
                                       "{specification}.",
                                       logAttrs(nss),
                                       "specification"_attr = indexSpec,
-                                      "tries"_attr = tryCount);
+                                      "tries"_attr = tryCount,
+                                      "isPrimary"_attr = _isPrimary.load());
                     }
                     return status;
                 }

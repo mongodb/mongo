@@ -1072,11 +1072,16 @@ void TransactionParticipant::Participant::beginOrContinue(
     // Make sure we are still a primary. We need to hold on to the RSTL through the end of this
     // method, as we otherwise risk stepping down in the interim and incorrectly updating the
     // transaction number, which can abort active transactions.
-    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
     boost::optional<rss::consensus::IntentGuard> txnGuard;
     if (gFeatureFlagIntentRegistration.isEnabled()) {
-        txnGuard.emplace(rss::consensus::IntentRegistry::Intent::PreparedTransaction, opCtx);
+        uassert(ErrorCodes::NotWritablePrimary,
+                "Not primary so we cannot begin or continue a transaction",
+                rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                        .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx) ||
+                    !opCtx->writesAreReplicated());
+        txnGuard.emplace(rss::consensus::IntentRegistry::Intent::BlockingWrite, opCtx);
     }
+    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
 
     if (opCtx->writesAreReplicated()) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -1733,7 +1738,8 @@ void TransactionParticipant::Participant::unstashTransactionResources(
     // yield and restore all locks on state transition. Otherwise, we'd have to remember
     // which locks are managed by WUOW.
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
-    invariant(!shard_role_details::getLocker(opCtx)->isRSTLLocked());
+    invariant(!shard_role_details::getLocker(opCtx)->isRSTLLocked() ||
+              gFeatureFlagIntentRegistration.isEnabled());
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     // If maxTransactionLockRequestTimeoutMillis is set, then we will ensure no
@@ -1810,6 +1816,11 @@ void TransactionParticipant::Participant::refreshLocksForPreparedTransaction(
 std::pair<Timestamp, absl::flat_hash_set<NamespaceString>>
 TransactionParticipant::Participant::prepareTransaction(
     OperationContext* opCtx, boost::optional<repl::OpTime> prepareOptime) {
+
+    boost::optional<rss::consensus::IntentGuard> txnGuard;
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        txnGuard.emplace(rss::consensus::IntentRegistry::Intent::BlockingWrite, opCtx);
+    }
 
     ScopeGuard abortGuard([&] {
         // Prepare transaction on secondaries should always succeed.
@@ -1965,7 +1976,7 @@ TransactionParticipant::Participant::prepareTransaction(
     // be the last thing we do since a state transition may happen immediately after releasing the
     // RSTL.
     const bool unlocked = shard_role_details::getLocker(opCtx)->unlockRSTLforPrepare();
-    invariant(unlocked);
+    invariant(unlocked || gFeatureFlagIntentRegistration.isEnabled());
 
     return {prepareOplogSlot.getTimestamp(), o().affectedNamespaces};
 }
@@ -2096,17 +2107,24 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
 
     // Re-acquire the RSTL to prevent state transitions while committing the transaction. When the
     // transaction was prepared, we dropped the RSTL.
-    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
     boost::optional<rss::consensus::IntentGuard> txnGuard;
     if (gFeatureFlagIntentRegistration.isEnabled()) {
-        txnGuard.emplace(rss::consensus::IntentRegistry::Intent::PreparedTransaction, opCtx);
+        uassert(ErrorCodes::NotWritablePrimary,
+                "Not primary so we cannot commit a prepared transaction",
+                rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                        .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx) ||
+                    !opCtx->writesAreReplicated());
+        txnGuard.emplace(rss::consensus::IntentRegistry::Intent::BlockingWrite, opCtx);
     }
+    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
 
     // Prepared transactions cannot hold the RSTL, or else they will deadlock with state
     // transitions. If we do not commit the transaction we must unlock the RSTL explicitly so two
     // phase locking doesn't hold onto it.
-    ScopeGuard unlockGuard(
-        [&] { invariant(shard_role_details::getLocker(opCtx)->unlockRSTLforPrepare()); });
+    ScopeGuard unlockGuard([&] {
+        invariant(shard_role_details::getLocker(opCtx)->unlockRSTLforPrepare() ||
+                  gFeatureFlagIntentRegistration.isEnabled());
+    });
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
@@ -2231,7 +2249,8 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
 void TransactionParticipant::Participant::_commitStorageTransaction(OperationContext* opCtx,
                                                                     bool isSplitPreparedTxn) {
     invariant(shard_role_details::getWriteUnitOfWork(opCtx));
-    invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked() || isSplitPreparedTxn);
+    invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked() || isSplitPreparedTxn ||
+              gFeatureFlagIntentRegistration.isEnabled());
     try {
         shard_role_details::getWriteUnitOfWork(opCtx)->commit();
     } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
@@ -2427,11 +2446,16 @@ void TransactionParticipant::Participant::_abortActivePreparedTransaction(Operat
 
     // Re-acquire the RSTL to prevent state transitions while aborting the transaction. Since the
     // transaction was prepared, we dropped it on preparing the transaction.
-    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
     boost::optional<rss::consensus::IntentGuard> txnGuard;
     if (gFeatureFlagIntentRegistration.isEnabled()) {
-        txnGuard.emplace(rss::consensus::IntentRegistry::Intent::PreparedTransaction, opCtx);
+        uassert(ErrorCodes::NotWritablePrimary,
+                "Not primary so we cannot abort a prepared transaction",
+                rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                        .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx) ||
+                    !opCtx->writesAreReplicated());
+        txnGuard.emplace(rss::consensus::IntentRegistry::Intent::BlockingWrite, opCtx);
     }
+    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
 
     // Prepared transactions cannot hold the RSTL, or else they will deadlock with state
     // transitions. If we do not abort the transaction we must unlock the RSTL explicitly so two
@@ -2666,7 +2690,8 @@ void TransactionParticipant::Participant::_cleanUpTxnResourceOnOpCtx(
         // 2. We have failed trying to get the initial global lock, in which case we will have
         //    a WriteUnitOfWork but not have allocated the storage transaction.
         invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked() || isSplitPreparedTxn ||
-                  !shard_role_details::getRecoveryUnit(opCtx)->isActive());
+                  !shard_role_details::getRecoveryUnit(opCtx)->isActive() ||
+                  gFeatureFlagIntentRegistration.isEnabled());
         shard_role_details::setWriteUnitOfWork(opCtx, nullptr);
     }
 

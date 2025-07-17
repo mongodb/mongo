@@ -90,7 +90,7 @@ public:
         Read,
         Write,
         LocalWrite,
-        PreparedTransaction,
+        BlockingWrite,
         _NumDistinctIntents_,
     };
 
@@ -196,7 +196,7 @@ private:
     };
 
     bool _validIntent(Intent intent) const;
-    void _killOperationsByIntent(Intent intent, bool forShutdown);
+    void _killOperationsByIntent(Intent intent, InterruptionType interruption);
     void _waitForDrain(Intent intent, stdx::chrono::milliseconds timeout);
 
     bool _enabled = true;
@@ -205,6 +205,8 @@ private:
     InterruptionType _lastInterruption = InterruptionType::None;
     OperationContext* _interruptionCtx = nullptr;
     std::vector<tokenMap> _tokenMaps;
+    Atomic<int> _pendingStateChange = 0;
+    stdx::condition_variable _pendingStateChangeCV;
 
     // Tracks number of operations killed on state transition.
     size_t _totalOpsKilled = 0;

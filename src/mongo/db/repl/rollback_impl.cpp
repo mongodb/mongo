@@ -382,9 +382,8 @@ Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
     {
         rollbackHangBeforeTransitioningToRollback.pauseWhileSet(opCtx);
 
-        boost::optional<repl::ReplicationStateTransitionLockGuard> rstlLock;
         boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstGuard;
-        rstlLock.emplace(opCtx, MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());
+        boost::optional<repl::ReplicationStateTransitionLockGuard> rstlLock;
         if (gFeatureFlagIntentRegistration.isEnabled()) {
             rstGuard.emplace(rss::consensus::IntentRegistry::get(opCtx)
                                  .killConflictingOperations(
@@ -393,6 +392,7 @@ Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
                                      0 /* no timeout */)
                                  .get());
         }
+        rstlLock.emplace(opCtx, MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());
 
         // Kill all user operations to ensure we can successfully acquire the RSTL. Since the node
         // must be a secondary, this is only killing readers, whose connections will be closed

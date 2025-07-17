@@ -1,5 +1,8 @@
 /**
  * Tests that collStats can run concurrently with a RSTL MODE_X lock.
+ * @tags: [
+ * featureFlagIntentRegistration_incompatible,
+ * ]
  */
 import {waitForCommand} from "jstests/libs/wait_for_command.js";
 

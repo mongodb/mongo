@@ -79,6 +79,7 @@
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/disk_space_util.h"
@@ -789,7 +790,13 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
         MODE_IX,
         Date_t::max(),
         Lock::DBLockSkipOptions{
-            false, false, false, rss::consensus::IntentRegistry::Intent::LocalWrite});
+            false,
+            false,
+            false,
+            rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                    .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx)
+                ? rss::consensus::IntentRegistry::Intent::Write
+                : rss::consensus::IntentRegistry::Intent::LocalWrite});
     CollectionNamespaceOrUUIDLock collLock(opCtx, nssOrUuid, MODE_X);
 
     CollectionWriter collection(opCtx, resumeInfo.getCollectionUUID());
@@ -1421,9 +1428,12 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
 
         // Only on single phase builds, skip RSTL to avoid deadlocks with prepare conflicts and
         // state transitions caused by taking a strong collection lock. See SERVER-42621.
-        const auto lockOptions =
-            makeAutoGetCollectionOptions(IndexBuildProtocol::kSinglePhase == replState->protocol,
-                                         rss::consensus::IntentRegistry::Intent::LocalWrite);
+        const auto lockOptions = makeAutoGetCollectionOptions(
+            IndexBuildProtocol::kSinglePhase == replState->protocol,
+            rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                    .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx)
+                ? rss::consensus::IntentRegistry::Intent::Write
+                : rss::consensus::IntentRegistry::Intent::LocalWrite);
         AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_X, lockOptions);
         // Same options used here in order to avoid locking the RSTL after having taken the Global
         // lock.
@@ -1441,7 +1451,8 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
         // to be able to abort two phase index builds during the oplog replay phase.
         if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
             // The AutoGetCollection helper takes the RSTL implicitly.
-            invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked());
+            invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked() ||
+                      gFeatureFlagIntentRegistration.isEnabled());
 
             // Override the 'signalAction' as this is an initial syncing node.
             // Don't override it if it's a rollback abort which would be explictly requested
@@ -1673,7 +1684,7 @@ void IndexBuildsCoordinator::_completeAbortForShutdown(
             return;
         } catch (const ExceptionFor<ErrorCodes::InterruptedAtShutdown>&) {
             ++retryAttempts;
-            logAndBackoff(10262302,
+            logAndBackoff(10363503,
                           MONGO_LOGV2_DEFAULT_COMPONENT,
                           logv2::LogSeverity::Debug(1),
                           retryAttempts,
@@ -1721,93 +1732,107 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
 
 void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
     auto indexBuilds = activeIndexBuilds.getAllIndexBuilds();
-    const auto signalCommitQuorumAndRetrySkippedRecords =
-        [this, opCtx](const std::shared_ptr<ReplIndexBuildState>& replState) {
-            try {
-                if (replState->protocol != IndexBuildProtocol::kTwoPhase) {
-                    return;
+    const auto signalCommitQuorumAndRetrySkippedRecords = [this,
+                                                           opCtx](const std::shared_ptr<
+                                                                  ReplIndexBuildState>& replState) {
+        try {
+            if (replState->protocol != IndexBuildProtocol::kTwoPhase) {
+                return;
+            }
+
+            // Take an intent lock, the actual index build should keep running in parallel.
+            // This also prevents the concurrent index build from aborting or committing
+            // while we check if the commit quorum has to be signaled or check the skipped
+            // records.
+            const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
+            // Retry loop to make sure we get an error besides NotWritablePrimary due to stepup
+            // timings.
+            auto autoColl = [&] {
+                for (int retryAttempts = 0;; ++retryAttempts) {
+                    try {
+                        return AutoGetCollection{opCtx, dbAndUUID, MODE_IX};
+                    } catch (const ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
+                        logAndBackoff(
+                            10262302,
+                            MONGO_LOGV2_DEFAULT_COMPONENT,
+                            logv2::LogSeverity::Debug(1),
+                            retryAttempts,
+                            "Retrying _completeAbortForShutdown until we can declare our intent");
+                    }
                 }
+            }();
 
-                // Take an intent lock, the actual index build should keep running in parallel.
-                // This also prevents the concurrent index build from aborting or committing
-                // while we check if the commit quorum has to be signaled or check the skipped
-                // records.
-                const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-                AutoGetCollection autoColl(opCtx, dbAndUUID, MODE_IX);
-
-                // We've taken the RSTL, now make sure we are still primary.
-                uassert(
-                    ErrorCodes::InterruptedDueToReplStateChange,
+            // We've taken the RSTL, now make sure we are still primary.
+            uassert(ErrorCodes::InterruptedDueToReplStateChange,
                     "Index build step up task interrupted due to repl state change",
                     repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, dbAndUUID));
 
-                // The index build hasn't yet completed its initial setup, and persisted state like
-                // commit quorum information is absent. There's nothing to do here.
-                if (replState->isSettingUp()) {
-                    return;
-                }
-
-                // The index build might have committed or aborted while looping and not holding the
-                // collection lock. Re-checking if it is still active after taking locks would not
-                // solve the issue, as build can still be registered as active, even if it is in an
-                // aborted or committed state.
-                if (replState->isAborting() || replState->isAborted() || replState->isCommitted()) {
-                    return;
-                }
-
-                if (!_signalIfCommitQuorumNotEnabled(opCtx, replState)) {
-                    // This reads from system.indexBuilds collection to see if commit quorum got
-                    // satisfied.
-                    try {
-                        hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum.pauseWhileSet();
-
-                        if (_signalIfCommitQuorumIsSatisfied(opCtx, replState)) {
-                            // The index build has been signalled to commit. As retrying skipped
-                            // records during step-up is done to prevent waiting until commit time,
-                            // if the build has already been signalled to commit, we may skip the
-                            // retry during step-up.
-                            return;
-                        }
-                    } catch (DBException& ex) {
-                        // If the operation context is interrupted (shutdown, stepdown, killOp),
-                        // stop the verification process and exit.
-                        opCtx->checkForInterrupt();
-
-                        fassert(31440, ex.toStatus());
-                    }
-                }
-
-                // Unlike the primary, secondaries cannot fail immediately when detecting key
-                // generation errors; they instead temporarily store them in the 'skipped records'
-                // table, to validate them on commit. As an optimisation to potentially detect
-                // errors earlier, check the table on step-up. Unlike during commit, we only check
-                // key generation here, we do not actually insert the keys.
-                uassertStatusOK(_indexBuildsManager.retrySkippedRecords(
-                    opCtx,
-                    replState->buildUUID,
-                    autoColl.getCollection(),
-                    IndexBuildsManager::RetrySkippedRecordMode::kKeyGeneration));
-
-            } catch (const ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>&) {
-                throw;
-            } catch (const DBException& ex) {
-                // If the operation context is interrupted (shutdown, stepdown, killOp), stop the
-                // verification process and exit.
-                opCtx->checkForInterrupt();
-
-                // Some of the checks might have opened a snapshot. Abandon it before acquiring
-                // MODE_X lock during abort.
-                shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-
-                // All other errors must be due to key generation. Abort the build now, instead of
-                // failing later during the commit phase retry.
-                auto status = ex.toStatus().withContext("Skipped records retry failed on step-up");
-                abortIndexBuildByBuildUUID(opCtx,
-                                           replState->buildUUID,
-                                           IndexBuildAction::kPrimaryAbort,
-                                           Status{ErrorCodes::IndexBuildAborted, status.reason()});
+            // The index build hasn't yet completed its initial setup, and persisted state like
+            // commit quorum information is absent. There's nothing to do here.
+            if (replState->isSettingUp()) {
+                return;
             }
-        };
+
+            // The index build might have committed or aborted while looping and not holding the
+            // collection lock. Re-checking if it is still active after taking locks would not
+            // solve the issue, as build can still be registered as active, even if it is in an
+            // aborted or committed state.
+            if (replState->isAborting() || replState->isAborted() || replState->isCommitted()) {
+                return;
+            }
+
+            if (!_signalIfCommitQuorumNotEnabled(opCtx, replState)) {
+                // This reads from system.indexBuilds collection to see if commit quorum got
+                // satisfied.
+                try {
+                    hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum.pauseWhileSet();
+
+                    if (_signalIfCommitQuorumIsSatisfied(opCtx, replState)) {
+                        // The index build has been signalled to commit. As retrying skipped
+                        // records during step-up is done to prevent waiting until commit time,
+                        // if the build has already been signalled to commit, we may skip the
+                        // retry during step-up.
+                        return;
+                    }
+                } catch (DBException& ex) {
+                    // If the operation context is interrupted (shutdown, stepdown, killOp),
+                    // stop the verification process and exit.
+                    opCtx->checkForInterrupt();
+
+                    fassert(31440, ex.toStatus());
+                }
+            }
+
+            // Unlike the primary, secondaries cannot fail immediately when detecting key
+            // generation errors; they instead temporarily store them in the 'skipped records'
+            // table, to validate them on commit. As an optimisation to potentially detect
+            // errors earlier, check the table on step-up. Unlike during commit, we only check
+            // key generation here, we do not actually insert the keys.
+            uassertStatusOK(_indexBuildsManager.retrySkippedRecords(
+                opCtx,
+                replState->buildUUID,
+                autoColl.getCollection(),
+                IndexBuildsManager::RetrySkippedRecordMode::kKeyGeneration));
+        } catch (const ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>&) {
+            throw;
+        } catch (const DBException& ex) {
+            // If the operation context is interrupted (shutdown, stepdown, killOp), stop the
+            // verification process and exit.
+            opCtx->checkForInterrupt();
+
+            // Some of the checks might have opened a snapshot. Abandon it before acquiring
+            // MODE_X lock during abort.
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+
+            // All other errors must be due to key generation. Abort the build now, instead of
+            // failing later during the commit phase retry.
+            auto status = ex.toStatus().withContext("Skipped records retry failed on step-up");
+            abortIndexBuildByBuildUUID(opCtx,
+                                       replState->buildUUID,
+                                       IndexBuildAction::kPrimaryAbort,
+                                       Status{ErrorCodes::IndexBuildAborted, status.reason()});
+        }
+    };
 
     try {
         forEachIndexBuild(indexBuilds,
@@ -2252,14 +2277,19 @@ Status IndexBuildsCoordinator::_setUpIndexBuildForTwoPhaseRecovery(
     }
     // Don't use the AutoGet helpers because they require an open database, which may not be the
     // case when an index build is restarted during recovery.
-
     Lock::DBLock dbLock(
         opCtx,
         dbName,
         MODE_IX,
         Date_t::max(),
         Lock::DBLockSkipOptions{
-            false, false, false, rss::consensus::IntentRegistry::Intent::LocalWrite});
+            false,
+            false,
+            false,
+            rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                    .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx)
+                ? rss::consensus::IntentRegistry::Intent::Write
+                : rss::consensus::IntentRegistry::Intent::LocalWrite});
     CollectionNamespaceOrUUIDLock collLock(opCtx, nssOrUuid, MODE_X);
     CollectionWriter collWriter(opCtx, collectionUUID);
     invariant(collWriter);
@@ -2276,7 +2306,7 @@ StatusWith<AutoGetCollection> IndexBuildsCoordinator::_autoGetCollectionExclusiv
         try {
             auto autoGetCollOptions =
                 AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
-                    .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
+                    .explicitIntent = rss::consensus::IntentRegistry::Intent::BlockingWrite});
             autoGetCollOptions.deadline(Date_t::now() + kStateTransitionBlockedMaxMs);
             return AutoGetCollection(
                 opCtx, {replState->dbName, replState->collectionUUID}, MODE_X, autoGetCollOptions);
@@ -3094,7 +3124,11 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     {
         auto autoGetCollOptions =
             AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
-                .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
+                .explicitIntent =
+                    rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                        .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx)
+                    ? rss::consensus::IntentRegistry::Intent::Write
+                    : rss::consensus::IntentRegistry::Intent::LocalWrite});
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         AutoGetCollection collLock(opCtx, dbAndUUID, MODE_IX, autoGetCollOptions);
 
@@ -3169,18 +3203,24 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     }
 
     // Need to return the collection lock back to exclusive mode to complete the index build.
-    auto locksOrStatus =
-        _autoGetCollectionExclusiveWithTimeout(opCtx, replState.get(), /*retry=*/false);
-    if (!locksOrStatus.isOK()) {
+    boost::optional<StatusWith<AutoGetCollection>> locksOrStatus;
+    try {
+        locksOrStatus.emplace(
+            _autoGetCollectionExclusiveWithTimeout(opCtx, replState.get(), /*retry=*/false));
+    } catch (const DBException&) {
+        return CommitResult::kNoLongerPrimary;
+    }
+    if (!locksOrStatus.get().isOK()) {
         return CommitResult::kLockTimeout;
     }
 
-    const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-
     auto autoGetCollOptions =
         AutoGetCollection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
-            .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
+            .explicitIntent =
+                rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                    .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx)
+                ? rss::consensus::IntentRegistry::Intent::Write
+                : rss::consensus::IntentRegistry::Intent::LocalWrite});
     AutoGetCollection indexBuildEntryColl(
         opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX, autoGetCollOptions);
 
@@ -3188,6 +3228,8 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     // new signal from a new primary because we cannot commit. Note that two-phase index builds can
     // retry because a new signal should be received. Single-phase builds will be unable to commit
     // and will self-abort.
+    const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     bool isPrimary = replCoord->canAcceptWritesFor(opCtx, dbAndUUID) &&
         !replCoord->getSettings().shouldRecoverFromOplogAsStandalone() &&
         !storageGlobalParams.magicRestore;
