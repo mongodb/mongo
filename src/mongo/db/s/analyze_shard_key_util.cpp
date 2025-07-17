@@ -69,6 +69,10 @@ StatusWith<UUID> validateCollectionOptions(OperationContext* opCtx, const Namesp
         return Status{ErrorCodes::NamespaceNotFound,
                       str::stream() << "The namespace does not exist"};
     }
+    if (collection.getCollectionPtr()->isTimeseriesCollection()) {
+        return Status{ErrorCodes::IllegalOperation,
+                      "Operation not supported for a timeseries collection"};
+    }
     if (collection.getCollectionPtr()->getCollectionOptions().encryptedFieldConfig.has_value()) {
         return Status{
             ErrorCodes::IllegalOperation,

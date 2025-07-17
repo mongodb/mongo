@@ -49,6 +49,7 @@
     selector:
       exclude_files: null
       roots:
+        - jstests/sharding/analyze_shard_key/timeseries.js
         - jstests/sharding/libs/timeseries_update_multi_util.js
         - jstests/sharding/resharding_timeseries/move_timeseries.js
         - jstests/sharding/resharding_timeseries/reshard_timeseries.js
