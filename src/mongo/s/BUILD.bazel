@@ -68,6 +68,14 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "balancer_feature_flag_gen",
+    src = "balancer_feature_flag.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "sharding_helpers",
     srcs = [
@@ -380,6 +388,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "common_s",
     srcs = [
+        ":balancer_feature_flag_gen",
         "//src/mongo/s/catalog:type_changelog.cpp",
         "//src/mongo/s/catalog:type_chunk.cpp",
         "//src/mongo/s/catalog:type_chunk_range.cpp",

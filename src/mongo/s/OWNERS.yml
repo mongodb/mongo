@@ -168,3 +168,6 @@ filters:
   - "load_balancer_support*":
     approvers:
       - 10gen/server-networking-and-observability
+  - "balancer_feature_flag*":
+    approvers:
+      - 10gen/server-cluster-scalability
