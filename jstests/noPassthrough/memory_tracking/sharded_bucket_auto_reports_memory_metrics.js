@@ -54,7 +54,7 @@ runShardedMemoryStatsTest({
         allowDiskUse: false,
     },
     pipelineComment: "sharded memory stats bucketAuto test",
-    stageName: "bucketAuto",
+    stageName: "$bucketAuto",
     expectedNumGetMores: 5,
     numShards: 2,
     skipExplain: true  // $bucketAuto will execute on the merging part of the pipeline and will not

@@ -15,6 +15,7 @@
  * ]
  */
 import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
+
 const collName = jsTestName();
 const coll = db[collName];
 db[collName].drop();
@@ -45,7 +46,7 @@ runMemoryStatsTest({
         cursor: {batchSize: 1},
         allowDiskUse: false
     },
-    stageName: "group",
+    stageName: "$group",
     expectedNumGetMores: 2
 });
 

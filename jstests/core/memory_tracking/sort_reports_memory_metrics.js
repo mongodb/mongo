@@ -41,6 +41,8 @@ for (let i = 1; i <= nDocs; i++) {
 }
 assert.commandWorked(bulk.execute());
 
+// We are testing SBE sort here, so the stage appears in explain output without the dollar sign.
+const stageName = "sort";
 const pipeline = [{$sort: {_id: 1, b: -1}}];
 const pipelineWithLimit = [{$sort: {_id: 1, b: -1}}, {$limit: nDocs / 10}];
 {
@@ -54,7 +56,7 @@ const pipelineWithLimit = [{$sort: {_id: 1, b: -1}}, {$limit: nDocs / 10}];
             comment: "memory stats sort test",
             allowDiskUse: false
         },
-        stageName: "sort",
+        stageName,
         expectedNumGetMores: 5,
     });
 }
@@ -70,7 +72,7 @@ const pipelineWithLimit = [{$sort: {_id: 1, b: -1}}, {$limit: nDocs / 10}];
             comment: "memory stats sort limit test",
             allowDiskUse: false
         },
-        stageName: "sort",
+        stageName,
         expectedNumGetMores: 5,
     });
 }
@@ -89,7 +91,7 @@ const pipelineWithLimit = [{$sort: {_id: 1, b: -1}}, {$limit: nDocs / 10}];
             comment: "memory stats sort spilling test",
             allowDiskUse: true
         },
-        stageName: "sort",
+        stageName,
         expectedNumGetMores: 5,
         // Since we spill to disk when adding to the sorter, we don't expect to see inUseMemBytes
         // populated as it should be 0 on each operation.

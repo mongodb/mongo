@@ -52,7 +52,7 @@ runShardedMemoryStatsTest({
         allowDiskUse: false,
     },
     pipelineComment: "sharded memory stats setWindowFields test",
-    stageName: "_internalSetWindowFields",
+    stageName: "$_internalSetWindowFields",
     expectedNumGetMores: 2,
     // We don't expect any explain stages on the shards because $setWindowFields is always run on
     // the merging node - so we skip explain.

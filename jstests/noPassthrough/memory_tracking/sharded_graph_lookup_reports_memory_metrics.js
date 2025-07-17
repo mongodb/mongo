@@ -57,7 +57,7 @@ runShardedMemoryStatsTest({
         allowDiskUse: false,
     },
     pipelineComment: "sharded memory stats graphLookup test",
-    stageName: "graphLookup",
+    stageName: "$graphLookup",
     expectedNumGetMores: 3,
     numShards: 2,
     skipExplain: true,  // graphLookup will execute on the merging part of the pipeline and will not
