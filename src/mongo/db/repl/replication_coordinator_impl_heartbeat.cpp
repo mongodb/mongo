@@ -281,6 +281,16 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
                              "target"_attr = target,
                              "response"_attr = resp);
 
+        if (!responseStatus.isOK() && responseStatus == ErrorCodes::BadValue) {
+            LOGV2_FOR_HEARTBEATS(
+                10456300,
+                2,
+                "Received response to heartbeat, but the heartbeat was from ourselves",
+                "requestId"_attr = cbData.request.id,
+                "errorMessage"_attr = responseStatus.reason());
+            return;
+        }
+
         if (responseStatus.isOK() && _rsConfig.unsafePeek().isInitialized() &&
             _rsConfig.unsafePeek().getReplSetName() != hbResponse.getReplicaSetName()) {
             responseStatus =

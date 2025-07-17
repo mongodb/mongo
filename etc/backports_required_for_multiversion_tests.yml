@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+    - test_file: jstests/replsets/malformed_heartbeat_request.js
+      ticket: SERVER-104563
     - test_file: jstests/core/query/query_settings/query_settings_strict_api.js
       ticket: SERVER-99550
     - test_file: jstests/aggregation/expressions/null_chars_string_input.js
@@ -465,6 +467,8 @@ last-continuous:
   suites: null
 last-lts:
   all:
+    - test_file: jstests/replsets/malformed_heartbeat_request.js
+      ticket: SERVER-104563
     - test_file: jstests/core/query/query_settings/query_settings_strict_api.js
       ticket: SERVER-99550
     - test_file: jstests/aggregation/expressions/null_chars_string_input.js
