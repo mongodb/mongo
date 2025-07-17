@@ -157,6 +157,15 @@ feature_flags:
         cpp_varname: gFeatureFlagRawDataCrudOperations
         default: true
         fcv_gated: false
+    featureFlagAllBinariesSupportRawDataOperations:
+        description: >-
+            Feature flag which is only enabled once an upgrade to FCV v8.2 or higher is initiated,
+            which guarantees that all binaries in the cluster support rawData operations.
+        cpp_varname: gFeatureFlagAllBinariesSupportRawDataOperations
+        default: true
+        version: 8.2
+        fcv_gated: true
+        enable_on_transitional_fcv: true
     featureFlagIntentRegistration:
         description: "Enables intent registration in place of RSTL acquisitions"
         cpp_varname: gFeatureFlagIntentRegistration
