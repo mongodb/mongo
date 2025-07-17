@@ -873,6 +873,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "server_status_servers",
     srcs = [
+        "server_status_security_servers.cpp",
         "server_status_servers.cpp",
     ],
     deps = [

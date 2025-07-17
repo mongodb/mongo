@@ -153,7 +153,10 @@ filters:
       - 10gen/server-dbhash
   - "server_status*":
     approvers:
-      - 10gen/query-integration-observability
+      - 10gen/server-networking-and-observability
+  - "server_status_security_servers.cpp":
+    approvers:
+      - 10gen/server-security
   - "sysprofile*":
     approvers:
       - 10gen/query-execution

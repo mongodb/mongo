@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,36 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/transport/message_compressor_registry.h"
-#include "mongo/transport/service_executor.h"
 #include "mongo/transport/session_manager.h"
-#include "mongo/transport/transport_layer_manager.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/net/hostname_canonicalization.h"
-#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_types.h"
-
-#include <memory>
 
 namespace mongo {
 namespace {
 
-// some universal sections
-
-class Network : public ServerStatusSection {
+class Security : public ServerStatusSection {
 public:
     using ServerStatusSection::ServerStatusSection;
 
@@ -66,59 +53,57 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        BSONObjBuilder b;
-        networkCounter.append(b);
-        appendMessageCompressionStats(&b);
+        BSONObjBuilder result;
 
+        BSONObjBuilder auth;
+        authCounter.append(&auth);
+        result.append("authentication", auth.obj());
 
-        if (gFeatureFlagIngressRateLimiting.isEnabled()) {
-            appendIngressRequestRateLimiterStats(&b, opCtx->getServiceContext());
+#ifdef MONGO_CONFIG_SSL
+        if (SSLManagerCoordinator::get()) {
+            SSLManagerCoordinator::get()
+                ->getSSLManager()
+                ->getSSLConfiguration()
+                .getServerStatusBSON(&result);
         }
+#endif
 
-        auto svcCtx = opCtx->getServiceContext();
-
-        {
-            BSONObjBuilder section = b.subobjStart("serviceExecutors");
-            transport::ServiceExecutor::appendAllServerStats(&section, svcCtx);
-        }
-
-        if (auto tl = svcCtx->getTransportLayerManager())
-            tl->appendStatsForServerStatus(&b);
-
-        return b.obj();
-    }
-
-    void appendIngressRequestRateLimiterStats(BSONObjBuilder* b, ServiceContext* service) const {
-        auto ingressRequestRateLimiterBuilder =
-            BSONObjBuilder{b->subobjStart("ingressRequestRateLimiter")};
-        const auto& ingressRequestRateLimeter = IngressRequestRateLimiter::get(service);
-        ingressRequestRateLimeter.appendStats(&ingressRequestRateLimiterBuilder);
-        ingressRequestRateLimiterBuilder.done();
+        return result.obj();
     }
 };
-auto& network = *ServerStatusSectionBuilder<Network>("network");
+auto& security = *ServerStatusSectionBuilder<Security>("security").forShard().forRouter();
 
-class AdvisoryHostFQDNs final : public ServerStatusSection {
+#ifdef MONGO_CONFIG_SSL
+/**
+ * Status section of which tls versions connected to MongoDB and completed an SSL handshake.
+ * Note: Clients are only not counted if they try to connect to the server with a unsupported TLS
+ * version. They are still counted if the server rejects them for certificate issues in
+ * parseAndValidatePeerCertificate.
+ */
+class TLSVersionStatus : public ServerStatusSection {
 public:
     using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
-        return false;
+        return true;
     }
 
-    void appendSection(OperationContext* opCtx,
-                       const BSONElement& configElement,
-                       BSONObjBuilder* out) const override {
-        auto statusWith =
-            getHostFQDNs(getHostNameCached(), HostnameCanonicalizationMode::kForwardAndReverse);
-        if (statusWith.isOK()) {
-            out->append("advisoryHostFQDNs", statusWith.getValue());
-        }
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        auto& counts = TLSVersionCounts::get(opCtx->getServiceContext());
+
+        BSONObjBuilder builder;
+        builder.append("1.0", counts.tls10.load());
+        builder.append("1.1", counts.tls11.load());
+        builder.append("1.2", counts.tls12.load());
+        builder.append("1.3", counts.tls13.load());
+        builder.append("unknown", counts.tlsUnknown.load());
+        return builder.obj();
     }
 };
-// Register one instance of the section shared by both roles; the system has one set of FQDNs.
-auto& advisoryHostFQDNs =
-    *ServerStatusSectionBuilder<AdvisoryHostFQDNs>("advisoryHostFQDNs").forShard().forRouter();
+auto& tlsVersionStatus =
+    *ServerStatusSectionBuilder<TLSVersionStatus>("transportSecurity").forShard().forRouter();
+#endif
 
 }  // namespace
 }  // namespace mongo
