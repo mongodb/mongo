@@ -293,6 +293,7 @@ MONGOJS_CPP_JSFILES = [
     "types.js",
     "utils.js",
     "utils_auth.js",
+    "utils_auth_global.js",
     "utils_sh.js",
     "utils_sh_global.js",
     ":error_codes_js",

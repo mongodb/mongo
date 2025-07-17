@@ -241,7 +241,7 @@ export default [
                 setVerboseShell: true,
                 timestampCmp: true,
 
-                // src/mongo/shell/utils_auth.d.ts
+                // src/mongo/shell/utils_auth_global.js
                 authutil: true,
 
                 // src/mongo/shell/utils_sh_global.js

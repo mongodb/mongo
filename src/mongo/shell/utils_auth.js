@@ -1,6 +1,5 @@
 var authutil;
 
-(function() {
 assert(!authutil);
 authutil = {};
 
@@ -158,4 +157,5 @@ authutil.asCluster = function(conn, keyfile, action) {
         }
     }
 };
-}());
+
+export {authutil};
