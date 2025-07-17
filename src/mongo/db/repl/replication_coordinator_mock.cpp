@@ -818,14 +818,7 @@ std::shared_ptr<const HelloResponse> ReplicationCoordinatorMock::awaitHelloRespo
     response->setIsWritablePrimary(true);
     response->setIsSecondary(false);
     if (config.getNumMembers() > 0) {
-        for (auto i = 0; i < config.getNumMembers(); ++i) {
-            auto hnp = config.getMemberAt(i).getHostAndPort();
-            response->addHost(hnp);
-            if (i == 0) {
-                response->setMe(hnp);
-                response->setPrimary(hnp);
-            }
-        }
+        response->setMe(config.getMemberAt(0).getHostAndPort());
     } else {
         response->setMe(HostAndPort::parseThrowing("localhost:27017"));
     }
