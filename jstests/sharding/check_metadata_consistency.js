@@ -208,6 +208,40 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     assertNoInconsistencies();
 })();
 
+(function testMisplacedCollectionOnConfigServer() {
+    jsTest.log("Executing testMisplacedCollectionOnConfigServer");
+    // TODO SERVER-107179: do not skip test in multiversion suites
+    const isMultiVersion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+    if (isMultiVersion) {
+        jsTestLog("Skipping test because checkMetadataConsistency in the previous binary " +
+                  "version doesn't include yet the config server as a participant shard");
+        return;
+    }
+
+    const db = getNewDb();
+    assert.commandWorked(mongos.adminCommand({enableSharding: db.getName()}));
+
+    assert.commandWorked(st.configRS.getPrimary().getDB(db.getName()).coll.insert({_id: 'foo'}));
+
+    // Database level mode command
+    let inconsistencies = db.checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+    assert.eq("MisplacedCollection", inconsistencies[0].type, tojson(inconsistencies[0]));
+    assert.eq(1, inconsistencies[0].details.numDocs, tojson(inconsistencies[0]));
+
+    // Collection level mode command
+    const collInconsistencies = db.coll.checkMetadataConsistency().toArray();
+    assert.eq(1, collInconsistencies.length, tojson(inconsistencies));
+    assert.eq("MisplacedCollection", collInconsistencies[0].type, tojson(inconsistencies[0]));
+    assert.eq(1, collInconsistencies[0].details.numDocs, tojson(inconsistencies[0]));
+
+    // Clean up the database to pass the hooks that detect inconsistencies
+    db.dropDatabase();
+    assert.commandWorked(
+        st.configRS.getPrimary().getDB(db.getName()).runCommand({dropDatabase: 1}));
+    assertNoInconsistencies();
+})();
+
 (function testMissingShardKeyInconsistency() {
     jsTest.log("Executing testMissingShardKeyInconsistency");
 

@@ -21,3 +21,6 @@ filters:
   - "replica_set_to_csrs_promotion_startup_flag.js":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "sessions_collection_config_server.js":
+    approvers:
+      - 10gen/server-catalog-and-routing

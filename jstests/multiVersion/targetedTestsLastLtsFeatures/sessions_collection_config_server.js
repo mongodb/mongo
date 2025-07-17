@@ -107,7 +107,8 @@ jsTest.log("Dedicated config server tests");
             st.configRS.getPrimary().getDB("config").createCollection("system.sessions"));
         assert.commandWorked(
             st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
-        checkSessionsCollection(st.s, st.configRS.getPrimary(), true /* garbage version present */);
+        checkSessionsCollectionPresent(st.configRS.getPrimary(),
+                                       true /* garbage version present */);
 
         jsTest.log("Downgrade again so we can do more upgrade tests");
         assert.commandWorked(
