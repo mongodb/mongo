@@ -262,7 +262,7 @@ public:
             auto updatedHosts = std::make_shared<TaggedHostsType>();
             auto& updatedHostsValue = *updatedHosts;
             updatedHostsValue.configVersionAndTerm = replSetConfig.getConfigVersionAndTerm();
-            auto tagConfig = replSetConfig.getTagConfig();
+            const auto& tagConfig = replSetConfig.getTagConfig();
             for (const auto& member : replSetConfig.members()) {
                 for (auto&& it = member.tagsBegin(); it != member.tagsEnd(); ++it) {
                     if (tagConfig.getTagKey(*it) == tag.first &&
@@ -318,7 +318,7 @@ private:
         _params.refreshSnapshot(_paramsSnapshot);
 
         if (MONGO_likely(_paramsSnapshot)) {
-            auto tag = _paramsSnapshot->getTargetedMirroring().getTag();
+            const auto& tag = _paramsSnapshot->getTargetedMirroring().getTag();
             return toTagFromBSON(tag);
         }
 
@@ -328,7 +328,7 @@ private:
     /**
      * Checks if config is uninitialized and signals to defer host computation accordingly.
      */
-    bool _maybeDeferHostCompute(repl::ReplSetConfig config) {
+    bool _maybeDeferHostCompute(const repl::ReplSetConfig& config) {
         if (!config.isInitialized()) {
             // If the config is not yet initialized, then we must defer computation of the host list
             // until we get the relevant information.
@@ -640,7 +640,7 @@ void MirrorMaestroImpl::updateMirroringOptions(MirroredReadsParameters params) {
         return;
     }
 
-    auto targetedParams = _paramsSnapshot->getTargetedMirroring();
+    const auto& targetedParams = _paramsSnapshot->getTargetedMirroring();
 
     // If targeted mirroring was previously enabled and is now disabled, clear the tagged hosts list
     if (targetedParams.getSamplingRate() == 0 && !prevTag.isEmpty()) {
@@ -651,7 +651,7 @@ void MirrorMaestroImpl::updateMirroringOptions(MirroredReadsParameters params) {
 
     // Update the hosts if targetedMirroring was previously disabled (because we would have cleared
     // the hosts list) or if the tag has been updated.
-    if (auto currTag = targetedParams.getTag(); prevRate == 0 ||
+    if (const auto& currTag = targetedParams.getTag(); prevRate == 0 ||
         (targetedParams.getSamplingRate() != 0 && prevTag.woCompare(currTag) != 0)) {
         _cachedHostsForTargetedMirroring.maybeUpdateHosts(
             toTagFromBSON(currTag), config, true /* tagChanged */);
@@ -667,8 +667,8 @@ std::vector<HostAndPort> MirrorMaestroImpl::getCachedHostsForTargetedMirroring()
             return {};
         }
 
-        auto targetedParams = _paramsSnapshot->getTargetedMirroring();
-        auto currTag = targetedParams.getTag();
+        const auto& targetedParams = _paramsSnapshot->getTargetedMirroring();
+        const auto& currTag = targetedParams.getTag();
         _cachedHostsForTargetedMirroring.maybeUpdateHosts(
             toTagFromBSON(currTag), config, true /* tagChanged */);
     }
