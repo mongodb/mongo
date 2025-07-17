@@ -78,3 +78,6 @@ filters:
   - "check_metadata_consistency_helpers.js":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "raw_operation_utils.js":
+    approvers:
+      - 10gen/server-collection-write-path

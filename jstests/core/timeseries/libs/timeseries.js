@@ -2,7 +2,6 @@
 
 import {documentEq} from "jstests/aggregation/extras/utils.js";
 import {
-    getTimeseriesBucketsColl,
     getTimeseriesCollForDDLOps,
     isShardedTimeseries,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
@@ -341,10 +340,6 @@ export var TimeseriesTest = class {
                 assert.eq(updatedShards.length, currentShards.length + 1);
             }
         }
-    }
-
-    static getBucketsCollName(collName) {
-        return getTimeseriesBucketsColl(collName);
     }
 
     static assertInsertWorked(res) {

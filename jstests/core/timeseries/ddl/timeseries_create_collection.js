@@ -11,7 +11,8 @@
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {
-    areViewlessTimeseriesEnabled
+    areViewlessTimeseriesEnabled,
+    getTimeseriesBucketsColl
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const viewlessTimeseriesEnabled = areViewlessTimeseriesEnabled(db);
@@ -21,7 +22,7 @@ assert.commandWorked(testDB.dropDatabase());
 const timeFieldName = 'time';
 const collName = 'ts';
 const coll = testDB[collName];
-const bucketsName = TimeseriesTest.getBucketsCollName(collName);
+const bucketsName = getTimeseriesBucketsColl(collName);
 
 function assertCollExists(
     exists,

@@ -60,7 +60,7 @@ export const kRawOperationFieldName = 'rawData';
 
 // TODO (SERVER-103187): Remove these functions once v9.0 becomes last-LTS.
 export function isRawOperationSupported(db) {
-    return isBinaryCompatibleFlagEnabledAndStable(db, 'RawDataCrudOperations');
+    return isBinaryCompatibleFlagEnabledAndStable(db.getMongo(), 'RawDataCrudOperations');
 }
 export function getRawOperationSpec(db) {
     return isRawOperationSupported(db) ? {[kRawOperationFieldName]: true} : {};
