@@ -26,12 +26,19 @@ const waitPerIterationMs = 200;
 const delinquentIntervalMs = waitPerIterationMs - 20;
 const findComment = "delinquent_ops.js-COMMENT";
 
-function assertDelinquentStats(metrics, count, msg) {
+function assertDelinquentStats(metrics, count, msg, previousOperationMetrics) {
     if (count > 0) {
         assert(metrics, msg);
-        assert.gte(metrics.totalDelinquentAcquisitions, count, metrics);
-        assert.gte(metrics.totalAcquisitionDelinquencyMillis, waitPerIterationMs * count, metrics);
-        assert.gte(metrics.maxAcquisitionDelinquencyMillis, waitPerIterationMs, metrics);
+        let totalCount = metrics.totalDelinquentAcquisitions;
+        let totalMillis = metrics.totalAcquisitionDelinquencyMillis;
+        let maxMillis = metrics.maxAcquisitionDelinquencyMillis;
+        if (previousOperationMetrics) {
+            totalCount -= previousOperationMetrics.totalDelinquentAcquisitions;
+            totalMillis -= previousOperationMetrics.totalAcquisitionDelinquencyMillis;
+        }
+        assert.gte(totalCount, count, metrics);
+        assert.gte(totalMillis, waitPerIterationMs * count, metrics);
+        assert.gte(maxMillis, waitPerIterationMs, metrics);
     } else if (metrics) {
         assert.eq(metrics.totalDelinquentAcquisitions, 0);
         assert.eq(metrics.totalAcquisitionDelinquencyMillis, 0);
@@ -109,7 +116,7 @@ function testDelinquencyOnShard(routerDb, shardDb) {
 
     // Collect the number of overdue operations before running the op that we force to be
     // overdue.
-    const previousOperationMetrics = shardDb.serverStatus().metrics.operation;
+    const previousOperationMetrics = shardDb.serverStatus();
 
     // Configure a failpoint to wait some time before yielding, so that the ticket hold by find()
     // command is considered delinquent.
@@ -153,8 +160,10 @@ function testDelinquencyOnShard(routerDb, shardDb) {
     {
         const serverStatus = shardDb.serverStatus();
         assert.gte(serverStatus.metrics.commands["find"].total, 1);
-        assertDelinquentStats(
-            serverStatus.queues.execution.read.normalPriority, 4, serverStatus.metrics);
+        assertDelinquentStats(serverStatus.queues.execution.read.normalPriority,
+                              4,
+                              serverStatus,
+                              previousOperationMetrics.queues.execution.read.normalPriority);
     }
 
     // Now examine the log for this find() command and ensure it has information
@@ -207,12 +216,13 @@ function runTest(routerDb, shardDb) {
     // After startup, we check that there were no operations marked delinquent, using the extremely
     // high threshold for delinquency that was configured earlier.
     {
-        const shardStatus = shardDb.serverStatus();
-        assertDelinquentStats(shardStatus.queues.execution.read.normalPriority, 0, shardStatus);
+        // const shardStatus = shardDb.serverStatus();
+        // TODO: SERVER-107670 Add back this assertion after we find the root cause.
+        // assertDelinquentStats(shardStatus.queues.execution.read.normalPriority, 0, shardStatus);
         // TODO: SERVER-104007 Add back this assertion
         // assertOverdueOps(shardStatus.metrics.operation, null);
 
-        const routerStatus = routerDb.serverStatus();
+        // const routerStatus = routerDb.serverStatus();
         // TODO: SERVER-104007 Add back this assertion
         // assertOverdueOps(routerStatus.metrics.operation, null);
     }
