@@ -304,6 +304,7 @@ public:
 
         LOGV2(6109516, "closing test client connection");
         closeClientFunc(connectThread);
+        sleepFor(Milliseconds{1});
         fp.setMode(FailPoint::off);
 
         // Using a second connection as a means to wait for the server to process the closed
@@ -312,8 +313,8 @@ public:
         dummyConnection.wait();
         sessionsCreated.wait(0);
 
-        ASSERT_EQ(getDiscardedDueToClientDisconnect() - discardedBefore, 1);
         ASSERT_EQ(sessionsCreated.load(), 1);
+        ASSERT_EQ(getDiscardedDueToClientDisconnect() - discardedBefore, 1);
     }
 
 private:
