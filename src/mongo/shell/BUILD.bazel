@@ -288,6 +288,7 @@ MONGOJS_CPP_JSFILES = [
     "mongo.js",
     "prelude.js",
     "query.js",
+    "query_global.js",
     "session.js",
     "session_global.js",
     "types.js",

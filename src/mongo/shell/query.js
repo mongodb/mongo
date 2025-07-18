@@ -1,8 +1,7 @@
 // query.js
 
-if (typeof DBQuery == "undefined") {
-    DBQuery = function(
-        mongo, db, collection, ns, filter, projection, limit, skip, batchSize, options) {
+const DBQuery = globalThis.DBQuery ??
+    function(mongo, db, collection, ns, filter, projection, limit, skip, batchSize, options) {
         this._mongo = mongo;
         this._db = db;
         this._collection = collection;
@@ -24,8 +23,6 @@ if (typeof DBQuery == "undefined") {
         this._numReturned = 0;
         this._prettyShell = false;
     };
-    print("DBQuery probably won't have array access ");
-}
 
 DBQuery.prototype.help = function() {
     print("find(<predicate>, <projection>) modifiers");
@@ -527,9 +524,9 @@ DBQuery.prototype.shellPrint = function() {
         }
         if (this.hasNext()) {
             print("Type \"it\" for more");
-            ___it___ = this;
+            globalThis.___it___ = this;
         } else {
-            ___it___ = null;
+            globalThis.___it___ = null;
         }
     } catch (e) {
         print(e);
@@ -888,4 +885,10 @@ const QueryHelpers = {
 
         return query;
     }
+};
+
+export {
+    DBQuery,
+    DBCommandCursor,
+    QueryHelpers,
 };
