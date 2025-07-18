@@ -27,8 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/ce/ce_test_utils.h"
-#include "mongo/db/query/ce/sampling/sampling_test_utils.h"
+#include "mongo/db/query/compiler/ce/ce_test_utils.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::ce {

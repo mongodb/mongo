@@ -28,9 +28,9 @@
  */
 
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/ce/ce_test_utils.h"
-#include "mongo/db/query/ce/sampling/sampling_estimator_impl.h"
-#include "mongo/db/query/ce/sampling/sampling_test_utils.h"
+#include "mongo/db/query/compiler/ce/ce_test_utils.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 
 #include <benchmark/benchmark.h>

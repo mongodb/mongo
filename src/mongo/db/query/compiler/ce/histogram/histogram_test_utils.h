@@ -30,9 +30,9 @@
 #pragma once
 
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/query/ce/ce_test_utils.h"
-#include "mongo/db/query/ce/histogram/histogram_common.h"
-#include "mongo/db/query/ce/histogram/histogram_estimator.h"
+#include "mongo/db/query/compiler/ce/ce_test_utils.h"
+#include "mongo/db/query/compiler/ce/histogram/histogram_common.h"
+#include "mongo/db/query/compiler/ce/histogram/histogram_estimator.h"
 #include "mongo/db/query/compiler/stats/ce_histogram.h"
 #include "mongo/db/query/compiler/stats/scalar_histogram.h"
 #include "mongo/db/query/compiler/stats/value_utils.h"

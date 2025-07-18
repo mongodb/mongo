@@ -15,7 +15,7 @@ mongo_cc_library(
         "histogram_common.h",
     ],
     deps = [
-        "//src/mongo/db/query/ce:ce_common",
+        "//src/mongo/db/query/compiler/ce:ce_common",
     ],
 )
 
@@ -51,7 +51,7 @@ mongo_cc_library(
         ":histogram_estimator",
         "//src/mongo/db:query_exec",
         "//src/mongo/db/catalog:catalog_test_fixture",
-        "//src/mongo/db/query/ce:ce_test_utils",
+        "//src/mongo/db/query/compiler/ce:ce_test_utils",
         "//src/mongo/db/query/compiler/stats:stats_gen",
         "//src/mongo/db/query/compiler/stats:stats_test_utils",
         "//src/mongo/unittest",
@@ -64,7 +64,7 @@ mongo_cc_unit_test(
         "histogram_estimation_impl_test.cpp",
         "histogram_estimator_test.cpp",
     ],
-    tags = ["mongo_unittest_eighth_group"],
+    tags = ["mongo_unittest_second_group"],
     deps = [
         ":histogram_test_utils",
         "//src/mongo/db/query/compiler/stats:stats_gen",
@@ -76,7 +76,7 @@ mongo_cc_unit_test(
     srcs = [
         "maxdiff_histogram_test.cpp",
     ],
-    tags = ["mongo_unittest_eighth_group"],
+    tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":histogram_test_utils",
         "//src/mongo/db/query/compiler/stats:maxdiff_test_utils",
@@ -90,7 +90,7 @@ mongo_cc_unit_test(
     srcs = [
         "generated_histograms_test.cpp",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":histogram_test_utils",
         "//src/mongo/db:service_context_test_fixture",

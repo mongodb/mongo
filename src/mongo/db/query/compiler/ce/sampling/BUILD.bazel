@@ -23,7 +23,7 @@ mongo_cc_library(
         "//src/mongo/db/catalog:catalog_test_fixture",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/query:query_planner",
-        "//src/mongo/db/query/ce:ce_test_utils",
+        "//src/mongo/db/query/compiler/ce:ce_test_utils",
     ],
 )
 
@@ -57,7 +57,7 @@ mongo_cc_unit_test(
     srcs = [
         "sampling_estimator_test.cpp",
     ],
-    tags = ["mongo_unittest_eighth_group"],
+    tags = ["mongo_unittest_third_group"],
     deps = [
         ":sampling_test_utils",
         "//src/mongo/db:query_exec",
@@ -70,7 +70,7 @@ mongo_cc_unit_test(
     srcs = [
         "sampling_accuracy_test.cpp",
     ],
-    tags = ["mongo_unittest_seventh_group"],
+    tags = ["mongo_unittest_first_group"],
     deps = [
         ":sampling_test_utils",
         "//src/mongo/db/query:query_test_service_context",

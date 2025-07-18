@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/ce/histogram/histogram_estimator.h"
+#include "mongo/db/query/compiler/ce/histogram/histogram_estimator.h"
 
 #include "mongo/db/exec/sbe/values/bson.h"
 

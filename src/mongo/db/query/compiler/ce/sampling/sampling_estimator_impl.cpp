@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/ce/sampling/sampling_estimator_impl.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"

@@ -29,10 +29,10 @@
 
 #include "mongo/db/query/get_executor.h"
 
-#include "mongo/db/query/ce/exact/exact_cardinality.h"
-#include "mongo/db/query/ce/exact/exact_cardinality_impl.h"
-#include "mongo/db/query/ce/sampling/sampling_estimator.h"
-#include "mongo/db/query/ce/sampling/sampling_estimator_impl.h"
+#include "mongo/db/query/compiler/ce/exact/exact_cardinality.h"
+#include "mongo/db/query/compiler/ce/exact/exact_cardinality_impl.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 
 #include <absl/container/flat_hash_set.h>
 #include <absl/container/node_hash_map.h>

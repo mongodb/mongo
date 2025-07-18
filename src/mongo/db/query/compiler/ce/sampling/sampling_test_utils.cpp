@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/ce/sampling/sampling_test_utils.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
 
 #include "mongo/db/concurrency/exception_util.h"
 

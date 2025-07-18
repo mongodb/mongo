@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/ce/exact/exact_cardinality_impl.h"
+#include "mongo/db/query/compiler/ce/exact/exact_cardinality_impl.h"
 
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 

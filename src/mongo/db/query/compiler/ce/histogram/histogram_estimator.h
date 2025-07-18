@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/query/ce/histogram/histogram_estimation_impl.h"
+#include "mongo/db/query/compiler/ce/histogram/histogram_estimation_impl.h"
 
 namespace mongo::ce {
 

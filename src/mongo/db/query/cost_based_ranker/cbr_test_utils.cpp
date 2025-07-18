@@ -31,8 +31,8 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/ce/ce_test_utils.h"
-#include "mongo/db/query/ce/histogram/histogram_test_utils.h"
+#include "mongo/db/query/compiler/ce/ce_test_utils.h"
+#include "mongo/db/query/compiler/ce/histogram/histogram_test_utils.h"
 #include "mongo/db/query/compiler/stats/collection_statistics_mock.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/platform/compiler.h"
