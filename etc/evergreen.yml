@@ -56,9 +56,11 @@ include:
 - filename: etc/evergreen_yml_components/project_and_distro_settings.yml
 - filename: etc/evergreen_yml_components/configuration.yml
 - filename: etc/evergreen_yml_components/definitions.yml
+- filename: etc/evergreen_yml_components/tasks/release_tasks.yml
 - filename: etc/evergreen_yml_components/variants/task_generation.yml
 - filename: etc/evergreen_yml_components/variants/sanitizer.yml
 - filename: etc/evergreen_yml_components/variants/in_memory.yml
+- filename: etc/evergreen_yml_components/variants/misc/misc.yml
 - filename: etc/evergreen_yml_components/variants/ninja.yml
 - filename: etc/evergreen_yml_components/variants/compile_static_analysis.yml
 # TODO: (SERVER-86211) Re-enable config shard evergreen variant.

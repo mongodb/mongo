@@ -1,0 +1,17 @@
+# Miscellaneous build variants
+#
+# After the branching variants in this file
+# should continue to run on a new rapid release (v7.1, v7.2 etc.)
+# and LTS release (v7.0, v6.0 etc.) branch projects
+
+buildvariants:
+  - name: test-release
+    display_name: "Test Release"
+    allowed_requesters: ["commit", "patch"]
+    tags: ["assigned_to_jira_team_devprod_release_infrastructure"]
+    activate: true
+    run_on: ubuntu2404-small
+    modules:
+      - devprod_coverity
+    tasks:
+      - name: publish-sast-report
