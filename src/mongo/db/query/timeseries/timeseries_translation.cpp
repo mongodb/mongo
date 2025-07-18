@@ -214,7 +214,7 @@ template <class T>
 void translateIndexHintIfRequiredImpl(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const T& catalogData,
                                       AggregateCommandRequest& request) {
-    const auto hint = request.getHint();
+    const auto& hint = request.getHint();
     if (!hint || !timeseries::isHintIndexKey(*hint)) {
         return;
     }
