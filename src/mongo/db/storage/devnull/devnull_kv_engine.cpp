@@ -173,7 +173,6 @@ public:
         return nullptr;
     }
 
-    using RecordStoreBase::getLargestKey;
     RecordId getLargestKey(OperationContext* opCtx, RecoveryUnit& ru) const final {
         return RecordId();
     }

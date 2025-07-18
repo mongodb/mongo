@@ -227,10 +227,6 @@ public:
 
     void appendAllCustomStats(RecoveryUnit&, BSONObjBuilder*, double scale) const final {}
 
-    RecordId getLargestKey(OperationContext*) const final {
-        unimplementedTasserted();
-        return {};
-    }
     RecordId getLargestKey(OperationContext*, RecoveryUnit&) const final {
         unimplementedTasserted();
         return {};

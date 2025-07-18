@@ -119,7 +119,6 @@ public:
     StatusWith<int64_t> compact(OperationContext*, const CompactOptions&) final;
     StatusWith<int64_t> compact(OperationContext*, RecoveryUnit&, const CompactOptions&) final;
 
-    RecordId getLargestKey(OperationContext*) const final;
     RecordId getLargestKey(OperationContext*, RecoveryUnit&) const override = 0;
 
     void reserveRecordIds(OperationContext*, std::vector<RecordId>*, size_t numRecords) final;

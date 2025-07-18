@@ -618,10 +618,7 @@ public:
      *
      * May throw WriteConflictException in certain cache-stuck scenarios even if the operation isn't
      * part of a WriteUnitOfWork.
-     *
-     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
-    virtual RecordId getLargestKey(OperationContext*) const = 0;
     virtual RecordId getLargestKey(OperationContext*, RecoveryUnit&) const = 0;
 
     /**

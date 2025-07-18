@@ -148,7 +148,6 @@ public:
         _data->dataSize = dataSize;
     }
 
-    using RecordStoreBase::getLargestKey;
     RecordId getLargestKey(OperationContext* opCtx, RecoveryUnit& ru) const final {
         stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
         return RecordId(_data->nextId - 1);

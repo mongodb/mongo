@@ -182,10 +182,6 @@ StatusWith<int64_t> RecordStoreBase::compact(OperationContext* opCtx,
     return _compact(opCtx, ru, options);
 }
 
-RecordId RecordStoreBase::getLargestKey(OperationContext* opCtx) const {
-    return getLargestKey(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
-}
-
 void RecordStoreBase::reserveRecordIds(OperationContext* opCtx,
                                        std::vector<RecordId>* rids,
                                        size_t numRecords) {

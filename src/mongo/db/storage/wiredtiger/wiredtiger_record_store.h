@@ -207,7 +207,6 @@ public:
 
     void updateStatsAfterRepair(long long numRecords, long long dataSize) override;
 
-    using RecordStoreBase::getLargestKey;
     RecordId getLargestKey(OperationContext* opCtx, RecoveryUnit& ru) const override;
 
     using RecordStoreBase::reserveRecordIds;
