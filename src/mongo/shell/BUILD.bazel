@@ -292,6 +292,7 @@ MONGOJS_CPP_JSFILES = [
     "session_global.js",
     "types.js",
     "utils.js",
+    "utils_global.js",
     "utils_auth.js",
     "utils_auth_global.js",
     "utils_sh.js",

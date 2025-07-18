@@ -1,11 +1,9 @@
-__quiet = false;
-__magicNoPrint = {
-    __magicNoPrint: 1111
-};
-_verboseShell = false;
+globalThis.__quiet = false;
+let __magicNoPrint = {__magicNoPrint: 1111};
+let _verboseShell = false;
 
-chatty = function(s) {
-    if (!__quiet)
+function chatty(s) {
+    if (!globalThis.__quiet)
         print(s);
 };
 
@@ -251,7 +249,7 @@ function executeNoThrowNetworkError(func) {
 }
 
 // Please consider using bsonWoCompare instead of this as much as possible.
-friendlyEqual = function(a, b) {
+function friendlyEqual(a, b) {
     if (a == b)
         return true;
 
@@ -275,7 +273,7 @@ friendlyEqual = function(a, b) {
     return false;
 };
 
-printStackTrace = function() {
+function printStackTrace() {
     try {
         throw new Error("Printing Stack Trace");
     } catch (e) {
@@ -289,7 +287,7 @@ printStackTrace = function() {
  * <p> Default is off. <p>
  * @param {Bool} verbosity on / off
  */
-setVerboseShell = function(value) {
+function setVerboseShell(value) {
     if (value == undefined)
         value = true;
     _verboseShell = value;
@@ -301,7 +299,7 @@ setVerboseShell = function(value) {
 // @param width width of the bar (excluding the left and right delimiters [ ] )
 // e.g. _barFormat([[.3, "="], [.5, '-']], 80) returns
 //      "[========================----------------------------------------                ]"
-_barFormat = function(data, width) {
+function _barFormat(data, width) {
     var remaining = width;
     var res = "[";
     for (var i = 0; i < data.length; i++) {
@@ -319,29 +317,29 @@ _barFormat = function(data, width) {
 };
 
 // these two are helpers for Array.sort(func)
-compare = function(l, r) {
+function compare(l, r) {
     return (l == r ? 0 : (l < r ? -1 : 1));
 };
 
 // arr.sort(compareOn('name'))
-compareOn = function(field) {
+function compareOn(field) {
     return function(l, r) {
         return compare(l[field], r[field]);
     };
 };
 
-shellPrint = function(x) {
+function shellPrint(x) {
     const it = x;
     if (x != undefined)
         shellPrintHelper(x);
 };
 
-_originalPrint = print;
-disablePrint = function() {
+let _originalPrint = print;
+function disablePrint() {
     print = Function.prototype;
 };
 
-enablePrint = function() {
+function enablePrint() {
     print = _originalPrint;
 };
 
@@ -374,9 +372,7 @@ var indentStr = function(indent, s) {
     return s;
 };
 
-if (typeof TestData == "undefined") {
-    TestData = undefined;
-}
+globalThis.TestData ??= undefined;
 
 // Enabling a custom JS_GC_ZEAL value for spidermonkey is a two step process:
 // 1) JS_GC_ZEAL preprocessor directive needs to be defined at compilation (spider-monkey-dbg=on).
@@ -393,7 +389,14 @@ function _isSpiderMonkeyDebugEnabled() {
     return regex.test(jsGcZeal);
 }
 
-jsTestName = function() {
+/**
+ * Returns the name of the current jsTest to be used as an identifier.
+ * This may be prefixed and/or hashed to improve traceability.
+ *
+ * @example
+ * const coll = db[jsTestName()];
+ */
+function jsTestName() {
     if (TestData) {
         // If we are using the jsTestName as a database name and performing tenant prefixing
         // then it's possible that the prefixed database name will exceed the server's dbName
@@ -410,7 +413,7 @@ jsTestName = function() {
 
 var _jsTestOptions = {};
 
-jsTestOptions = function() {
+function jsTestOptions() {
     if (TestData) {
         return Object.merge(_jsTestOptions, {
             // Test commands should be enabled by default if no enableTestCommands were present in
@@ -552,7 +555,7 @@ jsTestOptions = function() {
  * @param {object} args
  * @param {("I"|"D"|"W"|"E")} args.severity - An unique identified to help with filtering logs.
  */
-jsTestLog = function(msg, attr, {severity = "I"} = {}) {
+function jsTestLog(msg, attr, {severity = "I"} = {}) {
     const severityMap = {E: 1, W: 2, I: 3, D: 4};
     const severityLevel = severityMap[severity];
     const logLevel = TestData?.logLevel ?? severityMap["I"];  // The default log level is 'INFO'.
@@ -603,7 +606,7 @@ jsTestLog = function(msg, attr, {severity = "I"} = {}) {
     print(`\n\n${msgs.join("\n")}\n\n`);
 };
 
-jsTest = {};
+let jsTest = {};
 
 jsTest.name = jsTestName;
 jsTest.options = jsTestOptions;
@@ -707,7 +710,7 @@ jsTest.isMongos = function(conn) {
     return conn.getDB('admin')._helloOrLegacyHello().msg == 'isdbgrid';
 };
 
-defaultPrompt = function() {
+function defaultPrompt() {
     var status = globalThis.db.getMongo().authStatus;
     var prefix = globalThis.db.getMongo().promptPrefix;
 
@@ -786,7 +789,7 @@ defaultPrompt = function() {
     return prefix + "> ";
 };
 
-replSetMemberStatePrompt = function() {
+function replSetMemberStatePrompt() {
     var state = '';
     var stateInfo = globalThis.db.getSiblingDB('admin')._runCommandWithoutApiStrict(
         {replSetGetStatus: 1, forShell: 1});
@@ -813,7 +816,7 @@ replSetMemberStatePrompt = function() {
     return state + '> ';
 };
 
-helloStatePrompt = function(helloReply) {
+function helloStatePrompt(helloReply) {
     var state = '';
     var hello = helloReply || globalThis.db._helloOrLegacyHello({forShell: 1});
     if (hello.ok) {
@@ -842,25 +845,21 @@ helloStatePrompt = function(helloReply) {
     return state + '> ';
 };
 
-if (typeof _shouldRetryWrites === 'undefined') {
-    // We ensure the _shouldRetryWrites() function is always defined, in case the JavaScript engine
-    // is being used from someplace other than the mongo shell (e.g. map-reduce).
-    _shouldRetryWrites = function _shouldRetryWrites() {
-        return false;
-    };
-}
+// We ensure the _shouldRetryWrites() function is always defined, in case the JavaScript engine
+// is being used from someplace other than the mongo shell (e.g. map-reduce).
+let _shouldRetryWrites = globalThis._shouldRetryWrites ?? function() {
+    return false;
+};
 
-if (typeof _shouldUseImplicitSessions === 'undefined') {
-    // We ensure the _shouldUseImplicitSessions() function is always defined, in case the JavaScript
-    // engine is being used from someplace other than the mongo shell (e.g. map-reduce). If the
-    // function was not defined, implicit sessions are disabled to prevent unnecessary sessions from
-    // being created.
-    _shouldUseImplicitSessions = function _shouldUseImplicitSessions() {
-        return false;
-    };
-}
+// We ensure the _shouldUseImplicitSessions() function is always defined, in case the JavaScript
+// engine is being used from someplace other than the mongo shell (e.g. map-reduce). If the
+// function was not defined, implicit sessions are disabled to prevent unnecessary sessions from
+// being created.
+let _shouldUseImplicitSessions = globalThis._shouldUseImplicitSessions ?? function() {
+    return false;
+};
 
-shellPrintHelper = function(x) {
+function shellPrintHelper(x) {
     if (typeof (x) == "undefined") {
         return;
     }
@@ -890,7 +889,7 @@ shellPrintHelper = function(x) {
         print(tojson(x));
 };
 
-shellAutocomplete = function(
+let shellAutocomplete = function(
     /*prefix*/) {  // outer scope function called on init. Actual function at end
     var universalMethods =
         "constructor prototype toString valueOf toLocaleString hasOwnProperty propertyIsEnumerable"
@@ -964,9 +963,7 @@ shellAutocomplete = function(
     };
 
     var worker = function(prefix) {
-        var global = (function() {
-                         return this;
-                     }).call();  // trick to get global object
+        var global = globalThis;
 
         var curObj = global;
         var parts = prefix.split('.');
@@ -1024,17 +1021,17 @@ shellAutocomplete = function(
     // this is the actual function that gets assigned to shellAutocomplete
     return function(prefix) {
         try {
-            __autocomplete__ = worker(prefix).sort();
+            globalThis.__autocomplete__ = worker(prefix).sort();
         } catch (e) {
             print("exception during autocomplete: " + tojson(e.message));
-            __autocomplete__ = [];
+            globalThis.__autocomplete__ = [];
         }
     };
 }();
 
 shellAutocomplete.showPrivate = false;  // toggle to show (useful when working on internals)
 
-shellHelper = function(command, rest, shouldPrint) {
+function shellHelper(command, rest, shouldPrint) {
     command = command.trim();
     var args = rest.trim().replace(/\s*;$/, "").split("\s+");
 
@@ -1371,7 +1368,8 @@ shellHelper.show = function(what) {
     throw Error("don't know how to show [" + what + "]");
 };
 
-__promptWrapper__ = function(promptFunction) {
+let __prompt__;
+function __promptWrapper__(promptFunction) {
     // Call promptFunction directly if the global "db" is not defined, e.g. --nodb.
     if (typeof globalThis.db === 'undefined' || !(globalThis.db instanceof DB)) {
         __prompt__ = promptFunction();
@@ -1519,7 +1517,7 @@ function timestampCmp(ts1, ts2) {
     }
 }
 
-Geo = {};
+let Geo = {};
 Geo.distance = function(a, b) {
     var ax = null;
     var ay = null;
@@ -1581,8 +1579,7 @@ Geo.sphereDistance = function(a, b) {
     return Math.acos(cross_prod);
 };
 
-// eslint-disable-next-line
-rs = function() {
+function rs() {
     return "try rs.help()";
 };
 
@@ -1593,7 +1590,7 @@ rs = function() {
  * It should be used instead of awaitRSClientHost when there is no MongoS with a connection to the
  * replica set.
  */
-_awaitRSHostViaRSMonitor = function(hostAddr, desiredState, rsName, timeout) {
+function _awaitRSHostViaRSMonitor(hostAddr, desiredState, rsName, timeout) {
     timeout = timeout || 60 * 1000;
 
     if (desiredState == undefined) {
@@ -1748,7 +1745,7 @@ rs.reconfig = function(cfg, options) {
     return this._runCmd(cmd);
 };
 
-_validateMemberIndex = function(memberIndex, newConfig) {
+function _validateMemberIndex(memberIndex, newConfig) {
     const newMemberConfig = newConfig.members[memberIndex];
     assert(newMemberConfig, `Node at index ${memberIndex} does not exist in the new config`);
     assert.eq(1,
@@ -1963,7 +1960,7 @@ rs.compareOpTimes = function(ot1, ot2) {
     }
 };
 
-help = shellHelper.help = function(x) {
+function help(x) {
     if (x == "mr") {
         print("\nSee also http://dochub.mongodb.org/core/mapreduce");
         print("\nfunction mapf() {");
@@ -2098,4 +2095,51 @@ help = shellHelper.help = function(x) {
               "exit                         quit the mongo shell");
     } else
         print("unknown help option");
+};
+shellHelper.help = help;
+
+export {
+    Geo,
+    Random,
+    __magicNoPrint,
+    __promptWrapper__,
+    __prompt__,
+    _awaitRSHostViaRSMonitor,
+    _barFormat,
+    _getErrorWithCode,
+    _isSpiderMonkeyDebugEnabled,
+    _originalPrint,
+    _shouldRetryWrites,
+    _shouldUseImplicitSessions,
+    _validateMemberIndex,
+    _verboseShell,
+    chatty,
+    compare,
+    compareOn,
+    defaultPrompt,
+    disablePrint,
+    enablePrint,
+    executeNoThrowNetworkError,
+    friendlyEqual,
+    hasErrorCode,
+    helloStatePrompt,
+    help,
+    indentStr,
+    isNetworkError,
+    isRetryableError,
+    jsTest,
+    jsTestOptions,
+    jsTestLog,
+    jsTestName,
+    printStackTrace,
+    replSetMemberStatePrompt,
+    retryOnNetworkError,
+    retryOnRetryableError,
+    rs,
+    shellAutocomplete,
+    shellHelper,
+    shellPrint,
+    shellPrintHelper,
+    setVerboseShell,
+    timestampCmp,
 };
