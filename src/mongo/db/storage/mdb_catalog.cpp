@@ -82,6 +82,13 @@ void MDBCatalog::init(OperationContext* opCtx) {
     }
 }
 
+RecordId MDBCatalog::reserveCatalogId(OperationContext* opCtx) {
+    std::vector<RecordId> reservedRids;
+    _rs->reserveRecordIds(opCtx, &reservedRids, 1);
+    invariant(reservedRids.size() == 1);
+    return std::move(reservedRids[0]);
+}
+
 std::vector<MDBCatalog::EntryIdentifier> MDBCatalog::getAllCatalogEntries(
     OperationContext* opCtx) const {
     std::vector<MDBCatalog::EntryIdentifier> ret;
@@ -199,17 +206,22 @@ StatusWith<MDBCatalog::EntryIdentifier> MDBCatalog::addOrphanedEntry(
     return _addEntry(opCtx, ident, nss, catalogEntryObj);
 }
 
-StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> MDBCatalog::initializeNewEntry(
+StatusWith<std::unique_ptr<RecordStore>> MDBCatalog::initializeNewEntry(
     OperationContext* opCtx,
     boost::optional<UUID>& uuid,
     const std::string& ident,
     const NamespaceString& nss,
     const RecordStore::Options& recordStoreOptions,
-    const BSONObj& catalogEntryObj) {
-    StatusWith<EntryIdentifier> swEntry = _addEntry(opCtx, ident, nss, catalogEntryObj);
+    const BSONObj& catalogEntryObj,
+    const RecordId& catalogId) {
+    invariant(!catalogId.isNull());
+
+    StatusWith<EntryIdentifier> swEntry = _addEntry(opCtx, ident, nss, catalogEntryObj, catalogId);
     if (!swEntry.isOK())
         return swEntry.getStatus();
+
     EntryIdentifier& entry = swEntry.getValue();
+    invariant(catalogId == entry.catalogId);
 
     Status status = _engine->createRecordStore(nss, ident, recordStoreOptions);
     if (!status.isOK())
@@ -223,8 +235,7 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> MDBCatalog::initia
 
     auto rs = _engine->getRecordStore(opCtx, nss, ident, recordStoreOptions, uuid);
     invariant(rs);
-
-    return std::pair<RecordId, std::unique_ptr<RecordStore>>(entry.catalogId, std::move(rs));
+    return rs;
 }
 
 StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> MDBCatalog::importCatalogEntry(
@@ -460,9 +471,11 @@ RecordStore::Options MDBCatalog::_parseRecordStoreOptions(const NamespaceString&
 StatusWith<MDBCatalog::EntryIdentifier> MDBCatalog::_addEntry(OperationContext* opCtx,
                                                               const std::string& ident,
                                                               const NamespaceString& nss,
-                                                              const BSONObj& catalogEntryObj) {
+                                                              const BSONObj& catalogEntryObj,
+                                                              const RecordId& catalogId) {
     StatusWith<RecordId> res = _rs->insertRecord(opCtx,
                                                  *shard_role_details::getRecoveryUnit(opCtx),
+                                                 catalogId,
                                                  catalogEntryObj.objdata(),
                                                  catalogEntryObj.objsize(),
                                                  Timestamp());

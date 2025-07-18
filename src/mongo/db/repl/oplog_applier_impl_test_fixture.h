@@ -202,7 +202,11 @@ public:
     std::function<void(OperationContext*, const OplogUpdateEntryArgs&)> onUpdateFn;
 
     std::function<void(
-        OperationContext*, const NamespaceString&, const CollectionOptions&, const BSONObj&)>
+        OperationContext*,
+        const NamespaceString&,
+        const CollectionOptions&,
+        const BSONObj&,
+        const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier)>
         onCreateCollectionFn;
 
     std::function<void(OperationContext*,

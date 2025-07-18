@@ -70,8 +70,9 @@ public:
         {
             WriteUnitOfWork wuow(opCtx);
             const auto ident = _storageEngine->generateNewCollectionIdent(ns.dbName());
-            std::tie(catalogId, rs) = unittest::assertGet(
-                durable_catalog::createCollection(opCtx, ns, ident, options, mdbCatalog));
+            catalogId = mdbCatalog->reserveCatalogId(opCtx);
+            rs = unittest::assertGet(durable_catalog::createCollection(
+                opCtx, catalogId, ns, ident, options, mdbCatalog));
             wuow.commit();
         }
         std::shared_ptr<Collection> coll = std::make_shared<CollectionImpl>(

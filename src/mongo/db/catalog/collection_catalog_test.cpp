@@ -1209,14 +1209,16 @@ private:
         auto storageEngine = getServiceContext()->getStorageEngine();
         const auto ident = storageEngine->generateNewCollectionIdent(nss.dbName());
         auto mdbCatalog = storageEngine->getMDBCatalog();
-        std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
-            uassertStatusOK(
-                durable_catalog::createCollection(opCtx, nss, ident, options, mdbCatalog));
-        auto& catalogId = catalogIdRecordStorePair.first;
+        const auto catalogId = mdbCatalog->reserveCatalogId(opCtx);
+        auto rs = unittest::assertGet(
+            durable_catalog::createCollection(opCtx, catalogId, nss, ident, options, mdbCatalog));
         auto catalogEntry = durable_catalog::getParsedCatalogEntry(opCtx, catalogId, mdbCatalog);
+        ASSERT_EQUALS(catalogEntry->catalogId, catalogId);
+        ASSERT_EQUALS(catalogEntry->ident, ident);
+
         auto metadata = catalogEntry->metadata;
-        std::shared_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
-            opCtx, nss, catalogId, metadata, std::move(catalogIdRecordStorePair.second));
+        std::shared_ptr<Collection> ownedCollection =
+            Collection::Factory::get(opCtx)->make(opCtx, nss, catalogId, metadata, std::move(rs));
         ownedCollection->init(opCtx);
         invariant(ownedCollection->getSharedDecorations());
         historicalIDTrackerAllowsMixedModeWrites(ownedCollection->getSharedDecorations())

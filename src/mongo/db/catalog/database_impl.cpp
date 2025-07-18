@@ -49,6 +49,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/disagg_storage/server_parameters_gen.h"
 #include "mongo/db/index_builds/index_build_block.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -150,6 +151,19 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString cons
     }
 }
 
+RecordId acquireCatalogId(
+    OperationContext* opCtx,
+    const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
+    MDBCatalog* mdbCatalog) {
+    if (disagg::gDisaggregatedStorageEnabled && createCollCatalogIdentifier.has_value()) {
+        // Replicated catalogIds aren't compatible with standard architecture, as a node may create
+        // local collection whose catalogId collides with that of a replicated collection created on
+        // another node.
+        return createCollCatalogIdentifier->catalogId;
+    }
+    return mdbCatalog->reserveCatalogId(opCtx);
+}
+
 std::shared_ptr<Collection> makeCollectionInstance(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -161,8 +175,9 @@ std::shared_ptr<Collection> makeCollectionInstance(
     }
 
     auto mdbCatalog = opCtx->getServiceContext()->getStorageEngine()->getMDBCatalog();
+    const auto& catalogId = catalogIdentifier.catalogId;
     auto createResult = durable_catalog::createCollection(
-        opCtx, nss, catalogIdentifier.ident, collectionOptions, mdbCatalog);
+        opCtx, catalogId, nss, catalogIdentifier.ident, collectionOptions, mdbCatalog);
     if (createResult == ErrorCodes::ObjectAlreadyExists) {
         // Each new ident must uniquely identify the collection's underlying table in the storage
         // engine. A scenario where the ident collides with a pre-existing ident should never happen
@@ -171,10 +186,11 @@ std::shared_ptr<Collection> makeCollectionInstance(
                     "Generated ident cannot uniquely identify a new collection's storage table. "
                     "The ident maps to an occupied file",
                     "nss"_attr = nss.toStringForErrorMsg(),
-                    "ident"_attr = catalogIdentifier.ident);
+                    "ident"_attr = catalogIdentifier.ident,
+                    "catalogId"_attr = catalogId);
     }
 
-    auto [catalogId, recordStore] = uassertStatusOK(std::move(createResult));
+    auto recordStore = uassertStatusOK(std::move(createResult));
     auto catalogEntry = durable_catalog::getParsedCatalogEntry(opCtx, catalogId, mdbCatalog);
     invariant(catalogEntry);
     auto& metadata = catalogEntry->metadata;
@@ -182,11 +198,22 @@ std::shared_ptr<Collection> makeCollectionInstance(
         opCtx, nss, catalogId, metadata, std::move(recordStore));
 }
 
-CreateCollCatalogIdentifier makeIdents(OperationContext* opCtx, const NamespaceString& nss) {
+// Acquires the final set of identifiers to use when creating a new collection in the catalog.
+CreateCollCatalogIdentifier acquireCatalogIdentifierForCreate(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const boost::optional<CreateCollCatalogIdentifier>& providedIdentifier) {
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     CreateCollCatalogIdentifier catalogIdentifiers;
+
+    // TODO(SERVER-105262): Use the replicated idents rather than always generating new ones
     catalogIdentifiers.ident = storageEngine->generateNewCollectionIdent(nss.dbName());
     catalogIdentifiers.idIndexIdent = storageEngine->generateNewIndexIdent(nss.dbName());
+
+    // The acquired catalogId can be different than one specified in the 'providedIdentifier' unless
+    // disaggregated storage is enabled.
+    catalogIdentifiers.catalogId =
+        acquireCatalogId(opCtx, providedIdentifier, storageEngine->getMDBCatalog());
     return catalogIdentifiers;
 }
 
@@ -655,7 +682,13 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                                            bool fromMigrate) const {
 
     return _createCollection(
-        opCtx, nss, options, makeIdents(opCtx, nss), createIdIndex, idIndex, fromMigrate);
+        opCtx,
+        nss,
+        options,
+        acquireCatalogIdentifierForCreate(opCtx, nss, /*providedIdentifier=*/boost::none),
+        createIdIndex,
+        idIndex,
+        fromMigrate);
 }
 
 Collection* DatabaseImpl::createVirtualCollection(OperationContext* opCtx,
@@ -774,21 +807,15 @@ Collection* DatabaseImpl::_createCollection(
                 "uuid"_attr = optionsWithUUID.uuid.value(),
                 "options"_attr = options);
 
-    boost::optional<CreateCollCatalogIdentifier> catalogIdentifierWithCatalogId;
+    boost::optional<CreateCollCatalogIdentifier> catalogIdentifierForColl;
     auto ownedCollection = std::visit(
         OverloadedVisitor{
             [&](const VirtualCollectionOptions& vopts) {
                 return VirtualCollectionImpl::make(opCtx, nss, optionsWithUUID, vopts);
             },
             [&](const CreateCollCatalogIdentifier& catalogIdentifier) {
-                auto coll = makeCollectionInstance(opCtx, nss, optionsWithUUID, catalogIdentifier);
-
-                // The newly created collection may not have used the catalogId we told it to use
-                // (if any), so we need to use the actual catalogId from here on
-                catalogIdentifierWithCatalogId = catalogIdentifier;
-                catalogIdentifierWithCatalogId->catalogId = coll->getCatalogId();
-
-                return coll;
+                catalogIdentifierForColl = catalogIdentifier;
+                return makeCollectionInstance(opCtx, nss, optionsWithUUID, catalogIdentifier);
             }},
         voptsOrCatalogIdentifier);
 
@@ -809,8 +836,8 @@ Collection* DatabaseImpl::_createCollection(
         if (optionsWithUUID.autoIndexId != CollectionOptions::NO) {
             // Creating an index requires touching disk, which means there must be catalog
             // identifiers associated with the newly created collection.
-            invariant(catalogIdentifierWithCatalogId);
-            invariant(catalogIdentifierWithCatalogId->idIndexIdent);
+            invariant(catalogIdentifierForColl);
+            invariant(catalogIdentifierForColl->idIndexIdent);
 
             // TODO(SERVER-103398): Investigate usage validity of
             // CollectionPtr::CollectionPtr_UNSAFE
@@ -822,7 +849,7 @@ Collection* DatabaseImpl::_createCollection(
                 !idIndex.isEmpty() ? idIndex : ic->getDefaultIdIndexSpec(collectionPtr),
                 boost::none));
             uassertStatusOK(IndexBuildBlock::buildEmptyIndex(
-                opCtx, collection, fullIdIndexSpec, *catalogIdentifierWithCatalogId->idIndexIdent));
+                opCtx, collection, fullIdIndexSpec, *catalogIdentifierForColl->idIndexIdent));
         } else {
             // autoIndexId: false is only allowed on unreplicated collections.
             uassert(50001,
@@ -839,7 +866,7 @@ Collection* DatabaseImpl::_createCollection(
                                                                     optionsWithUUID,
                                                                     fullIdIndexSpec,
                                                                     createOplogSlot,
-                                                                    catalogIdentifierWithCatalogId,
+                                                                    catalogIdentifierForColl,
                                                                     fromMigrate);
 
     // It is necessary to create the system index *after* running the onCreateCollection so that
@@ -981,10 +1008,7 @@ Status DatabaseImpl::userCreateNS(
             _createCollection(opCtx,
                               nss,
                               collectionOptions,
-                              // TODO(SERVER-105262): Use the replicated idents rather
-                              // than always generating new ones
-                              // catalogIdentifier ? *catalogIdentifier : makeIdents(opCtx, nss),
-                              makeIdents(opCtx, nss),
+                              acquireCatalogIdentifierForCreate(opCtx, nss, catalogIdentifier),
                               createDefaultIndexes,
                               idIndex,
                               fromMigrate),

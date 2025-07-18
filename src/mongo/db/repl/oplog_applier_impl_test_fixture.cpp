@@ -135,8 +135,7 @@ void OplogApplierImplOpObserver::onCreateCollection(
     if (!onCreateCollectionFn) {
         return;
     }
-    // TODO SERVER-105262: Modify tests to check 'createCollCatalogIdentifier'.
-    onCreateCollectionFn(opCtx, collectionName, options, idIndex);
+    onCreateCollectionFn(opCtx, collectionName, options, idIndex, createCollCatalogIdentifier);
 }
 
 void OplogApplierImplOpObserver::onRenameCollection(OperationContext* opCtx,
@@ -532,8 +531,7 @@ OplogEntry makeCreateCollectionOplogEntry(
     const CollectionOptions& collectionOptions,
     const BSONObj& idIndex,
     boost::optional<CreateCollCatalogIdentifier> createCollCatalogIdentifier) {
-    const auto object =
-        MutableOplogEntry::makeCreateCollObject(nss, collectionOptions, collectionOptions.idIndex);
+    const auto object = MutableOplogEntry::makeCreateCollObject(nss, collectionOptions, idIndex);
 
     BSONObj o2;
     if (createCollCatalogIdentifier.has_value()) {

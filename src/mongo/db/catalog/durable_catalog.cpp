@@ -202,8 +202,9 @@ void putMetaData(OperationContext* opCtx,
     mdbCatalog->putUpdatedEntry(opCtx, catalogId, b.obj());
 }
 
-StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> createCollection(
+StatusWith<std::unique_ptr<RecordStore>> createCollection(
     OperationContext* opCtx,
+    const RecordId& catalogId,
     const NamespaceString& nss,
     const std::string& ident,
     const CollectionOptions& collectionOptions,
@@ -220,7 +221,7 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> createCollection(
         internal::buildRawMDBCatalogEntry(ident, BSONObj() /* idxIdent */, md, ns);
 
     return mdbCatalog->initializeNewEntry(
-        opCtx, md.options.uuid, ident, nss, recordStoreOptions, mdbCatalogEntryObj);
+        opCtx, md.options.uuid, ident, nss, recordStoreOptions, mdbCatalogEntryObj, catalogId);
 }
 
 Status createIndex(OperationContext* opCtx,

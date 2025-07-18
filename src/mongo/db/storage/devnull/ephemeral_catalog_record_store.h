@@ -157,7 +157,7 @@ public:
     void reserveRecordIds(OperationContext* opCtx,
                           RecoveryUnit& ru,
                           std::vector<RecordId>* out,
-                          size_t nRecords) final {};
+                          size_t nRecords) final;
 
     RecordStore::Capped* capped() override {
         return nullptr;

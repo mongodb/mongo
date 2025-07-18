@@ -62,8 +62,9 @@ void BM_CatalogControlReopen(benchmark::State& state) {
             CollectionOptions options;
             options.uuid = UUID::gen();
             const auto ident = ident::generateNewCollectionIdent(nss.dbName(), false, false);
-            uassertStatusOK(
-                durable_catalog::createCollection(opCtx.get(), nss, ident, options, mdbCatalog));
+            const auto catalogId = mdbCatalog->reserveCatalogId(opCtx.get());
+            uassertStatusOK(durable_catalog::createCollection(
+                opCtx.get(), catalogId, nss, ident, options, mdbCatalog));
         }
         wuow.commit();
     }

@@ -353,22 +353,21 @@ Status EphemeralForTestRecordStore::_insertRecords(OperationContext* opCtx,
         EphemeralForTestRecord rec(record->data.size());
         memcpy(rec.data.get(), record->data.data(), record->data.size());
 
-        RecordId loc;
-        if (_data->isOplog) {
-            StatusWith<RecordId> status =
-                extractAndCheckLocForOplog(lock, record->data.data(), record->data.size());
-            if (!status.isOK())
-                return status.getStatus();
-            loc = std::move(status.getValue());
-        } else {
-            loc = allocateLoc(lock);
+        if (record->id.isNull()) {
+            if (_data->isOplog) {
+                StatusWith<RecordId> status =
+                    extractAndCheckLocForOplog(lock, record->data.data(), record->data.size());
+                if (!status.isOK())
+                    return status.getStatus();
+                record->id = std::move(status.getValue());
+            } else {
+                record->id = allocateLoc(lock);
+            }
         }
-
         _data->dataSize += record->data.size();
-        _data->records[loc] = rec;
-        record->id = loc;
+        _data->records[record->id] = rec;
 
-        ru.onRollback([this, loc = std::move(loc)](OperationContext*) {
+        ru.onRollback([this, loc = record->id](OperationContext*) {
             stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
             Records::iterator it = _data->records.find(loc);
@@ -507,6 +506,16 @@ StatusWith<int64_t> EphemeralForTestRecordStore::_compact(OperationContext*,
 void EphemeralForTestRecordStore::validate(RecoveryUnit&,
                                            const CollectionValidation::ValidationOptions&,
                                            ValidateResults*) {}
+
+void EphemeralForTestRecordStore::reserveRecordIds(OperationContext* opCtx,
+                                                   RecoveryUnit& ru,
+                                                   std::vector<RecordId>* out,
+                                                   size_t nRecords) {
+    stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
+    for (size_t i = 0; i < nRecords; i++) {
+        out->push_back(allocateLoc(lock));
+    }
+}
 
 int64_t EphemeralForTestRecordStore::storageSize(RecoveryUnit&,
                                                  BSONObjBuilder* extraInfo,

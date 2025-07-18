@@ -102,6 +102,11 @@ public:
 
     void init(OperationContext* opCtx);
 
+    /**
+     * Reserves a 'catalogId' to use when creating a new catalog entry.
+     */
+    RecordId reserveCatalogId(OperationContext* opCtx);
+
     std::vector<MDBCatalog::EntryIdentifier> getAllCatalogEntries(OperationContext* opCtx) const;
 
     EntryIdentifier getEntry(const RecordId& catalogId) const;
@@ -139,13 +144,14 @@ public:
     /**
      * Both adds a new catalog entry to the _mdb_catalog and initializes a 'RecordStore' to back it.
      */
-    StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> initializeNewEntry(
+    StatusWith<std::unique_ptr<RecordStore>> initializeNewEntry(
         OperationContext* opCtx,
         boost::optional<UUID>& uuid,
         const std::string& ident,
         const NamespaceString& nss,
         const RecordStore::Options& recordStoreOptions,
-        const BSONObj& catalogEntryObj);
+        const BSONObj& catalogEntryObj,
+        const RecordId& catalogId);
 
     StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> importCatalogEntry(
         OperationContext* opCtx,
@@ -178,10 +184,15 @@ public:
 private:
     class AddIdentChange;
 
+    /**
+     * Inserts a new entry to the '_mdb_catalog'. If 'catalogId' is a null RecordId, the storage
+     * engine will automatically assign it one.
+     */
     StatusWith<MDBCatalog::EntryIdentifier> _addEntry(OperationContext* opCtx,
                                                       const std::string& ident,
                                                       const NamespaceString& nss,
-                                                      const BSONObj& catalogEntryObj);
+                                                      const BSONObj& catalogEntryObj,
+                                                      const RecordId& catalogId = RecordId());
 
     BSONObj _findRawEntry(SeekableRecordCursor& cursor, const RecordId& catalogId) const;
 

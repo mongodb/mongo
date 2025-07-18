@@ -100,15 +100,15 @@ void putMetaData(OperationContext* opCtx,
                  boost::optional<BSONObj> indexIdents = boost::none);
 
 /**
- * On success, returns the RecordId which identifies the new record store in the durable catalog in
- * addition to ownership of the new RecordStore.
+ * Persists a new collection in the catalog. The caller takes ownership of the newly created
+ * RecordStore for the collection.
  */
-StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> createCollection(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const std::string& ident,
-    const CollectionOptions& options,
-    MDBCatalog* mdbCatalog);
+StatusWith<std::unique_ptr<RecordStore>> createCollection(OperationContext* opCtx,
+                                                          const RecordId& catalogId,
+                                                          const NamespaceString& nss,
+                                                          const std::string& ident,
+                                                          const CollectionOptions& options,
+                                                          MDBCatalog* mdbCatalog);
 
 Status createIndex(OperationContext* opCtx,
                    const RecordId& catalogId,

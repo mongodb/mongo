@@ -150,20 +150,16 @@ public:
 
         options.uuid = UUID::gen();
         const auto ident = generateNewCollectionIdent(nss);
-        auto swColl = durable_catalog::createCollection(
-            operationContext(), nss, ident, options, getMDBCatalog());
-        ASSERT_OK(swColl.getStatus());
-
-        std::pair<RecordId, std::unique_ptr<RecordStore>> coll = std::move(swColl.getValue());
-        RecordId catalogId = coll.first;
-
+        const auto catalogId = getMDBCatalog()->reserveCatalogId(operationContext());
+        auto rs = unittest::assertGet(durable_catalog::createCollection(
+            operationContext(), catalogId, nss, ident, options, getMDBCatalog()));
         std::shared_ptr<Collection> collection = std::make_shared<CollectionImpl>(
             operationContext(),
             nss,
             catalogId,
             durable_catalog::getParsedCatalogEntry(operationContext(), catalogId, getMDBCatalog())
                 ->metadata,
-            std::move(coll.second));
+            std::move(rs));
         collection->init(operationContext());
 
         CollectionCatalog::write(operationContext(), [&](CollectionCatalog& catalog) {
@@ -263,10 +259,9 @@ protected:
 
         const auto generatedIdent = generateNewCollectionIdent(nss);
         auto mdbCatalog = getMDBCatalog();
-        auto catalogId =
-            unittest::assertGet(durable_catalog::createCollection(
-                                    operationContext(), nss, generatedIdent, {}, mdbCatalog))
-                .first;
+        const auto catalogId = mdbCatalog->reserveCatalogId(operationContext());
+        unittest::assertGet(durable_catalog::createCollection(
+            operationContext(), catalogId, nss, generatedIdent, {}, mdbCatalog));
         ident = getMDBCatalog()->getEntry(catalogId).ident;
         ASSERT_EQ(generatedIdent, ident);
 
