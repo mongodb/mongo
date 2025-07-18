@@ -159,6 +159,11 @@ public:
     void updateMirroringOptions(MirroredReadsParameters params);
 
     /**
+     * Returns the cached HelloResponse in the TopologyVersionObserver.
+     */
+    std::shared_ptr<const repl::HelloResponse> getCachedHelloResponse();
+
+    /**
      * Returns the list of hosts to send mirrored reads to for targeted mirroring.
      */
     std::vector<HostAndPort> getCachedHostsForTargetedMirroring();
@@ -658,6 +663,10 @@ void MirrorMaestroImpl::updateMirroringOptions(MirroredReadsParameters params) {
     }
 }
 
+std::shared_ptr<const repl::HelloResponse> MirrorMaestroImpl::getCachedHelloResponse() {
+    return _topologyVersionObserver.getCached();
+}
+
 std::vector<HostAndPort> MirrorMaestroImpl::getCachedHostsForTargetedMirroring() {
     if (MONGO_unlikely(_cachedHostsForTargetedMirroring.consumeDeferHostCompute())) {
         auto config = _topologyVersionObserver.getReplSetConfig();
@@ -1020,6 +1029,12 @@ std::shared_ptr<executor::TaskExecutor> getMirroringTaskExecutor_forTest(
     ServiceContext* serviceContext) {
     auto& impl = getMirrorMaestroImpl(serviceContext);
     return impl.getExecutor();
+}
+
+std::shared_ptr<const repl::HelloResponse> getCachedHelloResponse_forTest(
+    ServiceContext* serviceContext) {
+    auto& impl = getMirrorMaestroImpl(serviceContext);
+    return impl.getCachedHelloResponse();
 }
 
 std::vector<HostAndPort> getCachedHostsForTargetedMirroring_forTest(

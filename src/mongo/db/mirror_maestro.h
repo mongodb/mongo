@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/mirror_maestro_gen.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/hello/hello_response.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
@@ -94,12 +95,18 @@ std::shared_ptr<executor::TaskExecutor> getMirroringTaskExecutor_forTest(
     ServiceContext* serviceContext);
 
 /**
- * Returns the list of hosts that will be targeted for targeted mirrored reads.
+ * Returns the cached HelloResponse that will be used for general mirrored reads.
+ */
+std::shared_ptr<const repl::HelloResponse> getCachedHelloResponse_forTest(
+    ServiceContext* serviceContext);
+
+/**
+ * Returns the list of hosts that will be used for targeted mirrored reads.
  */
 std::vector<HostAndPort> getCachedHostsForTargetedMirroring_forTest(ServiceContext* serviceContext);
 
 /**
- * Updates the list of hosts that will be targeted by targeted mirrored reads.
+ * Updates the list of hosts that will be used by targeted mirrored reads.
  *
  * The function will update the list of hosts to target on config version changes, or if the repl
  * set tag used to target hosts is updated (tagChanged).
