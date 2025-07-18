@@ -37,6 +37,17 @@ buildvariants:
   tasks:
   - name: burn_in_tags_gen
 
+- name: test-release
+  display_name: "Test Release"
+  allowed_requesters: ["commit", "patch"]
+  tags: ["assigned_to_jira_team_devprod_release_infrastructure"]
+  activate: true
+  run_on: ubuntu2404-small
+  modules:
+    - devprod_coverity
+  tasks:
+    - name: publish-sast-report
+
 - name: &copybara-sync-between-repos copybara-sync-between-repos
   display_name: "* Copybara Sync Between Repos"
   tags: ["suggested"]

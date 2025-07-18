@@ -62,6 +62,7 @@ include:
 - filename: etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
 - filename: etc/evergreen_yml_components/tasks/compile_tasks.yml
 - filename: etc/evergreen_yml_components/tasks/misc_tasks.yml
+- filename: etc/evergreen_yml_components/tasks/release_tasks.yml
 
 - filename: etc/evergreen_yml_components/variants/misc/task_generation.yml
 - filename: etc/evergreen_yml_components/variants/misc/misc.yml
