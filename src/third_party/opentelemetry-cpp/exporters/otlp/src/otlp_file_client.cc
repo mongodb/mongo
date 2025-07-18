@@ -22,9 +22,9 @@
 
 #include "opentelemetry/nostd/string_view.h"
 #include "opentelemetry/nostd/variant.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/base64.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/global_log_handler.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/sdk/common/base64.h"
+#include "opentelemetry/sdk/common/global_log_handler.h"
+#include "opentelemetry/version.h"
 
 #ifdef _MSC_VER
 #  include <string.h>

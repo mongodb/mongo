@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/global_log_handler.h"
+#include "opentelemetry/sdk/common/global_log_handler.h"
 
 #include <iostream>
 

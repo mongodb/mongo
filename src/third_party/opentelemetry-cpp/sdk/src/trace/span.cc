@@ -4,11 +4,11 @@
 #include <chrono>
 #include <utility>
 
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/processor.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/recordable.h"
+#include "opentelemetry/sdk/trace/processor.h"
+#include "opentelemetry/sdk/trace/recordable.h"
 #include "opentelemetry/trace/span_id.h"
 #include "opentelemetry/trace/span_metadata.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/version.h"
 #include "src/trace/span.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE

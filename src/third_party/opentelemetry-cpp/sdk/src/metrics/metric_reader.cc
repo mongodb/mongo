@@ -1,10 +1,10 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/metric_reader.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/global_log_handler.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/export/metric_producer.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/sdk/metrics/metric_reader.h"
+#include "opentelemetry/sdk/common/global_log_handler.h"
+#include "opentelemetry/sdk/metrics/export/metric_producer.h"
+#include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
 namespace sdk

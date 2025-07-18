@@ -22,7 +22,7 @@
 #include "opentelemetry/ext/http/common/url_parser.h"
 #include "opentelemetry/nostd/shared_ptr.h"
 #include "opentelemetry/nostd/string_view.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/version.h"
 
 #ifdef ENABLE_OTLP_COMPRESSION_PREVIEW
 #  include <zlib.h>

@@ -8,7 +8,8 @@ IFS=$'\n\t'
 
 NAME="opentelemetry-cpp"
 
-VERSION="mongo/v1.17"
+VERSION="1.17"
+BRANCH="mongo/v${VERSION}"
 
 LIB_GIT_URL="https://github.com/mongodb-forks/opentelemetry-cpp.git"
 LIB_GIT_DIR=$(mktemp -d /tmp/import-opentelemetry-cpp.XXXXXX)
@@ -18,7 +19,7 @@ trap "rm -rf $LIB_GIT_DIR" EXIT
 LIBDIR=$(git rev-parse --show-toplevel)/src/third_party/$NAME
 DIST=${LIBDIR}/dist
 git clone "$LIB_GIT_URL" $LIB_GIT_DIR
-git -C $LIB_GIT_DIR checkout $VERSION
+git -C $LIB_GIT_DIR checkout $BRANCH
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/$NAME
 
@@ -40,41 +41,11 @@ done
 ## Remote all CMakelists.txt files
 find $DIST/ -name "CMakeLists.txt" -delete
 
-## Fix includes in headers and cpp files.
-update_includes() {
-    sed -i 's@#include "opentelemetry/proto@#include "src/third_party/opentelemetry-proto/opentelemetry/proto@' $file
-    sed -i 's@#include "opentelemetry/sdk@#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk@' $file
-    #sed -i 's@#include "opentelemetry/version.h"@#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"@' $file
-}
-
-for file in $(find $DIST/ -name "*.h" ); do
-    update_includes "${file}"
-done
-
-for file in $(find $DIST/ -name "*.cc" ); do
-    update_includes "${file}"
-done
-
-# Update  path to version.h
-update_version() {
-    sed -i 's@#include "opentelemetry/version.h"@#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"@' $file
-}
-
-for file in $(find $DIST/sdk -name "*.cc" ); do
-    update_version "${file}"
-done
-
-for file in $(find $DIST/exporters -name "*.cc" ); do
-    update_version "${file}"
-done
-
-# Remove uneeded directories
+# Remove unneeded directories
 pushd $DIST
 
-# Remove file uneeded functionalities (logs, grpc)
-rm exporters/otlp/include/opentelemetry/exporters/otlp/*grpc*.h
+# Remove file uneeded functionalities (logs)
 rm exporters/otlp/include/opentelemetry/exporters/otlp/*log*.h
-rm exporters/otlp/src/*grpc*.cc
 rm exporters/otlp/src/*log*.cc
 rm -rf api/include/opentelemetry/logs
 rm -rf sdk/include/opentelemetry/sdk/logs
@@ -95,9 +66,13 @@ rm -rf ext/test
 rm -rf sdk/test
 popd
 
-git apply src/third_party/opentelemetry-cpp/patches/0001-Build-system-changes-for-opentelemetry-cpp.patch
-git apply src/third_party/opentelemetry-cpp/patches/0002-Build-system-changes-for-opentelemetry-cpp.patch
-git apply src/third_party/opentelemetry-cpp/patches/0003-Build-system-changes-for-opentelemetry-cpp.patch
+PATCHES_DIR="${LIBDIR}/patches"
+git apply "${PATCHES_DIR}/0001-Build-system-changes-for-opentelemetry-cpp.patch"
+git apply "${PATCHES_DIR}/0002-Build-system-changes-for-opentelemetry-cpp.patch"
+git apply "${PATCHES_DIR}/0003-Build-system-changes-for-opentelemetry-cpp.patch"
+git apply "${PATCHES_DIR}/0001-SERVER-100631-update-api-BUILD.patch"
+git apply "${PATCHES_DIR}/0001-SERVER-106258-vendor-OpenTelemetry-gRPC-exporter.patch"
+
 cp -R ${DIST}/* ${LIBDIR}/
 echo ${DIST}
 rm -rf ${DIST}

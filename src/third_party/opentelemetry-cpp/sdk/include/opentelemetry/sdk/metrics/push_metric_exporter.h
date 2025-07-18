@@ -5,8 +5,8 @@
 
 #include <chrono>
 
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/exporter_utils.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/instruments.h"
+#include "opentelemetry/sdk/common/exporter_utils.h"
+#include "opentelemetry/sdk/metrics/instruments.h"
 #include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE

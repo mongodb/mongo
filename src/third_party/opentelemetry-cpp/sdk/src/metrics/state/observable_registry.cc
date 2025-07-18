@@ -15,14 +15,14 @@
 #include "opentelemetry/metrics/observer_result.h"
 #include "opentelemetry/nostd/shared_ptr.h"
 #include "opentelemetry/nostd/variant.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/global_log_handler.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/async_instruments.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/instruments.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/observer_result.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/state/metric_storage.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/state/observable_registry.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/view/attributes_processor.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/sdk/common/global_log_handler.h"
+#include "opentelemetry/sdk/metrics/async_instruments.h"
+#include "opentelemetry/sdk/metrics/instruments.h"
+#include "opentelemetry/sdk/metrics/observer_result.h"
+#include "opentelemetry/sdk/metrics/state/metric_storage.h"
+#include "opentelemetry/sdk/metrics/state/observable_registry.h"
+#include "opentelemetry/sdk/metrics/view/attributes_processor.h"
+#include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
 namespace sdk

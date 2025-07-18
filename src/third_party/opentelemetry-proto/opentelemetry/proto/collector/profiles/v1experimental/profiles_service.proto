@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package opentelemetry.proto.collector.profiles.v1experimental;
 
-import "src/third_party/opentelemetry-proto/opentelemetry/proto/profiles/v1experimental/profiles.proto";
+import "opentelemetry/proto/profiles/v1experimental/profiles.proto";
 
 option csharp_namespace = "OpenTelemetry.Proto.Collector.Profiles.V1Experimental";
 option java_multiple_files = true;

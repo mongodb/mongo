@@ -6,9 +6,9 @@
 #include <memory>
 
 #include "opentelemetry/metrics/async_instruments.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/instruments.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/state/metric_storage.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/state/observable_registry.h"
+#include "opentelemetry/sdk/metrics/instruments.h"
+#include "opentelemetry/sdk/metrics/state/metric_storage.h"
+#include "opentelemetry/sdk/metrics/state/observable_registry.h"
 #include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE

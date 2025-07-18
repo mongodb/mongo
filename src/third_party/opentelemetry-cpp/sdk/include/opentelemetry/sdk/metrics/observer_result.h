@@ -9,8 +9,8 @@
 #include "opentelemetry/common/key_value_iterable.h"
 #include "opentelemetry/metrics/observer_result.h"
 #include "opentelemetry/nostd/string_view.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/state/attributes_hashmap.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/view/attributes_processor.h"
+#include "opentelemetry/sdk/metrics/state/attributes_hashmap.h"
+#include "opentelemetry/sdk/metrics/view/attributes_processor.h"
 #include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE

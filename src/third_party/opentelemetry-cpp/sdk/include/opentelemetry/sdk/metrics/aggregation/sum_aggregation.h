@@ -7,9 +7,9 @@
 #include <memory>
 
 #include "opentelemetry/common/spin_lock_mutex.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/aggregation/aggregation.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/data/metric_data.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/data/point_data.h"
+#include "opentelemetry/sdk/metrics/aggregation/aggregation.h"
+#include "opentelemetry/sdk/metrics/data/metric_data.h"
+#include "opentelemetry/sdk/metrics/data/point_data.h"
 #include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE

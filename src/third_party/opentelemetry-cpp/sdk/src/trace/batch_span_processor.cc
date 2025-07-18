@@ -16,17 +16,17 @@
 
 #include "opentelemetry/common/timestamp.h"
 #include "opentelemetry/nostd/span.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/atomic_unique_ptr.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/circular_buffer.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/circular_buffer_range.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/global_log_handler.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/batch_span_processor.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/batch_span_processor_options.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/exporter.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/processor.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/recordable.h"
+#include "opentelemetry/sdk/common/atomic_unique_ptr.h"
+#include "opentelemetry/sdk/common/circular_buffer.h"
+#include "opentelemetry/sdk/common/circular_buffer_range.h"
+#include "opentelemetry/sdk/common/global_log_handler.h"
+#include "opentelemetry/sdk/trace/batch_span_processor.h"
+#include "opentelemetry/sdk/trace/batch_span_processor_options.h"
+#include "opentelemetry/sdk/trace/exporter.h"
+#include "opentelemetry/sdk/trace/processor.h"
+#include "opentelemetry/sdk/trace/recordable.h"
 #include "opentelemetry/trace/span_context.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/version.h"
 
 using opentelemetry::sdk::common::AtomicUniquePtr;
 using opentelemetry::sdk::common::CircularBufferRange;

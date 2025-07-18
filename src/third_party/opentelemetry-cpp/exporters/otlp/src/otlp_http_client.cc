@@ -34,10 +34,10 @@
 #include "opentelemetry/ext/http/common/url_parser.h"
 #include "opentelemetry/nostd/string_view.h"
 #include "opentelemetry/nostd/variant.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/base64.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/exporter_utils.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/global_log_handler.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/sdk/common/base64.h"
+#include "opentelemetry/sdk/common/exporter_utils.h"
+#include "opentelemetry/sdk/common/global_log_handler.h"
+#include "opentelemetry/version.h"
 
 // clang-format off
 #include "opentelemetry/exporters/otlp/protobuf_include_prefix.h" // IWYU pragma: keep

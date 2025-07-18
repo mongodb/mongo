@@ -13,13 +13,13 @@
 #include <utility>
 
 #include "opentelemetry/common/timestamp.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/global_log_handler.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/export/metric_producer.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/export/periodic_exporting_metric_reader.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/export/periodic_exporting_metric_reader_options.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/instruments.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/push_metric_exporter.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/sdk/common/global_log_handler.h"
+#include "opentelemetry/sdk/metrics/export/metric_producer.h"
+#include "opentelemetry/sdk/metrics/export/periodic_exporting_metric_reader.h"
+#include "opentelemetry/sdk/metrics/export/periodic_exporting_metric_reader_options.h"
+#include "opentelemetry/sdk/metrics/instruments.h"
+#include "opentelemetry/sdk/metrics/push_metric_exporter.h"
+#include "opentelemetry/version.h"
 
 #if defined(_MSC_VER)
 #  pragma warning(suppress : 5204)

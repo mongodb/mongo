@@ -6,10 +6,10 @@
 #include <memory>
 #include <string>
 
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/aggregation/aggregation_config.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/instruments.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/view/attributes_processor.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/view/view.h"
+#include "opentelemetry/sdk/metrics/aggregation/aggregation_config.h"
+#include "opentelemetry/sdk/metrics/instruments.h"
+#include "opentelemetry/sdk/metrics/view/attributes_processor.h"
+#include "opentelemetry/sdk/metrics/view/view.h"
 #include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE

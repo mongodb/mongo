@@ -5,16 +5,16 @@
 #include <utility>
 #include <vector>
 
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/resource.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/id_generator.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/processor.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/random_id_generator_factory.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/sampler.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/samplers/always_on_factory.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/tracer_context.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/tracer_provider.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/tracer_provider_factory.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/sdk/resource/resource.h"
+#include "opentelemetry/sdk/trace/id_generator.h"
+#include "opentelemetry/sdk/trace/processor.h"
+#include "opentelemetry/sdk/trace/random_id_generator_factory.h"
+#include "opentelemetry/sdk/trace/sampler.h"
+#include "opentelemetry/sdk/trace/samplers/always_on_factory.h"
+#include "opentelemetry/sdk/trace/tracer_context.h"
+#include "opentelemetry/sdk/trace/tracer_provider.h"
+#include "opentelemetry/sdk/trace/tracer_provider_factory.h"
+#include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
 namespace sdk

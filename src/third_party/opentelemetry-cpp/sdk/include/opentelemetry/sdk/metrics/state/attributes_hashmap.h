@@ -12,10 +12,10 @@
 
 #include "opentelemetry/common/key_value_iterable.h"
 #include "opentelemetry/nostd/function_ref.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/attribute_utils.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/attributemap_hash.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/aggregation/aggregation.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/view/attributes_processor.h"
+#include "opentelemetry/sdk/common/attribute_utils.h"
+#include "opentelemetry/sdk/common/attributemap_hash.h"
+#include "opentelemetry/sdk/metrics/aggregation/aggregation.h"
+#include "opentelemetry/sdk/metrics/view/attributes_processor.h"
 #include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE

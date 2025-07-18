@@ -8,9 +8,9 @@
 
 // clang-format off
 #include "opentelemetry/exporters/otlp/protobuf_include_prefix.h" // IWYU pragma: keep
-#include "src/third_party/opentelemetry-proto/opentelemetry/proto/common/v1/common.pb.h"
-#include "src/third_party/opentelemetry-proto/opentelemetry/proto/resource/v1/resource.pb.h"
-#include "src/third_party/opentelemetry-proto/opentelemetry/proto/trace/v1/trace.pb.h"
+#include "opentelemetry/proto/common/v1/common.pb.h"
+#include "opentelemetry/proto/resource/v1/resource.pb.h"
+#include "opentelemetry/proto/trace/v1/trace.pb.h"
 #include "opentelemetry/exporters/otlp/protobuf_include_suffix.h" // IWYU pragma: keep
 // clang-format on
 

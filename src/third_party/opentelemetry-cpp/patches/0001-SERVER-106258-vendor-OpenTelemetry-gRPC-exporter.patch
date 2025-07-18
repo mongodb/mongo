@@ -1,0 +1,97 @@
+From 412598732c7908de396b460f1bcef9d6bd64436d Mon Sep 17 00:00:00 2001
+From: Benety Goh <benety@mongodb.com>
+Date: Mon, 14 Jul 2025 23:36:32 +0000
+Subject: [PATCH] SERVER-106258 vendor OpenTelemetry gRPC exporter
+
+---
+ .../dist/exporters/otlp/BUILD                 | 77 +++++++++++++++++++
+ 1 file changed, 77 insertions(+)
+
+diff --git a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/BUILD b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/BUILD
+index 0ef1a177878..db1acb27d56 100644
+--- a/src/third_party/opentelemetry-cpp/dist/exporters/otlp/BUILD
++++ b/src/third_party/opentelemetry-cpp/dist/exporters/otlp/BUILD
+@@ -200,3 +200,80 @@ mongo_cc_library(
+         "//src/third_party/opentelemetry-proto:trace_service_proto_cc",
+     ],
+ )
++
++mongo_cc_library(
++    name = "otlp_grpc_client",
++    srcs = [
++        "src/otlp_grpc_client.cc",
++    ],
++    hdrs = [
++        "include/opentelemetry/exporters/otlp/otlp_environment.h",
++        "include/opentelemetry/exporters/otlp/otlp_grpc_client.h",
++        "include/opentelemetry/exporters/otlp/otlp_grpc_client_options.h",
++        "include/opentelemetry/exporters/otlp/protobuf_include_prefix.h",
++        "include/opentelemetry/exporters/otlp/protobuf_include_suffix.h",
++    ],
++    copts = OTEL_COPTS,
++    strip_include_prefix = "include",
++    tags = [
++        "otlp",
++        "otlp_grpc",
++    ],
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
++    deps = [
++        "//src/third_party/abseil-cpp:absl_strings",
++        "//src/third_party/grpc:grpc++",
++        "//src/third_party/nlohmann-json:json",
++        "//src/third_party/opentelemetry-cpp/api",
++        "//src/third_party/opentelemetry-cpp/ext/src/http/client/curl:http_client_curl",
++        "//src/third_party/opentelemetry-cpp/sdk:headers",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common:base64",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common:global_log_handler",
++        "//src/third_party/opentelemetry-proto:common_proto_cc",
++        "//src/third_party/opentelemetry-proto:logs_service",
++        "//src/third_party/opentelemetry-proto:metrics_service",
++        "//src/third_party/opentelemetry-proto:trace_service",
++    ],
++)
++
++mongo_cc_library(
++    name = "otlp_grpc_exporter",
++    srcs = [
++        "src/otlp_grpc_exporter.cc",
++        "src/otlp_grpc_exporter_factory.cc",
++        "src/otlp_grpc_exporter_options.cc",
++        "src/otlp_grpc_metric_exporter.cc",
++        "src/otlp_grpc_metric_exporter_factory.cc",
++        "src/otlp_grpc_metric_exporter_options.cc",
++        "src/otlp_grpc_utils.cc",
++    ],
++    hdrs = [
++        "include/opentelemetry/exporters/otlp/otlp_environment.h",
++        "include/opentelemetry/exporters/otlp/otlp_grpc_exporter.h",
++        "include/opentelemetry/exporters/otlp/otlp_grpc_exporter_factory.h",
++        "include/opentelemetry/exporters/otlp/otlp_grpc_exporter_options.h",
++        "include/opentelemetry/exporters/otlp/otlp_grpc_metric_exporter.h",
++        "include/opentelemetry/exporters/otlp/otlp_grpc_metric_exporter_factory.h",
++        "include/opentelemetry/exporters/otlp/otlp_grpc_metric_exporter_options.h",
++        "include/opentelemetry/exporters/otlp/otlp_grpc_utils.h",
++        "include/opentelemetry/exporters/otlp/protobuf_include_prefix.h",
++        "include/opentelemetry/exporters/otlp/protobuf_include_suffix.h",
++    ],
++    copts = OTEL_COPTS,
++    strip_include_prefix = "include",
++    tags = [
++        "otlp",
++        "otlp_grpc",
++    ],
++    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
++    deps = [
++        ":otlp_grpc_client",
++        ":otlp_recordable",
++        "//src/third_party/opentelemetry-cpp/sdk/src/common:global_log_handler",
++        "//src/third_party/opentelemetry-cpp/sdk/src/trace",
++        "//src/third_party/opentelemetry-proto:common_proto_cc",
++        "//src/third_party/opentelemetry-proto:resource_proto_cc",
++        "//src/third_party/opentelemetry-proto:trace_proto_cc",
++        "//src/third_party/opentelemetry-proto:trace_service",
++    ],
++)
+-- 
+2.34.1
+

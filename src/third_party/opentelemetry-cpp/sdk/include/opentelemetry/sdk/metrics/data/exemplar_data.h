@@ -6,8 +6,8 @@
 #include <memory>
 
 #include "opentelemetry/common/timestamp.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/data/metric_data.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/state/filtered_ordered_attribute_map.h"
+#include "opentelemetry/sdk/metrics/data/metric_data.h"
+#include "opentelemetry/sdk/metrics/state/filtered_ordered_attribute_map.h"
 #include "opentelemetry/trace/span_context.h"
 #include "opentelemetry/version.h"
 

@@ -1,11 +1,11 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/resource_detector.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/env_variables.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/resource.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/semantic_conventions.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/sdk/resource/resource_detector.h"
+#include "opentelemetry/sdk/common/env_variables.h"
+#include "opentelemetry/sdk/resource/resource.h"
+#include "opentelemetry/sdk/resource/semantic_conventions.h"
+#include "opentelemetry/version.h"
 
 #include <stddef.h>
 #include <sstream>

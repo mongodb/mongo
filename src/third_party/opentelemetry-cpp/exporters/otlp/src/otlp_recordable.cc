@@ -14,21 +14,21 @@
 #include "opentelemetry/nostd/span.h"
 #include "opentelemetry/nostd/string_view.h"
 #include "opentelemetry/nostd/utility.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/resource.h"
+#include "opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
+#include "opentelemetry/sdk/resource/resource.h"
 #include "opentelemetry/trace/span_context.h"
 #include "opentelemetry/trace/span_id.h"
 #include "opentelemetry/trace/span_metadata.h"
 #include "opentelemetry/trace/trace_flags.h"
 #include "opentelemetry/trace/trace_id.h"
 #include "opentelemetry/trace/trace_state.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/version.h"
 
 // clang-format off
 #include "opentelemetry/exporters/otlp/protobuf_include_prefix.h" // IWYU pragma: keep
-#include "src/third_party/opentelemetry-proto/opentelemetry/proto/common/v1/common.pb.h"
-#include "src/third_party/opentelemetry-proto/opentelemetry/proto/resource/v1/resource.pb.h"
-#include "src/third_party/opentelemetry-proto/opentelemetry/proto/trace/v1/trace.pb.h"
+#include "opentelemetry/proto/common/v1/common.pb.h"
+#include "opentelemetry/proto/resource/v1/resource.pb.h"
+#include "opentelemetry/proto/trace/v1/trace.pb.h"
 #include "opentelemetry/exporters/otlp/protobuf_include_suffix.h" // IWYU pragma: keep
 // clang-format on
 

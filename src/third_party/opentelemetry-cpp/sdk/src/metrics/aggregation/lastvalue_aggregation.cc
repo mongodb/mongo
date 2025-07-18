@@ -10,11 +10,11 @@
 #include "opentelemetry/common/spin_lock_mutex.h"
 #include "opentelemetry/common/timestamp.h"
 #include "opentelemetry/nostd/variant.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/aggregation/aggregation.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/aggregation/lastvalue_aggregation.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/data/metric_data.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/data/point_data.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/sdk/metrics/aggregation/aggregation.h"
+#include "opentelemetry/sdk/metrics/aggregation/lastvalue_aggregation.h"
+#include "opentelemetry/sdk/metrics/data/metric_data.h"
+#include "opentelemetry/sdk/metrics/data/point_data.h"
+#include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
 namespace sdk

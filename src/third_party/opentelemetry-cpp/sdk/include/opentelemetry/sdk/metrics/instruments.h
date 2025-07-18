@@ -6,7 +6,7 @@
 #include <functional>
 #include <string>
 
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/state/filtered_ordered_attribute_map.h"
+#include "opentelemetry/sdk/metrics/state/filtered_ordered_attribute_map.h"
 #include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE

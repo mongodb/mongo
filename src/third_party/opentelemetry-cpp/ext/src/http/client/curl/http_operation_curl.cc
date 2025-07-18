@@ -22,8 +22,8 @@
 #include "opentelemetry/ext/http/client/curl/http_client_curl.h"
 #include "opentelemetry/ext/http/client/curl/http_operation_curl.h"
 #include "opentelemetry/ext/http/client/http_client.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/global_log_handler.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/sdk/common/global_log_handler.h"
+#include "opentelemetry/version.h"
 
 // CURL_VERSION_BITS was added in CURL 7.43.0
 #ifndef CURL_VERSION_BITS

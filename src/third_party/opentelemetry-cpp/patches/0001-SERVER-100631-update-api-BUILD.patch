@@ -1,0 +1,29 @@
+From da6790aa87e803f7ca7a38cca8fac2dd2f15a90d Mon Sep 17 00:00:00 2001
+From: Benety Goh <benety@mongodb.com>
+Date: Fri, 11 Jul 2025 20:51:55 +0000
+Subject: [PATCH] SERVER-100631 update api BUILD
+
+---
+ src/third_party/opentelemetry-cpp/dist/api/BUILD | 6 ------
+ 1 file changed, 6 deletions(-)
+
+diff --git a/src/third_party/opentelemetry-cpp/dist/api/BUILD b/src/third_party/opentelemetry-cpp/dist/api/BUILD
+index 2b8f088ac12..908e14bec21 100644
+--- a/src/third_party/opentelemetry-cpp/dist/api/BUILD
++++ b/src/third_party/opentelemetry-cpp/dist/api/BUILD
+@@ -67,12 +67,6 @@ config_setting(
+     flag_values = {":with_cxx_stdlib": "best"},
+ )
+ 
+-bool_flag(
+-    name = "with_abseil",
+-    build_setting_default = False,
+-    deprecation = "The value of this flag is ignored. Bazel builds always depend on Abseil for its pre-adopted `std::` types. You should remove this flag from your build command.",
+-)
+-
+ int_flag(
+     name = "abi_version_no",
+     build_setting_default = 1,
+-- 
+2.34.1
+

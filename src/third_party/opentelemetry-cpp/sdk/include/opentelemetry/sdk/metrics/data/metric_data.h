@@ -6,9 +6,9 @@
 #include <vector>
 
 #include "opentelemetry/nostd/variant.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/attribute_utils.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/data/point_data.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/instruments.h"
+#include "opentelemetry/sdk/common/attribute_utils.h"
+#include "opentelemetry/sdk/metrics/data/point_data.h"
+#include "opentelemetry/sdk/metrics/instruments.h"
 #include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE

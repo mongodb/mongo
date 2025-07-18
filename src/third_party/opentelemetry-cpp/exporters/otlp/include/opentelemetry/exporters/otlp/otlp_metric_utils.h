@@ -4,14 +4,14 @@
 #pragma once
 
 #include "opentelemetry/exporters/otlp/otlp_preferred_temporality.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/data/metric_data.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/export/metric_producer.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/instruments.h"
+#include "opentelemetry/sdk/metrics/data/metric_data.h"
+#include "opentelemetry/sdk/metrics/export/metric_producer.h"
+#include "opentelemetry/sdk/metrics/instruments.h"
 #include "opentelemetry/version.h"
 
 // clang-format off
 #include "opentelemetry/exporters/otlp/protobuf_include_prefix.h" // IWYU pragma: keep
-#include "src/third_party/opentelemetry-proto/opentelemetry/proto/metrics/v1/metrics.pb.h"
+#include "opentelemetry/proto/metrics/v1/metrics.pb.h"
 #include "opentelemetry/exporters/otlp/protobuf_include_suffix.h" // IWYU pragma: keep
 // clang-format on
 

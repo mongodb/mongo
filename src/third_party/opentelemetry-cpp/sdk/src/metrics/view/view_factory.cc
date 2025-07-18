@@ -5,12 +5,12 @@
 #include <string>
 #include <utility>
 
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/aggregation/aggregation_config.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/instruments.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/view/attributes_processor.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/view/view.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/view/view_factory.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/sdk/metrics/aggregation/aggregation_config.h"
+#include "opentelemetry/sdk/metrics/instruments.h"
+#include "opentelemetry/sdk/metrics/view/attributes_processor.h"
+#include "opentelemetry/sdk/metrics/view/view.h"
+#include "opentelemetry/sdk/metrics/view/view_factory.h"
+#include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
 namespace sdk

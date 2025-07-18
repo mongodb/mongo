@@ -11,9 +11,9 @@
 #include "opentelemetry/common/kv_properties.h"
 #include "opentelemetry/exporters/otlp/otlp_environment.h"
 #include "opentelemetry/nostd/string_view.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/attribute_utils.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/env_variables.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/sdk/common/attribute_utils.h"
+#include "opentelemetry/sdk/common/env_variables.h"
+#include "opentelemetry/version.h"
 
 namespace sdk_common = opentelemetry::sdk::common;
 

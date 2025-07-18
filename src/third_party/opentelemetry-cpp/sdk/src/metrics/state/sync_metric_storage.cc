@@ -9,12 +9,12 @@
 #include "opentelemetry/common/timestamp.h"
 #include "opentelemetry/nostd/function_ref.h"
 #include "opentelemetry/nostd/span.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/data/metric_data.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/state/attributes_hashmap.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/state/metric_collector.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/state/sync_metric_storage.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/state/temporal_metric_storage.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/sdk/metrics/data/metric_data.h"
+#include "opentelemetry/sdk/metrics/state/attributes_hashmap.h"
+#include "opentelemetry/sdk/metrics/state/metric_collector.h"
+#include "opentelemetry/sdk/metrics/state/sync_metric_storage.h"
+#include "opentelemetry/sdk/metrics/state/temporal_metric_storage.h"
+#include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
 namespace sdk

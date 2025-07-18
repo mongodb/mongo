@@ -6,11 +6,11 @@
 #include <utility>
 
 #include "opentelemetry/nostd/variant.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/resource.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/resource_detector.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/semantic_conventions.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/version/version.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/sdk/resource/resource.h"
+#include "opentelemetry/sdk/resource/resource_detector.h"
+#include "opentelemetry/sdk/resource/semantic_conventions.h"
+#include "opentelemetry/sdk/version/version.h"
+#include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
 namespace sdk

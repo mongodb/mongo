@@ -17,15 +17,15 @@
 #include "opentelemetry/exporters/otlp/otlp_recordable_utils.h"
 #include "opentelemetry/nostd/span.h"
 #include "opentelemetry/nostd/string_view.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/exporter_utils.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/global_log_handler.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/recordable.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/sdk/common/exporter_utils.h"
+#include "opentelemetry/sdk/common/global_log_handler.h"
+#include "opentelemetry/sdk/trace/recordable.h"
+#include "opentelemetry/version.h"
 
 // clang-format off
 #include "opentelemetry/exporters/otlp/protobuf_include_prefix.h" // IWYU pragma: keep
 #include "google/protobuf/arena.h"
-#include "src/third_party/opentelemetry-proto/opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
+#include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 #include "opentelemetry/exporters/otlp/protobuf_include_suffix.h" // IWYU pragma: keep
 // clang-format on
 

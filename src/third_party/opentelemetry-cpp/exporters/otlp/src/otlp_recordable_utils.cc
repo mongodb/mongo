@@ -13,18 +13,18 @@
 #include "opentelemetry/exporters/otlp/otlp_recordable.h"
 #include "opentelemetry/exporters/otlp/otlp_recordable_utils.h"
 #include "opentelemetry/nostd/span.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/attribute_utils.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/resource/resource.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/recordable.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/sdk/common/attribute_utils.h"
+#include "opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
+#include "opentelemetry/sdk/resource/resource.h"
+#include "opentelemetry/sdk/trace/recordable.h"
+#include "opentelemetry/version.h"
 
 // clang-format off
 #include "opentelemetry/exporters/otlp/protobuf_include_prefix.h"  // IWYU pragma: keep
-#include "src/third_party/opentelemetry-proto/opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
-#include "src/third_party/opentelemetry-proto/opentelemetry/proto/common/v1/common.pb.h"
-#include "src/third_party/opentelemetry-proto/opentelemetry/proto/resource/v1/resource.pb.h"
-#include "src/third_party/opentelemetry-proto/opentelemetry/proto/trace/v1/trace.pb.h"
+#include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
+#include "opentelemetry/proto/common/v1/common.pb.h"
+#include "opentelemetry/proto/resource/v1/resource.pb.h"
+#include "opentelemetry/proto/trace/v1/trace.pb.h"
 #include "opentelemetry/exporters/otlp/protobuf_include_suffix.h"  // IWYU pragma: keep
 // clang-format on
 

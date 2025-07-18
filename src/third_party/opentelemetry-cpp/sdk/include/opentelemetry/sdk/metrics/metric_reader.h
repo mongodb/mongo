@@ -7,8 +7,8 @@
 #include <chrono>
 
 #include "opentelemetry/nostd/function_ref.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/export/metric_producer.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/instruments.h"
+#include "opentelemetry/sdk/metrics/export/metric_producer.h"
+#include "opentelemetry/sdk/metrics/instruments.h"
 #include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE

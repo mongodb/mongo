@@ -6,7 +6,7 @@
 #include <memory>
 
 #include "opentelemetry/nostd/string_view.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/view/predicate.h"
+#include "opentelemetry/sdk/metrics/view/predicate.h"
 #include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE

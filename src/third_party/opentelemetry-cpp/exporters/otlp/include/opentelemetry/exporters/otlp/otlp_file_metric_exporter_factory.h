@@ -6,7 +6,7 @@
 #include <memory>
 
 #include "opentelemetry/exporters/otlp/otlp_file_metric_exporter_options.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/push_metric_exporter.h"
+#include "opentelemetry/sdk/metrics/push_metric_exporter.h"
 #include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE

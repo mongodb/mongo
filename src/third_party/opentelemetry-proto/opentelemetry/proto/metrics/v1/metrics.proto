@@ -16,8 +16,8 @@ syntax = "proto3";
 
 package opentelemetry.proto.metrics.v1;
 
-import "src/third_party/opentelemetry-proto/opentelemetry/proto/common/v1/common.proto";
-import "src/third_party/opentelemetry-proto/opentelemetry/proto/resource/v1/resource.proto";
+import "opentelemetry/proto/common/v1/common.proto";
+import "opentelemetry/proto/resource/v1/resource.proto";
 
 option csharp_namespace = "OpenTelemetry.Proto.Metrics.V1";
 option java_multiple_files = true;

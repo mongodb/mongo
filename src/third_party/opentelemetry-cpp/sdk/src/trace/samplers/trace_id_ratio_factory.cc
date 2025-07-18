@@ -1,9 +1,9 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/samplers/trace_id_ratio_factory.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/samplers/trace_id_ratio.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/sdk/trace/samplers/trace_id_ratio_factory.h"
+#include "opentelemetry/sdk/trace/samplers/trace_id_ratio.h"
+#include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
 namespace sdk

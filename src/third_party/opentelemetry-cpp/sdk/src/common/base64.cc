@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/base64.h"
+#include "opentelemetry/sdk/common/base64.h"
 
 #if defined(HAVE_GSL)
 #  include <gsl/gsl>

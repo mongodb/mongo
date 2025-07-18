@@ -6,7 +6,7 @@
 #include <vector>
 #include "opentelemetry/common/macros.h"
 #include "opentelemetry/nostd/string_view.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/global_log_handler.h"
+#include "opentelemetry/sdk/common/global_log_handler.h"
 
 #if OPENTELEMETRY_HAVE_WORKING_REGEX
 #  include <regex>

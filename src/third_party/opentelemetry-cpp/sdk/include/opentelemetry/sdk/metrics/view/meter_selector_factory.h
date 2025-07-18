@@ -6,7 +6,7 @@
 #include <memory>
 #include <string>
 
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/view/meter_selector.h"
+#include "opentelemetry/sdk/metrics/view/meter_selector.h"
 #include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE

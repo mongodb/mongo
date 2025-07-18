@@ -3,10 +3,10 @@
 
 #include <memory>
 
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/sampler.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/samplers/parent.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/samplers/parent_factory.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/sdk/trace/sampler.h"
+#include "opentelemetry/sdk/trace/samplers/parent.h"
+#include "opentelemetry/sdk/trace/samplers/parent_factory.h"
+#include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
 namespace sdk

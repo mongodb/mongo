@@ -8,21 +8,21 @@
 #include <unordered_map>
 
 #include "opentelemetry/nostd/shared_ptr.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/common/attributemap_hash.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/aggregation/default_aggregation.h"
+#include "opentelemetry/sdk/common/attributemap_hash.h"
+#include "opentelemetry/sdk/metrics/aggregation/default_aggregation.h"
 
 #ifdef ENABLE_METRICS_EXEMPLAR_PREVIEW
 #  include "opentelemetry/sdk/metrics/exemplar/filter_type.h"
 #  include "opentelemetry/sdk/metrics/exemplar/reservoir.h"
 #endif
 
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/instruments.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/observer_result.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/state/attributes_hashmap.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/state/metric_collector.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/state/metric_storage.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/state/temporal_metric_storage.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/view/attributes_processor.h"
+#include "opentelemetry/sdk/metrics/instruments.h"
+#include "opentelemetry/sdk/metrics/observer_result.h"
+#include "opentelemetry/sdk/metrics/state/attributes_hashmap.h"
+#include "opentelemetry/sdk/metrics/state/metric_collector.h"
+#include "opentelemetry/sdk/metrics/state/metric_storage.h"
+#include "opentelemetry/sdk/metrics/state/temporal_metric_storage.h"
+#include "opentelemetry/sdk/metrics/view/attributes_processor.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
 namespace sdk

@@ -4,7 +4,7 @@
 // Please DONOT touch this file.
 // Any changes done here would be overwritten by pre-commit git hook
 
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/version/version.h"
+#include "opentelemetry/sdk/version/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
 namespace sdk

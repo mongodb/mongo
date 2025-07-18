@@ -9,6 +9,11 @@ OTEL_TARGET_COMPATIBLE_WITH = select({
     "//conditions:default": ["@platforms//:incompatible"],
 })
 
+GRPC_TARGET_COMPATIBLE_WITH = select({
+    "//bazel/config:build_grpc_enabled": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
 idl_generator(
     name = "trace_settings_gen",
     src = "trace_settings.idl",
@@ -25,11 +30,6 @@ mongo_cc_library(
         "trace_initialization.h",
         "traceable.h",
         "tracing.h",
-    ],
-    copts = [
-        "-Isrc/third_party/opentelemetry-cpp/api/include",
-        "-Isrc/third_party/opentelemetry-cpp/exporters/otlp/include",
-        "-Isrc/third_party/opentelemetry-cpp/sdk/include",
     ],
     deps = [
         "//src/mongo/base:system_error",
@@ -58,11 +58,6 @@ mongo_cc_unit_test(
         "trace_initialization_test.cpp",
         "tracing_test.cpp",
     ],
-    copts = [
-        "-Isrc/third_party/opentelemetry-cpp/api/include",
-        "-Isrc/third_party/opentelemetry-cpp/exporters/otlp/include",
-        "-Isrc/third_party/opentelemetry-cpp/sdk/include",
-    ],
     tags = [
         "mongo_unittest_fourth_group",
         "tracing_test",
@@ -71,5 +66,21 @@ mongo_cc_unit_test(
     deps = [
         ":tracing",
         "//src/third_party/opentelemetry-cpp/api",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "grpc_tracing_test",
+    srcs = [
+        "grpc_tracing_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fourth_group",
+        "tracing_test",
+    ],
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":tracing",
+        "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_grpc_exporter",
     ],
 )

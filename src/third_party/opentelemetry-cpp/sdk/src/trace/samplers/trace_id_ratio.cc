@@ -11,11 +11,11 @@
 
 #include "opentelemetry/common/attribute_value.h"
 #include "opentelemetry/nostd/string_view.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/sampler.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/trace/samplers/trace_id_ratio.h"
+#include "opentelemetry/sdk/trace/sampler.h"
+#include "opentelemetry/sdk/trace/samplers/trace_id_ratio.h"
 #include "opentelemetry/trace/span_metadata.h"
 #include "opentelemetry/trace/trace_id.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/version.h"
 
 namespace trace_api = opentelemetry::trace;
 

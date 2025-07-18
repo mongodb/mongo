@@ -7,8 +7,8 @@
 #include <vector>
 
 #include "opentelemetry/nostd/string_view.h"
-#include "third_party/opentelemetry-cpp/sdk/include/opentelemetry/sdk/metrics/instrument_metadata_validator.h"
-#include "third_party/opentelemetry-cpp/api/include/opentelemetry/version.h"
+#include "opentelemetry/sdk/metrics/instrument_metadata_validator.h"
+#include "opentelemetry/version.h"
 
 #if OPENTELEMETRY_HAVE_WORKING_REGEX
 #  include <regex>
