@@ -1134,6 +1134,10 @@ def ninja_sorted_build(ninja, **build):
     ninja.build(**sorted_dict)
 
 
+def mongo_get_default_ENV(env, target, source):
+    return get_default_ENV(env)
+
+
 def get_command_env(env, target, source):
     """
     Return a string that sets the environment for any environment variables that
@@ -1150,7 +1154,7 @@ def get_command_env(env, target, source):
     # os.environ or differ from it. We assume if it's a new or
     # differing key from the process environment then it's
     # important to pass down to commands in the Ninja file.
-    ENV = env.get('SHELL_ENV_GENERATOR', get_default_ENV)(env)
+    ENV = env.get('SHELL_ENV_GENERATOR', mongo_get_default_ENV)(env, target, source)
     scons_specified_env = {
         key: value
         for key, value in ENV.items() if key not in os.environ or os.environ.get(key, None) != value
