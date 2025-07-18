@@ -287,6 +287,18 @@ functions:
       bucket: mciuploads
       local_file: src/mongo-binaries.tgz
 
+  "verify binaries sha": &verify_binaries_sha
+    command: subprocess.exec
+    params:
+      binary: bash
+      add_expansions_to_env: true
+      args:
+        - "src/evergreen/run_python_script.sh"
+        - "buildscripts/s3_binary/download.py"
+        - "https://mciuploads.s3.amazonaws.com/${mongo_binaries}"
+        - "mongo-binaries.tgz"
+        - "--remote-sha"
+
   "fetch jstestshell": &fetch_jstestshell
     command: s3.get
     display_name: "fetch jstestshell"
@@ -297,6 +309,17 @@ functions:
       bucket: mciuploads
       local_file: src/mongodb-jstestshell.tgz
       optional: true
+
+  "verify jstestshell sha": &verify_jstestshell_sha
+    command: subprocess.exec
+    params:
+      binary: bash
+      add_expansions_to_env: true
+      args:
+        - "src/evergreen/run_python_script.sh"
+        - "evergreen/jstestshell_sha_check.py"
+        - "https://mciuploads.s3.amazonaws.com/${mongo_jstestshell}"
+        - "mongodb-jstestshell.tgz"
 
   "write mongo binary URL to downstream_expansions.yml": &echo_mongo_binary_url
     command: subprocess.exec
@@ -761,7 +784,9 @@ functions:
     - *fetch_venv
     - *adjust_venv
     - *fetch_binaries
+    - *verify_binaries_sha
     - *fetch_jstestshell
+    - *verify_jstestshell_sha
     - *extract_binaries
     - *extract_jstestshell
     - *get_buildnumber

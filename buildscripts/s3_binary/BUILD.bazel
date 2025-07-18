@@ -24,5 +24,12 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         "hashes",
+        "//buildscripts/resmokelib",
     ],
+)
+
+py_library(
+    name = "sha256sum",
+    srcs = ["sha256sum.py"],
+    visibility = ["//visibility:public"],
 )

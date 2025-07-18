@@ -139,6 +139,14 @@ tasks:
             - "bazel-bin/dist-test-stripped.${ext|tgz}"
       - func: "BOLT"
 
+      - command: subprocess.exec
+        params:
+          binary: bash
+          add_expansions_to_env: true
+          args:
+            - "src/evergreen/run_python_script.sh"
+            - "buildscripts/s3_binary/sha256sum.py"
+            - "bazel-bin/dist-test-stripped.${ext|tgz}"
       - command: s3.put
         params:
           optional: true
@@ -151,6 +159,17 @@ tasks:
           content_type: application/gzip
           # Sys-perf relies on this display name, please reach out before changing it.
           display_name: Binaries
+      - command: s3.put
+        params:
+          optional: true
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/bazel-bin/dist-test-stripped.${ext|tgz}.sha256
+          remote_file: ${mongo_binaries}.sha256
+          bucket: mciuploads
+          permissions: public-read
+          content_type: text/plain
+          display_name: Binaries SHA256
 
       - func: "f_expansions_write"
       - func: "gen feature flags"
@@ -433,6 +452,14 @@ tasks:
           permissions: public-read
           content_type: application/tar
           display_name: Dist Debugsymbols
+      - command: subprocess.exec
+        params:
+          binary: bash
+          add_expansions_to_env: true
+          args:
+            - "src/evergreen/run_python_script.sh"
+            - "buildscripts/s3_binary/sha256sum.py"
+            - "bazel-bin/mongo-stripped.${ext|tgz}"
       - command: s3.put
         params:
           aws_key: ${aws_key}
@@ -443,6 +470,16 @@ tasks:
           permissions: public-read
           content_type: ${content_type|application/gzip}
           display_name: Jstestshell
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/bazel-bin/mongo-stripped.${ext|tgz}.sha256
+          remote_file: ${mongo_jstestshell}.sha256
+          bucket: mciuploads
+          permissions: public-read
+          content_type: text/plain
+          display_name: Jstestshell SHA256
       - command: s3.put
         params:
           aws_key: ${aws_key}
