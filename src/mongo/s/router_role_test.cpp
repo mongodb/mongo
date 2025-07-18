@@ -157,6 +157,13 @@ public:
         auto targetService =
             operationContext()->getServiceContext()->getService(ClusterRole::RouterServer);
         operationContext()->getClient()->setService(targetService);
+
+        // Initialize the TransactionRouter state with state related to a previous txnNumber on this
+        // same sessionId. We'll later use a greater txnNumber in the test cases.
+        {
+            setupTransactionWithAtClusterTime(Timestamp(2, 0), 3);
+            actAsSubRouter();
+        }
     }
 
     void tearDown() override {
@@ -194,10 +201,6 @@ public:
                                 << clusterTime << repl::ReadConcernArgs::kLevelFieldName
                                 << "snapshot"))));
         repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
-
-        auto txnRouter = TransactionRouter::get(operationContext());
-        txnRouter.beginOrContinueTxn(
-            operationContext(), txnNum, TransactionRouter::TransactionActions::kStartOrContinue);
     }
 
     void setupReadConcernAtClusterTime(Timestamp clusterTime) {

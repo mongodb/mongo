@@ -47,16 +47,16 @@
 namespace mongo {
 namespace {
 boost::optional<Timestamp> getEffectiveAtClusterTime(OperationContext* opCtx) {
+    if (auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
+        // Check the read concern for the atClusterTime argument.
+        return atClusterTime->asTimestamp();
+    }
+
     if (auto txnRouter = TransactionRouter::get(opCtx)) {
         // Check to see if we're running in a transaction with snapshot level read concern.
         if (auto atClusterTime = txnRouter.getSelectedAtClusterTime()) {
             return atClusterTime->asTimestamp();
         }
-    }
-
-    if (auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
-        // Check the read concern for the atClusterTime argument.
-        return atClusterTime->asTimestamp();
     }
 
     // Otherwise, the latest routing table is sufficient.
