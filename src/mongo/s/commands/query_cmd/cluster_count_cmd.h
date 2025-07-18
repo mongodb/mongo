@@ -98,6 +98,7 @@ inline bool convertAndRunAggregateIfViewlessTimeseries(
             {aggRequest},
             {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)},
             boost::none,
+            boost::none, /* originalRequest */
             verbosity,
             &bodyBuilder));
         return true;

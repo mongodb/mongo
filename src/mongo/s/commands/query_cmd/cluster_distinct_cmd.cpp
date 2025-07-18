@@ -576,6 +576,7 @@ public:
                     {distinctAggRequest},
                     PrivilegeVector{},
                     boost::none,
+                    boost::none, /* originalRequest */
                     verbosity,
                     &bob));
             }
@@ -604,6 +605,7 @@ public:
                                                              {distinctAggRequest},
                                                              privileges,
                                                              boost::none,
+                                                             boost::none, /* originalRequest */
                                                              verbosity,
                                                              &bob));
         }

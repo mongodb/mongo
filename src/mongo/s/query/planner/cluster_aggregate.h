@@ -115,18 +115,21 @@ public:
 
     /**
      * Convenience version to inject the routingCtx by the caller. This function skips the
-     * collection routing management, therefore it has to be managed by the caller.
-     * Avoid calling this function unless it's strictly necessary.
+     * collection routing management, therefore it has to be managed by the caller. If the view is
+     * resolved, 'request' will refer to the resolved request and 'originalRequest' will refer to
+     * the unresolved request'. Avoid calling this function unless it's strictly necessary.
      */
-    static Status runAggregateWithRoutingCtx(OperationContext* opCtx,
-                                             RoutingContext& routingCtx,
-                                             const Namespaces& namespaces,
-                                             AggregateCommandRequest& request,
-                                             const LiteParsedPipeline& liteParsedPipeline,
-                                             const PrivilegeVector& privileges,
-                                             boost::optional<ResolvedView> resolvedView,
-                                             boost::optional<ExplainOptions::Verbosity> verbosity,
-                                             BSONObjBuilder* result);
+    static Status runAggregateWithRoutingCtx(
+        OperationContext* opCtx,
+        RoutingContext& routingCtx,
+        const Namespaces& namespaces,
+        AggregateCommandRequest& request,
+        const LiteParsedPipeline& liteParsedPipeline,
+        const PrivilegeVector& privileges,
+        boost::optional<ResolvedView> resolvedView,
+        boost::optional<AggregateCommandRequest> originalRequest,
+        boost::optional<ExplainOptions::Verbosity> verbosity,
+        BSONObjBuilder* result);
 
     /**
      * Retries a command that was previously run on a view by resolving the view as an aggregation

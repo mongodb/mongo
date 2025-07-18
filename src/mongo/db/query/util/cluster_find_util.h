@@ -82,6 +82,7 @@ inline boost::optional<CursorId> convertFindAndRunAggregateIfViewlessTimeseries(
             {aggRequest} /* liteParsedPipeline */,
             {Privilege(ResourcePattern::forExactNamespace(origNss), ActionType::find)},
             boost::none /* resolvedView */,
+            boost::none /* originalRequest */,
             verbosity,
             &bodyBuilder));
 
