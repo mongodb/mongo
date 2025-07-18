@@ -3,13 +3,40 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 package(default_visibility = ["//visibility:public"])
 
 [
+    # Note: For these extensions to load successfully in the server, they must be built with
+    # --allocator=system. Otherwise, the extensions will get a local instance of tcmalloc which
+    # fails to run properly because there isn't enough TLS space available for both the host and
+    # extension's tcmalloc. When testing on evergreen, we should build the extensions with the
+    # system allocator, and load the extensions into a host that was built with tcmalloc.
     mongo_cc_library(
         name = extension_name + "_extension",
         srcs = [extension_name + ".cpp"],
+        additional_linker_inputs = select({
+            "@platforms//os:linux": [
+                ":test_extensions.version_script.lds",
+            ],
+            "//conditions:default": [],
+        }) + select({
+            "@platforms//os:macos": [
+                ":test_extensions.exported_symbols_list.lds",
+            ],
+            "//conditions:default": [],
+        }),
         # linkshared produces a shared library as the output.
         # TODO SERVER-106929 Make sure the test extensions are statically linked, as we expect
         # all extensions to be.
         linkshared = True,
+        non_transitive_dyn_linkopts = select({
+            "@platforms//os:linux": [
+                "-Wl,--version-script=$(location :test_extensions.version_script.lds)",
+            ],
+            "//conditions:default": [],
+        }) + select({
+            "@platforms//os:macos": [
+                "-Wl,-exported_symbols_list,$(location :test_extensions.exported_symbols_list.lds)",
+            ],
+            "//conditions:default": [],
+        }),
         skip_global_deps = [
             # This is a globally injected dependency. We don't want a special allocator linked
             # here. Instead, the allocator should be overriden at load time.
