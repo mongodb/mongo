@@ -417,6 +417,8 @@ public:
     void visit(const ExpressionInternalIndexKey* expr) final {}
     void visit(const ExpressionInternalKeyStringValue* expr) final {}
     void visit(const ExpressionCreateUUID* expr) final {}
+    void visit(const ExpressionTestFeatureFlagLatest* expr) final {}
+    void visit(const ExpressionTestFeatureFlagLastLTS* expr) final {}
 
 private:
     ExpressionVisitorContext* _context;
@@ -603,6 +605,8 @@ public:
     void visit(const ExpressionInternalIndexKey* expr) final {}
     void visit(const ExpressionInternalKeyStringValue* expr) final {}
     void visit(const ExpressionCreateUUID* expr) final {}
+    void visit(const ExpressionTestFeatureFlagLatest* expr) final {}
+    void visit(const ExpressionTestFeatureFlagLastLTS* expr) final {}
 
 private:
     ExpressionVisitorContext* _context;
@@ -2953,6 +2957,12 @@ public:
         visitConditionalExpression(expr);
     }
     void visit(const ExpressionTestApiVersion* expr) final {
+        pushExpr(_b.makeInt32Constant(1));
+    }
+    void visit(const ExpressionTestFeatureFlagLatest* expr) final {
+        pushExpr(_b.makeInt32Constant(1));
+    }
+    void visit(const ExpressionTestFeatureFlagLastLTS* expr) final {
         pushExpr(_b.makeInt32Constant(1));
     }
     void visit(const ExpressionToLower* expr) final {

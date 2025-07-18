@@ -128,5 +128,9 @@ Value evaluate(const ExpressionLet& expr, const Document& root, Variables* varia
     return expr.getSubExpression()->evaluate(root, variables);
 }
 
+Value evaluate(const ExpressionTestFeatureFlags& expr, const Document& root, Variables* variables) {
+    return Value(1);
+}
+
 }  // namespace exec::expression
 }  // namespace mongo

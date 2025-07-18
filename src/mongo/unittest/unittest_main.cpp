@@ -61,8 +61,8 @@ int main(int argc, char** argv) {
     ::mongo::setupSynchronousSignalHandlers();
 
     ::mongo::TestingProctor::instance().setEnabled(true);
-    ::mongo::runGlobalInitializersOrDie(argVec);
     ::mongo::setTestCommandsEnabled(true);
+    ::mongo::runGlobalInitializersOrDie(argVec);
 
     moe::OptionSection options;
 

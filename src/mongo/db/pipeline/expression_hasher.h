@@ -202,6 +202,8 @@ public:
         kInternalKeyStringValue,
         kCurrentDate,
         kUUID,
+        kTestFeatureFlagLatest,
+        kTestFeatureFlagLastLTS
     };
 
     explicit ExpressionHashVisitor(H hashState) : _hashState(std::move(hashState)) {}
@@ -862,6 +864,14 @@ public:
 
     void visit(const ExpressionCreateUUID* expr) final {
         combine(OpType::kUUID);
+    }
+
+    void visit(const ExpressionTestFeatureFlagLatest* expr) final {
+        combine(OpType::kTestFeatureFlagLatest);
+    }
+
+    void visit(const ExpressionTestFeatureFlagLastLTS* expr) final {
+        combine(OpType::kTestFeatureFlagLastLTS);
     }
 
     H moveHashState() {

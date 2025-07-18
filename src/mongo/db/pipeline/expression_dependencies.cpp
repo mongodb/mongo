@@ -211,6 +211,8 @@ public:
     void visit(const ExpressionInternalOwningShard*) override {}
     void visit(const ExpressionInternalIndexKey*) override {}
     void visit(const ExpressionInternalKeyStringValue*) override {}
+    void visit(const ExpressionTestFeatureFlagLatest*) override {}
+    void visit(const ExpressionTestFeatureFlagLastLTS*) override {}
 };
 
 class DependencyVisitor : public DefaultDependencyVisitor {

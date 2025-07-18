@@ -184,14 +184,17 @@ enum class ExpressionDisabledReason {
 
 /**
  * Registers a Parser only if test commands are enabled. Use this if your expression is only used
- * for testing purposes.
+ * for testing purposes. If the expression requires a FCV gated feature flag, the feature flag
+ * should be tied to a permanent FCV (see 'featureFlagBlender'). If the expression does not require
+ * a feature flag, a 'nullptr' should be passed.
  */
-#define REGISTER_TEST_EXPRESSION(key, parser, allowedWithApiStrict, allowedClientType) \
-    REGISTER_EXPRESSION_CONDITIONALLY(key,                                             \
-                                      parser,                                          \
-                                      allowedWithApiStrict,                            \
-                                      allowedClientType,                               \
-                                      nullptr /* featureFlag */,                       \
+#define REGISTER_TEST_EXPRESSION(                                      \
+    key, parser, allowedWithApiStrict, allowedClientType, featureFlag) \
+    REGISTER_EXPRESSION_CONDITIONALLY(key,                             \
+                                      parser,                          \
+                                      allowedWithApiStrict,            \
+                                      allowedClientType,               \
+                                      featureFlag,                     \
                                       getTestCommandsEnabled())
 
 class Expression : public RefCountable {

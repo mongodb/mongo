@@ -48,7 +48,8 @@ namespace mongo {
 REGISTER_TEST_EXPRESSION(_testApiVersion,
                          ExpressionTestApiVersion::parse,
                          AllowedWithApiStrict::kConditionally,
-                         AllowedWithClientType::kAny);
+                         AllowedWithClientType::kAny,
+                         nullptr /* featureFlag */);
 
 ExpressionTestApiVersion::ExpressionTestApiVersion(ExpressionContext* const expCtx,
                                                    bool unstable,

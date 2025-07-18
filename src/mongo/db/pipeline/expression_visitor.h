@@ -179,6 +179,8 @@ class ExpressionEncStrStartsWith;
 class ExpressionEncStrEndsWith;
 class ExpressionEncStrContains;
 class ExpressionEncStrNormalizedEq;
+class ExpressionTestFeatureFlagLatest;
+class ExpressionTestFeatureFlagLastLTS;
 
 class AccumulatorAvg;
 class AccumulatorFirstN;
@@ -412,6 +414,10 @@ public:
     virtual void visit(
         expression_walker::MaybeConstPtr<IsConst, ExpressionInternalKeyStringValue>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionCreateUUID>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst, ExpressionTestFeatureFlagLatest>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst, ExpressionTestFeatureFlagLastLTS>) = 0;
 };
 
 using ExpressionMutableVisitor = ExpressionVisitor<false>;
@@ -591,5 +597,7 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionInternalIndexKey*) override {}
     void visit(const ExpressionInternalKeyStringValue*) override {}
     void visit(const ExpressionCreateUUID*) override {}
+    void visit(const ExpressionTestFeatureFlagLatest*) override {}
+    void visit(const ExpressionTestFeatureFlagLastLTS*) override {}
 };
 }  // namespace mongo
