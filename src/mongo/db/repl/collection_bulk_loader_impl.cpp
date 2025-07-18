@@ -39,7 +39,6 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index_builds/multi_index_block_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -49,6 +48,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/shared_buffer_fragment.h"
 
 #include <cstddef>
@@ -58,6 +58,29 @@
 
 namespace mongo {
 namespace repl {
+
+namespace {
+size_t getIndexBuildMemoryLimit() {
+    const double memPct = initialSyncIndexBuildMemoryPercentage.load();
+    const size_t memMinBytes =
+        static_cast<size_t>(initialSyncIndexBuildMemoryMinMB.load()) * 1024 * 1024;
+    const size_t memMaxBytes =
+        static_cast<size_t>(initialSyncIndexBuildMemoryMaxMB.load()) * 1024 * 1024;
+
+    ProcessInfo pi;
+    size_t memSizeMB = pi.getMemSizeMB();
+    size_t memLimitBytes = (memPct / 100.0) * memSizeMB * 1024 * 1024;
+
+    // The min and max are not validated relative to each other, so if the min is greater than the
+    // max, just bound to the maximum.
+    if (memMinBytes > memMaxBytes) {
+        return std::min(memLimitBytes, memMaxBytes);
+    }
+
+    return std::clamp(memLimitBytes, memMinBytes, memMaxBytes);
+}
+
+}  // namespace
 
 CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(ServiceContext::UniqueClient client,
                                                    ServiceContext::UniqueOperationContext opCtx,
@@ -106,8 +129,12 @@ Status CollectionBulkLoaderImpl::init(const BSONObj& idIndexSpec,
                     _opCtx.get(), collWriter.get(), secondaryIndexSpecs);
                 auto totalIndexBuildsIncludingIdIndex =
                     specs.size() + (idIndexSpec.isEmpty() ? 0 : 1);
-                auto maxInitialSyncIndexBuildMemoryUsageBytes =
-                    MultiIndexBlock::getTotalIndexBuildMaxMemoryUsageBytes();
+                auto maxInitialSyncIndexBuildMemoryUsageBytes = getIndexBuildMemoryLimit();
+                LOGV2(10658900,
+                      "Collection cloner index build memory usage",
+                      "totalLimitMB"_attr =
+                          maxInitialSyncIndexBuildMemoryUsageBytes / (1024 * 1024),
+                      "numIndexes"_attr = totalIndexBuildsIncludingIdIndex);
                 if (specs.size()) {
                     _secondaryIndexesBlock->ignoreUniqueConstraint();
                     auto maxSecondaryIndexMemoryUsageBytes =

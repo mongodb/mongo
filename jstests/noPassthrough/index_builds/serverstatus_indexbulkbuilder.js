@@ -144,8 +144,13 @@ assert.eq(indexBulkBuilderSection.memUsage, 0, tojson(indexBulkBuilderSection));
 
 (function initialSyncNewNode() {
     jsTestLog("Adding new node and initial syncing");
-    const newNode =
-        replSet.add({setParameter: {maxIndexBuildMemoryUsageMegabytes: maxMemUsageMegabytes}});
+    const newNode = replSet.add({
+        setParameter: {
+            initialSyncIndexBuildMemoryPercentage:
+                80,  // Set high enough to reliably hit the maximum.
+            initialSyncIndexBuildMemoryMaxMB: maxMemUsageMegabytes
+        }
+    });
     replSet.reInitiate();
     replSet.awaitSecondaryNodes(null, [newNode]);
     replSet.awaitReplication();
@@ -163,7 +168,7 @@ assert.gte(indexBulkBuilderSection.count, 3, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 1, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 1, tojson(indexBulkBuilderSection));
 // We try building three indexes for the test collection so the memory usage limit for each index
-// build during initial sync is the maxIndexBuildMemoryUsageMegabytes divided by the number of index
+// build during initial sync is the initialSyncIndexBuildMemoryMaxMB divided by the number of index
 // builds. We end up with a third of the in-memory memory so we triple the amount of the memory
 // reserved for the file iterators in sort.
 let maxMemUsagePerIndexBytes = maxMemUsageMegabytes * 1024 * 1024 / 3;

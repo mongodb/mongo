@@ -94,6 +94,24 @@ config_fuzzer_params = {
             "choices": ["nearest", "primary", "primaryPreferred", "secondaryPreferred"],
             "fuzz_at": ["startup"],
         },
+        "initialSyncIndexBuildMemoryPercentage": {
+            "min": 0,
+            "max": 20,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "initialSyncIndexBuildMemoryMinMB": {
+            "min": 50,
+            "max": 1024,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "initialSyncIndexBuildMemoryMaxMB": {
+            "min": 50,
+            "max": 1024,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
         "internalInsertMaxBatchSize": {
             "min": 1,
             "max": 750,
