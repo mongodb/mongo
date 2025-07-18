@@ -286,7 +286,6 @@ public:
         return _maxSize;
     }
 
-    using RecordStoreBase::Oplog::getRawCursor;
     std::unique_ptr<SeekableRecordCursor> getRawCursor(OperationContext* opCtx,
                                                        RecoveryUnit& ru,
                                                        bool forward) const override {

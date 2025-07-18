@@ -55,7 +55,8 @@ RecordId reclaimOplog(OperationContext* opCtx, RecordStore& oplog, RecordId mayT
                 auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
                 StorageWriteTransaction txn(ru);
 
-                auto seekableCursor = oplog.oplog()->getRawCursor(opCtx);
+                auto seekableCursor =
+                    oplog.oplog()->getRawCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
                 auto firstRecordSeekable = seekableCursor->next();
                 if (!firstRecordSeekable) {
                     LOGV2_WARNING(8841100, "The oplog is empty, there is nothing to truncate");

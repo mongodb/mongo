@@ -191,8 +191,6 @@ private:
 class RecordStoreBase::Oplog : public RecordStore::Oplog {
 public:
     std::unique_ptr<SeekableRecordCursor> getRawCursor(OperationContext* opCtx,
-                                                       bool forward = true) const final;
-    std::unique_ptr<SeekableRecordCursor> getRawCursor(OperationContext* opCtx,
                                                        RecoveryUnit& ru,
                                                        bool forward = true) const override = 0;
 };

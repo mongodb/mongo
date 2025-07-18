@@ -711,11 +711,7 @@ public:
     /**
      * Returns a new cursor on the oplog, ignoring any visibility semantics specific to forward
      * cursors.
-     *
-     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
-    virtual std::unique_ptr<SeekableRecordCursor> getRawCursor(OperationContext* opCtx,
-                                                               bool forward = true) const = 0;
     virtual std::unique_ptr<SeekableRecordCursor> getRawCursor(OperationContext* opCtx,
                                                                RecoveryUnit&,
                                                                bool forward = true) const = 0;

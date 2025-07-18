@@ -218,10 +218,4 @@ RecordStoreBase::Capped::TruncateAfterResult RecordStoreBase::Capped::truncateAf
     validateWriteAllowed(opCtx);
     return _truncateAfter(opCtx, ru, id, inclusive);
 }
-
-std::unique_ptr<SeekableRecordCursor> RecordStoreBase::Oplog::getRawCursor(OperationContext* opCtx,
-                                                                           bool forward) const {
-    return getRawCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), forward);
-}
-
 }  // namespace mongo
