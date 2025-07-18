@@ -757,11 +757,6 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
                 ->updateReplSetHosts(rsMonitorConfigConnStr,
                                      ShardRegistry::ConnectionStringUpdateType::kConfirmed);
         }
-
-        if (auto routerService = service->getService(ClusterRole::RouterServer); routerService) {
-            uassertStatusOK(globalAuthzManagerFactory->initialize(opCtx));
-            UserCacheInvalidator::start(service, opCtx);
-        }
     }
 
     RouterUptimeReporter::get(service).startPeriodicThread(service);
