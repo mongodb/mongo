@@ -63,6 +63,7 @@ public:
 
     /** read in the object specified, and advance buffer pointer */
     template <typename T>
+    requires(isEndiannessSpecified<T>())
     void read(T& t) {
         ConstDataRangeCursor cdrc(_pos, _end);
         cdrc.readAndAdvance(&t);
@@ -79,6 +80,7 @@ public:
 
     /** read in the object specified, but do not advance buffer pointer */
     template <typename T>
+    requires(isEndiannessSpecified<T>())
     void peek(T& t) const {
         ConstDataRange(_pos, _end).readInto(&t);
     }

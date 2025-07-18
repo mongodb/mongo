@@ -125,4 +125,11 @@ struct DataType::Handler<T, typename std::enable_if<IsEndian<T>::value>::type> {
     }
 };
 
+// XXX should likely also fail for trivially copyable types
+// for which DataType::Handler hasn't been overridden
+template <typename T>
+constexpr bool isEndiannessSpecified() {
+    return !std::is_integral_v<T> || sizeof(T) == 1;
+}
+
 }  // namespace mongo

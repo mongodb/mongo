@@ -30,6 +30,7 @@
 #include "mongo/db/storage/key_string/key_string.h"
 
 #include "mongo/base/data_cursor.h"
+#include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_validate.h"
@@ -347,8 +348,8 @@ void memcpy_flipBits(void* dst, const void* src, size_t bytes) {
 }
 
 template <typename T>
+requires(IsEndian<T>::value || sizeof(T) == 1)
 T readType(BufReader* reader, bool inverted) {
-    MONGO_STATIC_ASSERT(std::is_integral<T>::value);
     T t = ConstDataView(static_cast<const char*>(reader->skip(sizeof(T)))).read<T>();
     if (inverted)
         return ~t;
@@ -1526,7 +1527,7 @@ Decimal128 adjustDecimalExponent(TypeBits::ReaderBase* typeBits, Decimal128 num)
  */
 Decimal128 readDecimalContinuation(BufReader* reader, bool inverted, Decimal128 num) {
     uint32_t flags = Decimal128::kNoFlag;
-    uint64_t continuation = endian::bigToNative(readType<uint64_t>(reader, inverted));
+    uint64_t continuation = readType<BigEndian<uint64_t>>(reader, inverted);
     num = num.normalize();
     keyStringAssert(
         50850,
@@ -1578,11 +1579,11 @@ void toBsonValue(uint8_t ctype,
 
         case CType::kDate:
             *stream << Date_t::fromMillisSinceEpoch(
-                endian::bigToNative(readType<uint64_t>(reader, inverted)) ^ (1LL << 63));
+                readType<BigEndian<uint64_t>>(reader, inverted) ^ (1LL << 63));
             break;
 
         case CType::kTimestamp:
-            *stream << Timestamp(endian::bigToNative(readType<uint64_t>(reader, inverted)));
+            *stream << Timestamp(readType<BigEndian<uint64_t>>(reader, inverted));
             break;
 
         case CType::kOID:
@@ -1652,7 +1653,7 @@ void toBsonValue(uint8_t ctype,
             size_t size = readType<uint8_t>(reader, inverted);
             if (size == 0xff) {
                 // size was stored in 4 bytes.
-                size = endian::bigToNative(readType<uint32_t>(reader, inverted));
+                size = readType<BigEndian<uint32_t>>(reader, inverted);
             }
             BinDataType subType = BinDataType(readType<uint8_t>(reader, inverted));
             const void* ptr = reader->skip(size);
@@ -1692,7 +1693,7 @@ void toBsonValue(uint8_t ctype,
         }
 
         case CType::kDBRef: {
-            size_t size = endian::bigToNative(readType<uint32_t>(reader, inverted));
+            size_t size = readType<BigEndian<uint32_t>>(reader, inverted);
             if (inverted) {
                 std::unique_ptr<char[]> ns(new char[size]);
                 memcpy_flipBits(ns.get(), reader->skip(size), size);
@@ -1787,8 +1788,7 @@ void toBsonValue(uint8_t ctype,
             keyStringAssert(31231,
                             "Unexpected decimal encoding for V0 KeyString.",
                             version > Version::V0 || originalType != TypeBits::kDecimal);
-            uint64_t encoded = readType<uint64_t>(reader, inverted);
-            encoded = endian::bigToNative(encoded);
+            uint64_t encoded = readType<BigEndian<uint64_t>>(reader, inverted);
             bool hasDecimalContinuation = false;
             double bin;
 
@@ -1810,7 +1810,7 @@ void toBsonValue(uint8_t ctype,
                                 "Invalid type bits for decimal number.",
                                 originalType == TypeBits::kDecimal);
                 uint64_t highbits = encoded & ~(1ULL << 63);
-                uint64_t lowbits = endian::bigToNative(readType<uint64_t>(reader, inverted));
+                uint64_t lowbits = readType<BigEndian<uint64_t>>(reader, inverted);
                 Decimal128 dec(Decimal128::Value{lowbits, highbits});
                 if (isNegative)
                     dec = dec.negate();
@@ -1852,8 +1852,7 @@ void toBsonValue(uint8_t ctype,
 
         case CType::kNumericPositiveSmallMagnitude: {
             const uint8_t originalType = typeBits->readNumeric();
-            uint64_t encoded = readType<uint64_t>(reader, inverted);
-            encoded = endian::bigToNative(encoded);
+            uint64_t encoded = readType<BigEndian<uint64_t>>(reader, inverted);
 
             if (version == Version::V0) {
                 // for these, the raw double was stored intact, including sign bit.
@@ -1869,8 +1868,7 @@ void toBsonValue(uint8_t ctype,
             switch (encoded >> 62) {
                 case 0x0: {
                     // Teeny tiny decimal, smaller magnitude than 2**(-1074)
-                    uint64_t lowbits = readType<uint64_t>(reader, inverted);
-                    lowbits = endian::bigToNative(lowbits);
+                    uint64_t lowbits = readType<BigEndian<uint64_t>>(reader, inverted);
                     Decimal128 dec = Decimal128(Decimal128::Value{lowbits, encoded});
                     dec = adjustDecimalExponent(typeBits, dec);
                     if (ctype == CType::kNumericNegativeSmallMagnitude)
@@ -2166,7 +2164,7 @@ void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Ver
             size_t size = readType<uint8_t>(reader, inverted);
             if (size == 0xff) {
                 // size was stored in 4 bytes.
-                size = endian::bigToNative(readType<uint32_t>(reader, inverted));
+                size = readType<BigEndian<uint32_t>>(reader, inverted);
             }
             // Read the subtype of BinData
             (void)readType<uint8_t>(reader, inverted);
@@ -2191,7 +2189,7 @@ void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Ver
         }
 
         case CType::kDBRef: {
-            size_t size = endian::bigToNative(readType<uint32_t>(reader, inverted));
+            size_t size = readType<BigEndian<uint32_t>>(reader, inverted);
             reader->skip(size);
             reader->skip(OID::kOIDSize);
             break;
@@ -2225,8 +2223,7 @@ void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Ver
             inverted = !inverted;
             [[fallthrough]];  // format is the same as positive, but inverted
         case CType::kNumericPositiveLargeMagnitude: {
-            uint64_t encoded = readType<uint64_t>(reader, inverted);
-            encoded = endian::bigToNative(encoded);
+            uint64_t encoded = readType<BigEndian<uint64_t>>(reader, inverted);
             bool hasDecimalContinuation = false;
 
             // Backward compatibility or infinity
@@ -2236,7 +2233,7 @@ void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Ver
                 hasDecimalContinuation = encoded & 1;
             } else {  // Huge decimal number, get the low bits
                 // It should be of type kDecimal
-                (void)readType<uint64_t>(reader, inverted);
+                (void)readType<BigEndian<uint64_t>>(reader, inverted);
                 break;
             }
 
@@ -2251,8 +2248,7 @@ void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Ver
             [[fallthrough]];  // format is the same as positive, but inverted
 
         case CType::kNumericPositiveSmallMagnitude: {
-            uint64_t encoded = readType<uint64_t>(reader, inverted);
-            encoded = endian::bigToNative(encoded);
+            uint64_t encoded = readType<BigEndian<uint64_t>>(reader, inverted);
 
             if (version == Version::V0) {
                 break;
@@ -2261,7 +2257,7 @@ void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Ver
             switch (encoded >> 62) {
                 case 0x0: {
                     // Teeny tiny decimal, smaller magnitude than 2**(-1074)
-                    (void)readType<uint64_t>(reader, inverted);
+                    (void)readType<BigEndian<uint64_t>>(reader, inverted);
                     break;
                 }
                 case 0x1:
