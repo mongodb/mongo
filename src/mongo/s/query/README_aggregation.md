@@ -15,6 +15,8 @@ Stage implementations specify their splitting requirements by implementing the [
 
 ## Routing of aggregations that involve multiple collections
 
+**Note**: For information about routing aggregations and other query operations safely with the `RoutingContext`, refer to the [RoutingContext README](/src/mongo/s/query/README_routing_context.md).
+
 Some aggregation stages reference a second (or more) collections. Some examples of this are the following stages: $lookup, $graphLookup, $out, $merge, $unionWith.
 
 Routing of these pipelines generally follows the same approach as for single-collection pipelines — they are targeted according to the _main_ (leftmost) collection. Then, each targeted shard will execute the pipeline and when it comes the time to execute one of the stages that references a secondary collection, will in turn query the shard that owns the relevant data ranges for it — this is, the shard will then behave as a router.

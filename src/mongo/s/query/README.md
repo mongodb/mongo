@@ -37,3 +37,4 @@ CRUD operations with a read concern weaker than snapshot roughly match the "read
 
 - The [MoveRange TLA+ specification](https://github.com/mongodb/mongo/blob/d40899bd45db62def8941cc6ba65c44a2cbbb83a/src/mongo/tla_plus/MoveRange/MoveRange.tla), which models the distributed query protocol and verifies the safety and liveness properties described in this readme.
 - The [Sharded Transactions and DDLs readme](https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/README_transactions_and_ddl.md), covering aspects pertaining to CRUD operations in distributed transactions.
+- The [RoutingContext readme](/src/mongo/s/query/README_routing_context.md) for information about routing operations safely with the `RoutingContext`

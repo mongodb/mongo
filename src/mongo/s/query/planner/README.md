@@ -35,7 +35,7 @@ For queries that must run on more than one shard (i.e. the query requires data t
 
 > ### Aside: Routing table
 >
-> The **routing table** maps chunks of data to shard ids, and it is consulted by `mongos` for shard targeting. It must be updated as data moves between shards, such as when the balancer is turned on or a range migration commits. For more information on the shard versioning protocol it uses to ensure a consistent view of data across a request, refer to the [Distributed CRUDs README](../README.md).
+> The **routing table** maps chunks of data to shard ids, and it is consulted by `mongos` for shard targeting. It must be updated as data moves between shards, such as when the balancer is turned on or a range migration commits. For more information on the shard versioning protocol it uses to ensure a consistent view of data across a request, refer to the [Distributed CRUDs README](../README.md). For information about routing query operations safely with the `RoutingContext`, refer to the [RoutingContext README](/src/mongo/s/query/README_routing_context.md).
 >
 > A **chunk** is a contiguous range over the shard key.
 
