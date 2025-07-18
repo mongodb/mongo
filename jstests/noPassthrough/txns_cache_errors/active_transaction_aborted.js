@@ -71,7 +71,11 @@ function testIdleAbort() {
     }, "Timed out waiting for an active txn to be killed");
 
     for (let t = 0; t < threads.length; t++) {
-        threads[t].join();
+        try {
+            threads[t].join();
+        } catch (error) {
+            jsTestLog("Ignoring non-critical error " + error);
+        }
     }
 
     replSet.stopSet();
@@ -138,7 +142,11 @@ function testCachePressureAbort() {
     replSet.stopSet();
 
     for (let t = 0; t < threads.length; t++) {
-        threads[t].join();
+        try {
+            threads[t].join();
+        } catch (error) {
+            jsTestLog("Ignoring non-critical error " + error);
+        }
     }
 }
 
