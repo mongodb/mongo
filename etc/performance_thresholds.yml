@@ -48,22 +48,22 @@ tests:
       - thread_level: 1
         metrics:
           - name: instructions_per_iteration_mean
-            value: 19754
+            value: 19447
             bound_direction: upper
       - thread_level: 32
         metrics:
           - name: instructions_per_iteration_mean
-            value: 19762
+            value: 19461
             bound_direction: upper
   ServiceEntryPointShardRoleBenchmarkFixture/BM_SEP_PING:
     al2023-arm64-sep-benchmark:
       - thread_level: 1
         metrics:
           - name: instructions_per_iteration_mean
-            value: 21257
+            value: 20852
             bound_direction: upper
       - thread_level: 32
         metrics:
           - name: instructions_per_iteration_mean
-            value: 21332
+            value: 20924
             bound_direction: upper
