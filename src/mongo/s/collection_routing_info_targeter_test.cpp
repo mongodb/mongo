@@ -633,6 +633,17 @@ TEST_F(CollectionRoutingInfoTargeterTest, TestRoutingWithout_id) {
                        ErrorCodes::InvalidIdField);
 }
 
+TEST_F(CollectionRoutingInfoTargeterTest, ThrowOnCollectionlessAggregateNss) {
+    const auto kCollectionlessAggNss =
+        NamespaceString::createNamespaceString_forTest("db", "$cmd.aggregate");
+    ASSERT_THROWS_CODE(
+        [&] {
+            CollectionRoutingInfoTargeter cri(operationContext(), kCollectionlessAggNss);
+        }(),
+        DBException,
+        ErrorCodes::InvalidNamespace);
+}
+
 /**
  * Fixture that populates the CatalogCache with 'kNss' as an unsharded collection not tracked on the
  * configsvr, or a non-existent collection.

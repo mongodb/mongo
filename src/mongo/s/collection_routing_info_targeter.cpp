@@ -232,6 +232,10 @@ std::unique_ptr<RoutingContext> CollectionRoutingInfoTargeter::_init(OperationCo
         }
     };
 
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Must use a real namespace with CollectionRoutingInfoTargeter, got "
+                          << _nss.toStringForErrorMsg(),
+            !_nss.isCollectionlessAggregateNS());
     auto routingCtx = createDatabaseAndGetRoutingCtx(_nss);
     const auto& cri = routingCtx->getCollectionRoutingInfo(_nss);
     auto cm = std::move(cri.getChunkManager());
