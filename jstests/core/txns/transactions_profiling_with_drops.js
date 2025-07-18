@@ -49,7 +49,7 @@ profilerHasSingleMatchingEntryOrThrow(
 let lockShell = startParallelShell(function() {
     assert.commandFailed(db.adminCommand({
         sleep: 1,
-        secs: 500,
+        secs: 300,
         lock: "w",
         lockTarget: "test",
         $comment: "transaction_profiling_with_drops lock sleep"
@@ -89,7 +89,7 @@ profilerHasSingleMatchingEntryOrThrow(
 // Lock 'test' database in X mode.
 lockShell = startParallelShell(function() {
     assert.commandFailed(db.getSiblingDB("test").adminCommand(
-        {sleep: 1, secs: 500, lock: "w", lockTarget: "test", $comment: "lock sleep"}));
+        {sleep: 1, secs: 300, lock: "w", lockTarget: "test", $comment: "lock sleep"}));
 });
 
 // Wait for sleep to appear in currentOp
