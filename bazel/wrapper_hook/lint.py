@@ -227,6 +227,10 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
                 if file.endswith((".cpp", ".c", ".h", ".py", ".js", ".mjs", ".json"))
             ]
 
+    # Default to linting everything in rules_lint if no path was passed in.
+    if len([arg for arg in args if not arg.startswith("--")]) == 0:
+        args = ["//..."] + args
+
     if lint_all or "sbom.json" in files_to_format:
         subprocess.run([bazel_bin, "run", "//buildscripts:sbom_linter"], check=True)
 
