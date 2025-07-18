@@ -204,9 +204,9 @@ protected:
 
 private:
     const IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
-        CollectionPtr collection =
-            CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
-                &_opCtx, nss, boost::none));
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr collection = CollectionPtr::CollectionPtr_UNSAFE(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss));
         std::vector<const IndexDescriptor*> indexes;
         collection->getIndexCatalog()->findIndexesByKeyPattern(
             &_opCtx, obj, IndexCatalog::InclusionPolicy::kReady, &indexes);

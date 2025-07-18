@@ -125,14 +125,14 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        CollectionPtr coll =
-            CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
-                &_opCtx, nss(), boost::none));
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            db->createCollection(&_opCtx, nss());
-            coll = CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
-                &_opCtx, nss(), boost::none));
+            // TODO(SERVER-103403): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            coll = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(&_opCtx, nss()));
             wuow.commit();
         }
 
@@ -194,14 +194,14 @@ public:
     void run() {
         AutoGetDb autodb(&_opCtx, nss().dbName(), MODE_X);
         Database* db = autodb.ensureDbExists(&_opCtx);
-        CollectionPtr coll =
-            CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
-                &_opCtx, nss(), boost::none));
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
-            db->createCollection(&_opCtx, nss());
-            coll = CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
-                &_opCtx, nss(), boost::none));
+            // TODO(SERVER-103403): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            coll = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(&_opCtx, nss()));
             wuow.commit();
         }
 

@@ -88,8 +88,8 @@ public:
         _autodb.ensureDbExists(&_opCtx);
         _autodb.getDb()->dropCollection(&_opCtx, nss()).transitional_ignore();
         _coll = _autodb.getDb()->createCollection(&_opCtx, nss());
-        _collPtr = CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
-            &_opCtx, nss(), boost::none));
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        _collPtr = CollectionPtr::CollectionPtr_UNSAFE(_coll);
 
         ASSERT_OK(_coll->getIndexCatalog()->createIndexOnEmptyCollection(
             &_opCtx,
@@ -103,13 +103,12 @@ public:
     void insert(const BSONObj& doc) {
         WriteUnitOfWork wunit(&_opCtx);
         OpDebug* const nullOpDebug = nullptr;
-        ASSERT_OK(collection_internal::insertDocument(
-            &_opCtx,
-            CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
-                &_opCtx, nss(), boost::none)),
-            InsertStatement(doc),
-            nullOpDebug,
-            false));
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        ASSERT_OK(collection_internal::insertDocument(&_opCtx,
+                                                      CollectionPtr::CollectionPtr_UNSAFE(_coll),
+                                                      InsertStatement(doc),
+                                                      nullOpDebug,
+                                                      false));
         wunit.commit();
     }
 

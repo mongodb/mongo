@@ -100,8 +100,9 @@ public:
     }
 
     CollectionPtr getCollection() {
-        return CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
-            &_opCtx, ns(), boost::none));
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        return CollectionPtr::CollectionPtr_UNSAFE(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, ns()));
     }
 
     const IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
