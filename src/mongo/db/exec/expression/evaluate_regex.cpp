@@ -65,6 +65,11 @@ struct RegexExecutionState {
     boost::optional<std::string> input;
     int startCodePointPos = 0;
     int startBytePos = 0;
+    /**
+     * The starting position in the input text that has not yet been split using match. This index
+     * can be different from startBytePos.
+     */
+    int beforeMatchStrStart = 0;
 
     /**
      * If either the text input or regex pattern is nullish, then we consider the operation as a
@@ -198,6 +203,27 @@ RegexExecutionState buildInitialState(const RegexExpression& expr,
 }
 
 /**
+ * Creates an initial execution state from an input string value and regular expression pattern
+ * value. This returned object can later be used for calling execute() or nextMatch().
+ */
+RegexExecutionState buildInitialState(const std::string& opName,
+                                      const Value& textInput,
+                                      const Value& regexPattern) {
+    RegexExecutionState executionState;
+
+    extractRegexAndOptions(
+        regexPattern, Value(BSONNULL), opName, executionState.pattern, executionState.options);
+    compile(executionState.pattern,
+            executionState.options,
+            opName,
+            executionState.pcrePtr,
+            executionState.numCaptures);
+    extractInputField(textInput, opName, executionState.input);
+
+    return executionState;
+}
+
+/**
  * Checks if there is a match for the input, options, and pattern of 'regexState'.
  * Returns the pcre::MatchData yielded by that match operation.
  * Will uassert for any errors other than `pcre::Errc::ERROR_NOMATCH`.
@@ -256,6 +282,41 @@ Value nextMatch(RegexExecutionState* regexState, const std::string& opName) {
     match.addField("idx", Value(regexState->startCodePointPos));
     match.addField("captures", Value(std::move(captures)));
     return match.freezeToValue();
+}
+
+/**
+ * Finds the next possible match for the given input and pattern that are part of
+ * 'regexState'. This function returns the matched MatchData object and the input substring
+ * preceding the match.
+ */
+std::pair<pcre::MatchData, StringData> nextMatchAndPrecedingString(RegexExecutionState* regexState,
+                                                                   const std::string& opName) {
+    auto m = execute(regexState, opName);
+    if (!m) {
+        // No match.
+        return {std::move(m), ""_sd};
+    }
+
+    const int matchPos = m[0].data() - m.input().data();
+
+    const StringData beforeMatch = m.input().substr(regexState->beforeMatchStrStart,
+                                                    matchPos - regexState->beforeMatchStrStart);
+
+    // Move indices for next match.
+    regexState->beforeMatchStrStart += beforeMatch.size() + m[0].size();
+    if (m[0].empty()) {
+        // Move the startBytePos index to the next character, so we don't capture the same empty
+        // match in the next iteration. To accommodate unicode characters, we need the length of the
+        // current character to move, but this can only be done if the index points to a valid
+        // character (i.e. startBytePos < m.input().size()), if that's not the case we just increase
+        // by one because we will exit in the next iteration.
+        regexState->startBytePos = static_cast<size_t>(regexState->startBytePos) < m.input().size()
+            ? matchPos + str::getCodePointLength(m.input()[regexState->startBytePos])
+            : m.input().size() + 1;
+    } else {
+        regexState->startBytePos = regexState->beforeMatchStrStart;
+    }
+    return {std::move(m), beforeMatch};
 }
 
 }  // namespace
@@ -341,6 +402,238 @@ Value evaluate(const ExpressionRegexMatch& expr, const Document& root, Variables
     }
     pcre::MatchData m = execute(&state, expr.getOpName());
     return Value(!!m);
+}
+
+namespace {
+void validateSplitArguments(const ExpressionSplit& expr,
+                            const Value& inputArg,
+                            const Value& separatorArg) {
+    uassert(40085,
+            str::stream() << "$split requires an expression that evaluates to a string as a first "
+                             "argument, found: "
+                          << typeName(inputArg.getType()),
+            inputArg.getType() == BSONType::string);
+
+    if (expr.getExpressionContext()->isFeatureFlagMqlJsEngineGapEnabled()) {
+        uassert(40086,
+                str::stream() << "$split requires an expression that evaluates to a string or "
+                                 "regular expression as a second argument, found: "
+                              << typeName(separatorArg.getType()),
+                separatorArg.getType() == BSONType::string ||
+                    separatorArg.getType() == BSONType::regEx);
+    } else {
+        uassert(
+            10503900,
+            str::stream() << "$split requires an expression that evaluates to a string as a second "
+                             "argument, found: "
+                          << typeName(separatorArg.getType()),
+            separatorArg.getType() == BSONType::string);
+    }
+}
+}  // namespace
+
+Value evaluate(const ExpressionSplit& expr, const Document& root, Variables* variables) {
+    auto& children = expr.getChildren();
+    Value inputArg = children[0]->evaluate(root, variables);
+    Value separatorArg = children[1]->evaluate(root, variables);
+
+    if (inputArg.nullish() || separatorArg.nullish()) {
+        return Value(BSONNULL);
+    }
+    validateSplitArguments(expr, inputArg, separatorArg);
+
+    std::vector<Value> output;
+
+    if (separatorArg.getType() == BSONType::string) {
+        // Split using a string delimiter.
+        StringData input = inputArg.getStringData();
+        StringData separator = separatorArg.getStringData();
+
+        uassert(40087, "$split requires a non-empty separator", !separator.empty());
+
+        const char* needle = separator.data();
+        const char* const needleEnd = needle + separator.size();
+        const char* remainingHaystack = input.data();
+        const char* const haystackEnd = remainingHaystack + input.size();
+
+        const char* it = remainingHaystack;
+        while ((it = std::search(remainingHaystack, haystackEnd, needle, needleEnd)) !=
+               haystackEnd) {
+            StringData sd(remainingHaystack, it - remainingHaystack);
+            output.push_back(Value(sd));
+            remainingHaystack = it + separator.size();
+        }
+
+        StringData splitString(remainingHaystack,
+                               input.size() - (remainingHaystack - input.data()));
+        output.push_back(Value(splitString));
+        return Value(std::move(output));
+    }
+
+    tassert(10503905,
+            str::stream() << "Expected separator to be a regular expression, but found: "
+                          << typeName(separatorArg.getType()),
+            separatorArg.getType() == BSONType::regEx);
+    tassert(10503906,
+            str::stream() << "featureFlagMqlJsEngineGap is not enabled, but $split accepted a "
+                             "regular expression as separator.",
+            expr.getExpressionContext()->isFeatureFlagMqlJsEngineGapEnabled());
+    // Split using a regular expression delimiter.
+    auto executionState = buildInitialState(expr.getOpName(), inputArg, separatorArg);
+    if (executionState.nullish()) {
+        return Value(std::move(output));
+    }
+
+    auto input = inputArg.getStringData();
+
+    // Condition uses <= instead of < to also capture possible empty matches at the end of the
+    // search string.
+    while (static_cast<size_t>(executionState.startBytePos) <= input.size()) {
+        auto [match, beforeMatch] = nextMatchAndPrecedingString(&executionState, expr.getOpName());
+        if (!match) {
+            // No match.
+            break;
+        }
+        output.push_back(Value(beforeMatch));
+        for (StringData subMatch : match.getCaptures()) {
+            output.push_back(Value(subMatch));
+        }
+    }
+    output.push_back(Value(input.substr(executionState.beforeMatchStrStart)));
+    return Value(std::move(output));
+}
+
+namespace {
+template <typename ExpressionReplace>
+Value evaluateReplace(
+    ExpressionReplace& expr,
+    const Document& root,
+    Variables* variables,
+    std::function<Value(StringData, StringData, StringData)> replaceOpStr,
+    std::function<Value(StringData, RegexExecutionState, StringData)> replaceOpRegEx) {
+    Value input = expr.getInput()->evaluate(root, variables);
+    Value find = expr.getFind()->evaluate(root, variables);
+    Value replacement = expr.getReplacement()->evaluate(root, variables);
+
+    uassert(10503904,
+            str::stream() << expr.getOpName()
+                          << " requires that 'input' be a string, found: " << input.toString(),
+            input.getType() == BSONType::string || input.nullish());
+    if (replaceOpRegEx != nullptr &&
+        expr.getExpressionContext()->isFeatureFlagMqlJsEngineGapEnabled()) {
+        uassert(10503903,
+                str::stream() << expr.getOpName()
+                              << " requires that 'find' be a string or regular expression, found: "
+                              << find.toString(),
+                find.getType() == BSONType::string || find.getType() == BSONType::regEx ||
+                    find.nullish());
+    } else {
+        uassert(10503901,
+                str::stream() << expr.getOpName()
+                              << " requires that 'find' be a string, found: " << find.toString(),
+                find.getType() == BSONType::string || find.nullish());
+    }
+    uassert(10503902,
+            str::stream() << expr.getOpName() << " requires that 'replacement' be a string, found: "
+                          << replacement.toString(),
+            replacement.getType() == BSONType::string || replacement.nullish());
+
+    // Return null if any arg is nullish.
+    if (input.nullish() || find.nullish() || replacement.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    if (find.getType() == BSONType::regEx) {
+        tassert(
+            10503907,
+            str::stream() << "Find argument is a regular expression, but replaceOpRegEx is null.",
+            replaceOpRegEx != nullptr);
+        tassert(10503908,
+                str::stream() << "featureFlagMqlJsEngineGap is not enabled, but "
+                              << expr.getOpName() << " accepted a regular expression as separator.",
+                expr.getExpressionContext()->isFeatureFlagMqlJsEngineGapEnabled());
+        auto executionState = buildInitialState(expr.getOpName(), input, find);
+        if (executionState.nullish()) {
+            return Value(std::move(input));
+        }
+        return replaceOpRegEx(
+            input.getStringData(), std::move(executionState), replacement.getStringData());
+    }
+    // find.getType() == BSONType::string
+    return replaceOpStr(input.getStringData(), find.getStringData(), replacement.getStringData());
+}
+}  // namespace
+
+Value evaluate(const ExpressionReplaceOne& expr, const Document& root, Variables* variables) {
+    auto replaceOneOp = [](StringData input, StringData find, StringData replacement) -> Value {
+        size_t startIndex = input.find(find);
+        if (startIndex == std::string::npos) {
+            return Value(StringData(input));
+        }
+        // An empty string matches at every position, so replaceOne should insert the replacement
+        // text at position 0. input.find correctly returns position 0 when 'find' is empty, so we
+        // don't need any special case to handle this.
+        size_t endIndex = startIndex + find.size();
+        StringBuilder output;
+        output << input.substr(0, startIndex);
+        output << replacement;
+        output << input.substr(endIndex);
+        return Value(output.stringData());
+    };
+    return evaluateReplace(expr, root, variables, replaceOneOp, nullptr);
+}
+
+Value evaluate(const ExpressionReplaceAll& expr, const Document& root, Variables* variables) {
+    auto replaceAllOpStr = [](StringData input, StringData find, StringData replacement) -> Value {
+        // An empty string matches at every position, so replaceAll should insert 'replacement'
+        // at every position when 'find' is empty. Handling this as a special case lets us
+        // assume 'find' is nonempty in the usual case.
+        if (find.size() == 0) {
+            StringBuilder output;
+            for (char c : input) {
+                output << replacement << c;
+            }
+            output << replacement;
+            return Value(output.stringData());
+        }
+
+        StringBuilder output;
+        for (;;) {
+            size_t startIndex = input.find(find);
+            if (startIndex == std::string::npos) {
+                output << input;
+                break;
+            }
+
+            size_t endIndex = startIndex + find.size();
+            output << input.substr(0, startIndex);
+            output << replacement;
+            // This step assumes 'find' is nonempty. If 'find' were empty then input.find would
+            // always find a match at position 0, and the input would never shrink.
+            input = input.substr(endIndex);
+        }
+        return Value(output.stringData());
+    };
+    auto replaceAllOpRegEx =
+        [&](StringData input, RegexExecutionState executionState, StringData replacement) -> Value {
+        StringBuilder output;
+
+        // Condition uses <= instead of < to also capture possible empty matches at the end of the
+        // search string.
+        while (static_cast<size_t>(executionState.startBytePos) <= input.size()) {
+            auto [match, beforeMatch] =
+                nextMatchAndPrecedingString(&executionState, expr.getOpName());
+            if (!match) {
+                // No match.
+                break;
+            }
+            output << beforeMatch << replacement;
+        }
+        output << input.substr(executionState.beforeMatchStrStart);
+
+        return Value(output.stringData());
+    };
+    return evaluateReplace(expr, root, variables, replaceAllOpStr, replaceAllOpRegEx);
 }
 
 }  // namespace exec::expression

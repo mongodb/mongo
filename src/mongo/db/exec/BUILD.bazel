@@ -229,6 +229,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/expression:evaluate_or_test.cpp",
         "//src/mongo/db/exec/expression:evaluate_regex_test.cpp",
         "//src/mongo/db/exec/expression:evaluate_replace_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_split_test.cpp",
         "//src/mongo/db/exec/expression:evaluate_string_test.cpp",
         "//src/mongo/db/exec/expression:evaluate_test.cpp",
         "//src/mongo/db/exec/expression:evaluate_test_helpers.cpp",

@@ -1025,6 +1025,10 @@ public:
         return _params.wasRateLimited;
     }
 
+    bool isFeatureFlagMqlJsEngineGapEnabled() const {
+        return _featureFlagMqlJsEngineGap.get(VersionContext::getDecoration(getOperationContext()));
+    }
+
 protected:
     struct ExpressionContextParams {
         OperationContext* opCtx = nullptr;
@@ -1297,6 +1301,12 @@ private:
             return feature_flags::gFeatureFlagMongotIndexedViews
                 .isEnabledUseLatestFCVWhenUninitialized(
                     vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        }};
+
+    Deferred<bool (*)(const VersionContext&)> _featureFlagMqlJsEngineGap{
+        [](const VersionContext& vCtx) {
+            return feature_flags::gFeatureFlagMqlJsEngineGap.isEnabledUseLatestFCVWhenUninitialized(
+                vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
         }};
 
     // Initialized in constructor to avoid including server_feature_flags_gen.h
