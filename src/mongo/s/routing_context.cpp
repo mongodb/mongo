@@ -100,7 +100,7 @@ std::unique_ptr<RoutingContext> RoutingContext::createSynthetic(
     return std::unique_ptr<RoutingContext>(new RoutingContext(std::move(nssMap)));
 }
 RoutingContext::RoutingContext(stdx::unordered_map<NamespaceString, CollectionRoutingInfo> nssMap)
-    : _nssRoutingInfoMap([nssMap = std::move(nssMap)]() {
+    : _catalogCache(nullptr), _nssRoutingInfoMap([nssMap = std::move(nssMap)]() {
           NssRoutingInfoMap result;
           for (auto&& [nss, cri] : nssMap) {
               result.emplace(std::move(nss),
