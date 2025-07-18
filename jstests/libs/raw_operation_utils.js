@@ -1,7 +1,7 @@
 /**
  * Utility library to simplify using raw operations.
  *
- * Raw operations are supported starting with binary version 9.0.
+ * Raw operations are supported starting with binary version 8.2.
  *
  * To use raw operations in a test without excluding it
  * from multiversion suites, use the following pattern:
@@ -29,39 +29,51 @@
 import {getTimeseriesBucketsColl} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-export function isBinaryCompatibleFlagEnabledAndStable(db, flagName) {
-    const flagDoc = FeatureFlagUtil.getFeatureFlagDoc(db, flagName);
-    if (!flagDoc ||
-        FeatureFlagUtil.getFeatureFlagDocStatus(db, flagDoc) !==
-            FeatureFlagUtil.FlagStatus.kEnabled) {
-        return false;
-    }
-
-    assert.hasFields(flagDoc, ['fcv_gated', 'version']);
-    assert(!flagDoc.fcv_gated);
-
-    const flagEnabledInLastContinuous =
-        MongoRunner.compareBinVersions(flagDoc.version, lastContinuousFCV) <= 0;
-
-    const flagEnabledInLastLTS = MongoRunner.compareBinVersions(flagDoc.version, lastLTSFCV) <= 0;
-
-    const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
-        Boolean(TestData.multiversionBinVersion);
-
-    if ((!flagEnabledInLastLTS || !flagEnabledInLastContinuous) && isMultiversion) {
-        return false;
-    }
-
-    return true;
-}
-
 // TODO SERVER-103187 remove this constant once 9.0 becomes last LTS
 export const kRawOperationFieldName = 'rawData';
 
 // TODO (SERVER-103187): Remove these functions once v9.0 becomes last-LTS.
 export function isRawOperationSupported(db) {
-    return isBinaryCompatibleFlagEnabledAndStable(db.getMongo(), 'RawDataCrudOperations');
+    // getParameter can't be used inside transactions, so issue the command directly on the
+    // connection, rather than using the session potentially linked to the DB object.
+    const conn = db.getMongo();
+
+    // In multiversion suites, the flag is stable only if *all* binaries in the cluster have the
+    // binary-compatible flag enabled. We detect this through an FCV-gated feature flag, which works
+    // because the FCV can only be upgraded once all binaries in the cluster are upgraded.
+    const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+        Boolean(TestData.multiversionBinVersion);
+    if (isMultiversion) {
+        const flagDoc =
+            FeatureFlagUtil.getFeatureFlagDoc(conn, 'AllBinariesSupportRawDataOperations');
+        if (!flagDoc ||
+            FeatureFlagUtil.getFeatureFlagDocStatus(conn, flagDoc) !==
+                FeatureFlagUtil.FlagStatus.kEnabled) {
+            return false;
+        }
+
+        assert.hasFields(flagDoc, ['fcv_gated']);
+        assert(flagDoc.fcv_gated);
+
+        return true;
+    }
+
+    // For non-multiversion suites, check the status of the binary-compatible flag directly
+    // Note that we may return true here even if 'AllBinariesSupportRawDataOperations' is disabled
+    // (e.g. in FCV upgrade/downgrade suites, where all binaries are always on the latest version)
+    const flagDoc = FeatureFlagUtil.getFeatureFlagDoc(conn, 'RawDataCrudOperations');
+    if (!flagDoc ||
+        FeatureFlagUtil.getFeatureFlagDocStatus(conn, flagDoc) !==
+            FeatureFlagUtil.FlagStatus.kEnabled) {
+        return false;
+    }
+
+    assert.hasFields(flagDoc, ['fcv_gated']);
+    assert(!flagDoc.fcv_gated);
+
+    return true;
 }
+
 export function getRawOperationSpec(db) {
     return isRawOperationSupported(db) ? {[kRawOperationFieldName]: true} : {};
 }
