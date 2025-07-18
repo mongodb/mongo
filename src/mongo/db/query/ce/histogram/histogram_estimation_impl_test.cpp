@@ -30,7 +30,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/query/ce/histogram/histogram_test_utils.h"
-#include "mongo/db/query/stats/max_diff.h"
+#include "mongo/db/query/compiler/stats/max_diff.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

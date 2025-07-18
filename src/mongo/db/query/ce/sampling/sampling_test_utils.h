@@ -36,7 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/ce/ce_test_utils.h"
 #include "mongo/db/query/ce/sampling/sampling_estimator_impl.h"
-#include "mongo/db/query/stats/value_utils.h"
+#include "mongo/db/query/compiler/stats/value_utils.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"

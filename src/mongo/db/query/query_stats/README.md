@@ -1,7 +1,7 @@
 # Query Stats
 
 This directory is the home of the infrastructure related to recording runtime query statistics for
-the database. It is not to be confused with `src/mongo/db/query/stats/` which is the home of the
+the database. It is not to be confused with `src/mongo/db/query/compiler/stats/` which is the home of the
 logic for computing and maintaining statistics about a collection or index's data distribution - for
 use by the query planner.
 

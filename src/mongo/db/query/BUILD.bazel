@@ -112,7 +112,7 @@ mongo_cc_library(
         ":projection_ast",
         ":sort_pattern",
         "//src/mongo:base",
-        "//src/mongo/db/query/stats:collection_statistics_interface",
+        "//src/mongo/db/query/compiler/stats:collection_statistics_interface",
     ],
 )
 

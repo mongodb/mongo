@@ -17,9 +17,9 @@ mongo_cc_library(
         "ce_common.h",
     ],
     deps = [
+        "//src/mongo/db/query/compiler/stats:stats_gen",
+        "//src/mongo/db/query/compiler/stats:stats_test_utils",
         "//src/mongo/db/query/cost_based_ranker:estimates",
-        "//src/mongo/db/query/stats:stats_gen",
-        "//src/mongo/db/query/stats:stats_test_utils",
     ],
 )
 
@@ -34,8 +34,8 @@ mongo_cc_library(
     deps = [
         ":ce_common",
         "//src/mongo/db:query_expressions",
-        "//src/mongo/db/query/stats:stats_gen",
-        "//src/mongo/db/query/stats:stats_test_utils",
+        "//src/mongo/db/query/compiler/stats:stats_gen",
+        "//src/mongo/db/query/compiler/stats:stats_test_utils",
         "//src/mongo/unittest",
     ],
 )

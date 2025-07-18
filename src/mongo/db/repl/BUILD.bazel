@@ -2425,7 +2425,7 @@ mongo_cc_benchmark(
     deps = [
         ":oplog_application",
         "//src/mongo/db/auth:authmocks",
-        "//src/mongo/db/query/stats:stats_test_utils",
+        "//src/mongo/db/query/compiler/stats:stats_test_utils",
     ],
 )
 

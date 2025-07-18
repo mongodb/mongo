@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/ce/ce_common.h"
-#include "mongo/db/query/stats/ce_histogram.h"
+#include "mongo/db/query/compiler/stats/ce_histogram.h"
 
 namespace mongo::ce {
 

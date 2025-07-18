@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/query/ce/histogram/histogram_test_utils.h"
-#include "mongo/db/query/stats/max_diff.h"
+#include "mongo/db/query/compiler/stats/max_diff.h"
 
 #include <benchmark/benchmark.h>
 

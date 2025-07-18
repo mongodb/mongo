@@ -35,11 +35,11 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/stats/collection_statistics.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/stats/collection_statistics.h"
 
 #include <vector>
 

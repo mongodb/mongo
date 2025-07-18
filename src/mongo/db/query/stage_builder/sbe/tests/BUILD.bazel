@@ -66,8 +66,8 @@ mongo_cc_unit_test(
         "//src/mongo/db/catalog:index_catalog_mock",
         "//src/mongo/db/exec/sbe:sbe_unittest_base",
         "//src/mongo/db/query:shard_filterer_factory_mock",
+        "//src/mongo/db/query/compiler/stats:stats_histograms",
         "//src/mongo/db/query/stage_builder/sbe:abt_unit_test_utils",
-        "//src/mongo/db/query/stats:stats_histograms",
         "//src/mongo/idl:server_parameter_test_util",
     ],
 )

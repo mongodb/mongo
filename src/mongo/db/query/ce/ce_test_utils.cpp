@@ -31,8 +31,8 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/matcher/matcher.h"
-#include "mongo/db/query/stats/rand_utils_new.h"
-#include "mongo/db/query/stats/value_utils.h"
+#include "mongo/db/query/compiler/stats/rand_utils_new.h"
+#include "mongo/db/query/compiler/stats/value_utils.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

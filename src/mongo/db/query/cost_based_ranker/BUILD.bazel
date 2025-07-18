@@ -25,7 +25,7 @@ mongo_cc_library(
         "//src/mongo/db/query:index_bounds_builder",
         "//src/mongo/db/query/ce/histogram:histogram_estimator",
         "//src/mongo/db/query/ce/sampling:sampling_estimator_interface",
-        "//src/mongo/db/query/stats:collection_statistics_interface",
+        "//src/mongo/db/query/compiler/stats:collection_statistics_interface",
     ],
 )
 
@@ -130,9 +130,9 @@ mongo_cc_library(
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/ce:ce_test_utils",
         "//src/mongo/db/query/ce/histogram:histogram_test_utils",
-        "//src/mongo/db/query/stats:collection_statistics_mock",
-        "//src/mongo/db/query/stats:stats_histograms",
-        "//src/mongo/db/query/stats:stats_test_utils",
+        "//src/mongo/db/query/compiler/stats:collection_statistics_mock",
+        "//src/mongo/db/query/compiler/stats:stats_histograms",
+        "//src/mongo/db/query/compiler/stats:stats_test_utils",
         "//src/mongo/unittest",
     ],
 )

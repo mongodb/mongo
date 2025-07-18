@@ -1,0 +1,276 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "stats_gen_for_histograms",
+    src = "stats.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "stats_histograms",
+    srcs = [
+        "ce_histogram.cpp",
+        "scalar_histogram.cpp",
+        "value_utils.cpp",
+        ":stats_gen_for_histograms",
+    ],
+    hdrs = [
+        "ce_histogram.h",
+        "scalar_histogram.h",
+        "value_utils.h",
+    ],
+    deps = [
+        "//src/mongo/db:sbe_values",
+        "//src/mongo/db/exec:docval_to_sbeval",
+    ],
+)
+
+mongo_cc_library(
+    name = "stats_gen",
+    srcs = [
+        "max_diff.cpp",
+    ],
+    hdrs = [
+        "max_diff.h",
+    ],
+    deps = [
+        ":stats_histograms",
+    ],
+)
+
+mongo_cc_library(
+    name = "collection_statistics_interface",
+    hdrs = [
+        "collection_statistics.h",
+    ],
+    deps = [
+        ":stats_histograms",
+    ],
+)
+
+mongo_cc_library(
+    name = "stats",
+    srcs = [
+        "collection_statistics_impl.cpp",
+        "stats_cache.cpp",
+        "stats_cache_loader_impl.cpp",
+        "stats_catalog.cpp",
+    ],
+    hdrs = [
+        "collection_statistics_impl.h",
+        "stats_cache.h",
+        "stats_cache_loader.h",
+        "stats_cache_loader_impl.h",
+        "stats_catalog.h",
+    ],
+    deps = [
+        ":collection_statistics_interface",
+        ":stats_histograms",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/util:caching",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:thread_pool",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "test_utils",
+    srcs = [
+        "test_utils.cpp",
+    ],
+    hdrs = [
+        "test_utils.h",
+    ],
+    deps = [
+        "//src/mongo/db:sbe_values",
+    ],
+)
+
+mongo_cc_library(
+    name = "collection_statistics_mock",
+    srcs = [
+        "collection_statistics_mock.cpp",
+    ],
+    hdrs = [
+        "collection_statistics_mock.h",
+    ],
+    deps = [
+        ":collection_statistics_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "maxdiff_test_utils",
+    srcs = [
+        "maxdiff_test_utils.cpp",
+    ],
+    hdrs = [
+        "maxdiff_test_utils.h",
+    ],
+    deps = [
+        ":stats_histograms",
+        "//src/mongo:base",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:sbe_values",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:plan_executor",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "stats_test_utils",
+    srcs = [
+        "rand_utils.cpp",
+        "rand_utils_new.cpp",
+    ],
+    hdrs = [
+        "rand_utils.h",
+        "rand_utils_new.h",
+    ],
+    deps = [
+        ":stats_histograms",
+        "//src/mongo:base",
+        "//src/mongo/db:sbe_values",
+        "//src/mongo/stdx",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "stats_cache_test",
+    srcs = [
+        "stats_cache_loader_mock.cpp",
+        "stats_cache_loader_mock.h",
+        "stats_cache_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":stats",
+        ":stats_test_utils",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:service_context_test_fixture",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "stats_path_test",
+    srcs = [
+        "stats_path_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":stats_test_utils",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "type_collision_test",
+    srcs = [
+        "type_collision_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":stats_gen",
+        ":stats_test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "type_count_test",
+    srcs = [
+        "type_count_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":stats_test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ce_histogram_test",
+    srcs = [
+        "ce_histogram_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":stats_gen",
+        ":stats_test_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "value_utils_test",
+    srcs = [
+        "value_utils_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":stats_test_utils",
+        ":test_utils",
+        "//src/mongo/db/query:index_bounds_builder",
+        "//src/mongo/db/query:index_bounds_builder_test_fixture",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "stats_cache_loader_test",
+    srcs = [
+        "stats_cache_loader_test.cpp",
+        "stats_cache_loader_test_fixture.cpp",
+        "stats_cache_loader_test_fixture.h",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/index_builds:index_builds_coordinator_mongod",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/op_observer:op_observer_impl",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/datetime:date_time_support",
+        "//src/mongo/db/repl:oplog",
+        "//src/mongo/db/repl:optime",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/repl:storage_interface_impl",
+        "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/unittest",
+        "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util:pcre_wrapper",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "value_utils_bm",
+    srcs = [
+        "value_utils_bm.cpp",
+    ],
+    deps = [
+        "stats_histograms",
+        "test_utils",
+    ],
+)
