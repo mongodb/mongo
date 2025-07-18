@@ -158,7 +158,7 @@
 
         # Skip any tests that run with auth explicitly.
         - jstests/multiVersion/genericBinVersion/load_keys_on_upgrade.js
-        - jstests/multiVersion/targetedTestsLastLtsFeatures/dollar_audit_mixed_version_mongods.js
+        - jstests/multiVersion/targetedTestsLastLtsFeatures/server-security/dollar_audit_mixed_version_mongods.js
       exclude_with_any_tags:
         - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
 
