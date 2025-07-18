@@ -36,6 +36,9 @@ filters:
   - "cannot_downgrade_from_latest_to_last_continuous.js":
     approvers:
       - 10gen/server-fcv
+  - "create_coll_validator_new_feature_no_applyops_check.js":
+    approvers:
+      - 10gen/query-optimization
   - "default_startup_FCV_parameter.js":
     approvers:
       - 10gen/server-fcv
@@ -58,6 +61,9 @@ filters:
   - "major_version_upgrade.js":
     approvers:
       - 10gen/server-fcv
+  - "profile_filter_query_feature_flag.js":
+    approvers:
+      - 10gen/query-integration-observability
   - "remove_feature_compatibility_version.js":
     approvers:
       - 10gen/server-fcv

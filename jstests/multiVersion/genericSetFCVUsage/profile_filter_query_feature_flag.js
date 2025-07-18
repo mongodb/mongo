@@ -11,24 +11,15 @@ import {findMatchingLogLine} from "jstests/libs/log.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-// TODO SERVER-104457 Add a permanent test for this scenario.
 const collName = jsTestName();
 const pipeline = [{$count: "count"}];
 
-// $convert numeric is guarded by 'featureFlagBinDataConvertNumeric' under FCV 8.1.
+// '$_testFeatureFlagLatest' is an expression that is permanently enabled in the latest FCV.
 const filter = {
-    $expr: {$gte: [{$convert: {input: "$docsExamined", to: "binData", byteOrder: "big"}}, true]}
+    $expr: {$eq: [1, {$_testFeatureFlagLatest: 1}]}
 };
 const parsedFilter = {
-    $expr: {
-        $gte: [
-            {
-                $convert:
-                    {input: "$docsExamined", to: {$const: "binData"}, byteOrder: {$const: "big"}},
-            },
-            {$const: true}
-        ]
-    }
+    $expr: {$eq: [{$const: 1}, {$_testFeatureFlagLatest: 1}]}
 };
 
 function runAggregationAndDowngradeFCV(coll, adminDB) {
@@ -71,7 +62,7 @@ function testProfileCommand(conn, isMongos) {
     } else {
         // We should not be able to make a profiler entry with the filter on the downgraded FCV.
         assert.commandFailedWithCode(testDB.runCommand({profile: profileLevel, filter: filter}),
-                                     ErrorCodes.FailedToParse);
+                                     ErrorCodes.QueryFeatureNotAllowed);
     }
 
     assert.commandWorked(
@@ -112,7 +103,7 @@ function testGlobalFilterCommand(conn, isMongos) {
     } else {
         // We should not be able to make a profiler entry with the filter on the downgraded FCV.
         assert.commandFailedWithCode(testDB.runCommand({profile: profileLevel, filter: filter}),
-                                     ErrorCodes.FailedToParse);
+                                     ErrorCodes.QueryFeatureNotAllowed);
     }
 
     assert.commandWorked(

@@ -166,22 +166,22 @@ TEST_F(ProfileFilterTest, FilterOnOptionalField) {
 }
 
 TEST_F(ProfileFilterTest, FilterDependsOnEnabledFeatureFlag) {
-    // TODO SERVER-104457 Add a permanent test for this scenario.
-    // $sigmoid is gated by 'featureFlagRankFusionBasic' under FCV 8.1.
+    // '$_testFeatureFlagLatest' is an expression that is permanently enabled in the latest FCV.
     auto filterExpr = fromjson(R"({
         $expr: {
-            $gte: [{$sigmoid : '$nreturned'}, 0.6]
+            $gt: ['$nreturned', {'$_testFeatureFlagLatest' : 1}]
         }
     })");
 
     ProfileFilterImpl profileFilter{filterExpr, expCtx};
     ASSERT_TRUE(profileFilter.dependsOn("nreturned"));
 
-    // $sigmoid will be ~0.7 when 'nreturned' is 1.
-    opDebug->additiveMetrics.nreturned = 1;
+    // '$_testFeatureFlagLatest' will always return 1. If 'nreturned' is 2, the filter should match.
+    opDebug->additiveMetrics.nreturned = 2;
     ASSERT_TRUE(profileFilter.matches(opCtx, *opDebug, *curop));
 
-    // $sigmoid will be ~0.5 when 'nreturned' is 0.1.
+    // '$_testFeatureFlagLatest' will always return 1. If 'nreturned' is 0.1, the filter should not
+    // match.
     opDebug->additiveMetrics.nreturned = 0.1;
     ASSERT_FALSE(profileFilter.matches(opCtx, *opDebug, *curop));
 }

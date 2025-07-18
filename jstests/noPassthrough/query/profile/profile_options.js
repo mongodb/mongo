@@ -40,4 +40,14 @@ testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_profiling_filte
 testGetCmdLineOptsMongos({config: "jstests/libs/config_files/set_profiling_filter.json"},
                          expectedResult);
 
+jsTest.log(
+    "Testing \"operationProfiling.filter\" config with agg expressions that depend on lastLTS feature flag");
+expectedResult = {
+    "parsed": {
+        "config": "jstests/libs/config_files/set_profiling_filter_ff.json",
+        "operationProfiling": {"filter": "{$expr: {$lt: [{$_testFeatureFlagLastLTS: 1}, 0.01]}}"}
+    }
+};
+testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_profiling_filter_ff.json"},
+                         expectedResult);
 print(baseName + " succeeded.");
