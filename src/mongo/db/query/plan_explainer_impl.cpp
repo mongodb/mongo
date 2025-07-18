@@ -487,6 +487,9 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
             bob->appendNumber("seeks", static_cast<long long>(spec->seeks));
             bob->appendNumber("dupsTested", static_cast<long long>(spec->dupsTested));
             bob->appendNumber("dupsDropped", static_cast<long long>(spec->dupsDropped));
+            if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+                bob->appendNumber("maxUsedMemBytes", static_cast<long long>(spec->maxUsedMemBytes));
+            }
         }
     } else if (STAGE_OR == stats.stageType) {
         OrStats* spec = static_cast<OrStats*>(stats.specific.get());

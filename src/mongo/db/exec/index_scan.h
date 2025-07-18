@@ -39,6 +39,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
@@ -158,6 +159,10 @@ public:
         return _bounds;
     }
 
+    const SimpleMemoryUsageTracker& getMemoryTracker_forTest() {
+        return _memoryTracker;
+    }
+
 protected:
     void doSaveStateRequiresIndex() final;
 
@@ -229,6 +234,8 @@ private:
     bool _startKeyInclusive;
     // Is the end key included in the range?
     bool _endKeyInclusive;
+
+    SimpleMemoryUsageTracker _memoryTracker;
 };
 
 }  // namespace mongo

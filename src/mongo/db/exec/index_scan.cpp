@@ -79,7 +79,9 @@ IndexScan::IndexScan(ExpressionContext* expCtx,
       _dedup(params.shouldDedup),
       _recordIdDeduplicator(expCtx),
       _startKeyInclusive(IndexBounds::isStartIncludedInBound(_bounds.boundInclusion)),
-      _endKeyInclusive(IndexBounds::isEndIncludedInBound(_bounds.boundInclusion)) {
+      _endKeyInclusive(IndexBounds::isEndIncludedInBound(_bounds.boundInclusion)),
+      // TODO SERVER-97747 Add internalIndexScanMaxMemoryBytes when it exists.
+      _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx)) {
     _specificStats.indexName = params.name;
     _specificStats.keyPattern = _keyPattern;
     _specificStats.isMultiKey = params.isMultiKey;
@@ -230,6 +232,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         _scanState = HIT_END;
         _commonStats.isEOF = true;
         _indexCursor.reset();
+        _specificStats.maxUsedMemBytes = _memoryTracker.maxMemoryBytes();
         return PlanStage::IS_EOF;
     }
 
@@ -242,8 +245,12 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         // ... check whether we have seen the record id.
         // Do not add the recordId to recordIdDeduplicator unless we know that the
         // scan will return the recordId.
+        uint64_t dedupBytesPrev = _recordIdDeduplicator.getApproximateSize();
         bool duplicate = _filter == nullptr ? !_recordIdDeduplicator.insert(kv->loc)
                                             : _recordIdDeduplicator.contains(kv->loc);
+        uint64_t dedupBytes = _recordIdDeduplicator.getApproximateSize();
+        _memoryTracker.add(dedupBytes - dedupBytesPrev);
+        _specificStats.maxUsedMemBytes = _memoryTracker.maxMemoryBytes();
 
         // If we've seen the RecordId before
         if (duplicate) {
@@ -260,7 +267,11 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     // If we're deduping and the record matches a non-null filter
     if (_dedup && _filter != nullptr) {
         // ... now we can add the RecordId to the Deduplicator.
+        uint64_t dedupBytesPrev = _recordIdDeduplicator.getApproximateSize();
         _recordIdDeduplicator.insert(kv->loc);
+        uint64_t dedupBytes = _recordIdDeduplicator.getApproximateSize();
+        _memoryTracker.add(dedupBytes - dedupBytesPrev);
+        _specificStats.maxUsedMemBytes = _memoryTracker.maxMemoryBytes();
     }
 
     if (!kv->key.isOwned())
