@@ -445,7 +445,7 @@ current_tools_releases = r.json()
 logging.info("Attempting to download current mongosh releases json")
 r = retry_call(
     requests.get,
-    fargs=["https://s3.amazonaws.com/info-mongodb-com/com-download-center/mongosh.json"],
+    fargs=["https://downloads.mongodb.com/compass/mongosh.json"],
     fkwargs={"timeout": 30},
     tries=5,
     delay=5,
@@ -500,13 +500,13 @@ def get_mongosh_package(arch_name: str, os_name: str) -> Optional[str]:
     if arch_name == "aarch64":
         arch_name = "arm64"
     if arch_name in ("x86_64", "amd64"):
-        arch_name = "x64"
+        arch_name = "x86_64"
     pkg_ext = "rpm"
     if "debian" in os_name or "ubuntu" in os_name:
         pkg_ext = "deb"
-    for platform_type in mongosh_releases["versions"][0]["platform"]:
-        if platform_type["os"] == pkg_ext and platform_type["arch"] == arch_name:
-            return platform_type["download_link"]
+    for platform_type in mongosh_releases["versions"][0]["downloads"]:
+        if platform_type["distro"] == pkg_ext and platform_type["arch"] == arch_name:
+            return platform_type["archive"]["url"]
     return None
 
 
