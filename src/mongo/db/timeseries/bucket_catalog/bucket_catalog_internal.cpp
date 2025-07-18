@@ -681,17 +681,26 @@ void removeBucket(BucketCatalog& catalog,
                   Stripe& stripe,
                   WithLock stripeLock,
                   Bucket& bucket,
-                  ExecutionStatsController& stats,
-                  RemovalMode mode) {
+                  ExecutionStatsController& stats) {
+    removeBucketWithoutStats(catalog, stripe, stripeLock, bucket);
+    stats.decNumActiveBuckets();
+}
+
+void removeBucketWithoutStats(BucketCatalog& catalog,
+                              Stripe& stripe,
+                              WithLock stripeLock,
+                              Bucket& bucket) {
     invariant(bucket.batches.empty());
     invariant(!bucket.preparedBatch);
 
+    // Clear out all open bucket state in the Stripe & Registry.
     auto allIt = stripe.openBucketsById.find(bucket.bucketId);
     invariant(allIt != stripe.openBucketsById.end());
 
     markBucketNotIdle(stripe, stripeLock, bucket);
 
-    // If the bucket was rolled over, then there may be a different open bucket for this metadata.
+    // Removes the state associated with this open bucket, leaving behind the BucketKey & set if
+    // there is an uncleared bucket besides the current one still tracked by the Stripe.
     auto openIt =
         stripe.openBucketsByKey.find({bucket.bucketId.collectionUUID, bucket.key.metadata});
     if (openIt != stripe.openBucketsByKey.end()) {
@@ -701,32 +710,15 @@ void removeBucket(BucketCatalog& catalog,
             if (openSet.size() == 1) {
                 stripe.openBucketsByKey.erase(openIt);
             } else {
+                // Can't delete the set, only remove 'bucket'.
                 openSet.erase(bucketIt);
             }
         }
     }
 
-    // If we are cleaning up while archiving a bucket, then we want to preserve its state. Otherwise
-    // we can remove the state from the catalog altogether.
-    switch (mode) {
-        case RemovalMode::kClose: {
-            auto state = getBucketState(catalog.bucketStateRegistry, bucket.bucketId);
-            // When removing a closed bucket, the BucketStateRegistry may contain state for this
-            // bucket due to an untracked ongoing direct write (such as TTL delete).
-            if (state.has_value()) {
-                invariant(holds_alternative<DirectWriteCounter>(state.value()),
-                          bucketStateToString(*state));
-                invariant(get<DirectWriteCounter>(state.value()) < 0, bucketStateToString(*state));
-            }
-            break;
-        }
-        case RemovalMode::kAbort:
-        case RemovalMode::kArchive:
-            stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
-            break;
-    }
+    // Remove the bucket from the bucket state registry.
+    stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
 
-    stats.decNumActiveBuckets();
     stripe.openBucketsById.erase(allIt);
 }
 
@@ -743,10 +735,7 @@ void archiveBucket(BucketCatalog& catalog,
             .second;
 
     if (archived) {
-        // If we have an archived bucket, we still want to account for it in numberOfActiveBuckets
-        // so we will increase it here since removeBucket decrements the count.
-        stats.incNumActiveBuckets();
-        removeBucket(catalog, stripe, stripeLock, bucket, stats, RemovalMode::kArchive);
+        removeBucketWithoutStats(catalog, stripe, stripeLock, bucket);
     } else {
         // We had a meta hash collision, and already have a bucket archived with the same meta hash
         // and timestamp as this bucket. Since it's somewhat arbitrary which bucket we keep, we'll
@@ -910,7 +899,7 @@ void abort(BucketCatalog& catalog,
     }
 
     if (doRemove) {
-        removeBucket(catalog, stripe, stripeLock, bucket, stats, RemovalMode::kAbort);
+        removeBucket(catalog, stripe, stripeLock, bucket, stats);
     } else {
         clearBucketState(catalog.bucketStateRegistry, bucket.bucketId);
     }
@@ -961,7 +950,7 @@ void expireIdleBuckets(BucketCatalog& catalog,
         } else if (state &&
                    (isBucketStateCleared(state.value()) || isBucketStateFrozen(state.value()))) {
             // Bucket was cleared and just needs to be removed from catalog.
-            removeBucket(catalog, stripe, stripeLock, *bucket, stats, RemovalMode::kAbort);
+            removeBucket(catalog, stripe, stripeLock, *bucket, stats);
         } else {
             closeOpenBucket(catalog, stripe, stripeLock, *bucket, stats);
             stats.incNumBucketsClosedDueToMemoryThreshold();
@@ -982,11 +971,9 @@ void expireIdleBuckets(BucketCatalog& catalog,
         BucketId bucketId(uuid, archived.oid, BucketKey::signature(hash));
         ExecutionStatsController& stats = statsForBucket(bucketId);
 
-        closeArchivedBucket(catalog, bucketId);
+        closeArchivedBucket(catalog, bucketId, stats);
 
         stripe.archivedBuckets.erase(it);
-
-        stats.decNumActiveBuckets();
         stats.incNumBucketsClosedDueToMemoryThreshold();
         ++numExpired;
     }
@@ -1276,16 +1263,34 @@ void closeOpenBucket(BucketCatalog& catalog,
                      WithLock stripeLock,
                      Bucket& bucket,
                      ExecutionStatsController& stats) {
-    // Remove the bucket from the bucket state registry.
-    stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
+    // Make a copy since bucket will be destroyed in removeBucket.
+    BucketId bucketId = bucket.bucketId;
 
-    removeBucket(catalog, stripe, stripeLock, bucket, stats, RemovalMode::kClose);
-    return;
+    removeBucket(catalog, stripe, stripeLock, bucket, stats);
+
+    // Perform these safety checks after stopTrackingBucketState.
+    auto state = getBucketState(catalog.bucketStateRegistry, bucketId);
+    // When removing a closed bucket, the BucketStateRegistry may contain state for this
+    // bucket due to an untracked ongoing direct write (such as TTL delete).
+    if (state.has_value()) {
+        std::visit(OverloadedVisitor{[&](const DirectWriteCounter& value) {
+                                         invariant(value < 0, bucketStateToString(*state));
+                                     },
+                                     [&](const BucketState& value) {
+                                         invariant(value == BucketState::kFrozen,
+                                                   bucketStateToString(*state));
+                                     }},
+                   state.value());
+    }
 }
 
-void closeArchivedBucket(BucketCatalog& catalog, const BucketId& bucketId) {
+void closeArchivedBucket(BucketCatalog& catalog,
+                         const BucketId& bucketId,
+                         ExecutionStatsController& stats) {
     // Remove the bucket from the bucket state registry.
     stopTrackingBucketState(catalog.bucketStateRegistry, bucketId);
+
+    stats.decNumActiveBuckets();
 }
 
 StageInsertBatchResult stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,

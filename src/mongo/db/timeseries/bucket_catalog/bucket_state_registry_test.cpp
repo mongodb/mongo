@@ -114,8 +114,7 @@ public:
                                    *stripes[internal::getStripeNumber(*this, bucket.key)],
                                    withLock,
                                    bucket,
-                                   stats(bucket),
-                                   internal::RemovalMode::kAbort);
+                                   stats(bucket));
             return true;
         } else {
             return false;
@@ -139,8 +138,7 @@ public:
                                *stripes[internal::getStripeNumber(*this, bucket.key)],
                                withLock,
                                bucket,
-                               stats(bucket),
-                               internal::RemovalMode::kAbort);
+                               stats(bucket));
     }
 
     bool doesBucketStateMatch(const BucketId& bucketId,

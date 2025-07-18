@@ -78,16 +78,6 @@ enum class StageInsertBatchResult {
 };
 
 /**
- * Mode to signal to 'removeBucket' what's happening to the bucket, and how to handle the bucket
- * state change.
- */
-enum class RemovalMode {
-    kClose,    // Normal closure
-    kArchive,  // Archive bucket, no state change
-    kAbort,    // Bucket is being cleared, possibly due to error, erase state
-};
-
-/**
  * Mode enum to control whether the bucket retrieval methods will return buckets that have a state
  * that conflicts with insertion.
  */
@@ -231,14 +221,22 @@ void waitToCommitBatch(BucketStateRegistry& registry,
                        const std::shared_ptr<WriteBatch>& batch);
 
 /**
- * Removes the given bucket from the bucket catalog's internal data structures.
+ * Removes the given bucket from the bucket catalog's internal data structures,
+ * including statistics.
  */
 void removeBucket(BucketCatalog& catalog,
                   Stripe& stripe,
                   WithLock stripeLock,
                   Bucket& bucket,
-                  ExecutionStatsController& stats,
-                  RemovalMode mode);
+                  ExecutionStatsController& stats);
+
+/**
+ * Removes the given bucket from the bucket catalog's internal data structures.
+ */
+void removeBucketWithoutStats(BucketCatalog& catalog,
+                              Stripe& stripe,
+                              WithLock stripeLock,
+                              Bucket& bucket);
 
 /**
  * Archives the given bucket, minimizing the memory footprint but retaining the necessary
@@ -426,7 +424,9 @@ void closeOpenBucket(BucketCatalog& catalog,
 /**
  * Close an archived bucket, setting the state appropriately and removing it from the catalog.
  */
-void closeArchivedBucket(BucketCatalog& catalog, const BucketId& bucketId);
+void closeArchivedBucket(BucketCatalog& catalog,
+                         const BucketId& bucketId,
+                         ExecutionStatsController& stats);
 
 /**
  * Inserts measurements into the provided eligible bucket. On success of all measurements being
