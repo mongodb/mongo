@@ -47,6 +47,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/list_indexes_allowed_fields.h"
@@ -1025,9 +1026,7 @@ void _dropLocalIndexes(OperationContext* opCtx,
     // Determine which indexes exist on the local collection that don't exist on the donor's
     // collection.
     DBDirectClient client(opCtx);
-    const bool includeBuildUUIDs = false;
-    const int options = 0;
-    auto indexes = client.getIndexSpecs(nss, includeBuildUUIDs, options);
+    auto indexes = listIndexesEmptyListIfMissing(opCtx, nss, ListIndexesInclude::Nothing);
     for (auto&& recipientIndex : indexes) {
         bool dropIndex = true;
         for (auto&& donorIndex : indexSpecs) {
@@ -1041,10 +1040,16 @@ void _dropLocalIndexes(OperationContext* opCtx,
         if (indexNameElem.type() == BSONType::string && dropIndex &&
             !IndexDescriptor::isIdIndexPattern(
                 recipientIndex[IndexDescriptor::kKeyPatternFieldName].Obj())) {
+            DropIndexes dropIndexesCmd{nss};
+            dropIndexesCmd.setIndex(indexNameElem.str());
+            if (gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                dropIndexesCmd.setRawData(true);
+            }
+
             BSONObj info;
-            if (!client.runCommand(nss.dbName(),
-                                   BSON("dropIndexes" << nss.coll() << "index" << indexNameElem),
-                                   info))
+            if (!client.runCommand(nss.dbName(), dropIndexesCmd.toBSON(), info))
                 uassertStatusOK(getStatusFromCommandResult(info));
         }
     }

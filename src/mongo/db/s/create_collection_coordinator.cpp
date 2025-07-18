@@ -2042,6 +2042,9 @@ OptionsAndIndexes CreateCollectionCoordinator::_getCollectionOptionsAndIndexes(
     }
 
     ListIndexes listIndexes(NamespaceStringOrUUID(nss().dbName(), *_uuid));
+    if (viewlessTimeseriesEnabled(opCtx)) {
+        listIndexes.setRawData(true);
+    }
 
     std::vector<BSONObj> indexes;
     auto swIndexResponse = destinationShard->runExhaustiveCursorCommand(
