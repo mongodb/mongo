@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup_gen.h"
+#include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/lite_parsed_search.h"
 
 namespace mongo {
@@ -94,8 +95,23 @@ Value DocumentSourceInternalSearchIdLookUp::serialize(const SerializationOptions
         std::vector<BSONObj> pipeline = {
             BSON("$match" << Document({{"_id", Value("_id placeholder"_sd)}}))};
 
-        // Append the view pipeline if it exists.
-        if (_viewPipeline) {
+        // At this point, we are serializing a search stage - however it is unclear if it comes
+        // from the view pipeline or if it comes from the user pipeline
+        // (as we have passed view resolution, where a search view could have been prepended).
+        //
+        // If the view pipeline does not contain a search stage, then this search stage must be
+        // coming from the user pipeline, and we need to append the view pipeline after search stage
+        // (since running a search pipeline on a non-search view prepends the
+        //  search pipeline before the view pipeline).
+        //
+        // If the view pipeline does contain a search stage, then this search stage may be coming
+        // from either the user pipeline or the view pipeline. Running a search pipeline on a view
+        // defined with a search returns no results and is technically not supported,
+        // so we can safely assume that the only case we need to handle here is where the
+        // search stage is coming from the view pipeline. In this case, the view pipeline will
+        // already be serialized to the explain, it would be incorrect to append
+        // the pipeline *again* here.
+        if (_viewPipeline && !search_helpers::isMongotPipeline(_viewPipeline.get())) {
             auto bsonViewPipeline = _viewPipeline->serializeToBson();
             pipeline.insert(pipeline.end(), bsonViewPipeline.begin(), bsonViewPipeline.end());
         }

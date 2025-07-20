@@ -148,13 +148,9 @@ const runRankFusionOnSearchViewsTest = (testName, inputPipelines) => {
         assert.commandWorked(
             searchView.runCommand("aggregate", {pipeline: rankFusionPipeline, cursor: {}}));
 
-        // Running a $rankFusion with mongot input pipelines aggregation query with explain fails on
-        // views defined with search with this error: $search is only valid as the first stage in a
-        // pipeline.
-        assert.commandFailedWithCode(
-            searchView.runCommand("aggregate",
-                                  {pipeline: rankFusionPipeline, explain: true, cursor: {}}),
-            40602);
+        // Check explain query works running a rank fusion on a search view
+        assert.commandWorked(searchView.runCommand(
+            "aggregate", {pipeline: rankFusionPipeline, explain: true, cursor: {}}));
 
         // If all of the $rankFusion query's input pipelines are mongot input pipelines, then the
         // aggregation query should fail silently (not return any documents).

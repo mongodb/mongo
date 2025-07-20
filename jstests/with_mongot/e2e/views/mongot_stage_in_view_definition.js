@@ -127,20 +127,13 @@ const expectedResultsMatchSearch = buildExpectedResults([6, 2, 4, 5], datasets.M
 const expectedResultsMatchVectorSearch =
     buildExpectedResults([6, 4, 8, 9, 12, 13, 5, 2, 11], datasets.MOVIES);
 
-const runTest = (collOrView, pipeline, expectedResults, expectedExplainErrorCode = 0) => {
+const runTest = (collOrView, pipeline, expectedResults) => {
     const results = collOrView.aggregate(pipeline).toArray();
     assertDocArrExpectedFuzzy(expectedResults, results);
 
-    // Some combos of topologies, views, and pipelines will not work on explain(), so we account for
-    // that.
-    if (expectedExplainErrorCode === 0) {
-        assert.commandWorked(
-            collOrView.runCommand("aggregate", {pipeline: pipeline, explain: true, cursor: {}}));
-    } else {
-        assert.commandFailedWithCode(
-            collOrView.runCommand("aggregate", {pipeline: pipeline, explain: true, cursor: {}}),
-            expectedExplainErrorCode);
-    }
+    // Confirm that running explain works.
+    assert.commandWorked(
+        collOrView.runCommand("aggregate", {pipeline: pipeline, explain: true, cursor: {}}));
 };
 
 // TODO SERVER-107803 The tests failing with this function should be fixed and return empty results.
@@ -172,10 +165,7 @@ const isShardedCluster = adminDB.system.version.findOne({_id: "shardIdentity"});
 })();
 
 (function searchAgainstSearchView() {
-    runTest(searchView,
-            buildSearchPipeline(searchIndexOnCollName),
-            [],
-            isShardedCluster ? 40602 : 5491300);
+    runTest(searchView, buildSearchPipeline(searchIndexOnCollName), []);
 })();
 
 (function matchSubpipelineFromSearchViewAgainstTopLevelSearchView() {
@@ -207,24 +197,19 @@ const isShardedCluster = adminDB.system.version.findOne({_id: "shardIdentity"});
 (function unionWithSearchSubpipelineFromSearchView() {
     runTest(coll,
             buildUnionWithPipeline(searchViewName, buildSearchPipeline(searchIndexOnCollName)),
-            [],
-            isShardedCluster ? 40602 : 5491300);
+            []);
     runTest(matchView,
             buildUnionWithPipeline(searchViewName, buildSearchPipeline(searchIndexOnCollName)),
-            [],
-            isShardedCluster ? 40602 : 5491300);
+            []);
     runTest(searchView,
             buildUnionWithPipeline(searchViewName, buildSearchPipeline(searchIndexOnCollName)),
-            [],
-            isShardedCluster ? 40602 : 5491300);
+            []);
     runTest(unionWithView,
             buildUnionWithPipeline(searchViewName, buildSearchPipeline(searchIndexOnCollName)),
-            [],
-            isShardedCluster ? 40602 : 5491300);
+            []);
     runTest(lookupView,
             buildUnionWithPipeline(searchViewName, buildSearchPipeline(searchIndexOnCollName)),
-            [],
-            isShardedCluster ? 40602 : 5491300);
+            []);
 })();
 
 (function searchSubpipelineFromCollection() {
@@ -331,10 +316,7 @@ const isShardedCluster = adminDB.system.version.findOne({_id: "shardIdentity"});
 })();
 
 (function vectorSearchAgainstVectorSearchView() {
-    runTest(vectorSearchView,
-            buildVectorSearchPipeline(vectorSearchIndexOnCollName),
-            [],
-            isShardedCluster ? 40602 : 5491300);
+    runTest(vectorSearchView, buildVectorSearchPipeline(vectorSearchIndexOnCollName), []);
 })();
 
 (function matchSubpipelineFromVectorSearchViewAgainstTopLevelVectorSearchView() {
@@ -347,28 +329,23 @@ const isShardedCluster = adminDB.system.version.findOne({_id: "shardIdentity"});
     runTest(coll,
             buildUnionWithPipeline(vectorSearchViewName,
                                    buildVectorSearchPipeline(vectorSearchIndexOnCollName)),
-            [],
-            isShardedCluster ? 40602 : 5491300);
+            []);
     runTest(matchView,
             buildUnionWithPipeline(vectorSearchViewName,
                                    buildVectorSearchPipeline(vectorSearchIndexOnCollName)),
-            [],
-            isShardedCluster ? 40602 : 5491300);
+            []);
     runTest(vectorSearchView,
             buildUnionWithPipeline(vectorSearchViewName,
                                    buildVectorSearchPipeline(vectorSearchIndexOnCollName)),
-            [],
-            isShardedCluster ? 40602 : 5491300);
+            []);
     runTest(unionWithView,
             buildUnionWithPipeline(vectorSearchViewName,
                                    buildVectorSearchPipeline(vectorSearchIndexOnCollName)),
-            [],
-            isShardedCluster ? 40602 : 5491300);
+            []);
     runTest(lookupView,
             buildUnionWithPipeline(vectorSearchViewName,
                                    buildVectorSearchPipeline(vectorSearchIndexOnCollName)),
-            [],
-            isShardedCluster ? 40602 : 5491300);
+            []);
 })();
 
 (function vectorSearchSubpipelineFromCollection() {
