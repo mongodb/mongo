@@ -277,6 +277,12 @@ public:
      */
     void validate(const OperationContext* opCtx, bool performApiVersionChecks = true) const;
 
+    /**
+     * Checks that specific stage types are not present in the pipeline that are disallowed
+     * in the definition of a view. Recursively checks sub-pipelines.
+     */
+    void checkStagesAllowedInViewDefinition() const;
+
     // TODO SERVER-101722: Remove this once the validation is changed.
     bool isRunningAgainstViewForRankFusion() const {
         return _isRunningAgainstViewForRankFusion;

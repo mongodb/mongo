@@ -57,6 +57,10 @@ const rankFusionPipelineWithSearch = [
     },
     {$limit: limit}
 ];
+const lookupPipelineWithRankFusion =
+    [{$lookup: {from: collName, as: "matched_docs", pipeline: rankFusionPipelineWithoutSearch}}];
+const unionWithPipelineWithRankFusion =
+    [{$unionWith: {coll: collName, pipeline: rankFusionPipelineWithoutSearch}}];
 
 function runTest(underlyingCollOrViewName) {
     const rankFusionViewName = "rank_fusion_view";
@@ -69,6 +73,15 @@ function runTest(underlyingCollOrViewName) {
         ErrorCodes.OptionNotSupportedOnView);
     assert.commandFailedWithCode(
         db.createView(rankFusionViewName, underlyingCollOrViewName, rankFusionPipelineWithSearch),
+        ErrorCodes.OptionNotSupportedOnView);
+
+    // Check that it fails with a $rankFusion in a $lookup or $unionWith subpipeline.
+    assert.commandFailedWithCode(
+        db.createView(rankFusionViewName, underlyingCollOrViewName, lookupPipelineWithRankFusion),
+        ErrorCodes.OptionNotSupportedOnView);
+    assert.commandFailedWithCode(
+        db.createView(
+            rankFusionViewName, underlyingCollOrViewName, unionWithPipelineWithRankFusion),
         ErrorCodes.OptionNotSupportedOnView);
 }
 

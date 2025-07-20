@@ -10,7 +10,7 @@ const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
 
-const scoreFirstViewDefinition = [
+const scoreFirstPipeline = [
     {
         $score: {
             score: {$add: ["$single", "$double"]},
@@ -23,7 +23,7 @@ const scoreFirstViewDefinition = [
     {$sort: {_id: 1}}
 ];
 
-const scoreSecondViewDefinition = [
+const scoreSecondViewPipeline = [
     {$limit: 10},
     {
         $score: {
@@ -37,8 +37,28 @@ const scoreSecondViewDefinition = [
     {$sort: {_id: 1}}
 ];
 
-assert.commandFailedWithCode(db.createView("scoreView", collName, scoreFirstViewDefinition),
+const lookupPipelineWithScoreFirst =
+    [{$lookup: {from: collName, as: "matched_docs", pipeline: scoreFirstPipeline}}];
+const unionWithPipelineWithScoreFirst =
+    [{$unionWith: {coll: collName, pipeline: scoreFirstPipeline}}];
+
+const lookupPipelineWithScoreSecond =
+    [{$lookup: {from: collName, as: "matched_docs", pipeline: scoreSecondViewPipeline}}];
+const unionWithPipelineWithScoreSecond =
+    [{$unionWith: {coll: collName, pipeline: scoreSecondViewPipeline}}];
+
+assert.commandFailedWithCode(db.createView("scoreView", collName, scoreFirstPipeline),
                              ErrorCodes.OptionNotSupportedOnView);
 
-assert.commandFailedWithCode(db.createView("scoreView", collName, scoreSecondViewDefinition),
+assert.commandFailedWithCode(db.createView("scoreView", collName, scoreSecondViewPipeline),
+                             ErrorCodes.OptionNotSupportedOnView);
+
+assert.commandFailedWithCode(db.createView("scoreView", collName, lookupPipelineWithScoreFirst),
+                             ErrorCodes.OptionNotSupportedOnView);
+assert.commandFailedWithCode(db.createView("scoreView", collName, unionWithPipelineWithScoreFirst),
+                             ErrorCodes.OptionNotSupportedOnView);
+
+assert.commandFailedWithCode(db.createView("scoreView", collName, lookupPipelineWithScoreSecond),
+                             ErrorCodes.OptionNotSupportedOnView);
+assert.commandFailedWithCode(db.createView("scoreView", collName, unionWithPipelineWithScoreSecond),
                              ErrorCodes.OptionNotSupportedOnView);

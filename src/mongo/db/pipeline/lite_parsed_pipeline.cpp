@@ -175,4 +175,23 @@ void LiteParsedPipeline::validate(const OperationContext* opCtx,
     }
 }
 
+void LiteParsedPipeline::checkStagesAllowedInViewDefinition() const {
+    for (auto stage_it = _stageSpecs.begin(); stage_it != _stageSpecs.end(); stage_it++) {
+        const auto& stage = *stage_it;
+
+        // TODO SERVER-101721 Enable $rankFusion run in a view definition.
+        uassert(ErrorCodes::OptionNotSupportedOnView,
+                "$rankFusion is currently unsupported in a view definition",
+                !stage->isRankFusionStage());
+
+        uassert(ErrorCodes::OptionNotSupportedOnView,
+                "$score is currently unsupported in a view definition",
+                !(stage->getParseTimeName() == "$score"));
+
+        for (auto&& subPipeline : stage->getSubPipelines()) {
+            subPipeline.checkStagesAllowedInViewDefinition();
+        }
+    }
+}
+
 }  // namespace mongo
