@@ -856,19 +856,17 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
                      documentMultikeyPaths.get(),
                      recordId);
     } catch (const AssertionException& ex) {
-        if (ex.toStatus() == ErrorCodes::CannotBuildIndexKeys) {
-            LOGV2(8411400,
-                  "Could not build index key ",
-                  "indexName"_attr = descriptor->indexName(),
-                  "recordId"_attr = recordId,
-                  "record"_attr = redact(recordBson),
-                  "error"_attr = ex.toString());
-            results->addError(str::stream()
-                                  << "Could not build key for index '" << descriptor->indexName()
-                                  << "' from document with recordId '" << recordId << "'",
-                              false);
-            return;
-        }
+        LOGV2(8411400,
+              "Could not build index key ",
+              "indexName"_attr = descriptor->indexName(),
+              "recordId"_attr = recordId,
+              "record"_attr = redact(recordBson),
+              "error"_attr = ex.toString());
+        results->addError(str::stream()
+                              << "Could not build key for index '" << descriptor->indexName()
+                              << "' from document with recordId '" << recordId << "'",
+                          false);
+        return;
     }
 
     const bool shouldBeMultikey =
