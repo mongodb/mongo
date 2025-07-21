@@ -334,7 +334,7 @@ mongo_cc_library(
         "//src/mongo/util:modules.h",
         "//src/mongo/util:modules_incompletely_marked_header.h",
         "//src/mongo/util:murmur3.h",
-        "//src/mongo/util:observation_token.h",
+        "//src/mongo/util:observable_mutex.h",
         "//src/mongo/util:optional_util.h",
         "//src/mongo/util:out_of_line_executor.h",
         "//src/mongo/util:quick_exit.h",

@@ -59,6 +59,6 @@ filters:
   - "moving_average*":
     approvers:
       - 10gen/server-networking-and-observability
-  - "observation_token*":
+  - "observable_mutex*":
     approvers:
       - 10gen/server-networking-and-observability

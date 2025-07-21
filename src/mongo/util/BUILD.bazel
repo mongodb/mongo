@@ -820,15 +820,6 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
-    name = "observation_token_test",
-    srcs = ["observation_token_test.cpp"],
-    tags = [
-        "mongo_unittest_second_group",
-        "networking-and-observability",
-    ],
-)
-
-mongo_cc_unit_test(
     name = "tracing_support_test",
     srcs = [
         "tracing_support_test.cpp",
@@ -1073,6 +1064,15 @@ mongo_cc_unit_test(
         ":version_impl",
         "//src/mongo:base",
         "//src/mongo/db:service_context_non_d",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "observable_mutex_test",
+    srcs = ["observable_mutex_test.cpp"],
+    tags = [
+        "mongo_unittest_eighth_group",
+        "networking-and-observability",
     ],
 )
 
