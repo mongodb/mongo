@@ -49,6 +49,8 @@ variables:
         variant: &amazon_linux2023_arm64_static_compile_variant_name amazon-linux2023-arm64-static-compile
       - name: archive_jstestshell
         variant: *amazon_linux2023_arm64_static_compile_variant_name
+      - name: archive_extensions
+        variant: *amazon_linux2023_arm64_static_compile_variant_name
       - name: version_gen
         variant: generate-tasks-for-version
         # This is added because of EVG-18211.

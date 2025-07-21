@@ -685,6 +685,8 @@ functions:
           value: ${project}/${build_variant}/${version_id}/libfuzzer-corpora/corpora-${revision_order_id}.${ext|tgz}
         - key: mongo_fuzzer_corpus
           value: corpora-${project}-${build_variant}.${ext|tgz}
+        - key: mongo_extensions
+          value: ${project}/${compile_variant}/${version_id}/extensions/extensions-${revision_order_id}.tgz
         - key: skip_tests
           value: skip_test-${build_id}
 
