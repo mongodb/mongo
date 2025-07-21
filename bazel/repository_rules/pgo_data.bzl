@@ -7,7 +7,7 @@ DEFAULT_GCC_PGO_DATA_CHECKSUM = "4a0f3191776d2b8cc36fe2d69b07034b325c9989252e412
 
 # TODO(SERVER-107582): Get llvm-profdata from actual pipeline build
 LLVM_PROFDATA_URL = "https://mdb-build-public.s3.us-east-1.amazonaws.com/andrew_pgo_scratch/llvm-profdata"
-LLVM_PROFDATA_CHECKSUM = "22d4694a0d80691c16c41212c192938992444d6d43a95d12f298506012640753"
+LLVM_PROFDATA_CHECKSUM = "90ff926b362ca728c60dc7869184560d3b63436a6ea20606c7cd9b9524c5f470"
 
 # recursion and while loops are not allowed, we can only count files to a certain depth
 def get_all_files(root_path, depth):
