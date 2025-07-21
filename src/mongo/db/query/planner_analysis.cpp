@@ -881,11 +881,11 @@ void QueryPlannerAnalysis::removeImpreciseInternalExprFilters(const QueryPlanner
 }
 
 // Checks if there is an index that can be used if the $lookup is pushed to SBE. It returns a tuple
-// {boost::optional<IndexEntry>, bool}. The right side contains an eligible index or boost::none if
-// no such index exits. The left side is a flag denoting whether the eligible index has also
-// compatible collation. An eligible index with compatible collation can be used in the INLJ
-// strategy while an eligible index without a compatible collation can be used in the DINLJ
-// strategy.
+// {boost::optional<IndexEntry>, bool}. The left side contains an eligible index or boost::none if
+// no such index exits. The right side is a flag denoting whether the eligible index has also
+// compatible collation. An eligible index with compatible collation can be used in the Indexed
+// Nested Loop Join (INLJ) strategy while an eligible index without a compatible collation can be
+// used in the Dynamic Indexed Loop Join (DILJ) strategy.
 std::tuple<boost::optional<IndexEntry>, bool> determineForeignIndexForRightSideOfLookupPushdown(
     const std::string& foreignField,
     std::vector<IndexEntry> indexes,
@@ -954,15 +954,15 @@ QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
                 "No foreign index and table scan disallowed",
                 !tableScanForbidden);
 
-        if (foreignIndex) {
-            // There is an index with incompatible collation. Use dynamic indexed loop join to
-            // benefit from it in case the data type ignores tha collation.
-            return EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin;
+        if (allowDiskUse && isEligibleForHashJoin(foreignCollItr->second)) {
+            // No index with compatible collation. Use HashJoin.
+            return EqLookupNode::LookupStrategy::kHashJoin;
         }
 
-        if (allowDiskUse && isEligibleForHashJoin(foreignCollItr->second)) {
-            // No index. Use HashJoin.
-            return EqLookupNode::LookupStrategy::kHashJoin;
+        if (foreignIndex) {
+            // There is an index with incompatible collation. Use dynamic indexed loop join to
+            // benefit from it in case the data type ignores the collation.
+            return EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin;
         }
 
         return EqLookupNode::LookupStrategy::kNestedLoopJoin;

@@ -126,9 +126,10 @@ let explain;
 
 // In presence of indexes, lookup might choose a different strategy for the join, that relies on the
 // index (INLJ). It should respect the effective collation of $lookup. If there is an index with
-// compatible collation, it should select an IndexedLoopJoin otherwise, if the index does not have
-// compatible collation, it should select DynamicIndexedLoopJoin. If there is no index and disk
-// usage is allowed it should select HashLookup. In all other cases it should select NestedLoopJoin.
+// compatible collation, it should select an IndexedNestedLoopJoin. If there is no index
+// and disk usage is allowed it should select HashLookup. If there is an index but it does not have
+// compatible collation, it should select DynamicIndexedLoopJoin. In all other cases it should
+// select NestedLoopJoin.
 (function testCollationWithIndexes() {
     function assertJoinStrategy(explain, strategyName, indexName) {
         // Check join strategy when $lookup is pushed down.
@@ -178,9 +179,9 @@ let explain;
             extraErrorMsg: " Case-insensitive collation on local, foreign is indexed, running: " +
                 tojson(lookupInto)
         });
-        let areCollectionsCollocated =
+        let areCollectionsColocated =
             FixtureHelpers.areCollectionsColocated([collAA, collAa_indexed]);
-        if (areCollectionsCollocated) {
+        if (areCollectionsColocated) {
             explain = collAA.explain().aggregate([lookupInto(collAa_indexed)]);
             assertJoinStrategy(explain, "IndexedLoopJoin", "key_1_x_1");
         }
@@ -195,8 +196,8 @@ let explain;
             extraErrorMsg: " Case-insensitive collation on command, foreign is indexed, running:" +
                 tojson(lookupInto)
         });
-        areCollectionsCollocated = FixtureHelpers.areCollectionsColocated([collAa, collAa_indexed]);
-        if (areCollectionsCollocated) {
+        areCollectionsColocated = FixtureHelpers.areCollectionsColocated([collAa, collAa_indexed]);
+        if (areCollectionsColocated) {
             explain = collAa.explain().aggregate([lookupInto(collAa_indexed)],
                                                  {collation: caseInsensitive});
             assertJoinStrategy(explain, "IndexedLoopJoin", "key_1_x_1");
@@ -212,8 +213,8 @@ let explain;
             extraErrorMsg:
                 " locale fr collation on local, foreign is indexed,running: " + tojson(lookupInto)
         });
-        areCollectionsCollocated = FixtureHelpers.areCollectionsColocated([collAa, collAa_indexed]);
-        if (areCollectionsCollocated) {
+        areCollectionsColocated = FixtureHelpers.areCollectionsColocated([collAa, collAa_indexed]);
+        if (areCollectionsColocated) {
             // If there is an index but it is not compatible with the requested collation and disk
             // usage is not allowed, dynamic indexed loop join will be chosen.
             explain = collAa.explain().aggregate([lookupInto(collAa_indexed)],
@@ -227,32 +228,25 @@ let explain;
                 assertJoinStrategy(explain, "DynamicIndexedLoopJoin", "key_1");
             }
         }
-        areCollectionsCollocated = FixtureHelpers.areCollectionsColocated([collAa, collAa_indexed]);
-        if (areCollectionsCollocated) {
+        areCollectionsColocated = FixtureHelpers.areCollectionsColocated([collAa, collAa_indexed]);
+        if (areCollectionsColocated) {
             // If there is an index but it is not compatible with the requested collation and disk
-            // usage is allowed, dynamic indexed loop join will be chosen.
+            // usage is allowed, hash join will be chosen.
             explain = collAa.explain().aggregate([lookupInto(collAa_indexed)],
                                                  {allowDiskUse: true, collation: {locale: "fr"}});
-            if (isMultiversion) {
-                assertJoinStrategyMulti(explain, [
-                    {name: "HashJoin", index: null},
-                    {name: "DynamicIndexedLoopJoin", index: "key_1"}
-                ]);
-            } else {
-                assertJoinStrategy(explain, "DynamicIndexedLoopJoin", "key_1");
-            }
+            assertJoinStrategy(explain, "HashJoin", null);
         }
 
         // There is no compatible index.
-        areCollectionsCollocated = FixtureHelpers.areCollectionsColocated([collAa, collAA]);
-        if (areCollectionsCollocated) {
+        areCollectionsColocated = FixtureHelpers.areCollectionsColocated([collAa, collAA]);
+        if (areCollectionsColocated) {
             // If no index is compatible with the requested collation and disk use is
             // allowed, hash join will be chosen.
             explain = collAa.explain().aggregate([lookupInto(collAA)], {allowDiskUse: true});
             assertJoinStrategy(explain, "HashJoin", null);
         }
-        areCollectionsCollocated = FixtureHelpers.areCollectionsColocated([collAa, collAA]);
-        if (areCollectionsCollocated) {
+        areCollectionsColocated = FixtureHelpers.areCollectionsColocated([collAa, collAA]);
+        if (areCollectionsColocated) {
             // If no index is compatible with the requested collation and disk use is not
             // allowed, nested loop join will be chosen.
             explain = collAa.explain().aggregate([lookupInto(collAA)], {allowDiskUse: false});
@@ -269,31 +263,19 @@ let explain;
             pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_key"]}}}]
         }
     };
-    let areCollectionsCollocated = FixtureHelpers.areCollectionsColocated([collAa, collAA]);
-    if (areCollectionsCollocated) {
+    let areCollectionsColocated = FixtureHelpers.areCollectionsColocated([collAa, collAA]);
+    if (areCollectionsColocated) {
         explain = collAa.explain().aggregate([pipeline]);
-        if (isMultiversion) {
-            assertJoinStrategyMulti(
-                explain,
-                [{name: "HashJoin", index: null}, {name: "DynamicIndexedLoopJoin", index: "_id_"}]);
-        } else {
-            assertJoinStrategy(explain, "DynamicIndexedLoopJoin", "_id_");
-        }
+        assertJoinStrategy(explain, "HashJoin", null);
     }
 
     pipeline = {
         $lookup: {from: collAA.getName(), localField: "_id", foreignField: "_id", as: "matched"}
     };
     jsTest.log.info("Running pipeline: ", pipeline);
-    areCollectionsCollocated = FixtureHelpers.areCollectionsColocated([collAa, collAA]);
-    if (areCollectionsCollocated) {
+    areCollectionsColocated = FixtureHelpers.areCollectionsColocated([collAa, collAA]);
+    if (areCollectionsColocated) {
         explain = collAa.explain().aggregate([pipeline]);
-        if (isMultiversion) {
-            assertJoinStrategyMulti(
-                explain,
-                [{name: "HashJoin", index: null}, {name: "DynamicIndexedLoopJoin", index: "_id_"}]);
-        } else {
-            assertJoinStrategy(explain, "DynamicIndexedLoopJoin", "_id_");
-        }
+        assertJoinStrategy(explain, "HashJoin", null);
     }
 })();

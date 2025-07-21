@@ -535,16 +535,8 @@ for (let res of expectedResults) {
         foreignMatchIndex: localDocCount,
         allowDiskUse: false
     });
-    // Index and incompatible collation, disk usage allowed. The collation seems incompatible but it
-    // is not. The statistics will be the same with the index statistics.
-    testQueryExecutorStatsWithDynamicIndexedLoopJoin({
-        withUnwind: res.unwind,
-        expectedOutput: res.results,
-        localNoIndex: 0,
-        localWithIndex: localDocCount,
-        foreignMatchIndex: localDocCount,
-        allowDiskUse: true
-    });
+    // Index and incompatible collation, disk usage allowed.
+    testQueryExecutorStatsWithHashLookup({withUnwind: res.unwind, expectedOutput: res.results});
 }
 
 // Create collections with objects that can use the index and objects that cannot when the collation
@@ -604,14 +596,7 @@ for (let res of expectedResults) {
         allowDiskUse: false
     });
     // Index with incompatible collation, disk usage allowed.
-    testQueryExecutorStatsWithDynamicIndexedLoopJoin({
-        withUnwind: res.unwind,
-        expectedOutput: res.results,
-        localNoIndex: 1,
-        localWithIndex: 2,
-        foreignMatchIndex: 2,
-        allowDiskUse: true
-    });
+    testQueryExecutorStatsWithHashLookup({withUnwind: res.unwind, expectedOutput: res.results});
 }
 
 // Create collections with objects that cannot use the index when the collation is incompatible.
@@ -683,14 +668,6 @@ for (let res of expectedResults) {
         foreignMatchIndex: 0,
         allowDiskUse: false
     });
-    // Index with incompatible collation, no disk usage allowed. None of the objects can use the
-    // index so all objects will use scan.
-    testQueryExecutorStatsWithDynamicIndexedLoopJoin({
-        withUnwind: res.unwind,
-        expectedOutput: res.results,
-        localNoIndex: localDocCount,
-        localWithIndex: 0,
-        foreignMatchIndex: 0,
-        allowDiskUse: true
-    });
+    // Index with incompatible collation, disk usage allowed.
+    testQueryExecutorStatsWithHashLookup({withUnwind: res.unwind, expectedOutput: res.results});
 }
