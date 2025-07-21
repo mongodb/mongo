@@ -218,6 +218,7 @@ public:
             std::make_unique<ce::SamplingEstimatorImpl>(
                 &_opCtx,
                 collectionsAccessor,
+                PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                 static_cast<size_t>(N),
                 ce::SamplingEstimatorImpl::SamplingStyle::kRandom,
                 boost::none,

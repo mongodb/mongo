@@ -289,6 +289,7 @@ void SamplingAccuracyTest::runSamplingEstimatorTestConfiguration(
             SamplingEstimatorImpl samplingEstimator(
                 operationContext(),
                 collection,
+                PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                 actualSampleSize,
                 samplingAlgoAndChunk.first,
                 samplingAlgoAndChunk.second,

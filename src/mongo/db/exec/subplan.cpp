@@ -220,6 +220,7 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
         samplingEstimator = std::make_unique<ce::SamplingEstimatorImpl>(
             _query->getOpCtx(),
             multiCollectionAccessor,
+            yieldPolicy->getPolicy(),
             samplingMode == SamplingCEMethodEnum::kRandom
                 ? ce::SamplingEstimatorImpl::SamplingStyle::kRandom
                 : ce::SamplingEstimatorImpl::SamplingStyle::kChunk,

@@ -360,10 +360,12 @@ class PrepareExecutionHelper {
 public:
     PrepareExecutionHelper(OperationContext* opCtx,
                            const MultipleCollectionAccessor& collections,
+                           PlanYieldPolicy::YieldPolicy yieldPolicy,
                            CanonicalQuery* cq,
                            std::unique_ptr<QueryPlannerParams> plannerParams)
         : _opCtx{opCtx},
           _collections{collections},
+          _yieldPolicy{yieldPolicy},
           _cq{cq},
           _plannerParams(std::move(plannerParams)),
           _result{std::make_unique<ResultType>()} {
@@ -469,6 +471,7 @@ public:
                 samplingEstimator = std::make_unique<ce::SamplingEstimatorImpl>(
                     _cq->getOpCtx(),
                     getCollections(),
+                    _yieldPolicy,
                     samplingMode == SamplingCEMethodEnum::kRandom
                         ? ce::SamplingEstimatorImpl::SamplingStyle::kRandom
                         : ce::SamplingEstimatorImpl::SamplingStyle::kChunk,
@@ -617,6 +620,7 @@ protected:
 
     OperationContext* _opCtx;
     const MultipleCollectionAccessor& _collections;
+    PlanYieldPolicy::YieldPolicy _yieldPolicy;
     CanonicalQuery* _cq;
     // Stored as a smart pointer for memory safety reasons. Storing a reference would be even
     // faster, but also more prone to memory errors. Storing a direct value would incur copying
@@ -639,9 +643,8 @@ public:
                                   CanonicalQuery* cq,
                                   PlanYieldPolicy::YieldPolicy yieldPolicy,
                                   std::unique_ptr<QueryPlannerParams> plannerParams)
-        : PrepareExecutionHelper{opCtx, collections, cq, std::move(plannerParams)},
-          _ws{std::move(ws)},
-          _yieldPolicy{yieldPolicy} {}
+        : PrepareExecutionHelper{opCtx, collections, yieldPolicy, cq, std::move(plannerParams)},
+          _ws{std::move(ws)} {}
 
 private:
     using CachedSolutionPair =
@@ -777,7 +780,6 @@ private:
     }
 
     std::unique_ptr<WorkingSet> _ws;
-    PlanYieldPolicy::YieldPolicy _yieldPolicy;
     boost::optional<size_t> _cachedPlanHash;
 };
 
@@ -806,9 +808,8 @@ public:
         std::unique_ptr<QueryPlannerParams> plannerParams,
         bool useSbePlanCache)
         : PrepareExecutionHelper<CacheKey, RuntimePlanningResult>(
-              opCtx, collections, cq, std::move(plannerParams)),
+              opCtx, collections, policy, cq, std::move(plannerParams)),
           _ws{std::move(ws)},
-          _yieldPolicy{policy},
           _sbeYieldPolicy{std::move(sbeYieldPolicy)},
           _useSbePlanCache{useSbePlanCache} {}
 
@@ -821,7 +822,7 @@ protected:
                                           std::move(_ws),
                                           this->_collections,
                                           std::move(this->_plannerParams),
-                                          _yieldPolicy,
+                                          this->_yieldPolicy,
                                           _cachedPlanHash,
                                           std::move(_sbeYieldPolicy),
                                           _useSbePlanCache};
@@ -871,8 +872,8 @@ protected:
     std::unique_ptr<WorkingSet> _ws;
 
     // When using the classic multi-planner for SBE, we need both classic and SBE yield policy to
-    // support yielding during trial period in classic engine.
-    PlanYieldPolicy::YieldPolicy _yieldPolicy;
+    // support yielding during trial period in classic engine. The classic yield policy to stored in
+    // 'PrepareExecutionHelper'.
     std::unique_ptr<PlanYieldPolicySBE> _sbeYieldPolicy;
 
     const bool _useSbePlanCache;

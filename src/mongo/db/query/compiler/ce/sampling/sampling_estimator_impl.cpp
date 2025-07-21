@@ -371,8 +371,7 @@ void SamplingEstimatorImpl::executeSamplingQueryAndSample(
 void SamplingEstimatorImpl::generateFullCollScanSample() {
     // Create a CanonicalQuery for the CollScan plan.
     auto cq = makeCanonicalQuery(_collections.getMainCollection()->ns(), _opCtx, boost::none);
-    auto sbeYieldPolicy = PlanYieldPolicySBE::make(
-        _opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, _collections, cq->nss());
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, cq->nss());
 
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
     sbe::value::SlotIdGenerator ids;
@@ -397,8 +396,7 @@ void SamplingEstimatorImpl::generateRandomSample(size_t sampleSize) {
     // Create a CanonicalQuery for the sampling plan.
     auto cq = makeCanonicalQuery(_collections.getMainCollection()->ns(), _opCtx, sampleSize);
     _sampleSize = sampleSize;
-    auto sbeYieldPolicy = PlanYieldPolicySBE::make(
-        _opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, _collections, cq->nss());
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, cq->nss());
 
     auto plan = generateRandomSamplingPlan(sbeYieldPolicy.get());
     executeSamplingQueryAndSample(plan, std::move(cq), std::move(sbeYieldPolicy));
@@ -415,8 +413,7 @@ void SamplingEstimatorImpl::generateChunkSample(size_t sampleSize) {
     // Create a CanonicalQuery for the sampling plan.
     auto cq = makeCanonicalQuery(_collections.getMainCollection()->ns(), _opCtx, sampleSize);
     _sampleSize = sampleSize;
-    auto sbeYieldPolicy = PlanYieldPolicySBE::make(
-        _opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, _collections, cq->nss());
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, cq->nss());
 
     auto plan = generateChunkSamplingPlan(sbeYieldPolicy.get());
     executeSamplingQueryAndSample(plan, std::move(cq), std::move(sbeYieldPolicy));
@@ -432,8 +429,7 @@ void SamplingEstimatorImpl::generateChunkSample() {
 void SamplingEstimatorImpl::generateSampleBySeqScanningForTesting() {
     // Create a CanonicalQuery for the sampling plan.
     auto cq = makeCanonicalQuery(_collections.getMainCollection()->ns(), _opCtx, _sampleSize);
-    auto sbeYieldPolicy = PlanYieldPolicySBE::make(
-        _opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, _collections, cq->nss());
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, cq->nss());
 
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
     sbe::value::SlotIdGenerator ids;
@@ -462,6 +458,9 @@ void SamplingEstimatorImpl::generateSampleBySeqScanningForTesting() {
 }
 
 CardinalityEstimate SamplingEstimatorImpl::estimateCardinality(const MatchExpression* expr) const {
+    if (_sampleSize == 0) {
+        return cost_based_ranker::zeroCE;
+    }
     size_t cnt = 0;
     try {
         for (const auto& doc : _sample) {
@@ -585,12 +584,14 @@ CardinalityEstimate SamplingEstimatorImpl::estimateRIDs(const IndexBounds& bound
 
 SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                                              const MultipleCollectionAccessor& collections,
+                                             PlanYieldPolicy::YieldPolicy yieldPolicy,
                                              size_t sampleSize,
                                              SamplingStyle samplingStyle,
                                              boost::optional<int> numChunks,
                                              CardinalityEstimate collectionCard)
     : _opCtx(opCtx),
       _collections(collections),
+      _yieldPolicy(yieldPolicy),
       _sampleSize(sampleSize),
       _numChunks(numChunks),
       _collectionCard(collectionCard) {
@@ -614,6 +615,7 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
 
 SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                                              const MultipleCollectionAccessor& collections,
+                                             PlanYieldPolicy::YieldPolicy yieldPolicy,
                                              SamplingStyle samplingStyle,
                                              CardinalityEstimate collectionCard,
                                              SamplingConfidenceIntervalEnum ci,
@@ -621,6 +623,7 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                                              boost::optional<int> numChunks)
     : SamplingEstimatorImpl(opCtx,
                             collections,
+                            yieldPolicy,
                             calculateSampleSize(ci, marginOfError),
                             samplingStyle,
                             numChunks,

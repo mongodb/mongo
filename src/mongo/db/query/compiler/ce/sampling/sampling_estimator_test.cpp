@@ -75,6 +75,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingProcess) {
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
                                                   numChunks,
@@ -99,6 +100,7 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingProcess) {
         const size_t kChunkSize = sampleSize / chunkNum;
         SamplingEstimatorForTesting samplingEstimator(optCtx,
                                                       colls,
+                                                      PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                       sampleSize,
                                                       SamplingEstimatorImpl::SamplingStyle::kChunk,
                                                       chunkNum,
@@ -153,6 +155,7 @@ TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcess) {
     const int collectionSize = 50;
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   sampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
                                                   boost::none, /* numChunks */
@@ -178,6 +181,7 @@ TEST_F(SamplingEstimatorTest, DrawANewSample) {
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
+        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         kSampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         numChunks,
@@ -224,6 +228,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinality) {
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
+        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         numChunks,
@@ -279,6 +284,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityLogicalExpressions) {
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
+        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         numChunks,
@@ -360,6 +366,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityMultipleExpressions) {
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
+        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         numChunks,
@@ -408,6 +415,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBounds) {
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
+        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         numChunks,
@@ -497,6 +505,7 @@ TEST_F(SamplingEstimatorTest, EstimateIndexKeysScanned) {
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
+        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         numChunks,
@@ -553,6 +562,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBoundsAndMatchExpression
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
+        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         SamplingEstimatorForTesting::SamplingStyle::kRandom,
         numChunks,
@@ -659,6 +669,7 @@ DEATH_TEST_F(SamplingEstimatorTest,
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
                                                   SamplingEstimatorImpl::SamplingStyle::kRandom,
                                                   numChunks,

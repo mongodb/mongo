@@ -55,6 +55,7 @@ public:
      */
     SamplingEstimatorImpl(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
+                          PlanYieldPolicy::YieldPolicy yieldPolicy,
                           SamplingStyle samplingStyle,
                           CardinalityEstimate collectionCard,
                           SamplingConfidenceIntervalEnum ci,
@@ -69,6 +70,7 @@ public:
      */
     SamplingEstimatorImpl(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
+                          PlanYieldPolicy::YieldPolicy yieldPolicy,
                           size_t sampleSize,
                           SamplingStyle samplingStyle,
                           boost::optional<int> numChunks,
@@ -243,6 +245,7 @@ private:
     // The collection the sampling plan runs against and is the one accessed by the query being
     // optimized.
     const MultipleCollectionAccessor& _collections;
+    PlanYieldPolicy::YieldPolicy _yieldPolicy;
     size_t _sampleSize;
     boost::optional<int> _numChunks;
 

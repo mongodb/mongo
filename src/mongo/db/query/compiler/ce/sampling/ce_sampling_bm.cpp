@@ -200,6 +200,7 @@ void BM_CreateSample(benchmark::State& state) {
         SamplingEstimatorImpl samplingEstimator(
             samplingEstimatorTest.getOperationContext(),
             collection,
+            PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
             sampleSize,
             sampling.first,
             sampling.second,
@@ -249,6 +250,7 @@ void BM_RunCardinalityEstimationOnSample(benchmark::State& state) {
     SamplingEstimatorImpl samplingEstimator(
         samplingEstimatorTest.getOperationContext(),
         collection,
+        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
         sampling.first,
         sampling.second,
