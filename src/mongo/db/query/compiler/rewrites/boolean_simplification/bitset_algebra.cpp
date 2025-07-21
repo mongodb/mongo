@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/boolean_simplification/bitset_algebra.h"
+#include "mongo/db/query/compiler/rewrites/boolean_simplification/bitset_algebra.h"
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/util/assert_util.h"

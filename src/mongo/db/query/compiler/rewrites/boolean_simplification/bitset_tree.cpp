@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/boolean_simplification/bitset_tree.h"
+#include "mongo/db/query/compiler/rewrites/boolean_simplification/bitset_tree.h"
 
 #include "mongo/util/assert_util.h"
 #include "mongo/util/stream_utils.h"

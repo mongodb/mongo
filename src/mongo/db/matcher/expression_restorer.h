@@ -31,7 +31,7 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_bitset_tree_converter.h"
-#include "mongo/db/query/boolean_simplification/bitset_algebra.h"
+#include "mongo/db/query/compiler/rewrites/boolean_simplification/bitset_algebra.h"
 
 namespace mongo {
 /**

@@ -40,7 +40,7 @@ mongo_cc_unit_test(
         "petrick_test.cpp",
         "quine_mccluskey_test.cpp",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":boolean_simplification",
     ],

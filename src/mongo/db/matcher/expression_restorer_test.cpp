@@ -33,7 +33,7 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
-#include "mongo/db/query/boolean_simplification/bitset_test_util.h"
+#include "mongo/db/query/compiler/rewrites/boolean_simplification/bitset_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 

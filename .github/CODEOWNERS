@@ -2336,10 +2336,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/query/benchmark/OWNERS.yml
 /src/mongo/db/query/benchmark/**/README.md @10gen/query-optimization @svc-auto-approve-bot
 
-# The following patterns are parsed from ./src/mongo/db/query/boolean_simplification/OWNERS.yml
-/src/mongo/db/query/boolean_simplification/**/* @10gen/query-optimization @svc-auto-approve-bot
-/src/mongo/db/query/boolean_simplification/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
-
 # The following patterns are parsed from ./src/mongo/db/query/bson/OWNERS.yml
 /src/mongo/db/query/bson/**/* @10gen/query-execution @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/bson/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
@@ -2371,6 +2367,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/query/compiler/physical_model/query_solution/OWNERS.yml
 /src/mongo/db/query/compiler/physical_model/query_solution/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/compiler/physical_model/query_solution/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/query/compiler/rewrites/boolean_simplification/OWNERS.yml
+/src/mongo/db/query/compiler/rewrites/boolean_simplification/**/* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/compiler/rewrites/boolean_simplification/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/compiler/stats/OWNERS.yml
 /src/mongo/db/query/compiler/stats/**/* @10gen/query-optimization @svc-auto-approve-bot

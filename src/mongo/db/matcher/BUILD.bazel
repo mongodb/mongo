@@ -118,7 +118,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/matcher/schema:logical_keywords_test.cpp",
         "//src/mongo/db/matcher/schema:object_keywords_test.cpp",
         "//src/mongo/db/matcher/schema:scalar_keywords_test.cpp",
-        "//src/mongo/db/query/boolean_simplification:bitset_test_util.h",
+        "//src/mongo/db/query/compiler/rewrites/boolean_simplification:bitset_test_util.h",
     ],
     data = [
         "//src/mongo/db/test_output/matcher/debug_string_test:test_data",

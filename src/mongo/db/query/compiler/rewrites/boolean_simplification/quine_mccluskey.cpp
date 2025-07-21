@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/boolean_simplification/quine_mccluskey.h"
+#include "mongo/db/query/compiler/rewrites/boolean_simplification/quine_mccluskey.h"
 
 #include <absl/container/node_hash_set.h>
 #include <boost/dynamic_bitset/dynamic_bitset.hpp>

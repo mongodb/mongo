@@ -2618,9 +2618,9 @@ mongo_cc_library(
         "//src/mongo/db/query:query_knob_configuration",
         "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query:random_utils",
-        "//src/mongo/db/query/boolean_simplification",
         "//src/mongo/db/query/collation:collator_factory_interface",
         "//src/mongo/db/query/collation:collator_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/compiler/rewrites/boolean_simplification",
         "//src/mongo/db/query/datetime:date_time_support",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_settings",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_shape:query_shape_common",  # TODO(SERVER-93876): Remove.

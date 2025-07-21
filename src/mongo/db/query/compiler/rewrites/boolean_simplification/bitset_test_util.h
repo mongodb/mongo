@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/query/boolean_simplification/bitset_tree.h"
+#include "mongo/db/query/compiler/rewrites/boolean_simplification/bitset_tree.h"
 
 namespace mongo::boolean_simplification {
 inline BitsetTerm makeBitsetTerm(const Minterm& minterm) {

@@ -26,65 +26,55 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/query/boolean_simplification/petrick.h"
+
+#include "mongo/db/query/compiler/rewrites/boolean_simplification/bitset_algebra.h"
 
 #include <benchmark/benchmark.h>
 
 namespace mongo::boolean_simplification {
 /**
- * The classic example from Petrick's method papers. No essential terms, the number of terms
- * is reduced by half.
+ * Best case: create a maxterm with a single minterm.
  */
-void petrick_classic(benchmark::State& state) {
-    std::vector<CoveredOriginalMinterms> data{
-        {0, 1},
-        {0, 3},
-        {1, 2},
-        {3, 4},
-        {2, 5},
-        {4, 5},
-    };
-
+void bitsetAlgebra_createAndMaxterm(benchmark::State& state) {
     for (auto _ : state) {
-        benchmark::DoNotOptimize(petricksMethod(data));
+        Maxterm maxterm{64};
+        maxterm.append(10, true);
     }
 }
-
-BENCHMARK(petrick_classic);
 
 /**
- * Petrick can do no simplifications.
+ * Worst case: create a maxterm with N minterms of size N and 1 set predicate.
  */
-void petrick_noSimplifications(benchmark::State& state) {
-    std::vector<CoveredOriginalMinterms> data(100);
-    for (size_t i = 0; i < data.size(); ++i) {
-        data[i].emplace_back(static_cast<CoveredOriginalMinterms::value_type>(i));
-    }
+void bitsetAlgebra_createOrMaxterm(benchmark::State& state) {
+    const size_t numPredicates = static_cast<size_t>(state.range());
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(petricksMethod(data));
+        Maxterm maxterm{numPredicates};
+        for (size_t predicateIndex = 0; predicateIndex < numPredicates; ++predicateIndex) {
+            maxterm.append(predicateIndex % maxterm.numberOfBits(), true);
+        }
     }
 }
-
-BENCHMARK(petrick_noSimplifications);
 
 /**
- * Some terms are essential and some simplifications are possible.
+ * Middle case: create a maxtern with N minterms and N % kBitsetNumberOfBits set predicates.
  */
-void petrick_essentialWithSimplications(benchmark::State& state) {
-    std::vector<CoveredOriginalMinterms> data{
-        {0, 1, 2},
-        {2, 3},
-        {0, 3},
-        {4},
-        {5},
-        {6},
-    };
+void bitsetAlgebra_createMaxterm(benchmark::State& state) {
+    const size_t numMinterms = static_cast<size_t>(state.range());
+    const size_t numPredicates = numMinterms;
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(petricksMethod(data));
+        Maxterm maxterm{numPredicates};
+        for (size_t index = 0; index < numMinterms; ++index) {
+            maxterm.appendEmpty();
+            for (size_t predicateIndex = 0; predicateIndex < numPredicates; ++predicateIndex) {
+                maxterm.minterms.back().set(predicateIndex, true);
+            }
+        }
     }
 }
 
-BENCHMARK(petrick_essentialWithSimplications);
+BENCHMARK(bitsetAlgebra_createAndMaxterm);
+BENCHMARK(bitsetAlgebra_createOrMaxterm)->RangeMultiplier(10)->Range(10, 10000);
+BENCHMARK(bitsetAlgebra_createMaxterm)->Args({3})->Args({7})->Args({10})->Args({13});
 }  // namespace mongo::boolean_simplification

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/boolean_simplification/quine_mccluskey.h"
+#include "mongo/db/query/compiler/rewrites/boolean_simplification/quine_mccluskey.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
