@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import json
 import os
 import pathlib
 import socket
@@ -74,8 +75,7 @@ def write_workstation_bazelrc(args):
         filtered_args = filtered_args[:filtered_args.index("--")] + ["--", "(REDACTED)"]
 
     developer_build = os.environ.get("CI") is None
-    filtered_command_line = " ".join(filtered_args)
-    b64_cmd_line = base64.b64encode(filtered_command_line.encode()).decode()
+    b64_cmd_line = base64.b64encode(json.dumps(filtered_args).encode()).decode()
     normalized_os = sys.platform.replace("win32", "windows").replace("darwin", "macos")
     bazelrc_contents = f"""\
 # Generated file, do not modify
