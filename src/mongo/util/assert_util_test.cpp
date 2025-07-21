@@ -34,6 +34,7 @@
 
 #include "mongo/base/static_assert.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/death_test.h"
@@ -661,6 +662,17 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
     someRiskyBusiness();
 }
 
+// Tests the functionality of the `signalHandlerUsesDiagnosticLogging` knob.
+// Note the regex here uses the negative lookahead operator `(?!)` in order to ensure that the
+// string `hello` is not found within the logs. The syntax here means: we want to match the start of
+// the string unless something after the start of the string contains `hello`.
+DEATH_TEST_REGEX(ScopedDebugInfo, InvariantWhenSignalHandlerLoggingDisabled, "(?s)^(?!.*hello)") {
+    RAIIServerParameterControllerForTest knobController("signalHandlerUsesDiagnosticLogging",
+                                                        false);
+    ScopedDebugInfo guard("test", "hello");
+    someRiskyBusiness();
+}
+
 // The following tests relies on SIGSEGV which is not supported on Windows.
 // Test that we end the process as expected due to a seg fault even if we hit a tassert during
 // logging of the `ScopedDebugInfoStack`.
@@ -680,6 +692,18 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
                  "(?s)Invalid access at address.*abruptQuit"
                  ".*ScopedDebugInfo failed.*test.*9513402") {
     ScopedDebugInfo guardUasserts("test", PrinterMockUassert());
+    raise(SIGSEGV);
+}
+
+// Tests the functionality of the `signalHandlerUsesDiagnosticLogging` knob with a signal
+// raised.
+// Note the regex here uses the negative lookahead operator `(?!)` in order to ensure that the
+// string `hello` is not found within the logs. The syntax here means: we want to match the start of
+// the string unless something after the start of the string contains `hello`.
+DEATH_TEST_REGEX(ScopedDebugInfo, SignalWhenSignalHandlerLoggingDisabled, "(?s)^(?!.*hello)") {
+    RAIIServerParameterControllerForTest knobController("signalHandlerUsesDiagnosticLogging",
+                                                        false);
+    ScopedDebugInfo guard("test", "hello");
     raise(SIGSEGV);
 }
 #endif

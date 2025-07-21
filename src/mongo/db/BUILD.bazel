@@ -2457,6 +2457,7 @@ mongo_cc_library(
         "coll_mod_reply_validation.cpp",
         "commands.cpp",
         "curop.cpp",
+        "curop_diagnostic_printer.cpp",
     ],
     deps = [
         "api_parameters",
@@ -2501,6 +2502,19 @@ mongo_cc_library(
         "//bazel/config:use_diagnostic_latches_enabled": ["//src/mongo/util:diagnostic_info"],
         "//conditions:default": [],
     }),
+)
+
+mongo_cc_unit_test(
+    name = "diagnostic_printers_test",
+    srcs = [
+        "diagnostic_printers_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":commands",
+        ":service_context_test_fixture",
+        "//src/mongo/db/commands:standalone",
+    ],
 )
 
 mongo_cc_unit_test(
@@ -2743,6 +2757,7 @@ mongo_cc_library(
         "//src/mongo/transport:message_compressor_options_server_idl",
         "//src/mongo/transport:session_manager",
         "//src/mongo/transport:transport_layer_manager",
+        "//src/mongo/util:assert_util_params",
         "//src/mongo/util:clock_sources",
         "//src/mongo/util:elapsed_tracker",
         "//src/mongo/util:fail_point",

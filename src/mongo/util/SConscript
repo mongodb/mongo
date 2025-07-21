@@ -946,6 +946,7 @@ icuEnv.CppUnitTest(
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/third_party/croaring/croaring',
         'alarm',
+        'assert_util_params',
         'background_job',
         'caching',
         'clock_source_mock',

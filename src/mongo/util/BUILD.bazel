@@ -780,6 +780,7 @@ mongo_cc_unit_test(
     ],
     deps = [
         ":alarm",
+        ":assert_util_params",
         ":background_job",
         ":caching",
         ":clock_source_mock",
@@ -1000,6 +1001,31 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+    ],
+)
+
+mongo_idl_library(
+    name = "assert_util_parameters_idl",
+    src = "assert_util_parameters.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_cc_library(
+    name = "assert_util_params",
+    srcs = [
+        "assert_util_parameters.cpp",
+    ],
+    hdrs = [
+        "assert_util_parameters.h",
+    ],
+    deps = [
+        ":assert_util_parameters_idl",
+        "//src/mongo/db:server_base",
     ],
 )
 

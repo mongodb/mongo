@@ -33,7 +33,13 @@
 
 namespace mongo {
 /**
- * Sets the appropriate state to reflect the value of the knob.
+ * Sets the appropriate state to reflect the value of the `enableDiagnosticLogging` knob.
  */
 Status onUpdateEnableDiagnosticLogging(bool newValue);
+
+/**
+ * Sets the appropriate state to reflect the value of the
+ * `signalHandlerUsesDiagnosticLogging` knob.
+ */
+Status onUpdateSignalHandlerUsesDiagnosticLogging(bool newValue);
 }  // namespace mongo

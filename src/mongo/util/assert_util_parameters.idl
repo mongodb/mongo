@@ -32,10 +32,19 @@ global:
 
 server_parameters:
   enableDiagnosticLogging:
-    description: "Enables additional diagnostic logging during tassert/invariant/signal handing"
-    set_at: ["startup", "runtime"]
-    cpp_varname: "enableDiagnosticLogging"
-    cpp_vartype: AtomicWord<bool>
-    default: true
-    redact: false
-    on_update: onUpdateEnableDiagnosticLogging
+      description: "Enables additional diagnostic logging during tassert, invariant, and signal handing. If set to false, diagnostic logging won't happen in any scenario."
+      set_at: ["startup", "runtime"]
+      cpp_varname: "enableDiagnosticLogging"
+      cpp_vartype: AtomicWord<bool>
+      default: true
+      redact: false
+      on_update: onUpdateEnableDiagnosticLogging
+
+  signalHandlerUsesDiagnosticLogging:
+      description: "When true, diagnostic logging will occur during invariant and signal handling."
+      set_at: ["startup", "runtime"]
+      cpp_varname: "signalHandlerUsesDiagnosticLogging"
+      cpp_vartype: AtomicWord<bool>
+      default: true
+      redact: false
+      on_update: onUpdateSignalHandlerUsesDiagnosticLogging
