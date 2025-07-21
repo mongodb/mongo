@@ -24,7 +24,7 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         "hashes",
-        "//buildscripts/resmokelib",
+        "//buildscripts/util:download_utils",
     ],
 )
 

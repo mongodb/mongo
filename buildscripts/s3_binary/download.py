@@ -9,12 +9,11 @@ import time
 import traceback
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-
-from buildscripts.resmokelib.setup_multiversion.download import (
+from buildscripts.s3_binary.hashes import S3_SHA256_HASHES
+from buildscripts.util.download_utils import (
     download_from_s3_with_boto,
     download_from_s3_with_requests,
 )
-from buildscripts.s3_binary.hashes import S3_SHA256_HASHES
 
 
 def read_sha_file(filename):
@@ -121,9 +120,8 @@ def download_s3_binary(
 
     if os.path.exists(local_path):
         try:
-            print(f"{local_path} exists, validating...")
+            print(f"Downloaded file {local_path} already exists, validating...")
             validate_file(s3_path, local_path, remote_sha_allowed)
-            print(f"File is already valid: {local_path}")
             return True
         except Exception:
             print("File is invalid, redownloading...")
@@ -146,7 +144,6 @@ def download_s3_binary(
 
 
 if __name__ == "__main__":
-
 
     parser = argparse.ArgumentParser(description="Download and verify S3 binary.")
     parser.add_argument("s3_path", help="S3 URL to download from")

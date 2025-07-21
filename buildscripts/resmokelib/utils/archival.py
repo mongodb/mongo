@@ -12,6 +12,7 @@ import threading
 import time
 
 from buildscripts.resmokelib import config
+from buildscripts.util.download_utils import get_s3_client
 
 _IS_WINDOWS = sys.platform in ("win32", "cygwin")
 
@@ -127,7 +128,7 @@ class Archival(object):
         self._archive_file_worker.setDaemon(True)
         self._archive_file_worker.start()
         if not s3_client:
-            self.s3_client = self._get_s3_client()
+            self.s3_client = get_s3_client()
         else:
             self.s3_client = s3_client
 
@@ -140,37 +141,6 @@ class Archival(object):
         )
         self._upload_worker.setDaemon(True)
         self._upload_worker.start()
-
-    @staticmethod
-    def _get_s3_client():
-        # Since boto3 is a 3rd party module, we import locally.
-        import boto3
-        import botocore.session
-
-        botocore.session.Session()
-
-        if sys.platform in ("win32", "cygwin"):
-            # These overriden values can be found here
-            # https://github.com/boto/botocore/blob/13468bc9d8923eccd0816ce2dd9cd8de5a6f6e0e/botocore/configprovider.py#L49C7-L49C7
-            # This is due to the backwards breaking changed python introduced https://bugs.python.org/issue36264
-            botocore_session = botocore.session.Session(
-                session_vars={
-                    "config_file": (
-                        None,
-                        "AWS_CONFIG_FILE",
-                        os.path.join(os.environ["HOME"], ".aws", "config"),
-                        None,
-                    ),
-                    "credentials_file": (
-                        None,
-                        "AWS_SHARED_CREDENTIALS_FILE",
-                        os.path.join(os.environ["HOME"], ".aws", "credentials"),
-                        None,
-                    ),
-                }
-            )
-            boto3.setup_default_session(botocore_session=botocore_session)
-        return boto3.client("s3")
 
     def archive_files_to_s3(self, display_name, input_files, s3_bucket, s3_path):
         """Archive 'input_files' to 's3_bucket' and 's3_path'.

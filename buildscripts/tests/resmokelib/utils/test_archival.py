@@ -8,6 +8,7 @@ import tempfile
 import unittest
 
 from buildscripts.resmokelib.utils import archival
+from buildscripts.util.download_utils import get_s3_client
 
 _BUCKET = "mongodatafiles"
 
@@ -48,7 +49,7 @@ class ArchivalTestCase(unittest.TestCase):
         if mock_client:
             cls.s3_client = MockS3Client(cls.logger)
         else:
-            cls.s3_client = archival.Archival._get_s3_client()
+            cls.s3_client = get_s3_client()
         cls.archive = cls.create_archival()
 
     @classmethod

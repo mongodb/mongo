@@ -10,11 +10,13 @@ import tarfile
 import zipfile
 from urllib.parse import parse_qs, urlparse
 
-import requests
 import structlog
 
-from buildscripts.resmokelib.utils import archival
 from buildscripts.resmokelib.utils.filesystem import build_hygienic_bin_path, mkdtemp_in_build_dir
+from buildscripts.util.download_utils import (
+    download_from_s3_with_boto,
+    download_from_s3_with_requests,
+)
 
 S3_BUCKET = "mciuploads"
 
@@ -34,35 +36,6 @@ def is_s3_presigned_url(url: str) -> bool:
     qs = parse_qs(urlparse(url).query)
     return "X-Amz-Signature" in qs
 
-
-def extract_s3_bucket_key(url: str) -> tuple[str, str]:
-    """
-    Extracts the S3 bucket name and object key from an HTTP(s) S3 URL.
-
-    Supports both:
-      - https://bucket.s3.amazonaws.com/key/…
-      - https://bucket.s3.<region>.amazonaws.com/key/…
-
-    Returns:
-      (bucket, key)
-    """
-    parsed = urlparse(url)
-    # Hostname labels, e.g. ["bucket","s3","us-east-1","amazonaws","com"]
-    bucket = parsed.hostname.split(".")[0]
-    key = parsed.path.lstrip("/")
-    return bucket, key
-
-
-def download_from_s3_with_requests(url, output_file):
-    with requests.get(url, stream=True) as reader:
-        with open(output_file, "wb") as file_handle:
-            shutil.copyfileobj(reader.raw, file_handle)
-
-
-def download_from_s3_with_boto(url, output_file):
-    bucket_name, object_key = extract_s3_bucket_key(url)
-    s3_client = archival.Archival._get_s3_client()
-    s3_client.download_file(bucket_name, object_key, output_file)
 
 
 def download_from_s3(url):

@@ -39,3 +39,21 @@ py_library(
         ),
     ],
 )
+
+py_library(
+    name = "download_utils",
+    srcs = [
+        "download_utils.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "boto3",
+            group = "aws",
+        ),
+        dependency(
+            "requests",
+            group = "core",
+        ),
+    ],
+)

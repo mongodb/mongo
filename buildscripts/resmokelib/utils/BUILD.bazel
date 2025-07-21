@@ -36,5 +36,6 @@ py_library(
             "botocore",
             group = "aws",
         ),
+        "//buildscripts/util:download_utils",
     ],
 )
