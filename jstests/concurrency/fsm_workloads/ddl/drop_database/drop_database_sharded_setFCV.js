@@ -14,6 +14,9 @@
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
+    assertSetFCVSoon
+} from "jstests/concurrency/fsm_workload_helpers/query/assert_fcv_reset_soon.js";
+import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/ddl/drop_database/drop_database_sharded.js";
 
@@ -85,8 +88,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.teardown = function(db, collName) {
-        assert.commandWorked(
-            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assertSetFCVSoon(db, latestFCV);
         $super.teardown(db, collName);
     };
 

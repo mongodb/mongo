@@ -17,6 +17,9 @@ import "jstests/libs/override_methods/retry_on_killed_session.js";
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
+    assertSetFCVSoon
+} from "jstests/concurrency/fsm_workload_helpers/query/assert_fcv_reset_soon.js";
+import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_update_shard_key.js";
 
@@ -122,8 +125,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.teardown = function(db, collName, cluster) {
-        assert.commandWorked(
-            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assertSetFCVSoon(db, latestFCV);
     };
 
     return $config;
