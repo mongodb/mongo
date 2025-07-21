@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/cost_based_ranker/heuristic_estimator.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/heuristic_estimator.h"
 
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_type.h"
-#include "mongo/db/query/cost_based_ranker/ce_utils.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/ce_utils.h"
 
 #include <span>
 

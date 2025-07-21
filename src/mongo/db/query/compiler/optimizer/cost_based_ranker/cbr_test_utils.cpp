@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/cost_based_ranker/cbr_test_utils.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"

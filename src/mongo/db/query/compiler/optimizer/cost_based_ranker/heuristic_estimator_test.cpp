@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/cost_based_ranker/heuristic_estimator.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/heuristic_estimator.h"
 
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"

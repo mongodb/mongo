@@ -29,28 +29,40 @@
 
 #pragma once
 
-#include "mongo/db/query/cost_based_ranker/estimates.h"
-
-#include <span>
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
+#include "mongo/db/query/compiler/physical_model/interval/interval.h"
 
 namespace mongo::cost_based_ranker {
 
-/**
- * Specifies the maximum number of elements (selectivities) to use when estimating via
- * exponential backoff.
- */
-constexpr size_t kMaxBackoffElements = 4;
+constexpr double kEqualityScalingFactor = 0.5;
+constexpr double kTextSearchScalingFactor = 0.4;
+constexpr double kDefaultScalingFactor = 0.3;
+constexpr double kAverageElementsPerArray = 7.0;
+const SelectivityEstimate kIsArraySel =
+    SelectivityEstimate{SelectivityType{0.9}, EstimationSource::Heuristics};
+const SelectivityEstimate kIsObjectSel =
+    SelectivityEstimate{SelectivityType{0.9}, EstimationSource::Heuristics};
+const SelectivityEstimate kExistsSel{SelectivityType{0.9}, EstimationSource::Heuristics};
+const SelectivityEstimate oneSelHeuristic{SelectivityType{1}, EstimationSource::Heuristics};
+const SelectivityEstimate zeroSelHeuristic{SelectivityType{0}, EstimationSource::Heuristics};
 
 /**
- * Estimates the selectivity of a conjunction given the selectivities of its subexpressions using
- * exponential backoff.
+ * Return true if an expression can be estimated via heuristics.
  */
-SelectivityEstimate conjExponentialBackoff(std::span<SelectivityEstimate> conjSelectivities);
+bool heuristicIsEstimable(const MatchExpression* expr);
 
 /**
- * Estimates the selectivity of a disjunction given the selectivities of its subexpressions using
- * exponential backoff.
+ * Estimate the selectivity of the given 'MatchExpression'. The expression must be a leaf, that is
+ * an atomic predicate. The caller is responsible for estimating selectivies of conjunctions,
+ * disjuctions and negations.
  */
-SelectivityEstimate disjExponentialBackoff(std::span<SelectivityEstimate> disjSelectivities);
+SelectivityEstimate heuristicLeafMatchExpressionSel(const MatchExpression* expr,
+                                                    CardinalityEstimate inputCard);
+
+/**
+ * Estimate a single interval heuristically, depending on the available bounds.
+ */
+SelectivityEstimate estimateInterval(const Interval& interval, CardinalityEstimate inputCard);
 
 }  // namespace mongo::cost_based_ranker

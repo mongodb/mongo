@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/cost_based_ranker/cost_estimator.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/cost_estimator.h"
 
 namespace mongo::cost_based_ranker {
 

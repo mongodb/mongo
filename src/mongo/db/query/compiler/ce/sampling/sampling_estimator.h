@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
-#include "mongo/db/query/cost_based_ranker/estimates.h"
 
 namespace mongo::ce {
 

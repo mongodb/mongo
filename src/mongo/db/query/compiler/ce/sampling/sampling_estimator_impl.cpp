@@ -36,7 +36,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/cost_based_ranker/estimates.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/query_knobs_gen.h"

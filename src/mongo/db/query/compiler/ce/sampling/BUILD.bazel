@@ -38,7 +38,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:query_exec",
-        "//src/mongo/db/query/cost_based_ranker:estimates",
+        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:estimates",
     ],
 )
 

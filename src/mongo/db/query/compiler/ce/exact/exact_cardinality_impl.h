@@ -31,8 +31,8 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/query/compiler/ce/ce_common.h"
 #include "mongo/db/query/compiler/ce/exact/exact_cardinality.h"
-#include "mongo/db/query/cost_based_ranker/estimates.h"
-#include "mongo/db/query/cost_based_ranker/estimates_storage.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
 namespace mongo::ce {
 
 using CardinalityEstimate = mongo::cost_based_ranker::CardinalityEstimate;

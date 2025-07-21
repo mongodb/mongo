@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/cost_based_ranker/cost_estimator.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/cost_estimator.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/db/query/cost_based_ranker/cbr_test_utils.h"
-#include "mongo/db/query/cost_based_ranker/estimates.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::cost_based_ranker {

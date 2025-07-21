@@ -2368,6 +2368,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/compiler/metadata/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/compiler/metadata/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/query/compiler/optimizer/cost_based_ranker/OWNERS.yml
+/src/mongo/db/query/compiler/optimizer/cost_based_ranker/**/* @10gen/query-optimization-cost-based-ranker @svc-auto-approve-bot
+/src/mongo/db/query/compiler/optimizer/cost_based_ranker/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/query/compiler/physical_model/index_bounds/OWNERS.yml
 /src/mongo/db/query/compiler/physical_model/index_bounds/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/compiler/physical_model/index_bounds/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
@@ -2387,10 +2391,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/query/compiler/stats/OWNERS.yml
 /src/mongo/db/query/compiler/stats/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/compiler/stats/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
-
-# The following patterns are parsed from ./src/mongo/db/query/cost_based_ranker/OWNERS.yml
-/src/mongo/db/query/cost_based_ranker/**/* @10gen/query-optimization-cost-based-ranker @svc-auto-approve-bot
-/src/mongo/db/query/cost_based_ranker/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/datetime/OWNERS.yml
 /src/mongo/db/query/datetime/**/* @10gen/query-execution @svc-auto-approve-bot

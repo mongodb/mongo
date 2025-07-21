@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/cost_based_ranker/estimates.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 
 #include "mongo/unittest/unittest.h"
 

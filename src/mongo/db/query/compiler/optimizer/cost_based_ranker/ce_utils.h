@@ -29,14 +29,28 @@
 
 #pragma once
 
-#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
-#include "mongo/db/query/cost_based_ranker/estimates.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
+
+#include <span>
 
 namespace mongo::cost_based_ranker {
 
 /**
- * EstimateMap is a type representing a mapping from QuerySolutionNodes to cost estimates.
+ * Specifies the maximum number of elements (selectivities) to use when estimating via
+ * exponential backoff.
  */
-using EstimateMap = absl::flat_hash_map<const QuerySolutionNode*, QSNEstimate>;
+constexpr size_t kMaxBackoffElements = 4;
+
+/**
+ * Estimates the selectivity of a conjunction given the selectivities of its subexpressions using
+ * exponential backoff.
+ */
+SelectivityEstimate conjExponentialBackoff(std::span<SelectivityEstimate> conjSelectivities);
+
+/**
+ * Estimates the selectivity of a disjunction given the selectivities of its subexpressions using
+ * exponential backoff.
+ */
+SelectivityEstimate disjExponentialBackoff(std::span<SelectivityEstimate> disjSelectivities);
 
 }  // namespace mongo::cost_based_ranker
