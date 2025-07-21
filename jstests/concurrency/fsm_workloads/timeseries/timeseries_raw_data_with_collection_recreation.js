@@ -39,6 +39,9 @@ export const $config = (function() {
         // Encountered (especially in slower suites) if the router retries the operation too many
         // times due to transient errors.
         ErrorCodes.StaleConfig,
+        // Encountered if a collection did not exist at the beginning of an operation but was
+        // created as a time-series collection by the time we go to acquire it.
+        10685100,
     ];
 
     const data = {

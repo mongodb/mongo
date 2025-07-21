@@ -1538,6 +1538,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:storage_engine_common",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/timeseries:catalog_helper",
+        "//src/mongo/db/timeseries:collection_pre_conditions_util",
         "//src/mongo/db/timeseries:timeseries_collmod",
         "//src/mongo/db/timeseries:timeseries_conversion_util",
         "//src/mongo/db/timeseries:timeseries_options",

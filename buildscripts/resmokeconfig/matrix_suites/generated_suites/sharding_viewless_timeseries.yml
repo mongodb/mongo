@@ -35,6 +35,7 @@ selector:
     - jstests/sharding/resharding_timeseries/reshard_timeseries_ttl_deletes.js
     - jstests/sharding/resharding_timeseries/reshard_timeseries_validation.js
     - jstests/sharding/resharding_timeseries/resharding_ts_resume_agg_token.js
+    - jstests/sharding/resharding_timeseries/resharding_ts_txn_cloner.js
     - jstests/sharding/resharding_timeseries/unshard_timeseries.js
     - jstests/sharding/timeseries/timeseries_balancer.js
     - jstests/sharding/timeseries/timeseries_buckets_modification_with_id.js
@@ -56,5 +57,9 @@ selector:
     - jstests/sharding/timeseries/timeseries_shard_collection_with_deprecation_message.js
     - jstests/sharding/timeseries/timeseries_sharding_admin_commands.js
     - jstests/sharding/timeseries/timeseries_time_value_rounding.js
+    - jstests/sharding/timeseries/timeseries_update.js
+    - jstests/sharding/timeseries/timeseries_update_multi.js
+    - jstests/sharding/timeseries/timeseries_update_multi_explain.js
+    - jstests/sharding/timeseries/timeseries_update_routing.js
     - jstests/sharding/timeseries/timeseries_user_system_buckets_sharding.js
 test_kind: js_test

@@ -107,6 +107,7 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_compression_failure.h"
+#include "mongo/db/timeseries/collection_pre_conditions_util.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils.h"
@@ -1390,13 +1391,14 @@ static SingleWriteResult performSingleUpdateOpNoRetry(OperationContext* opCtx,
 /**
  * Performs a single update, sometimes retrying failure due to WriteConflictException.
  */
-static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
-                                               const NamespaceString& ns,
-                                               const boost::optional<mongo::UUID>& opCollectionUUID,
-                                               UpdateRequest* updateRequest,
-                                               OperationSource source,
-                                               bool forgoOpCounterIncrements,
-                                               bool* containsDotsAndDollarsField) {
+static SingleWriteResult performSingleUpdateOp(
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    const timeseries::CollectionPreConditions& preConditions,
+    UpdateRequest* updateRequest,
+    OperationSource source,
+    bool forgoOpCounterIncrements,
+    bool* containsDotsAndDollarsField) {
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangDuringBatchUpdate,
         opCtx,
@@ -1410,19 +1412,16 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         ns);
 
     const CollectionAcquisition collection = [&]() {
-        const auto acquisitionRequest = CollectionAcquisitionRequest::fromOpCtx(
-            opCtx, ns, AcquisitionPrerequisites::kWrite, opCollectionUUID);
+        const auto acquisitionRequest =
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kWrite);
         while (true) {
             {
                 auto acquisition = acquireCollection(
                     opCtx, acquisitionRequest, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
+                timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
+                    opCtx, preConditions, acquisition);
                 if (acquisition.exists()) {
                     return acquisition;
-                }
-
-                if (source == OperationSource::kTimeseriesInsert ||
-                    source == OperationSource::kTimeseriesUpdate) {
-                    timeseries::write_ops::assertTimeseriesBucketsCollectionNotFound(ns);
                 }
 
                 // If this is an upsert, which is an insert, we must have a collection.
@@ -1528,9 +1527,9 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
     OperationContext* opCtx,
     const NamespaceString& ns,
-    const boost::optional<mongo::UUID>& opCollectionUUID,
     const std::vector<StmtId>& stmtIds,
     const write_ops::UpdateOpEntry& op,
+    const timeseries::CollectionPreConditions& preConditions,
     LegacyRuntimeConstants runtimeConstants,
     const boost::optional<BSONObj>& letParams,
     const OptionalBool& bypassEmptyTsReplacement,
@@ -1543,9 +1542,11 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
         ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(
             opCtx->getWriteConcern());
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp.setNS(lk,
-                    source == OperationSource::kTimeseriesUpdate ? ns.getTimeseriesViewNamespace()
-                                                                 : ns);
+        curOp.setNS(
+            lk,
+            (source == OperationSource::kTimeseriesUpdate && ns.isTimeseriesBucketsCollection())
+                ? ns.getTimeseriesViewNamespace()
+                : ns);
         curOp.setNetworkOp(lk, dbUpdate);
         curOp.setLogicalOp(lk, LogicalOp::opUpdate);
         curOp.setOpDescription(lk, op.toBSON());
@@ -1580,7 +1581,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
             bool containsDotsAndDollarsField = false;
             auto ret = performSingleUpdateOp(opCtx,
                                              ns,
-                                             opCollectionUUID,
+                                             preConditions,
                                              &request,
                                              source,
                                              forgoOpCounterIncrements,
@@ -1606,16 +1607,6 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
                           retryAttempts,
                           "Caught DuplicateKey exception during upsert",
                           logAttrs(ns));
-        } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>&) {
-            // In a time-series context, this particular CollectionUUIDMismatch is re-thrown
-            // differently because there is already a check for this error higher up, which means
-            // this error must come from the guards installed to enforce that time-series operations
-            // are prepared and committed on the same collection.
-            if (source == OperationSource::kTimeseriesInsert) {
-                uasserted(9748802, "Collection was changed during insert");
-            }
-
-            throw;
         }
     }
 
@@ -1623,12 +1614,11 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
 }
 
 void runTimeseriesRetryableUpdates(OperationContext* opCtx,
-                                   const NamespaceString& bucketNs,
+                                   const NamespaceString& nss,
                                    const write_ops::UpdateCommandRequest& wholeOp,
+                                   const timeseries::CollectionPreConditions& preConditions,
                                    std::shared_ptr<executor::TaskExecutor> executor,
                                    write_ops_exec::WriteResult* reply) {
-    checkCollectionUUIDMismatch(
-        opCtx, bucketNs.getTimeseriesViewNamespace(), nullptr, wholeOp.getCollectionUUID());
 
     size_t nextOpIndex = 0;
     for (auto&& singleOp : wholeOp.getUpdates()) {
@@ -1669,7 +1659,7 @@ void runTimeseriesRetryableUpdates(OperationContext* opCtx,
         } catch (const DBException& ex) {
             reply->canContinue = handleError(opCtx,
                                              ex,
-                                             bucketNs,
+                                             preConditions.getTargetNs(nss),
                                              wholeOp.getOrdered(),
                                              singleOp.getMulti(),
                                              singleOp.getSampleId(),
@@ -1683,21 +1673,10 @@ void runTimeseriesRetryableUpdates(OperationContext* opCtx,
 
 WriteResult performUpdates(OperationContext* opCtx,
                            const write_ops::UpdateCommandRequest& wholeOp,
+                           const timeseries::CollectionPreConditions& preConditions,
                            OperationSource source) {
-    auto ns = wholeOp.getNamespace();
-    if (isRawDataOperation(opCtx)) {
-        ns = timeseries::isTimeseriesViewRequest(opCtx, wholeOp).second;
-    }
+    auto ns = preConditions.getTargetNs(wholeOp.getNamespace());
     NamespaceString originalNs;
-    if (source == OperationSource::kTimeseriesUpdate) {
-        originalNs = ns;
-        if (!ns.isTimeseriesBucketsCollection()) {
-            ns = ns.makeTimeseriesBucketsNamespace();
-        }
-
-        checkCollectionUUIDMismatch(
-            opCtx, ns.getTimeseriesViewNamespace(), nullptr, wholeOp.getCollectionUUID());
-    }
 
     // Update performs its own retries, so we should not be in a WriteUnitOfWork unless run in a
     // transaction.
@@ -1756,7 +1735,7 @@ WriteResult performUpdates(OperationContext* opCtx,
                 // the caller since each statement will run as a command through the internal
                 // transaction API.
                 containsRetry = source != OperationSource::kTimeseriesUpdate ||
-                    originalNs.isTimeseriesBucketsCollection();
+                    !preConditions.wasNssTranslated();
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                 // Returns the '_id' of the user measurement for time-series upserts.
                 boost::optional<BSONElement> upsertedId;
@@ -1813,9 +1792,9 @@ WriteResult performUpdates(OperationContext* opCtx,
             const SingleWriteResult&& reply =
                 performSingleUpdateOpWithDupKeyRetry(opCtx,
                                                      ns,
-                                                     wholeOp.getCollectionUUID(),
                                                      stmtIds,
                                                      singleOp,
+                                                     preConditions,
                                                      runtimeConstants,
                                                      wholeOp.getLet(),
                                                      wholeOp.getBypassEmptyTsReplacement(),
@@ -2304,6 +2283,7 @@ void explainUpdate(OperationContext* opCtx,
                    bool isTimeseriesViewRequest,
                    const SerializationContext& serializationContext,
                    const BSONObj& command,
+                   const timeseries::CollectionPreConditions& preConditions,
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result) {
 
@@ -2314,6 +2294,9 @@ void explainUpdate(OperationContext* opCtx,
         CollectionAcquisitionRequest::fromOpCtx(
             opCtx, updateRequest.getNamespaceString(), AcquisitionPrerequisites::kWrite),
         MODE_IX);
+
+    timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
+        opCtx, preConditions, collection);
 
     if (isTimeseriesViewRequest) {
         timeseries::timeseriesRequestChecks<UpdateRequest>(VersionContext::getDecoration(opCtx),

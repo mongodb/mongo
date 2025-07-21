@@ -112,10 +112,10 @@ TimeseriesLookupInfo lookupTimeseriesCollection(OperationContext* opCtx,
     if (coll) {
         if (isValidTimeseriesColl(coll)) {
             // Received nss exists and it is timeseries collection
-            return {true, false, nss};
+            return {true, coll->isNewTimeseriesWithoutView(), false, nss, coll->uuid()};
         } else {
             // Received nss exists but it is not timeseries collection
-            return {false, false, nss};
+            return {false, false, false, nss, coll->uuid()};
         }
     }
 
@@ -124,14 +124,20 @@ TimeseriesLookupInfo lookupTimeseriesCollection(OperationContext* opCtx,
     if (!skipSystemBucketLookup) {
         const auto bucketsCollNss = nss.makeTimeseriesBucketsNamespace();
         auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsCollNss);
+
         if (isValidTimeseriesColl(bucketsColl)) {
-            return {true, true, bucketsCollNss};
+            tassert(
+                10664101,
+                fmt::format("Found a viewless time-series collections with a buckets namespace {}",
+                            nss.toStringForErrorMsg()),
+                !bucketsColl->isNewTimeseriesWithoutView());
+            return {true, false, true, bucketsCollNss, bucketsColl->uuid()};
         }
         // There could be also buckets collections without timeseries options (SERVER-99290).
     }
 
     // neither the received nss nor the buckets nss are existing timeseries collections
-    return {false, false, nss};
+    return {false, false, false, nss, boost::none};
 }
 
 std::pair<CollectionAcquisition, bool> acquireCollectionWithBucketsLookup(

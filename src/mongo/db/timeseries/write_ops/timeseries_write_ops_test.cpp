@@ -36,6 +36,7 @@
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/timeseries/bucket_compression.h"
+#include "mongo/db/timeseries/collection_pre_conditions_util.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 #include "mongo/unittest/unittest.h"
@@ -129,17 +130,6 @@ TEST_F(TimeseriesWriteOpsTest, TimeseriesWritesMismatchedUUID) {
                                                    &result),
         DBException,
         9748801);
-
-    // Update
-    auto updateCommandRequest =
-        write_ops::UpdateCommandRequest(_nsNoMeta.makeTimeseriesBucketsNamespace());
-    updateCommandRequest.setUpdates(
-        {write_ops::UpdateOpEntry(BSON("_id" << 0), write_ops::UpdateModification())});
-    updateCommandRequest.setCollectionUUID(UUID::gen());
-    result = write_ops_exec::performUpdates(
-        _opCtx, updateCommandRequest, OperationSource::kTimeseriesInsert);
-    ASSERT_EQ(1, result.results.size());
-    ASSERT_EQ(9748802, result.results[0].getStatus().code());
 }
 
 // It is possible that a collection is dropped after an insert starts but before it finishes. In
@@ -197,19 +187,6 @@ TEST_F(TimeseriesWriteOpsTest, PerformInsertsNoCollection) {
     request.setDocuments({fromjson("{_id: 0, foo: 1}")});
     auto source = OperationSource::kTimeseriesInsert;
     auto writeResult = write_ops_exec::performInserts(_opCtx, request, source);
-    ASSERT_FALSE(writeResult.canContinue);
-    ASSERT_EQ(1, writeResult.results.size());
-    ASSERT_EQ(ErrorCodes::NamespaceNotFound, writeResult.results[0].getStatus());
-}
-
-TEST_F(TimeseriesWriteOpsTest, PerformTimeseriesUpdatesNoCollection) {
-    auto nss = NamespaceString::createNamespaceString_forTest(
-        "db_timeseries_write_ops_test", "system.buckets.perform_timeseries_updates_no_collection");
-    write_ops::UpdateCommandRequest request(nss);
-    request.setUpdates(
-        {write_ops::UpdateOpEntry(BSON("_id" << 0), write_ops::UpdateModification())});
-    auto source = OperationSource::kTimeseriesUpdate;
-    auto writeResult = write_ops_exec::performUpdates(_opCtx, request, source);
     ASSERT_FALSE(writeResult.canContinue);
     ASSERT_EQ(1, writeResult.results.size());
     ASSERT_EQ(ErrorCodes::NamespaceNotFound, writeResult.results[0].getStatus());

@@ -11,7 +11,6 @@
  *   requires_timeseries,
  *   # The feature flag for time-series arbitrary updates should be enabled.
  *   featureFlagTimeseriesUpdatesSupport,
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";

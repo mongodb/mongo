@@ -129,6 +129,7 @@ mongo_cc_library(
         "//src/mongo/db/timeseries/bucket_catalog:rollover.h",
         "//src/mongo/db/timeseries/bucket_catalog:tracking_contexts.h",
         "//src/mongo/db/timeseries/bucket_catalog:write_batch.h",
+        "//src/mongo/db/timeseries:collection_pre_conditions_util.h",
         "//src/mongo/db/timeseries/write_ops:measurement.h",
         "//src/mongo/db/catalog:collection.h",
         "//src/mongo/db/catalog:index_catalog.h",
@@ -276,7 +277,9 @@ mongo_cc_library(
     ],
     deps = [
         ":catalog_helper",
+        "//src/mongo/db:raw_data_operation",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/timeseries/write_ops:timeseries_write_ops_utils",
     ],
 )
 

@@ -94,11 +94,8 @@ assert.eq(buckets[2].control.min[timeFieldName], times[2]);
 assert.eq(buckets[2].control.max[timeFieldName], times[2]);
 assert(!buckets[2].control.hasOwnProperty("closed"));
 
-// TODO(SERVER-106641) - Re-enable this once update path is fixed for viewless Timeseries
-
 // Make sure that closed buckets are skipped by updates and deletes.
-if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesSupport") &&
-    FeatureFlagUtil.isPresentAndDisabled(testDB, "CreateViewlessTimeseriesCollections")) {
+if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesSupport")) {
     // The first two buckets containing documents 0 and 1 are closed, so we can only update the
     // third document in the last bucket.
     const result = assert.commandWorked(coll.updateMany({}, {$set: {newField: 123}}));

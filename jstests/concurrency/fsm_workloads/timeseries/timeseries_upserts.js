@@ -5,8 +5,6 @@
  *   requires_timeseries,
  *   requires_non_retryable_writes,
  *   featureFlagTimeseriesUpdatesSupport,
- *   # TODO SERVER-106641
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 

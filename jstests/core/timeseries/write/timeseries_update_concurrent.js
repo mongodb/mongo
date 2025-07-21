@@ -24,7 +24,6 @@
  *   multi_clients_incompatible,
  *   # We expect the feature flag for time-series arbitrary updates to be enabled.
  *   featureFlagTimeseriesUpdatesSupport,
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 
@@ -110,7 +109,11 @@ validateUpdateIndex(
     docs,
     [{q: {[metaFieldName]: {a: "B"}}, u: {$set: {[metaFieldName]: {c: "C"}}}, multi: true}],
     testCases.DROP_COLLECTION,
-    [ErrorCodes.NamespaceNotFound, 8555700, 8555701]);  // TODO (SERVER-85548): revisit error codes
+    [
+        ErrorCodes.NamespaceNotFound,
+        8555700,
+        8555701,
+    ]);  // TODO (SERVER-85548): revisit error codes
 
 // Attempt to update a document in a collection that has been replaced with a non-time-series
 // collection.
@@ -118,4 +121,11 @@ validateUpdateIndex(
     docs,
     [{q: {[metaFieldName]: {a: "B"}}, u: {$set: {[metaFieldName]: {c: "C"}}}, multi: true}],
     testCases.REPLACE_COLLECTION,
-    [ErrorCodes.NamespaceNotFound, 8555700, 8555701]);  // TODO (SERVER-85548): revisit error codes
+    [
+        ErrorCodes.NamespaceNotFound,
+        8555700,
+        8555701,
+        // Encountered when a time-series collection that we are operating on is dropped and
+        // re-created as a non-timeseries collection.
+        10685101
+    ]);  // TODO (SERVER-85548): revisit error codes

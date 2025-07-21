@@ -29,52 +29,126 @@
 
 #include "mongo/db/timeseries/collection_pre_conditions_util.h"
 
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/raw_data_operation.h"
+#include "mongo/db/timeseries/catalog_helper.h"
+#include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils.h"
+
 
 namespace mongo::timeseries {
 
-CollectionPreConditions getCollectionPreConditions(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   boost::optional<UUID> expectedUUID) {
-
-    auto acquisitionRequest = CollectionAcquisitionRequest::fromOpCtx(
-        opCtx, nss, AcquisitionPrerequisites::OperationType::kRead, expectedUUID);
-
-    auto [acquisition, wasNssTranslatedToBuckets] =
-        acquireCollectionWithBucketsLookup(opCtx, acquisitionRequest, LockMode::MODE_IS);
-
-    if (!acquisition.exists()) {
-        return NonExistentCollectionPreConditions{};
-    }
-    return ExistingCollectionPreConditions{
-        acquisition.getCollectionPtr()->uuid(),
-        acquisition.getCollectionPtr()->isTimeseriesCollection(),
-        acquisition.getCollectionPtr()->isNewTimeseriesWithoutView(),
-        wasNssTranslatedToBuckets};
+bool CollectionPreConditions::exists() const {
+    return _uuid.has_value();
 }
 
-void checkAcquisitionAgainstPreConditions(const CollectionPreConditions& preConditions,
-                                          const CollectionAcquisition& acquisition) {
-    std::visit(
-        OverloadedVisitor{
-            [&](const NonExistentCollectionPreConditions&) {
-                uassert(10685100,
-                        "Collection did not exist at the beginning of operation but has "
-                        "subsequently been created as a time-series collection",
-                        !acquisition.exists() ||
-                            !acquisition.getCollectionPtr()->isTimeseriesCollection());
-            },
-            [&](const ExistingCollectionPreConditions& preConditions) {
-                uassert(
-                    10685101,
-                    fmt::format("Collection with ns {} has been dropped and recreated since the "
-                                "beginning of the operation",
-                                acquisition.nss().toStringForErrorMsg()),
-                    preConditions.collectionUUID == acquisition.uuid() ||
-                        (preConditions.isTimeseriesCollection ==
-                             acquisition.getCollectionPtr()->isTimeseriesCollection() &&
-                         preConditions.isViewlessTimeseriesCollection ==
-                             acquisition.getCollectionPtr()->isNewTimeseriesWithoutView()));
-            }},
-        preConditions);
+UUID CollectionPreConditions::uuid() const {
+    tassert(10664100, "Attemped to get the uuid for a collection that doesn't exist", exists());
+    return _uuid.get();
+}
+
+bool CollectionPreConditions::isTimeseriesCollection() const {
+    return exists() && _isTimeseriesCollection;
+}
+
+bool CollectionPreConditions::isViewlessTimeseriesCollection() const {
+    return exists() && _isViewlessTimeseriesCollection;
+}
+
+bool CollectionPreConditions::isLegacyTimeseriesCollection() const {
+    return exists() && isTimeseriesCollection() && !isViewlessTimeseriesCollection();
+}
+
+bool CollectionPreConditions::wasNssTranslated() const {
+    return exists() && _translatedNss.has_value();
+}
+
+NamespaceString CollectionPreConditions::getTargetNs(const NamespaceString& ns) const {
+    return wasNssTranslated() ? _translatedNss.get() : ns;
+}
+
+CollectionPreConditions CollectionPreConditions::getCollectionPreConditions(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    bool isRawDataRequest,
+    boost::optional<UUID> expectedUUID) {
+    // Hold reference to the catalog for collection lookup without locks to be safe.
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto lookupInfo = lookupTimeseriesCollection(opCtx, nss, /*skipSystemBucketLookup=*/false);
+
+    // We pass a nullptr into the checkCollectionUUIDMismatch machinery so that we always throw
+    // CollectionUUIDMismatch if an expectedUUID is specified for an operation on the user-facing
+    // view namespace of a legacy time-series collection.
+    if (expectedUUID && lookupInfo.isTimeseries && !lookupInfo.isViewlessTimeseries &&
+        !isRawDataRequest) {
+        checkCollectionUUIDMismatch(
+            opCtx,
+            (nss.isTimeseriesBucketsCollection()) ? nss.getTimeseriesViewNamespace() : nss,
+            nullptr,
+            expectedUUID);
+    } else if (lookupInfo.uuid || expectedUUID) {
+        checkCollectionUUIDMismatch(
+            opCtx,
+            (nss.isTimeseriesBucketsCollection()) ? nss.getTimeseriesViewNamespace() : nss,
+            catalog->lookupCollectionByNamespace(opCtx, lookupInfo.targetNss),
+            expectedUUID);
+    }
+
+    if (!lookupInfo.uuid) {
+        return CollectionPreConditions();
+    }
+
+    boost::optional<NamespaceString> translatedNss = boost::none;
+    if (lookupInfo.wasNssTranslated) {
+        translatedNss = lookupInfo.targetNss;
+    }
+
+    return CollectionPreConditions(lookupInfo.uuid.get(),
+                                   lookupInfo.isTimeseries,
+                                   lookupInfo.isViewlessTimeseries,
+                                   translatedNss);
+}
+
+void CollectionPreConditions::checkAcquisitionAgainstPreConditions(
+    OperationContext* opCtx,
+    const CollectionPreConditions& preConditions,
+    const CollectionAcquisition& acquisition) {
+
+    if (!preConditions.exists()) {
+        uassert(10685100,
+                "Collection did not exist at the beginning of operation but has "
+                "subsequently been created as a time-series collection",
+                !acquisition.exists() || !acquisition.getCollectionPtr()->isTimeseriesCollection());
+    } else {
+        if (!acquisition.exists()) {
+            if (preConditions.isTimeseriesCollection()) {
+                if (preConditions.isViewlessTimeseriesCollection()) {
+                    uasserted(ErrorCodes::NamespaceNotFound,
+                              str::stream()
+                                  << "Timeseries collection "
+                                  << acquisition.nss().toStringForErrorMsg()
+                                  << " got dropped during the executing of the operation.");
+                } else {
+                    uasserted(ErrorCodes::NamespaceNotFound,
+                              str::stream()
+                                  << "Buckets collection not found for time-series collection "
+                                  << acquisition.nss()
+                                         .getTimeseriesViewNamespace()
+                                         .toStringForErrorMsg());
+                }
+            }
+            return;
+        }
+        uassert(10685101,
+                fmt::format("Collection with ns {} has been dropped and "
+                            "recreated since the "
+                            "beginning of the operation",
+                            acquisition.nss().toStringForErrorMsg()),
+                preConditions.uuid() == acquisition.uuid() ||
+                    (preConditions.isTimeseriesCollection() ==
+                         acquisition.getCollectionPtr()->isTimeseriesCollection() &&
+                     preConditions.isViewlessTimeseriesCollection() ==
+                         acquisition.getCollectionPtr()->isNewTimeseriesWithoutView()));
+    }
 }
 }  // namespace mongo::timeseries

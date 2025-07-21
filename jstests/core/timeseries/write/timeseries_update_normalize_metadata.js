@@ -7,7 +7,6 @@
  *   requires_non_retryable_writes,
  *   featureFlagTimeseriesUpdatesSupport,
  *   requires_getmore,
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 

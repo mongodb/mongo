@@ -70,6 +70,11 @@ class OpDebug;
 class PlanExecutor;
 class UpdateRequest;
 
+// TODO SERVER-107768: Remove the forward declaration here.
+namespace timeseries {
+class CollectionPreConditions;
+}  // namespace timeseries
+
 namespace write_ops_exec {
 
 /**
@@ -178,20 +183,26 @@ void logOperationAndProfileIfNeeded(OperationContext* opCtx, CurOp* curOp);
  *
  * Note: performInserts() gets called for both user and internal (like initial sync oplog buffer)
  * inserts.
+ *
+ * Note: performUpdates does not itself handle any logic dealing with recognizing whether an
+ * operation is a logical time-series operation or not. This has to be handled at the layer above
+ * it, and passed in through the CollectionPreConditions parameter.
  */
 WriteResult performInserts(OperationContext* opCtx,
                            const write_ops::InsertCommandRequest& op,
                            OperationSource source = OperationSource::kStandard);
 WriteResult performUpdates(OperationContext* opCtx,
                            const write_ops::UpdateCommandRequest& op,
+                           const timeseries::CollectionPreConditions& preConditions,
                            OperationSource source = OperationSource::kStandard);
 WriteResult performDeletes(OperationContext* opCtx,
                            const write_ops::DeleteCommandRequest& op,
                            OperationSource source = OperationSource::kStandard);
 
 void runTimeseriesRetryableUpdates(OperationContext* opCtx,
-                                   const NamespaceString& bucketNs,
+                                   const NamespaceString& nss,
                                    const write_ops::UpdateCommandRequest& wholeOp,
+                                   const timeseries::CollectionPreConditions& preConditions,
                                    std::shared_ptr<executor::TaskExecutor> executor,
                                    write_ops_exec::WriteResult* reply);
 
@@ -218,6 +229,7 @@ void explainUpdate(OperationContext* opCtx,
                    bool isTimeseriesViewRequest,
                    const SerializationContext& serializationContext,
                    const BSONObj& command,
+                   const timeseries::CollectionPreConditions& preConditions,
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result);
 

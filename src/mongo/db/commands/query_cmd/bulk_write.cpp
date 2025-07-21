@@ -116,6 +116,7 @@
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/timeseries/collection_pre_conditions_util.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
@@ -1150,11 +1151,14 @@ void explainUpdateOp(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) {
     invariant(op);
-    auto [isTimeseriesViewRequest, nss] = timeseries::isTimeseriesViewRequest(opCtx, nsEntry);
+
+    const auto [preConditions, isTimeseriesLogicalRequest] =
+        timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+            opCtx, nsEntry.getNs(), nsEntry, nsEntry.getCollectionUUID());
 
     auto updateRequest = UpdateRequest();
 
-    updateRequest.setNamespaceString(nss);
+    updateRequest.setNamespaceString(preConditions.getTargetNs(nsEntry.getNs()));
     updateRequest.setQuery(getQueryForExplain(opCtx, req, op, nsEntry));
     updateRequest.setProj(BSONObj());
     updateRequest.setUpdateModification(op->getUpdateMods());
@@ -1175,9 +1179,10 @@ void explainUpdateOp(OperationContext* opCtx,
 
     write_ops_exec::explainUpdate(opCtx,
                                   updateRequest,
-                                  isTimeseriesViewRequest,
+                                  isTimeseriesLogicalRequest,
                                   req.getSerializationContext(),
                                   command,
+                                  preConditions,
                                   verbosity,
                                   result);
 }
@@ -1607,11 +1612,12 @@ bool handleUpdateOp(OperationContext* opCtx,
             ? bulk_write_common::getStatementId(req, currentOpIdx)
             : kUninitializedStmtId;
 
-        auto [isTimeseriesViewRequest, bucketNs] =
-            timeseries::isTimeseriesViewRequest(opCtx, nsEntry);
+        const auto [preConditions, isTimeseriesLogicalRequest] =
+            timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+                opCtx, nsEntry.getNs(), nsEntry, nsEntry.getCollectionUUID());
 
         // Handle retryable timeseries updates.
-        if (isTimeseriesViewRequest && opCtx->isRetryableWrite() &&
+        if (isTimeseriesLogicalRequest && opCtx->isRetryableWrite() &&
             !opCtx->inMultiDocumentTransaction()) {
             write_ops_exec::WriteResult out;
             auto executor = serverGlobalParams.clusterRole.has(ClusterRole::None)
@@ -1622,7 +1628,7 @@ bool handleUpdateOp(OperationContext* opCtx,
                 opCtx, op, req, currentOpIdx);
 
             write_ops_exec::runTimeseriesRetryableUpdates(
-                opCtx, bucketNs, updateRequest, executor, &out);
+                opCtx, nsEntry.getNs(), updateRequest, preConditions, executor, &out);
             responses.addUpdateReply(opCtx, currentOpIdx, out);
             bulk_write_common::incrementBulkWriteUpdateMetrics(getQueryCounters(opCtx),
                                                                ClusterRole::ShardServer,

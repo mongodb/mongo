@@ -75,6 +75,7 @@ selector:
     - jstests/noPassthrough/timeseries/query/timeseries_group_spill_metrics.js
     - jstests/noPassthrough/timeseries/query/timeseries_group_topN_bottomN.js
     - jstests/noPassthrough/timeseries/query/timeseries_id_filtered_explicit_upack_bucket.js
+    - jstests/noPassthrough/timeseries/query/timeseries_in_sbe_uses_plan_cache.js
     - jstests/noPassthrough/timeseries/query/timeseries_internal_bounded_sort_spilling.js
     - jstests/noPassthrough/timeseries/query/timeseries_nested_elem_match.js
     - jstests/noPassthrough/timeseries/query/timeseries_query_knob_sbe.js
@@ -92,6 +93,9 @@ selector:
     - jstests/noPassthrough/timeseries/ttl/timeseries_expires_with_partial_index.js
     - jstests/noPassthrough/timeseries/ttl/timeseries_ttl.js
     - jstests/noPassthrough/timeseries/updates_deletes/timeseries_direct_update.js
+    - jstests/noPassthrough/timeseries/updates_deletes/timeseries_multi_update_spill_to_disk.js
+    - jstests/noPassthrough/timeseries/updates_deletes/timeseries_update_one_transaction.js
+    - jstests/noPassthrough/timeseries/updates_deletes/timeseries_update_oplog.js
     - jstests/noPassthrough/timeseries/updates_deletes/timeseries_updates_create_compressed_buckets.js
     - jstests/noPassthrough/timeseries/validate/validate_compressed_bucket_with_time_out_of_order.js
     - jstests/noPassthrough/timeseries/validate/validate_timeseries_bucket_max_span.js
@@ -123,7 +127,9 @@ selector:
     - jstests/noPassthrough/timeseries/write/timeseries_large_measurements_max_size.js
     - jstests/noPassthrough/timeseries/write/timeseries_retry_writes.js
     - jstests/noPassthrough/timeseries/write/timeseries_retryable_writes_restart.js
+    - jstests/noPassthrough/timeseries/write/timeseries_side_bucket_catalog_memory_usage_threshold.js
     - jstests/noPassthrough/timeseries/write/timeseries_time_backward.js
+    - jstests/noPassthrough/timeseries/write/timeseries_use_after_meta_update.js
     - jstests/noPassthrough/timeseries/write/timeseries_write_concern.js
     - jstests/noPassthrough/versioning_protocol/stale_shard_version_with_timeseries.js
 test_kind: js_test

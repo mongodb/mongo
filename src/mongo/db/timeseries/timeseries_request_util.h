@@ -33,6 +33,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/timeseries/catalog_helper.h"
+#include "mongo/db/timeseries/collection_pre_conditions_util.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 
 namespace mongo::timeseries {
@@ -189,6 +190,28 @@ std::pair<bool, NamespaceString> isTimeseriesViewRequest(OperationContext* opCtx
         (lookupTimeseriesInfo.wasNssTranslated || isTimeseriesNamespaceFlag);
 
     return {isTsViewRequest, std::move(lookupTimeseriesInfo.targetNss)};
+}
+
+/**
+ * Returns a pair where the first element is the CollectionPreConditions object for this class, and
+ * the second is a bool indicating whether the request being performed is a request to perform a
+ * logical time-series operation.
+ */
+template <typename T>
+requires IsRequestableOnTimeseries<T>
+std::pair<CollectionPreConditions, bool> getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const T& request,
+    boost::optional<UUID> expectedUUID = boost::none) {
+
+    const bool isRawDataReq = isRawDataRequest(opCtx, request);
+    auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
+        opCtx, nss, isRawDataReq, expectedUUID);
+
+    const auto isTimeseriesLogicalRequest = preConditions.isTimeseriesCollection() && !isRawDataReq;
+
+    return {preConditions, isTimeseriesLogicalRequest};
 }
 
 }  // namespace mongo::timeseries

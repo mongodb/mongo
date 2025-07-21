@@ -50,23 +50,19 @@ protected:
 TEST_F(TimeseriesCollectionPreConditionsUtilTest, NoCollectionNotFound) {
     auto collThatDoesntExist =
         NamespaceString::createNamespaceString_forTest("test.nonexistentColl");
-    auto preConditions = timeseries::getCollectionPreConditions(_opCtx, collThatDoesntExist);
-
-    auto nonExistentCollectionPreConditions =
-        std::get_if<timeseries::NonExistentCollectionPreConditions>(&preConditions);
-    ASSERT(nonExistentCollectionPreConditions);
+    auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
+        _opCtx, collThatDoesntExist, /*isRawDataRequest=*/false);
+    ASSERT(!preConditions.exists());
 }
 
 TEST_F(TimeseriesCollectionPreConditionsUtilTest, NonTimeseriesCollection) {
     CreateCommand cmd = CreateCommand(nonTsNss);
     uassertStatusOK(createCollection(_opCtx, cmd));
-    auto preConditions = timeseries::getCollectionPreConditions(_opCtx, nonTsNss);
-
-    auto existingCollectionPreConditions =
-        std::get_if<timeseries::ExistingCollectionPreConditions>(&preConditions);
-    ASSERT(existingCollectionPreConditions);
-    ASSERT(!existingCollectionPreConditions->isTimeseriesCollection);
-    ASSERT(!existingCollectionPreConditions->isViewlessTimeseriesCollection);
+    auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
+        _opCtx, nonTsNss, /*isRawDataRequest=*/false);
+    ASSERT(preConditions.exists());
+    ASSERT(!preConditions.isTimeseriesCollection());
+    ASSERT(!preConditions.isViewlessTimeseriesCollection());
 }
 
 TEST_F(TimeseriesCollectionPreConditionsUtilTest, LegacyTimeseriesCollection) {
@@ -75,13 +71,14 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, LegacyTimeseriesCollection) {
     cmd.getCreateCollectionRequest().setTimeseries(std::move(timeseriesOptions));
     uassertStatusOK(createCollection(_opCtx, cmd));
 
-    auto preConditions = timeseries::getCollectionPreConditions(_opCtx, viewfulTsNss);
+    auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
+        _opCtx, viewfulTsNss, /*isRawDataRequest=*/false);
 
-    auto existingCollectionPreConditions =
-        std::get_if<timeseries::ExistingCollectionPreConditions>(&preConditions);
-    ASSERT(existingCollectionPreConditions);
-    ASSERT(existingCollectionPreConditions->isTimeseriesCollection);
-    ASSERT(!existingCollectionPreConditions->isViewlessTimeseriesCollection);
+    ASSERT(preConditions.exists());
+    ASSERT(preConditions.isTimeseriesCollection());
+    ASSERT(!preConditions.isViewlessTimeseriesCollection());
+    ASSERT(preConditions.wasNssTranslated());
+    ASSERT_EQ(preConditions.getTargetNs(viewfulTsNss), viewfulTsSystemBucketsNss);
 }
 
 TEST_F(TimeseriesCollectionPreConditionsUtilTest, ViewlessTimeseriesCollection) {
@@ -93,19 +90,20 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, ViewlessTimeseriesCollection) 
     cmd.getCreateCollectionRequest().setTimeseries(std::move(timeseriesOptions));
     uassertStatusOK(createCollection(_opCtx, cmd));
 
-    auto preConditions = timeseries::getCollectionPreConditions(_opCtx, viewlessTsNss);
+    auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
+        _opCtx, viewlessTsNss, /*isRawDataRequest=*/false);
 
-    auto existingCollectionPreConditions =
-        std::get_if<timeseries::ExistingCollectionPreConditions>(&preConditions);
-    ASSERT(existingCollectionPreConditions);
-    ASSERT(existingCollectionPreConditions->isTimeseriesCollection);
-    ASSERT(existingCollectionPreConditions->isViewlessTimeseriesCollection);
+    ASSERT(preConditions.exists());
+    ASSERT(preConditions.isTimeseriesCollection());
+    ASSERT(preConditions.isViewlessTimeseriesCollection());
+    ASSERT(!preConditions.wasNssTranslated());
 }
 
 TEST_F(TimeseriesCollectionPreConditionsUtilTest, CollectionCreatedAfterPreConditionsCreated) {
     RAIIServerParameterControllerForTest queryKnobController{
         "featureFlagCreateViewlessTimeseriesCollections", true};
-    auto preConditions = timeseries::getCollectionPreConditions(_opCtx, viewlessTsNss);
+    auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
+        _opCtx, viewlessTsNss, /*isRawDataRequest=*/false);
 
     CreateCommand cmd = CreateCommand(viewlessTsNss);
     auto timeseriesOptions = TimeseriesOptions(std::string{_timeField});
@@ -120,10 +118,10 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, CollectionCreatedAfterPreCondi
                                      AcquisitionPrerequisites::kRead),
         MODE_IS);
 
-    ASSERT_THROWS_CODE(
-        timeseries::checkAcquisitionAgainstPreConditions(preConditions, collectionAcquisition),
-        DBException,
-        10685100);
+    ASSERT_THROWS_CODE(timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
+                           _opCtx, preConditions, collectionAcquisition),
+                       DBException,
+                       10685100);
 }
 
 TEST_F(TimeseriesCollectionPreConditionsUtilTest, DetectWhenCollectionIsDroppedAndReacquired) {
@@ -133,7 +131,8 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, DetectWhenCollectionIsDroppedA
     CreateCommand cmd = CreateCommand(viewlessTsNss);
     uassertStatusOK(createCollection(_opCtx, cmd));
 
-    auto preConditions = timeseries::getCollectionPreConditions(_opCtx, viewlessTsNss);
+    auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
+        _opCtx, viewlessTsNss, /*isRawDataRequest=*/false);
 
     ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, viewlessTsNss));
 
@@ -150,10 +149,10 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, DetectWhenCollectionIsDroppedA
                                      AcquisitionPrerequisites::kRead),
         MODE_IS);
 
-    ASSERT_THROWS_CODE(
-        timeseries::checkAcquisitionAgainstPreConditions(preConditions, collectionAcquisition),
-        DBException,
-        10685101);
+    ASSERT_THROWS_CODE(timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
+                           _opCtx, preConditions, collectionAcquisition),
+                       DBException,
+                       10685101);
 }
 
 

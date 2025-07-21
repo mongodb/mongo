@@ -66,10 +66,14 @@ std::pair<CollectionAcquisition, bool> acquireCollectionWithBucketsLookup(
 struct TimeseriesLookupInfo {
     // If the namespace refer to a timeseries collection
     bool isTimeseries;
+    // If the namespace refers to a viewless time-series collection
+    bool isViewlessTimeseries;
     // If the namespace was translated from view to system.buckets collection
     bool wasNssTranslated;
     // The namespace of the target buckets collection
     NamespaceString targetNss;
+    // The UUID for the collection. boost::none if no such collection exists
+    boost::optional<UUID> uuid;
 };
 
 /**

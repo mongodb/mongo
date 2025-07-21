@@ -43,7 +43,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
-#include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/timeseries/write_ops/measurement.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"

@@ -53,6 +53,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/timeseries/collection_pre_conditions_util.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -302,7 +303,10 @@ TEST_F(WriteOpsRetryability, OpCountersUpdateSuccess) {
         entry.setUpsert(true);
         return entry;
     }()});
-    write_ops_exec::WriteResult result = write_ops_exec::performUpdates(opCtxRaii.get(), updateOp);
+    auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
+        opCtxRaii.get(), nss, /*isRawDataRequest=*/false, updateOp.getCollectionUUID());
+    write_ops_exec::WriteResult result =
+        write_ops_exec::performUpdates(opCtxRaii.get(), updateOp, preConditions);
     auto globalCommandsCountAfterUpdate = opCounters().getCommand()->load();
     auto globalDeletesCountAfterUpdate = opCounters().getDelete()->load();
     auto globalInsertsCountAfterUpdate = opCounters().getInsert()->load();

@@ -73,6 +73,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/timeseries/collection_pre_conditions_util.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
@@ -496,11 +497,12 @@ public:
                 return processFLEUpdate(opCtx, request());
             }
 
-            auto [isTimeseriesViewRequest, bucketNs] =
-                timeseries::isTimeseriesViewRequest(opCtx, request());
-            OperationSource source = (isTimeseriesViewRequest && !isRawDataOperation(opCtx))
-                ? OperationSource::kTimeseriesUpdate
-                : OperationSource::kStandard;
+            const auto [preConditions, isTimeseriesLogicalRequest] =
+                timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+                    opCtx, ns(), request(), request().getCollectionUUID());
+
+            OperationSource source = isTimeseriesLogicalRequest ? OperationSource::kTimeseriesUpdate
+                                                                : OperationSource::kStandard;
 
             long long nModified = 0;
 
@@ -511,9 +513,8 @@ public:
             write_ops_exec::WriteResult reply;
             // For retryable updates on time-series collections, we needs to run them in
             // transactions to ensure the multiple writes are replicated atomically.
-            bool isTimeseriesRetryableUpdate = isTimeseriesViewRequest &&
-                opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction() &&
-                !isRawDataOperation(opCtx);
+            bool isTimeseriesRetryableUpdate = isTimeseriesLogicalRequest &&
+                opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction();
             if (isTimeseriesRetryableUpdate) {
                 auto executor = serverGlobalParams.clusterRole.has(ClusterRole::None)
                     ? ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(
@@ -530,7 +531,7 @@ public:
                     }
                 });
                 write_ops_exec::runTimeseriesRetryableUpdates(
-                    opCtx, bucketNs, request(), executor, &reply);
+                    opCtx, ns(), request(), preConditions, executor, &reply);
             } else {
                 if (hangUpdateBeforeWrite.shouldFail([&](const BSONObj& data) {
                         const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"_sd);
@@ -539,7 +540,7 @@ public:
                     hangUpdateBeforeWrite.pauseWhileSet();
                 }
 
-                reply = write_ops_exec::performUpdates(opCtx, request(), source);
+                reply = write_ops_exec::performUpdates(opCtx, request(), preConditions, source);
             }
 
             // Handler to process each 'SingleWriteResult'.
@@ -608,15 +609,12 @@ public:
                     "explained write batches must be of size 1",
                     request().getUpdates().size() == 1);
 
-            auto [isTimeseriesViewRequest, nss] =
-                timeseries::isTimeseriesViewRequest(opCtx, request());
-
-            if (isRawDataOperation(opCtx)) {
-                isTimeseriesViewRequest = false;
-            }
+            const auto [preConditions, isTimeseriesLogicalRequest] =
+                timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
+                    opCtx, ns(), request(), request().getCollectionUUID());
 
             UpdateRequest updateRequest(request().getUpdates()[0]);
-            updateRequest.setNamespaceString(nss);
+            updateRequest.setNamespaceString(preConditions.getTargetNs(ns()));
             if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
                 updateRequest.setQuery(
                     processFLEWriteExplainD(opCtx,
@@ -634,9 +632,10 @@ public:
 
             write_ops_exec::explainUpdate(opCtx,
                                           updateRequest,
-                                          isTimeseriesViewRequest,
+                                          isTimeseriesLogicalRequest,
                                           request().getSerializationContext(),
                                           _commandObj,
+                                          preConditions,
                                           verbosity,
                                           result);
         }
