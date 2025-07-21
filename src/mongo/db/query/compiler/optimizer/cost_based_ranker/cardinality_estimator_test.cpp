@@ -29,7 +29,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
-#include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/unittest/unittest.h"
 
 #include <limits>

@@ -222,8 +222,8 @@ mongo_cc_unit_test(
     deps = [
         ":stats_test_utils",
         ":test_utils",
-        "//src/mongo/db/query:index_bounds_builder",
-        "//src/mongo/db/query:index_bounds_builder_test_fixture",
+        "//src/mongo/db/query/compiler/optimizer/index_bounds_builder",
+        "//src/mongo/db/query/compiler/optimizer/index_bounds_builder:index_bounds_builder_test_fixture",
     ],
 )
 

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/interval_evaluation_tree.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/interval_evaluation_tree.h"
 
 #include <cstddef>
 
@@ -39,8 +39,8 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/matcher/expression_type.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
-#include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

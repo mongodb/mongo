@@ -34,7 +34,7 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/query_shard_server_test_fixture.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/unittest/unittest.h"

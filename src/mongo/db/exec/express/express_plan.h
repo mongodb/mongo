@@ -47,7 +47,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/plan_explainer_express.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/write_ops/update_request.h"

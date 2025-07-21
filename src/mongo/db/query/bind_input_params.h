@@ -33,7 +33,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/interval_evaluation_tree.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/interval_evaluation_tree.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 
 namespace mongo::input_params {

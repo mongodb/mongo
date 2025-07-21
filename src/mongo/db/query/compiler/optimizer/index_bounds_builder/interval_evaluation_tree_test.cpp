@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/interval_evaluation_tree.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/interval_evaluation_tree.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/string_data.h"
@@ -42,7 +42,7 @@
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 

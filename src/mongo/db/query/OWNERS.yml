@@ -212,9 +212,6 @@ filters:
   - "bind_input_params*":
     approvers:
       - 10gen/query-optimization
-  - "interval_evaluation_tree*":
-    approvers:
-      - 10gen/query-optimization
   - "partitioned_cache.h":
     approvers:
       - 10gen/query-optimization
@@ -279,8 +276,5 @@ filters:
     approvers:
       - 10gen/query-optimization
   - "index_tag*":
-    approvers:
-      - 10gen/query-optimization
-  - "index_bounds_builder*":
     approvers:
       - 10gen/query-optimization

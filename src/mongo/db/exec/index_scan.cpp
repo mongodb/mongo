@@ -33,7 +33,7 @@
 
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/key_string/key_string.h"

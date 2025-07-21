@@ -38,12 +38,12 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/expression_geo_index_mapping.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder_test_fixture.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/interval_evaluation_tree.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
-#include "mongo/db/query/expression_geo_index_mapping.h"
-#include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/db/query/index_bounds_builder_test_fixture.h"
-#include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
