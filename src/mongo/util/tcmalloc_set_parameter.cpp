@@ -329,6 +329,12 @@ Status TCMallocReleaseRateServerParameter::setFromString(StringData tcmallocRele
         return {ErrorCodes::BadValue,
                 fmt::format("tcmallocReleaseRate cannot be negative: {}", tcmallocReleaseRate)};
     }
+    if (value >= 1 && value <= 100) {
+        LOGV2_WARNING(8627602,
+                      "The tcmallocReleaseRate value is an amount of bytes to be released "
+                      "per second by the tcmalloc background thread. Setting a low value "
+                      "will likely not result in a noticeable change in behavior.");
+    }
     setMemoryReleaseRate(value);
     return Status::OK();
 }
