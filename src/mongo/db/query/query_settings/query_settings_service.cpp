@@ -36,6 +36,7 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/query/query_settings/query_settings_backfill.h"
 #include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings/query_settings_service_dependencies.h"
@@ -437,6 +438,16 @@ SetClusterParameter makeQuerySettingsClusterParameter(
 
 class QuerySettingsRouterService : public QuerySettingsService {
 public:
+    QuerySettingsRouterService() {
+        _backfillCoordinator = BackfillCoordinator::create(
+            /* onCompletionHook */ [this](std::vector<QueryShapeHash> hashes,
+                                          LogicalTime clusterParameterTime,
+                                          boost::optional<TenantId> tenantId) {
+                _manager.markBackfilledRepresentativeQueries(
+                    hashes, clusterParameterTime, tenantId);
+            });
+    }
+
     QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations(
         const boost::optional<TenantId>& tenantId) const final {
         return _manager.getAllQueryShapeConfigurations(tenantId);
@@ -495,6 +506,12 @@ public:
                 if (!result.has_value()) {
                     return QuerySettings();
                 }
+
+                // Backfill the representative query if needed.
+                if (BackfillCoordinator::shouldBackfill(expCtx, result->hasRepresentativeQuery)) {
+                    _backfillCoordinator->markForBackfillAndScheduleIfNeeded(
+                        opCtx, hash, CurOp::get(opCtx)->opDescription().getOwned());
+                }
                 return std::move(result->querySettings);
             } catch (const DBException& ex) {
                 LOGV2_WARNING_OPTIONS(10153400,
@@ -551,6 +568,7 @@ public:
 
 private:
     QuerySettingsManager _manager;
+    std::unique_ptr<BackfillCoordinator> _backfillCoordinator;
 };
 
 class QuerySettingsShardService : public QuerySettingsRouterService {

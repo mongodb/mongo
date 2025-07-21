@@ -86,6 +86,7 @@ mongo_cc_library(
     ],
     deps = [
         ":query_settings",
+        "//src/mongo/client:remote_command_targeter",
         "//src/mongo/crypto:fle_fields",
         "//src/mongo/crypto:sha256_block",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
@@ -95,6 +96,7 @@ mongo_cc_library(
         "//src/mongo/db/concurrency:exception_util",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/pipeline/process_interface:common_process_interface",
         "//src/mongo/db/query:command_shapes",
         "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_shape",

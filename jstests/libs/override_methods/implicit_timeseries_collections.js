@@ -363,7 +363,9 @@ QuerySettingsUtils.prototype.assertQueryFramework = function({query, settings, e
 const assertQueryShapeConfigurationInit =
     QuerySettingsUtils.prototype.assertQueryShapeConfiguration;
 QuerySettingsUtils.prototype.assertQueryShapeConfiguration = function(
-    expectedQueryShapeConfigurations, shouldRunExplain = true) {
+    expectedQueryShapeConfigurations,
+    shouldRunExplain = true,
+    ignoreRepresentativeQueryFields = []) {
     const transformedQueryShapeConfigurations = expectedQueryShapeConfigurations.map(config => {
         if (!config["representativeQuery"]) {
             return config;
@@ -374,8 +376,10 @@ QuerySettingsUtils.prototype.assertQueryShapeConfiguration = function(
                 applyTimefieldProjectionToRepresentativeQuery(config['representativeQuery'])
         };
     });
-    return assertQueryShapeConfigurationInit.call(
-        this, transformedQueryShapeConfigurations, shouldRunExplain);
+    return assertQueryShapeConfigurationInit.call(this,
+                                                  transformedQueryShapeConfigurations,
+                                                  shouldRunExplain,
+                                                  ignoreRepresentativeQueryFields);
 };
 
 const getQueryShapeHashFromQuerySettingsInit =
@@ -392,21 +396,13 @@ QuerySettingsUtils.prototype.getQueryShapeHashFromExplain = function(representat
 };
 
 const getQuerySettingsInit = QuerySettingsUtils.prototype.getQuerySettings;
-QuerySettingsUtils.prototype.getQuerySettings = function(
-    {showDebugQueryShape = false, showQueryShapeHash = false, filter = undefined} = {}) {
-    const settingsArr =
-        getQuerySettingsInit.call(this, {showDebugQueryShape, showQueryShapeHash, filter});
-    if (!showDebugQueryShape) {
-        return settingsArr;
-    }
-    const newarr = settingsArr.map(settings => {
-        const debugQueryShape = settings.debugQueryShape;
-        if (!debugQueryShape) {
-            return settings;
+QuerySettingsUtils.prototype.getQuerySettings = function(args) {
+    return getQuerySettingsInit.call(this, args).map(settings => {
+        if (settings.hasOwnProperty("debugQueryShape")) {
+            settings.debugQueryShape = removeTimefieldProjectionFromQuery(settings.debugQueryShape);
         }
-        return {...settings, debugQueryShape: removeTimefieldProjectionFromQuery(debugQueryShape)};
+        return settings;
     });
-    return newarr;
 };
 
 /**

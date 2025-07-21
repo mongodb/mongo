@@ -83,6 +83,11 @@ function runCommandWithReadAndWriteConcerns(
             shouldForceReadConcern = false;
         }
 
+        if (OverrideHelpers.isAggregationWithChangeStreamStage(commandName, commandObj)) {
+            // The $changeStream stage can only be used with readConcern={level: "majority"}.
+            shouldForceReadConcern = false;
+        }
+
         if (OverrideHelpers.isAggregationWithOutOrMergeStage(commandName, commandObj)) {
             // The $out stage can only be used with readConcern={level: "local"} or
             // readConcern={level: "majority"}
