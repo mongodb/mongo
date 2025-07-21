@@ -140,8 +140,7 @@ function isAcceptableRetryFailedResponse(cmdName, res) {
     // These codes are uniquely returned from user_management_commands.cpp
     const kErrorCodeRoleAlreadyExists = 51002;
     const kErrorCodeUserAlreadyExists = 51003;
-    return ((cmdName === "createIndexes" && res.code === ErrorCodes.IndexAlreadyExists) ||
-            (cmdName === "drop" && res.code === ErrorCodes.NamespaceNotFound) ||
+    return ((cmdName === "drop" && res.code === ErrorCodes.NamespaceNotFound) ||
             ((cmdName == "createUser") && (res.code === kErrorCodeUserAlreadyExists)) ||
             ((cmdName == "createRole") && (res.code === kErrorCodeRoleAlreadyExists)) ||
             ((cmdName === "dropIndexes" || cmdName === "deleteIndexes") &&

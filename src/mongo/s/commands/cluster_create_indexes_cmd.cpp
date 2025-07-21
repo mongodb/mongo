@@ -157,7 +157,7 @@ public:
                     CommandHelpers::filterCommandRequestForPassthrough(
                         applyReadWriteConcern(opCtx, this, cmdToBeSent)),
                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                    Shard::RetryPolicy::kNoRetry,
+                    Shard::RetryPolicy::kIdempotent,
                     BSONObj() /*query*/,
                     BSONObj() /*collation*/,
                     boost::none /*letParameters*/,

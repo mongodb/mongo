@@ -943,23 +943,6 @@ const retryOnNetworkErrorTests = [
         }
     },
     {
-        name: "raw response w/ only acceptable errors",
-        test: function() {
-            setCommandMockResponse("createIndexes", {
-                ok: 0,
-                code: ErrorCodes.IndexAlreadyExists,
-                raw: {
-                    shardOne: {code: ErrorCodes.IndexAlreadyExists, errmsg: "dummy"},
-                    shardTwo: {ok: 1},
-                    shardThree: {code: ErrorCodes.IndexAlreadyExists, errmsg: "dummy"}
-                }
-            });
-
-            assert.commandWorked(testDB.createCollection(collName1));
-            assert.commandWorked(coll1.createIndex({x: 1}));
-        }
-    },
-    {
         name: "raw response w/ acceptable error and non-acceptable, non-retryable error",
         test: function() {
             setCommandMockResponse("createIndexes", {

@@ -62,8 +62,7 @@ export const $config = (function() {
      * Checks that the createIndex cmd result either succeeded or failed in an acceptible manner.
      */
     function processCreateIndex(createIndexRes, indexSpec) {
-        assert(createIndexRes.ok == 1 || createIndexRes.code == ErrorCodes.IndexAlreadyExists ||
-                   createIndexRes.code == ErrorCodes.IndexBuildAborted ||
+        assert(createIndexRes.ok == 1 || createIndexRes.code == ErrorCodes.IndexBuildAborted ||
                    createIndexRes.code == ErrorCodes.NoMatchingDocument,
                "Create index for spec '" + indexSpec + "'failed: " + tojson(createIndexRes));
     }
