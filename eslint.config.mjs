@@ -390,7 +390,11 @@ export default [
     },
     {
         // Shell-specific: extra strict!
-        files: ["jstests/core/js/**", "jstests/noPassthrough/shell/**"],
+        files: [
+            "jstests/core/js/**",
+            "jstests/noPassthrough/shell/**",
+            "src/mongo/shell/**",
+        ],
         rules: {
             "no-var": 2,
         },

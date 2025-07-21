@@ -819,7 +819,7 @@ ServerSession.canRetryWrites = function canRetryWrites(cmdObj) {
 };
 
 function makeDriverSessionConstructor(implMethods, defaultOptions = {}) {
-    var driverSessionConstructor = function(client, options = defaultOptions) {
+    let driverSessionConstructor = function(client, options = defaultOptions) {
         const sessionAwareClient = new SessionAwareClient(client);
 
         let _options = options;

@@ -3,7 +3,7 @@
 // normally.
 //
 
-var parseVerbosity = function(verbosity) {
+let parseVerbosity = function(verbosity) {
     // Truthy non-strings are interpreted as "allPlansExecution" verbosity.
     if (verbosity && (typeof verbosity !== "string")) {
         return "allPlansExecution";
@@ -19,7 +19,7 @@ var parseVerbosity = function(verbosity) {
     return verbosity;
 };
 
-var throwOrReturn = function(explainResult) {
+let throwOrReturn = function(explainResult) {
     if (("ok" in explainResult && !explainResult.ok) || explainResult.$err) {
         throw _getErrorWithCode(explainResult, "explain failed: " + tojson(explainResult));
     }
@@ -27,8 +27,8 @@ var throwOrReturn = function(explainResult) {
     return explainResult;
 };
 
-var buildExplainCmd = function(innerCmd, verbosity) {
-    var explainCmd = {"explain": innerCmd, "verbosity": verbosity};
+let buildExplainCmd = function(innerCmd, verbosity) {
+    let explainCmd = {"explain": innerCmd, "verbosity": verbosity};
     // If "maxTimeMS" is set on innerCmd, it needs to be propagated to the top-level
     // of explainCmd so that it has the intended effect.
     if (innerCmd.hasOwnProperty("maxTimeMS")) {
@@ -136,19 +136,19 @@ function Explainable(collection, verbosity) {
      * to the server.
      */
     this.find = function() {
-        var cursor = this._collection.find.apply(this._collection, arguments);
+        let cursor = this._collection.find.apply(this._collection, arguments);
         return new DBExplainQuery(cursor, this._verbosity);
     };
 
     this.findAndModify = function(params) {
-        var famCmd = Object.extend({"findAndModify": this._collection.getName()}, params);
-        var explainCmd = buildExplainCmd(famCmd, this._verbosity);
-        var explainResult = this._collection.runReadCommand(explainCmd);
+        let famCmd = Object.extend({"findAndModify": this._collection.getName()}, params);
+        let explainCmd = buildExplainCmd(famCmd, this._verbosity);
+        let explainResult = this._collection.runReadCommand(explainCmd);
         return throwOrReturn(explainResult);
     };
 
     this.distinct = function(keyString, query, options) {
-        var distinctCmd = {
+        let distinctCmd = {
             distinct: this._collection.getName(),
             key: keyString,
             query: query || {}
@@ -167,25 +167,25 @@ function Explainable(collection, verbosity) {
             distinctCmd.rawData = options.rawData;
         }
 
-        var explainCmd = buildExplainCmd(distinctCmd, this._verbosity);
-        var explainResult = this._collection.runReadCommand(explainCmd);
+        let explainCmd = buildExplainCmd(distinctCmd, this._verbosity);
+        let explainResult = this._collection.runReadCommand(explainCmd);
         return throwOrReturn(explainResult);
     };
 
     this.remove = function() {
-        var parsed = this._collection._parseRemove.apply(this._collection, arguments);
-        var query = parsed.query;
-        var justOne = parsed.justOne;
-        var collation = parsed.collation;
-        var rawData = parsed.rawData;
+        let parsed = this._collection._parseRemove.apply(this._collection, arguments);
+        let query = parsed.query;
+        let justOne = parsed.justOne;
+        let collation = parsed.collation;
+        let rawData = parsed.rawData;
 
-        var bulk = this._collection.initializeOrderedBulkOp();
+        let bulk = this._collection.initializeOrderedBulkOp();
 
         if (rawData) {
             bulk.setRawData(rawData);
         }
 
-        var removeOp = bulk.find(query);
+        let removeOp = bulk.find(query);
 
         if (collation) {
             removeOp.collation(collation);
@@ -197,29 +197,29 @@ function Explainable(collection, verbosity) {
             removeOp.remove();
         }
 
-        var explainCmd = bulk.convertToExplainCmd(this._verbosity);
-        var explainResult = this._collection.runCommand(explainCmd);
+        let explainCmd = bulk.convertToExplainCmd(this._verbosity);
+        let explainResult = this._collection.runCommand(explainCmd);
         return throwOrReturn(explainResult);
     };
 
     this.update = function() {
-        var parsed = this._collection._parseUpdate.apply(this._collection, arguments);
-        var query = parsed.query;
-        var updateSpec = parsed.updateSpec;
-        var upsert = parsed.upsert;
-        var multi = parsed.multi;
-        var collation = parsed.collation;
-        var arrayFilters = parsed.arrayFilters;
-        var hint = parsed.hint;
-        var rawData = parsed.rawData;
+        let parsed = this._collection._parseUpdate.apply(this._collection, arguments);
+        let query = parsed.query;
+        let updateSpec = parsed.updateSpec;
+        let upsert = parsed.upsert;
+        let multi = parsed.multi;
+        let collation = parsed.collation;
+        let arrayFilters = parsed.arrayFilters;
+        let hint = parsed.hint;
+        let rawData = parsed.rawData;
 
-        var bulk = this._collection.initializeOrderedBulkOp();
+        let bulk = this._collection.initializeOrderedBulkOp();
 
         if (rawData) {
             bulk.setRawData(rawData);
         }
 
-        var updateOp = bulk.find(query);
+        let updateOp = bulk.find(query);
 
         if (hint) {
             updateOp.hint(hint);
@@ -243,8 +243,8 @@ function Explainable(collection, verbosity) {
             updateOp.updateOne(updateSpec);
         }
 
-        var explainCmd = bulk.convertToExplainCmd(this._verbosity);
-        var explainResult = this._collection.runCommand(explainCmd);
+        let explainCmd = bulk.convertToExplainCmd(this._verbosity);
+        let explainResult = this._collection.runCommand(explainCmd);
         return throwOrReturn(explainResult);
     };
 
@@ -378,7 +378,7 @@ function sbeReformatExperimental(explain, fieldsToKeep) {
     // callback is executed last on the root.
     function walkTree(root, callbackFn) {
         if ("inputStages" in root) {
-            for (var i = 0; i < root.inputStages.length; i++) {
+            for (let i = 0; i < root.inputStages.length; i++) {
                 walkTree(root.inputStages[i], callbackFn);
             }
         }
