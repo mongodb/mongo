@@ -38,7 +38,11 @@
 namespace mongo {
 namespace unified_write_executor {
 
-enum BatchType { kSingleShard, kMultiShard };
+enum BatchType {
+    kSingleShard,
+    kMultiShard,
+    kNonTargetedWrite,
+};
 
 struct Analysis {
     BatchType type;

@@ -180,7 +180,12 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
 
     auto future = launchAsync([&]() {
         WriteBatchExecutor executor(context);
-        auto responses = executor.execute(operationContext(), batch);
+        auto resps = executor.execute(operationContext(), {batch});
+
+        ASSERT_TRUE(holds_alternative<SimpleWriteBatchResponse>(resps));
+
+        auto& responses = get<SimpleWriteBatchResponse>(resps);
+
         std::set<ShardId> expectedShardIds{shardId1, shardId2};
         ASSERT_EQ(2, responses.size());
         for (auto& [shardId, response] : responses) {

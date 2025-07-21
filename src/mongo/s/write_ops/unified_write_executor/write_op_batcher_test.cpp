@@ -109,6 +109,13 @@ public:
             }
         }
     }
+
+    void assertNonTargetedWriteBatch(const WriteBatch& batch, WriteOpId expectedOpId) {
+        ASSERT_TRUE(std::holds_alternative<NonTargetedWriteBatch>(batch));
+        auto& nonTargetedWriteBatch = std::get<NonTargetedWriteBatch>(batch);
+        const auto& op = nonTargetedWriteBatch.op;
+        ASSERT_EQ(op.getId(), expectedOpId);
+    }
 };
 
 class OrderedUnifiedWriteExecutorBatcherTest : public UnifiedWriteExecutorBatcherTest {
@@ -296,6 +303,39 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherBatchesMultiShardOp
     ASSERT_FALSE(batch3.has_value());
 }
 
+TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherBatchesNonTargetedWriteOpSeparately) {
+    BulkWriteCommandRequest request(
+        {
+            BulkWriteUpdateOp(
+                0, BSON("x" << -1), write_ops::UpdateModification(BSON("$set" << BSON("a" << 1)))),
+            BulkWriteUpdateOp(
+                0, BSON("y" << 1), write_ops::UpdateModification(BSON("$set" << BSON("a" << 1)))),
+        },
+        {NamespaceInfoEntry(nss0)});
+
+    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
+
+    MockWriteOpAnalyzer analyzer({
+        {0, {kSingleShard, {nss0Shard0}}},
+        {1, {kNonTargetedWrite, {nss0Shard0}}},
+    });
+
+    auto routingCtx = RoutingContext::createSynthetic({});
+    auto batcher = OrderedWriteOpBatcher(producer, analyzer);
+
+    // Output batches: [0], [1]
+    auto batch1 = batcher.getNextBatch(nullptr /* opCtx */, *routingCtx);
+    ASSERT_TRUE(batch1.has_value());
+    assertSingleShardSimpleWriteBatch(*batch1, {0}, {nss0Shard0});
+
+    auto batch2 = batcher.getNextBatch(nullptr /* opCtx */, *routingCtx);
+    ASSERT_TRUE(batch2.has_value());
+    assertNonTargetedWriteBatch(*batch2, 1);
+
+    auto batch3 = batcher.getNextBatch(nullptr /* opCtx */, *routingCtx);
+    ASSERT_FALSE(batch3.has_value());
+}
+
 TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherReprocessesWriteOps) {
     BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSONObj()),
                                      BulkWriteInsertOp(1, BSONObj()),
@@ -469,6 +509,42 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherBatchesMultiSha
 
     auto batch2 = batcher.getNextBatch(nullptr /* opCtx */, *routingCtx);
     ASSERT_FALSE(batch2.has_value());
+}
+
+TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,
+       UnorderedBatcherBatchesNonTargetedWriteOpSeparately) {
+    BulkWriteCommandRequest request(
+        {
+            BulkWriteUpdateOp(
+                0, BSON("x" << -1), write_ops::UpdateModification(BSON("$set" << BSON("a" << 1)))),
+            BulkWriteUpdateOp(
+                0, BSON("y" << 1), write_ops::UpdateModification(BSON("$set" << BSON("a" << 1)))),
+        },
+        {NamespaceInfoEntry(nss0)});
+
+    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
+
+    MockWriteOpAnalyzer analyzer({
+        {0, {kSingleShard, {nss0Shard0}}},
+        {1, {kNonTargetedWrite, {nss0Shard0}}},
+    });
+
+    auto routingCtx = RoutingContext::createSynthetic({});
+    auto batcher = UnorderedWriteOpBatcher(producer, analyzer);
+
+    SimpleWriteBatch::ShardRequest shardRequest1{{{nss0, nss0Shard0}}, {WriteOp(request, 0)}};
+    SimpleWriteBatch expectedBatch1{{{shardId0, shardRequest1}}};
+
+    auto batch1 = batcher.getNextBatch(nullptr /* opCtx */, *routingCtx);
+    ASSERT_TRUE(batch1.has_value());
+    assertUnorderedSingleShardSimpleWriteBatch(*batch1, expectedBatch1);
+
+    auto batch2 = batcher.getNextBatch(nullptr /* opCtx */, *routingCtx);
+    ASSERT_TRUE(batch2.has_value());
+    assertNonTargetedWriteBatch(*batch2, 1);
+
+    auto batch3 = batcher.getNextBatch(nullptr /* opCtx */, *routingCtx);
+    ASSERT_FALSE(batch3.has_value());
 }
 
 TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,

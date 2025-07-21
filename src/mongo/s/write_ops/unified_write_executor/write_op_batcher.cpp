@@ -98,7 +98,13 @@ boost::optional<WriteBatch> OrderedWriteOpBatcher::getNextBatch(OperationContext
                 };
                 batch.requestByShardId.emplace(shardVersion.shardName, std::move(shardRequest));
             }
-            return WriteBatch{batch};
+            return WriteBatch{std::move(batch)};
+        } break;
+
+        case kNonTargetedWrite: {
+            // If the op is a two-phase write, then we must use the NonTargetedWriteBatch type
+            // and we must put this op in a batch by itself.
+            return WriteBatch{NonTargetedWriteBatch{*writeOp}};
         } break;
 
         default: {
@@ -186,7 +192,25 @@ void addWriteOpToBatch(SimpleWriteBatch& writeBatch, WriteOp& writeOp, Analysis&
 
 boost::optional<WriteBatch> UnorderedWriteOpBatcher::getNextBatch(
     OperationContext* opCtx, const RoutingContext& routingCtx) {
+    // Peek at the next op. If there are no more ops left, return.
+    auto firstWriteOp = _producer.peekNext();
+    if (!firstWriteOp) {
+        return boost::none;
+    }
+    _producer.advance();
+
+    // Analyze the op. If the op is a two-phase write, then we must use the NonTargetedWriteBatch
+    // type and we must put this op in a batch by itself.
+    auto firstOpAnalysis = _analyzer.analyze(opCtx, routingCtx, *firstWriteOp);
+    if (firstOpAnalysis.type == kNonTargetedWrite) {
+        return WriteBatch{NonTargetedWriteBatch{*firstWriteOp}};
+    }
+
+    // If the op is kSingleShard or kMultiShard, then create a new SimpleWriteBatch and add
+    // the op to the batch.
     SimpleWriteBatch batch;
+    addWriteOpToBatch(batch, *firstWriteOp, firstOpAnalysis);
+
     while (true) {
         auto writeOp = _producer.peekNext();
         if (!writeOp) {
@@ -198,6 +222,10 @@ boost::optional<WriteBatch> UnorderedWriteOpBatcher::getNextBatch(
             }
         }
         auto analysis = _analyzer.analyze(opCtx, routingCtx, *writeOp);
+
+        if (analysis.type != kSingleShard && analysis.type != kMultiShard) {
+            return WriteBatch{std::move(batch)};
+        }
 
         // A new batch is required if we're targeting a namespace with a shard endpoint that is
         // different to the one in the current batch.

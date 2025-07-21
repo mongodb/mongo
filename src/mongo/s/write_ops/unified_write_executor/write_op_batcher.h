@@ -48,7 +48,11 @@ struct SimpleWriteBatch {
     std::map<ShardId, ShardRequest> requestByShardId;
 };
 
-using WriteBatch = std::variant<SimpleWriteBatch>;
+struct NonTargetedWriteBatch {
+    WriteOp op;
+};
+
+using WriteBatch = std::variant<SimpleWriteBatch, NonTargetedWriteBatch>;
 
 /**
  * Based on the analysis of the write ops, this class bundles multiple write ops into batches to be

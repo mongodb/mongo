@@ -80,9 +80,9 @@ TEST_F(WriteBatchResponseProcessorTest, OKReplies) {
     WriteOpContext ctx(request);
     WriteBatchResponseProcessor processor(ctx);
 
-    processor.onWriteBatchResponse(
-        {{shard1Name, Response{rcr1, {}}},
-         {shard2Name, Response{rcr2, {WriteOp(request, 0), WriteOp(request, 1)}}}});
+    processor.onWriteBatchResponse(SimpleWriteBatchResponse{
+        {shard1Name, Response{rcr1, {}}},
+        {shard2Name, Response{rcr2, {WriteOp(request, 0), WriteOp(request, 1)}}}});
 
     auto clientReply = processor.generateClientResponse<BulkWriteCommandReply>();
     ASSERT_EQ(clientReply.getNInserted(), 2);
@@ -113,7 +113,8 @@ TEST_F(WriteBatchResponseProcessorTest, AllStatisticsCopied) {
     WriteOpContext ctx(request);
     WriteBatchResponseProcessor processor(ctx);
 
-    processor.onWriteBatchResponse({{shard1Name, Response{rcr1, {WriteOp(request, 0)}}}});
+    processor.onWriteBatchResponse(
+        SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {WriteOp(request, 0)}}}});
     auto clientReply = processor.generateClientResponse<BulkWriteCommandReply>();
     ASSERT_EQ(clientReply.getNInserted(), 1);
     ASSERT_EQ(clientReply.getNMatched(), 1);
@@ -174,10 +175,10 @@ TEST_F(WriteBatchResponseProcessorTest, MixedErrorsAndOk) {
     WriteOpContext ctx(request);
     WriteBatchResponseProcessor processor(ctx);
 
-    processor.onWriteBatchResponse({{shard1Name, Response{rcr1, {op1}}},
-                                    {shard2Name, Response{rcr2, {op2, op3}}},
-                                    {shard3Name, Response{rcr3, {op4}}}});
-
+    processor.onWriteBatchResponse(
+        SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {op1}}},
+                                 {shard2Name, Response{rcr2, {op2, op3}}},
+                                 {shard3Name, Response{rcr3, {op4}}}});
 
     auto clientReply = processor.generateClientResponse<BulkWriteCommandReply>();
     ASSERT_EQ(clientReply.getNErrors(), 2);
@@ -217,11 +218,11 @@ TEST_F(WriteBatchResponseProcessorTest, CreateCollection) {
 
     WriteOpContext ctx(request);
     WriteBatchResponseProcessor processor(ctx);
-    auto result = processor.onWriteBatchResponse({{shard1Name,
-                                                   Response{
-                                                       rcr1,
-                                                       {op1, op2},
-                                                   }}});
+    auto result = processor.onWriteBatchResponse(SimpleWriteBatchResponse{{shard1Name,
+                                                                           Response{
+                                                                               rcr1,
+                                                                               {op1, op2},
+                                                                           }}});
     // No unrecoverable error.
     ASSERT_FALSE(result.unrecoverableError);
     // One incomplete returned (op2).
@@ -257,7 +258,8 @@ TEST_F(WriteBatchResponseProcessorTest, CreateCollection) {
 
     RemoteCommandResponse rcr2(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
-    result = processor.onWriteBatchResponse({{shard1Name, Response{rcr2, {op2}}}});
+    result = processor.onWriteBatchResponse(
+        SimpleWriteBatchResponse{{shard1Name, Response{rcr2, {op2}}}});
     ASSERT_FALSE(result.unrecoverableError);
     ASSERT(result.opsToRetry.empty());
     ASSERT(result.collsToCreate.empty());
@@ -292,11 +294,11 @@ TEST_F(WriteBatchResponseProcessorTest, SingleReplyItemForBatchOfThree) {
 
     WriteOpContext ctx(request);
     WriteBatchResponseProcessor processor(ctx);
-    auto result = processor.onWriteBatchResponse({{shard1Name,
-                                                   Response{
-                                                       rcr1,
-                                                       {op1, op2, op3},
-                                                   }}});
+    auto result = processor.onWriteBatchResponse(SimpleWriteBatchResponse{{shard1Name,
+                                                                           Response{
+                                                                               rcr1,
+                                                                               {op1, op2, op3},
+                                                                           }}});
     // No unrecoverable error.
     ASSERT_FALSE(result.unrecoverableError);
     // Assert all ops were returned for retry even though there was only one item in the reply.
@@ -362,16 +364,16 @@ TEST_F(WriteBatchResponseProcessorTest, TwoShardMixedNamespaceExistence) {
 
     WriteOpContext ctx(request);
     WriteBatchResponseProcessor processor(ctx);
-    auto result = processor.onWriteBatchResponse({{shard1Name,
-                                                   Response{
-                                                       rcr1,
-                                                       {op1, op2, op3},
-                                                   }},
-                                                  {shard2Name,
-                                                   Response{
-                                                       rcr2,
-                                                       {op4, op5, op6},
-                                                   }}});
+    auto result = processor.onWriteBatchResponse(SimpleWriteBatchResponse{{shard1Name,
+                                                                           Response{
+                                                                               rcr1,
+                                                                               {op1, op2, op3},
+                                                                           }},
+                                                                          {shard2Name,
+                                                                           Response{
+                                                                               rcr2,
+                                                                               {op4, op5, op6},
+                                                                           }}});
     // No unrecoverable error.
     ASSERT_FALSE(result.unrecoverableError);
     // Assert all the errors were returned for retry.
@@ -437,7 +439,7 @@ TEST_F(WriteBatchResponseProcessorTest, IdxsCorrectlyRewrittenInReplyItems) {
 
     WriteOpContext ctx(request);
     WriteBatchResponseProcessor processor(ctx);
-    auto result = processor.onWriteBatchResponse({
+    auto result = processor.onWriteBatchResponse(SimpleWriteBatchResponse{
         {shard2Name,
          Response{
              rcr2,
@@ -508,18 +510,16 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesSingleWriteConcernError) {
 
     WriteOpContext ctx(request);
     WriteBatchResponseProcessor processor(ctx);
-    auto result = processor.onWriteBatchResponse({
-        {shard1Name,
-         Response{
-             rcr1,
-             {op2},
-         }},
-        {shard2Name,
-         Response{
-             rcr2,
-             {op1},
-         }},
-    });
+    auto result = processor.onWriteBatchResponse(SimpleWriteBatchResponse{{shard1Name,
+                                                                           Response{
+                                                                               rcr1,
+                                                                               {op2},
+                                                                           }},
+                                                                          {shard2Name,
+                                                                           Response{
+                                                                               rcr2,
+                                                                               {op1},
+                                                                           }}});
     ASSERT_FALSE(result.unrecoverableError);
     ASSERT_EQ(result.opsToRetry.size(), 0);
     ASSERT_EQ(result.collsToCreate.size(), 0);
@@ -574,7 +574,7 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesMultipleWriteConcernErrors) {
 
     WriteOpContext ctx(request);
     WriteBatchResponseProcessor processor(ctx);
-    auto result = processor.onWriteBatchResponse({
+    auto result = processor.onWriteBatchResponse(SimpleWriteBatchResponse{
         {shard1Name,
          Response{
              rcr1,

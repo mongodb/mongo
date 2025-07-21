@@ -160,9 +160,9 @@ BSONObj constructUpsertResponse(BatchedCommandResponse& writeRes,
                 0, {replyItem}, NamespaceString::makeBulkWriteNSS(boost::none)),
             0 /* nErrors */,
             0 /* nInserted */,
-            writeRes.getN() /* nMatched */,
+            0 /* nMatched */,
             0 /* nModified */,
-            1 /* nUpserted */,
+            writeRes.getN() /* nUpserted */,
             0 /* nDeleted */);
         reply = bulkWriteReply.toBSON();
     } else if (commandName == write_ops::FindAndModifyCommandRequest::kCommandName ||

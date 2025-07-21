@@ -229,12 +229,12 @@ TEST_F(WriteOpAnalyzerTest, RangeUpdateOnes) {
     WriteOp op1(request, 0);
     auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
     ASSERT_EQ(2, analysis.shardsAffected.size());
-    ASSERT_EQ(BatchType::kMultiShard, analysis.type);
+    ASSERT_EQ(BatchType::kNonTargetedWrite, analysis.type);
 
     WriteOp op2(request, 1);
     analysis = analyzer.analyze(operationContext(), *rtx, op2);
     ASSERT_EQ(2, analysis.shardsAffected.size());
-    ASSERT_EQ(BatchType::kMultiShard, analysis.type);
+    ASSERT_EQ(BatchType::kNonTargetedWrite, analysis.type);
 
     rtx->onRequestSentForNss(nss);
 }
@@ -298,14 +298,12 @@ TEST_F(WriteOpAnalyzerTest, SingleShardRangeUpdateOnes) {
     auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
-    // TODO SERVER-103780 this should be changed with 2 phase write support.
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
     analysis = analyzer.analyze(operationContext(), *rtx, op2);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
-    // TODO SERVER-103780 this should be changed with 2 phase write support.
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     rtx->onRequestSentForNss(nss);
@@ -395,12 +393,74 @@ TEST_F(WriteOpAnalyzerTest, RangeDeleteOnes) {
     WriteOp op1(request, 0);
     auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
     ASSERT_EQ(2, analysis.shardsAffected.size());
+    ASSERT_EQ(BatchType::kNonTargetedWrite, analysis.type);
+
+    WriteOp op2(request, 1);
+    analysis = analyzer.analyze(operationContext(), *rtx, op2);
+    ASSERT_EQ(2, analysis.shardsAffected.size());
+    ASSERT_EQ(BatchType::kNonTargetedWrite, analysis.type);
+
+    rtx->onRequestSentForNss(nss);
+}
+
+TEST_F(WriteOpAnalyzerTest, RangeDeleteManys) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    UUID uuid = UUID::gen();
+    auto rtx = createRoutingContextSharded({{uuid, nss}});
+
+    BulkWriteCommandRequest request(
+        {
+            [&]() {
+                auto op = BulkWriteDeleteOp(
+                    0, BSON("x" << BSON("$gt" << -1) << "_id" << BSON("$gt" << -1)));
+                op.setMulti(true);
+                return op;
+            }(),
+            [&]() {
+                auto op = BulkWriteDeleteOp(
+                    0, BSON("x" << BSON("$lt" << 1) << "_id" << BSON("$lt" << 1)));
+                op.setMulti(true);
+                return op;
+            }(),
+        },
+        {NamespaceInfoEntry(nss)});
+
+    WriteOp op1(request, 0);
+    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
+    ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
     WriteOp op2(request, 1);
     analysis = analyzer.analyze(operationContext(), *rtx, op2);
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
+
+    rtx->onRequestSentForNss(nss);
+}
+
+TEST_F(WriteOpAnalyzerTest, SingleShardRangeDeleteOnes) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    UUID uuid = UUID::gen();
+    auto rtx = createRoutingContextSharded({{uuid, nss}});
+
+    BulkWriteCommandRequest request(
+        {
+            BulkWriteDeleteOp(0, BSON("x" << BSON("$lt" << -1) << "_id" << BSON("$lt" << -1))),
+            BulkWriteDeleteOp(0, BSON("x" << BSON("$gt" << 1) << "_id" << BSON("$gt" << 1))),
+        },
+        {NamespaceInfoEntry(nss)});
+
+    WriteOp op1(request, 0);
+    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
+    ASSERT_EQ(1, analysis.shardsAffected.size());
+    ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
+    ASSERT_EQ(BatchType::kSingleShard, analysis.type);
+
+    WriteOp op2(request, 1);
+    analysis = analyzer.analyze(operationContext(), *rtx, op2);
+    ASSERT_EQ(1, analysis.shardsAffected.size());
+    ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
+    ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     rtx->onRequestSentForNss(nss);
 }
@@ -437,7 +497,6 @@ TEST_F(WriteOpAnalyzerTest, SingleShardRangeDeleteManys) {
     analysis = analyzer.analyze(operationContext(), *rtx, op2);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
-    // TODO SERVER-103780 this should be changed with 2 phase write support.
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     rtx->onRequestSentForNss(nss);

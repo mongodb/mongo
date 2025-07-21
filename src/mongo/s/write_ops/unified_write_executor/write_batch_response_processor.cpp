@@ -31,12 +31,21 @@
 
 #include "mongo/s/write_ops/batched_command_response.h"
 
+#include <variant>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::unified_write_executor {
 using Result = WriteBatchResponseProcessor::Result;
 
 Result WriteBatchResponseProcessor::onWriteBatchResponse(const WriteBatchResponse& response) {
+    return std::visit(
+        [&](const auto& responseData) -> Result { return _onWriteBatchResponse(responseData); },
+        response);
+}
+
+Result WriteBatchResponseProcessor::_onWriteBatchResponse(
+    const SimpleWriteBatchResponse& response) {
     Result result;
     for (const auto& [shardId, shardResponse] : response) {
         auto shardResult = onShardResponse(shardId, shardResponse);
@@ -51,6 +60,74 @@ Result WriteBatchResponseProcessor::onWriteBatchResponse(const WriteBatchRespons
         }
     }
     return result;
+}
+
+Result WriteBatchResponseProcessor::_onWriteBatchResponse(
+    const NonTargetedWriteBatchResponse& response) {
+    // TODO SERVER-104115 retried stmts.
+    // TODO SERVER-104535 cursor support for UnifiedWriteExec.
+    // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
+    // TODO SERVER-105762 Add support for errorsOnly: true.
+    const auto& swRes = response.swResponse;
+    const auto& op = response.op;
+
+    // Extract the reply item from the ClusterWriteWithoutShardKeyResponse if possible, otherwise
+    // create a reply item.
+    BulkWriteReplyItem replyItem = [&] {
+        if (swRes.isOK() && !swRes.getValue().getResponse().isEmpty()) {
+            auto parsedReply = BulkWriteCommandReply::parse(
+                IDLParserContext("BulkWriteCommandReply_UnifiedWriteExec"),
+                swRes.getValue().getResponse());
+
+            // Update the counters.
+            _nInserted += parsedReply.getNInserted();
+            _nDeleted += parsedReply.getNDeleted();
+            _nMatched += parsedReply.getNMatched();
+            _nUpserted += parsedReply.getNUpserted();
+            _nModified += parsedReply.getNModified();
+
+            const auto& replyItems = parsedReply.getCursor().getFirstBatch();
+            tassert(10378000, "Unexpected reply for NonTargetedWriteBatch", replyItems.size() == 1);
+
+            const auto& replyItem = parsedReply.getCursor().getFirstBatch().front();
+            tassert(10378001,
+                    fmt::format("reply with invalid opId {} when command only had 1 op",
+                                replyItem.getIdx()),
+                    static_cast<WriteOpId>(replyItem.getIdx()) == 0);
+
+            return replyItem;
+        }
+
+        // If we reach here, then either:
+        //   1) 'swRes' is not OK (which means an error occurred); or
+        //   2) 'swRes' is OK but 'response' is empty (which means the two-phase write completed
+        //      successfully without updating/deleting anything because nothing matched the filter).
+        //
+        // In either case, we create a reply item with the status from 'swRes' and we set n=0
+        // and nModified=0 (if 'op' is an update) or just n=0 (if 'op' is a delete).
+        BulkWriteReplyItem replyItem(0, swRes.getStatus());
+        replyItem.setN(0);
+        if (op.getType() == WriteType::kUpdate) {
+            replyItem.setNModified(0);
+        }
+
+        return replyItem;
+    }();
+
+    if (!replyItem.getStatus().isOK()) {
+        _nErrors++;
+    }
+
+    auto [it, _] = _results.emplace(op.getId(), std::move(replyItem));
+    it->second.setIdx(op.getId());
+
+    // NonTargetedWriteBatches are only used for update and delete, so we never need to implicitly
+    // create collections for a TwoPhaseWrite op.
+    //
+    // Also, the write_without_shard_key::runTwoPhaseWriteProtocol() API handles StaleConfig
+    // responses internally, so the UnifiedWriteExecutor doesn't need to have retry logic for
+    // TwoPhaseWrite operations.
+    return {};
 }
 
 Result WriteBatchResponseProcessor::onShardResponse(const ShardId& shardId,

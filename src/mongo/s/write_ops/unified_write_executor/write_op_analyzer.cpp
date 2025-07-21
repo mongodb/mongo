@@ -40,31 +40,38 @@ Analysis WriteOpAnalyzer::analyze(OperationContext* opCtx,
     const auto& cri = routingCtx.getCollectionRoutingInfo(op.getNss());
     // TODO SERVER-103782 Don't use CRITargeter.
     CollectionRoutingInfoTargeter targeter(op.getNss(), cri);
-    // TODO SERVER-103780 Add support for kNoKey.
     // TODO SERVER-103781 Add support for kPartialKeyWithId.
     // TODO SERVER-103146 Add kChangesOwnership.
-    std::vector<ShardEndpoint> shardsAffected = [&]() {
-        switch (op.getType()) {
-            case WriteType::kInsert: {
-                return std::vector<ShardEndpoint>{
-                    targeter.targetInsert(opCtx, op.getRef().getDocument())};
-            }
-            case WriteType::kUpdate: {
-                return targeter.targetUpdate(opCtx, op.getRef()).endpoints;
-            }
-            case WriteType::kDelete: {
-                return targeter.targetDelete(opCtx, op.getRef()).endpoints;
-            }
-            case WriteType::kFindAndMod:
-                MONGO_UNIMPLEMENTED;
-        }
-        MONGO_UNREACHABLE;
-    }();
-    tassert(10346500, "Expected write to affect at least one shard", !shardsAffected.empty());
-    if (shardsAffected.size() == 1) {
-        return {BatchType::kSingleShard, std::move(shardsAffected)};
+    // TODO SERVER-103781 Add support for "WriteWithoutShardKeyWithId" writes.
+
+    NSTargeter::TargetingResult tr;
+
+    switch (op.getType()) {
+        case WriteType::kInsert: {
+            tr.endpoints.emplace_back(targeter.targetInsert(opCtx, op.getRef().getDocument()));
+        } break;
+        case WriteType::kUpdate: {
+            tr = targeter.targetUpdate(opCtx, op.getRef());
+        } break;
+        case WriteType::kDelete: {
+            tr = targeter.targetDelete(opCtx, op.getRef());
+        } break;
+        case WriteType::kFindAndMod: {
+            MONGO_UNIMPLEMENTED;
+        } break;
+        default: {
+            MONGO_UNREACHABLE;
+        } break;
+    }
+
+    tassert(10346500, "Expected write to affect at least one shard", !tr.endpoints.empty());
+
+    if (tr.useTwoPhaseWriteProtocol || tr.isNonTargetedRetryableWriteWithId) {
+        return {BatchType::kNonTargetedWrite, std::move(tr.endpoints)};
+    } else if (tr.endpoints.size() == 1) {
+        return {BatchType::kSingleShard, std::move(tr.endpoints)};
     } else {
-        return {BatchType::kMultiShard, std::move(shardsAffected)};
+        return {BatchType::kMultiShard, std::move(tr.endpoints)};
     }
 }
 

@@ -82,6 +82,9 @@ public:
     CmdResponse generateClientResponse();
 
 private:
+    Result _onWriteBatchResponse(const SimpleWriteBatchResponse& response);
+    Result _onWriteBatchResponse(const NonTargetedWriteBatchResponse& response);
+
     /**
      * Process a response from a shard, handle errors, and collect statistics. Returns an array
      * containing ops that did not complete successfully that need to be resent.
