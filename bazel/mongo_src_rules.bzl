@@ -751,7 +751,7 @@ def _mongo_cc_binary_and_test(
         "testonly": testonly,
         "copts": copts,
         "data": data + SANITIZER_DATA + select({
-            "//bazel/platforms:use_mongo_toolchain": ["@gdb"],
+            "//bazel/platforms:use_mongo_toolchain": ["//:gdb"],
             "//conditions:default": [],
         }),
         "tags": tags,
