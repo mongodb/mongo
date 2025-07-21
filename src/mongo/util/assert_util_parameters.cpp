@@ -38,7 +38,8 @@ namespace mongo {
 
 MONGO_INITIALIZER(SetUpDiagnosticLoggingStatus)(InitializerContext*) {
     bool startUpVal = enableDiagnosticLogging.load();
-    setDiagnosticLoggingInSignalHandlers(startUpVal);
+    bool signalHandlerLoggingVal = signalHandlerUsesDiagnosticLogging.load();
+    setDiagnosticLoggingInSignalHandlers(startUpVal && signalHandlerLoggingVal);
     setDiagnosticLoggingInAssertUtil(startUpVal);
 }
 
@@ -47,4 +48,10 @@ Status onUpdateEnableDiagnosticLogging(bool newValue) {
     setDiagnosticLoggingInAssertUtil(newValue);
     return Status::OK();
 }
+
+Status onUpdateSignalHandlerUsesDiagnosticLogging(bool newValue) {
+    setDiagnosticLoggingInSignalHandlers(newValue);
+    return Status::OK();
+}
+
 }  // namespace mongo
