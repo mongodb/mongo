@@ -1392,7 +1392,6 @@ mongo_cc_library(
         "sharding_ddl_coordinator_service.cpp",
         "sharding_server_status.cpp",
         "sharding_state_command.cpp",
-        "shardsvr_abort_migrations.cpp",
         "shardsvr_abort_reshard_collection_command.cpp",
         "shardsvr_add_shard_cmd.cpp",
         "shardsvr_change_primary_command.cpp",

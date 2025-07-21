@@ -857,7 +857,6 @@ data_movement:
     - src/mongo/s/request_types/resharding_operation_time.idl
 
     # chunk operations
-    - src/mongo/db/s/*abort_migrations*
     - src/mongo/db/s/migration_chunk*
     - src/mongo/db/s/migration_batch*
     - src/mongo/db/s/migration*manager*

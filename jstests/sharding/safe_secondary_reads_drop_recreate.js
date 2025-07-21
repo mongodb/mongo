@@ -84,7 +84,6 @@ let testCases = {
     _migrateClone: {skip: "primary only"},
     _mirrorMaestroConnPoolStats: {skip: "internal command"},
     _mongotConnPoolStats: {skip: "internal command"},
-    _shardsvrAbortMigrations: {skip: "internal command"},
     _shardsvrBeginMigrationBlockingOperation: {skip: "internal command"},
     _shardsvrChangePrimary: {skip: "internal command"},
     _shardsvrCheckMetadataConsistency: {skip: "internal command"},

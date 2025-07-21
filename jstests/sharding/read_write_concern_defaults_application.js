@@ -151,7 +151,6 @@ let testCases = {
     _recvChunkStart: {skip: "internal command"},
     _recvChunkStatus: {skip: "internal command"},
     _refreshQueryAnalyzerConfiguration: {skip: "internal command"},
-    _shardsvrAbortMigrations: {skip: "internal command"},
     _shardsvrAbortReshardCollection: {skip: "internal command"},
     _shardsvrBeginMigrationBlockingOperation: {skip: "internal command"},
     _shardsvrChangePrimary: {skip: "internal command"},

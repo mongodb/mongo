@@ -422,10 +422,6 @@ const internalCommandsMap = {
             indexes: [],
         },
     },
-    _shardsvrAbortMigrations: {
-        testname: "_shardsvrAbortMigrations",
-        command: {_shardsvrAbortMigrations: "test.x"},
-    },
     _shardsvrAbortReshardCollection: {
         testname: "_shardsvrAbortReshardCollection",
         command: {_shardsvrAbortReshardCollection: UUID(), userCanceled: true},
