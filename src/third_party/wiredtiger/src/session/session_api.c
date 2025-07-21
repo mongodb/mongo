@@ -1753,7 +1753,7 @@ err:
         WT_STAT_CONN_INCR(session, session_table_verify_success);
 
     /*
-     * FIXME-WT-14553: Implement verify for disagg. For now we are skipping the expected ENOTSUP
+     * FIXME-WT-14908: Implement verify for disagg. For now we are skipping the expected ENOTSUP
      * error.
      */
     if (__wt_conn_is_disagg(session) && ret == ENOTSUP) {

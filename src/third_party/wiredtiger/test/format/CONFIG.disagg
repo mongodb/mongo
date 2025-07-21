@@ -18,7 +18,7 @@ ops.compaction=0
 ops.salvage=0
 ops.throttle=0
 ops.truncate=0
-# FIXME-WT-14553 should fix WT_SESSION->verify for layered tables.
+# FIXME-WT-14908 should fix WT_SESSION->verify for layered tables.
 ops.verify=0
 quiet=0
 runs.in_memory=0
