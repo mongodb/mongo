@@ -78,7 +78,7 @@ AllMappings computeReverseMappings(SplitHorizon::ForwardMapping forwardMapping) 
             std::transform(begin(forwardMapping),
                            end(forwardMapping),
                            back_inserter(rv),
-                           [](const auto& entry) { return entry.second.host(); });
+                           [](const auto& entry) -> const auto& { return entry.second.host(); });
             std::sort(begin(rv), end(rv));
             return rv;
         }();
