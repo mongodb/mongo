@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_info.h"

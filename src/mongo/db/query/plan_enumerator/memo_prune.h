@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/plan_enumerator/enumerator_memo.h"
 #include "mongo/db/query/projection.h"
 

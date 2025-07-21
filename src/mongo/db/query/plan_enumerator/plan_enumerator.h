@@ -32,7 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/plan_enumerator/enumerator_memo.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"

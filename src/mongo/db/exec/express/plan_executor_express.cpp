@@ -46,7 +46,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer_express.h"
 #include "mongo/db/query/planner_ixselect.h"

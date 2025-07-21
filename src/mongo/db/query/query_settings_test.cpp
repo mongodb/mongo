@@ -41,7 +41,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/unittest/unittest.h"
 
 using mongo::AllowedIndicesFilter;

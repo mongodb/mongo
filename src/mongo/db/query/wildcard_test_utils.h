@@ -32,7 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/wildcard_key_generator.h"
-#include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
 
 namespace mongo::wildcard_planning {
 /**

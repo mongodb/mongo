@@ -32,7 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"

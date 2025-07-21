@@ -2357,6 +2357,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/compiler/ce/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/compiler/ce/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/query/compiler/metadata/OWNERS.yml
+/src/mongo/db/query/compiler/metadata/**/* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/compiler/metadata/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/query/compiler/physical_model/index_bounds/OWNERS.yml
 /src/mongo/db/query/compiler/physical_model/index_bounds/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/compiler/physical_model/index_bounds/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot

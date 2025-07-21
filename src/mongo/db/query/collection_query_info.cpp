@@ -48,7 +48,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
-#include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"

@@ -29,9 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
-#include "mongo/db/query/index_entry.h"
 
 namespace mongo {
 namespace wildcard_planning {

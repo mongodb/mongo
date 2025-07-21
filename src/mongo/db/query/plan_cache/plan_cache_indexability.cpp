@@ -40,7 +40,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/util/assert_util.h"
 

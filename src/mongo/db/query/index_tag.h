@@ -32,7 +32,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_hasher.h"
-#include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
 
 #include <cstddef>
 #include <deque>

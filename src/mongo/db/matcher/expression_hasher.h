@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/compiler/metadata/index_entry.h"
 
 namespace mongo {
 /**
