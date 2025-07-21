@@ -62,7 +62,7 @@ TEST(RecordStoreTest, TruncateEmpty) {
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
             StorageWriteTransaction txn(ru);
-            ASSERT_OK(rs->truncate(opCtx.get()));
+            ASSERT_OK(rs->truncate(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get())));
             txn.commit();
         }
     }
@@ -106,7 +106,7 @@ TEST(RecordStoreTest, TruncateNonEmpty) {
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         {
             StorageWriteTransaction txn(ru);
-            ASSERT_OK(rs->truncate(opCtx.get()));
+            ASSERT_OK(rs->truncate(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get())));
             txn.commit();
         }
     }

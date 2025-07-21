@@ -185,10 +185,6 @@ public:
         return nullptr;
     }
 
-    Status truncate(OperationContext*) final {
-        unimplementedTasserted();
-        return {ErrorCodes::Error::UnknownError, "Unknown error"};
-    }
     Status truncate(OperationContext*, RecoveryUnit&) final {
         unimplementedTasserted();
         return {ErrorCodes::Error::UnknownError, "Unknown error"};

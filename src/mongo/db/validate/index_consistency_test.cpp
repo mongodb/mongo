@@ -63,7 +63,7 @@ ValidateResults validate(OperationContext* opCtx) {
 // Clears the collection without updating indexes, this creates extra index entries.
 void clearCollection(OperationContext* opCtx, const CollectionPtr& coll) {
     RecordStore* rs = coll->getRecordStore();
-    ASSERT_OK(rs->truncate(opCtx));
+    ASSERT_OK(rs->truncate(opCtx, *shard_role_details::getRecoveryUnit(opCtx)));
 }
 
 // Removes entries found in the given collection from this index, this creates missing index

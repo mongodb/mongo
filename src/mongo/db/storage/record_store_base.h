@@ -106,7 +106,6 @@ public:
     std::unique_ptr<RecordCursor> getRandomCursor(OperationContext*,
                                                   RecoveryUnit&) const override = 0;
 
-    Status truncate(OperationContext*) final;
     Status truncate(OperationContext*, RecoveryUnit&) final;
 
     Status rangeTruncate(OperationContext*,

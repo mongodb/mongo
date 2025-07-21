@@ -149,9 +149,6 @@ std::unique_ptr<RecordCursor> RecordStoreBase::getRandomCursor(OperationContext*
     return getRandomCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
 }
 
-Status RecordStoreBase::truncate(OperationContext* opCtx) {
-    return truncate(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
-}
 Status RecordStoreBase::truncate(OperationContext* opCtx, RecoveryUnit& ru) {
     validateWriteAllowed(opCtx);
     return _truncate(opCtx, ru);

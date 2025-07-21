@@ -549,10 +549,7 @@ public:
 
     /**
      * Removes all Records.
-     *
-     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
-    virtual Status truncate(OperationContext*) = 0;
     virtual Status truncate(OperationContext*, RecoveryUnit&) = 0;
 
     /**
