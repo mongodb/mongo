@@ -48,3 +48,6 @@ filters:
   - "wait_for_replication.py":
     approvers:
       - 10gen/server-jstest-infra
+  - "generate_and_check_perf_results.py":
+    approvers:
+      - 10gen/devprod-performance-analysis

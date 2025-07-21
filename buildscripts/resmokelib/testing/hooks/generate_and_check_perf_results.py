@@ -282,17 +282,20 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
             ):
                 if metric_to_check.bound_direction == BoundDirection.LOWER:
                     self.logger.error(
-                        f"Metric {metric_to_check.metric_name} in {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} has failed the threshold check. The reported value of {reported_metric.value} is lower than the set threshold of {metric_to_check.value}"
+                        f"Metric {metric_to_check.metric_name} in {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} has failed the threshold check. The reported value of {reported_metric.value} is lower than the set threshold of {metric_to_check.value}."
+                        " For more information on this failure and how to resolve it, please see the documentation at https://docs.devprod.prod.corp.mongodb.com/performance/workloads/instruction_microbenchmarks"
                     )
                     any_metric_has_failed = True
                 else:
                     self.logger.error(
-                        f"Metric {metric_to_check.metric_name} in {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} has failed the threshold check. The reported value of {reported_metric.value} is higher than the set threshold of {metric_to_check.value}"
+                        f"Metric {metric_to_check.metric_name} in {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} has failed the threshold check. The reported value of {reported_metric.value} is higher than the set threshold of {metric_to_check.value}."
+                        " For more information on this failure and how to resolve it, please see the documentation at https://docs.devprod.prod.corp.mongodb.com/performance/workloads/instruction_microbenchmarks"
                     )
                     any_metric_has_failed = True
         if any_metric_has_failed:
             raise ServerFailure(
-                f"One or more of the metrics reported by this task have failed the threshold check. Please resolve all of the issues called out above. These thresholds can be found in {THRESHOLD_LOCATION}"
+                f"One or more of the metrics reported by this task have failed the threshold check. These thresholds can be found in {THRESHOLD_LOCATION}."
+                " For more information on this failure and how to resolve it, please see the documentation at https://docs.devprod.prod.corp.mongodb.com/performance/workloads/instruction_microbenchmarks"
             )
 
 
