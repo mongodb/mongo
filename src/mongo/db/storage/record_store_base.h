@@ -115,7 +115,6 @@ public:
                          int64_t hintDataSizeIncrement = 0,
                          int64_t hintNumRecordsIncrement = 0) final;
 
-    StatusWith<int64_t> compact(OperationContext*, const CompactOptions&) final;
     StatusWith<int64_t> compact(OperationContext*, RecoveryUnit&, const CompactOptions&) final;
 
     RecordId getLargestKey(OperationContext*, RecoveryUnit&) const override = 0;

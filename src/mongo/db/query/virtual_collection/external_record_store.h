@@ -204,10 +204,6 @@ public:
         return false;
     }
 
-    StatusWith<int64_t> compact(OperationContext*, const CompactOptions&) final {
-        unimplementedTasserted();
-        return {ErrorCodes::Error::UnknownError, "Unknown error"};
-    }
     StatusWith<int64_t> compact(OperationContext*, RecoveryUnit&, const CompactOptions&) final {
         unimplementedTasserted();
         return {ErrorCodes::Error::UnknownError, "Unknown error"};

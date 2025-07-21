@@ -578,10 +578,7 @@ public:
      * Attempt to reduce the storage space used by this RecordStore.
      * Only called if compactSupported() returns true.
      * Returns an estimated number of bytes when doing a dry run.
-     *
-     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
-    virtual StatusWith<int64_t> compact(OperationContext*, const CompactOptions&) = 0;
     virtual StatusWith<int64_t> compact(OperationContext*,
                                         RecoveryUnit&,
                                         const CompactOptions&) = 0;

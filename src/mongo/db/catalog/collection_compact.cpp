@@ -87,7 +87,8 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
 
     pauseCompactCommandBeforeWTCompact.pauseWhileSet();
 
-    auto compactCollectionStatus = recordStore->compact(opCtx, options);
+    auto compactCollectionStatus =
+        recordStore->compact(opCtx, *shard_role_details::getRecoveryUnit(opCtx), options);
     if (!compactCollectionStatus.isOK())
         return compactCollectionStatus;
 

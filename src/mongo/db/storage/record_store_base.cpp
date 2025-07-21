@@ -169,10 +169,6 @@ Status RecordStoreBase::rangeTruncate(OperationContext* opCtx,
 }
 
 StatusWith<int64_t> RecordStoreBase::compact(OperationContext* opCtx,
-                                             const CompactOptions& options) {
-    return compact(opCtx, *shard_role_details::getRecoveryUnit(opCtx), options);
-}
-StatusWith<int64_t> RecordStoreBase::compact(OperationContext* opCtx,
                                              RecoveryUnit& ru,
                                              const CompactOptions& options) {
     validateWriteAllowed(opCtx);
