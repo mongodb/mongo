@@ -48,7 +48,9 @@ RM* _named = NULL;
 
 }  // namespace
 
-RamLog::RamLog(StringData name) : _name(name) {
+RamLog::RamLog(StringData name, size_t maxLines, size_t maxSizeBytes)
+    : _maxLines(maxLines), _maxSizeBytes(maxSizeBytes), _name(name) {
+    _lines.resize(_maxLines);
     clear();
 }
 
@@ -71,19 +73,19 @@ void RamLog::write(const std::string& str) {
     _totalSizeBytes += str.size();
 
     // Advance the last line position to the next entry
-    _lastLinePosition = (_lastLinePosition + 1) % kMaxLines;
+    _lastLinePosition = (_lastLinePosition + 1) % _maxLines;
 
     // If _lastLinePosition is == _firstLinePosition, it means we wrapped around so advance
     // firstLinePosition
     if (_lastLinePosition == _firstLinePosition) {
-        _firstLinePosition = (_firstLinePosition + 1) % kMaxLines;
+        _firstLinePosition = (_firstLinePosition + 1) % _maxLines;
     }
 }
 
 // warning: this function must be invoked under existing mutex
 void RamLog::trimIfNeeded(size_t newStr) {
     // Check if we are going to go past the size limit
-    if ((_totalSizeBytes + newStr) < kMaxSizeBytes) {
+    if ((_totalSizeBytes + newStr) < _maxSizeBytes) {
         return;
     }
 
@@ -105,7 +107,7 @@ void RamLog::trimIfNeeded(size_t newStr) {
         _lines[_firstLinePosition].clear();
         _lines[_firstLinePosition].shrink_to_fit();
 
-        _firstLinePosition = (_firstLinePosition + 1) % kMaxLines;
+        _firstLinePosition = (_firstLinePosition + 1) % _maxLines;
     }
 }
 
@@ -116,7 +118,7 @@ void RamLog::clear() {
     _lastLinePosition = 0;
     _totalSizeBytes = 0;
 
-    for (size_t i = 0; i < kMaxLines; i++) {
+    for (size_t i = 0; i < _maxLines; i++) {
         _lines[i].clear();
         _lines[i].shrink_to_fit();
     }
@@ -128,14 +130,14 @@ StringData RamLog::getLine(size_t lineNumber) const {
     }
 
     stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
-    return _lines[(lineNumber + _firstLinePosition) % kMaxLines].c_str();
+    return _lines[(lineNumber + _firstLinePosition) % _maxLines].c_str();
 }
 
 size_t RamLog::getLineCount() const {
     stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
 
     if (_lastLinePosition < _firstLinePosition) {
-        return (kMaxLines - _firstLinePosition) + _lastLinePosition;
+        return (_maxLines - _firstLinePosition) + _lastLinePosition;
     }
 
     return _lastLinePosition - _firstLinePosition;
@@ -155,6 +157,14 @@ size_t RamLog::LineIterator::getTotalLinesWritten() {
 // ---------------
 
 RamLog* RamLog::get(const std::string& name) {
+    return getImpl(name);
+}
+
+RamLog* RamLog::get(const std::string& name, size_t maxLines, size_t maxSizeBytes) {
+    return getImpl(name, maxLines, maxSizeBytes);
+}
+
+RamLog* RamLog::getImpl(const std::string& name, size_t maxLines, size_t maxSizeBytes) {
     if (!_namedLock) {
         // Guaranteed to happen before multi-threaded operation.
         _namedLock = new stdx::mutex();
@@ -168,7 +178,7 @@ RamLog* RamLog::get(const std::string& name) {
 
     auto [iter, isNew] = _named->try_emplace(name);
     if (isNew)
-        iter->second = new RamLog(name);
+        iter->second = new RamLog(name, maxLines, maxSizeBytes);
     return iter->second;
 }
 

@@ -74,6 +74,14 @@ public:
     static RamLog* get(const std::string& name);
 
     /**
+     * Returns a pointer to the ramlog named "name", creating one if it did not already exist.
+     * Allows setting custom maxLines and maxSizeBytes.
+     *
+     * Synchronizes on the RamLog catalog lock, _namedLock.
+     */
+    static RamLog* get(const std::string& name, size_t maxLines, size_t maxSizeBytes);
+
+    /**
      * Returns a pointer to the ramlog named "name", or NULL if no such ramlog exists.
      *
      * Synchronizes on the RamLog catalog lock, _namedLock.
@@ -100,8 +108,22 @@ public:
      */
     void clear();
 
+    /**
+     * Inspect maxLines setting
+     */
+    size_t getMaxLines() const {
+        return _maxLines;
+    }
+
+    /**
+     * Inspect maxSizeBytes setting
+     */
+    size_t getMaxSizeBytes() const {
+        return _maxSizeBytes;
+    }
+
 private:
-    explicit RamLog(StringData name);
+    explicit RamLog(StringData name, size_t maxLines, size_t maxSizeBytes);
     ~RamLog();  // want this private as we want to leak so we can use them till the very end
 
     StringData getLine(size_t lineNumber) const;
@@ -110,19 +132,29 @@ private:
 
     void trimIfNeeded(size_t newStr);
 
+    static RamLog* getImpl(const std::string& name,
+                           size_t maxLines = kMaxLines,
+                           size_t maxSizeBytes = kMaxSizeBytes);
+
 private:
-    // Maximum number of lines
+    // Default maximum number of lines
     static constexpr size_t kMaxLines = 1024;
 
-    // Maximum capacity of RamLog of string data
+    // Default maximum capacity of RamLog of string data
     static constexpr size_t kMaxSizeBytes = 1024 * 1024;
+
+    // Maximum number of lines
+    size_t _maxLines;
+
+    // Maximum capacity of RamLog of string data
+    size_t _maxSizeBytes;
 
     // Guards all non-static data.
     // stdx::recursive_mutex // NOLINT is intentional, stdx::mutex can not be used here
     mutable stdx::recursive_mutex _mutex;  // NOLINT
 
     // Array of lines
-    std::array<std::string, kMaxLines> _lines;
+    std::vector<std::string> _lines;
 
     // First line of ram log
     size_t _firstLinePosition;
