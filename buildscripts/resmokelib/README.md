@@ -2,6 +2,8 @@
 
 Resmoke is MongoDB's integration test runner.
 
+The JS Tests it can run live in the `jstests/` directory - reference its [README](../../jstests/README.md) to learn about their content.
+
 ## Build
 
 Though the source is built with bazel, resmoke is not yet integrated. This means that the source has to be built prior to using resmoke, eg:

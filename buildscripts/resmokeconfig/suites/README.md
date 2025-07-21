@@ -2,11 +2,13 @@
 
 Test "suites" are configuration files that group which tests to run, and how.
 
-Yaml files enumerate the test files that the suite encompasses, as well as any test fixtures and their configuations to leverage, options for the shell, hooks, and more.
+Yaml files enumerate the test files that the suite encompasses, as well as any test fixtures and their configurations to leverage, options for the shell, hooks, and more.
 
 ## Minimal Example
 
-```
+`my_suite.yml`:
+
+```yaml
 test_kind: js_test
 selector:
   roots:
@@ -17,19 +19,74 @@ executor:
       nodb: ""
 ```
 
+This relays the following:
+
+- The suite name is the filename, "my_suite"
+- The suite includes all JS files in the `jstests/mytests` directory
+- Those tests are run against a shell that is passed the `nodb: ""` options
+
+The following is one with placeholders that illustrate the overall structure:
+
+```yaml
+test_kind: js_test
+selector:
+  roots:
+    - jstests/mytests/**/*.js
+executor:
+  config:
+    shell_options:
+      nodb: ""
+      global_vars:
+        TestData:
+          defaultReadConcernLevel: null
+  hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ShardedClusterFixture
+    num_shards: 2
+  archive:
+    tests: true
+    hooks:
+      - ValidateCollections
+```
+
 # Suite Fields
 
 ## `test_kind`
 
-This represents the type of tests that are running in this suite. Some examples include: _js_test,
-cpp_unit_test, cpp_integration_tests, benchmark_test, fsm_workload_test_, etc. You can see all
-available options in the `_SELECTOR_REGISTRY` at [buildscripts/resmokelib/selector.py](../../../buildscripts/resmokelib/selector.py).
+This represents the type of tests that are running in this suite.
 
 Example:
 
 ```yaml
 test_kind: js_test
 ```
+
+The following kinds are supported (see [`_SELECTOR_REGISTRY`](../../../buildscripts/resmokelib/selector.py)):
+
+- `all_versions_js_test`
+- `benchmark_test`
+- `bulk_write_cluster_js_test`
+- `cpp_integration_test`
+- `cpp_libfuzzer_test`
+- `cpp_unit_test`
+- `db_test`
+- `fsm_workload_test`
+- `js_test`
+- `json_schema_test`
+- `multi_stmt_txn_passthrough`
+- `magic_restore_js_test`
+- `parallel_fsm_workload_test`
+- `pretty_printer_test`
+- `py_test`
+- `query_tester_self_test`
+- `query_tester_server_test`
+- `sdam_json_test`
+- `server_selection_json_test`
+- `sleep_test`
+- `tla_plus_test`
 
 ## `selector`
 
@@ -52,50 +109,33 @@ selector:
 
 File path(s) of test files to include. If a path without a glob is provided, it must exist.
 
+### `selector.root`
+
+A file containing glob patterns, one per line, typically used by test_kind cpp_unit_test (usually build/unittests.txt). Specifies which tests to consider for including into the suite. If no other options are specified, these are the tests that will be run. Glob patterns are supported (and common) here.
+
+### `selector.include_files`
+
+A list of strings representing glob patterns. Includes only this subset of tests in the suite. These files will be included even if they would otherwise be excluded by tags. Will error if a test specified here was not included in the roots.
+
 ### `selector.exclude_files`
 
-File path(s) of test files to exclude. If a path without a glob is provided, it must exist.
+A list of strings representing glob patterns. Excludes this list of tests from the suite. These files will be excluded even if they would otherwise be included by tags. Will error if a test specified here was not included in the roots.
+
+### `selector.include_with_any_tags`
+
+A list of strings. Only jstests which define a list of tags which includes any of these tags will be included in the suite, unless otherwise excluded by filename.
+
+To see all available tags, run `./buildscripts/resmoke.py list-tags`.
 
 ### `selector.exclude_with_any_tags`
 
-Exclude test files by tag name(s). To see all available tags, run
-`./buildscripts/resmoke.py list-tags`.
+A list of strings. Any jstest which defines a list of tags which includes any of these tags will be excluded from the suite, unless otherwise included by filename.
+
+To see all available tags, run `./buildscripts/resmoke.py list-tags`.
 
 ## `executor`
 
-Configuration for the test execution framework.
-
-Example:
-
-```yaml
-executor:
-  archive:
----
-config:
----
-hooks:
----
-fixture:
-```
-
-### `executor.archive`
-
-Upon failure, data files can be uploaded to s3. A failure is when a `hook` or `test` throws an
-exception. Data files will be archived in the following situations:
-
-1. Any `hook` included in this section throws an exception.
-2. If `tests: true` and any `test` in the suite throws an exception.
-
-Example:
-
-```yaml
-archive:
-  hooks:
-    - Hook1
-    - Hook2
----
-tests: true
-```
+Defines how the tests will be executed.
 
 ### `executor.config`
 
@@ -123,6 +163,14 @@ config:
 Above is an example of the most common `test_kind` -- `js_test`. `js_test` uses `shell_options` to
 customize the mongo shell when running tests.
 
+#### `executor.config.shell_options`
+
+Any parameters (besides `global_vars`) will directly be passed to the mongo shell executable.
+
+##### `executor.config.shell_options.global_vars`
+
+Will use this as the base for the string passed to `--eval`. Anything specified in `shell_options.eval` will be appended after these. Formats any objects so that they will evaluate properly as a string.
+
 `global_vars` allows for setting global variables. A `TestData` object is a special global variable
 that is used to hold testing data. Parts of `TestData` can be updated via `resmoke` command-line
 invocation, via `.yml` (as shown above), and during runtime. The global `TestData` object is merged
@@ -138,10 +186,11 @@ javascript code, or you can put it in a separate script & `load` it.
 
 ### `executor.hooks`
 
-Specify hooks can run before, after, and between individual tests to execute specified logic.
+Specify hooks to run before, after, and between individual tests to execute specified logic.
 
-The hook name in the `.yml` must match its Python class name in the
-`buildscripts/resmokelib/testing/hooks` directory. Parameters can also be included in the `.yml`
+> Read more about hooks in [buildscripts/resmokelib/testing/hooks/README.md](../../../buildscripts/resmokelib/testing/hooks/README.md)
+
+The hook name in the `.yml` must match its Python class name of the hook. Parameters can also be included in the `.yml`
 and will be passed to the hook's constructor (the `hook_logger` & `fixture` parameters are
 automatically included, so those should not be included in the `.yml`).
 
@@ -159,14 +208,13 @@ hooks:
     param2: somethingelse
 ```
 
-> Read more about implementing hooks in [buildscripts/resmokelib/testing/hooks/README.md](../../../buildscripts/resmokelib/testing/hooks/README.md)
-
 ### `executor.fixture`
 
-This represents the test fixture to run tests against. The `class` sub-field corresponds to the
-Python class name of a fixture in the [buildscripts/resmokelib/testing/fixtures](../../..buildscripts/resmokelib/testing/fixtures)` directory. All
-other sub-fields are passed into the constructor of the fixture. These sub-fields will vary based
-on the fixture used.
+Specify a test fixture to run around the tests.
+
+> Read more about fixtures in [buildscripts/resmokelib/testing/fixtures/README.md](../../../buildscripts/resmokelib/testing/fixtures/README.md).
+
+The `class` sub-field corresponds to the Python class name of a fixture. All other sub-fields are passed into the constructor of the fixture. These sub-fields will vary based on the fixture used.
 
 Example:
 
@@ -185,3 +233,31 @@ fixture:
       periodicNoopIntervalSecs: 1
       writePeriodicNoops: true
 ```
+
+### `executor.archive`
+
+Upon failure, data files can be uploaded to s3. A failure is when a `hook` or `test` throws an
+exception. Data files will be archived in the following situations:
+
+1. Any `hook` included in this section throws an exception.
+2. If `tests: true` and any `test` in the suite throws an exception.
+
+Example:
+
+```yaml
+archive:
+  hooks:
+    - Hook1
+    - Hook2
+  tests: true
+```
+
+#### `executor.archive.hooks`
+
+Specify a list of hook class names to archive on failure. Set to `true` to archive _all_ hooks.
+
+Read more about [hooks](../../../buildscripts/resmokelib/testing/hooks/README.md).
+
+#### `executor.archive.tests`
+
+Specify a list of test files to archive on failure. Wildcard selection a valid. Set to `true` to archive _all_ tests.

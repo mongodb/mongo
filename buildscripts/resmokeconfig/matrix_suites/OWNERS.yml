@@ -1,23 +1,26 @@
-version: 1.0.0
+version: 2.0.0
 filters:
   - "*":
     approvers:
       - 10gen/mongo-default-approvers
-  - "generated_suites/*viewless_timeseries.yml":
+  - "README.md":
+    approvers:
+      - 10gen/devprod-correctness
+  - "/generated_suites/*viewless_timeseries.yml":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "generated_suites/*injected_catalog_metadata.yml":
+  - "/generated_suites/*injected_catalog_metadata.yml":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "generated_suites/sharding_task_executor_pool_size*":
+  - "/generated_suites/sharding_task_executor_pool_size*":
     approvers:
       - 10gen/server-networking-and-observability
-  - "generated_suites/change_streams_*":
+  - "/generated_suites/change_streams_*":
     approvers:
       - 10gen/query-execution-change-streams
-  - "generated_suites/*ingress_request_rate_limiter*":
+  - "/generated_suites/*ingress_request_rate_limiter*":
     approvers:
       - 10gen/server-workload-scheduling
-  - "generated_suites/bulk_write_*":
+  - "/generated_suites/bulk_write_*":
     approvers:
       - 10gen/query-execution-router

@@ -51,7 +51,7 @@ It is best to use variable names that attempt to describe what a value is used f
 
 All assertions in a test should attempt to verify the most specific property possible. For example, if you are trying to test that a certain collection exists, it is better to assert that the collection’s exact name exists in the list of collections, as opposed to verifying that the collection count is equal to 1. The desired collection’s existence is sufficient for the collection count to be 1, but not necessary (a different collection could exist in its place). Be wary of adding these kind of indirect assertions in a test.
 
-## Modules in Practice
+## Modern JS: Modules in Practice
 
 We have fully migrated to the modularized JavaScript world so any new test should use modules and adapt the new style.
 
@@ -103,3 +103,49 @@ import * as MyModule from "/path/to/my_module.js";
 ```
 
 This can help the language server to discover the methods and provide code navigation for it.
+
+### Use Mocha-style Constructs
+
+The [mochalite.js](../jstests/libs/mochalite.js) library ports over a subset of [MochaJS](https://mochajs.org/) functionality for the shell, including:
+
+- `it` test contruction
+- `describe` suite structures
+- `before` and `after` hooks, to run _once_ around _all_ `it` tests
+- `beforeEach` and `afterEach` hooks, to run around _each_ `it` test
+- The above (excluding `describe`) support `async` functions
+- Resmoke test filtering using the `--mochagrep` flag, which mirrors the [`grep`](https://mochajs.org/#-grep-regexp-g-regexp) flag from MochaJS
+
+Example using all APIs:
+
+```
+import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+
+describe("simple inserts and finds", () => {
+    before(() => {
+        this.fixtureDB = startupNewDB();
+    });
+    beforeEach(() => {
+        this.fixtureDB.seed();
+    });
+    afterEach(async () => {
+        await this.fixtureDB.clear();
+    });
+    after(() => {
+        this.fixtureDB.shutdown();
+    });
+    it("should do something", () => {
+        this.fixtureDB.insert({ name: "test" });
+        assert.eq(this.fixtureDB.find({ name: "test" }).count(), 1);
+    });
+    it("should error on invalid data", () => {
+        const e = assert.throws(() => this.fixtureDB.insert({ "notafield": undefined }));
+        assert.eq(e.message, "Field 'notafield' not found");
+    });
+});
+```
+
+Use the filter on resmoke to run just the one test:
+
+```
+buildscripts/resmoke.py run --suites=no_passthrough --mochagrep "do something" jstests/noPassthrough/mytest.js
+```
