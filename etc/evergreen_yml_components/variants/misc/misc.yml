@@ -58,6 +58,13 @@ buildvariants:
     tasks:
       - name: promote_custom_build
 
+  - name: promote-sys-perf-build
+    display_name: "Promote Sys-perf Build"
+    activate: false
+    allowed_requesters: ["patch"]
+    tasks:
+      - name: promote_sys_perf_build
+
   - name: copybara-sync-between-repos
     display_name: "* Copybara Sync Between Repos"
     tags: ["suggested"]
