@@ -255,7 +255,8 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
     _resolvedPipeline = resolvedNamespace.pipeline;
     _fromNsIsAView = resolvedNamespace.involvedNamespaceIsAView;
 
-    _fromExpCtx = expCtx->copyForSubPipeline(resolvedNamespace.ns, resolvedNamespace.uuid);
+    _fromExpCtx = expCtx->copyForSubPipeline(
+        resolvedNamespace.ns, resolvedNamespace.uuid, boost::none, _fromNs);
     _fromExpCtx->setInLookup(true);
 }
 

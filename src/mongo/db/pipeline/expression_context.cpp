@@ -599,7 +599,8 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     NamespaceString ns,
     boost::optional<UUID> uuid,
     boost::optional<std::unique_ptr<CollatorInterface>> updatedCollator,
-    boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view) const {
+    boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view,
+    boost::optional<NamespaceString> userNs) const {
     auto collator = [&]() {
         if (updatedCollator) {
             return std::move(*updatedCollator);
@@ -619,7 +620,12 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
             .ifrContext(_params.ifrContext)
             .collator(std::move(collator))
             .mongoProcessInterface(_params.mongoProcessInterface)
-            .ns(ns)
+            // For stages like $lookup and $unionWith that have a $rankFusion as subpipeline, we
+            // want to pass the namespace of the spec (aka the executionNs) to avoid running against
+            // an incorrect namespace, e.g.
+            // db.collA.aggregate([$unionWith: {coll: collB, pipeline: <rankFusionCollB>}]);
+            .originalNs(userNs.value_or(ns))
+            .ns(std::move(ns))
             .resolvedNamespace(_params.resolvedNamespaces)
             .mayDbProfile(_params.mayDbProfile)
             .fromRouter(_params.fromRouter)
@@ -644,11 +650,6 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
             .initialPostBatchResumeToken(_params.initialPostBatchResumeToken.getOwned())
             .view(view)
             .requiresTimeseriesExtendedRangeSupport(_params.requiresTimeseriesExtendedRangeSupport)
-            // For stages like $lookup and $unionWith that have a $rankFusion as subpipeline, we
-            // want to pass the namespace of the spec (aka the executionNs) to avoid running against
-            // an incorrect namespace, e.g.
-            // db.collA.aggregate([$unionWith: {coll: collB, pipeline: <rankFusionCollB>}]);
-            .originalNs(std::move(ns))
             .isRankFusion(_params.isRankFusion)
             .build();
 

@@ -294,21 +294,26 @@ public:
     /**
      * Returns an ExpressionContext that is identical to 'this' that can be used to execute a
      * separate aggregation pipeline on 'ns' with the optional 'uuid' and an updated collator.
+     * 'userNs' indicates the namespace the user typed in the 'from/coll' field in a
+     * $lookup/$unionWith respectively.
      */
     boost::intrusive_ptr<ExpressionContext> copyWith(
         NamespaceString ns,
         boost::optional<UUID> uuid = boost::none,
         boost::optional<std::unique_ptr<CollatorInterface>> updatedCollator = boost::none,
-        boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view = boost::none) const;
+        boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view = boost::none,
+        boost::optional<NamespaceString> userNs = boost::none) const;
 
     /**
      * Returns an ExpressionContext that is identical to 'this' except for the 'subPipelineDepth'
-     * and 'needsMerge' fields.
+     * and 'needsMerge' fields, as well as changing the 'userNs' to whatever was passed in as
+     * 'from' in $lookup or 'coll' in $unionWith.
      */
     boost::intrusive_ptr<ExpressionContext> copyForSubPipeline(
         NamespaceString nss,
         boost::optional<UUID> uuid = boost::none,
-        boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view = boost::none) {
+        boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view = boost::none,
+        boost::optional<NamespaceString> userNs = boost::none) {
         uassert(ErrorCodes::MaxSubPipelineDepthExceeded,
                 str::stream() << "Maximum number of nested sub-pipelines exceeded. Limit is "
                               << internalMaxSubPipelineViewDepth.load(),
@@ -316,7 +321,7 @@ public:
         // Initialize any referenced system variables now so that the subpipeline has the same
         // values for these variables.
         this->initializeReferencedSystemVariables();
-        auto newCopy = copyWith(std::move(nss), uuid, boost::none, view);
+        auto newCopy = copyWith(std::move(nss), uuid, boost::none, view, userNs);
         newCopy->_params.subPipelineDepth += 1;
         // The original expCtx might have been attached to an aggregation pipeline running on the
         // shards. We must reset 'needsMerge' in order to get fully merged results for the
@@ -584,6 +589,10 @@ public:
 
     const NamespaceString& getUserNss() const {
         return _params.originalNs;
+    }
+
+    void setUserNss(NamespaceString ns) {
+        _params.originalNs = std::move(ns);
     }
 
     void setNamespaceString(NamespaceString ns) {

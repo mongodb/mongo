@@ -93,12 +93,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
     opts.optimize = !resolvedNs.pipeline.empty();
     opts.validator = validatorCallback;
 
+    auto subExpCtx =
+        expCtx->copyForSubPipeline(resolvedNs.ns, resolvedNs.uuid, boost::none, userNss);
+
     return Pipeline::makePipelineFromViewDefinition(
-        expCtx->copyForSubPipeline(resolvedNs.ns, resolvedNs.uuid),
-        resolvedNs,
-        std::move(currentPipeline),
-        opts,
-        userNss);
+        subExpCtx, resolvedNs, std::move(currentPipeline), opts, userNss);
 }
 
 }  // namespace
