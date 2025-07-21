@@ -95,4 +95,14 @@ jsTest.log('Remove network partition before tearing down');
 configPrimary.discardMessagesFrom(st.s, 0.0);
 st.s.discardMessagesFrom(configPrimary, 0.0);
 
+// The mongos may have some connections in its pool that were created during the partition. They
+// are waiting on hello responses that will never come and will eventually time out. Any operation
+// that is waiting for a connection to the config primary when that happens will have its request
+// failed, and this may fail the operation and the test. Operations that need a connection may
+// even be forced to wait for one of those doomed connections, which virtually guarantees that
+// it will fail as described above. To avoid that, drop the connections to the config primary.
+// For good measure, we'll also drop connections in the other direction in case they also exist.
+assert.commandWorked(st.s.adminCommand({dropConnections: 1, hostAndPort: [configPrimary.host]}));
+assert.commandWorked(configPrimary.adminCommand({dropConnections: 1, hostAndPort: [st.s.host]}));
+
 st.stop();
