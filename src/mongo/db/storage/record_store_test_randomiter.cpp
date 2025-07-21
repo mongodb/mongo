@@ -60,7 +60,8 @@ TEST(RecordStoreTest, GetRandomIteratorEmpty) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto cursor = rs->getRandomCursor(opCtx.get());
+        auto cursor =
+            rs->getRandomCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         // returns NULL if getRandomCursor is not supported
         if (!cursor) {
             return;
@@ -105,7 +106,8 @@ TEST(RecordStoreTest, GetRandomIteratorNonEmpty) {
     set<RecordId> remain(locs, locs + nToInsert);
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto cursor = rs->getRandomCursor(opCtx.get());
+        auto cursor =
+            rs->getRandomCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         // returns NULL if getRandomCursor is not supported
         if (!cursor) {
             return;
@@ -115,7 +117,8 @@ TEST(RecordStoreTest, GetRandomIteratorNonEmpty) {
         for (unsigned i = 0; i < nToInsert - 1; i++) {
             // Get a new cursor once in a while, shouldn't affect things
             if (i % (nToInsert / 8) == 0) {
-                cursor = rs->getRandomCursor(opCtx.get());
+                cursor = rs->getRandomCursor(opCtx.get(),
+                                             *shard_role_details::getRecoveryUnit(opCtx.get()));
             }
             remain.erase(cursor->next()->id);  // can happen more than once per doc
         }
@@ -158,7 +161,8 @@ TEST(RecordStoreTest, GetRandomIteratorSingleton) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto cursor = rs->getRandomCursor(opCtx.get());
+        auto cursor =
+            rs->getRandomCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         // returns NULL if getRandomCursor is not supported
         if (!cursor) {
             return;

@@ -750,7 +750,8 @@ TEST(RecordStoreTest, ClusteredRecordStore) {
         ASSERT_EQ(numRecords, currRecord);
     }
 
-    if (auto cursor = rs->getRandomCursor(opCtx.get())) {
+    if (auto cursor =
+            rs->getRandomCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()))) {
         auto record = cursor->next();
         ASSERT(record);
 

@@ -173,7 +173,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::sampleColl
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
     auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collectionPtr->ns()).build();
 
-    auto rsRandCursor = collectionPtr->getRecordStore()->getRandomCursor(opCtx);
+    auto rsRandCursor = collectionPtr->getRecordStore()->getRandomCursor(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     std::unique_ptr<PlanStage> root =
         std::make_unique<MultiIteratorStage>(expCtx.get(), ws.get(), collection);
     static_cast<MultiIteratorStage*>(root.get())->addIterator(std::move(rsRandCursor));

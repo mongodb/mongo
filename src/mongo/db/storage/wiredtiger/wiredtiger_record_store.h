@@ -185,7 +185,6 @@ public:
                                                     RecoveryUnit& ru,
                                                     bool forward = true) const override;
 
-    using RecordStoreBase::getRandomCursor;
     std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* opCtx,
                                                   RecoveryUnit& ru) const override;
 

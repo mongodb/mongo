@@ -375,7 +375,8 @@ void ScanStage::scanResetState(bool reOpen) {
             }
         }
     } else {
-        _randomCursor = _coll.getPtr()->getRecordStore()->getRandomCursor(_opCtx);
+        _randomCursor = _coll.getPtr()->getRecordStore()->getRandomCursor(
+            _opCtx, *shard_role_details::getRecoveryUnit(_opCtx));
     }
 
     _firstGetNext = true;
@@ -1014,7 +1015,8 @@ void ParallelScanStage::open(bool reOpen) {
                 if (ranges > 1024) {
                     ranges = 1024;
                 }
-                auto randomCursor = _coll.getPtr()->getRecordStore()->getRandomCursor(_opCtx);
+                auto randomCursor = _coll.getPtr()->getRecordStore()->getRandomCursor(
+                    _opCtx, *shard_role_details::getRecoveryUnit(_opCtx));
                 invariant(randomCursor);
                 std::set<RecordId> rids;
                 while (ranges--) {

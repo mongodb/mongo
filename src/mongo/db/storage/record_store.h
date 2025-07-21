@@ -540,10 +540,7 @@ public:
      * the same document more than once and, as a result, may return more documents than exist in
      * the record store. Implementations should avoid obvious biases toward older, newer, larger
      * smaller or other specific classes of documents.
-     *
-     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
-    virtual std::unique_ptr<RecordCursor> getRandomCursor(OperationContext*) const = 0;
     virtual std::unique_ptr<RecordCursor> getRandomCursor(OperationContext*,
                                                           RecoveryUnit&) const = 0;
 

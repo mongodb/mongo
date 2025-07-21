@@ -175,10 +175,6 @@ public:
                                                     RecoveryUnit& ru,
                                                     bool forward = true) const final;
 
-    std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* opCtx) const final {
-        unimplementedTasserted();
-        return nullptr;
-    }
     std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* opCtx,
                                                   RecoveryUnit& ru) const final {
         unimplementedTasserted();

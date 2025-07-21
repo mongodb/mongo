@@ -413,7 +413,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
     }
 
     // Attempt to get a random cursor from the RecordStore.
-    auto rsRandCursor = coll.getRecordStore()->getRandomCursor(opCtx);
+    auto rsRandCursor =
+        coll.getRecordStore()->getRandomCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     if (!rsRandCursor) {
         // The storage engine has no random cursor support.
         return nullptr;

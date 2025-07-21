@@ -102,7 +102,6 @@ public:
                                                     RecoveryUnit&,
                                                     bool forward = true) const override = 0;
 
-    std::unique_ptr<RecordCursor> getRandomCursor(OperationContext*) const final;
     std::unique_ptr<RecordCursor> getRandomCursor(OperationContext*,
                                                   RecoveryUnit&) const override = 0;
 

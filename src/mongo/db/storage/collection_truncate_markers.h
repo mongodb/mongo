@@ -34,6 +34,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
@@ -482,7 +483,7 @@ public:
 
     void reset(OperationContext* opCtx) final {
         _directionalCursor = _rs->getCursor(opCtx);
-        _randomCursor = _rs->getRandomCursor(opCtx);
+        _randomCursor = _rs->getRandomCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     }
 
 private:
