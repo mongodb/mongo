@@ -35,6 +35,8 @@
 #define WT_HS_FILE_SHARED "WiredTigerSharedHS.wt_stable"     /* Shared history store */
 #define WT_HS_URI "file:WiredTigerHS.wt"                     /* History store table URI */
 #define WT_HS_URI_SHARED "file:WiredTigerSharedHS.wt_stable" /* Shared history store URI */
+#define WT_HS_ID 1                                           /* ID for HS */
+#define WT_HS_ID_SHARED 2                                    /* ID for shared HS */
 
 #define WT_CC_METAFILE "WiredTigerCC.wt"          /* Chunk cache metadata table */
 #define WT_CC_METAFILE_URI "file:WiredTigerCC.wt" /* Chunk cache metadata table URI */
@@ -79,6 +81,20 @@
  * Other useful comparisons.
  */
 #define WT_IS_URI_HS(uri) (strcmp(uri, WT_HS_URI) == 0 || strcmp(uri, WT_HS_URI_SHARED) == 0)
+
+#define WT_HS_ID_TO_URI(session, hs_id, uri)                                                   \
+    do {                                                                                       \
+        switch ((hs_id)) {                                                                     \
+        case WT_HS_ID:                                                                         \
+            (uri) = WT_HS_URI;                                                                 \
+            break;                                                                             \
+        case WT_HS_ID_SHARED:                                                                  \
+            (uri) = WT_HS_URI_SHARED;                                                          \
+            break;                                                                             \
+        default:                                                                               \
+            WT_ASSERT_ALWAYS((session), false, "No such History Store ID: %" PRIu32, (hs_id)); \
+        }                                                                                      \
+    } while (0)
 
 #define WT_IS_URI_METADATA(uri) \
     (strcmp(uri, WT_METAFILE_URI) == 0 || strcmp(uri, WT_DISAGG_METADATA_URI) == 0)

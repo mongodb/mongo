@@ -39,7 +39,7 @@ from wtscenario import make_scenarios
 class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
     uri = "layered:test_layered45"
     conn_base_config = 'statistics=(all),statistics_log=(wait=1,json=true,on_close=true),transaction_sync=(enabled,method=fsync),' \
-                     + 'disaggregated=(page_log=palm),preserve_prepared=true,'
+                     + 'disaggregated=(page_log=palm),checkpoint=(precise=true),preserve_prepared=true,'
     conn_config = conn_base_config + 'disaggregated=(role="leader")'
     disagg_storages = gen_disagg_storages('test_layered45', disagg_only = True)
 
@@ -71,11 +71,15 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
             cursor[str(i)] = value1
             self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(5)}')
 
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
+
         self.session.checkpoint()
 
         self.session.begin_transaction()
         cursor[str(5)] = value2
         self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(10)}')
+
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
 
         self.session.checkpoint()
 
@@ -103,12 +107,16 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
             cursor[str(i)] = value1
             self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(5)}')
 
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
+
         self.session.checkpoint()
 
         self.session.begin_transaction()
         cursor.set_key(str(5))
         cursor.remove()
         self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(10)}')
+
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
 
         self.session.checkpoint()
 
@@ -150,6 +158,7 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # packing/unpacking prepare_ts and prepared_id on checkpoint yet, so it
         # will fail cell validation when trying to read prepared_id from disk. Re-enable this test
         # when the feature is supported.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.skipTest('FIXME-WT-14941 Enable when packing/unpacking prepare_ts and prepared_id on checkpoint is supported')
         self.session.create(self.uri, self.session_create_config())
 
@@ -161,6 +170,8 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
             self.session.begin_transaction()
             cursor[str(i)] = value1
             self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(5)}')
+
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
 
         self.session.checkpoint()
 
@@ -177,6 +188,8 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
         evict_cursor.reset()
         evict_cursor.close()
         session2.rollback_transaction()
+
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
 
         session2.checkpoint()
 
@@ -211,6 +224,7 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # packing/unpacking prepare_ts and prepared_id on checkpoint yet, so it
         # will fail cell validation when trying to read prepared_id from disk. Re-enable this test
         # when the feature is supported.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.skipTest('FIXME-WT-14941 Enable when packing/unpacking prepare_ts and prepared_id on checkpoint is supported')
         self.session.create(self.uri, self.session_create_config())
 
@@ -222,6 +236,8 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
             self.session.begin_transaction()
             cursor[str(i)] = value1
             self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(5)}')
+
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
 
         self.session.checkpoint()
 
@@ -239,6 +255,8 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
         evict_cursor.reset()
         evict_cursor.close()
         session2.rollback_transaction()
+
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
 
         session2.checkpoint()
 
@@ -273,6 +291,7 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # packing/unpacking prepare_ts and prepared_id on checkpoint yet, so it
         # will fail cell validation when trying to read prepared_id from disk. Re-enable this test
         # when the feature is supported.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.skipTest('FIXME-WT-14941 Enable when packing/unpacking prepare_ts and prepared_id on checkpoint is supported')
         self.session.create(self.uri, self.session_create_config())
 
@@ -284,6 +303,8 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
             self.session.begin_transaction()
             cursor[str(i)] = value1
             self.session.commit_transaction(f'commit_timestamp={self.timestamp_str(5)}')
+
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
 
         self.session.checkpoint()
 
@@ -302,6 +323,8 @@ class test_layered45(wttest.WiredTigerTestCase, DisaggConfigMixin):
         evict_cursor.reset()
         evict_cursor.close()
         session2.rollback_transaction()
+
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
 
         session2.checkpoint()
 

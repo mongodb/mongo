@@ -61,6 +61,37 @@ err:
 }
 
 /*
+ * __wt_curhs_get_cached --
+ *     Retrieve the history store btree from the cursors dhandle cache.
+ */
+int
+__wt_curhs_get_cached(WT_SESSION_IMPL *session, uint32_t hs_id, WT_BTREE **hs_btreep)
+{
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    uint64_t hash_value;
+    const char *uri;
+
+    uri = NULL;
+    WT_HS_ID_TO_URI(session, hs_id, uri);
+
+    __wt_cursor_get_hash(session, uri, NULL, &hash_value);
+    if ((ret = __wt_cursor_cache_get(session, uri, hash_value, NULL, NULL, &cursor)) == 0) {
+        *hs_btreep = CUR2BT(cursor);
+        /*
+         * The pattern of acquiring a cursor, obtaining its dhandle, and then closing the cursor is
+         * generally unsafe and can lead to undefined behavior. This is because the sweep server
+         * checks for references to dhandles, and closing the cursor may result in the dhandle being
+         * swept while still in use. However, history store dhandles are an exception as they are
+         * not subject to sweeping.
+         */
+        WT_RET(cursor->close(cursor));
+    }
+
+    return (ret);
+}
+
+/*
  * __wt_curhs_cache --
  *     Cache a new history store table cursor. Open and then close a history store cursor without
  *     saving it in the session.
@@ -100,6 +131,13 @@ __wt_curhs_cache(WT_SESSION_IMPL *session)
       session == conn->default_session)
         return (0);
 
+    /*
+     * The pattern of acquiring a cursor, obtaining its dhandle, and then closing the cursor is
+     * generally unsafe and can lead to undefined behavior. This is because the sweep server checks
+     * for references to dhandles, and closing the cursor may result in the dhandle being swept
+     * while still in use. However, history store dhandles are an exception as they are not subject
+     * to sweeping.
+     */
     WT_RET(__curhs_file_cursor_open(session, WT_HS_URI, NULL, &cursor));
     WT_RET(cursor->close(cursor));
 
@@ -1266,14 +1304,14 @@ __wt_curhs_next_hs_id(WT_SESSION_IMPL *session, uint32_t hs_id, uint32_t *next_h
     WT_UNUSED(session);
 
     if (hs_id == 0) {
-        *next_hs_idp = 1;
+        *next_hs_idp = WT_HS_ID;
         return (0);
     }
 
-    if (hs_id == 1) {
+    if (hs_id == WT_HS_ID) {
         if (!__wt_conn_is_disagg(session))
             return (WT_NOTFOUND);
-        *next_hs_idp = 2;
+        *next_hs_idp = WT_HS_ID_SHARED;
         return (0);
     }
 
@@ -1392,19 +1430,9 @@ __wt_curhs_open_ext(WT_SESSION_IMPL *session, uint32_t hs_id, uint32_t btree_id,
 
     cursor = NULL;
     *cursorp = NULL;
+    uri = NULL;
 
-    switch (hs_id) {
-    case 1:
-        uri = WT_HS_URI;
-        break;
-
-    case 2:
-        uri = WT_HS_URI_SHARED;
-        break;
-
-    default:
-        WT_ERR_MSG(session, EINVAL, "No such History Store ID: %" PRIu32, hs_id);
-    }
+    WT_HS_ID_TO_URI(session, hs_id, uri);
 
     WT_ERR(__wt_calloc_one(session, &hs_cursor));
     ++session->hs_cursor_counter;

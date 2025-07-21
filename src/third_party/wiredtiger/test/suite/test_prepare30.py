@@ -27,7 +27,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper import simulate_crash_restart
 from wtscenario import make_scenarios
 
 # test_prepare30.py
@@ -36,7 +35,7 @@ from wtscenario import make_scenarios
 class test_prepare30(wttest.WiredTigerTestCase):
 
     conn_config_values = [
-        ('preserve_prepared_on', dict(expected_error=True, conn_config=f'preserve_prepared=true')),
+        ('preserve_prepared_on', dict(expected_error=True, conn_config='checkpoint=(precise=true),preserve_prepared=true')),
     ]
 
     scenarios = make_scenarios(conn_config_values)
@@ -53,5 +52,3 @@ class test_prepare30(wttest.WiredTigerTestCase):
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
                 self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(ts)),
                         '/prepared_id need to be set with preserve_prepared flag on/')
-
-

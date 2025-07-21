@@ -31,8 +31,8 @@ file_parse()
 func_ok()
 {
     sed \
+        -e '/int LLVMFuzzerTestOneInput$/d' \
         -e '/int __bm_stat$/d' \
-        -e '/int __bmd_free$/d' \
         -e '/int __bmd_stat$/d' \
         -e '/int __checkpoint_presync$/d' \
         -e '/int __compact_uri_analyze$/d' \
@@ -66,20 +66,54 @@ func_ok()
         -e '/int __time_value_validate_parent_stable$/d' \
         -e '/int __tree_walk_skip_count_callback$/d' \
         -e '/int __txn_rollback_to_stable_custom_skip$/d' \
+        -e '/int __ut_ckpt_add_blkmod_entry$/d' \
+        -e '/int __ut_ovfl_discard_verbose$/d' \
+        -e '/int __ut_ovfl_discard_wrapup$/d' \
         -e '/int __win_terminate$/d' \
         -e '/int __wt_block_compact_end$/d' \
         -e '/int __wt_block_compact_start$/d' \
         -e '/int __wt_block_disagg_manager_create$/d' \
-        -e '/int __wt_block_disagg_manager_size$/d' \
-        -e '/int __wt_block_disagg_read$/d' \
         -e '/int __wt_block_manager_size$/d' \
         -e '/int __wt_block_tiered_load$/d' \
         -e '/int __wt_block_write_size$/d' \
         -e '/int __wt_btcur_skip_page$/d' \
         -e '/int __wt_buf_catfmt$/d' \
         -e '/int __wt_buf_fmt$/d' \
-        -e '/int __wt_count_birthmarks$/d' \
         -e '/int __wt_conn_prefetch_clear_tree$/d' \
+        -e '/int __wt_count_birthmarks$/d' \
+        -e '/int __wt_curhs_search_near_after$/d' \
+        -e '/int __wt_curhs_search_near_before$/d' \
+        -e '/int __wt_epoch$/d' \
+        -e '/int __wt_errno$/d' \
+        -e '/int __wt_futex_wait/d' \
+        -e '/int __wt_futex_wake/d' \
+        -e '/int __wt_get_vm_pagesize$/d' \
+        -e '/int __wt_lex_compare_skip$/d' \
+        -e '/int __wt_logop_read$/d' \
+        -e '/int __wt_logop_unpack$/d' \
+        -e '/int __wt_logrec_read$/d' \
+        -e '/int __wt_once$/d' \
+        -e '/int __wt_session_breakpoint$/d' \
+        -e '/int __wt_set_return_func$/d' \
+        -e '/int __wt_spin_init$/d' \
+        -e '/int __wt_spin_trylock$/d' \
+        -e '/int __wt_stat_connection_desc$/d' \
+        -e '/int __wt_stat_dsrc_desc$/d' \
+        -e '/int __wt_stat_session_desc/d' \
+        -e '/int __wt_struct_pack_checkpoint_start$/d' \
+        -e '/int __wt_struct_unpack_backup_id$/d' \
+        -e '/int __wt_struct_unpack_checkpoint_start$/d' \
+        -e '/int __wt_struct_unpack_col_modify$/d' \
+        -e '/int __wt_struct_unpack_col_put$/d' \
+        -e '/int __wt_struct_unpack_col_remove$/d' \
+        -e '/int __wt_struct_unpack_col_truncate$/d' \
+        -e '/int __wt_struct_unpack_prev_lsn$/d' \
+        -e '/int __wt_struct_unpack_row_modify$/d' \
+        -e '/int __wt_struct_unpack_row_put$/d' \
+        -e '/int __wt_struct_unpack_row_remove$/d' \
+        -e '/int __wt_struct_unpack_row_truncate$/d' \
+        -e '/int __wt_struct_unpack_txn_timestamp$/d' \
+        -e '/int __wt_txn_read_upd_list$/d' \
         -e '/int __wti_block_disagg_checkpoint_start$/d' \
         -e '/int __wti_block_disagg_checkpoint_unload$/d' \
         -e '/int __wti_block_disagg_compact_end$/d' \
@@ -99,25 +133,8 @@ func_ok()
         -e '/int __wti_block_disagg_verify_start$/d' \
         -e '/int __wti_block_disagg_write_size$/d' \
         -e '/int __wti_cursor_noop$/d' \
-        -e '/int __wt_epoch$/d' \
-        -e '/int __wt_errno$/d' \
-        -e '/int __wt_get_vm_pagesize$/d' \
-        -e '/int __wt_lex_compare_skip$/d' \
-        -e '/int __wt_once$/d' \
         -e '/int __wti_posix_directory_list_free$/d' \
-        -e '/int __wt_session_breakpoint$/d' \
-        -e '/int __wt_set_return_func$/d' \
-        -e '/int __wt_spin_init$/d' \
-        -e '/int __wt_spin_trylock$/d' \
-        -e '/int __wt_stat_connection_desc$/d' \
-        -e '/int __wt_stat_dsrc_desc$/d' \
-        -e '/int __wt_stat_session_desc/d' \
-        -e '/int __wt_txn_read_upd_list$/d' \
         -e '/int __wti_win_directory_list_free$/d' \
-        -e '/int __ut_ckpt_add_blkmod_entry$/d' \
-        -e '/int __ut_ovfl_discard_verbose$/d' \
-        -e '/int __ut_ovfl_discard_wrapup$/d' \
-        -e '/int LLVMFuzzerTestOneInput$/d' \
         -e '/int bdb_compare_reverse$/d' \
         -e '/int check_timing$/d' \
         -e '/int copyout_val$/d' \
@@ -129,6 +146,11 @@ func_ok()
         -e '/int demo_file_sync$/d' \
         -e '/int demo_fs_directory_list_free$/d' \
         -e '/int demo_fs_exist$/d' \
+        -e '/int dir_store_directory_list_free$/d' \
+        -e '/int dir_store_err$/d' \
+        -e '/int dir_store_file_lock$/d' \
+        -e '/int dir_store_file_sync$/d' \
+        -e '/int dir_store_fs_terminate$/d' \
         -e '/int error_handler$/d' \
         -e '/int fail_file_lock$/d' \
         -e '/int fail_file_sync$/d' \
@@ -139,17 +161,12 @@ func_ok()
         -e '/int handle_general$/d' \
         -e '/int handle_message$/d' \
         -e '/int handle_progress$/d' \
-        -e '/int index_compare_S$/d' \
-        -e '/int index_compare_primary$/d' \
-        -e '/int index_compare_u$/d' \
         -e '/int iaa_error$/d' \
         -e '/int iaa_pre_size$/d' \
         -e '/int iaa_terminate$/d' \
-        -e '/int dir_store_directory_list_free$/d' \
-        -e '/int dir_store_err$/d' \
-        -e '/int dir_store_file_lock$/d' \
-        -e '/int dir_store_file_sync$/d' \
-        -e '/int dir_store_fs_terminate$/d' \
+        -e '/int index_compare_S$/d' \
+        -e '/int index_compare_primary$/d' \
+        -e '/int index_compare_u$/d' \
         -e '/int log_print_err_worker$/d' \
         -e '/int lz4_error$/d' \
         -e '/int lz4_pre_size$/d' \
@@ -165,7 +182,6 @@ func_ok()
         -e '/int os_errno$/d' \
         -e '/int palm_err$/d' \
         -e '/int palm_kv_err$/d' \
-        -e '/int palm_handle_get$/d' \
         -e '/int palm_set_last_materialized_lsn$/d' \
         -e '/int revint_terminate$/d' \
         -e '/int rotn_error$/d' \
@@ -191,26 +207,6 @@ func_ok()
         -e '/int zstd_error$/d' \
         -e '/int zstd_pre_size$/d' \
         -e '/int zstd_terminate$/d' \
-        -e '/int __wt_curhs_search_near_after$/d' \
-        -e '/int __wt_curhs_search_near_before$/d' \
-        -e '/int __wt_logrec_read$/d' \
-        -e '/int __wt_logop_read$/d' \
-        -e '/int __wt_logop_unpack$/d' \
-        -e '/int __wt_struct_unpack_col_modify$/d' \
-        -e '/int __wt_struct_unpack_col_put$/d' \
-        -e '/int __wt_struct_unpack_col_remove$/d' \
-        -e '/int __wt_struct_unpack_col_truncate$/d' \
-        -e '/int __wt_struct_unpack_row_modify$/d' \
-        -e '/int __wt_struct_unpack_row_put$/d' \
-        -e '/int __wt_struct_unpack_row_remove$/d' \
-        -e '/int __wt_struct_unpack_row_truncate$/d' \
-        -e '/int __wt_struct_pack_checkpoint_start$/d' \
-        -e '/int __wt_struct_unpack_checkpoint_start$/d' \
-        -e '/int __wt_struct_unpack_prev_lsn$/d' \
-        -e '/int __wt_struct_unpack_backup_id$/d' \
-        -e '/int __wt_struct_unpack_txn_timestamp$/d' \
-        -e '/int __wt_futex_wait/d' \
-        -e '/int __wt_futex_wake/d' \
         ;
 }
 

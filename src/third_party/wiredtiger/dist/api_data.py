@@ -588,6 +588,10 @@ connection_runtime_config = [
         Config('wait', '300', r'''
             seconds to wait between each checkpoint cleanup''',
             min='1', max='100000'),
+        Config('file_wait_ms', '0', r'''
+            the number of milliseconds to wait between each file by the checkpoint cleanup,
+            0 will not wait''',
+            min=0),
         ]),
     Config('debug_mode', '', r'''
         control the settings of various extended debugging features''',

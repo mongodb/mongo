@@ -55,7 +55,7 @@ class test_timestamp27_preserve_prepared_off(wttest.WiredTigerTestCase):
             '/rollback timestamp is set when the preserve_prepared config is off/')
 
 class test_timestamp27_preserve_prepared_on(wttest.WiredTigerTestCase):
-    conn_config = "preserve_prepared=true"
+    conn_config = "checkpoint=(precise=true),preserve_prepared=true"
 
     types = [
         ('fix', dict(key_format='r', value_format='8t')),
@@ -65,17 +65,20 @@ class test_timestamp27_preserve_prepared_on(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(types)
 
     def test_non_prepared(self):
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.session.begin_transaction()
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
         self.session.rollback_transaction('rollback_timestamp=' + self.timestamp_str(100)),
             '/rollback timestamp is set for an non-prepared transaction/')
 
     def test_prepared(self):
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.session.begin_transaction()
         self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(50)+',prepared_id=123')
         self.session.timestamp_transaction('rollback_timestamp=' + self.timestamp_str(100))
 
     def test_rollback_timestamp_lt_stable(self):
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.session.begin_transaction()
         self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(50)+',prepared_id=123')
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(100))
@@ -84,6 +87,7 @@ class test_timestamp27_preserve_prepared_on(wttest.WiredTigerTestCase):
             '/is not newer than the stable timestamp/')
 
     def test_rollback_timestamp_eq_stable(self):
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.session.begin_transaction()
         self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(50)+',prepared_id=123')
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(100))
@@ -92,6 +96,7 @@ class test_timestamp27_preserve_prepared_on(wttest.WiredTigerTestCase):
             '/is not newer than the stable timestamp/')
 
     def test_rollback_timestamp_with_commit_timestamp(self):
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.session.begin_transaction()
         self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(50)+',prepared_id=123')
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
@@ -99,6 +104,7 @@ class test_timestamp27_preserve_prepared_on(wttest.WiredTigerTestCase):
             '/commit timestamp and rollback timestamp should not be set together/')
 
     def test_rollback_timestamp_with_commit_timestamp(self):
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.session.begin_transaction()
         self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(50)+',prepared_id=123')
         self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(100))
@@ -107,6 +113,7 @@ class test_timestamp27_preserve_prepared_on(wttest.WiredTigerTestCase):
             '/commit timestamp and rollback timestamp should not be set together/')
 
     def test_roundup_prepare_timestamp(self):
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
         self.session.begin_transaction("roundup_timestamps=(prepare=true)"),
             '/cannot round up prepare timestamp to the oldest timestamp when the preserve prepare config is on/')

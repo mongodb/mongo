@@ -657,9 +657,7 @@ __wt_blkcache_write(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE_BLOCK_META *
      */
     if (btree->compressor == NULL || btree->compressor->compress == NULL || compressed)
         ip = buf;
-    else if (buf->size < 2 * WT_BLOCK_COMPRESS_SKIP) {
-        /* FIXME-WT-14609: the heuristic in the condition above was added for deltas and is likely
-         * to need tweaking. */
+    else if (buf->size <= btree->allocsize) {
         ip = buf;
         WT_STAT_DSRC_INCR(session, compress_write_too_small);
     } else {
@@ -700,9 +698,7 @@ __wt_blkcache_write(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE_BLOCK_META *
          * output requires), it just means the uncompressed version is as good as it gets, and
          * that's what we use.
          */
-        if (compression_failed || buf->size < 2 * WT_BLOCK_COMPRESS_SKIP) {
-            /* FIXME-WT-14609: the heuristic in the condition above was added for deltas and is
-             * likely to need tweaking. */
+        if (compression_failed || buf->size / btree->allocsize <= result_len / btree->allocsize) {
             ip = buf;
             WT_STAT_DSRC_INCR(session, compress_write_fail);
         } else {

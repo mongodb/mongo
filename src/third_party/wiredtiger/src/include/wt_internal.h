@@ -445,6 +445,8 @@ struct __wt_update_vector;
 typedef struct __wt_update_vector WT_UPDATE_VECTOR;
 struct __wt_verbose_dump_cookie;
 typedef struct __wt_verbose_dump_cookie WT_VERBOSE_DUMP_COOKIE;
+struct __wt_verbose_message_info;
+typedef struct __wt_verbose_message_info WT_VERBOSE_MESSAGE_INFO;
 struct __wt_verbose_multi_category;
 typedef struct __wt_verbose_multi_category WT_VERBOSE_MULTI_CATEGORY;
 struct __wt_verify_info;

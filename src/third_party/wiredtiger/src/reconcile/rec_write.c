@@ -3376,9 +3376,9 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
         break;
     default: /* Page split */
         if (WT_PAGE_IS_INTERNAL(page))
-            WT_STAT_DSRC_INCR(session, rec_multiblock_internal);
+            WT_STAT_CONN_DSRC_INCR(session, rec_multiblock_internal);
         else
-            WT_STAT_DSRC_INCR(session, rec_multiblock_leaf);
+            WT_STAT_CONN_DSRC_INCR(session, rec_multiblock_leaf);
 
         /* Optionally display the actual split keys in verbose mode. */
         if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_SPLIT, WT_VERBOSE_DEBUG_2))

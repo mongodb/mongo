@@ -9,7 +9,6 @@
 #include "wt_internal.h"
 
 #define WT_CHECKPOINT_CLEANUP_DEFAULT_WAKE_UP_INTERVAL 5 /* 5 seconds */
-#define WT_CHECKPOINT_CLEANUP_FILE_INTERVAL 1            /* 1 second */
 #define WT_URI_FILE_PREFIX "file:"
 
 /*
@@ -497,16 +496,6 @@ __checkpoint_cleanup_walk_btree(WT_SESSION_IMPL *session, WT_ITEM *uri)
     ref = NULL;
     flags = WT_READ_NO_EVICT | WT_READ_VISIBLE_ALL;
 
-    /*
-     * To reduce the impact of checkpoint cleanup on the running database, it operates only on the
-     * dhandles that are already opened.
-     */
-    WT_WITHOUT_DHANDLE(session,
-      WT_WITH_HANDLE_LIST_READ_LOCK(
-        session, (ret = __wt_conn_dhandle_find(session, uri->data, NULL))));
-    if (ret == WT_NOTFOUND)
-        return (0);
-
     /* Open a handle for processing. */
     ret = __wt_session_get_dhandle(session, uri->data, NULL, NULL, 0);
     if (ret != 0) {
@@ -581,6 +570,15 @@ __checkpoint_cleanup_eligibility(WT_SESSION_IMPL *session, const char *uri, cons
      */
     if (strcmp(uri, WT_HS_URI) == 0)
         return (true);
+
+    /*
+     * To reduce the impact of checkpoint cleanup on the running database, it operates only on the
+     * dhandles that are already opened.
+     */
+    WT_WITHOUT_DHANDLE(session,
+      WT_WITH_HANDLE_LIST_READ_LOCK(session, (ret = __wt_conn_dhandle_find(session, uri, NULL))));
+    if (ret == WT_NOTFOUND)
+        return (false);
 
     /*
      * Logged table. The logged tables do not support timestamps, so we need to check for obsolete
@@ -728,12 +726,16 @@ __checkpoint_cleanup_int(WT_SESSION_IMPL *session)
         }
         WT_ERR(ret);
 
-        /*
-         * Wait here for some time before proceeding with another table to minimize the impact of
-         * checkpoint cleanup on the regular workload.
-         */
-        __wt_cond_wait(session, S2C(session)->cc_cleanup.cond,
-          WT_CHECKPOINT_CLEANUP_FILE_INTERVAL * WT_MILLION, __checkpoint_cleanup_run_chk);
+        /* Check if we need to wait before continuing with the next file to minimize impact. */
+        if (S2C(session)->cc_cleanup.file_wait_ms > 0) {
+            __wt_verbose_debug1(session, WT_VERB_CHECKPOINT_CLEANUP,
+              "waiting for %" PRIu64
+              " milliseconds after %s cleanup before continuing with the next file",
+              S2C(session)->cc_cleanup.file_wait_ms, (char *)uri->data);
+
+            __wt_cond_wait(session, S2C(session)->cc_cleanup.cond,
+              S2C(session)->cc_cleanup.file_wait_ms * WT_THOUSAND, __checkpoint_cleanup_run_chk);
+        }
 
         /* Check if we're quitting. */
         if (!__checkpoint_cleanup_run_chk(session))
@@ -821,6 +823,9 @@ __wt_checkpoint_cleanup_create(WT_SESSION_IMPL *session, const char *cfg[])
 
     WT_RET(__wt_config_gets(session, cfg, "checkpoint_cleanup.wait", &cval));
     conn->cc_cleanup.interval = (uint64_t)cval.val;
+
+    WT_RET(__wt_config_gets(session, cfg, "checkpoint_cleanup.file_wait_ms", &cval));
+    conn->cc_cleanup.file_wait_ms = (uint64_t)cval.val;
 
     /*
      * Checkpoint cleanup does enough I/O it may be called upon to perform slow operations for the

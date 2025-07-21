@@ -658,8 +658,8 @@ __wt_evict_threads_destroy(WT_SESSION_IMPL *session)
  * __evict_update_work --
  *     Configure eviction work state.
  */
-static bool
-__evict_update_work(WT_SESSION_IMPL *session)
+static int
+__evict_update_work(WT_SESSION_IMPL *session, bool *eviction_needed)
 {
     WT_BTREE *hs_tree;
     WT_CACHE *cache;
@@ -687,7 +687,8 @@ __evict_update_work(WT_SESSION_IMPL *session)
 
     if (!FLD_ISSET(conn->server_flags, WT_CONN_SERVER_EVICTION)) {
         __wt_atomic_store32(&evict->flags, 0);
-        return (false);
+        *eviction_needed = false;
+        return (0);
     }
 
     if (!__evict_queue_empty(evict->evict_urgent_queue, false))
@@ -708,11 +709,25 @@ __evict_update_work(WT_SESSION_IMPL *session)
                 (void)ret; /* Keep the assignment to 0 just in case, but suppress clang warnings. */
                 break;
             }
-            if (__wt_hs_get_btree(session, hs_id, &hs_tree) == 0) {
+            /*
+             * At this point, we are under the evict pass lock and should only attempt to read from
+             * the cursors dhandle cache to obtain the HS. If it is not present in the cursors
+             * dhandle cache, we bail out. We must not proceed to acquire a connection dhandle read
+             * lock or a schema lock to acquire the HS dhandle while holding the pass lock, as this
+             * could lead to a deadlock. There are several places in the code where a pass lock is
+             * taken after a schema lock, which makes this sequence unsafe.
+             */
+            WT_RET_NOTFOUND_OK(ret = __wt_curhs_get_cached(session, hs_id, &hs_tree));
+            if (ret == 0) {
                 total_inmem += __wt_atomic_load64(&hs_tree->bytes_inmem);
                 total_dirty += __wt_atomic_load64(&hs_tree->bytes_dirty_intl) +
                   __wt_atomic_load64(&hs_tree->bytes_dirty_leaf);
                 total_updates += __wt_atomic_load64(&hs_tree->bytes_updates);
+            } else {
+                if (hs_id == WT_HS_ID)
+                    WT_STAT_CONN_INCR(session, cache_eviction_hs_cursor_not_cached);
+                else if (hs_id == WT_HS_ID_SHARED)
+                    WT_STAT_CONN_INCR(session, cache_eviction_hs_shared_cursor_not_cached);
             }
         }
         __wt_atomic_store64(&cache->bytes_hs, total_inmem);
@@ -810,7 +825,8 @@ __evict_update_work(WT_SESSION_IMPL *session)
     /* Update the global eviction state. */
     __wt_atomic_store32(&evict->flags, flags);
 
-    return (F_ISSET(evict, WT_EVICT_CACHE_ALL | WT_EVICT_CACHE_URGENT));
+    *eviction_needed = F_ISSET(evict, WT_EVICT_CACHE_ALL | WT_EVICT_CACHE_URGENT);
+    return (0);
 }
 
 /*
@@ -827,10 +843,12 @@ __evict_pass(WT_SESSION_IMPL *session)
     uint64_t eviction_progress, oldest_id, prev_oldest_id;
     uint64_t time_now, time_prev;
     u_int loop;
+    bool eviction_needed;
 
     conn = S2C(session);
     cache = conn->cache;
     evict = conn->evict;
+    eviction_needed = false;
     txn_global = &conn->txn_global;
     time_prev = 0; /* [-Wconditional-uninitialized] */
 
@@ -864,7 +882,8 @@ __evict_pass(WT_SESSION_IMPL *session)
          */
         WT_RET(__wt_txn_update_oldest(session, WT_TXN_OLDEST_STRICT));
 
-        if (!__evict_update_work(session))
+        WT_RET(__evict_update_work(session, &eviction_needed));
+        if (!eviction_needed)
             break;
 
         __wt_verbose_debug2(session, WT_VERB_EVICTION,

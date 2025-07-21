@@ -5,9 +5,6 @@ __bit_ffs
 __bit_nclr
 __ovfl_discard_dump
 __ovfl_reuse_dump
-__wt_block_disagg_manager_create
-__wt_block_disagg_manager_open
-__wt_block_disagg_manager_owns_object
 __wt_bloom_create
 __wt_bloom_drop
 __wt_bloom_finalize
@@ -18,7 +15,6 @@ __wt_bulk_insert_fix
 __wt_bulk_insert_row
 __wt_bulk_insert_var
 __wt_config_getone
-__wt_conn_remove_page_log
 __wt_crc32c_le
 __wt_curhs_open
 __wt_cursor_get_raw_value

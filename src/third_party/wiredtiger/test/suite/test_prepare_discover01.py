@@ -38,7 +38,7 @@ from wtscenario import make_scenarios
 class test_prepare_discover01(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_prepare_discover01'
     uri = 'table:' + tablename
-    conn_config = 'preserve_prepared=true'
+    conn_config = 'checkpoint=(precise=true),preserve_prepared=true'
 
     types = [
         ('row', dict(s_config='key_format=i,value_format=S')),
@@ -56,9 +56,9 @@ class test_prepare_discover01(wttest.WiredTigerTestCase, suite_subprocess):
         # packing/unpacking prepare_ts and prepared_id on checkpoint yet, so it
         # will fail cell validation when trying to read prepared_id from disk. Re-enable this test
         # when the feature is supported.
-        self.skipTest('FIXME-WT-14941 Enable when packing/unpacking prepare_ts and prepared_id on checkpoint is supported')
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(50))
+        self.skipTest('FIXME-WT-14941 Enable when packing/unpacking prepare_ts and prepared_id on checkpoint is supported')
         self.session.create(self.uri, self.s_config)
         c = self.session.open_cursor(self.uri)
 

@@ -33,11 +33,11 @@ __hs_cleanup_las(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_hs_get_btree --
+ * __hs_get_btree --
  *     Get the history store btree by opening a history store cursor.
  */
-int
-__wt_hs_get_btree(WT_SESSION_IMPL *session, uint32_t hs_id, WT_BTREE **hs_btreep)
+static int
+__hs_get_btree(WT_SESSION_IMPL *session, uint32_t hs_id, WT_BTREE **hs_btreep)
 {
     WT_CURSOR *hs_cursor;
 
@@ -80,7 +80,7 @@ __hs_config(WT_SESSION_IMPL *session, uint32_t hs_id, const char **cfg)
     WT_ERR(__wt_open_internal_session(conn, "hs_access", true, 0, 0, &tmp_setup_session));
 
     /* Retrieve the btree from the history store cursor. */
-    WT_ERR(__wt_hs_get_btree(tmp_setup_session, hs_id, &btree));
+    WT_ERR(__hs_get_btree(tmp_setup_session, hs_id, &btree));
 
     /* Track the history store file ID. */
     if (conn->cache->hs_fileid == 0)

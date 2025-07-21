@@ -71,10 +71,10 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
      * exception is the clean eviction for a page that has been reconciled before. We should use the
      * new value but we cannot detect this case here.
      *
-     * FIXME-WT-14720: this check needs a bit more thought after SLS-1956 -- there isn't really an
-     * LSN that makes sense as a comparison point any more. Scrub eviction leaves the content in the
-     * cache, so we won't issue a read for the page we're evicting. That means we're free to write
-     * the page even if it's ahead of the materialization frontier.
+     * FIXME-WT-14720: this check needs a bit more thought. There isn't really an LSN that makes
+     * sense as a comparison point. Scrub eviction leaves the content in the cache, so we won't
+     * issue a read for the page we're evicting. That means we're free to write the page even if
+     * it's ahead of the materialization frontier.
      */
     if (!(F_ISSET(session->dhandle, WT_DHANDLE_DEAD) || F_ISSET(S2C(session), WT_CONN_CLOSING)))
         if (!__wt_page_materialization_check(session, page->old_rec_lsn_max))

@@ -59,9 +59,7 @@ __rts_btree_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *firs
          */
         txn_id_visible = __wti_rts_visibility_txn_visible_id(session, upd->txnid);
         if (!txn_id_visible || rollback_timestamp < upd->upd_durable_ts ||
-          (upd->prepare_state == WT_PREPARE_INPROGRESS &&
-            (!F_ISSET(conn, WT_CONN_PRESERVE_PREPARED) ||
-              rollback_timestamp < upd->upd_start_ts))) {
+          upd->prepare_state == WT_PREPARE_INPROGRESS) {
             __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
               WT_RTS_VERB_TAG_UPDATE_ABORT "rollback to stable aborting update with txnid=%" PRIu64
                                            ", txnid_not_visible=%s"
@@ -705,8 +703,7 @@ __rts_btree_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
             return (0);
     } else if (tw->durable_start_ts > rollback_timestamp ||
       !__wti_rts_visibility_txn_visible_id(session, tw->start_txn) ||
-      (!WT_TIME_WINDOW_HAS_STOP(tw) && prepared &&
-        (!F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) || tw->start_ts > rollback_timestamp))) {
+      (!WT_TIME_WINDOW_HAS_STOP(tw) && prepared)) {
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           WT_RTS_VERB_TAG_ONDISK_ABORT_TW
           "on-disk update aborted with time_window=%s. "

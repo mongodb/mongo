@@ -43,6 +43,7 @@ class test_verbose_base(wttest.WiredTigerTestCase, suite_subprocess):
     expected_json_schema = {
         'category': {'type': str, 'always_expected': True },
         'category_id': {'type': int, 'always_expected': True },
+        'log_id': {'type': int, 'always_expected': True },
         'error_str': {'type': str, 'always_expected': False },
         'error_code': {'type': int, 'always_expected': False },
         'msg': {'type': str, 'always_expected': True },
