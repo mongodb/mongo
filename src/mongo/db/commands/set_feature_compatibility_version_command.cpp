@@ -730,7 +730,7 @@ public:
                 abortAllReshardCollection(opCtx);
 
                 // Tell the shards to enter 'start' phase of setFCV (transition to kDowngrading).
-                _sendSetFCVRequestToShards(
+                _sendEnterSetFCVPhaseRequestToShard(
                     opCtx, request, changeTimestamp, SetFCVPhaseEnum::kStart);
 
                 // The config server may also be a shard, so have it run any shard server tasks.
@@ -756,7 +756,7 @@ public:
             if (role && role->has(ClusterRole::ConfigServer)) {
                 // Tell the shards to enter the 'prepare' phase of setFCV (check that they will be
                 // able to upgrade or downgrade).
-                _sendSetFCVRequestToShards(
+                _sendEnterSetFCVPhaseRequestToShard(
                     opCtx, request, changeTimestamp, SetFCVPhaseEnum::kPrepare);
             }
 
@@ -1146,7 +1146,8 @@ private:
 
         if (role && role->has(ClusterRole::ConfigServer)) {
             // Tell the shards to complete setFCV (transition to fully upgraded)
-            _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kComplete);
+            _sendEnterSetFCVPhaseRequestToShard(
+                opCtx, request, changeTimestamp, SetFCVPhaseEnum::kComplete);
         }
 
         // This helper function is for updating server metadata to make sure the new features in the
@@ -1175,10 +1176,10 @@ private:
     }
 
     // Tell the shards to enter phase-1 or phase-2 of setFCV.
-    void _sendSetFCVRequestToShards(OperationContext* opCtx,
-                                    const SetFeatureCompatibilityVersion& request,
-                                    boost::optional<Timestamp> changeTimestamp,
-                                    enum mongo::SetFCVPhaseEnum phase) {
+    void _sendEnterSetFCVPhaseRequestToShard(OperationContext* opCtx,
+                                             const SetFeatureCompatibilityVersion& request,
+                                             boost::optional<Timestamp> changeTimestamp,
+                                             enum mongo::SetFCVPhaseEnum phase) {
         auto requestPhase = request;
         requestPhase.setFromConfigServer(true);
         requestPhase.setPhase(phase);
@@ -1569,7 +1570,8 @@ private:
 
         if (role && role->has(ClusterRole::ConfigServer)) {
             // Tell the shards to complete setFCV (transition to fully downgraded).
-            _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kComplete);
+            _sendEnterSetFCVPhaseRequestToShard(
+                opCtx, request, changeTimestamp, SetFCVPhaseEnum::kComplete);
         }
 
         hangBeforeTransitioningToDowngraded.pauseWhileSet(opCtx);
@@ -1881,6 +1883,13 @@ private:
             }
         }
     }
+    void _forwardSetFCVRequestToShards(OperationContext* opCtx,
+                                       const SetFeatureCompatibilityVersion& request) {
+        auto requestSetFCV = request;
+        requestSetFCV.setFromConfigServer(true);
+        uassertStatusOK(ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
+            opCtx, CommandHelpers::filterCommandRequestForPassthrough(requestSetFCV.toBSON())));
+    }
 
     void processDryRun(OperationContext* opCtx,
                        const SetFeatureCompatibilityVersion& request,
@@ -1895,6 +1904,11 @@ private:
             _userCollectionsUassertsForUpgrade(opCtx, requestedVersion, actualVersion);
         } else if (requestedVersion < actualVersion) {
             _userCollectionsUassertsForDowngrade(opCtx, requestedVersion, actualVersion);
+        }
+
+        auto role = ShardingState::get(opCtx)->pollClusterRole();
+        if (role && role->has(ClusterRole::ConfigServer)) {
+            _forwardSetFCVRequestToShards(opCtx, request);
         }
 
         LOGV2(10710701,

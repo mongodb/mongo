@@ -91,9 +91,6 @@ filters:
   - "test_sharding_startup_in_downgrading_state.js":
     approvers:
       - 10gen/server-fcv
-  - "set_fcv_dry_run_mode_downgrade.js":
-    approvers:
-      - 10gen/server-fcv
-  - "set_fcv_dry_run_mode_upgrade.js":
+  - "set_fcv_dry_run_mode.js":
     approvers:
       - 10gen/server-fcv
