@@ -70,6 +70,7 @@ def resmoke_suite_test(
         exclude_with_any_tags = [],
         include_with_any_tags = [],
         resmoke_args = [],
+        size = "small",
         srcs = [],
         tags = [],
         timeout = "eternal",
@@ -130,6 +131,7 @@ def resmoke_suite_test(
         ] + extra_args + resmoke_args,
         tags = tags + ["no-cache", "local", "resources:port_block:1"],
         timeout = timeout,
+        size = size,
         env = {
             "LOCAL_RESOURCES": "$(LOCAL_RESOURCES)",
         },

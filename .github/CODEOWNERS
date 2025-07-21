@@ -278,11 +278,17 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /etc/evergreen_yml_components/tasks/release_tasks.yml @10gen/devprod-release-infrastructure @svc-auto-approve-bot
 /etc/evergreen_yml_components/variants/release/release.yml @10gen/devprod-release-infrastructure @svc-auto-approve-bot
 
+# The following patterns are parsed from ./etc/evergreen_yml_components/tasks/resmoke/non_server_teams/OWNERS.yml
+/etc/evergreen_yml_components/tasks/resmoke/non_server_teams/ @10gen/devprod-correctness @svc-auto-approve-bot
+
 # The following patterns are parsed from ./etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/OWNERS.yml
 /etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/**/* @10gen/query @svc-auto-approve-bot
 
 # The following patterns are parsed from ./etc/evergreen_yml_components/variants/codecoverage/OWNERS.yml
 /etc/evergreen_yml_components/variants/codecoverage/**/* @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
+
+# The following patterns are parsed from ./etc/evergreen_yml_components/variants/misc/OWNERS.yml
+/etc/evergreen_yml_components/variants/misc/ @10gen/devprod-correctness @svc-auto-approve-bot
 
 # The following patterns are parsed from ./etc/evergreen_yml_components/variants/mongot/OWNERS.yml
 /etc/evergreen_yml_components/variants/mongot/**/* @10gen/query-integration-search @svc-auto-approve-bot
