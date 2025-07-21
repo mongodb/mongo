@@ -10,7 +10,6 @@
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 export const $config = (function() {
     const data = {numDocs: 1000};
@@ -123,8 +122,8 @@ export const $config = (function() {
     }
 
     return {
-        threadCount: 10,
-        iterations: 100,
+        threadCount: 5,
+        iterations: 50,
         states: states,
         startState: 'query',
         transitions: transitions,

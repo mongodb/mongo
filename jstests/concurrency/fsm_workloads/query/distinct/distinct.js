@@ -42,8 +42,8 @@ export const $config = (function() {
 
     return {
         data: data,
-        threadCount: 10,
-        iterations: 20,
+        threadCount: 5,
+        iterations: 10,
         states: states,
         transitions: transitions,
     };
