@@ -248,11 +248,6 @@ function runTest(planRankerMode) {
     // TODO(SERVER-100648): assert.lt(rootStageCost(coll.find().sort({a:1}).limit(2).hint({$natural:
     // 1})), 0.001);
 
-    // SORT with a large $limit should have the full cost
-    // TODO(SERVER-100650):
-    // assert.eq(rootStageCost(coll.find().sort({a:1}).limit(1000000).hint({$natural: 1})),
-    // rootStageCost(coll.find().sort({a:1}).hint({$natural: 1})));
-
     /*
      * Cost of stand-alone LIMIT.
      */
