@@ -46,9 +46,9 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_ast.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/projection_ast.h"
-#include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/string_map.h"
 

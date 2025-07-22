@@ -31,7 +31,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_internal_projection_gen.h"
-#include "mongo/db/query/projection.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection.h"
 
 namespace mongo {
 /**

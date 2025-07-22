@@ -96,9 +96,9 @@ mongo_cc_library(
         "//src/mongo/db/index_builds:index_build_interceptor",
         "//src/mongo/db/index_builds:resumable_index_builds_idl",
         "//src/mongo/db/pipeline:document_path_support",
-        "//src/mongo/db/query:projection_ast",
         "//src/mongo/db/query:spill_util",
         "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast",
         "//src/mongo/db/query/compiler/logical_model/sort_pattern",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/sorter:sorter_base",

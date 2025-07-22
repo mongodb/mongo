@@ -36,7 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/util/assert_util.h"

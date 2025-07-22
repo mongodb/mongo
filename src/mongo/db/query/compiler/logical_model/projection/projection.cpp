@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/projection.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection.h"
 
 #include "mongo/base/exact_cast.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/query/projection_ast_path_tracking_visitor.h"
-#include "mongo/db/query/projection_ast_visitor.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_ast_path_tracking_visitor.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_ast_visitor.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/util/assert_util.h"
 

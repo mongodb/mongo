@@ -29,7 +29,7 @@
 
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
 
-#include "mongo/db/query/projection_ast_util.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_ast_util.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
 
 namespace mongo::query_shape {

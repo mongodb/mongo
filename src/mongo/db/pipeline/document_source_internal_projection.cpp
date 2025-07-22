@@ -29,7 +29,7 @@
 
 #include "mongo/db/pipeline/document_source_internal_projection.h"
 
-#include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 
 namespace mongo {
 

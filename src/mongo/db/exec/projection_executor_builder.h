@@ -31,9 +31,9 @@
 
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/projection.h"
-#include "mongo/db/query/projection_ast.h"
-#include "mongo/db/query/projection_policies.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_ast.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
 
 #include <bitset>
 #include <memory>

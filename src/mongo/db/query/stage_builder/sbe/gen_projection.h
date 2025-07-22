@@ -31,7 +31,7 @@
 
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/projection.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/stage_builder/sbe/analysis.h"
 
 namespace mongo::stage_builder {

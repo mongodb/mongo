@@ -38,7 +38,7 @@
 #include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
 

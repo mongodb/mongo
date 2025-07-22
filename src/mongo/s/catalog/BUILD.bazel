@@ -123,7 +123,7 @@ mongo_cc_library(
     deps = [
         ":sharding_catalog_client",
         "//src/mongo/db/pipeline",
-        "//src/mongo/db/query:projection_ast",
+        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast",
         "//src/mongo/db/repl:read_concern_args",
         "//src/mongo/db/session:logical_session_id_helpers",
         "//src/mongo/db/storage:duplicate_key_error_info",

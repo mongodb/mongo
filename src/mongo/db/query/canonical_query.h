@@ -40,10 +40,10 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_distinct.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/parsed_find_command.h"
-#include "mongo/db/query/projection.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/util/assert_util.h"
 

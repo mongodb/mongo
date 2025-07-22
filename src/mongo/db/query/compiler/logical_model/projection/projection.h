@@ -32,7 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/pipeline/dependencies.h"
-#include "mongo/db/query/projection_ast.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_ast.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

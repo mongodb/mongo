@@ -37,11 +37,11 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/projection.h"
-#include "mongo/db/query/projection_policies.h"
 
 #include <memory>
 

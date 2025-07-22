@@ -29,8 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/query/projection_ast.h"
-#include "mongo/db/query/projection_ast_visitor.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_ast.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_ast_visitor.h"
 
 #include <list>
 #include <stack>

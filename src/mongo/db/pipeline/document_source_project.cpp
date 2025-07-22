@@ -37,7 +37,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/projection_ast.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_ast.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>

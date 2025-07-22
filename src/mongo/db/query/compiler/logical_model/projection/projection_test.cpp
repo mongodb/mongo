@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/projection.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection.h"
 
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/error_codes.h"
@@ -43,8 +43,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/projection_parser.h"
-#include "mongo/db/query/projection_policies.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

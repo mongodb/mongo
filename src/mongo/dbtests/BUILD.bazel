@@ -66,8 +66,8 @@ mongo_cc_library(
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/exec:projection_executor",
         "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/db/query:projection_ast",
         "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast",
         "//src/mongo/db/repl:replica_set_messages",
     ],
 )

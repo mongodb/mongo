@@ -236,9 +236,6 @@ filters:
       - 10gen/query-optimization
       - 10gen/query-execution
       - 10gen/query-integration
-  - "projection_parser*":
-    approvers:
-      - 10gen/query-optimization
   - "hint_parser*":
     approvers:
       - 10gen/query-optimization
@@ -246,18 +243,6 @@ filters:
     approvers:
       - 10gen/query-optimization
   - "canonical_distinct*":
-    approvers:
-      - 10gen/query-optimization
-  - "projection_ast*":
-    approvers:
-      - 10gen/query-optimization
-  - "projection_policies.h":
-    approvers:
-      - 10gen/query-optimization
-  - "projection_test.cpp":
-    approvers:
-      - 10gen/query-optimization
-  - "projection.*":
     approvers:
       - 10gen/query-optimization
   - "query_planner*":

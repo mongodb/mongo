@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/projection_ast.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_ast.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -35,10 +35,10 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/query/projection.h"
-#include "mongo/db/query/projection_ast_util.h"
-#include "mongo/db/query/projection_parser.h"
-#include "mongo/db/query/projection_policies.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_ast_util.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/type_traits.h"

@@ -39,7 +39,7 @@ mongo_cc_library(
         "query_shape.cpp",
         "shape_helpers.cpp",
         "//src/mongo/db/query:count_request.h",
-        "//src/mongo/db/query:projection_ast_util.h",
+        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast_util.h",
     ],
     hdrs = [
         "agg_cmd_shape.h",

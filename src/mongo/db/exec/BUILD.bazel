@@ -128,7 +128,7 @@ mongo_cc_library(
         "projection_executor_builder.cpp",
         "projection_node.cpp",
         "//src/mongo/base:exact_cast.h",
-        "//src/mongo/db/query:projection_ast_path_tracking_visitor.h",
+        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast_path_tracking_visitor.h",
     ],
     hdrs = [
         "add_fields_projection_executor.h",

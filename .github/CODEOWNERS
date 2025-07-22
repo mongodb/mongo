@@ -2325,14 +2325,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/**/plan_rank* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/*.idl @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/query_feature_flags.idl @10gen/query-execution @10gen/query-integration @10gen/query-optimization @svc-auto-approve-bot
-/src/mongo/db/query/**/projection_parser* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/hint_parser* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/parsed* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/canonical_distinct* @10gen/query-optimization @svc-auto-approve-bot
-/src/mongo/db/query/**/projection_ast* @10gen/query-optimization @svc-auto-approve-bot
-/src/mongo/db/query/**/projection_policies.h @10gen/query-optimization @svc-auto-approve-bot
-/src/mongo/db/query/**/projection_test.cpp @10gen/query-optimization @svc-auto-approve-bot
-/src/mongo/db/query/**/projection.* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/query_planner* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/planner* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/interval.* @10gen/query-optimization @svc-auto-approve-bot
@@ -2365,6 +2360,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/query/compiler/ce/OWNERS.yml
 /src/mongo/db/query/compiler/ce/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/compiler/ce/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/query/compiler/logical_model/projection/OWNERS.yml
+/src/mongo/db/query/compiler/logical_model/projection/**/* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/compiler/logical_model/projection/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/compiler/logical_model/sort_pattern/OWNERS.yml
 /src/mongo/db/query/compiler/logical_model/sort_pattern/**/* @10gen/query-optimization @svc-auto-approve-bot

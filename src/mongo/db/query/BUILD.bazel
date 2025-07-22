@@ -93,8 +93,8 @@ mongo_cc_library(
         "//src/mongo/db/pipeline",
     ],
     deps = [
-        ":projection_ast",
         "//src/mongo:base",
+        "//src/mongo/db/query/compiler/logical_model/projection:projection_ast",
         "//src/mongo/db/query/compiler/logical_model/sort_pattern",
         "//src/mongo/db/query/compiler/stats:collection_statistics_interface",
     ],
@@ -223,28 +223,6 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/idl:cluster_server_parameter_gen",
-    ],
-)
-
-mongo_cc_library(
-    name = "projection_ast",
-    srcs = [
-        "projection.cpp",
-        "projection_ast_path_tracking_visitor.h",
-        "projection_ast_util.cpp",
-        "projection_parser.cpp",
-        "//src/mongo/base:exact_cast.h",
-    ],
-    hdrs = [
-        "projection.h",
-        "projection_ast.h",
-        "projection_ast_util.h",
-        "projection_ast_visitor.h",
-        "projection_parser.h",
-    ],
-    deps = [
-        "//src/mongo/db:query_expressions",
-        "//src/mongo/db:server_base",
     ],
 )
 
@@ -779,8 +757,6 @@ mongo_cc_unit_test(
         "plan_explainer_test.cpp",
         "plan_ranker_index_prefix_test.cpp",
         "plan_ranker_test.cpp",
-        "projection_ast_test.cpp",
-        "projection_test.cpp",
         "query_request_test.cpp",
         "query_settings_test.cpp",
         "query_utils_test.cpp",

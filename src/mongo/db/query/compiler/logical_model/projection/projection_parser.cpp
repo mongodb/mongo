@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/exact_cast.h"
