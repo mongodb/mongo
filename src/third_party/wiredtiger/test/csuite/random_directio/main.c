@@ -1294,7 +1294,7 @@ main(int argc, char *argv[])
             testutil_mkdir(buf);
         }
 
-        __wt_random_init_default(&rnd);
+        __wt_random_init(NULL, &rnd);
         if (rand_time) {
             timeout = __wt_random(&rnd) % MAX_TIME;
             if (timeout < MIN_TIME)

@@ -237,6 +237,10 @@ rollback_to_stable(WT_SESSION *session)
     if (!g.transaction_timestamps_config)
         return;
 
+    /* Rollback-to-stable is not supported for disaggregated storage. */
+    if (g.disagg_storage_config)
+        return;
+
     /*
      * Rollback the system using up to 10 threads. Extend to 11 values to cover the NULL config
      * case.

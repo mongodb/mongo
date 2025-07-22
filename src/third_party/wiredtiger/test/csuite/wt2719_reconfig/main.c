@@ -178,7 +178,7 @@ main(int argc, char *argv[])
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
     /* Initialize the RNG. */
-    __wt_random_init_default(&rnd);
+    __wt_random_init(NULL, &rnd);
 
     /* Allocate memory for the config. */
     len = WT_ELEMENTS(list) * 64;

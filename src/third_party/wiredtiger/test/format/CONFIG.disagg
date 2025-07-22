@@ -20,6 +20,8 @@ ops.throttle=0
 ops.truncate=0
 # FIXME-WT-14908 should fix WT_SESSION->verify for layered tables.
 ops.verify=0
+# FIXME-WT-14931 should allow prepared operations for layered tables.
+ops.prepare=0
 quiet=0
 runs.in_memory=0
 transaction.timestamps=1

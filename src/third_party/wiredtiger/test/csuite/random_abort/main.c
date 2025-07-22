@@ -735,7 +735,7 @@ main(int argc, char *argv[])
             testutil_lazyfs_setup(&lazyfs, home);
 
         /* Set up the rest of the test. */
-        __wt_random_init_default(&rnd);
+        __wt_random_init(NULL, &rnd);
         if (rand_time) {
             timeout = __wt_random(&rnd) % MAX_TIME;
             if (timeout < MIN_TIME)

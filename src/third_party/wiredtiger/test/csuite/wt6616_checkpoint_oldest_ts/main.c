@@ -310,7 +310,7 @@ main(int argc, char *argv[])
     /* Remember the current working directory. */
     testutil_assert_errno(getcwd(cwd_start, sizeof(cwd_start)) != NULL);
 
-    __wt_random_init_default(&rnd);
+    __wt_random_init(NULL, &rnd);
     if (rand_time) {
         timeout = __wt_random(&rnd) % MAX_TIME;
         if (timeout < MIN_TIME)

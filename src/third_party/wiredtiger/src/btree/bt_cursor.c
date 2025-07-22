@@ -658,18 +658,7 @@ __wt_btcur_search_prepared(WT_CURSOR *cursor, WT_UPDATE **updp)
     F_CLR(&cbt->iface, WT_CURSTD_KEY_ONLY);
     /*
      * The following assertion relies on the fact that for every prepared update there must be an
-     * associated key. However this is only true if we pin the page to prevent eviction. By calling
-     * into the standard search function we avoid releasing our hazard pointer between update chain
-     * resolutions. It also depends on sorting the transaction modifications by key, if we didn't do
-     * that we would unpin the page between searches and later come back to the same key. We rely on
-     * resolving all updates for a single key in sequence.
-     *
-     * This is a complex scenario, suppose we have two updates to the same key by our transaction,
-     * and are resolving the prepared updates. The first pass resolves the update chain, now if we
-     * let eviction run it could evict the page and it will treat the update chain as a regular non
-     * prepared update chain. If we were rolling back the transaction the key may not exist after
-     * eviction, similarly if we wrote a globally visible tombstone. Thus our second attempt at
-     * resolution would fail as it wouldn't find a key.
+     * associated key and we only resolve the same key once.
      */
     WT_ASSERT_ALWAYS(
       CUR2S(cursor), ret == 0, "A valid key must exist when resolving prepared updates.");

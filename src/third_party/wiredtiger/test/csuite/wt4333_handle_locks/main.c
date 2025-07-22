@@ -357,7 +357,7 @@ run(int argc, char *argv[])
     bool default_home, preserve;
 
     (void)testutil_set_progname(argv);
-    __wt_random_init_default(&rnd);
+    __wt_random_init(NULL, &rnd);
 
     default_home = true;
     preserve = false;

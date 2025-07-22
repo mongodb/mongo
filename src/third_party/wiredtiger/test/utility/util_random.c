@@ -40,7 +40,7 @@ testutil_random(WT_RAND_STATE *rnd)
     if (rnd != NULL) {
         return __wt_random(rnd);
     } else {
-        __wt_random_init_default(&rnd_inner); /* The session argument is not required. */
+        __wt_random_init(NULL, &rnd_inner); /* The session argument is not required. */
         return __wt_random(&rnd_inner);
     }
 }

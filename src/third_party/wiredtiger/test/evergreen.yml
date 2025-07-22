@@ -2189,20 +2189,6 @@ tasks:
           # as there are a few files that contain a large number of slower tests.
           unit_test_parallel_args: -v 2 --timeout 1800 --hook "disagg=(role=leader)"
 
-  - name: unit-test-hook-disagg-leader-table
-    tags: ["pull_request", "python"]
-    depends_on:
-    - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "unit test parallel"
-        vars:
-          # As leader, run the set of tests that are not in the fail list.
-          unit_test_parallel_ignore: test/suite/hook_disagg.fail
-          # The timeout for this command is on a test file basis. Make the timeouts long,
-          # as there are a few files that contain a large number of slower tests.
-          unit_test_parallel_args: -v 2 --timeout 1800 --hook "disagg=(role=leader,table_prefix=table)"
-
   - name: unit-test-hook-disagg-follower
     tags: ["python"]
     depends_on:
@@ -2213,17 +2199,6 @@ tasks:
         vars:
           # As follower, run a minimal functionality test
           unit_test_args: -v 2 --timeout 60 --hook "disagg=(role=follower)" base01
-
-  - name: unit-test-hook-disagg-follower-table
-    tags: ["pull_request", "python"]
-    depends_on:
-    - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "unit test"
-        vars:
-          # As follower, run a minimal functionality test
-          unit_test_args: -v 2 --timeout 60 --hook "disagg=(role=follower,table_prefix=table)" base01
 
   - name: unit-test-hook-timing-stress-log
     tags: ["python"]

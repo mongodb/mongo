@@ -584,7 +584,7 @@ subtest_populate(TEST_OPTS *opts, bool close_test)
     bool failed;
 
     failed = false;
-    __wt_random_init_default(&rnd);
+    __wt_random_init(NULL, &rnd);
     CHECK(create_big_string(&bigref), false);
     nrecords = opts->nrecords;
 

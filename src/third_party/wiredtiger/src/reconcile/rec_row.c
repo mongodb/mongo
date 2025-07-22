@@ -646,7 +646,7 @@ __rec_row_garbage_collect_fixup_update_list(WT_SESSION_IMPL *session, WTI_RECONC
     if ((first_upd = WT_ROW_UPDATE(page, rip)) == NULL)
         return (0);
 
-    for (upd = first_upd; upd != NULL && upd->txnid == WT_TXN_ABORTED; upd = first_upd->next)
+    for (upd = first_upd; upd != NULL && upd->txnid == WT_TXN_ABORTED; upd = upd->next)
         ;
 
     if (upd == NULL)
