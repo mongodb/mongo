@@ -911,7 +911,6 @@ error_codes:
       name: InterruptedDueToReshardingCriticalSection,
       categories: [Interruption, RetriableError],
     }
-
   #Replay client errors.
   - {code: 454, name: ReplayClientConfigurationError}
   - {code: 455, name: ReplayClientNotConnected}
@@ -919,6 +918,16 @@ error_codes:
   - {code: 457, name: ReplayClientInternalError}
   - {code: 458, name: ReplayClientSessionSchedulerError}
   - {code: 459, name: ReplayClientSessionSimulationError}
+  - {
+      code: 460,
+      name: StreamProcessorKinesisConnectionError,
+      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+    }
+  - {
+      code: 461,
+      name: StreamProcessorKinesisError,
+      categories: [StreamProcessorUserError],
+    }
 
   # Error codes 4000-8999 are reserved.
 
