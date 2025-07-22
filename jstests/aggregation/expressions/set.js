@@ -4,6 +4,10 @@
 import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
+
+const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
 
 const coll = db.expression_set;
 coll.drop();
@@ -316,6 +320,13 @@ for (const operator of nullResultOperators) {
                   null,
                   `Expected null result for operator ${operator} with document ${tojson(doc)}`);
     }
+}
+
+// ToDo: SERVER-107904. Remove check when 9.0 becomes last-lts
+if (isMultiversion && !checkSbeCompletelyDisabled(db)) {
+    jsTest.log.info(
+        "Skipping $setEquals and $setIsSubset tests on null or missing arrays for SBE.");
+    quit();
 }
 
 for (const [operator, errorCodes] of errorCodeOperators) {
