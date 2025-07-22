@@ -202,6 +202,7 @@ public:
         kInternalKeyStringValue,
         kCurrentDate,
         kUUID,
+        kOID,
         kTestFeatureFlagLatest,
         kTestFeatureFlagLastLTS
     };
@@ -864,6 +865,10 @@ public:
 
     void visit(const ExpressionCreateUUID* expr) final {
         combine(OpType::kUUID);
+    }
+
+    void visit(const ExpressionCreateObjectId* expr) final {
+        combine(OpType::kOID);
     }
 
     void visit(const ExpressionTestFeatureFlagLatest* expr) final {

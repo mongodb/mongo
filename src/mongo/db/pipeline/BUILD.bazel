@@ -1408,6 +1408,7 @@ mongo_cc_unit_test(
         "expression_compare_test.cpp",
         "expression_context_test.cpp",
         "expression_convert_test.cpp",
+        "expression_create_oid_test.cpp",
         "expression_create_uuid_test.cpp",
         "expression_date_test.cpp",
         "expression_field_path_test.cpp",

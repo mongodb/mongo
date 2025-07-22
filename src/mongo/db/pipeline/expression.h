@@ -5010,6 +5010,34 @@ private:
     explicit ExpressionCreateUUID(ExpressionContext* expCtx);
 };
 
+
+class ExpressionCreateObjectId : public Expression {
+public:
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement exprElement,
+                                                  const VariablesParseState& vps);
+
+    Value serialize(const SerializationOptions& options = {}) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+
+    const char* getOpName() const;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+private:
+    explicit ExpressionCreateObjectId(ExpressionContext* expCtx);
+};
+
+
 /**
  * ExpressionEncTextSearch is the base class for all encrypted text search expressions. The first
  * operand (input) must be a field path expression, and the second operand (text) a constant

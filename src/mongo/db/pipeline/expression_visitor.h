@@ -179,6 +179,7 @@ class ExpressionEncStrStartsWith;
 class ExpressionEncStrEndsWith;
 class ExpressionEncStrContains;
 class ExpressionEncStrNormalizedEq;
+class ExpressionCreateObjectId;
 class ExpressionTestFeatureFlagLatest;
 class ExpressionTestFeatureFlagLastLTS;
 
@@ -414,6 +415,7 @@ public:
     virtual void visit(
         expression_walker::MaybeConstPtr<IsConst, ExpressionInternalKeyStringValue>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionCreateUUID>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionCreateObjectId>) = 0;
     virtual void visit(
         expression_walker::MaybeConstPtr<IsConst, ExpressionTestFeatureFlagLatest>) = 0;
     virtual void visit(
@@ -597,6 +599,7 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionInternalIndexKey*) override {}
     void visit(const ExpressionInternalKeyStringValue*) override {}
     void visit(const ExpressionCreateUUID*) override {}
+    void visit(const ExpressionCreateObjectId*) override {}
     void visit(const ExpressionTestFeatureFlagLatest*) override {}
     void visit(const ExpressionTestFeatureFlagLastLTS*) override {}
 };
