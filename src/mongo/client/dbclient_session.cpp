@@ -88,6 +88,12 @@
 
 
 namespace mongo {
+namespace {
+auto& dbClientSessionReconnectAttempts =
+    *MetricBuilder<Counter64>("network.dbClientSessionReconnectAttempts");
+auto& dbClientSessionWithoutAutoReconnectFailures =
+    *MetricBuilder<Counter64>("network.dbClientSessionWithoutAutoReconnectFailures");
+}  // namespace
 
 using std::string;
 
