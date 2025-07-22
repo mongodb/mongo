@@ -37,8 +37,8 @@
 #include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/query_request_helper.h"
-#include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/shared_buffer_fragment.h"
 

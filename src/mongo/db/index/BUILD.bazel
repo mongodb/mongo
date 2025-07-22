@@ -97,9 +97,9 @@ mongo_cc_library(
         "//src/mongo/db/index_builds:resumable_index_builds_idl",
         "//src/mongo/db/pipeline:document_path_support",
         "//src/mongo/db/query:projection_ast",
-        "//src/mongo/db/query:sort_pattern",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query:spill_util",
         "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/compiler/logical_model/sort_pattern",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/sorter:sorter_base",
         "//src/mongo/db/sorter:sorter_stats",  # TODO(SERVER-93876): Remove.
@@ -158,8 +158,8 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
-        "//src/mongo/db/query:sort_pattern",
         "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/db/query/compiler/logical_model/sort_pattern",
         "//src/mongo/db/sorter:sorter_stats",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/idl:server_parameter_test_util",
@@ -178,6 +178,6 @@ mongo_cc_benchmark(
         "//src/mongo:base",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
-        "//src/mongo/db/query:sort_pattern",
+        "//src/mongo/db/query/compiler/logical_model/sort_pattern",
     ],
 )

@@ -94,8 +94,8 @@ mongo_cc_library(
     ],
     deps = [
         ":projection_ast",
-        ":sort_pattern",
         "//src/mongo:base",
+        "//src/mongo/db/query/compiler/logical_model/sort_pattern",
         "//src/mongo/db/query/compiler/stats:collection_statistics_interface",
     ],
 )
@@ -245,23 +245,6 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:query_expressions",
         "//src/mongo/db:server_base",
-    ],
-)
-
-mongo_cc_library(
-    name = "sort_pattern",
-    srcs = [
-        "sort_pattern.cpp",
-    ],
-    hdrs = [
-        "sort_pattern.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/exec/document_value",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db:query_expressions",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -802,7 +785,6 @@ mongo_cc_unit_test(
         "query_settings_test.cpp",
         "query_utils_test.cpp",
         "record_id_range_test.cpp",
-        "sort_pattern_test.cpp",
         "view_response_formatter_test.cpp",
         "wildcard_test_utils.h",
     ],

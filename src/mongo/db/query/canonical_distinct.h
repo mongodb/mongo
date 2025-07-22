@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/group_from_first_document_transformation.h"
-#include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/util/uuid.h"
 
 #include <string>

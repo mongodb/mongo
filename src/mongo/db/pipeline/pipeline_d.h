@@ -51,11 +51,11 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/group_from_first_document_transformation.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/sort_pattern.h"
 
 #include <functional>
 #include <memory>

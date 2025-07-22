@@ -33,9 +33,9 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/sort_pattern.h"
 
 namespace mongo {
 /**

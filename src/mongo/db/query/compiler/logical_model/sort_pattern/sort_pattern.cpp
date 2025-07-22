@@ -28,7 +28,7 @@
  */
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"

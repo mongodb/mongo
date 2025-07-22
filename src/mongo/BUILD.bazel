@@ -664,7 +664,7 @@ filegroup(
         "//src/mongo/db/query:query_knob_expressions.h",
         "//src/mongo/db/query:query_knobs_gen",
         "//src/mongo/db/query:record_id_bound.h",
-        "//src/mongo/db/query:sort_pattern.h",
+        "//src/mongo/db/query/compiler/logical_model/sort_pattern:sort_pattern.h",
         "//src/mongo/db/query:tailable_mode.h",
         "//src/mongo/db/query:tailable_mode_gen",
         "//src/mongo/db/query/client_cursor:generic_cursor.h",

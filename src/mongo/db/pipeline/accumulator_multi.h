@@ -42,8 +42,8 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/memory_token_container_util.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/db/query/sort_pattern.h"
 
 #include <deque>
 #include <functional>

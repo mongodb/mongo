@@ -260,9 +260,6 @@ filters:
   - "projection.*":
     approvers:
       - 10gen/query-optimization
-  - "sort_pattern*":
-    approvers:
-      - 10gen/query-optimization
   - "query_planner*":
     approvers:
       - 10gen/query-optimization
