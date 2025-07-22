@@ -9,7 +9,7 @@ buildvariants:
     name: &ubuntu2204 ubuntu2204
     display_name: Ubuntu 22.04
     tags: ["forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2204-small
     expansions:
@@ -67,7 +67,7 @@ buildvariants:
     name: &ubuntu2404 ubuntu2404
     display_name: Ubuntu 24.04
     tags: ["forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2404-small
     expansions:
@@ -124,7 +124,7 @@ buildvariants:
   - name: ubuntu2004
     display_name: Ubuntu 20.04
     tags: ["forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2004-small
     expansions:
@@ -172,7 +172,7 @@ buildvariants:
     name: &enterprise-ubuntu2004-64 enterprise-ubuntu2004-64
     display_name: Enterprise Ubuntu 20.04
     tags: ["forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2004-small
     stepback: false
@@ -234,7 +234,7 @@ buildvariants:
   - name: enterprise-ubuntu2204-64
     display_name: Enterprise Ubuntu 22.04
     tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2204-small
     stepback: false
@@ -282,7 +282,7 @@ buildvariants:
   - name: enterprise-ubuntu2204-jepsen-plain
     display_name: Jepsen Tests
     tags: ["bazel_check"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2204-small
     # TODO SERVER-102932 remove --allocator=tcmalloc-gperf
@@ -306,7 +306,7 @@ buildvariants:
   - name: enterprise-ubuntu2204-jepsen
     display_name: Jepsen Docker Tests
     tags: ["bazel_check"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2204-small
     stepback: false
@@ -326,7 +326,7 @@ buildvariants:
   - name: enterprise-ubuntu2004-arm64
     display_name: Enterprise Ubuntu 20.04 arm64
     tags: ["forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2004-arm64
     expansions:
@@ -375,7 +375,7 @@ buildvariants:
   - name: ubuntu2004-arm64
     display_name: Ubuntu 20.04 arm64
     tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2004-arm64-small
     expansions:
@@ -424,7 +424,7 @@ buildvariants:
   - name: enterprise-ubuntu2204-arm64
     display_name: Enterprise Ubuntu 22.04 arm64
     tags: ["forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2204-arm64-small
     expansions:
@@ -470,7 +470,7 @@ buildvariants:
   - name: ubuntu2204-arm64
     display_name: Ubuntu 22.04 arm64
     tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2204-arm64-small
     expansions:
@@ -519,7 +519,7 @@ buildvariants:
   - name: enterprise-ubuntu2404
     display_name: Enterprise Ubuntu 24.04
     tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2404-small
     stepback: false
@@ -570,7 +570,7 @@ buildvariants:
   - name: ubuntu2404-arm64
     display_name: Ubuntu 24.04 arm64
     tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2404-arm64-small
     expansions:
@@ -619,7 +619,7 @@ buildvariants:
   - name: enterprise-ubuntu2404-arm64
     display_name: Enterprise Ubuntu 24.04 arm64
     tags: ["forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - ubuntu2404-arm64-small
     expansions:

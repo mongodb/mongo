@@ -176,7 +176,7 @@ buildvariants:
   - name: &enterprise-rhel-8-64-bit-dynamic-debug-mode enterprise-rhel-8-64-bit-dynamic-debug-mode
     display_name: "Shared Library Enterprise RHEL 8 Debug Mode"
     tags: ["forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
+    cron: "0 2 * * 0" # From the ${project_weekly_cron} parameter
     run_on:
       - rhel8.8-small
     stepback: false
@@ -250,7 +250,7 @@ buildvariants:
   - name: &windows-debug-suggested windows-debug-suggested
     display_name: "* Windows Server 2022 DEBUG"
     tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - windows-2022-small
     expansions:
@@ -293,7 +293,7 @@ buildvariants:
   - name: &enterprise-windows-debug-unoptimized enterprise-windows-debug-unoptimized
     display_name: "Enterprise Windows Server 2022 DEBUG (Unoptimized)"
     tags: []
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - windows-2022-small
     expansions:
@@ -330,7 +330,7 @@ buildvariants:
   - name: &macos-debug-suggested macos-debug-suggested
     display_name: "* macOS arm64 DEBUG"
     tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
+    cron: "0 2 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - macos-14-arm64
     expansions:
@@ -359,7 +359,7 @@ buildvariants:
   - name: &enterprise-macos enterprise-macos
     display_name: "Enterprise macOS arm64 DEBUG"
     tags: []
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - macos-14-arm64
     expansions:
@@ -390,7 +390,7 @@ buildvariants:
   - name: &rhel8-debug-ubsan-all-feature-flags rhel8-debug-ubsan-all-feature-flags
     display_name: "* Shared Library UBSAN Enterprise RHEL 8 DEBUG (all feature flags)"
     tags: ["suggested"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-large
     stepback: false
@@ -429,7 +429,7 @@ buildvariants:
   - name: rhel8-debug-ubsan-all-non-rollback-feature-flags
     display_name: "Shared Library UBSAN Enterprise RHEL 8 DEBUG (all non-rollback feature flags)"
     tags: []
-    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This variant runs infrequently to reduce its cost.
+    cron: "0 2 * * 0" # From the ${project_weekly_cron} parameter # This variant runs infrequently to reduce its cost.
     run_on:
       - rhel8.8-large
     stepback: false
@@ -462,7 +462,7 @@ buildvariants:
     name: rhel8-debug-aubsan-all-feature-flags
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags)"
     tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day
+    cron: "0 2 1-31/2 * *" # For cost reasons, we run this variant every other day
     run_on:
       - rhel8.8-large
     expansions:
@@ -495,7 +495,7 @@ buildvariants:
     name: rhel8-debug-aubsan-experimental-all-feature-flags
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG Experimental (all feature flags)"
     tags: ["suggested"]
-    cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
+    cron: "0 2 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - rhel8.8-large
     expansions:
@@ -519,7 +519,7 @@ buildvariants:
     name: rhel8-debug-aubsan-non-rollback-feature-flags
     display_name: "Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all non-rollback feature flags)"
     tags: ["forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This variant runs infrequently to reduce its cost.
+    cron: "0 2 * * 0" # From the ${project_weekly_cron} parameter # This variant runs infrequently to reduce its cost.
     run_on:
       - rhel8.8-large
     expansions:
@@ -535,7 +535,7 @@ buildvariants:
   - name: &rhel8-debug-aubsan-benchmarks rhel8-debug-aubsan-benchmarks
     display_name: "* {A,UB}SAN Enterprise RHEL 8 DEBUG (Benchmarks)"
     tags: ["suggested"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-large
     expansions:
@@ -560,7 +560,7 @@ buildvariants:
     name: enterprise-rhel8-debug-tsan-all-feature-flags
     display_name: "* TSAN Enterprise RHEL 8 DEBUG (all feature flags)"
     tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day.
+    cron: "0 2 1-31/2 * *" # For cost reasons, we run this variant every other day.
     run_on:
       - rhel8.8-large
     stepback: false
@@ -604,7 +604,7 @@ buildvariants:
     name: enterprise-rhel8-debug-tsan-all-non-rollback-feature-flags
     display_name: "TSAN Enterprise RHEL 8 DEBUG (all non-rollback feature flags)"
     tags: ["forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This variant runs infrequently to reduce its cost.
+    cron: "0 2 * * 0" # From the ${project_weekly_cron} parameter # This variant runs infrequently to reduce its cost.
     run_on:
       - rhel8.8-large
     stepback: false
@@ -619,7 +619,7 @@ buildvariants:
   - name: &enterprise-rhel8-unoptimized-64-bit enterprise-rhel8-unoptimized-64-bit
     display_name: "~ Enterprise RHEL 8 DEBUG (Unoptimized)"
     tags: ["bazel_check"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     expansions:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel88
@@ -646,7 +646,7 @@ buildvariants:
   - name: &linux-debug-aubsan-compile-grpc linux-debug-aubsan-compile-grpc
     display_name: "~ Linux x86 Shared Library {A,UB}SAN Enterprise Compile with Ingress GRPC"
     tags: ["experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-large
     expansions:

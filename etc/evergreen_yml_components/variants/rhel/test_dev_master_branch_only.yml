@@ -110,7 +110,7 @@ variables:
   - &enterprise-rhel-8-64-bit-template
     name: enterprise-rhel-8-64-bit
     display_name: "Enterprise RHEL 8"
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-small
     expansions: &enterprise-rhel-8-64-bit-expansions-template
@@ -232,7 +232,7 @@ buildvariants:
 
   - name: &linux-x86-dynamic-grpc linux-x86-dynamic-grpc
     display_name: "~ Linux x86 Shared Library Enterprise with Ingress GRPC"
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-xlarge
     stepback: false
@@ -347,7 +347,7 @@ buildvariants:
   - name: &enterprise-rhel-8-benchmarks enterprise-rhel-8-benchmarks
     display_name: "* Enterprise RHEL 8 (Benchmarks)"
     tags: ["suggested"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-large
     expansions:
@@ -369,7 +369,7 @@ buildvariants:
     name: enterprise-rhel-8-64-bit-multiversion
     display_name: "Enterprise RHEL 8 (implicit multiversion)"
     tags: []
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-small
     expansions: &linux-x86-multiversion-expansions-template
@@ -425,7 +425,7 @@ buildvariants:
     name: &hot_backups-rhel-8-64-bit hot_backups-rhel-8-64-bit
     display_name: "hot_backups RHEL 8"
     tags: []
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-small
     expansions:
@@ -461,7 +461,7 @@ buildvariants:
   - name: &enterprise-rhel8-sdam-replica-set-monitor-64-bit enterprise-rhel8-sdam-replica-set-monitor-64-bit
     display_name: "~ Enterprise RHEL 8 (with SdamReplicaSetMonitor)"
     tags: []
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-small
     expansions:

@@ -78,7 +78,7 @@ buildvariants:
   - name: &amazon-linux2023-arm64-local-compile amazon-linux2023-arm64-local-compile
     display_name: "Amazon Linux 2023 arm64 Local Compile"
     tags: []
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - amazon2023-arm64-latest-large
     expansions:
@@ -96,7 +96,7 @@ buildvariants:
   - name: &amazon-linux-2023-arm64-bazel-compile amazon-linux-2023-arm64-bazel-compile
     display_name: "Amazon Linux 2023.3 Enterprise arm64 Bazel Compile"
     tags: ["bazel_check"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - amazon2023.3-arm64-large
     stepback: false
@@ -111,7 +111,7 @@ buildvariants:
   - name: &rhel81-ppc64le-bazel-compile rhel81-ppc64le-bazel-compile
     display_name: "RHEL 8.1 PPC64LE Bazel Compile"
     tags: ["bazel_check"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel81-power8-large
     stepback: false
@@ -129,7 +129,7 @@ buildvariants:
   - name: &rhel83-s390x-bazel-compile rhel83-s390x-bazel-compile
     display_name: "RHEL 8.3 S390X Bazel Compile"
     tags: ["bazel_check"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel83-zseries-large
     stepback: false
@@ -145,7 +145,7 @@ buildvariants:
     name: enterprise-amazon-linux2023-arm64-all-feature-flags
     display_name: "! Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags)"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - amazon2023-arm64-latest-small
     stepback: true
@@ -268,7 +268,7 @@ buildvariants:
   - name: &al2023-arm64-sep-benchmark al2023-arm64-sep-benchmark
     display_name: "! AL2023.3 arm64 Enterprise (SEP Benchmark)"
     tags: ["required"]
-    cron: "0 */4 * * *"
+    cron: "0 1,5,9,13,17,21 * * *"
     run_on:
       - amazon2023.3-arm64-large
     expansions:
@@ -335,23 +335,23 @@ buildvariants:
       - name: initial_sync_fuzzer_sanity_patch_gen
       - name: rollback_fuzzer_sanity_patch_gen
       - name: query_cbr_heuristic_jscore_passthrough
-        cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_cbr_heuristic_aggregation_passthrough
-        cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_cbr_sampling_jscore_passthrough
-        cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_cbr_sampling_aggregation_passthrough
-        cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_cbr_histogram_jscore_passthrough
-        cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_cbr_histogram_aggregation_passthrough
-        cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
 
   - <<: *amazon_linux2023_arm64_static_compile_variant_dependency
     name: amazon_linux2023_arm64_static-try-sbe-engine-query-patch-only
     display_name: "~ Amazon Linux 2023 arm64 Enterprise Query Patch Only (Try SBE Engine)"
     tags: []
-    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+    cron: "0 1 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
     run_on:
       - amazon2023-arm64-latest-small
     expansions:
@@ -390,7 +390,7 @@ buildvariants:
           - name: archive_dist_test
             variant: *amazon_linux2023_arm64_static_compile_variant_name
       - name: .query_correctness
-        cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter
       - name: check_feature_flag_tags
       - name: check_for_todos
       - name: test_api_version_compatibility
@@ -406,7 +406,7 @@ buildvariants:
     name: enterprise-amazon-linux2023-arm64-all-feature-flags-required-query-patch-only
     display_name: "~ Amazon Linux 2023 arm64 Enterprise Query Patch Only (all feature flags)"
     tags: []
-    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+    cron: "0 1 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
     expansions:
       expansions:
       <<: *amazon_linux2023_arm64_dynamic_expansions
@@ -426,7 +426,7 @@ buildvariants:
     name: amazon_linux2023_arm64_static-unified-write-executor-query-patch-only
     display_name: "~ Amazon Linux 2023 arm64 Enterprise Query Patch Only (Unified Write Executor)"
     tags: ["experimental"]
-    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+    cron: "0 1 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
     run_on:
       - amazon2023-arm64-latest-small
     expansions:
@@ -460,7 +460,7 @@ buildvariants:
   #   display_name: "Amazon Linux 2023 arm64 Enterprise (all feature flags) recordIdsReplicated"
   #   tags: []
   #   # Run daily once at 4 AM.
-  #   cron: "0 4 * * *"
+  #   cron: "0 1 * * *"
   #   tasks:
   #     - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
   #     - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated

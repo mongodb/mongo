@@ -273,7 +273,7 @@ buildvariants:
     name: linux-64-debug-required
     display_name: "! Linux x86 Shared Library DEBUG"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - rhel8.8-medium
     expansions:
@@ -301,7 +301,7 @@ buildvariants:
     name: rhel8-debug-aubsan-lite-all-feature-flags-required
     display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags)"
     tags: ["required"]
-    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - rhel8.8-large
     expansions:
@@ -320,7 +320,7 @@ buildvariants:
     name: rhel8-debug-aubsan
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG"
     tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day
+    cron: "0 1 1-31/2 * *" # For cost reasons, we run this variant every other day
     run_on:
       - rhel8.8-large
     expansions:
@@ -348,7 +348,7 @@ buildvariants:
     name: rhel8-debug-aubsan-roll-back-incremental-feature-flags
     display_name: "Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (roll back incremental feature flags)"
     tags: ["forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This variant runs infrequently to reduce its cost.
+    cron: "0 1 * * 0" # From the ${project_weekly_cron} parameter # This variant runs infrequently to reduce its cost.
     run_on:
       - rhel8.8-large
     expansions:
@@ -381,7 +381,7 @@ buildvariants:
     name: rhel8-debug-aubsan-experimental
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG Experimental"
     tags: ["suggested"]
-    cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
+    cron: "0 1 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - rhel8.8-large
     expansions:
@@ -398,7 +398,7 @@ buildvariants:
   - name: rhel8-asan
     display_name: ~ ASAN RHEL 8
     tags: []
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-large
     stepback: true
@@ -432,7 +432,7 @@ buildvariants:
   - name: &rhel8-debug-aubsan-lite_fuzzer rhel8-debug-aubsan-lite_fuzzer
     display_name: "{A,UB}SAN Enterprise RHEL 8 FUZZER"
     tags: []
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-xlarge
     stepback: false
@@ -467,7 +467,7 @@ buildvariants:
   - name: enterprise-rhel8-debug-tsan-compile
     display_name: "* TSAN Enterprise RHEL 8 DEBUG Compile"
     tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-large
     stepback: false
@@ -495,7 +495,7 @@ buildvariants:
   - name: enterprise-rhel8-debug-tsan-required
     display_name: "! TSAN Enterprise RHEL 8 DEBUG Essential"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - rhel8.8-large
     stepback: false
@@ -521,7 +521,7 @@ buildvariants:
     name: enterprise-rhel8-debug-tsan
     display_name: "* TSAN Enterprise RHEL 8 DEBUG"
     tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day.
+    cron: "0 2 1-31/2 * *" # For cost reasons, we run this variant every other day.
     run_on:
       - rhel8.8-large
     stepback: false
@@ -568,7 +568,7 @@ buildvariants:
     name: enterprise-rhel8-debug-tsan-roll-back-incremental-feature-flags
     display_name: "TSAN Enterprise RHEL 8 DEBUG (roll back incremental feature flags)"
     tags: ["forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This variant runs infrequently to reduce its cost.
+    cron: "0 2 * * 0" # From the ${project_weekly_cron} parameter # This variant runs infrequently to reduce its cost.
     run_on:
       - rhel8.8-large
     stepback: false
@@ -612,7 +612,7 @@ buildvariants:
     name: rhel8-debug-aubsan-classic-engine
     display_name: "* {A,UB}SAN Enterprise RHEL 8 DEBUG (Classic Engine)"
     tags: ["suggested"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-large
     expansions:
@@ -663,7 +663,7 @@ buildvariants:
   - name: enterprise-rhel-8-64-bit-dynamic-spider-monkey-dbg
     display_name: "~ Shared Library Enterprise RHEL 8 SpiderMonkey Debug"
     tags: []
-    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - rhel8.8-small
     expansions:
@@ -701,7 +701,7 @@ buildvariants:
   - name: &rhel8-debug-ubsan-roll-back-incremental-feature-flags rhel8-debug-ubsan-roll-back-incremental-feature-flags
     display_name: "Shared Library UBSAN Enterprise RHEL 8 DEBUG (roll back incremental feature flags)"
     tags: []
-    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This variant runs infrequently to reduce its cost.
+    cron: "0 2 * * 0" # From the ${project_weekly_cron} parameter # This variant runs infrequently to reduce its cost.
     run_on:
       - rhel8.8-large
     stepback: false

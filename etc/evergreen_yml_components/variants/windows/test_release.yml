@@ -8,7 +8,7 @@ buildvariants:
   - name: windows
     display_name: Windows Server 2022
     tags: []
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - windows-2022-small
     expansions:
@@ -52,7 +52,7 @@ buildvariants:
     name: &enterprise-windows enterprise-windows
     display_name: "Enterprise Windows Server 2022"
     tags: ["bazel_check"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - windows-2022-small
     expansions:

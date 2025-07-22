@@ -113,7 +113,7 @@ buildvariants:
     name: enterprise-windows-all-feature-flags-required
     display_name: "! Enterprise Windows Server 2022 (all feature flags) essential tasks"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - windows-2022-small
     expansions: &windows_essential_expansions
@@ -151,7 +151,7 @@ buildvariants:
     name: enterprise-windows-all-feature-flags-non-essential
     display_name: "* Enterprise Windows Server 2022 (all feature flags) non-essential tasks"
     tags: ["suggested"]
-    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - windows-2022-small
     expansions:

@@ -58,7 +58,7 @@ buildvariants:
   - name: linux-64-debug-wtdevelop
     display_name: "~ Linux DEBUG WiredTiger develop"
     tags: []
-    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - rhel8.8-medium
     modules:
@@ -120,7 +120,7 @@ buildvariants:
   - name: &enterprise-windows-wtdevelop enterprise-windows-wtdevelop
     display_name: "~ Enterprise Windows Server 2022 WiredTiger develop"
     tags: []
-    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - windows-2022-small
     modules:

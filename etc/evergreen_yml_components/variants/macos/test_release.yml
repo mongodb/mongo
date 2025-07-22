@@ -8,7 +8,7 @@ buildvariants:
   - name: macos-arm64
     display_name: macOS arm64
     tags: ["forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - macos-14-arm64
     expansions:
@@ -31,7 +31,7 @@ buildvariants:
   - name: enterprise-macos-arm64
     display_name: Enterprise macOS arm64
     tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - macos-14-arm64
     expansions:
@@ -54,7 +54,7 @@ buildvariants:
   - name: macos
     display_name: macOS
     tags: ["forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - macos-14
     expansions:
@@ -77,7 +77,7 @@ buildvariants:
   - name: enterprise-macos
     display_name: Enterprise macOS
     tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - macos-14
     expansions:

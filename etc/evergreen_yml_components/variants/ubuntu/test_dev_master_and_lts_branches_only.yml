@@ -24,7 +24,7 @@ buildvariants:
     name: &enterprise-ubuntu2204-64-libvoidstar enterprise-ubuntu2204-64-libvoidstar
     display_name: "~ Enterprise Ubuntu 22.04 w/ libvoidstar"
     tags: []
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
     expansions:
       <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
       compile_variant: *enterprise-ubuntu2204-64-libvoidstar
@@ -38,7 +38,7 @@ buildvariants:
     name: &enterprise-ubuntu2204-64-aubsan-libvoidstar enterprise-ubuntu2204-64-aubsan-libvoidstar
     display_name: "~ {A,UB}SAN Enterprise Ubuntu 22.04 w/ libvoidstar"
     tags: []
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
     expansions:
       <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
       antithesis_build_type: aubsan
@@ -64,7 +64,7 @@ buildvariants:
     name: &enterprise-ubuntu2204-64-tsan-libvoidstar enterprise-ubuntu2204-64-tsan-libvoidstar
     display_name: "~ TSAN Enterprise Ubuntu 22.04 w/ libvoidstar"
     tags: []
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
     expansions:
       <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
       antithesis_build_type: tsan
