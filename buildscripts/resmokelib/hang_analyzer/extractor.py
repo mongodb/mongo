@@ -366,11 +366,23 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
         )
 
         process = subprocess.run(
-            [f"{TOOLCHAIN_ROOT}/bin/eu-readelf", "-S", file_path], capture_output=True, text=True
+            [f"{TOOLCHAIN_ROOT}/bin/eu-readelf", "-n", file_path], capture_output=True, text=True
         )
-        if process.returncode != 0 or ".gnu_debuglink" not in process.stdout:
+        if process.returncode != 0:
             current_span.set_attribute("recalc_debuglink_status", "skipped")
             return
+        binary_build_id = get_build_id(process.stdout)
+        process = subprocess.run(
+            [f"{TOOLCHAIN_ROOT}/bin/eu-readelf", "-n", f"{file_path}.debug"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        debugsymbol_build_id = get_build_id(process.stdout)
+        if binary_build_id != debugsymbol_build_id:
+            print(f"{file_path} build id: {binary_build_id}")
+            print(f"{file_path}.debug build id: {debugsymbol_build_id}")
+            raise RuntimeError("binary and debugsymbol build ids do not match")
         try:
             # Ensure the file is writable, we have seen the uploaded binaries be non-writable.
             os.chmod(file_path, 0o775)
@@ -400,13 +412,17 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
 
         root_looger.debug("Finished recalculating the debuglink for %s", file_path)
 
-    install_dir = os.path.join(download_dir, "install")
-    lib_dir = os.path.join(install_dir, "dist-test", "lib")
-    if not os.path.exists(lib_dir):
-        return
-    lib_files = [os.path.join(lib_dir, file_path) for file_path in os.listdir(lib_dir)]
+    dist_dir = os.path.join(download_dir, "install", "dist-test")
+    bin_dir = os.path.join(dist_dir, "bin")
+    bin_files = [os.path.join(bin_dir, file_path) for file_path in os.listdir(bin_dir)]
+    lib_dir = os.path.join(dist_dir, "lib")
+    lib_files = []
+    if os.path.exists(lib_dir):
+        lib_files = [os.path.join(lib_dir, file_path) for file_path in os.listdir(lib_dir)]
+
     current_span = get_default_current_span()
 
+    # add gdb indexes so gdb can process these libraries faster, we cannot do this to the binaries.
     with OtelThreadPoolExecutor() as executor:
         with TRACER.start_as_current_span(
             "core_analyzer.post_install_gdb_optimization.add_indexes"
@@ -428,12 +444,14 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
                 # raise any exceptions that were thrown in child processes
                 future.result()
 
+        # add gnu_debuglink section to all libraries and debugsymbols. This tells gdb where to look
+        # to find the debugsymbols.
         with TRACER.start_as_current_span(
             "core_analyzer.post_install_gdb_optimization.recalc_debuglink"
         ):
             futures = []
             current_span = get_default_current_span()
-            for file_path in lib_files:
+            for file_path in lib_files + bin_files:
                 # There will be no debuglinks in the separate debug files
                 # We do not want to edit any of the binary files that gdb might directly run
                 # so we skip the bin directory
@@ -444,6 +462,11 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
             for future in concurrent.futures.as_completed(futures):
                 # raise any exceptions that were thrown in child processes
                 future.result()
+
+
+def get_build_id(process_output: str) -> str:
+    result = re.search("Build ID: ([0-9a-z]+)", process_output)
+    return result.group(1)
 
 
 @TRACER.start_as_current_span("core_analyzer.download_task_artifacts")

@@ -719,6 +719,7 @@ class GDBDumper(Dumper):
     ) -> Tuple[int, str]:  # returns (exit_code, test_status)
         cmds = []
         dbg = self._find_debugger()
+        readelf = find_program("eu-readelf", ["/opt/mongodbtoolchain/v5/bin", "/usr/bin"])
         basename = os.path.basename(core_file_path)
         if dbg is None:
             self._root_logger.error("Debugger not found, skipping dumping of %s", basename)
@@ -726,6 +727,7 @@ class GDBDumper(Dumper):
 
         # ensure debugger version is loggged
         call([dbg, "--version"], logger)
+        call([readelf, "--version"], logger, check=False)
         lib_dir = None
 
         binary_name, bin_version = self.get_binary_from_core_dump(core_file_path)
@@ -754,6 +756,9 @@ class GDBDumper(Dumper):
             f"set index-cache enabled {gdb_index_cache}",
             f"file {binary_path}",
         ]
+
+        # dump the gnu debuglink just to make sure it exists
+        call([readelf, "--string-dump=.gnu_debuglink", binary_path], logger, check=False)
 
         # We run gdb once to populate the gdb index cache because gdb can sometimes
         # behave weirdly and take a long time when pulling from the index cache
