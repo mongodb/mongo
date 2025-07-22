@@ -110,15 +110,15 @@ boost::optional<std::string> generateRandomStringBetween(const std::string& min,
  * the split point. Otherwise, looks at the type of min or max and tries to generate a valid
  * document of that type.
  */
-boost::optional<BSONObj> generateRandomDocument(const BSONObj& min,
-                                                const BSONObj& max,
+boost::optional<BSONObj> generateRandomDocument(const BSONObj& minDoc,
+                                                const BSONObj& maxDoc,
                                                 std::default_random_engine& gen) {
     std::vector<BSONElement> minElems;
-    min.elems(minElems);
+    minDoc.elems(minElems);
     BSONObjBuilder randomDocument;
     for (const auto& minField : minElems) {
         const auto& name = minField.fieldName();
-        const auto& maxField = max.getField(name);
+        const auto& maxField = maxDoc.getField(name);
         if (minField.type() == BSONType::minKey && maxField.type() == BSONType::maxKey) {
             // Since we don't know what type the shard key is, just use an int.
             randomDocument.appendNumber(name, 0);
