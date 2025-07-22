@@ -50,7 +50,7 @@ constexpr size_t kMaxAcquisitionRetryAttempts = 5;
 
 
 CollectionOrViewAcquisition acquireCollectionOrViewWithLockFreeRead(
-    OperationContext* opCtx, CollectionAcquisitionRequest acquisitionReq, LockMode mode) {
+    OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionReq, LockMode mode) {
     if (mode == LockMode::MODE_IS) {
         return acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionReq);
     }
@@ -147,7 +147,20 @@ std::pair<CollectionAcquisition, bool> acquireCollectionWithBucketsLookup(
             "Found unsupported view mode during buckets acquisition",
             acquisitionReq.viewMode == AcquisitionPrerequisites::ViewMode::kMustBeCollection);
 
+    auto [acq, wasNssTranslatedToBuckets] =
+        acquireCollectionOrViewWithBucketsLookup(opCtx, acquisitionReq, mode);
+
+    tassert(10168070,
+            fmt::format("Unexpectedly got view acquisition on collection '{}'",
+                        acquisitionReq.nssOrUUID.toStringForErrorMsg()),
+            !acq.isView());
+    return {CollectionAcquisition(std::move(acq)), wasNssTranslatedToBuckets};
+}
+
+std::pair<CollectionOrViewAcquisition, bool> acquireCollectionOrViewWithBucketsLookup(
+    OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionReq, LockMode mode) {
     const auto& originNssOrUUID = acquisitionReq.nssOrUUID;
+    const auto originalViewMode = acquisitionReq.viewMode;
     auto remainingAttempts = kMaxAcquisitionRetryAttempts;
     while (remainingAttempts-- > 0) {
         // Override view mode to allow acquisition on timeseries view
@@ -156,10 +169,13 @@ std::pair<CollectionAcquisition, bool> acquireCollectionWithBucketsLookup(
         boost::optional<CollectionOrViewAcquisition> acq =
             acquireCollectionOrViewWithLockFreeRead(opCtx, acquisitionReq, mode);
         if (acq->isView()) {
-            uassert(ErrorCodes::CommandNotSupportedOnView,
-                    fmt::format("Namespace {} is a view, not a collection",
-                                acq->nss().toStringForErrorMsg()),
-                    acq->getView().getViewDefinition().timeseries());
+            if (!acq->getView().getViewDefinition().timeseries()) {
+                uassert(ErrorCodes::CommandNotSupportedOnView,
+                        fmt::format("Namespace {} is a view, not a collection",
+                                    acq->nss().toStringForErrorMsg()),
+                        originalViewMode == AcquisitionPrerequisites::ViewMode::kCanBeView);
+                return {std::move(*acq), false};
+            }
 
             // modify acquisition request to target the buckets collection
             auto bucketsNss = acq->getView().getViewDefinition().viewOn();
@@ -176,7 +192,7 @@ std::pair<CollectionAcquisition, bool> acquireCollectionWithBucketsLookup(
                     fmt::format("Timeseries buckets collection does not exist {}",
                                 bucketsAcquisitionReq.nssOrUUID.toStringForErrorMsg()),
                     bucketsAcq.collectionExists());
-            return {CollectionAcquisition(std::move(bucketsAcq)), true};
+            return {std::move(bucketsAcq), true};
         }
 
 
@@ -209,11 +225,11 @@ std::pair<CollectionAcquisition, bool> acquireCollectionWithBucketsLookup(
                                 "remainingAttempts"_attr = remainingAttempts);
                     continue;
                 }
-                return {CollectionAcquisition(std::move(bucketsAcq)), true};
+                return {std::move(bucketsAcq), true};
             }
         }
 
-        return {CollectionAcquisition(std::move(*acq)), false};
+        return {std::move(*acq), false};
     }
 
     uasserted(

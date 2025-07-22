@@ -47,15 +47,28 @@ class OperationContext;
 namespace timeseries {
 
 /**
- * This function is a wrapper of `acquireCollection`.
+ * This function is a wrapper of `acquireCollectionOrView`.
  *
- * It returns a pair where the first element is the resulting collection acquisition.
+ * It returns a pair where the first element is the resulting collection or view acquisition.
  *
  * The second element is a boolean indicating if the acquisition has been made after translating the
  * namespace to the underlying timeseries system buckets collection. This boolean will be set to
  * true only for existing legacy timeseries collection (view + buckets).
  *
  * MODE_IS acquisition requests are implicitly converted to `maybeLockFree`.
+ *
+ * TODO SERVER-101784 remove this function once 9.0 becomes last LTS. By then only viewless
+ * timeseries collection will exist.
+ */
+std::pair<CollectionOrViewAcquisition, bool> acquireCollectionOrViewWithBucketsLookup(
+    OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionReq, LockMode mode);
+
+/**
+ * Similar to acquireCollectionOrViewWithBucketsLookup above, but it will throw
+ * `CommandNotSupportedOnView` if the target namespace is a normal view.
+ *
+ * For timeseries view instead it will return the CollectionAcquistion of the underlying
+ * system.buckets collection.
  *
  * TODO SERVER-101784 remove this function once 9.0 becomes last LTS. By then only viewless
  * timeseries collection will exist.

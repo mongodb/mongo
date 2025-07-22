@@ -122,25 +122,21 @@ Status processCollModCommandWithTimeSeriesTranslation(OperationContext* opCtx,
                                                       BSONObjBuilder* result) {
     auto [timeseriesOptions,
           isLegacyTimeseries] = [&]() -> std::pair<boost::optional<TimeseriesOptions>, bool> {
-        try {
-            // TODO SERVER-105548 switch back to acquireCollection once 9.0 becomes last LTS
-            auto [collAcq, wasNssTranslatedToBucket] =
-                timeseries::acquireCollectionWithBucketsLookup(
+        // TODO SERVER-105548 switch back to acquireCollection once 9.0 becomes last LTS
+        auto [collAcq, wasNssTranslatedToBucket] =
+            timeseries::acquireCollectionOrViewWithBucketsLookup(
+                opCtx,
+                CollectionOrViewAcquisitionRequest::fromOpCtx(
                     opCtx,
-                    CollectionAcquisitionRequest::fromOpCtx(
-                        opCtx,
-                        cmd.getNamespace(),
-                        AcquisitionPrerequisites::OperationType::kRead,
-                        cmd.getCollectionUUID()),
-                    LockMode::MODE_IS);
+                    cmd.getNamespace(),
+                    cmd.getCollectionUUID(),
+                    AcquisitionPrerequisites::OperationType::kRead),
+                LockMode::MODE_IS);
 
-            auto tsOptions =
-                collAcq.exists() ? collAcq.getCollectionPtr()->getTimeseriesOptions() : boost::none;
-            return {tsOptions, wasNssTranslatedToBucket};
-        } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
-            // The main namespace is a view that does not point to a timeseries buckets collection
-            return {boost::none, false};
-        }
+        auto tsOptions = collAcq.collectionExists()
+            ? collAcq.getCollectionPtr()->getTimeseriesOptions()
+            : boost::none;
+        return {tsOptions, wasNssTranslatedToBucket};
     }();
 
 
