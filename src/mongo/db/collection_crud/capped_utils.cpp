@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
@@ -44,7 +43,6 @@
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog/unique_collection_name.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -61,7 +59,6 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/record_store.h"
@@ -87,20 +84,15 @@ namespace mongo {
 
 void cloneCollectionAsCapped(OperationContext* opCtx,
                              Database* db,
-                             const NamespaceString& fromNss,
-                             const NamespaceString& toNss,
+                             const CollectionAcquisition& fromCollection,
+                             CollectionAcquisition& toCollection,
                              long long size,
                              bool temp,
                              const boost::optional<UUID>& targetUUID) {
-    // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-    CollectionPtr fromCollection = CollectionPtr::CollectionPtr_UNSAFE(
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, fromNss));
-    if (!fromCollection) {
-        uassert(ErrorCodes::CommandNotSupportedOnView,
-                str::stream() << "cloneCollectionAsCapped not supported for views: "
-                              << fromNss.toStringForErrorMsg(),
-                !CollectionCatalog::get(opCtx)->lookupView(opCtx, fromNss));
+    const auto& fromNss = fromCollection.nss();
+    const auto& toNss = toCollection.nss();
 
+    if (!fromCollection.exists()) {
         uasserted(ErrorCodes::NamespaceNotFound,
                   str::stream() << "source collection " << fromNss.toStringForErrorMsg()
                                 << " does not exist");
@@ -108,21 +100,22 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
 
     uassert(6367302,
             "Cannot convert an encrypted collection to a capped collection",
-            !fromCollection->getCollectionOptions().encryptedFieldConfig);
+            !fromCollection.getCollectionPtr()->getCollectionOptions().encryptedFieldConfig);
 
     uassert(ErrorCodes::IllegalOperation,
             "Cannot convert a timeseries collection to a capped collection",
-            !fromCollection->isTimeseriesCollection());
+            !fromCollection.getCollectionPtr()->isTimeseriesCollection());
 
     uassert(ErrorCodes::NamespaceExists,
             str::stream() << "cloneCollectionAsCapped failed - destination collection "
                           << toNss.toStringForErrorMsg() << " already exists. source collection: "
                           << fromNss.toStringForErrorMsg(),
-            !CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toNss));
+            !toCollection.exists());
 
     // create new collection
     {
-        auto options = fromCollection->getCollectionOptions();
+        ScopedLocalCatalogWriteFence scopedLocalCatalogWriteFence(opCtx, &toCollection);
+        auto options = fromCollection.getCollectionPtr()->getCollectionOptions();
         // The capped collection will get its own new unique id, as the conversion isn't reversible,
         // so it can't be rolled back.
         options.uuid = targetUUID;
@@ -136,10 +129,9 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
         uassertStatusOK(createCollection(opCtx, toNss, options, BSONObj()));
     }
 
-    // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-    CollectionPtr toCollection = CollectionPtr::CollectionPtr_UNSAFE(
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toNss));
-    invariant(toCollection);  // we created above
+    tassert(10769702,
+            "Expected toCollection to exist now",
+            toCollection.exists());  // we created above
 
     // how much data to ignore because it won't fit anyway
     // datasize and extentSize can't be compared exactly, so add some padding to 'size'
@@ -147,13 +139,14 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     long long allocatedSpaceGuess =
         std::max(static_cast<long long>(size * 2),
-                 static_cast<long long>(toCollection->getRecordStore()->storageSize(ru) * 2));
+                 static_cast<long long>(
+                     toCollection.getCollectionPtr()->getRecordStore()->storageSize(ru) * 2));
 
-    long long excessSize = fromCollection->dataSize(opCtx) - allocatedSpaceGuess;
+    long long excessSize = fromCollection.getCollectionPtr()->dataSize(opCtx) - allocatedSpaceGuess;
 
     auto exec =
         InternalPlanner::collectionScan(opCtx,
-                                        &fromCollection,
+                                        fromCollection,
                                         PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY,
                                         InternalPlanner::FORWARD);
 
@@ -163,8 +156,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
     DisableDocumentValidation validationDisabler(opCtx);
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    bool isOplogDisabledForCappedCollection =
-        replCoord->isOplogDisabledFor(opCtx, toCollection->ns());
+    bool isOplogDisabledForCappedCollection = replCoord->isOplogDisabledFor(opCtx, toNss);
 
     int retries = 0;  // non-zero when retrying our last document.
     while (true) {
@@ -196,7 +188,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
                 // The snapshot has changed. Fetch the document again from the collection in order
                 // to check whether it has been deleted.
                 Snapshotted<BSONObj> snapshottedObj;
-                if (!fromCollection->findDoc(opCtx, loc, &snapshottedObj)) {
+                if (!fromCollection.getCollectionPtr()->findDoc(opCtx, loc, &snapshottedObj)) {
                     // Doc was deleted so don't clone it.
                     retries = 0;
                     continue;
@@ -214,17 +206,20 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
             // Because of that, we acquire an optime for the insert now to ensure that the insert
             // oplog entry gets logged before any delete oplog entries.
             if (!isOplogDisabledForCappedCollection) {
-                if (toCollection->needsCappedLock()) {
+                if (toCollection.getCollectionPtr()->needsCappedLock()) {
                     Lock::ResourceLock heldUntilEndOfWUOW{
-                        opCtx, ResourceId(RESOURCE_METADATA, toCollection->ns()), MODE_X};
+                        opCtx, ResourceId(RESOURCE_METADATA, toNss), MODE_X};
                 }
                 auto oplogInfo = LocalOplogInfo::get(opCtx);
                 auto oplogSlots = oplogInfo->getNextOpTimes(opCtx, /*batchSize=*/1);
                 insertStmt.oplogSlot = oplogSlots.front();
             }
 
-            uassertStatusOK(collection_internal::insertDocument(
-                opCtx, toCollection, std::move(insertStmt), nullptr /* OpDebug */, true));
+            uassertStatusOK(collection_internal::insertDocument(opCtx,
+                                                                toCollection.getCollectionPtr(),
+                                                                std::move(insertStmt),
+                                                                nullptr /* OpDebug */,
+                                                                true));
             wunit.commit();
 
             // Go to the next document
@@ -241,7 +236,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
             // abandonSnapshot.
             exec->saveState();
             shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-            exec->restoreState(&fromCollection);  // Handles any WCEs internally.
+            exec->restoreState(nullptr);  // Handles any WCEs internally.
         }
     }
 
@@ -288,8 +283,10 @@ ConvertToCappedAcquisitions acquireLocksForConvertToCapped(
         }
         try {
             auto acquisitions = makeAcquisitionMap(acquireCollections(opCtx, requests, MODE_X));
-            bool tmpNameExists =
-                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, tmpName);
+            tassert(10769703,
+                    "Expected tmp collection to have been acquired",
+                    acquisitions.contains(tmpName));
+            bool tmpNameExists = acquisitions.at(tmpName).exists();
             if (tmpNameExists) {
                 // Retry the acquisitions as the tmpName already exists.
                 continue;
@@ -324,8 +321,7 @@ void convertToCapped(OperationContext* opCtx,
                      const NamespaceString& ns,
                      long long size,
                      const boost::optional<UUID>& targetUUID) {
-    const auto [sourceAcq, tmpAcq, leftoverAcq] =
-        acquireLocksForConvertToCapped(opCtx, ns, targetUUID);
+    auto [sourceAcq, tmpAcq, leftoverAcq] = acquireLocksForConvertToCapped(opCtx, ns, targetUUID);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns);
@@ -379,7 +375,7 @@ void convertToCapped(OperationContext* opCtx,
         }
     }
 
-    cloneCollectionAsCapped(opCtx, db, ns, tmpAcq.nss(), size, true /* temp */, targetUUID);
+    cloneCollectionAsCapped(opCtx, db, sourceAcq, tmpAcq, size, true /* temp */, targetUUID);
 
     RenameCollectionOptions options;
     options.dropTarget = true;

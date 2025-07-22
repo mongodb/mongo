@@ -138,8 +138,11 @@ public:
                 opCtx, fromNs, AcquisitionPrerequisites::OperationType::kWrite),
             CollectionAcquisitionRequest::fromOpCtx(
                 opCtx, toNs, AcquisitionPrerequisites::OperationType::kWrite)};
-        [[maybe_unused]] auto acquisitions =
-            acquireCollections(opCtx, acquisitionRequests, LockMode::MODE_X);
+        auto acquisitions =
+            makeAcquisitionMap(acquireCollections(opCtx, acquisitionRequests, LockMode::MODE_X));
+        tassert(
+            10769700, "Expected acquisition map to contain fromNs", acquisitions.contains(fromNs));
+        tassert(10769701, "Expected acquisition map to contain toNs", acquisitions.contains(toNs));
 
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, toNs)) {
             uasserted(ErrorCodes::NotWritablePrimary,
@@ -152,7 +155,10 @@ public:
                 str::stream() << "database " << dbName.toStringForErrorMsg() << " not found",
                 db);
 
-        cloneCollectionAsCapped(opCtx, db, fromNs, toNs, size, temp);
+
+        CollectionAcquisition fromColl = acquisitions.at(fromNs);
+        CollectionAcquisition toColl = acquisitions.at(toNs);
+        cloneCollectionAsCapped(opCtx, db, fromColl, toColl, size, temp);
         return true;
     }
 };

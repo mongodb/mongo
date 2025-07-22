@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/base/status.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/util/uuid.h"
 
 #include <boost/optional/optional.hpp>
@@ -44,8 +44,8 @@ class OperationContext;
  */
 void cloneCollectionAsCapped(OperationContext* opCtx,
                              Database* db,
-                             const NamespaceString& fromNss,
-                             const NamespaceString& toNss,
+                             const CollectionAcquisition& fromColl,
+                             CollectionAcquisition& toColl,
                              long long size,
                              bool temp,
                              const boost::optional<UUID>& targetUUID = boost::none);
