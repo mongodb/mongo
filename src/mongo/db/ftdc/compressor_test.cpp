@@ -272,7 +272,7 @@ TEST_F(FTDCCompressorTest, TestSchemaChanges) {
     ASSERT_SCHEMA_CHANGED(st);
 
     // Change field to oid
-    st = c.addSample(BSON(GENOID));
+    st = c.addSample(BSON("_id" << OID::gen()));
     ASSERT_SCHEMA_CHANGED(st);
 
     // Change field from oid to object
@@ -280,7 +280,7 @@ TEST_F(FTDCCompressorTest, TestSchemaChanges) {
     ASSERT_SCHEMA_CHANGED(st);
 
     // Change field from object to oid
-    st = c.addSample(BSON(GENOID));
+    st = c.addSample(BSON("_id" << OID::gen()));
     ASSERT_SCHEMA_CHANGED(st);
 }
 

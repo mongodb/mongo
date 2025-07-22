@@ -138,10 +138,6 @@ CIDR::CIDR() : _family(AF_UNSPEC), _len(0) {
     _ip.fill(0);
 }
 
-BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& stream, const CIDR& value) {
-    return stream << value.toString();
-}
-
 std::ostream& operator<<(std::ostream& s, const CIDR& cidr) {
     return append(s, cidr._family, cidr._ip, cidr._len);
 }

@@ -374,7 +374,11 @@ public:
     static Document fromBsonWithMetaData(const BSONObj& bson);
 
     // Support BSONObjBuilder and BSONArrayBuilder "stream" API
-    friend BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& builder, const Document& d);
+    friend void appendToBson(BSONObjBuilder& builder, StringData fieldName, const Document& doc) {
+        BSONObjBuilder subobj(builder.subobjStart(fieldName));
+        doc.toBson(&subobj);
+        subobj.doneFast();
+    }
 
     /** Return the abstract Position of a field, suitable to pass to operator[] or getField().
      *  This can potentially save time if you need to refer to a field multiple times.
@@ -900,8 +904,6 @@ class DocumentStream {
     // and ValueStream taking a Value.
     class ValueStream {
     public:
-        ValueStream(DocumentStream& builder) : builder(builder) {}
-
         DocumentStream& operator<<(const Value& val) {
             builder._md[name] = val;
             return builder;
@@ -913,16 +915,13 @@ class DocumentStream {
             return *this << Value(val);
         }
 
-        StringData name;
         DocumentStream& builder;
+        StringData name;
     };
 
 public:
-    DocumentStream() : _stream(*this) {}
-
-    ValueStream& operator<<(StringData name) {
-        _stream.name = name;
-        return _stream;
+    ValueStream operator<<(StringData name) {
+        return ValueStream{*this, name};
     }
 
     Document done() {
@@ -930,7 +929,6 @@ public:
     }
 
 private:
-    ValueStream _stream;
     MutableDocument _md;
 };
 

@@ -134,8 +134,4 @@ OpTimeAndWallTime OpTimeAndWallTime::parse(const BSONObj& obj) {
     return uassertStatusOK(parseOpTimeAndWallTimeFromOplogEntry(obj));
 }
 
-BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& builder, const OpTime& value) {
-    return builder << value.toBSON();
-}
-
 }  // namespace mongo::repl

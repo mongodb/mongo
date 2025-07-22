@@ -454,7 +454,7 @@ public:
     void run() {
         const int collSize = 1000;
         for (int i = 0; i < collSize; i++)
-            insert(_nss, BSON(GENOID << "i" << i));
+            insert(_nss, BSON("_id" << OID::gen() << "i" << i));
 
         testLimit(1, 1);
         testLimit(10, 10);

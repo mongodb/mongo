@@ -124,6 +124,10 @@ public:
     void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const;
     void serializeToBSON(BSONArrayBuilder* builder) const;
 
+    friend void appendToBson(BSONObjBuilder& bob, StringData fieldName, const TenantId& value) {
+        value.serializeToBSON(fieldName, &bob);
+    }
+
 private:
     friend class NamespaceString;
     friend class DatabaseName;
@@ -164,11 +168,5 @@ StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& stream,
                                          const TenantId& tenantId) {
     return stream << tenantId.toString();
 }
-
-/**
- * Supports use of TenantId with the BSON macro:
- *     BSON("tenant" << tenantId)
- */
-BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& builder, const TenantId& value);
 
 }  // namespace mongo

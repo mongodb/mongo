@@ -300,9 +300,6 @@ public:
      */
     void addToBsonArray(BSONArrayBuilder* builder, size_t recursionLevel = 1) const;
 
-    // Support BSONObjBuilder and BSONArrayBuilder "stream" API
-    friend BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& builder, const Value& val);
-
     /** Coerce a value to a bool using BSONElement::trueValue() rules.
      */
     bool coerceToBool() const;
@@ -345,6 +342,11 @@ public:
     static int compare(const Value& lhs,
                        const Value& rhs,
                        const StringDataComparator* stringComparator);
+
+    // Support BSONObjBuilder and BSONArrayBuilder "stream" API
+    friend void appendToBson(BSONObjBuilder& builder, StringData fieldName, const Value& val) {
+        val._appendToBson(builder, fieldName);
+    }
 
     friend DeferredComparison operator==(const Value& lhs, const Value& rhs) {
         return DeferredComparison(DeferredComparison::Type::kEQ, lhs, rhs);
@@ -434,6 +436,8 @@ private:
 
     // May contain embedded NUL bytes, does not check the type.
     StringData getRawData() const;
+
+    void _appendToBson(BSONObjBuilder& builder, StringData fieldName) const;
 
     ValueStorage _storage;
     friend class MutableValue;  // gets and sets _storage.genericRCPtr

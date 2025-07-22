@@ -121,7 +121,7 @@ public:
         _coll = CollectionPtr::CollectionPtr_UNSAFE(coll);
 
         for (int i = 0; i < kDocuments; i++) {
-            insert(BSON(GENOID << "x" << i));
+            insert(BSON("_id" << OID::gen() << "x" << i));
         }
 
         wunit.commit();
@@ -339,7 +339,7 @@ public:
 
     // This is called 100 times as we scan the collection
     void interject(CountStage&, int) override {
-        insert(BSON(GENOID << "x" << 1));
+        insert(BSON("_id" << OID::gen() << "x" << 1));
     }
 };
 
@@ -406,7 +406,7 @@ public:
 
     void interject(CountStage&, int) override {
         // Should cause index to be converted to multikey
-        insert(BSON(GENOID << "x" << BSON_ARRAY(1 << 2)));
+        insert(BSON("_id" << OID::gen() << "x" << BSON_ARRAY(1 << 2)));
     }
 };
 

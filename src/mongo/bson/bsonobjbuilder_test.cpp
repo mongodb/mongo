@@ -595,5 +595,14 @@ TEST(BSONObjBuilderTest, UniqueArrayBuilderReleaseToBuffer) {
         auto tmp = UniqueBuffer::reclaim(rawData);
     }
 }
+
+TEST(BSONObjBuilderTest, QueryConstraintLabelSingle) {
+    ASSERT_BSONOBJ_EQ(BSON("ts" << GTE << 123), BSON("ts" << BSON("$gte" << 123)));
+}
+
+TEST(BSONObjBuilderTest, QueryConstraintLabelCompound) {
+    ASSERT_BSONOBJ_EQ(BSON("ts" << GTE << 123 << LTE << 456),
+                      BSON("ts" << BSON("$gte" << 123 << "$lte" << 456)));
+}
 }  // namespace
 }  // namespace mongo

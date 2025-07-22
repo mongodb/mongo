@@ -560,13 +560,6 @@ Document::Document(const std::vector<std::pair<StringData, Value>>& fields) {
     *this = mutableDoc.freeze();
 }
 
-BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& builder, const Document& doc) {
-    BSONObjBuilder subobj(builder.subobjStart());
-    doc.toBson(&subobj);
-    subobj.doneFast();
-    return builder.builder();
-}
-
 void Document::toBson(BSONObjBuilder* builder, size_t recursionLevel) const {
     uassert(ErrorCodes::Overflow,
             str::stream() << "cannot convert document to BSON because it exceeds the limit of "

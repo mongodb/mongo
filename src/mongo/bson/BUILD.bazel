@@ -115,5 +115,6 @@ mongo_cc_benchmark(
     deps = [
         "//src/mongo:base",
         "//src/mongo/bson:bson_validate",
+        "//src/mongo/db/exec/document_value",
     ],
 )

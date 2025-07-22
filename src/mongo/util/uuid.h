@@ -197,6 +197,14 @@ public:
         return "uuid"_attr = uuid;
     }
 
+    /**
+     * Supports use of UUID with the BSON macro:
+     *     BSON("uuid" << uuid) -> { uuid: BinData(4, "...") }
+     */
+    friend void appendToBson(BSONObjBuilder& bob, StringData fieldName, const UUID& value) {
+        value.appendToBuilder(&bob, fieldName);
+    }
+
 private:
     using UUIDStorage = std::array<unsigned char, kNumBytes>;
 
@@ -217,11 +225,5 @@ inline std::ostream& operator<<(std::ostream& s, const UUID& uuid) {
 inline StringBuilder& operator<<(StringBuilder& s, const UUID& uuid) {
     return (s << uuid.toString());
 }
-
-/**
- * Supports use of UUID with the BSON macro:
- *     BSON("uuid" << uuid) -> { uuid: BinData(4, "...") }
- */
-BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& stream, const UUID& value);
 
 }  // namespace mongo

@@ -75,10 +75,4 @@ void TenantId::serializeToBSON(BSONArrayBuilder* builder) const {
     builder->append(_oid);
 }
 
-BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& stream, const TenantId& value) {
-    auto& bob = stream.builder();
-    value.serializeToBSON(stream.consumeFieldName(), &bob);
-    return bob;
-}
-
 }  // namespace mongo

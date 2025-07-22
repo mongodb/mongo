@@ -546,8 +546,6 @@ public:
             // Handler to process each 'SingleWriteResult'.
             auto singleWriteHandler = [&](const SingleWriteResult& opResult, int index) {
                 nModified += opResult.getNModified();
-                BSONSizeTracker upsertInfoSizeTracker;
-
                 if (auto idElement = opResult.getUpsertedId().firstElement())
                     upsertedInfoVec.emplace_back(write_ops::Upserted(index, idElement));
             };

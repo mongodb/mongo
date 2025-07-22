@@ -326,64 +326,89 @@ Value Value::operator[](StringData name) const {
     return getDocument()[name];
 }
 
-BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& builder, const Value& val) {
-    switch (val.getType()) {
+void Value::_appendToBson(BSONObjBuilder& builder, StringData fieldName) const {
+    switch (getType()) {
         case BSONType::eoo:
-            return builder.builder();  // nothing appended
+            return;  // nothing appended
         case BSONType::minKey:
-            return builder << MINKEY;
+            appendToBson(builder, fieldName, MINKEY);
+            return;
         case BSONType::maxKey:
-            return builder << MAXKEY;
+            appendToBson(builder, fieldName, MAXKEY);
+            return;
         case BSONType::null:
-            return builder << BSONNULL;
+            appendToBson(builder, fieldName, BSONNULL);
+            return;
         case BSONType::undefined:
-            return builder << BSONUndefined;
+            appendToBson(builder, fieldName, BSONUndefined);
+            return;
         case BSONType::oid:
-            return builder << val.getOid();
+            appendToBson(builder, fieldName, getOid());
+            return;
         case BSONType::numberInt:
-            return builder << val.getInt();
+            appendToBson(builder, fieldName, getInt());
+            return;
         case BSONType::numberLong:
-            return builder << val.getLong();
+            appendToBson(builder, fieldName, getLong());
+            return;
         case BSONType::numberDouble:
-            return builder << val.getDouble();
+            appendToBson(builder, fieldName, getDouble());
+            return;
         case BSONType::numberDecimal:
-            return builder << val.getDecimal();
+            appendToBson(builder, fieldName, getDecimal());
+            return;
         case BSONType::string:
-            return builder << val.getStringData();
+            appendToBson(builder, fieldName, getStringData());
+            return;
         case BSONType::boolean:
-            return builder << val.getBool();
+            appendToBson(builder, fieldName, getBool());
+            return;
         case BSONType::date:
-            return builder << val.getDate();
+            appendToBson(builder, fieldName, getDate());
+            return;
         case BSONType::timestamp:
-            return builder << val.getTimestamp();
+            appendToBson(builder, fieldName, getTimestamp());
+            return;
         case BSONType::object:
-            return builder << val.getDocument();
+            appendToBson(builder, fieldName, getDocument());
+            return;
         case BSONType::symbol:
-            return builder << BSONSymbol(val.getRawData());
+            appendToBson(builder, fieldName, BSONSymbol(getRawData()));
+            return;
         case BSONType::code:
-            return builder << BSONCode(val.getRawData());
+            appendToBson(builder, fieldName, BSONCode(getRawData()));
+            return;
         case BSONType::regEx:
-            return builder << BSONRegEx(val.getRegex(), val.getRegexFlags());
+            appendToBson(builder, fieldName, BSONRegEx(getRegex(), getRegexFlags()));
+            return;
 
         case BSONType::dbRef:
-            return builder << BSONDBRef(val._storage.getDBRef()->ns, val._storage.getDBRef()->oid);
+            appendToBson(
+                builder, fieldName, BSONDBRef(_storage.getDBRef()->ns, _storage.getDBRef()->oid));
+            return;
 
         case BSONType::binData:
-            return builder << BSONBinData(val.getRawData().data(),  // looking for void*
-                                          val.getRawData().size(),
-                                          val._storage.binDataType());
+            appendToBson(builder,
+                         fieldName,
+                         BSONBinData(getRawData().data(),  // looking for void*
+                                     getRawData().size(),
+                                     _storage.binDataType()));
+            return;
 
         case BSONType::codeWScope:
-            return builder << BSONCodeWScope(val._storage.getCodeWScope()->code,
-                                             val._storage.getCodeWScope()->scope);
+            appendToBson(
+                builder,
+                fieldName,
+                BSONCodeWScope(_storage.getCodeWScope()->code, _storage.getCodeWScope()->scope));
+            return;
 
         case BSONType::array: {
-            BSONArrayBuilder arrayBuilder(builder.subarrayStart());
-            for (auto&& value : val.getArray()) {
+            BSONArrayBuilder arrayBuilder(builder.subarrayStart(fieldName));
+            for (auto&& value : getArray()) {
                 value.addToBsonArray(&arrayBuilder);
             }
             arrayBuilder.doneFast();
-            return builder.builder();
+            return;
         }
     }
     MONGO_verify(false);

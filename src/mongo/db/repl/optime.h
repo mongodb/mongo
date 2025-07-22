@@ -163,6 +163,10 @@ public:
         return !(*this < rhs);
     }
 
+    friend void appendToBson(BSONObjBuilder& builder, StringData fieldName, const OpTime& value) {
+        builder.append(fieldName, value.toBSON());
+    }
+
     friend std::ostream& operator<<(std::ostream& out, const OpTime& opTime);
 
     void appendAsQuery(BSONObjBuilder* builder) const;
@@ -172,7 +176,6 @@ private:
     Timestamp _timestamp;
     long long _term = kInitialTerm;
 };
-BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& builder, const OpTime& value);
 
 class OpTimeAndWallTime {
 public:

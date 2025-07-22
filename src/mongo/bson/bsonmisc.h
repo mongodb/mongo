@@ -58,43 +58,6 @@ private:
     const StringDataComparator* _stringComparator;
 };
 
-/**
-   used in conjuction with BSONObjBuilder, allows for proper buffer size to prevent crazy memory
-   usage
- */
-class BSONSizeTracker {
-public:
-    BSONSizeTracker() {
-        _pos = 0;
-        for (int i = 0; i < SIZE; i++)
-            _sizes[i] = 512;  // this is the default, so just be consistent
-    }
-
-    ~BSONSizeTracker() {}
-
-    void got(int size) {
-        _sizes[_pos] = size;
-        _pos = (_pos + 1) % SIZE;  // thread safe at least on certain compilers
-    }
-
-    /**
-     * right now choosing largest size
-     */
-    int getSize() const {
-        int x = 16;  // sane min
-        for (int i = 0; i < SIZE; i++) {
-            if (_sizes[i] > x)
-                x = _sizes[i];
-        }
-        return x;
-    }
-
-private:
-    enum { SIZE = 10 };
-    int _pos;
-    int _sizes[SIZE];
-};
-
 // considers order
 bool fieldsMatch(const BSONObj& lhs, const BSONObj& rhs);
 }  // namespace mongo

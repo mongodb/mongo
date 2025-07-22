@@ -106,6 +106,14 @@ public:
         return s.str();
     }
 
+    /**
+     * Supports use of CIDR with the BSON macro:
+     *     BSON("cidr" << cidr) -> { cidr: "..." }
+     */
+    friend void appendToBson(BSONObjBuilder& builder, StringData fieldName, const CIDR& value) {
+        builder.append(fieldName, value.toString());
+    }
+
 private:
 #ifdef _WIN32
     using sa_family_t = int;
@@ -129,11 +137,6 @@ inline bool operator==(const CIDR& lhs, const CIDR& rhs) {
 std::ostream& operator<<(std::ostream& s, const CIDR& cidr);
 StringBuilder& operator<<(StringBuilder& s, const CIDR& cidr);
 
-/**
- * Supports use of CIDR with the BSON macro:
- *     BSON("cidr" << cidr) -> { cidr: "..." }
- */
-BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& stream, const CIDR& value);
 
 /**
  * A list of CIDR or strings. When the value is a string, it is assumed to be a unix path.

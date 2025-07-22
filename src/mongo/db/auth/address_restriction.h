@@ -131,21 +131,21 @@ public:
      * Append to builder an array element with the human-readable CIDR ranges.
      */
     void appendToBuilder(BSONObjBuilder* builder) const override {
-        BSONArrayBuilder b;
+        BSONArrayBuilder b{builder->subarrayStart(T::field)};
         for (auto const& range : _ranges) {
             b.append(range.toString());
         }
-        builder->append(T::field, b.arr());
     }
 
     friend bool operator==(const AddressRestriction& lhs, const AddressRestriction& rhs) {
         return lhs._ranges == rhs._ranges;
     }
 
-    friend BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& stream,
-                                      const AddressRestriction& value) {
-        value.appendToBuilder(&BSONObjBuilder{stream.subobjStart()}.lvalue());
-        return stream.builder();
+    friend void appendToBson(BSONObjBuilder& bob,
+                             StringData fieldName,
+                             const AddressRestriction& ar) {
+        BSONObjBuilder sub{bob.subobjStart(fieldName)};
+        ar.appendToBuilder(&sub);
     }
 
 private:

@@ -78,14 +78,19 @@ int pseudoRandom7Digits(uint64_t i) {
 }
 
 BSONObj buildSampleObj(uint64_t i) {
-    return BSON(GENOID << "name"
-                       << "Wile E. Coyote"
-                       << "age" << pseudoRandomAge(i) << "i" << static_cast<int>(i) << "address"
-                       << BSON("street" << "433 W 43rd St"
-                                        << "zip_code" << pseudoRandomZipCode(i) << "city"
-                                        << "New York")
-                       << "random" << pseudoRandom7Digits(i) << "phone_no" << pseudoRandomPhoneNo(i)
-                       << "long_string" << pseudoRandomLongStr(i));
+    // clang-format off
+    return BSON("_id" << OID::gen()
+                << "name" << "Wile E. Coyote"
+                << "age" << pseudoRandomAge(i)
+                << "i" << static_cast<int>(i)
+                << "address" << BSON(
+                    "street" << "433 W 43rd St"
+                    << "zip_code" << pseudoRandomZipCode(i)
+                    << "city" << "New York")
+                << "random" << pseudoRandom7Digits(i)
+                << "phone_no" << pseudoRandomPhoneNo(i)
+                << "long_string" << pseudoRandomLongStr(i));
+    // clang-format on
 }
 
 BSONObj buildWideObj(uint64_t i, int numFields) {
@@ -117,7 +122,6 @@ BSONObj buildWideObj(uint64_t i, int numFields) {
 
     return builder.obj();
 }
-}  // namespace
 
 void BM_arrayBuilder(benchmark::State& state) {
     size_t totalBytes = 0;
@@ -347,4 +351,51 @@ BENCHMARK_TEMPLATE(BM_validateWideObj, BSONValidateModeEnum::kExtended)
 BENCHMARK_TEMPLATE(BM_validateWideObj, BSONValidateModeEnum::kFull)
     ->Ranges({{64, 512}, {50, 1'000}});
 
+void BM_objBuilderAppendInt(benchmark::State& state) {
+    int n = state.range(0);
+    int reps = 0;
+    for (auto _ : state) {
+        BSONObjBuilder bob;
+        for (int i = 0; i < n; ++i) {
+            bob.append("a"_sd, i);
+        }
+        benchmark::DoNotOptimize(bob.done());
+        ++reps;
+    }
+    state.SetItemsProcessed(n * reps);
+}
+
+void BM_objBuilderAppendIntStreamOperator(benchmark::State& state) {
+    int n = state.range(0);
+    int reps = 0;
+    for (auto _ : state) {
+        BSONObjBuilder bob;
+        for (int i = 0; i < n; ++i) {
+            bob << "a" << i;
+        }
+        benchmark::DoNotOptimize(bob.done());
+        ++reps;
+    }
+    state.SetItemsProcessed(n * reps);
+}
+
+void BM_objBuilderAppendStreamedValue(benchmark::State& state) {
+    int n = state.range(0);
+    int reps = 0;
+    for (auto _ : state) {
+        BSONObjBuilder bob;
+        for (int i = 0; i < n; ++i) {
+            bob << "a" << Value(i);
+        }
+        benchmark::DoNotOptimize(bob.done());
+        ++reps;
+    }
+    state.SetItemsProcessed(n * reps);
+}
+
+BENCHMARK(BM_objBuilderAppendInt)->DenseRange(1, 8)->Range(9, 1 << 20);
+BENCHMARK(BM_objBuilderAppendIntStreamOperator)->DenseRange(1, 8)->Range(9, 1 << 20);
+BENCHMARK(BM_objBuilderAppendStreamedValue)->DenseRange(1, 8)->Range(9, 1 << 20);
+
+}  // namespace
 }  // namespace mongo

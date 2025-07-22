@@ -1481,7 +1481,7 @@ void toBsonValue(uint8_t ctype,
                  TypeBits::ReaderBase* typeBits,
                  bool inverted,
                  Version version,
-                 Stream* stream,
+                 Stream&& stream,
                  uint32_t depth);
 
 void toBson(BufReader* reader,
@@ -1493,23 +1493,21 @@ void toBson(BufReader* reader,
     while (readType<uint8_t>(reader, inverted) != 0) {
         if (inverted) {
             std::string name = readInvertedCString(reader);
-            auto& stream = *builder << name;
             toBsonValue(readType<uint8_t>(reader, inverted),
                         reader,
                         typeBits,
                         inverted,
                         version,
-                        &stream,
+                        *builder << name,
                         depth);
         } else {
             StringData name = readCString(reader);
-            auto& stream = *builder << name;
             toBsonValue(readType<uint8_t>(reader, inverted),
                         reader,
                         typeBits,
                         inverted,
                         version,
-                        &stream,
+                        *builder << name,
                         depth);
         }
     }
@@ -1546,7 +1544,7 @@ void toBsonValue(uint8_t ctype,
                  TypeBits::ReaderBase* typeBits,
                  bool inverted,
                  Version version,
-                 Stream* stream,
+                 Stream&& stream,
                  uint32_t depth) {
     keyStringAssert(ErrorCodes::Overflow,
                     "KeyString encoding exceeded maximum allowable BSON nesting depth",
@@ -1558,41 +1556,41 @@ void toBsonValue(uint8_t ctype,
 
     switch (ctype) {
         case CType::kMinKey:
-            *stream << MINKEY;
+            stream << MINKEY;
             break;
         case CType::kMaxKey:
-            *stream << MAXKEY;
+            stream << MAXKEY;
             break;
         case CType::kNullish:
-            *stream << BSONNULL;
+            stream << BSONNULL;
             break;
         case CType::kUndefined:
-            *stream << BSONUndefined;
+            stream << BSONUndefined;
             break;
 
         case CType::kBoolTrue:
-            *stream << true;
+            stream << true;
             break;
         case CType::kBoolFalse:
-            *stream << false;
+            stream << false;
             break;
 
         case CType::kDate:
-            *stream << Date_t::fromMillisSinceEpoch(
-                readType<BigEndian<uint64_t>>(reader, inverted) ^ (1LL << 63));
+            stream << Date_t::fromMillisSinceEpoch(readType<BigEndian<uint64_t>>(reader, inverted) ^
+                                                   (1LL << 63));
             break;
 
         case CType::kTimestamp:
-            *stream << Timestamp(readType<BigEndian<uint64_t>>(reader, inverted));
+            stream << Timestamp(readType<BigEndian<uint64_t>>(reader, inverted));
             break;
 
         case CType::kOID:
             if (inverted) {
                 char buf[OID::kOIDSize];
                 memcpy_flipBits(buf, reader->skip(OID::kOIDSize), OID::kOIDSize);
-                *stream << OID::from(buf);
+                stream << OID::from(buf);
             } else {
-                *stream << OID::from(reader->skip(OID::kOIDSize));
+                stream << OID::from(reader->skip(OID::kOIDSize));
             }
             break;
 
@@ -1600,23 +1598,23 @@ void toBsonValue(uint8_t ctype,
             const uint8_t originalType = typeBits->readStringLike();
             if (inverted) {
                 if (originalType == TypeBits::kString) {
-                    *stream << readInvertedCStringWithNuls(reader);
+                    stream << readInvertedCStringWithNuls(reader);
                 } else {
                     keyStringAssert(50827,
                                     "Expected original type to be Symbol.",
                                     originalType == TypeBits::kSymbol);
-                    *stream << BSONSymbol(readInvertedCStringWithNuls(reader));
+                    stream << BSONSymbol(readInvertedCStringWithNuls(reader));
                 }
 
             } else {
                 std::string scratch;
                 if (originalType == TypeBits::kString) {
-                    *stream << readCStringWithNuls(reader, &scratch);
+                    stream << readCStringWithNuls(reader, &scratch);
                 } else {
                     keyStringAssert(50828,
                                     "Expected original type to be Symbol.",
                                     originalType == TypeBits::kSymbol);
-                    *stream << BSONSymbol(readCStringWithNuls(reader, &scratch));
+                    stream << BSONSymbol(readCStringWithNuls(reader, &scratch));
                 }
             }
             break;
@@ -1624,10 +1622,10 @@ void toBsonValue(uint8_t ctype,
 
         case CType::kCode: {
             if (inverted) {
-                *stream << BSONCode(readInvertedCStringWithNuls(reader));
+                stream << BSONCode(readInvertedCStringWithNuls(reader));
             } else {
                 std::string scratch;
-                *stream << BSONCode(readCStringWithNuls(reader, &scratch));
+                stream << BSONCode(readCStringWithNuls(reader, &scratch));
             }
             break;
         }
@@ -1641,11 +1639,11 @@ void toBsonValue(uint8_t ctype,
             } else {
                 code = readCStringWithNuls(reader, &scratch);
             }
-            // Not going to optimize CodeWScope, but limit stack space usage due to recursion.
+            // Not going to optimize CodeWScope, but limit stack space usage due to recursion.
             auto scope = std::make_unique<BSONObjBuilder>();
             // BSON validation counts a CodeWithScope as two nesting levels, so match that.
             toBson(reader, typeBits, inverted, version, scope.get(), depth + 2);
-            *stream << BSONCodeWScope(code, scope->done());
+            stream << BSONCodeWScope(code, scope->done());
             break;
         }
 
@@ -1664,7 +1662,7 @@ void toBsonValue(uint8_t ctype,
                                     "Expected valid BSONColumn data",
                                     validateBSONColumn((const char*)ptr, size).isOK());
                 }
-                *stream << BSONBinData(ptr, size, subType);
+                stream << BSONBinData(ptr, size, subType);
             } else {
                 std::unique_ptr<char[]> flipped(new char[size]);
                 memcpy_flipBits(flipped.get(), ptr, size);
@@ -1674,7 +1672,7 @@ void toBsonValue(uint8_t ctype,
                                     "Expected valid BSONColumn data",
                                     validateBSONColumn((const char*)flipped.get(), size).isOK());
                 }
-                *stream << BSONBinData(flipped.get(), size, subType);
+                stream << BSONBinData(flipped.get(), size, subType);
             }
             break;
         }
@@ -1683,11 +1681,11 @@ void toBsonValue(uint8_t ctype,
             if (inverted) {
                 std::string pattern = readInvertedCString(reader);
                 std::string flags = readInvertedCString(reader);
-                *stream << BSONRegEx(pattern, flags);
+                stream << BSONRegEx(pattern, flags);
             } else {
                 StringData pattern = readCString(reader);
                 StringData flags = readCString(reader);
-                *stream << BSONRegEx(pattern, flags);
+                stream << BSONRegEx(pattern, flags);
             }
             break;
         }
@@ -1700,23 +1698,23 @@ void toBsonValue(uint8_t ctype,
                 char oidBytes[OID::kOIDSize];
                 memcpy_flipBits(oidBytes, reader->skip(OID::kOIDSize), OID::kOIDSize);
                 OID oid = OID::from(oidBytes);
-                *stream << BSONDBRef(StringData(ns.get(), size), oid);
+                stream << BSONDBRef(StringData(ns.get(), size), oid);
             } else {
                 const char* ns = static_cast<const char*>(reader->skip(size));
                 OID oid = OID::from(reader->skip(OID::kOIDSize));
-                *stream << BSONDBRef(StringData(ns, size), oid);
+                stream << BSONDBRef(StringData(ns, size), oid);
             }
             break;
         }
 
         case CType::kObject: {
-            BSONObjBuilder subObj(stream->subobjStart());
+            BSONObjBuilder subObj(stream.subobjStart());
             toBson(reader, typeBits, inverted, version, &subObj, depth + 1);
             break;
         }
 
         case CType::kArray: {
-            BSONObjBuilder subArr(stream->subarrayStart());
+            BSONObjBuilder subArr(stream.subarrayStart());
             DecimalCounter<unsigned> index;
             uint8_t elemType;
             while ((elemType = readType<uint8_t>(reader, inverted)) != 0) {
@@ -1725,7 +1723,7 @@ void toBsonValue(uint8_t ctype,
                             typeBits,
                             inverted,
                             version,
-                            &(subArr << StringData{index}),
+                            subArr << StringData{index},
                             depth + 1);
                 ++index;
             }
@@ -1739,12 +1737,12 @@ void toBsonValue(uint8_t ctype,
         case CType::kNumericNaN: {
             auto type = typeBits->readNumeric();
             if (type == TypeBits::kDouble) {
-                *stream << std::numeric_limits<double>::quiet_NaN();
+                stream << std::numeric_limits<double>::quiet_NaN();
             } else {
                 keyStringAssert(50819,
                                 "Invalid type bits for numeric NaN",
                                 type == TypeBits::kDecimal && version == Version::V1);
-                *stream << Decimal128::kPositiveNaN;
+                stream << Decimal128::kPositiveNaN;
             }
             break;
         }
@@ -1753,16 +1751,16 @@ void toBsonValue(uint8_t ctype,
             uint8_t zeroType = typeBits->readZero();
             switch (zeroType) {
                 case TypeBits::kDouble:
-                    *stream << 0.0;
+                    stream << 0.0;
                     break;
                 case TypeBits::kInt:
-                    *stream << 0;
+                    stream << 0;
                     break;
                 case TypeBits::kLong:
-                    *stream << 0ll;
+                    stream << 0ll;
                     break;
                 case TypeBits::kNegativeDoubleZero:
-                    *stream << -0.0;
+                    stream << -0.0;
                     break;
                 default:
                     const uint32_t whichZero = typeBits->readDecimalZero(zeroType);
@@ -1773,7 +1771,7 @@ void toBsonValue(uint8_t ctype,
                     keyStringAssert(50846,
                                     "Invalid numeric zero decimal.",
                                     Decimal128::isValid(isNegative, biasedExponent, 0, 0));
-                    *stream << Decimal128(isNegative, biasedExponent, 0, 0);
+                    stream << Decimal128(isNegative, biasedExponent, 0, 0);
                     break;
             }
             break;
@@ -1816,19 +1814,19 @@ void toBsonValue(uint8_t ctype,
                     dec = dec.negate();
                 if (dec.isFinite())
                     dec = adjustDecimalExponent(typeBits, dec);
-                *stream << dec;
+                stream << dec;
                 break;
             }
 
             // 'bin' contains the value of the input, rounded toward zero in case of decimal
             if (originalType == TypeBits::kDouble) {
-                *stream << bin;
+                stream << bin;
             } else if (originalType == TypeBits::kLong) {
                 // This can only happen for a single number.
                 keyStringAssert(50821,
                                 "Unexpected value for large number.",
                                 bin == static_cast<double>(std::numeric_limits<long long>::min()));
-                *stream << std::numeric_limits<long long>::min();
+                stream << std::numeric_limits<long long>::min();
             } else {
                 keyStringAssert(50826,
                                 "Unexpected type of large number.",
@@ -1840,7 +1838,7 @@ void toBsonValue(uint8_t ctype,
                     dec = readDecimalContinuation(reader, inverted, dec);
                 if (dec.isFinite())
                     dec = adjustDecimalExponent(typeBits, dec);
-                *stream << dec;
+                stream << dec;
             }
             break;
         }
@@ -1861,7 +1859,7 @@ void toBsonValue(uint8_t ctype,
                                 originalType == TypeBits::kDouble);
                 double d;
                 memcpy(&d, &encoded, sizeof(d));
-                *stream << d;
+                stream << d;
                 break;
             }
 
@@ -1873,7 +1871,7 @@ void toBsonValue(uint8_t ctype,
                     dec = adjustDecimalExponent(typeBits, dec);
                     if (ctype == CType::kNumericNegativeSmallMagnitude)
                         dec = dec.negate();
-                    *stream << dec;
+                    stream << dec;
                     break;
                 }
                 case 0x1:
@@ -1892,7 +1890,7 @@ void toBsonValue(uint8_t ctype,
                         keyStringAssert(
                             50822, "Unexpected decimal continuation.", !hasDecimalContinuation);
                         double bin = scaledBin * kTinyDoubleExponentDownshiftFactor;
-                        *stream << (isNegative ? -bin : bin);
+                        stream << (isNegative ? -bin : bin);
                         break;
                     }
                     keyStringAssert(50823,
@@ -1918,7 +1916,7 @@ void toBsonValue(uint8_t ctype,
                     }
 
                     dec = readDecimalContinuation(reader, inverted, dec);
-                    *stream << adjustDecimalExponent(typeBits, isNegative ? dec.negate() : dec);
+                    stream << adjustDecimalExponent(typeBits, isNegative ? dec.negate() : dec);
                     break;
                 }
                 case 0x3: {
@@ -1930,7 +1928,7 @@ void toBsonValue(uint8_t ctype,
                     if (originalType == TypeBits::kDouble) {
                         keyStringAssert(
                             50824, "Decimal contuation mismatch.", dcm == kDCMEqualToDouble);
-                        *stream << (isNegative ? -bin : bin);
+                        stream << (isNegative ? -bin : bin);
                         break;
                     }
 
@@ -1958,7 +1956,7 @@ void toBsonValue(uint8_t ctype,
                                              Decimal128::kRoundTowardPositive);
                             dec = readDecimalContinuation(reader, inverted, dec);
                     }
-                    *stream << adjustDecimalExponent(typeBits, isNegative ? dec.negate() : dec);
+                    stream << adjustDecimalExponent(typeBits, isNegative ? dec.negate() : dec);
                     break;
                 }
                 default:
@@ -2007,16 +2005,16 @@ void toBsonValue(uint8_t ctype,
 
                 switch (originalType) {
                     case TypeBits::kDouble:
-                        *stream << double(integerPart);
+                        stream << double(integerPart);
                         break;
                     case TypeBits::kInt:
-                        *stream << int(integerPart);
+                        stream << int(integerPart);
                         break;
                     case TypeBits::kLong:
-                        *stream << static_cast<long long>(integerPart);
+                        stream << static_cast<long long>(integerPart);
                         break;
                     case TypeBits::kDecimal:
-                        *stream << adjustDecimalExponent(typeBits, Decimal128(integerPart));
+                        stream << adjustDecimalExponent(typeBits, Decimal128(integerPart));
                         break;
                     default:
                         keyStringAsserted(50831, "Unexpected type for positive int.");
@@ -2052,7 +2050,7 @@ void toBsonValue(uint8_t ctype,
 
                 double number;
                 memcpy(&number, &doubleBits, sizeof(number));
-                *stream << number;
+                stream << number;
                 break;
             }
 
@@ -2067,7 +2065,7 @@ void toBsonValue(uint8_t ctype,
             // Zero out the DCM and convert the whole binary fraction
             double bin = static_cast<double>(encodedFraction & ~3ULL) * kInvPow256[fracBytes];
             if (originalType == TypeBits::kDouble) {
-                *stream << (isNegative ? -bin : bin);
+                stream << (isNegative ? -bin : bin);
                 break;
             }
 
@@ -2096,7 +2094,7 @@ void toBsonValue(uint8_t ctype,
                               bin, Decimal128::kRoundTo34Digits, Decimal128::kRoundTowardPositive);
                     dec = readDecimalContinuation(reader, inverted, dec);
             }
-            *stream << adjustDecimalExponent(typeBits, isNegative ? dec.negate() : dec);
+            stream << adjustDecimalExponent(typeBits, isNegative ? dec.negate() : dec);
             break;
         }
         default:
@@ -2772,7 +2770,7 @@ void toBsonSafe(std::span<const char> data,
         if (ctype == kEnd)
             break;
         toBsonValue(
-            ctype, &reader, &typeBitsReader, invert, typeBitsReader.version(), &(builder << ""), 1);
+            ctype, &reader, &typeBitsReader, invert, typeBitsReader.version(), builder << "", 1);
     }
 }
 
@@ -3002,7 +3000,7 @@ bool readValue(BufReader* reader,
                BuilderInterface* stream) {
     if (auto ctype = key_string::getAndValidateNextStoredCtype(reader, inverted)) {
         const uint32_t depth = 1;  // Only call this function for a top-level key_string::Value.
-        toBsonValue(*ctype, reader, typeBits, inverted, version, stream, depth);
+        toBsonValue(*ctype, reader, typeBits, inverted, version, *stream, depth);
         return true;
     }
 
@@ -3022,9 +3020,7 @@ void appendSingleFieldToBSONAs(
     // Callers discard their TypeBits.
     TypeBits typeBits(version);
     TypeBits::Reader typeBitsReader(typeBits);
-
-    toBsonValue(
-        ctype, &reader, &typeBitsReader, inverted, version, &(*builder << fieldName), depth);
+    toBsonValue(ctype, &reader, &typeBitsReader, inverted, version, *builder << fieldName, depth);
 }
 
 void appendToBSONArray(const char* buf, int len, BSONArrayBuilder* builder, Version version) {
@@ -3041,7 +3037,7 @@ void appendToBSONArray(const char* buf, int len, BSONArrayBuilder* builder, Vers
     TypeBits typeBits(version);
     TypeBits::Reader typeBitsReader(typeBits);
 
-    toBsonValue(ctype, &reader, &typeBitsReader, inverted, version, builder, depth);
+    toBsonValue(ctype, &reader, &typeBitsReader, inverted, version, *builder, depth);
 }
 
 Value Value::deserialize(BufReader& buf,
@@ -3186,13 +3182,8 @@ std::string explain(std::span<const char> buffer,
             TypeBits::ExplainReader explainReader(typeBitsReader);
             auto fieldName = (keyPatternIter->eoo()) ? "" : (keyPatternIter++)->fieldName();
 
-            toBsonValue(ctype,
-                        &reader,
-                        &explainReader,
-                        invert,
-                        typeBits.version,
-                        &(builder << fieldName),
-                        1);
+            toBsonValue(
+                ctype, &reader, &explainReader, invert, typeBits.version, builder << fieldName, 1);
 
             const auto endOff = reader.offset();
             if (auto bytes = (endOff - startOff); bytes > 0) {
