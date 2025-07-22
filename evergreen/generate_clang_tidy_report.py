@@ -25,16 +25,17 @@ if clang_tidy:
                         # source_file is:
                         # mongo_main.cpp
                         # target is mongo_main_with_debug
+                        # target dir is src/mongo/shell
                         filename = os.path.basename(log_file)
                         parts = filename.split(".")
                         if len(parts) < 5:
                             raise ValueError(f"Unexpected status file format: {filename}")
                         source_file = ".".join(parts[:2])
                         target_name = parts[2]
-                        label_path = re.sub(r"/bazel_clang_tidy_src/.*$", "", log_file)
-                        label_path = re.sub(r"^.*bazel-bin/", "//", label_path)
-                        label_path = os.path.dirname(label_path)
-                        target = f"{label_path}:{target_name}"
+                        target_dir = re.search(
+                            r"bazel-bin/(.*)/bazel_clang_tidy_src/", log_file
+                        ).group(1)
+                        target = f"//{target_dir}:{target_name}"
                         content += f"Run 'bazel build --config=clang-tidy --keep_going {target}' to reproduce this error"
 
                         failures.append(
