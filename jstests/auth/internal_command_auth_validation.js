@@ -609,6 +609,15 @@ const internalCommandsMap = {
             maxNumberOfChunksToMerge: NumberInt(2)
         },
     },
+    _shardsvrMergeChunks: {
+        testname: "_shardsvrMergeChunks",
+        command: {
+            _shardsvrMergeChunks: "x.y",
+            bounds: [{x: 0}, {x: 10}],
+            epoch: ObjectId(),
+            timestamp: Timestamp()
+        },
+    },
     _shardsvrMovePrimary: {
         testname: "_shardsvrMovePrimary",
         command: {

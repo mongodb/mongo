@@ -111,6 +111,7 @@ const allCommands = {
     _shardsvrJoinMigrations: {skip: isAnInternalCommand},
     _shardsvrJoinDDLCoordinators: {skip: isPrimaryOnly},
     _shardsvrMergeAllChunksOnShard: {skip: isPrimaryOnly},
+    _shardsvrMergeChunks: {skip: isAnInternalCommand},
     _shardsvrMovePrimary: {skip: isPrimaryOnly},
     _shardsvrMovePrimaryEnterCriticalSection: {skip: isPrimaryOnly},
     _shardsvrMovePrimaryExitCriticalSection: {skip: isPrimaryOnly},

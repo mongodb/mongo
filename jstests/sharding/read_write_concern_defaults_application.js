@@ -181,6 +181,7 @@ let testCases = {
     _shardsvrJoinDDLCoordinators: {skip: "internal command"},
     _shardsvrJoinMigrations: {skip: "internal command"},
     _shardsvrMergeAllChunksOnShard: {skip: "internal command"},
+    _shardsvrMergeChunks: {skip: "internal command"},
     _shardsvrMovePrimary: {skip: "internal command"},
     _shardsvrMovePrimaryEnterCriticalSection: {skip: "internal command"},
     _shardsvrMovePrimaryExitCriticalSection: {skip: "internal command"},

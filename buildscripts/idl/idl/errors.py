@@ -45,7 +45,6 @@ from . import common
 # Error codes must be unique, validated  _assert_unique_error_messages on file load.
 #
 ERROR_ID_UNKNOWN_ROOT = "ID0001"
-ERROR_ID_DUPLICATE_SYMBOL = "ID0002"
 ERROR_ID_IS_NODE_TYPE = "ID0003"
 ERROR_ID_IS_NODE_TYPE_SCALAR_OR_SEQUENCE = "ID0004"
 ERROR_ID_DUPLICATE_NODE = "ID0005"
@@ -288,16 +287,6 @@ class ParserContext(object):
             node,
             ERROR_ID_UNKNOWN_NODE,
             "Unknown IDL node '%s' for YAML entity '%s'" % (node.value, name),
-        )
-
-    def add_duplicate_symbol_error(self, location, name, duplicate_class_name, original_class_name):
-        # type: (common.SourceLocation, str, str, str) -> None
-        """Add an error about a duplicate symbol."""
-        self._add_error(
-            location,
-            ERROR_ID_DUPLICATE_SYMBOL,
-            "%s '%s' is a duplicate symbol of an existing %s"
-            % (duplicate_class_name, name, original_class_name),
         )
 
     def add_unknown_type_error(self, location, field_name, type_name):

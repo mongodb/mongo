@@ -114,10 +114,9 @@ commands:
                 description: "Chunk bounds to merge."
                 type: array<object_owned>
 
-    #TODO (SERVER-98960): Set the command_name to _shardsvrMergeChunks and command_alias to mergeChunks instead.
     _shardsvrMergeChunks:
-        command_name: mergeChunks
-        command_alias: _shardsvrMergeChunks
+        command_name: _shardsvrMergeChunks
+        command_alias: mergeChunks
         cpp_name: ShardsvrMergeChunks
         description: "The internal _shardsvrMergeChunks command on a shard."
         namespace: type

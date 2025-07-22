@@ -136,54 +136,24 @@ class SymbolTable(object):
         self.generic_argument_lists = []  # type: List[Struct]
         self.generic_reply_field_lists = []  # type: List[Struct]
 
-    def _is_duplicate(self, ctxt, location, name, duplicate_class_name):
-        # type: (errors.ParserContext, common.SourceLocation, str, str) -> bool
-        """Return true if the given item already exist in the symbol table."""
-        for item, entity_type in _item_and_type(
-            {
-                "command": self.commands,
-                "enum": self.enums,
-                "struct": self.structs,
-                "type": self.types,
-            }
-        ):
-            if item.name == name:
-                ctxt.add_duplicate_symbol_error(location, name, duplicate_class_name, entity_type)
-                return True
-            if entity_type == "command":
-                if name in [item.command_name, item.command_alias if item.command_alias else ""]:
-                    ctxt.add_duplicate_symbol_error(
-                        location, name, duplicate_class_name, entity_type
-                    )
-                    return True
-
-        return False
-
     def add_enum(self, ctxt, idl_enum):
         # type: (errors.ParserContext, Enum) -> None
         """Add an IDL enum to the symbol table and check for duplicates."""
-        if not self._is_duplicate(ctxt, idl_enum, idl_enum.name, "enum"):
-            self.enums.append(idl_enum)
+        self.enums.append(idl_enum)
 
     def add_struct(self, ctxt, struct):
         # type: (errors.ParserContext, Struct) -> None
         """Add an IDL struct to the symbol table and check for duplicates."""
-        if not self._is_duplicate(ctxt, struct, struct.name, "struct"):
-            self.structs.append(struct)
+        self.structs.append(struct)
 
     def add_type(self, ctxt, idltype):
         # type: (errors.ParserContext, Type) -> None
         """Add an IDL type to the symbol table and check for duplicates."""
-        if not self._is_duplicate(ctxt, idltype, idltype.name, "type"):
-            self.types.append(idltype)
+        self.types.append(idltype)
 
     def add_command(self, ctxt, command):
-        # type: (errors.ParserContext, Command) -> None
         """Add an IDL command to the symbol table and check for duplicates."""
-        if not self._is_duplicate(
-            ctxt, command, command.name, "command"
-        ) and not self._is_duplicate(ctxt, command, command.command_alias, "command"):
-            self.commands.append(command)
+        self.commands.append(command)
 
     def add_generic_argument_list(self, field_list):
         # type: (Struct) -> None
@@ -203,24 +173,21 @@ class SymbolTable(object):
         Marks imported structs as imported, and errors on duplicate symbols.
         """
         for command in imported_symbols.commands:
-            if not self._is_duplicate(ctxt, command, command.name, "command"):
-                command.imported = True
-                self.commands.append(command)
+            command.imported = True
+            self.commands.append(command)
 
         for struct in imported_symbols.structs:
-            if not self._is_duplicate(ctxt, struct, struct.name, "struct"):
-                struct.imported = True
-                self.structs.append(struct)
+            struct.imported = True
+            self.structs.append(struct)
 
-                if struct.is_generic_cmd_list == "arg":
-                    self.add_generic_argument_list(struct)
-                elif struct.is_generic_cmd_list == "reply":
-                    self.add_generic_reply_field_list(struct)
+            if struct.is_generic_cmd_list == "arg":
+                self.add_generic_argument_list(struct)
+            elif struct.is_generic_cmd_list == "reply":
+                self.add_generic_reply_field_list(struct)
 
         for idl_enum in imported_symbols.enums:
-            if not self._is_duplicate(ctxt, idl_enum, idl_enum.name, "enum"):
-                idl_enum.imported = True
-                self.enums.append(idl_enum)
+            idl_enum.imported = True
+            self.enums.append(idl_enum)
 
         for idltype in imported_symbols.types:
             self.add_type(ctxt, idltype)
