@@ -11,6 +11,7 @@ export const OCSP_CA_KEY = "jstests/libs/ocsp/ca_ocsp.key";
 export const CLUSTER_CA_CERT = "jstests/libs/ca.pem";
 export const CLUSTER_KEY = "jstests/libs/server.pem";
 export const OCSP_SERVER_CERT = "jstests/libs/ocsp/server_ocsp.pem";
+export const OCSP_NO_OCSP_SERVER_CERT = "jstests/libs/ocsp/server_no_ocsp.pem";
 export const OCSP_CLIENT_CERT = "jstests/libs/ocsp/client_ocsp.pem";
 export const OCSP_SERVER_MUSTSTAPLE_CERT = "jstests/libs/ocsp/server_ocsp_mustStaple.pem";
 export const OCSP_SERVER_CERT_REVOKED = "jstests/libs/ocsp/server_ocsp_revoked.pem";

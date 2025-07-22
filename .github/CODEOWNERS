@@ -864,6 +864,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/libs/index_builds/OWNERS.yml
 /jstests/libs/index_builds/**/* @10gen/server-index-builds @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/libs/ocsp/OWNERS.yml
+/jstests/libs/ocsp/**/* @10gen/server-security @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/libs/override_methods/OWNERS.yml
 /jstests/libs/override_methods/**/*golden_overrides.js @10gen/query-optimization @svc-auto-approve-bot
 /jstests/libs/override_methods/**/*changestream* @10gen/query-execution-change-streams @svc-auto-approve-bot

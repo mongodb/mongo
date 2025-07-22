@@ -11,10 +11,10 @@ if (determineSSLProvider() === "apple") {
 }
 
 const ocsp_options = {
-    sslMode: "requireSSL",
-    sslPEMKeyFile: OCSP_SERVER_CERT,
-    sslCAFile: OCSP_CA_CERT,
-    sslAllowInvalidHostnames: "",
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: OCSP_SERVER_CERT,
+    tlsCAFile: OCSP_CA_CERT,
+    tlsAllowInvalidHostnames: "",
     setParameter: {
         "failpoint.disableStapling": "{'mode':'alwaysOn'}",
         "ocspEnabled": "true",

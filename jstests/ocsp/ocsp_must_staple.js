@@ -17,10 +17,10 @@ let mock_ocsp = new MockOCSPServer();
 mock_ocsp.start();
 
 let ocsp_options = {
-    sslMode: "requireSSL",
-    sslPEMKeyFile: OCSP_SERVER_MUSTSTAPLE_CERT,
-    sslCAFile: OCSP_CA_PEM,
-    sslAllowInvalidHostnames: "",
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: OCSP_SERVER_MUSTSTAPLE_CERT,
+    tlsCAFile: OCSP_CA_PEM,
+    tlsAllowInvalidHostnames: "",
     setParameter: {
         "ocspEnabled": "true",
     },

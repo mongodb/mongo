@@ -22,7 +22,7 @@ function tryRotate(fault) {
 }
 
 mongod = MongoRunner.runMongod(
-    {sslMode: "requireSSL", sslPEMKeyFile: OCSP_SERVER_CERT, sslCAFile: OCSP_CA_PEM});
+    {tlsMode: "requireTLS", tlsCertificateKeyFile: OCSP_SERVER_CERT, tlsCAFile: OCSP_CA_PEM});
 
 // Positive: test with positive OCSP response
 assert(tryRotate());

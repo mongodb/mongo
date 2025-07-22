@@ -19,10 +19,10 @@ const RESPONSE_VALIDITY = 5;  // seconds
 const mock_ocsp = new MockOCSPServer("", RESPONSE_VALIDITY);
 
 const ocsp_options = {
-    sslMode: "requireSSL",
-    sslPEMKeyFile: OCSP_SERVER_CERT,
-    sslCAFile: OCSP_CA_PEM,
-    sslAllowInvalidHostnames: "",
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: OCSP_SERVER_CERT,
+    tlsCAFile: OCSP_CA_PEM,
+    tlsAllowInvalidHostnames: "",
     setParameter: {
         "ocspEnabled": "true",
     },
@@ -46,7 +46,7 @@ MongoRunner.stopMongod(conn);
 
 // ====== TEST 2
 jsTestLog("Test fetcher can recover on transient outages of the mock responder");
-ocsp_options.sslPEMKeyFile = OCSP_SERVER_MUSTSTAPLE_CERT;
+ocsp_options.tlsCertificateKeyFile = OCSP_SERVER_MUSTSTAPLE_CERT;
 ocsp_options.waitForConnect = false;
 
 conn = MongoRunner.runMongod(ocsp_options);

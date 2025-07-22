@@ -44,9 +44,9 @@ ReplSetTest.kDefaultTimeoutMS = 2 * 60 * 1000;
 MongoRunner.runHangAnalyzer.disable();
 
 const ocsp_options = {
-    sslMode: "requireSSL",
-    sslPEMKeyFile: OCSP_SERVER_CERT_INVALID,
-    sslCAFile: OCSP_CA_PEM,
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: OCSP_SERVER_CERT_INVALID,
+    tlsCAFile: OCSP_CA_PEM,
     setParameter: {
         "ocspEnabled": "true",
         "tlsOCSPStaplingTimeoutSecs": 1,

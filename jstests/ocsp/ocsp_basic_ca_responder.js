@@ -24,10 +24,10 @@ function test(serverCert, caCert, responderCertPair) {
     clearOCSPCache();
 
     const ocsp_options = {
-        sslMode: "requireSSL",
-        sslPEMKeyFile: serverCert,
-        sslCAFile: caCert,
-        sslAllowInvalidHostnames: "",
+        tlsMode: "requireTLS",
+        tlsCertificateKeyFile: serverCert,
+        tlsCAFile: caCert,
+        tlsAllowInvalidHostnames: "",
         setParameter: {
             "failpoint.disableStapling": "{'mode':'alwaysOn'}",
             "ocspEnabled": "true",

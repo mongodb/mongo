@@ -16,10 +16,10 @@ const logPath = MongoRunner.dataPath + "mongod.log";
 
 const ocsp_options = {
     logpath: logPath,
-    sslMode: "requireSSL",
-    sslPEMKeyFile: OCSP_SERVER_SIGNED_BY_INTERMEDIATE_CA_PEM,
-    sslCAFile: OCSP_CA_PEM,
-    sslAllowInvalidHostnames: "",
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: OCSP_SERVER_SIGNED_BY_INTERMEDIATE_CA_PEM,
+    tlsCAFile: OCSP_CA_PEM,
+    tlsAllowInvalidHostnames: "",
     waitForConnect: false,
 };
 

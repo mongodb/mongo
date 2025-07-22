@@ -549,6 +549,26 @@ certs:
       keyUsage: [digitalSignature, keyEncipherment]
       extendedKeyUsage: [serverAuth, clientAuth]
 
+  - name: "server_no_ocsp.pem"
+    description: >-
+      Non-OCSP certificate for the mongodb server using the OCSP CA.
+    Subject:
+      CN: "localhost"
+      C: US
+      ST: NY
+      L: OCSP-1
+    Issuer: "ca_ocsp.pem"
+    include_header: false
+    output_path: "jstests/libs/ocsp/"
+    extensions:
+      basicConstraints: {CA: false}
+      subjectAltName:
+        DNS: localhost
+        IP: 127.0.0.1
+      subjectKeyIdentifier: hash
+      keyUsage: [digitalSignature, keyEncipherment]
+      extendedKeyUsage: [serverAuth, clientAuth]
+
   - name: "server_ocsp_invalid.pem"
     description: >-
       An expired OCSP certificate for the mongodb server.

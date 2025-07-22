@@ -33,10 +33,10 @@ const CLUSTER_CA = {
 
 function test(serverCert, caCert, responderCertPair, extraOpts) {
     const ocsp_options = {
-        sslMode: "requireSSL",
-        sslPEMKeyFile: serverCert,
-        sslCAFile: caCert,
-        sslAllowInvalidHostnames: "",
+        tlsMode: "requireTLS",
+        tlsCertificateKeyFile: serverCert,
+        tlsCAFile: caCert,
+        tlsAllowInvalidHostnames: "",
         setParameter: {
             "ocspStaplingRefreshPeriodSecs": 500,
             "ocspEnabled": "true",
@@ -110,10 +110,10 @@ function test(serverCert, caCert, responderCertPair, extraOpts) {
 
 function testSuperLongOCSPResponseNextUpdateTime() {
     const ocsp_options = {
-        sslMode: "requireSSL",
-        sslPEMKeyFile: OCSP_SERVER_CERT,
-        sslCAFile: OCSP_CA_PEM,
-        sslAllowInvalidHostnames: "",
+        tlsMode: "requireTLS",
+        tlsCertificateKeyFile: OCSP_SERVER_CERT,
+        tlsCAFile: OCSP_CA_PEM,
+        tlsAllowInvalidHostnames: "",
         setParameter: {
             "ocspEnabled": "true",
         }

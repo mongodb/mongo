@@ -43,10 +43,10 @@ function testClient(serverCert, caCert, responderCertPair, issuerDigest) {
         new MockOCSPServer("", 1, responderCertPair, 0, INCLUDE_EXTRA_STATUS, issuerDigest);
 
     let ocsp_options = {
-        sslMode: "requireSSL",
-        sslPEMKeyFile: serverCert,
-        sslCAFile: caCert,
-        sslAllowInvalidHostnames: "",
+        tlsMode: "requireTLS",
+        tlsCertificateKeyFile: serverCert,
+        tlsCAFile: caCert,
+        tlsAllowInvalidHostnames: "",
         setParameter: {
             "failpoint.disableStapling": "{'mode':'alwaysOn'}",
             "ocspEnabled": "true",
@@ -97,10 +97,10 @@ function testStapling(serverCert, caCert, responderCertPair, issuerDigest) {
         new MockOCSPServer("", 32400, responderCertPair, 0, INCLUDE_EXTRA_STATUS, issuerDigest);
 
     let ocsp_options = {
-        sslMode: "requireSSL",
-        sslPEMKeyFile: serverCert,
-        sslCAFile: caCert,
-        sslAllowInvalidHostnames: "",
+        tlsMode: "requireTLS",
+        tlsCertificateKeyFile: serverCert,
+        tlsCAFile: caCert,
+        tlsAllowInvalidHostnames: "",
         setParameter: {
             "ocspEnabled": "true",
         },

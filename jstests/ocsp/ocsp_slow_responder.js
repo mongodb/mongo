@@ -10,10 +10,10 @@ if (determineSSLProvider() !== "windows") {
 }
 
 var ocsp_options = {
-    sslMode: "requireSSL",
-    sslPEMKeyFile: OCSP_SERVER_CERT,
-    sslCAFile: OCSP_CA_PEM,
-    sslAllowInvalidHostnames: "",
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: OCSP_SERVER_CERT,
+    tlsCAFile: OCSP_CA_PEM,
+    tlsAllowInvalidHostnames: "",
     setParameter: {
         "failpoint.disableStapling": "{'mode':'alwaysOn'}",
         "ocspEnabled": "true",
