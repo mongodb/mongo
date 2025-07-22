@@ -60,6 +60,8 @@ public:
         _executeRollbackHandlers();
     }
 
+    void _setIsolation(Isolation) override {}
+
 private:
     std::vector<std::unique_ptr<Change>> _changes;
 };

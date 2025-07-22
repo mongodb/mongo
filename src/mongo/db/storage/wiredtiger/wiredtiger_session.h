@@ -76,7 +76,7 @@ public:
      * @param connection Wrapped WT connection
      * @param epoch In which session cache cleanup epoch was this session instantiated.
      */
-    WiredTigerSession(WiredTigerConnection* connection, uint64_t epoch);
+    WiredTigerSession(WiredTigerConnection* connection, uint64_t epoch, const char* config);
 
     /**
      * Creates a new WT session on the specified connection. This session will not be cached.

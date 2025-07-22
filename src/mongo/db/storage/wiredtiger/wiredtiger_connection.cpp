@@ -176,13 +176,14 @@ bool WiredTigerConnection::isEphemeral() {
     return _engine && _engine->isEphemeral();
 }
 
-WiredTigerManagedSession WiredTigerConnection::getSession(OperationContext& opCtx) {
-    auto session = getUninterruptibleSession();
+WiredTigerManagedSession WiredTigerConnection::getSession(OperationContext& opCtx,
+                                                          const char* config) {
+    auto session = getUninterruptibleSession(config);
     session->attachOperationContext(opCtx);
     return session;
 }
 
-WiredTigerManagedSession WiredTigerConnection::getUninterruptibleSession() {
+WiredTigerManagedSession WiredTigerConnection::getUninterruptibleSession(const char* config) {
     // We should never be able to get here after _shuttingDown is set, because no new
     // operations should be allowed to start.
     invariant(!(_shuttingDown.load() & kShuttingDownMask));
@@ -201,7 +202,8 @@ WiredTigerManagedSession WiredTigerConnection::getUninterruptibleSession() {
     }
 
     // Outside of the cache partition lock, but on release will be put back on the cache
-    return WiredTigerManagedSession(std::make_unique<WiredTigerSession>(this, _epoch.load()));
+    return WiredTigerManagedSession(
+        std::make_unique<WiredTigerSession>(this, _epoch.load(), config));
 }
 
 int32_t WiredTigerConnection::getSessionCacheMax() const {
@@ -229,15 +231,7 @@ void WiredTigerConnection::_releaseSession(std::unique_ptr<WiredTigerSession> se
     session->detachOperationContext();
 
     {
-        uint64_t range;
-        // This checks that we are only caching idle sessions and not something which might hold
-        // locks or otherwise prevent truncation.
-        invariantWTOK(session->transaction_pinned_range(&range), *session);
-        invariant(range == 0);
-
         // Release resources in the session we're about to cache.
-        // If we are using hybrid caching, then close cursors now and let them
-        // be cached at the WiredTiger level.
         session->closeAllCursors("");
         invariant(session->cachedCursors() == 0);
 
