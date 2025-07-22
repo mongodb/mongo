@@ -898,7 +898,7 @@ CEResult CardinalityEstimator::estimate(const ElemMatchValueMatchExpression* nod
     }
 
     // Sampling and histogram handle this case higher up.
-    tassert(9808601,
+    uassert(9808601,
             "direct estimation of $elemMatch is currently only supported for heuristicCE",
             _rankerMode == QueryPlanRankerModeEnum::kHeuristicCE ||
                 _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE);
