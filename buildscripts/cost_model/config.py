@@ -33,6 +33,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Sequence
 
+import pandas as pd
 from random_generator import DataType, RandomDistribution
 
 
@@ -106,7 +107,7 @@ class FieldTemplate:
 class QsNodeCalibrationConfig:
     type: str
     filter_function: Callable[[Any], Any] = None
-    variables_override: Sequence[str] = None
+    variables_override: Callable[[pd.DataFrame], pd.DataFrame] = None
 
 
 @dataclass

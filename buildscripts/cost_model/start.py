@@ -162,7 +162,21 @@ async def execute_limits(database: DatabaseInstance, collections: Sequence[Colle
     collection = [c for c in collections if c.name.startswith("index_scan")][0]
     limits = [1, 2, 5, 10, 15, 20, 25, 50]  # , 100, 250, 500, 1000, 2500, 5000, 10000]
 
-    requests = [Query([{"$limit": limit}], note="Limit") for limit in limits]
+    requests = [Query([{"$limit": limit}], note="LIMIT") for limit in limits]
+    await workload_execution.execute(
+        database, main_config.workload_execution, [collection], requests
+    )
+
+
+async def execute_skips(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
+    collection = [c for c in collections if c.name.startswith("index_scan")][0]
+    skips = [5, 10, 15, 20, 25, 50, 75, 100, 500, 1000]
+    limits = [5, 10, 15, 20, 50, 75, 100]
+    requests = []
+    # We add a LIMIT on top of the SKIP in order to easily vary the number of processed documents.
+    for limit in limits:
+        for skip in skips:
+            requests.append(Query(pipeline=[{"$skip": skip}, {"$limit": limit}], note="SKIP"))
     await workload_execution.execute(
         database, main_config.workload_execution, [collection], requests
     )
@@ -181,7 +195,7 @@ async def main():
         await generator.populate_collections()
         # 3. Collecting data for calibration (optional).
         # It runs the pipelines and stores explains to the database.
-        execution_query_functions = [execute_limits]
+        execution_query_functions = [execute_limits, execute_skips]
         for execute_query in execution_query_functions:
             await execute_query(database, generator.collection_infos)
             main_config.workload_execution.write_mode = WriteMode.APPEND

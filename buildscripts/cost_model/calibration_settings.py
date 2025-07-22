@@ -31,6 +31,7 @@ import random
 from typing import Any
 
 import config
+import pandas as pd
 from random_generator import ArrayRandomDistribution, DataType, RandomDistribution, RangeGenerator
 
 __all__ = ["main_config", "distributions"]
@@ -322,7 +323,7 @@ workload_execution = config.WorkloadExecutionConfig(
     output_collection_name="calibrationData",
     write_mode=config.WriteMode.REPLACE,
     warmup_runs=5,
-    runs=100,
+    runs=75,
 )
 
 
@@ -345,7 +346,11 @@ qsn_nodes = [
     config.QsNodeCalibrationConfig(type="SORT_MERGE"),
     config.QsNodeCalibrationConfig(type="SORT"),
     config.QsNodeCalibrationConfig(type="LIMIT"),
-    config.QsNodeCalibrationConfig(type="SKIP"),
+    config.QsNodeCalibrationConfig(type="SKIP", variables_override=lambda df: pd.concat([
+        df['n_returned'].rename("Documents Passed"),
+        (df['n_processed'] - df['n_returned']).rename('Documents Skipped')],
+        axis=1
+    )),
 ]
 # Calibrator settings
 qs_calibrator = config.QuerySolutionCalibrationConfig(

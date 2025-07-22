@@ -79,8 +79,8 @@ def process_stage(stage: dict[str, Any]) -> Node:
         "MERGE_SORT": process_mergesort,
         "SORT_MERGE": process_mergesort,
         "SORT": process_sort,
-        "LIMIT": process_limitskip,
-        "SKIP": process_limitskip,
+        "LIMIT": process_limit,
+        "SKIP": process_skip,
     }
     processor = processors.get(stage["stage"])
     if processor is None:
@@ -131,10 +131,16 @@ def process_sort(stage: dict[str, Any]) -> Node:
     return Node(**get_common_fields(stage), n_processed=stage["nReturned"], children=[input_stage])
 
 
-def process_limitskip(stage: dict[str, Any]) -> Node:
+def process_limit(stage: dict[str, Any]) -> Node:
     input_stage = process_stage(stage["inputStage"])
+    return Node(**get_common_fields(stage), n_processed=stage["nReturned"], children=[input_stage])
+
+
+def process_skip(stage: dict[str, Any]) -> Node:
+    input_stage = process_stage(stage["inputStage"])
+    # This is different than the limit processor since the skip node processes both the documents it skips and the ones it passes up.
     return Node(
-        **get_common_fields(stage), n_processed=input_stage.n_processed, children=[input_stage]
+        **get_common_fields(stage), n_processed=input_stage.n_returned, children=[input_stage]
     )
 
 
