@@ -1,6 +1,6 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain.bzl", "setup_mongo_toolchains")
-load("//bazel/toolchains/cc/mongo_linux:mongo_gdb.bzl", "setup_gdb_toolchains")
+load("//bazel/toolchains/cc/mongo_linux:mongo_gdb.bzl", "gdb_download")
 
 http_archive(
     name = "aspect_rules_lint",
@@ -11,7 +11,10 @@ http_archive(
 
 setup_mongo_toolchains()
 
-setup_gdb_toolchains()
+gdb_download(
+    name = "gdb",
+    version = "v5",
+)
 
 http_archive(
     name = "windows_sasl",
