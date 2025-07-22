@@ -71,10 +71,6 @@ def install_bazel(binary_directory: str) -> str:
     is_bazelisk_supported = normalized_arch not in ["ppc64le", "s390x"]
     binary_filename = "bazelisk"
     binary_path = os.path.join(binary_directory, binary_filename)
-    if os.path.exists(binary_path):
-        print(f"{binary_filename} already exists ({binary_path}), skipping download")
-        _set_bazel_permissions(binary_path)
-        return binary_path
 
     if is_bazelisk_supported:
         print(f"Downloading {binary_filename}...")
