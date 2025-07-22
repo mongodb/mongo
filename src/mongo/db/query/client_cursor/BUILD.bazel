@@ -29,7 +29,7 @@ mongo_cc_library(
         "//src/mongo/db:shard_role",
         "//src/mongo/db/auth:auth_checks",
         "//src/mongo/db/memory_tracking",
-        "//src/mongo/db/pipeline",
+        "//src/mongo/db/repl:optime",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -101,7 +101,6 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/repl:optime",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -152,6 +151,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context",
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/util:clock_source_mock",
     ],
 )

@@ -45,7 +45,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_server_params.h"
@@ -98,7 +98,7 @@ protected:
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeFakePlanExecutor(
         OperationContext* opCtx) {
         // Create a mock ExpressionContext.
-        auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(kTestNss).build();
+        auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx, kTestNss);
         auto workingSet = std::make_unique<WorkingSet>();
         auto queuedDataStage = std::make_unique<QueuedDataStage>(expCtx.get(), workingSet.get());
         return unittest::assertGet(
