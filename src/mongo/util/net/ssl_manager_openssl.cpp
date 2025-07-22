@@ -3259,7 +3259,7 @@ Status _validatePeerRoles(const stdx::unordered_set<RoleName>& embeddedRoles, SS
                           << " is not authorized to grant any roles due to tlsCATrusts parameter"};
     }
 
-    auto allowedRoles = it->second;
+    auto& allowedRoles = it->second;
     // See TLSCATrustsSetParameter::set() for a description of tlsCATrusts format.
     if (allowedRoles.count(RoleName())) {
         // CA is authorized for all role assignments.
