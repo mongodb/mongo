@@ -183,8 +183,16 @@ void DocumentSourceFacet::setSource(Stage* source) {
 
 void DocumentSourceFacet::doDispose() {
     for (auto&& facet : _facets) {
-        facet.pipeline.get_deleter().dismissDisposal();
-        facet.pipeline->dispose(pExpCtx->getOperationContext());
+        // TODO SERVER-104225: Remove the following if-block when DocumentSourceCursor is split into
+        // QO and QE parts and the QO stage auto-disposes resources in destructor.
+        if (!facet.execPipeline) {
+            // Create an execution pipeline to make sure the resources are correctly disposed.
+            facet.execPipeline = exec::agg::buildPipeline(facet.pipeline->freeze());
+        }
+        if (facet.execPipeline) {
+            facet.execPipeline->dismissDisposal();
+            facet.execPipeline->dispose(pExpCtx->getOperationContext());
+        }
     }
 }
 

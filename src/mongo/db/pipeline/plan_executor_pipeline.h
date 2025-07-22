@@ -141,7 +141,7 @@ public:
     }
 
     void dispose(OperationContext* opCtx) override {
-        _pipeline->dispose(opCtx);
+        _execPipeline->dispose(opCtx);
     }
 
     void forceSpill(PlanYieldPolicy* yieldPolicy) override {
@@ -167,7 +167,7 @@ public:
     }
 
     bool isDisposed() const override {
-        return _pipeline->isDisposed();
+        return _execPipeline->isDisposed();
     }
 
     Timestamp getLatestOplogTimestamp() const override {

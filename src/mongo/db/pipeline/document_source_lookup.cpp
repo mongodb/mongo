@@ -1097,11 +1097,13 @@ bool DocumentSourceLookUp::usedDisk() const {
 }
 
 void DocumentSourceLookUp::doDispose() {
-    if (_pipeline) {
+    if (_execPipeline) {
         _execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
-        _pipeline->dispose(pExpCtx->getOperationContext());
-        _pipeline.reset();
+        _execPipeline->dispose(pExpCtx->getOperationContext());
         _execPipeline.reset();
+    }
+    if (_pipeline) {
+        _pipeline.reset();
     }
 }
 
@@ -1141,9 +1143,9 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
         // Accumulate stats from the pipeline for the previous input, if applicable. This is to
         // avoid missing the accumulation of stats on an early exit (below) if the input (i.e., left
         // side of the lookup) is done.
-        if (_pipeline) {
+        if (_execPipeline) {
             _execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
-            _pipeline->dispose(pExpCtx->getOperationContext());
+            _execPipeline->dispose(pExpCtx->getOperationContext());
         }
 
         auto nextInput = pSource->getNext();
@@ -1159,7 +1161,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
         // The $lookup stage takes responsibility for disposing of its Pipeline, since it will
         // potentially be used by multiple OperationContexts, and the $lookup stage is part of an
         // outer Pipeline that will propagate dispose() calls before being destroyed.
-        _pipeline.get_deleter().dismissDisposal();
+        _execPipeline->dismissDisposal();
 
         _cursorIndex = 0;
         _nextValue = _execPipeline->getNext();
@@ -1437,7 +1439,7 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceLookUp::dist
 }
 
 void DocumentSourceLookUp::detachFromOperationContext() {
-    if (_pipeline) {
+    if (_execPipeline) {
         // We have a pipeline we're going to be executing across multiple calls to getNext(), so we
         // use Pipeline::detachFromOperationContext() to take care of updating
         // '_fromExpCtx->getOperationContext()'.
@@ -1473,7 +1475,7 @@ void DocumentSourceLookUp::detachSourceFromOperationContext() {
 }
 
 void DocumentSourceLookUp::reattachToOperationContext(OperationContext* opCtx) {
-    if (_pipeline) {
+    if (_execPipeline) {
         // We have a pipeline we're going to be executing across multiple calls to getNext(), so we
         // use Pipeline::reattachToOperationContext() to take care of updating
         // '_fromExpCtx->getOperationContext()'.

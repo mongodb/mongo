@@ -239,23 +239,6 @@ public:
         return pCtx;
     }
 
-    /**
-     * Releases any resources held by this pipeline such as PlanExecutors or in-memory structures.
-     * Must be called before deleting a Pipeline.
-     *
-     * There are multiple cleanup scenarios:
-     *  - This Pipeline will only ever use one OperationContext. In this case the PipelineDeleter
-     *    will automatically call dispose() before deleting the Pipeline, and the owner need not
-     *    call dispose().
-     *  - This Pipeline may use multiple OperationContexts over its lifetime. In this case it
-     *    is the owner's responsibility to call dispose() with a valid OperationContext before
-     *    deleting the Pipeline.
-     */
-    void dispose(OperationContext* opCtx);
-
-    bool isDisposed() const {
-        return _disposed;
-    }
 
     bool isFrozen() const {
         return _frozen;
@@ -580,8 +563,6 @@ private:
     Pipeline(const boost::intrusive_ptr<ExpressionContext>& pCtx);
     Pipeline(DocumentSourceContainer stages, const boost::intrusive_ptr<ExpressionContext>& pCtx);
 
-    ~Pipeline();
-
     /**
      * Helper for public methods that parse pipelines from vectors of different types.
      */
@@ -604,16 +585,13 @@ private:
 
     PipelineSplitState _splitState = PipelineSplitState::kUnsplit;
     boost::intrusive_ptr<ExpressionContext> pCtx;
-    bool _disposed = false;
     bool _isParameterized = false;
 
     // Do not allow modifications of this pipeline.
     bool _frozen{false};
 };
 
-/**
- * This class will ensure a Pipeline is disposed before it is deleted.
- */
+// TODO SERVER-107007: Remove 'PipelineDeleter'.
 class PipelineDeleter {
 public:
     /**
@@ -624,24 +602,9 @@ public:
 
     explicit PipelineDeleter(OperationContext* opCtx) : _opCtx(opCtx) {}
 
-    /**
-     * If an owner of a std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> wants to assume
-     * responsibility for calling PlanExecutor::dispose(), they can call dismissDisposal(). If
-     * dismissed, a PipelineDeleter will not call dispose() when deleting the PlanExecutor.
-     */
-    void dismissDisposal() {
-        _dismissed = true;
-    }
-
-    /**
-     * Calls dispose() on 'pipeline', unless this PipelineDeleter has been dismissed.
-     */
     void operator()(Pipeline* pipeline) {
         // It is illegal to call this method on a default-constructed PipelineDeleter.
         invariant(_opCtx);
-        if (!_dismissed) {
-            pipeline->dispose(_opCtx);
-        }
         delete pipeline;
     }
 

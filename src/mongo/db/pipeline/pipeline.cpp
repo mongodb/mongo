@@ -175,10 +175,6 @@ Pipeline::Pipeline(const intrusive_ptr<ExpressionContext>& pTheCtx) : pCtx(pTheC
 Pipeline::Pipeline(DocumentSourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx)
     : _sources(std::move(stages)), pCtx(expCtx) {}
 
-Pipeline::~Pipeline() {
-    invariant(_disposed);
-}
-
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::clone(
     const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
     auto expCtx = newExpCtx ? newExpCtx : getContext();
@@ -419,27 +415,6 @@ bool Pipeline::aggHasWriteStage(const BSONObj& cmd) {
     }
 
     return false;
-}
-
-void Pipeline::dispose(OperationContext* opCtx) {
-    if (_disposed) {
-        return;
-    }
-    try {
-        pCtx->setOperationContext(opCtx);
-
-        // Make sure all stages are connected, in case we are being disposed via an error path and
-        // were not stitched at the time of the error.
-        stitch();
-
-        if (!_sources.empty()) {
-            auto& stage = dynamic_cast<exec::agg::Stage&>(*_sources.back());
-            stage.dispose();
-        }
-        _disposed = true;
-    } catch (...) {
-        std::terminate();
-    }
 }
 
 BSONObj Pipeline::getInitialQuery() const {

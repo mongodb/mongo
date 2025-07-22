@@ -752,7 +752,6 @@ SemiFuture<void> ReshardingCollectionCloner::run(
         .until<Status>([chainCtx, factory](const Status& status) {
             if (!status.isOK() && chainCtx->pipeline) {
                 auto opCtx = factory.makeOperationContext(&cc());
-                chainCtx->pipeline->dispose(opCtx.get());
                 chainCtx->pipeline.reset();
             }
 
@@ -776,7 +775,6 @@ SemiFuture<void> ReshardingCollectionCloner::run(
                 auto opCtx = cc().makeOperationContext();
 
                 // Guarantee the pipeline is always cleaned up - even upon cancellation.
-                chainCtx->pipeline->dispose(opCtx.get());
                 chainCtx->pipeline.reset();
             }
 

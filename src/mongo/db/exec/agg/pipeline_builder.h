@@ -47,14 +47,6 @@ namespace exec::agg {
  */
 std::unique_ptr<exec::agg::Pipeline> buildPipeline(const mongo::Pipeline& pipeline);
 
-/**
- * Builds and returns a query execution pipeline corresponding to the given ordered list of document
- * sources.
- * TODO SERVER-105777: Remove this overload.
- */
-std::unique_ptr<exec::agg::Pipeline> buildPipeline(
-    const std::list<boost::intrusive_ptr<DocumentSource>>& documentSources,
-    boost::intrusive_ptr<ExpressionContext> expCtx);
 
 }  // namespace exec::agg
 }  // namespace mongo

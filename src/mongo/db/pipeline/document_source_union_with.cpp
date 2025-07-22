@@ -117,6 +117,9 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
       _variables(original._variables),
       _variablesParseState(original._variablesParseState) {
     _pipeline->getContext()->setInUnionWith(true);
+    tassert(10577700,
+            "explain settings are different for $unionWith and its sub-pipeline",
+            pExpCtx->getExplain() == _pipeline->getContext()->getExplain());
 }
 
 DocumentSourceUnionWith::DocumentSourceUnionWith(
@@ -130,6 +133,9 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
         serviceOpCounters(expCtx->getOperationContext()).gotNestedAggregate();
     }
     _pipeline->getContext()->setInUnionWith(true);
+    tassert(10577701,
+            "explain settings are different for $unionWith and its sub-pipeline",
+            pExpCtx->getExplain() == _pipeline->getContext()->getExplain());
 }
 
 DocumentSourceUnionWith::DocumentSourceUnionWith(
@@ -156,8 +162,12 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
 }
 
 DocumentSourceUnionWith::~DocumentSourceUnionWith() {
-    if (_pipeline && _pipeline->getContext()->getExplain()) {
-        _pipeline->dispose(pExpCtx->getOperationContext());
+    // When in explain command, the sub-pipeline was not disposed in 'doDispose()', so we need to
+    // dispose it here.
+    if (pExpCtx->getExplain()) {
+        if (_execPipeline) {
+            _execPipeline->dispose(pExpCtx->getOperationContext());
+        }
     }
 }
 
@@ -318,7 +328,6 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
                         "pipeline"_attr = _pipeline->serializeToBson());
             _pipeline = pExpCtx->getMongoProcessInterface()->preparePipelineForExecution(
                 _pipeline.release());
-            _execPipeline = exec::agg::buildPipeline(_pipeline->freeze());
             LOGV2_DEBUG(9497003,
                         5,
                         "$unionWith POST pipeline prep: ",
@@ -334,12 +343,13 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
             logShardedViewFound(e);
             return doGetNext();
         }
-    }
+        _execPipeline = exec::agg::buildPipeline(_pipeline->freeze());
 
-    // The $unionWith stage takes responsibility for disposing of its Pipeline. When the outer
-    // Pipeline that contains the $unionWith is disposed of, it will propagate dispose() to its
-    // subpipeline.
-    _pipeline.get_deleter().dismissDisposal();
+        // The $unionWith stage takes responsibility for disposing of its Pipeline. When the outer
+        // Pipeline that contains the $unionWith is disposed of, it will propagate dispose() to its
+        // subpipeline.
+        _execPipeline->dismissDisposal();
+    }
 
     auto res = _execPipeline->getNext();
     if (res)
@@ -404,21 +414,23 @@ bool DocumentSourceUnionWith::usedDisk() const {
 }
 
 void DocumentSourceUnionWith::doDispose() {
-    if (_pipeline) {
-        _pipeline.get_deleter().dismissDisposal();
-        if (_execPipeline) {
-            _stats.planSummaryStats.usedDisk =
-                _stats.planSummaryStats.usedDisk || _execPipeline->usedDisk();
-            _execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
-        }
+    // Update execution statistics.
+    if (_execPipeline) {
+        _stats.planSummaryStats.usedDisk =
+            _stats.planSummaryStats.usedDisk || _execPipeline->usedDisk();
+        _execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
+    }
 
-        if (!_pipeline->getContext()->getExplain()) {
-            _pipeline->dispose(pExpCtx->getOperationContext());
-            _userPipeline.clear();
-            _pushedDownStages.clear();
-            _pipeline.reset();
-            _execPipeline.reset();
+    // When not in explain command, propagate disposal to the subpipeline, otherwise the subpipeline
+    // will be disposed in '~DocumentSourceUnionWith()'.
+    if (!pExpCtx->getExplain()) {
+        if (_execPipeline) {
+            _execPipeline->dispose(pExpCtx->getOperationContext());
         }
+        _userPipeline.clear();
+        _pushedDownStages.clear();
+        _pipeline.reset();
+        _execPipeline.reset();
     }
 }
 

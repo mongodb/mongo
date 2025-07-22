@@ -42,6 +42,13 @@ Pipeline::Pipeline(StageContainer&& stages, boost::intrusive_ptr<ExpressionConte
     }
 }
 
+Pipeline::~Pipeline() {
+    if (_disposeInDestructor) {
+        dispose(expCtx->getOperationContext());
+    }
+    tassert(10617100, "expecting the pipeline to be disposed at destruction", _disposed);
+}
+
 boost::optional<Document> Pipeline::getNext() {
     // TODO SERVER-105493: Remove the following early exit after we prohibit creating empty
     // execution pipelines.
@@ -158,6 +165,21 @@ std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) c
 bool Pipeline::usedDisk() const {
     return std::any_of(
         _stages.begin(), _stages.end(), [](const auto& stage) { return stage->usedDisk(); });
+}
+
+void Pipeline::dispose(OperationContext* opCtx) {
+    if (_disposed) {
+        return;
+    }
+    try {
+        expCtx->setOperationContext(opCtx);
+        if (!_stages.empty()) {
+            _stages.back()->dispose();
+        }
+        _disposed = true;
+    } catch (...) {
+        std::terminate();
+    }
 }
 
 }  // namespace mongo::exec::agg

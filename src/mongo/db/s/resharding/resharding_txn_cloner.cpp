@@ -264,9 +264,9 @@ SemiFuture<void> ReshardingTxnCloner::run(
                                             MONGO_unlikely(mongoProcessInterface_forTest)
                                                 ? mongoProcessInterface_forTest
                                                 : MongoProcessInterface::create(opCtx.get()));
-                       chainCtx->pipeline.get_deleter().dismissDisposal();
                        chainCtx->execPipeline =
                            exec::agg::buildPipeline(chainCtx->pipeline->freeze());
+                       chainCtx->execPipeline->dismissDisposal();
                        chainCtx->execPipeline->detachFromOperationContext();
                        chainCtx->pipeline->detachFromOperationContext();
                        chainCtx->donorRecord = boost::none;
@@ -277,7 +277,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
                    if (!chainCtx->donorRecord) {
                        auto opCtx = factory.makeOperationContext(&cc());
                        ScopeGuard guard([&] {
-                           chainCtx->pipeline->dispose(opCtx.get());
+                           chainCtx->execPipeline->dispose(opCtx.get());
                            chainCtx->pipeline.reset();
                            chainCtx->execPipeline.reset();
                        });
@@ -329,7 +329,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
         .until<Status>([chainCtx, factory](const Status& status) {
             if (!status.isOK() && chainCtx->pipeline) {
                 auto opCtx = factory.makeOperationContext(&cc());
-                chainCtx->pipeline->dispose(opCtx.get());
+                chainCtx->execPipeline->dispose(opCtx.get());
                 chainCtx->pipeline.reset();
                 chainCtx->execPipeline.reset();
             }
@@ -355,7 +355,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
                 AlternativeClientRegion acr(client);
                 auto opCtx = cc().makeOperationContext();
 
-                chainCtx->pipeline->dispose(opCtx.get());
+                chainCtx->execPipeline->dispose(opCtx.get());
                 chainCtx->pipeline.reset();
                 chainCtx->execPipeline.reset();
             }

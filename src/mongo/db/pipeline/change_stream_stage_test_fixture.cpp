@@ -248,7 +248,8 @@ std::unique_ptr<exec::agg::Pipeline> ChangeStreamStageTest::makeExecPipeline(
         result.erase(newEnd, result.end());
     }
 
-    return exec::agg::buildPipeline(result, getExpCtx());
+    auto pipeline = Pipeline::create(result, getExpCtx());
+    return exec::agg::buildPipeline(pipeline->freeze());
 }
 
 std::unique_ptr<exec::agg::Pipeline> ChangeStreamStageTest::makeExecPipeline(

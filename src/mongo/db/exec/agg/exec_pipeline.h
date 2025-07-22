@@ -42,7 +42,11 @@ public:
 
     // Deleting implicit copy constructor, because it was not needed so far.
     Pipeline(const Pipeline&) = delete;
+
     Pipeline(StageContainer&& stages, boost::intrusive_ptr<ExpressionContext> expCtx);
+
+    ~Pipeline();
+
     const StageContainer& getStages() const {
         return _stages;
     }
@@ -104,8 +108,35 @@ public:
      */
     bool usedDisk() const;
 
+    /**
+     * Releases any resources held by this pipeline such as PlanExecutors or in-memory structures.
+     * Must be called before deleting a Pipeline. There are multiple cleanup scenarios:
+     *  - This Pipeline will only ever use one OperationContext. In this case the destructor will
+     *    automatically call 'dispose()' before deleting the Pipeline, and the owner does not need
+     * to call 'dispose()'.
+     *  - This Pipeline may use multiple OperationContexts over its lifetime. In this case it is the
+     *    owner's responsibility to call 'dispose()' with a valid OperationContext before deleting
+     * the Pipeline.
+     */
+    void dispose(OperationContext* opCtx);
+
+    bool isDisposed() const {
+        return _disposed;
+    }
+
+    /**
+     * Deactivates disposing the pipeline in the destructor.
+     */
+    void dismissDisposal() {
+        _disposeInDestructor = false;
+    }
+
 private:
     StageContainer _stages;
     boost::intrusive_ptr<ExpressionContext> expCtx;
+    bool _disposed{false};
+
+    // Call 'dispose()' in destructor.
+    bool _disposeInDestructor{true};
 };
 }  // namespace mongo::exec::agg
