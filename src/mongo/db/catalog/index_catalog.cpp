@@ -63,6 +63,8 @@ StringData toString(IndexBuildMethod method) {
             return "Hybrid"_sd;
         case IndexBuildMethod::kForeground:
             return "Foreground"_sd;
+        case IndexBuildMethod::kPrimaryDriven:
+            return "Primary driven"_sd;
     }
 
     MONGO_UNREACHABLE_TASSERT(10083503);

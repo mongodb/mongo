@@ -362,15 +362,15 @@ TEST_F(IndexBuildsCoordinatorTest, StartIndexBuildOnNonEmptyCollectionReplicates
     {
         auto indexBuildsCoord = IndexBuildsCoordinator::get(operationContext());
         auto buildUUID = UUID::gen();
-        auto buildFuture =
-            unittest::assertGet(indexBuildsCoord->startIndexBuild(operationContext(),
-                                                                  nss.dbName(),
-                                                                  collUUID,
-                                                                  specs,
-                                                                  idents,
-                                                                  buildUUID,
-                                                                  IndexBuildProtocol::kTwoPhase,
-                                                                  {CommitQuorumOptions(1)}));
+        auto buildFuture = unittest::assertGet(indexBuildsCoord->startIndexBuild(
+            operationContext(),
+            nss.dbName(),
+            collUUID,
+            specs,
+            idents,
+            buildUUID,
+            IndexBuildProtocol::kTwoPhase,
+            IndexBuildsCoordinator::IndexBuildOptions{.commitQuorum = CommitQuorumOptions(1)}));
         ASSERT_OK(indexBuildsCoord->voteCommitIndexBuild(
             operationContext(), buildUUID, HostAndPort("test1", 1234)));
         ASSERT_OK(buildFuture.getNoThrow());

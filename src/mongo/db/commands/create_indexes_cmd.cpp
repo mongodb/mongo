@@ -600,7 +600,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
     auto buildUUID = UUID::gen();
     ReplIndexBuildState::IndexCatalogStats stats;
-    IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {commitQuorum};
+    IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {.commitQuorum = commitQuorum};
 
     LOGV2(20438,
           "Index build: registering",

@@ -1219,7 +1219,8 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
 
                            auto buildUUID = UUID::gen();
                            IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions{
-                               CommitQuorumOptions(CommitQuorumOptions::kVotingMembers)};
+                               .commitQuorum =
+                                   CommitQuorumOptions(CommitQuorumOptions::kVotingMembers)};
 
                            // TODO(SERVER-107070): investigate if this is a valid place to generate
                            // new idents or if we need to do something more complicated for catalog

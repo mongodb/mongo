@@ -80,7 +80,7 @@ public:
         NamespaceString::createNamespaceString_forTest(_tenantId, "test.test");
     const UUID _testFooTenantUUID = UUID::gen();
     const IndexBuildsCoordinator::IndexBuildOptions _indexBuildOptions = {
-        CommitQuorumOptions(CommitQuorumOptions::kDisabled)};
+        .commitQuorum = CommitQuorumOptions(CommitQuorumOptions::kDisabled)};
     std::unique_ptr<IndexBuildsCoordinator> _indexBuildsCoord;
 };
 
@@ -360,7 +360,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumFailsToTurnCommitQuorumF
 TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumFailsToTurnCommitQuorumFromOnToOff) {
 
     const IndexBuildsCoordinator::IndexBuildOptions indexBuildOptionsWithCQOn = {
-        CommitQuorumOptions(1)};
+        .commitQuorum = CommitQuorumOptions(1)};
     const auto buildUUID = UUID::gen();
 
     // Start an index build on _testFooNss with commit quorum enabled.

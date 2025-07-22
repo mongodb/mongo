@@ -444,7 +444,6 @@ repl::OpTime getLatestOplogOpTime(OperationContext* opCtx) {
 bool isIndexBuildResumable(OperationContext* opCtx,
                            const ReplIndexBuildState& replState,
                            const IndexBuildsCoordinator::IndexBuildOptions& indexBuildOptions) {
-
     if (replState.protocol != IndexBuildProtocol::kTwoPhase) {
         return false;
     }
@@ -2504,6 +2503,7 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
         ? IndexBuildsManager::IndexConstraints::kRelax
         : IndexBuildsManager::IndexConstraints::kEnforce;
     options.protocol = replState->protocol;
+    options.method = indexBuildOptions.indexBuildMethod;
 
     try {
         if (replCoord->canAcceptWritesFor(opCtx, collection->ns()) &&

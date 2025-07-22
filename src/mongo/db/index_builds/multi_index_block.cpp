@@ -1178,7 +1178,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
 }
 
 bool MultiIndexBlock::isBackgroundBuilding() const {
-    return _method == IndexBuildMethod::kHybrid;
+    return _method == IndexBuildMethod::kHybrid || _method == IndexBuildMethod::kPrimaryDriven;
 }
 
 void MultiIndexBlock::setIndexBuildMethod(IndexBuildMethod indexBuildMethod) {

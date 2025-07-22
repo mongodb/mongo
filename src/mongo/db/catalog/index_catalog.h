@@ -94,6 +94,17 @@ enum class IndexBuildMethod {
      * During this process, callers guarantee that no writes will be accepted on this collection.
      */
     kForeground,
+    /**
+     * The overall index build process is similar to kHybrid. However, instead of building the index
+     * independently on each replica, only the primary runs the logic to build the index. Replicas
+     * simply apply the oplog entries generated during the build.
+     *
+     * This is the default for all index builds in a disaggregated storage cluster and is currently
+     * not supported in an attached storage cluster.
+     *
+     * TODO(SERVER-103670): Add implementation for this new IndexBuildMethod.
+     */
+    kPrimaryDriven,
 };
 
 StringData toString(IndexBuildMethod method);

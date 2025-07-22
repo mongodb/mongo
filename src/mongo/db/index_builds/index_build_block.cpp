@@ -62,8 +62,16 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
-
 namespace mongo {
+
+namespace {
+
+bool isBackgroundBuilding(IndexBuildMethod method) {
+    return method == IndexBuildMethod::kHybrid || method == IndexBuildMethod::kPrimaryDriven;
+}
+
+}  // namespace
+
 
 IndexBuildBlock::IndexBuildBlock(const NamespaceString& nss,
                                  const BSONObj& spec,
@@ -164,7 +172,7 @@ Status IndexBuildBlock::init(OperationContext* opCtx,
             return status;
     }
 
-    if (_method == IndexBuildMethod::kHybrid) {
+    if (isBackgroundBuilding(_method)) {
         auto indexCatalog = collection->getIndexCatalog();
         auto indexCatalogEntry = indexCatalog->getWritableEntryByName(
             opCtx, _indexName, IndexCatalog::InclusionPolicy::kUnfinished);

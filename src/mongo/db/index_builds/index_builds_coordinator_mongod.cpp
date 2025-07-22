@@ -449,7 +449,6 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
     // written, or an error has been encountered otherwise.
     auto [startPromise, startFuture] = makePromiseFuture<void>();
 
-
     auto replState = invariant(_getIndexBuild(buildUUID));
 
     ForwardableOperationMetadata forwardableOpMetadata(opCtx);
