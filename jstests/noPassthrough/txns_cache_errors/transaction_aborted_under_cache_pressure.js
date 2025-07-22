@@ -49,7 +49,7 @@ let firstPreparedTxn = true;
 
 jsTestLog("Starting large inserts to create cache pressure...");
 
-let abortOldestTransactionsSuccessfulKills = 0;
+let successfulKills = 0;
 const timeoutTimestamp = Date.now() + 10 * 60 * 1000;  // 10 minutes timeout
 
 // Insert multiple large documents without committing.
@@ -77,11 +77,10 @@ while (true) {
 
     let status = db.serverStatus();
 
-    abortOldestTransactionsSuccessfulKills =
-        db.serverStatus().metrics.abortOldestTransactions.successfulKills;
+    successfulKills = db.serverStatus().metrics.rollbackUnderCachePressure.successfulKills;
 
     // Once we have a successful kill, we know we have aborted the oldest transaction.
-    if (abortOldestTransactionsSuccessfulKills > 0) {
+    if (successfulKills > 0) {
         jsTestLog("Oldest transaction successfully aborted under cache pressure.");
         logCacheStatus();
         break;

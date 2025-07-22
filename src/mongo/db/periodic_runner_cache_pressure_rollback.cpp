@@ -76,7 +76,7 @@ const auto periodicThreadToRollbackUnderCachePressureDecoration =
     ServiceContext::declareDecoration<PeriodicThreadToRollbackUnderCachePressure>();
 
 int64_t getPerBatchMemoryLimitBytes(OperationContext* opCtx) {
-    double limitParameter = gAbortOldestTransactionMemoryClearLimitPerBatch;
+    double limitParameter = gCachePressureAbortMemoryClearLimitPerBatch;
 
     // Positive values are MB.
     if (limitParameter > 0) {
@@ -94,22 +94,23 @@ int64_t getPerBatchMemoryLimitBytes(OperationContext* opCtx) {
 
 }  // namespace
 
-// Tracks the number of passes the "abortOldestTransactions" thread makes to abort oldest
+// Tracks the number of passes the "rollbackUnderCachePressure" thread makes to abort oldest
 // transactions.
-auto& abortOldestTransactionsPasses = *MetricBuilder<Counter64>("abortOldestTransactions.passes");
-// Tracks the number of transactions the "abortOldestTransactions" thread successfully killed.
-auto& abortOldestTransactionsSuccessfulKills =
-    *MetricBuilder<Counter64>("abortOldestTransactions.successfulKills");
-// Tracks the number of sessions the "abortOldestTransactions" thread has skipped.
-auto& abortOldestTransactionsSkippedSessions =
-    *MetricBuilder<Counter64>("abortOldestTransactions.skippedSessions");
-// Tracks the number of transactions unsuccessfully killed by the "abortOldestTransactions" thread
-// due to timing out trying to checkout a sessions.
-auto& abortOldestTransactionsTimedOutKills =
-    *MetricBuilder<Counter64>("abortOldestTransactions.timedOutKills");
+auto& rollbackUnderCachePressurePasses =
+    *MetricBuilder<Counter64>("rollbackUnderCachePressure.passes");
+// Tracks the number of transactions the "rollbackUnderCachePressure" thread successfully killed.
+auto& rollbackUnderCachePressureSuccessfulKills =
+    *MetricBuilder<Counter64>("rollbackUnderCachePressure.successfulKills");
+// Tracks the number of sessions the "rollbackUnderCachePressure" thread has skipped.
+auto& rollbackUnderCachePressureSkippedSessions =
+    *MetricBuilder<Counter64>("rollbackUnderCachePressure.skippedSessions");
+// Tracks the number of transactions unsuccessfully killed by the "rollbackUnderCachePressure"
+// thread due to timing out trying to checkout a sessions.
+auto& rollbackUnderCachePressureTimedOutKills =
+    *MetricBuilder<Counter64>("rollbackUnderCachePressure.timedOutKills");
 // Tracks the (estimated) number of bytes freed up by killing oldest transactions.
-auto& abortOldestTransactionsBytesClearedEstimate =
-    *MetricBuilder<Counter64>("abortOldestTransactions.bytesClearedEstimate");
+auto& rollbackUnderCachePressureBytesClearedEstimate =
+    *MetricBuilder<Counter64>("rollbackUnderCachePressure.bytesClearedEstimate");
 
 auto PeriodicThreadToRollbackUnderCachePressure::get(ServiceContext* serviceContext)
     -> PeriodicThreadToRollbackUnderCachePressure& {
@@ -161,7 +162,7 @@ void PeriodicThreadToRollbackUnderCachePressure::_init(ServiceContext* serviceCo
 
 
                 int64_t bytesTarget = getPerBatchMemoryLimitBytes(opCtx);
-                int64_t killsTarget = gAbortOldestTransactionSessionKillLimitPerBatch;
+                int64_t killsTarget = gCachePressureAbortSessionKillLimitPerBatch;
                 while (bytesTarget > 0 && killsTarget > 0) {
                     if (!underCachePressure(opCtx)) {
                         break;
@@ -177,16 +178,16 @@ void PeriodicThreadToRollbackUnderCachePressure::_init(ServiceContext* serviceCo
                     // one oldest transaction per scan.
                     killOldestTransaction(
                         opCtx,
-                        Milliseconds(gAbortOldestTransactionSessionCheckoutTimeoutMilliseconds),
+                        Milliseconds(gCachePressureAbortCheckoutTimeoutMilliseconds),
                         &numKills,
                         &numSkips,
                         &numTimeOuts,
                         &bytesClearedEstimate);
-                    abortOldestTransactionsPasses.increment(1);
-                    abortOldestTransactionsSuccessfulKills.increment(numKills);
-                    abortOldestTransactionsSkippedSessions.increment(numSkips);
-                    abortOldestTransactionsTimedOutKills.increment(numTimeOuts);
-                    abortOldestTransactionsBytesClearedEstimate.increment(bytesClearedEstimate);
+                    rollbackUnderCachePressurePasses.increment(1);
+                    rollbackUnderCachePressureSuccessfulKills.increment(numKills);
+                    rollbackUnderCachePressureSkippedSessions.increment(numSkips);
+                    rollbackUnderCachePressureTimedOutKills.increment(numTimeOuts);
+                    rollbackUnderCachePressureBytesClearedEstimate.increment(bytesClearedEstimate);
 
                     bytesTarget -= bytesClearedEstimate;
                     killsTarget -= numKills;

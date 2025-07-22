@@ -97,7 +97,7 @@ function testCachePressureAbort() {
                 cachePressureEvictionStallDetectionWindowSeconds: 10,
                 // Kill a lot of things at once during cache pressure, this improves the odds of an
                 // active-txn being killed.
-                AbortOldestTransactionSessionKillLimitPerBatch: 10,
+                CachePressureAbortSessionKillLimitPerBatch: 10,
             }
         }
     });
