@@ -84,6 +84,46 @@ BENCHMARK_DEFINE_F(PointQueryBenchmark, ArrayFieldPointQuery)
     runBenchmark(BSON("arrayField" << fieldValue), BSONObj{} /*projection*/, state);
 }
 
+BENCHMARK_DEFINE_F(PointQueryBenchmark, UniqueFieldPointQueryWithCoveredProjection)
+(benchmark::State& state) {
+    int64_t fieldValue = docs().size() / 2;
+    runBenchmark(BSON("uniqueField" << fieldValue), BSON("_id" << 0 << "uniqueField" << 1), state);
+}
+
+BENCHMARK_DEFINE_F(PointQueryBenchmark, UniqueFieldPointQueryWithNotCoveredProjection)
+(benchmark::State& state) {
+    int64_t fieldValue = docs().size() / 2;
+    runBenchmark(
+        BSON("uniqueField" << fieldValue), BSON("_id" << 0 << "nonUniqueField" << 1), state);
+}
+
+BENCHMARK_DEFINE_F(PointQueryBenchmark, NonUniqueFieldPointQueryWithCoveredProjection)
+(benchmark::State& state) {
+    int64_t fieldValue = docs().size() / 3;
+    runBenchmark(
+        BSON("nonUniqueField" << fieldValue), BSON("_id" << 0 << "nonUniqueField" << 1), state);
+}
+
+BENCHMARK_DEFINE_F(PointQueryBenchmark, NonUniqueFieldPointQueryWithNotCoveredProjection)
+(benchmark::State& state) {
+    int64_t fieldValue = docs().size() / 3;
+    runBenchmark(
+        BSON("nonUniqueField" << fieldValue), BSON("_id" << 0 << "uniqueField" << 1), state);
+}
+
+BENCHMARK_DEFINE_F(PointQueryBenchmark, IdPointQueryWithCoveredProjection)
+(benchmark::State& state) {
+    auto id = docs()[docs().size() / 2].getField("_id").OID();
+    runBenchmark(BSON("_id" << id), BSON("_id" << 1), state);
+}
+
+
+BENCHMARK_DEFINE_F(PointQueryBenchmark, IdPointQueryWithNotCoveredProjection)
+(benchmark::State& state) {
+    auto id = docs()[docs().size() / 2].getField("_id").OID();
+    runBenchmark(BSON("_id" << id), BSON("_id" << 0 << "uniqueField" << 1), state);
+}
+
 /**
  * ASAN can't handle the # of threads the benchmark creates. With sanitizers, run this in a
  * diminished "correctness check" mode. See SERVER-73168.
@@ -99,9 +139,29 @@ static void configureBenchmarks(benchmark::internal::Benchmark* bm) {
     bm->ThreadRange(1, kMaxThreads)->Args({10, 1024});
 }
 
+static void configureProjectionBenchmarks(benchmark::internal::Benchmark* bm) {
+    // Varying document size allows us to measure the effect of covering the projection with an
+    // index.
+    bm->ThreadRange(1, kMaxThreads)->Args({10, 256 * 1024})->Args({10, 4096 * 1024});
+}
+
 BENCHMARK_REGISTER_F(PointQueryBenchmark, IdPointQuery)->Apply(configureBenchmarks);
 BENCHMARK_REGISTER_F(PointQueryBenchmark, UniqueFieldPointQuery)->Apply(configureBenchmarks);
 BENCHMARK_REGISTER_F(PointQueryBenchmark, NonUniqueFieldPointQuery)->Apply(configureBenchmarks);
 BENCHMARK_REGISTER_F(PointQueryBenchmark, ArrayFieldPointQuery)->Apply(configureBenchmarks);
+
+BENCHMARK_REGISTER_F(PointQueryBenchmark, UniqueFieldPointQueryWithCoveredProjection)
+    ->Apply(configureProjectionBenchmarks);
+BENCHMARK_REGISTER_F(PointQueryBenchmark, UniqueFieldPointQueryWithNotCoveredProjection)
+    ->Apply(configureProjectionBenchmarks);
+BENCHMARK_REGISTER_F(PointQueryBenchmark, NonUniqueFieldPointQueryWithCoveredProjection)
+    ->Apply(configureProjectionBenchmarks);
+BENCHMARK_REGISTER_F(PointQueryBenchmark, NonUniqueFieldPointQueryWithNotCoveredProjection)
+    ->Apply(configureProjectionBenchmarks);
+BENCHMARK_REGISTER_F(PointQueryBenchmark, IdPointQueryWithCoveredProjection)
+    ->Apply(configureProjectionBenchmarks);
+BENCHMARK_REGISTER_F(PointQueryBenchmark, IdPointQueryWithNotCoveredProjection)
+    ->Apply(configureProjectionBenchmarks);
+
 }  // namespace
 }  // namespace mongo
