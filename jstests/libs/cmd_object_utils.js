@@ -107,6 +107,9 @@ export function getExplainCommand(cmdObj, verbosity = "queryPlanner") {
         "autocommit",
         "startTransaction",
         "stmtId",
+        // Don't pass in the "$readPreference" to ensure that the explain command can be executed
+        // against any node in a cluster.
+        "$readPreference",
     ];
     for (const arg of explainIncompatibleGenericArgs) {
         delete genericArgs[arg];
