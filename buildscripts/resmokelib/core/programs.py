@@ -119,6 +119,9 @@ def mongod_program(
     if config.TLS_CA_FILE:
         mongod_options["tlsCAFile"] = config.TLS_CA_FILE
 
+    if config.EXTENSIONS:
+        mongod_options["extensions"] = config.EXTENSIONS
+
     if "port" not in mongod_options:
         mongod_options["port"] = network.PortAllocator.next_fixture_port(job_num)
 
@@ -193,6 +196,9 @@ def mongos_program(
 
     if config.TLS_CA_FILE:
         mongos_options["tlsCAFile"] = config.TLS_CA_FILE
+
+    if config.EXTENSIONS:
+        mongos_options["extensions"] = config.EXTENSIONS
 
     if "port" not in mongos_options:
         mongos_options["port"] = network.PortAllocator.next_fixture_port(job_num)

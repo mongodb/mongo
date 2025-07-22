@@ -1983,6 +1983,13 @@ class RunPlugin(PluginInterface):
             help="If set, uses embedded routers instead of dedicated mongos.",
         )
 
+        mongodb_server_options.add_argument(
+            "--extensions",
+            dest="extensions",
+            metavar="EXTENSION1,EXTENSION2",
+            help="Comma separated list of extensions to load into the server upon startup.",
+        )
+
         internal_options = parser.add_argument_group(
             title=_INTERNAL_OPTIONS_TITLE,
             description=(

@@ -176,6 +176,9 @@ def _validate_config(parser: argparse.ArgumentParser):
         if _config.SHELL_TLS_CERTIFICATE_KEY_FILE:
             parser.error("--shellTlsCertificateKeyFile requires --shellTls")
 
+    if not sys.platform.startswith("linux") and _config.EXTENSIONS:
+        parser.error("--extensions is only supported on Linux")
+        
     # Ranges through param specs and checks that they are valid parameter declarations.
     for param_type in config_fuzzer_params:
         _validate_params_spec(parser, config_fuzzer_params[param_type])
@@ -699,6 +702,9 @@ flags in common: {common_set}
     _config.LOG_LEVEL = config.pop("log_level")
     _config.SANITY_CHECK = config.pop("sanity_check")
     _config.PAUSE_AFTER_POPULATE = config.pop("pause_after_populate")
+    _config.EXTENSIONS = config.pop("extensions")
+    if _config.EXTENSIONS is not None:
+        _config.extensions = _config.EXTENSIONS.split(",")
 
     # Internal testing options.
     _config.INTERNAL_PARAMS = config.pop("internal_params")
