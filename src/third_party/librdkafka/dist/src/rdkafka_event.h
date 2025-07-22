@@ -1,7 +1,8 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2016 Magnus Edenhill
+ * Copyright (c) 2016-2022, Magnus Edenhill
+ *               2023, Confluent Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -98,10 +99,13 @@ static RD_UNUSED RD_INLINE int rd_kafka_event_setup(rd_kafka_t *rk,
         case RD_KAFKA_EVENT_DELETETOPICS_RESULT:
         case RD_KAFKA_EVENT_CREATEPARTITIONS_RESULT:
         case RD_KAFKA_EVENT_ALTERCONFIGS_RESULT:
+        case RD_KAFKA_EVENT_INCREMENTALALTERCONFIGS_RESULT:
         case RD_KAFKA_EVENT_DESCRIBECONFIGS_RESULT:
         case RD_KAFKA_EVENT_DELETERECORDS_RESULT:
         case RD_KAFKA_EVENT_LISTCONSUMERGROUPS_RESULT:
         case RD_KAFKA_EVENT_DESCRIBECONSUMERGROUPS_RESULT:
+        case RD_KAFKA_EVENT_DESCRIBETOPICS_RESULT:
+        case RD_KAFKA_EVENT_DESCRIBECLUSTER_RESULT:
         case RD_KAFKA_EVENT_DELETEGROUPS_RESULT:
         case RD_KAFKA_EVENT_DELETECONSUMERGROUPOFFSETS_RESULT:
         case RD_KAFKA_EVENT_CREATEACLS_RESULT:
@@ -110,6 +114,10 @@ static RD_UNUSED RD_INLINE int rd_kafka_event_setup(rd_kafka_t *rk,
         case RD_KAFKA_EVENT_ALTERCONSUMERGROUPOFFSETS_RESULT:
         case RD_KAFKA_EVENT_LISTCONSUMERGROUPOFFSETS_RESULT:
         case RD_KAFKA_EVENT_OAUTHBEARER_TOKEN_REFRESH:
+        case RD_KAFKA_EVENT_DESCRIBEUSERSCRAMCREDENTIALS_RESULT:
+        case RD_KAFKA_EVENT_ALTERUSERSCRAMCREDENTIALS_RESULT:
+        case RD_KAFKA_EVENT_LISTOFFSETS_RESULT:
+        case RD_KAFKA_EVENT_ELECTLEADERS_RESULT:
                 return 1;
 
         default:

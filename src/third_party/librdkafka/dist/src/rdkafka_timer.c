@@ -1,7 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2012-2013, Magnus Edenhill
+ * Copyright (c) 2012-2022, Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,6 +29,7 @@
 #include "rdkafka_int.h"
 #include "rd.h"
 #include "rdtime.h"
+#include "rdrand.h"
 #include "rdsysqueue.h"
 
 #include "rdkafka_queue.h"
@@ -198,15 +199,32 @@ void rd_kafka_timer_start0(rd_kafka_timers_t *rkts,
 
 /**
  * Delay the next timer invocation by '2 * rtmr->rtmr_interval'
+ * @param minimum_backoff the minimum backoff to be applied
+ * @param maximum_backoff the maximum backoff to be applied
+ * @param max_jitter the jitter percentage to be applied to the backoff
  */
 void rd_kafka_timer_exp_backoff(rd_kafka_timers_t *rkts,
-                                rd_kafka_timer_t *rtmr) {
+                                rd_kafka_timer_t *rtmr,
+                                rd_ts_t minimum_backoff,
+                                rd_ts_t maximum_backoff,
+                                int max_jitter) {
+        int64_t jitter;
         rd_kafka_timers_lock(rkts);
         if (rd_kafka_timer_scheduled(rtmr)) {
-                rtmr->rtmr_interval *= 2;
                 rd_kafka_timer_unschedule(rkts, rtmr);
         }
-        rd_kafka_timer_schedule(rkts, rtmr, 0);
+        rtmr->rtmr_interval *= 2;
+        jitter =
+            (rd_jitter(-max_jitter, max_jitter) * rtmr->rtmr_interval) / 100;
+        if (rtmr->rtmr_interval + jitter < minimum_backoff) {
+                rtmr->rtmr_interval = minimum_backoff;
+                jitter              = 0;
+        } else if ((maximum_backoff != -1) &&
+                   (rtmr->rtmr_interval + jitter) > maximum_backoff) {
+                rtmr->rtmr_interval = maximum_backoff;
+                jitter              = 0;
+        }
+        rd_kafka_timer_schedule(rkts, rtmr, jitter);
         rd_kafka_timers_unlock(rkts);
 }
 

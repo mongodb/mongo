@@ -95,16 +95,17 @@ static Rune canon(Rune c) {
 
 /* Scan */
 
-enum { L_CHAR = 256,
-       L_CCLASS,  /* character class */
-       L_NCCLASS, /* negative character class */
-       L_NC,      /* "(?:" no capture */
-       L_PLA,     /* "(?=" positive lookahead */
-       L_NLA,     /* "(?!" negative lookahead */
-       L_WORD,    /* "\b" word boundary */
-       L_NWORD,   /* "\B" non-word boundary */
-       L_REF,     /* "\1" back-reference */
-       L_COUNT    /* {M,N} */
+enum {
+        L_CHAR = 256,
+        L_CCLASS,  /* character class */
+        L_NCCLASS, /* negative character class */
+        L_NC,      /* "(?:" no capture */
+        L_PLA,     /* "(?=" positive lookahead */
+        L_NLA,     /* "(?!" negative lookahead */
+        L_WORD,    /* "\b" word boundary */
+        L_NWORD,   /* "\B" non-word boundary */
+        L_REF,     /* "\1" back-reference */
+        L_COUNT    /* {M,N} */
 };
 
 static int hex(Restate *g, int c) {
@@ -451,21 +452,23 @@ static int lex(Restate *g) {
 
 /* Parse */
 
-enum { P_CAT,
-       P_ALT,
-       P_REP,
-       P_BOL,
-       P_EOL,
-       P_WORD,
-       P_NWORD,
-       P_PAR,
-       P_PLA,
-       P_NLA,
-       P_ANY,
-       P_CHAR,
-       P_CCLASS,
-       P_NCCLASS,
-       P_REF };
+enum {
+        P_CAT,
+        P_ALT,
+        P_REP,
+        P_BOL,
+        P_EOL,
+        P_WORD,
+        P_NWORD,
+        P_PAR,
+        P_PLA,
+        P_NLA,
+        P_ANY,
+        P_CHAR,
+        P_CCLASS,
+        P_NCCLASS,
+        P_REF
+};
 
 struct Renode {
         unsigned char type;
@@ -662,23 +665,25 @@ static Renode *parsealt(Restate *g) {
 
 /* Compile */
 
-enum { I_END,
-       I_JUMP,
-       I_SPLIT,
-       I_PLA,
-       I_NLA,
-       I_ANYNL,
-       I_ANY,
-       I_CHAR,
-       I_CCLASS,
-       I_NCCLASS,
-       I_REF,
-       I_BOL,
-       I_EOL,
-       I_WORD,
-       I_NWORD,
-       I_LPAR,
-       I_RPAR };
+enum {
+        I_END,
+        I_JUMP,
+        I_SPLIT,
+        I_PLA,
+        I_NLA,
+        I_ANYNL,
+        I_ANY,
+        I_CHAR,
+        I_CCLASS,
+        I_NCCLASS,
+        I_REF,
+        I_BOL,
+        I_EOL,
+        I_WORD,
+        I_NWORD,
+        I_LPAR,
+        I_RPAR
+};
 
 struct Reinst {
         unsigned char opcode;

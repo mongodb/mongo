@@ -1,7 +1,8 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2018 Magnus Edenhill
+ * Copyright (c) 2018-2022, Magnus Edenhill
+ *               2023 Confluent Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,6 +31,7 @@
 #define _RDINTERVAL_H_
 
 #include "rd.h"
+#include "rdrand.h"
 
 typedef struct rd_interval_s {
         rd_ts_t ri_ts_last; /* last interval timestamp */
@@ -107,6 +109,22 @@ static RD_INLINE RD_UNUSED void rd_interval_reset_to_now(rd_interval_t *ri,
 
         ri->ri_ts_last = now;
         ri->ri_backoff = 0;
+}
+
+/**
+ * Reset the interval to 'now' with the given backoff ms and max_jitter as
+ * percentage. The backoff is given just for absolute jitter calculation. If now
+ * is 0, the time will be gathered automatically.
+ */
+static RD_INLINE RD_UNUSED void
+rd_interval_reset_to_now_with_jitter(rd_interval_t *ri,
+                                     rd_ts_t now,
+                                     int64_t backoff_ms,
+                                     int max_jitter) {
+        rd_interval_reset_to_now(ri, now);
+        /* We are multiplying by 10 as (backoff_ms * percent * 1000)/100 ->
+         * backoff_ms * jitter * 10 */
+        ri->ri_backoff = backoff_ms * rd_jitter(-max_jitter, max_jitter) * 10;
 }
 
 /**

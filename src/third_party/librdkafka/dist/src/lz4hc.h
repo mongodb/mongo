@@ -1,7 +1,7 @@
 /*
    KLZ4 HC - High Compression Mode of KLZ4
    Header File
-   Copyright (C) 2011-2017, Yann Collet.
+   Copyright (C) 2011-2020, Yann Collet.
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
@@ -198,14 +198,17 @@ KLZ4LIB_API int KLZ4_saveDictHC (KLZ4_streamHC_t* streamHCPtr, char* safeBuffer,
 #define KLZ4HC_HASH_MASK (KLZ4HC_HASHTABLESIZE - 1)
 
 
+/* Never ever use these definitions directly !
+ * Declare or allocate an KLZ4_streamHC_t instead.
+**/
 typedef struct KLZ4HC_CCtx_internal KLZ4HC_CCtx_internal;
 struct KLZ4HC_CCtx_internal
 {
     KLZ4_u32   hashTable[KLZ4HC_HASHTABLESIZE];
     KLZ4_u16   chainTable[KLZ4HC_MAXD];
     const KLZ4_byte* end;       /* next block here to continue on current prefix */
-    const KLZ4_byte* base;      /* All index relative to this position */
-    const KLZ4_byte* dictBase;  /* alternate base for extDict */
+    const KLZ4_byte* prefixStart;  /* Indexes relative to this position */
+    const KLZ4_byte* dictStart; /* alternate reference for extDict */
     KLZ4_u32   dictLimit;       /* below that point, need extDict */
     KLZ4_u32   lowLimit;        /* below that point, no more dict */
     KLZ4_u32   nextToUpdate;    /* index from which to continue dictionary update */
@@ -216,20 +219,15 @@ struct KLZ4HC_CCtx_internal
     const KLZ4HC_CCtx_internal* dictCtx;
 };
 
-
-/* Do not use these definitions directly !
- * Declare or allocate an KLZ4_streamHC_t instead.
- */
-#define KLZ4_STREAMHCSIZE       262200  /* static size, for inter-version compatibility */
-#define KLZ4_STREAMHCSIZE_VOIDP (KLZ4_STREAMHCSIZE / sizeof(void*))
+#define KLZ4_STREAMHC_MINSIZE  262200  /* static size, for inter-version compatibility */
 union KLZ4_streamHC_u {
-    void* table[KLZ4_STREAMHCSIZE_VOIDP];
+    char minStateSize[KLZ4_STREAMHC_MINSIZE];
     KLZ4HC_CCtx_internal internal_donotuse;
 }; /* previously typedef'd to KLZ4_streamHC_t */
 
 /* KLZ4_streamHC_t :
  * This structure allows static allocation of KLZ4 HC streaming state.
- * This can be used to allocate statically, on state, or as part of a larger structure.
+ * This can be used to allocate statically on stack, or as part of a larger structure.
  *
  * Such state **must** be initialized using KLZ4_initStreamHC() before first use.
  *
@@ -244,7 +242,7 @@ union KLZ4_streamHC_u {
  * Required before first use of a statically allocated KLZ4_streamHC_t.
  * Before v1.9.0 : use KLZ4_resetStreamHC() instead
  */
-KLZ4LIB_API KLZ4_streamHC_t* KLZ4_initStreamHC (void* buffer, size_t size);
+KLZ4LIB_API KLZ4_streamHC_t* KLZ4_initStreamHC(void* buffer, size_t size);
 
 
 /*-************************************
@@ -272,9 +270,11 @@ KLZ4_DEPRECATED("use KLZ4_compress_HC_continue() instead") KLZ4LIB_API int KLZ4_
  * KLZ4_slideInputBufferHC() will truncate the history of the stream, rather
  * than preserve a window-sized chunk of history.
  */
+#if !defined(KLZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
 KLZ4_DEPRECATED("use KLZ4_createStreamHC() instead") KLZ4LIB_API void* KLZ4_createHC (const char* inputBuffer);
-KLZ4_DEPRECATED("use KLZ4_saveDictHC() instead") KLZ4LIB_API     char* KLZ4_slideInputBufferHC (void* KLZ4HC_Data);
 KLZ4_DEPRECATED("use KLZ4_freeStreamHC() instead") KLZ4LIB_API   int   KLZ4_freeHC (void* KLZ4HC_Data);
+#endif
+KLZ4_DEPRECATED("use KLZ4_saveDictHC() instead") KLZ4LIB_API     char* KLZ4_slideInputBufferHC (void* KLZ4HC_Data);
 KLZ4_DEPRECATED("use KLZ4_compress_HC_continue() instead") KLZ4LIB_API int KLZ4_compressHC2_continue               (void* KLZ4HC_Data, const char* source, char* dest, int inputSize, int compressionLevel);
 KLZ4_DEPRECATED("use KLZ4_compress_HC_continue() instead") KLZ4LIB_API int KLZ4_compressHC2_limitedOutput_continue (void* KLZ4HC_Data, const char* source, char* dest, int inputSize, int maxOutputSize, int compressionLevel);
 KLZ4_DEPRECATED("use KLZ4_createStreamHC() instead") KLZ4LIB_API int   KLZ4_sizeofStreamStateHC(void);
@@ -305,7 +305,7 @@ KLZ4LIB_API void KLZ4_resetStreamHC (KLZ4_streamHC_t* streamHCPtr, int compressi
  * They should not be linked from DLL,
  * as there is no guarantee of API stability yet.
  * Prototypes will be promoted to "stable" status
- * after successfull usage in real-life scenarios.
+ * after successful usage in real-life scenarios.
  ***************************************************/
 #ifdef KLZ4_HC_STATIC_LINKING_ONLY   /* protection macro */
 #ifndef KLZ4_HC_SLO_098092834

@@ -1,7 +1,8 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2012-2015, Magnus Edenhill
+ * Copyright (c) 2012-2022, Magnus Edenhill
+ *               2023, Confluent Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -147,6 +148,7 @@ void *rd_list_add(rd_list_t *rl, void *elem) {
                 rl->rl_elems[rl->rl_cnt] = elem;
         return rl->rl_elems[rl->rl_cnt++];
 }
+
 
 void rd_list_set(rd_list_t *rl, int idx, void *ptr) {
         if (idx >= rl->rl_size)
@@ -374,6 +376,34 @@ void *rd_list_find_duplicate(const rd_list_t *rl,
         }
 
         return NULL;
+}
+
+void rd_list_deduplicate(rd_list_t **rl,
+                         int (*cmp)(const void *, const void *)) {
+        rd_list_t *deduped = rd_list_new(0, (*rl)->rl_free_cb);
+        void *elem;
+        void *prev_elem = NULL;
+        int i;
+
+        if (!((*rl)->rl_flags & RD_LIST_F_SORTED))
+                rd_list_sort(*rl, cmp);
+
+        RD_LIST_FOREACH(elem, *rl, i) {
+                if (prev_elem && cmp(elem, prev_elem) == 0) {
+                        /* Skip this element, and destroy it */
+                        rd_list_free_cb(*rl, elem);
+                        continue;
+                }
+                rd_list_add(deduped, elem);
+                prev_elem = elem;
+        }
+        /* The elements we want destroyed are already destroyed. */
+        (*rl)->rl_free_cb = NULL;
+        rd_list_destroy(*rl);
+
+        /* The parent list was sorted, we can set this without re-sorting. */
+        deduped->rl_flags |= RD_LIST_F_SORTED;
+        *rl = deduped;
 }
 
 int rd_list_cmp(const rd_list_t *a,

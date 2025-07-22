@@ -1,7 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2012-2013, Magnus Edenhill
+ * Copyright (c) 2012-2022, Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -85,7 +85,10 @@ void rd_kafka_timer_start0(rd_kafka_timers_t *rkts,
                               callback, arg)
 
 void rd_kafka_timer_exp_backoff(rd_kafka_timers_t *rkts,
-                                rd_kafka_timer_t *rtmr);
+                                rd_kafka_timer_t *rtmr,
+                                rd_ts_t minimum,
+                                rd_ts_t maximum,
+                                int maxjitter);
 rd_ts_t rd_kafka_timer_next(rd_kafka_timers_t *rkts,
                             rd_kafka_timer_t *rtmr,
                             int do_lock);

@@ -1,7 +1,8 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2017 Magnus Edenhill
+ * Copyright (c) 2017-2022, Magnus Edenhill
+ *               2023, Confluent Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -76,6 +77,21 @@ rd_kafka_msgset_parse(rd_kafka_buf_t *rkbuf,
                       rd_kafka_toppar_t *rktp,
                       rd_kafka_aborted_txns_t *aborted_txns,
                       const struct rd_kafka_toppar_ver *tver);
+
+#if WITH_ZLIB
+rd_kafka_resp_err_t rd_kafka_gzip_compress(rd_kafka_broker_t *rkb,
+                                           int comp_level,
+                                           rd_slice_t *slice,
+                                           void **outbuf,
+                                           size_t *outlenp);
+#endif
+
+#if WITH_SNAPPY
+rd_kafka_resp_err_t rd_kafka_snappy_compress_slice(rd_kafka_broker_t *rkb,
+                                                   rd_slice_t *slice,
+                                                   void **outbuf,
+                                                   size_t *outlenp);
+#endif
 
 int unittest_aborted_txns(void);
 

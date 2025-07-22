@@ -1,7 +1,8 @@
 /*
  * librdkafka - The Apache Kafka C/C++ library
  *
- * Copyright (c) 2016 Magnus Edenhill
+ * Copyright (c) 2016-2022, Magnus Edenhill
+ *               2023, Confluent Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -288,6 +289,21 @@ int rd_strcmp(const char *a, const char *b) {
                 return strcmp(a, b);
 }
 
+
+/**
+ * @brief Same as rd_strcmp() but works with rd_list comparator.
+ */
+int rd_strcmp2(const void *a, const void *b) {
+        return rd_strcmp((const char *)a, (const char *)b);
+}
+
+/**
+ * @brief Same as rd_strcmp() but works with bsearch, which requires one more
+ * indirection.
+ */
+int rd_strcmp3(const void *a, const void *b) {
+        return rd_strcmp(*((const char **)a), *((const char **)b));
+}
 
 
 /**

@@ -1,7 +1,7 @@
 /*
  *  KLZ4 - Fast LZ compression algorithm
  *  Header File
- *  Copyright (C) 2011-present, Yann Collet.
+ *  Copyright (C) 2011-2020, Yann Collet.
 
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
@@ -97,36 +97,77 @@ extern "C" {
 #  define KLZ4LIB_API KLZ4LIB_VISIBILITY
 #endif
 
+/*! KLZ4_FREESTANDING :
+ *  When this macro is set to 1, it enables "freestanding mode" that is
+ *  suitable for typical freestanding environment which doesn't support
+ *  standard C library.
+ *
+ *  - KLZ4_FREESTANDING is a compile-time switch.
+ *  - It requires the following macros to be defined:
+ *    KLZ4_memcpy, KLZ4_memmove, KLZ4_memset.
+ *  - It only enables KLZ4/HC functions which don't use heap.
+ *    All KLZ4F_* functions are not supported.
+ *  - See tests/freestanding.c to check its basic setup.
+ */
+#if defined(KLZ4_FREESTANDING) && (KLZ4_FREESTANDING == 1)
+#  define KLZ4_HEAPMODE 0
+#  define KLZ4HC_HEAPMODE 0
+#  define KLZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION 1
+#  if !defined(KLZ4_memcpy)
+#    error "KLZ4_FREESTANDING requires macro 'KLZ4_memcpy'."
+#  endif
+#  if !defined(KLZ4_memset)
+#    error "KLZ4_FREESTANDING requires macro 'KLZ4_memset'."
+#  endif
+#  if !defined(KLZ4_memmove)
+#    error "KLZ4_FREESTANDING requires macro 'KLZ4_memmove'."
+#  endif
+#elif ! defined(KLZ4_FREESTANDING)
+#  define KLZ4_FREESTANDING 0
+#endif
+
+
 /*------   Version   ------*/
 #define KLZ4_VERSION_MAJOR    1    /* for breaking interface changes  */
 #define KLZ4_VERSION_MINOR    9    /* for new (non-breaking) interface capabilities */
-#define KLZ4_VERSION_RELEASE  3    /* for tweaks, bug-fixes, or development */
+#define KLZ4_VERSION_RELEASE  4    /* for tweaks, bug-fixes, or development */
 
 #define KLZ4_VERSION_NUMBER (KLZ4_VERSION_MAJOR *100*100 + KLZ4_VERSION_MINOR *100 + KLZ4_VERSION_RELEASE)
 
 #define KLZ4_LIB_VERSION KLZ4_VERSION_MAJOR.KLZ4_VERSION_MINOR.KLZ4_VERSION_RELEASE
 #define KLZ4_QUOTE(str) #str
 #define KLZ4_EXPAND_AND_QUOTE(str) KLZ4_QUOTE(str)
-#define KLZ4_VERSION_STRING KLZ4_EXPAND_AND_QUOTE(KLZ4_LIB_VERSION)
+#define KLZ4_VERSION_STRING KLZ4_EXPAND_AND_QUOTE(KLZ4_LIB_VERSION)  /* requires v1.7.3+ */
 
-KLZ4LIB_API int KLZ4_versionNumber (void);  /**< library version number; useful to check dll version */
-KLZ4LIB_API const char* KLZ4_versionString (void);   /**< library version string; useful to check dll version */
+KLZ4LIB_API int KLZ4_versionNumber (void);  /**< library version number; useful to check dll version; requires v1.3.0+ */
+KLZ4LIB_API const char* KLZ4_versionString (void);   /**< library version string; useful to check dll version; requires v1.7.5+ */
 
 
 /*-************************************
 *  Tuning parameter
 **************************************/
+#define KLZ4_MEMORY_USAGE_MIN 10
+#define KLZ4_MEMORY_USAGE_DEFAULT 14
+#define KLZ4_MEMORY_USAGE_MAX 20
+
 /*!
  * KLZ4_MEMORY_USAGE :
- * Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; etc.)
- * Increasing memory usage improves compression ratio.
- * Reduced memory usage may improve speed, thanks to better cache locality.
+ * Memory usage formula : N->2^N Bytes (examples : 10 -> 1KB; 12 -> 4KB ; 16 -> 64KB; 20 -> 1MB; )
+ * Increasing memory usage improves compression ratio, at the cost of speed.
+ * Reduced memory usage may improve speed at the cost of ratio, thanks to better cache locality.
  * Default value is 14, for 16KB, which nicely fits into Intel x86 L1 cache
  */
 #ifndef KLZ4_MEMORY_USAGE
-# define KLZ4_MEMORY_USAGE 14
+# define KLZ4_MEMORY_USAGE KLZ4_MEMORY_USAGE_DEFAULT
 #endif
 
+#if (KLZ4_MEMORY_USAGE < KLZ4_MEMORY_USAGE_MIN)
+#  error "KLZ4_MEMORY_USAGE is too small !"
+#endif
+
+#if (KLZ4_MEMORY_USAGE > KLZ4_MEMORY_USAGE_MAX)
+#  error "KLZ4_MEMORY_USAGE is too large !"
+#endif
 
 /*-************************************
 *  Simple Functions
@@ -270,8 +311,25 @@ KLZ4LIB_API int KLZ4_decompress_safe_partial (const char* src, char* dst, int sr
 ***********************************************/
 typedef union KLZ4_stream_u KLZ4_stream_t;  /* incomplete type (defined later) */
 
+/**
+ Note about RC_INVOKED
+
+ - RC_INVOKED is predefined symbol of rc.exe (the resource compiler which is part of MSVC/Visual Studio).
+   https://docs.microsoft.com/en-us/windows/win32/menurc/predefined-macros
+
+ - Since rc.exe is a legacy compiler, it truncates long symbol (> 30 chars)
+   and reports warning "RC4011: identifier truncated".
+
+ - To eliminate the warning, we surround long preprocessor symbol with
+   "#if !defined(RC_INVOKED) ... #endif" block that means
+   "skip this block when rc.exe is trying to read it".
+*/
+#if !defined(RC_INVOKED) /* https://docs.microsoft.com/en-us/windows/win32/menurc/predefined-macros */
+#if !defined(KLZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
 KLZ4LIB_API KLZ4_stream_t* KLZ4_createStream(void);
 KLZ4LIB_API int           KLZ4_freeStream (KLZ4_stream_t* streamPtr);
+#endif /* !defined(KLZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION) */
+#endif
 
 /*! KLZ4_resetStream_fast() : v1.9.0+
  *  Use this to prepare an KLZ4_stream_t for a new chain of dependent blocks
@@ -355,8 +413,12 @@ typedef union KLZ4_streamDecode_u KLZ4_streamDecode_t;   /* tracking context */
  *  creation / destruction of streaming decompression tracking context.
  *  A tracking context can be re-used multiple times.
  */
+#if !defined(RC_INVOKED) /* https://docs.microsoft.com/en-us/windows/win32/menurc/predefined-macros */
+#if !defined(KLZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION)
 KLZ4LIB_API KLZ4_streamDecode_t* KLZ4_createStreamDecode(void);
 KLZ4LIB_API int                 KLZ4_freeStreamDecode (KLZ4_streamDecode_t* KLZ4_stream);
+#endif /* !defined(KLZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION) */
+#endif
 
 /*! KLZ4_setStreamDecode() :
  *  An KLZ4_streamDecode_t context can be allocated once and re-used multiple times.
@@ -406,7 +468,10 @@ KLZ4LIB_API int KLZ4_decoderRingBufferSize(int maxBlockSize);
  *  save the last 64KB of decoded data into a safe buffer where it can't be modified during decompression,
  *  then indicate where this data is saved using KLZ4_setStreamDecode(), before decompressing next block.
 */
-KLZ4LIB_API int KLZ4_decompress_safe_continue (KLZ4_streamDecode_t* KLZ4_streamDecode, const char* src, char* dst, int srcSize, int dstCapacity);
+KLZ4LIB_API int
+KLZ4_decompress_safe_continue (KLZ4_streamDecode_t* KLZ4_streamDecode,
+                        const char* src, char* dst,
+                        int srcSize, int dstCapacity);
 
 
 /*! KLZ4_decompress_*_usingDict() :
@@ -417,7 +482,16 @@ KLZ4LIB_API int KLZ4_decompress_safe_continue (KLZ4_streamDecode_t* KLZ4_streamD
  *  Performance tip : Decompression speed can be substantially increased
  *                    when dst == dictStart + dictSize.
  */
-KLZ4LIB_API int KLZ4_decompress_safe_usingDict (const char* src, char* dst, int srcSize, int dstCapcity, const char* dictStart, int dictSize);
+KLZ4LIB_API int
+KLZ4_decompress_safe_usingDict(const char* src, char* dst,
+                              int srcSize, int dstCapacity,
+                              const char* dictStart, int dictSize);
+
+KLZ4LIB_API int
+KLZ4_decompress_safe_partial_usingDict(const char* src, char* dst,
+                                      int compressedSize,
+                                      int targetOutputSize, int maxOutputSize,
+                                      const char* dictStart, int dictSize);
 
 #endif /* KLZ4_H_2983827168210 */
 
@@ -496,13 +570,15 @@ KLZ4LIB_STATIC_API int KLZ4_compress_fast_extState_fastReset (void* state, const
  *  stream (and source buffer) must remain in-place / accessible / unchanged
  *  through the completion of the first compression call on the stream.
  */
-KLZ4LIB_STATIC_API void KLZ4_attach_dictionary(KLZ4_stream_t* workingStream, const KLZ4_stream_t* dictionaryStream);
+KLZ4LIB_STATIC_API void
+KLZ4_attach_dictionary(KLZ4_stream_t* workingStream,
+                const KLZ4_stream_t* dictionaryStream);
 
 
 /*! In-place compression and decompression
  *
  * It's possible to have input and output sharing the same buffer,
- * for highly contrained memory environments.
+ * for highly constrained memory environments.
  * In both cases, it requires input to lay at the end of the buffer,
  * and decompression to start at beginning of the buffer.
  * Buffer size must feature some margin, hence be larger than final size.
@@ -592,38 +668,26 @@ KLZ4LIB_STATIC_API void KLZ4_attach_dictionary(KLZ4_stream_t* workingStream, con
   typedef unsigned int   KLZ4_u32;
 #endif
 
+/*! KLZ4_stream_t :
+ *  Never ever use below internal definitions directly !
+ *  These definitions are not API/ABI safe, and may change in future versions.
+ *  If you need static allocation, declare or allocate an KLZ4_stream_t object.
+**/
+
 typedef struct KLZ4_stream_t_internal KLZ4_stream_t_internal;
 struct KLZ4_stream_t_internal {
     KLZ4_u32 hashTable[KLZ4_HASH_SIZE_U32];
-    KLZ4_u32 currentOffset;
-    KLZ4_u32 tableType;
     const KLZ4_byte* dictionary;
     const KLZ4_stream_t_internal* dictCtx;
+    KLZ4_u32 currentOffset;
+    KLZ4_u32 tableType;
     KLZ4_u32 dictSize;
+    /* Implicit padding to ensure structure is aligned */
 };
 
-typedef struct {
-    const KLZ4_byte* externalDict;
-    size_t extDictSize;
-    const KLZ4_byte* prefixEnd;
-    size_t prefixSize;
-} KLZ4_streamDecode_t_internal;
-
-
-/*! KLZ4_stream_t :
- *  Do not use below internal definitions directly !
- *  Declare or allocate an KLZ4_stream_t instead.
- *  KLZ4_stream_t can also be created using KLZ4_createStream(), which is recommended.
- *  The structure definition can be convenient for static allocation
- *  (on stack, or as part of larger structure).
- *  Init this structure with KLZ4_initStream() before first use.
- *  note : only use this definition in association with static linking !
- *  this definition is not API/ABI safe, and may change in future versions.
- */
-#define KLZ4_STREAMSIZE       16416  /* static size, for inter-version compatibility */
-#define KLZ4_STREAMSIZE_VOIDP (KLZ4_STREAMSIZE / sizeof(void*))
+#define KLZ4_STREAM_MINSIZE  ((1UL << KLZ4_MEMORY_USAGE) + 32)  /* static size, for inter-version compatibility */
 union KLZ4_stream_u {
-    void* table[KLZ4_STREAMSIZE_VOIDP];
+    char minStateSize[KLZ4_STREAM_MINSIZE];
     KLZ4_stream_t_internal internal_donotuse;
 }; /* previously typedef'd to KLZ4_stream_t */
 
@@ -641,21 +705,25 @@ union KLZ4_stream_u {
  *         In which case, the function will @return NULL.
  *  Note2: An KLZ4_stream_t structure guarantees correct alignment and size.
  *  Note3: Before v1.9.0, use KLZ4_resetStream() instead
- */
+**/
 KLZ4LIB_API KLZ4_stream_t* KLZ4_initStream (void* buffer, size_t size);
 
 
 /*! KLZ4_streamDecode_t :
- *  information structure to track an KLZ4 stream during decompression.
- *  init this structure  using KLZ4_setStreamDecode() before first use.
- *  note : only use in association with static linking !
- *         this definition is not API/ABI safe,
- *         and may change in a future version !
- */
-#define KLZ4_STREAMDECODESIZE_U64 (4 + ((sizeof(void*)==16) ? 2 : 0) /*AS-400*/ )
-#define KLZ4_STREAMDECODESIZE     (KLZ4_STREAMDECODESIZE_U64 * sizeof(unsigned long long))
+ *  Never ever use below internal definitions directly !
+ *  These definitions are not API/ABI safe, and may change in future versions.
+ *  If you need static allocation, declare or allocate an KLZ4_streamDecode_t object.
+**/
+typedef struct {
+    const KLZ4_byte* externalDict;
+    const KLZ4_byte* prefixEnd;
+    size_t extDictSize;
+    size_t prefixSize;
+} KLZ4_streamDecode_t_internal;
+
+#define KLZ4_STREAMDECODE_MINSIZE 32
 union KLZ4_streamDecode_u {
-    unsigned long long table[KLZ4_STREAMDECODESIZE_U64];
+    char minStateSize[KLZ4_STREAMDECODE_MINSIZE];
     KLZ4_streamDecode_t_internal internal_donotuse;
 } ;   /* previously typedef'd to KLZ4_streamDecode_t */
 
