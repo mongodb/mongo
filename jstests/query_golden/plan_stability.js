@@ -1,6 +1,6 @@
 /**
  * Tests that the plans remain stable across releases by comparing the expected plans against the
- * current ones.
+ * current ones. A product of SPM-3816. See README.plan_stability.md for more information.
  *
  * @tags: [
  * incompatible_aubsan,
@@ -44,6 +44,8 @@ const collName = "plan_stability";
  *    rather than simple "off-by-one" counter increments/decrements.
  */
 const collSize = 100_000;
+
+jsTestLog("See README.plan_stability.md for more information.");
 
 populateSimplePlanStabilityDataset(collName, collSize);
 
@@ -148,3 +150,5 @@ for (const param in parameters) {
 }
 
 print(`">>>parameters": ${JSON.stringify(parameters)}}`);
+
+jsTestLog("See README.plan_stability.md for more information.");

@@ -1,6 +1,12 @@
 
 
 [jsTest] ----
+[jsTest] See README.plan_stability.md for more information.
+[jsTest] ----
+
+
+
+[jsTest] ----
 [jsTest] Generating 100000 values with Zipfian distribution
 [jsTest] ----
 
@@ -8448,3 +8454,9 @@
 ],
 ">>>totals": {"plans":  10502, "keys": 127854229, "docs": 61496402, "sorts": 69333836, "rows": 38209791, "errors":      0},
 ">>>parameters": {"planRankerMode":"multiPlanning","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"random"}}
+
+
+[jsTest] ----
+[jsTest] See README.plan_stability.md for more information.
+[jsTest] ----
+
