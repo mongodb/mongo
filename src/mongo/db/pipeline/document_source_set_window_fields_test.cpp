@@ -330,7 +330,6 @@ TEST_F(DocumentSourceSetWindowFieldsTest, OptimizationRemovesRedundantSortStage)
         DocumentSourceInternalSetWindowFields::createFromBson(swfSpec.firstElement(), getExpCtx());
     auto sortSpec = fromjson(R"({$sort: {y: 1}})");
     auto sortStage = DocumentSourceSort::createFromBson(sortSpec.firstElement(), getExpCtx());
-    exec::agg::buildStage(swfStage)->setSource(exec::agg::buildStage(sortStage.get()).get());
     auto prevSortStage = DocumentSourceSort::createFromBson(sortSpec.firstElement(), getExpCtx());
     DocumentSourceContainer pipeline = {prevSortStage, swfStage, sortStage};
 

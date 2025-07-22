@@ -80,24 +80,6 @@ SkipThenLimit LimitThenSkip::flip() const {
     return {_skip, boost::none};
 }
 
-namespace {
-
-DocumentSourceContainer::iterator eraseAndStich(DocumentSourceContainer::iterator itr,
-                                                DocumentSourceContainer* container) {
-    itr = container->erase(itr);
-    // If the removed stage wasn't the last in the pipeline, make sure that the stage followed the
-    // erased stage has a valid pointer to the previous document source.
-    if (itr != container->end()) {
-        auto source = itr != container->begin()
-            ? dynamic_cast<exec::agg::Stage*>(std::prev(itr)->get())
-            : nullptr;
-        dynamic_cast<exec::agg::Stage*>(itr->get())->setSource(source);
-    }
-    return itr;
-}
-
-}  // namespace
-
 /**
  * If there are any $limit stages that could be logically swapped forward to the position of the
  * pipeline pointed to by 'itr' without changing the meaning of the query, removes these $limit
@@ -134,7 +116,7 @@ boost::optional<long long> extractLimitForPushdownHelper(DocumentSourceContainer
             }
 
             if (shouldModifyPipeline) {
-                itr = eraseAndStich(itr, container);
+                itr = container->erase(itr);
             } else {
                 ++itr;
             }
@@ -172,7 +154,7 @@ boost::optional<long long> extractSkipForPushdown(DocumentSourceContainer::itera
         // stages one after another, only total sum of skipped documents matters.
         if (nextSkip && !overflow::add(skipSum.get_value_or(0), nextSkip->getSkip(), &safeSum)) {
             skipSum = safeSum;
-            itr = eraseAndStich(itr, container);
+            itr = container->erase(itr);
         } else if (!nextSkip && !nextStage->constraints().canSwapWithSkippingOrLimitingStage) {
             break;
         } else {

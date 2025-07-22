@@ -223,7 +223,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseCommon(
     constexpr bool alreadyOptimized = false;
     pipeline->validateCommon(alreadyOptimized);
 
-    pipeline->stitch();
     return pipeline;
 }
 
@@ -264,7 +263,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::create(
 
     constexpr bool alreadyOptimized = false;
     pipeline->validateCommon(alreadyOptimized);
-    pipeline->stitch();
     return pipeline;
 }
 
@@ -375,8 +373,6 @@ void Pipeline::optimizeContainer(DocumentSourceContainer* container) {
         ex.addContext("Failed to optimize pipeline");
         throw;
     }
-
-    stitch(container);
 }
 
 void Pipeline::optimizeEachStage(DocumentSourceContainer* container) {
@@ -393,8 +389,6 @@ void Pipeline::optimizeEachStage(DocumentSourceContainer* container) {
         ex.addContext("Failed to optimize pipeline");
         throw;
     }
-
-    stitch(container);
 }
 
 bool Pipeline::aggHasWriteStage(const BSONObj& cmd) {
@@ -575,29 +569,6 @@ std::vector<BSONObj> Pipeline::serializeToBson(
     return asBson;
 }
 
-void Pipeline::stitch() {
-    stitch(&_sources);
-}
-
-void Pipeline::stitch(DocumentSourceContainer* container) {
-    if (container->empty()) {
-        return;
-    }
-
-    // Chain together all the stages.
-    // TODO SERVER-105683: Temporary cast to Stage until method is moved to agg::Pipeline.
-    auto prevSource = dynamic_cast<exec::agg::Stage*>(container->front().get());
-    prevSource->setSource(nullptr);
-    for (DocumentSourceContainer::iterator iter(++container->begin()), listEnd(container->end());
-         iter != listEnd;
-         ++iter) {
-        intrusive_ptr<DocumentSource> pTemp(*iter);
-        auto stage = dynamic_cast<exec::agg::Stage*>(pTemp.get());
-        stage->setSource(prevSource);
-        prevSource = stage;
-    }
-}
-
 std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) const {
     std::vector<Value> array;
     for (auto&& stage : _sources) {
@@ -613,10 +584,6 @@ void Pipeline::addInitialSource(intrusive_ptr<DocumentSource> source) {
     tassert(10706502,
             "unexpected attempt to modify a frozen pipeline in 'Pipeline::addInitialSource()'",
             !_frozen);
-    if (!_sources.empty()) {
-        auto& initialStage = dynamic_cast<exec::agg::Stage&>(*_sources.front());
-        initialStage.setSource(dynamic_cast<exec::agg::Stage*>(source.get()));
-    }
     _sources.push_front(source);
 }
 
@@ -624,10 +591,6 @@ void Pipeline::addFinalSource(intrusive_ptr<DocumentSource> source) {
     tassert(10706503,
             "unexpected attempt to modify a frozen pipeline in 'Pipeline::addFinalSource()'",
             !_frozen);
-    if (!_sources.empty()) {
-        auto& finalStage = dynamic_cast<exec::agg::Stage&>(*source.get());
-        finalStage.setSource(dynamic_cast<exec::agg::Stage*>(_sources.back().get()));
-    }
     _sources.push_back(source);
 }
 
@@ -639,14 +602,9 @@ void Pipeline::addSourceAtPosition(boost::intrusive_ptr<DocumentSource> source, 
             "unexpected attempt to modify a frozen pipeline in 'Pipeline::addSourceAtPosition()'",
             !_frozen);
 
-    const bool originallyEmpty = _sources.empty();
     auto sourceIter = _sources.begin();
     std::advance(sourceIter, index);
     _sources.insert(sourceIter, source);
-
-    if (!originallyEmpty) {
-        stitch();
-    }
 }
 
 void Pipeline::addVariableRefs(std::set<Variables::Id>* refs) const {
@@ -827,10 +785,6 @@ void Pipeline::pushBack(boost::intrusive_ptr<DocumentSource> newStage) {
     tassert(10706504,
             "unexpected attempt to modify a frozen pipeline in 'Pipeline::pushBack()'",
             !_frozen);
-    if (!_sources.empty()) {
-        auto& stage = dynamic_cast<exec::agg::Stage&>(*newStage);
-        stage.setSource(dynamic_cast<exec::agg::Stage*>(_sources.back().get()));
-    }
     _sources.push_back(std::move(newStage));
 }
 
@@ -855,7 +809,6 @@ boost::intrusive_ptr<DocumentSource> Pipeline::popFront() {
     }
     auto targetStage = std::move(_sources.front());
     _sources.pop_front();
-    stitch();
     return targetStage;
 }
 
@@ -898,7 +851,6 @@ void Pipeline::appendPipeline(std::unique_ptr<Pipeline, PipelineDeleter> otherPi
     }
     constexpr bool alreadyOptimized = false;
     validateCommon(alreadyOptimized);
-    stitch();
 }
 
 

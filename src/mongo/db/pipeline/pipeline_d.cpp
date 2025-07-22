@@ -2099,7 +2099,6 @@ void PipelineD::performBoundedSortOptimization(PlanStage* rootStage,
                             DocumentSourceSort::kStageName.data(),
                             DocumentSourceSort::kStageName.length()) == 0);
             pipeline->_sources.erase(iter);
-            pipeline->stitch();
         }
     }
 }

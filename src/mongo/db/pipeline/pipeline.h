@@ -453,13 +453,6 @@ public:
     }
 
     /**
-     * Stitch together the source pointers by calling setSource() for each source in 'container'.
-     * This function must be called any time the order of stages within the container changes, e.g.
-     * in optimizeContainer().
-     */
-    static void stitch(DocumentSourceContainer* container);
-
-    /**
      * Removes and returns the first stage of the pipeline. Returns nullptr if the pipeline is
      * empty.
      */
@@ -574,12 +567,6 @@ private:
         bool isFacetPipeline,
         std::function<BSONObj(T)> getElemFunc);
 
-    /**
-     * Stitch together the source pointers by calling setSource() for each source in '_sources'.
-     * This function must be called any time the order of stages within the pipeline changes, e.g.
-     * in optimizePipeline().
-     */
-    void stitch();
 
     DocumentSourceContainer _sources;
 

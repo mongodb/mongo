@@ -70,14 +70,12 @@ void desugarSearchPipeline(Pipeline* pipeline) {
     if (searchStage) {
         auto desugaredPipeline = dynamic_cast<DocumentSourceSearch*>(searchStage.get())->desugar();
         sources.insert(sources.begin(), desugaredPipeline.begin(), desugaredPipeline.end());
-        Pipeline::stitch(&sources);
     }
     auto vectorSearchStage = pipeline->popFrontWithName(DocumentSourceVectorSearch::kStageName);
     if (vectorSearchStage) {
         auto desugaredPipeline =
             dynamic_cast<DocumentSourceVectorSearch*>(vectorSearchStage.get())->desugar();
         sources.insert(sources.begin(), desugaredPipeline.begin(), desugaredPipeline.end());
-        Pipeline::stitch(&sources);
     }
 }
 
