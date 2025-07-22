@@ -40,6 +40,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sort_executor.h"
 #include "mongo/db/index/sort_key_generator.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
@@ -273,6 +274,10 @@ public:
         return isBoundedSortStage() ? &_timeSorterStats : &_sortExecutor->stats();
     }
 
+    const SimpleMemoryUsageTracker* getMemoryTracker_forTest() const {
+        return &_memoryTracker;
+    }
+
 protected:
     GetNextResult doGetNext() final;
     /**
@@ -377,6 +382,8 @@ private:
     SortStats _timeSorterStats;
 
     QueryMetadataBitSet _requiredMetadata;
+
+    SimpleMemoryUsageTracker _memoryTracker;
 };
 
 }  // namespace mongo

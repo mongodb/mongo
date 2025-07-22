@@ -1,8 +1,8 @@
 /**
  * Tests that, when the memory tracking feature flag is enabled, memory tracking statistics are
  * reported to the slow query log, system.profile, and explain("executionStats") for aggregations
- * with $sort with SBE enabled. Due to requires_profiling, this test should not run with sharded
- * clusters.
+ * with $sort with both classic engine and SBE enabled. Due to requires_profiling, this test should
+ * not run with sharded clusters.
  *
  * @tags: [
  * requires_profiling,
@@ -27,10 +27,6 @@ const kOriginalInternalQueryFrameworkControl =
     assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}))
         .internalQueryFrameworkControl;
 
-// TODO SERVER-104599 Modify test to support classic engine as well.
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
-
 const bigStr = Array(1025).toString();  // 1KB of ','
 const lowMaxMemoryLimit = 5000;
 const nDocs = 50;
@@ -41,69 +37,90 @@ for (let i = 1; i <= nDocs; i++) {
 }
 assert.commandWorked(bulk.execute());
 
-// We are testing SBE sort here, so the stage appears in explain output without the dollar sign.
-const stageName = "sort";
-const pipeline = [{$sort: {_id: 1, b: -1}}];
-const pipelineWithLimit = [{$sort: {_id: 1, b: -1}}, {$limit: nDocs / 10}];
-{
-    runMemoryStatsTest({
-        db: db,
-        collName: collName,
-        commandObj: {
-            aggregate: collName,
-            pipeline: pipeline,
-            cursor: {batchSize: 10},
-            comment: "memory stats sort test",
-            allowDiskUse: false
-        },
-        stageName,
-        expectedNumGetMores: 5,
-    });
+for (const engine of ["trySbeEngine", "forceClassicEngine"]) {
+    jsTestLog(`Testing memory tracking with engine: ${engine}`);
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: engine}));
+
+    let pipeline, pipelineWithLimit, stageName;
+    if (engine === "forceClassicEngine") {
+        pipeline = [
+            {$_internalInhibitOptimization: {}},
+            {$sort: {_id: 1, b: -1}}
+        ];  // $_internalInhibitOptimization will prevent $sort pushdown to find, allowing to test
+            // DocumentSourceSort.
+        pipelineWithLimit =
+            [{$_internalInhibitOptimization: {}}, {$sort: {_id: 1, b: -1}}, {$limit: nDocs / 10}];
+        stageName = "$sort";
+    } else {
+        pipeline = [{$_internalInhibitOptimization: {}}, {$sort: {_id: 1, b: -1}}];
+        pipelineWithLimit =
+            [{$_internalInhibitOptimization: {}}, {$sort: {_id: 1, b: -1}}, {$limit: nDocs / 10}];
+        // We are testing SBE sort here, so the stage appears in explain output without the dollar
+        // sign.
+        stageName = "sort";
+    }
+
+    {
+        runMemoryStatsTest({
+            db: db,
+            collName: collName,
+            commandObj: {
+                aggregate: collName,
+                pipeline: pipeline,
+                cursor: {batchSize: 10},
+                comment: "memory stats sort test",
+                allowDiskUse: false
+            },
+            stageName: stageName,
+            expectedNumGetMores: 5,
+        });
+    }
+
+    {
+        runMemoryStatsTest({
+            db: db,
+            collName: collName,
+            commandObj: {
+                aggregate: collName,
+                pipeline: pipelineWithLimit,
+                cursor: {batchSize: 1},
+                comment: "memory stats sort limit test",
+                allowDiskUse: false
+            },
+            stageName: stageName,
+            expectedNumGetMores: 5,
+        });
+    }
+
+    {
+        // Set maxMemory low to force spill to disk.
+        const originalMemoryLimit = assert.commandWorked(db.adminCommand(
+            {setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: lowMaxMemoryLimit}));
+        runMemoryStatsTest({
+            db: db,
+            collName: collName,
+            commandObj: {
+                aggregate: collName,
+                pipeline: pipeline,
+                cursor: {batchSize: 10},
+                comment: "memory stats sort spilling test",
+                allowDiskUse: true
+            },
+            stageName: stageName,
+            expectedNumGetMores: 5,
+            // Since we spill to disk when adding to the sorter, we don't expect to see
+            // inUseMemBytes populated as it should be 0 on each operation.
+            skipInUseMemBytesCheck: true,
+        });
+
+        // Set maxMemory to back to the original value.
+        assert.commandWorked(db.adminCommand({
+            setParameter: 1,
+            internalQueryMaxBlockingSortMemoryUsageBytes: originalMemoryLimit.was
+        }));
+    }
 }
 
-{
-    runMemoryStatsTest({
-        db: db,
-        collName: collName,
-        commandObj: {
-            aggregate: collName,
-            pipeline: pipelineWithLimit,
-            cursor: {batchSize: 1},
-            comment: "memory stats sort limit test",
-            allowDiskUse: false
-        },
-        stageName,
-        expectedNumGetMores: 5,
-    });
-}
-
-{
-    // Set maxMemory low to force spill to disk.
-    const originalMemoryLimit = assert.commandWorked(db.adminCommand(
-        {setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: lowMaxMemoryLimit}));
-    runMemoryStatsTest({
-        db: db,
-        collName: collName,
-        commandObj: {
-            aggregate: collName,
-            pipeline: pipeline,
-            cursor: {batchSize: 10},
-            comment: "memory stats sort spilling test",
-            allowDiskUse: true
-        },
-        stageName,
-        expectedNumGetMores: 5,
-        // Since we spill to disk when adding to the sorter, we don't expect to see inUseMemBytes
-        // populated as it should be 0 on each operation.
-        skipInUseMemBytesCheck: true,
-    });
-
-    // Set maxMemory to back to the original value.
-    assert.commandWorked(db.adminCommand(
-        {setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: originalMemoryLimit.was}));
-}
-
-//  Clean up.
-db[collName].drop();
+// Clean up.
 assert.commandWorked(db.adminCommand(
     {setParameter: 1, internalQueryFrameworkControl: kOriginalInternalQueryFrameworkControl}));
