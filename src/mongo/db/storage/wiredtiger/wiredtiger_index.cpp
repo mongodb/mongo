@@ -200,6 +200,9 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
     // WARNING: No user-specified config can appear below this line. These options are required
     // for correct behavior of the server.
 
+    // Check if the ident is already in use rather than silently reusing an existing file
+    ss << ",exclusive=true";
+
     // Indexes need to store the metadata for collation to work as expected.
     ss << ",key_format=u";
     ss << ",value_format=u";

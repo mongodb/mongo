@@ -177,8 +177,10 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
     spec.appendElementsUnique(options);
 
     BSONObj indexInfo;
+    boost::optional<BSONObj> o2;
     if (feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabledAndIgnoreFCVUnsafe()) {
         indexInfo = BSON("createIndexes" << nss.coll() << "spec" << spec.obj());
+        o2 = BSON("ident" << ident::generateNewIndexIdent(nss.dbName(), false, false));
     } else {
         BSONObjBuilder builder;
         builder.append("createIndexes", nss.coll());
@@ -190,7 +192,7 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
                           OpTypeEnum::kCommand,
                           nss.getCommandNS(),
                           indexInfo,
-                          boost::none /* object2 */,
+                          o2,
                           {} /* sessionInfo */,
                           Date_t() /* wallClockTime*/,
                           {} /* stmtIds */,
@@ -202,13 +204,14 @@ OplogEntry makeStartIndexBuildOplogEntry(OpTime opTime,
                                          const std::string& indexName,
                                          const BSONObj& keyPattern,
                                          const UUID& uuid,
-                                         const UUID& indexBuildUUID) {
+                                         const UUID& indexBuildUUID,
+                                         StringData ident) {
     BSONObjBuilder oplogEntryBuilder;
     oplogEntryBuilder.append("startIndexBuild", nss.coll());
     populateTwoPhaseIndexBuildOplogEntry(oplogEntryBuilder, indexBuildUUID, keyPattern, indexName);
 
     return makeCommandOplogEntry(
-        opTime, nss, oplogEntryBuilder.obj(), boost::none /* object2 */, uuid);
+        opTime, nss, oplogEntryBuilder.obj(), BSON("idents" << BSON_ARRAY(ident)), uuid);
 }
 
 OplogEntry makeCommitIndexBuildOplogEntry(OpTime opTime,

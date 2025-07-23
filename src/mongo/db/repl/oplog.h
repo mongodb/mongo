@@ -308,6 +308,7 @@ void signalOplogWaiters();
  */
 void createIndexForApplyOps(OperationContext* opCtx,
                             const BSONObj& indexSpec,
+                            const boost::optional<BSONObj>& indexMetadata,
                             const NamespaceString& indexNss,
                             OplogApplication::Mode mode);
 

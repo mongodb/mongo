@@ -1587,6 +1587,14 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
         auto ii = _indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kAll);
         while (ii->more()) {
             auto entry = ii->next();
+            if (entry->getIdent() == ident) {
+                return Status(
+                    ErrorCodes::ObjectAlreadyExists,
+                    fmt::format(
+                        "Attempting to create index '{}' with ident '{}' that is already in use",
+                        spec->indexName(),
+                        ident));
+            }
             indexIdents.append(entry->descriptor()->indexName(), entry->getIdent());
         }
 

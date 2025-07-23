@@ -230,20 +230,33 @@ Status createIndex(OperationContext* opCtx,
                    const CollectionOptions& collectionOptions,
                    const IndexConfig& indexConfig,
                    StringData ident) {
-    auto engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto kvEngine = storageEngine->getEngine();
     invariant(collectionOptions.uuid);
-    Status status =
-        engine->createSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx),
-                                          nss,
-                                          *collectionOptions.uuid,
-                                          ident,
-                                          indexConfig,
-                                          collectionOptions.indexOptionDefaults.getStorageEngine());
+
+    // If a previous attempt at creating this index was rolled back, the ident may still be drop
+    // pending. Complete that drop before creating the index if so.
+    if (Status status = storageEngine->immediatelyCompletePendingDrop(opCtx, ident);
+        !status.isOK()) {
+        LOGV2(10526400,
+              "Index ident was drop pending and required completing the drop",
+              "ident"_attr = ident,
+              "error"_attr = status);
+        return status;
+    }
+
+    Status status = kvEngine->createSortedDataInterface(
+        ru,
+        nss,
+        *collectionOptions.uuid,
+        ident,
+        indexConfig,
+        collectionOptions.indexOptionDefaults.getStorageEngine());
+
     if (status.isOK()) {
-        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-        ru.onRollback([engine, ident = std::string(ident), &ru](OperationContext*) {
-            // Intentionally ignoring failure.
-            engine->dropIdent(ru, ident, /*identHasSizeInfo=*/false).ignore();
+        ru.onRollback([storageEngine, ident = std::string(ident), &ru](OperationContext*) {
+            storageEngine->addDropPendingIdent(Timestamp::min(), std::make_shared<Ident>(ident));
         });
     }
     return status;

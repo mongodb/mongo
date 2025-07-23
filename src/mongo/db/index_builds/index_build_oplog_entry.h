@@ -57,6 +57,7 @@ public:
     UUID buildUUID;
     std::vector<std::string> indexNames;
     std::vector<BSONObj> indexSpecs;
+    std::vector<std::string> indexIdents;
     boost::optional<Status> cause;
     repl::OpTime opTime;
 };
