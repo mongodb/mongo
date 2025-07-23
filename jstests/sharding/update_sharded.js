@@ -3,6 +3,7 @@
  * since shard key is immutable.
  *
  * @tags: [
+ *   assumes_balancer_off,
  *   uses_multi_shard_transaction,
  *   uses_transactions,
  * ]
@@ -19,23 +20,33 @@ const s = new ShardingTest({name: "auto1", shards: 2, mongos: 1});
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(s);
 s.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName});
 
-const db = s.getDB("test");
+const dbName = "test";
+const db = s.getDB(dbName);
 const sessionDb = s.s.startSession({retryWrites: true}).getDatabase("test");
-let coll, sessionColl;
-
-// Repeat same tests with hashed shard key, to ensure identical behavior.
-s.shardColl("update0", {key: 1}, {key: 0}, {key: 1}, db.getName(), true);
-s.adminCommand({shardcollection: "test.update1", key: {key: "hashed"}});
 
 s.shard0.getDB("admin").setLogLevel(1);
 s.shard1.getDB("admin").setLogLevel(1);
 
-for (let i = 0; i < 2; i++) {
-    const collName = "update" + i;
-    const hashedKey = (collName == "update1");
+function testShardKeys(collName, hashedKey) {
+    const coll = db.getCollection(collName);
+    const sessionColl = sessionDb.getCollection(collName);
+    const keyPattern = hashedKey ? {key: "hashed"} : {key: 1};
 
-    coll = db.getCollection(collName);
-    sessionColl = sessionDb.getCollection(collName);  // Used for updates of the shard key.
+    // Create an index on the shard key pattern. Then add a single document to the collection
+    // so that it's not empty.
+    coll.createIndex(keyPattern);
+    coll.insert({_id: -1, key: -999});
+
+    // Shard the collection, split it at "key = 0" (for ascending shard keys) or at "hash(key) = 0"
+    // (for hashed shard keys), and finally take the chunk that owns "key" / "hash(key)" values
+    // greater than or equal to zero and move that chunk to shard0.
+    const middle = hashedKey ? {key: NumberLong(0)} : {key: 0};
+    s.shardColl(collName, keyPattern, middle, {key: 999}, dbName, true);
+
+    // Remove all documents from the collection before executing the testcases below.
+    coll.remove({});
+
+    // Insert a single document.
     coll.insert({_id: 1, key: 1});
 
     // Replacment and Opstyle upserts.
@@ -71,6 +82,8 @@ for (let i = 0; i < 2; i++) {
         assert.eq(x._id, x.other, "_id == other");
     });
 
+    // {key:1} and {key:2} will belong to shard0 for both hashed and ascending shard keys.
+    // Therefore these two "update" commands should execute as normal (non-WCOS) updates.
     assert.commandWorked(sessionColl.update({_id: 1, key: 1}, {$set: {key: 2}}));
     assert.eq(coll.findOne({_id: 1}).key, 2, 'key changed');
     assert.commandWorked(
@@ -209,12 +222,27 @@ for (let i = 0; i < 2; i++) {
     assert.docEq({_id: 14, key: {b: 1}}, sessionColl.findOne({_id: 14}));
 }
 
-// Tests for nested shard keys.
+// Run the above testcases twice, once with an ascending shard key and then again with a hashed
+// shard key.
+testShardKeys("update0", false);
+testShardKeys("update1", true);
 
-function testNestedShardKeys(collName, keyPattern) {
-    s.adminCommand({shardCollection: db.getName() + "." + collName, key: keyPattern});
-    coll = db.getCollection(collName);
-    sessionColl = sessionDb.getCollection(collName);
+function testNestedShardKeys(collName, hashedKey) {
+    const coll = db.getCollection(collName);
+    const sessionColl = sessionDb.getCollection(collName);
+    const keyPattern = hashedKey ? {"skey.skey": "hashed"} : {"skey.skey": 1};
+
+    // Create an index on the shard key pattern. Then add a single document to the collection
+    // so that it's not empty.
+    coll.createIndex(keyPattern);
+    coll.insert({_id: -1, skey: {skey: -999}});
+
+    // Shard the collection. After sharding, the collection should have a single chunk that is
+    // located on shard1 (the primary shard).
+    s.adminCommand({shardCollection: dbName + "." + collName, key: keyPattern});
+
+    // Remove all documents from the collection before executing the testcases below.
+    coll.remove({});
 
     //
     // Verify full shard key path can be unset.
@@ -264,7 +292,9 @@ function testNestedShardKeys(collName, keyPattern) {
     assert.docEq({_id: 16, largeStr: largeStr}, sessionColl.findOne({_id: 16}));
 }
 
-testNestedShardKeys("update_nested", {"skey.skey": 1});
-testNestedShardKeys("update_nested_hashed", {"skey.skey": "hashed"});
+// Run the testcases for nested shard keys twice, once with an ascending shard key and then again
+// with a hashed shard key.
+testNestedShardKeys("update_nested", false);
+testNestedShardKeys("update_nested_hashed", true);
 
 s.stop();
