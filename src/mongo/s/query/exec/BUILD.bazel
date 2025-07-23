@@ -82,6 +82,7 @@ mongo_cc_library(
     name = "router_exec_stage",
     srcs = [
         "document_source_merge_cursors.cpp",
+        "merge_cursors_stage.cpp",
         "router_stage_limit.cpp",
         "router_stage_mock.cpp",
         "router_stage_pipeline.cpp",
@@ -91,12 +92,15 @@ mongo_cc_library(
     ],
     hdrs = [
         "document_source_merge_cursors.h",
+        "merge_cursors_stage.h",
         "router_stage_limit.h",
         "router_stage_mock.h",
         "router_stage_pipeline.h",
         "router_stage_queued_data.h",
         "router_stage_remove_metadata_fields.h",
         "router_stage_skip.h",
+        "//src/mongo/db/exec/agg:document_source_to_stage_registry.h",
+        "//src/mongo/db/exec/agg:stage.h",
     ],
     deps = [
         ":async_results_merger",

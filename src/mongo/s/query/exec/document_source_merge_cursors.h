@@ -29,22 +29,18 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/executor/task_executor.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
 #include "mongo/s/query/exec/blocking_results_merger.h"
 #include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
@@ -52,7 +48,6 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/duration.h"
 
-#include <cstddef>
 #include <memory>
 #include <set>
 #include <vector>
@@ -74,7 +69,7 @@ namespace mongo {
  * Then this stage is forwarded to the merging shard, and it should not kill the cursors when it
  * goes out of scope on mongos.
  */
-class DocumentSourceMergeCursors : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceMergeCursors : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$mergeCursors"_sd;
 
@@ -106,21 +101,8 @@ public:
         return id;
     }
 
-    const PlanSummaryStats& getPlanSummaryStats() const {
-        return _stats.planSummaryStats;
-    }
-
-    bool usedDisk() const final {
-        return _stats.planSummaryStats.usedDisk;
-    }
-
-    const SpecificStats* getSpecificStats() const final {
-        return &_stats;
-    }
-
-    void detachFromOperationContext() final;
     void detachSourceFromOperationContext() final;
-    void reattachToOperationContext(OperationContext* opCtx) final;
+
     void reattachSourceToOperationContext(OperationContext* opCtx) final;
 
     /**
@@ -145,26 +127,6 @@ public:
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;
     }
-
-    std::size_t getNumRemotes() const;
-
-    /**
-     * Returns the set of shard ids whose cursor has already been established.
-     */
-    const std::set<ShardId>& getShardIds() const {
-        return _shardsWithCursors;
-    }
-
-    /**
-     * Returns the high water mark sort key for the given cursor, if it exists; otherwise, returns
-     * an empty BSONObj. Calling this method causes the underlying BlockingResultsMerger to be
-     * populated and assumes ownership of the remote cursors.
-     */
-    BSONObj getHighWaterMark();
-
-    bool remotesExhausted() const;
-
-    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout);
 
     /**
      * Adds the specified shard cursors to the set of cursors to be merged. The results from the
@@ -193,12 +155,6 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
-    boost::optional<query_stats::DataBearingNodeMetrics> takeRemoteMetrics() {
-        auto metrics = _stats.dataBearingNodeMetrics;
-        _stats.dataBearingNodeMetrics = {};
-        return metrics;
-    }
-
     /**
      * Set the initial high watermark to return when no cursors are tracked.
      * */
@@ -211,38 +167,26 @@ public:
     void setNextHighWaterMarkDeterminingStrategy(
         NextHighWaterMarkDeterminingStrategyPtr nextHighWaterMarkDeterminer);
 
-protected:
-    GetNextResult doGetNext() final;
-    void doDispose() final;
-    void doForceSpill() final;
+    ~DocumentSourceMergeCursors() override;
+
+    /**
+     * Converts '_armParams' into the execution machinery to merge the cursors. See below for why
+     * this is done lazily. Clears '_armParams' and populates '_blockingResultsMerger'. This method
+     * cannot be called repeatedly on the same object instance.
+     */
+    std::shared_ptr<BlockingResultsMerger>& populateMerger();
 
 private:
     friend class DocumentSourceMergeCursorsMultiTenancyTest;
 
-    DocumentSourceMergeCursors(const boost::intrusive_ptr<ExpressionContext>&,
-                               AsyncResultsMergerParams,
-                               boost::optional<BSONObj> ownedParamsSpec = boost::none);
-
-    /**
-     * Converts '_armParams' into the execution machinery to merge the cursors. See below for why
-     * this is done lazily. Clears '_armParams' and populates '_blockingResultsMerger'.
-     */
-    void populateMerger();
-
-    /**
-     * Adds the shard Ids of the given remote cursors into the _shardsWithCursors set.
-     */
-    void recordRemoteCursorShardIds(const std::vector<RemoteCursor>& remoteCursors);
+    DocumentSourceMergeCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                               AsyncResultsMergerParams armParams);
 
     /**
      * Get the Async Results Merger Params or return boost:none if it is not set. This is used by
      * DocumentSourceMergeCursorsMultiTenancyTest for unit test purpose.
      */
     boost::optional<NamespaceString> getAsyncResultMergerParamsNss_forTest() const;
-
-    // When we have parsed the params out of a BSONObj, the object needs to stay around while the
-    // params are in use. We store them here.
-    const boost::optional<BSONObj> _armParamsObj;
 
     // '_blockingResultsMerger' is lazily populated. Until we need to use it, '_armParams' will be
     // populated with the parameters. Once we start using '_blockingResultsMerger', '_armParams'
@@ -256,18 +200,13 @@ private:
     // set, and this after convertToRouterStage() is called. After that call the DocumentSource will
     // remain in an unusable state.
     boost::optional<AsyncResultsMergerParams> _armParams;
+
     // Can only be populated if _armParams is not set. Not populated initially.
-    boost::optional<BlockingResultsMerger> _blockingResultsMerger;
+    std::shared_ptr<BlockingResultsMerger> _blockingResultsMerger;
 
     // Indicates whether the cursors stored in _armParams are "owned", meaning the cursors should be
     // killed upon disposal of this DocumentSource.
     bool _ownCursors = true;
-
-    // Set containing shard ids with valid cursors.
-    std::set<ShardId> _shardsWithCursors;
-
-    // Specific stats for $mergeCursors stage.
-    DocumentSourceMergeCursorsStats _stats;
 };
 
 }  // namespace mongo

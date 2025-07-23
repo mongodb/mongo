@@ -69,11 +69,9 @@ namespace cluster_aggregation_planner {
  * $skip and $limit stages, the pipeline is eliminated entirely and replaced with a RouterExecStage
  * tree that does same thing but will avoid using a RouterStagePipeline. Avoiding a
  * RouterStagePipeline will remove an expensive conversion from BSONObj -> Document for each result.
- * TODO SERVER-105614 Consider removing the 'pipeline' parameter ('execPipeline' should suffice).
  */
 ClusterClientCursorGuard buildClusterCursor(OperationContext* opCtx,
                                             std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-                                            std::unique_ptr<exec::agg::Pipeline> execPipeline,
                                             ClusterClientCursorParams&&);
 
 /**
@@ -127,7 +125,6 @@ struct AggregationTargeter {
 Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
                            long long batchSize,
                            std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-                           std::unique_ptr<exec::agg::Pipeline> execPipeline,
                            BSONObjBuilder* result,
                            const PrivilegeVector& privileges,
                            bool requestQueryStatsFromRemotes);

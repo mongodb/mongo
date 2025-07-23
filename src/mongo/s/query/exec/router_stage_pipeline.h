@@ -38,8 +38,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/s/query/exec/cluster_query_result.h"
-#include "mongo/s/query/exec/document_source_merge_cursors.h"
-#include "mongo/s/query/exec/router_exec_stage.h"
+#include "mongo/s/query/exec/merge_cursors_stage.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -56,8 +55,7 @@ namespace mongo {
  */
 class RouterStagePipeline final : public RouterExecStage {
 public:
-    RouterStagePipeline(std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline,
-                        std::unique_ptr<exec::agg::Pipeline> mergeExecPipeline);
+    RouterStagePipeline(std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline);
 
     StatusWith<ClusterQueryResult> next() final;
 
@@ -98,10 +96,12 @@ protected:
 private:
     BSONObj _validateAndConvertToBSON(const Document& event);
 
+    // TODO SERVER-105521 Consider removing the '_mergePipeline' member
+    // ('_mergeExecPipeline' should suffice).
     std::unique_ptr<Pipeline, PipelineDeleter> _mergePipeline;
     std::unique_ptr<exec::agg::Pipeline> _mergeExecPipeline;
 
     // May be null if this pipeline runs exclusively on mongos without contacting the shards at all.
-    boost::intrusive_ptr<DocumentSourceMergeCursors> _mergeCursorsStage;
+    boost::intrusive_ptr<exec::agg::MergeCursorsStage> _mergeCursorsStage;
 };
 }  // namespace mongo

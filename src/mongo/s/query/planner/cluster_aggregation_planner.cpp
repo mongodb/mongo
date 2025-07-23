@@ -47,7 +47,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
@@ -394,10 +393,6 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
         std::move(shardDispatchResults.remoteCursors),
         shardDispatchResults.splitPipeline->shardCursorsSortSpec,
         requestQueryStatsFromRemotes);
-    // Creating QE pipeline as soon as QO pipeline gets the 'merge' stage added. This is necessary
-    // for the consequent changes when QE pipeline will be responsible for closing the remote
-    // cursors on disposal.
-    auto mergeExecPipeline = exec::agg::buildPipeline(mergePipeline->freeze());
 
     // First, check whether we can merge on the router. If the merge pipeline MUST run on router,
     // then ignore the internalQueryProhibitMergingOnMongoS parameter.
@@ -408,7 +403,6 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
         return runPipelineOnMongoS(namespaces,
                                    batchSize,
                                    std::move(mergePipeline),
-                                   std::move(mergeExecPipeline),
                                    result,
                                    privileges,
                                    requestQueryStatsFromRemotes);
@@ -474,7 +468,6 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
                                      long long batchSize,
                                      const NamespaceString& requestedNss,
                                      std::unique_ptr<Pipeline, PipelineDeleter> pipelineForMerging,
-                                     std::unique_ptr<exec::agg::Pipeline> execPipelineForMerging,
                                      const PrivilegeVector& privileges,
                                      bool requestQueryStatsFromRemotes) {
     ClusterClientCursorParams params(requestedNss,
@@ -503,7 +496,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     params.requestQueryStatsFromRemotes = requestQueryStatsFromRemotes;
 
     auto ccc = cluster_aggregation_planner::buildClusterCursor(
-        opCtx, std::move(pipelineForMerging), std::move(execPipelineForMerging), std::move(params));
+        opCtx, std::move(pipelineForMerging), std::move(params));
 
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
 
@@ -760,7 +753,6 @@ bool isAllLimitsAndSkips(Pipeline* pipeline) {
 
 ClusterClientCursorGuard buildClusterCursor(OperationContext* opCtx,
                                             std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-                                            std::unique_ptr<exec::agg::Pipeline> execPipeline,
                                             ClusterClientCursorParams&& cursorParams) {
     if (isAllLimitsAndSkips(pipeline.get())) {
         // We can optimize this Pipeline to avoid going through any DocumentSources at all and thus
@@ -768,9 +760,7 @@ ClusterClientCursorGuard buildClusterCursor(OperationContext* opCtx,
         return convertPipelineToRouterStages(std::move(pipeline), std::move(cursorParams));
     }
     return ClusterClientCursorImpl::make(
-        opCtx,
-        std::make_unique<RouterStagePipeline>(std::move(pipeline), std::move(execPipeline)),
-        std::move(cursorParams));
+        opCtx, std::make_unique<RouterStagePipeline>(std::move(pipeline)), std::move(cursorParams));
 }
 
 AggregationTargeter AggregationTargeter::make(OperationContext* opCtx,
@@ -805,7 +795,6 @@ AggregationTargeter AggregationTargeter::make(OperationContext* opCtx,
 Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
                            long long batchSize,
                            std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-                           std::unique_ptr<exec::agg::Pipeline> execPipeline,
                            BSONObjBuilder* result,
                            const PrivilegeVector& privileges,
                            bool requestQueryStatsFromRemotes) {
@@ -829,7 +818,6 @@ Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
                                                        batchSize,
                                                        namespaces.requestedNss,
                                                        std::move(pipeline),
-                                                       std::move(execPipeline),
                                                        privileges,
                                                        requestQueryStatsFromRemotes);
 

@@ -45,7 +45,7 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
-#include "mongo/s/query/exec/document_source_merge_cursors.h"
+#include "mongo/s/query/exec/merge_cursors_stage.h"
 #include "mongo/util/intrusive_counter.h"
 
 #include <memory>
@@ -134,7 +134,7 @@ private:
      */
     BSONObj replaceResumeTokenInCommand(Document resumeToken);
 
-    boost::intrusive_ptr<DocumentSourceMergeCursors> _mergeCursors;
+    boost::intrusive_ptr<exec::agg::MergeCursorsStage> _mergeCursors;
     BSONObj _originalAggregateCommand;
 };
 }  // namespace mongo

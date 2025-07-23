@@ -62,7 +62,7 @@ namespace agg {
     }
 
 using DocumentSourceToStageFn =
-    std::function<StagePtr(const boost::intrusive_ptr<const DocumentSource>&)>;
+    std::function<StagePtr(const boost::intrusive_ptr<DocumentSource>&)>;
 
 /**
  * Registers a DocumentSource with a function that builds an aggregation 'Stage' from

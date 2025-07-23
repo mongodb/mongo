@@ -34,7 +34,6 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/s/resource_yielders.h"
 #include "mongo/util/assert_util.h"
 
@@ -44,6 +43,8 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 
@@ -56,121 +57,75 @@ ALLOCATE_DOCUMENT_SOURCE_ID(mergeCursors, DocumentSourceMergeCursors::id)
 constexpr StringData DocumentSourceMergeCursors::kStageName;
 
 DocumentSourceMergeCursors::DocumentSourceMergeCursors(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    AsyncResultsMergerParams armParams,
-    boost::optional<BSONObj> ownedParamsSpec)
-    : DocumentSource(kStageName, expCtx),
-      exec::agg::Stage(kStageName, expCtx),
-      _armParamsObj(std::move(ownedParamsSpec)),
-      _armParams(std::move(armParams)) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, AsyncResultsMergerParams armParams)
+    : DocumentSource(kStageName, expCtx), _armParams(std::move(armParams)) {}
 
-    // Populate the shard ids from the 'RemoteCursor'.
-    recordRemoteCursorShardIds(_armParams->getRemotes());
-}
-
-std::size_t DocumentSourceMergeCursors::getNumRemotes() const {
-    if (_blockingResultsMerger) {
-        return _blockingResultsMerger->getNumRemotes();
+DocumentSourceMergeCursors::~DocumentSourceMergeCursors() {
+    if (_ownCursors) {
+        tassert(10561404, "_armParams must be set", _armParams);
+        BSONObj armParamsForLog = _armParams->toBSON();
+        if (getExpCtx()->getOperationContext()) {
+            // Method call 'populateMerger()->kill()' needs a valid operation context.
+            try {
+                populateMerger()->kill(getExpCtx()->getOperationContext());
+            } catch (const std::exception& ex) {
+                // When something goes wrong we might leak remote cursors, but we still want to keep
+                // this process running, therefore we do not let the exception out of the
+                // destructor.
+                LOGV2_ERROR(10561405,
+                            "remote cursors might be leaked due to an unexpected error",
+                            "armParams"_attr = armParamsForLog,
+                            "error"_attr = ex.what());
+            }
+        } else {
+            // We expect this object will be destroyed while still attached to the original
+            // operation context, but we still want to keep this process running, therefore no
+            // assertions here.
+            LOGV2_ERROR(
+                10561406,
+                "destroying a detached $mergeCursors stage at this point could leak remote cursors",
+                "armParams"_attr = armParamsForLog);
+        }
     }
-    return _armParams->getRemotes().size();
 }
 
-BSONObj DocumentSourceMergeCursors::getHighWaterMark() {
-    if (!_blockingResultsMerger) {
-        populateMerger();
-    }
-    return _blockingResultsMerger->getHighWaterMark();
-}
-
-bool DocumentSourceMergeCursors::remotesExhausted() const {
-    if (!_blockingResultsMerger) {
-        // We haven't started iteration yet.
-        return false;
-    }
-    return _blockingResultsMerger->remotesExhausted();
-}
-
-Status DocumentSourceMergeCursors::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
-    if (!_blockingResultsMerger) {
-        // In cases where a cursor was established with a batchSize of 0, the first getMore
-        // might specify a custom maxTimeMS (AKA await data timeout). In these cases we will not
-        // have iterated the cursor yet so will not have populated the merger, but need to
-        // remember/track the custom await data timeout. We will soon iterate the cursor, so we
-        // just populate the merger now and let it track the await data timeout itself.
-        populateMerger();
-    }
-    return _blockingResultsMerger->setAwaitDataTimeout(awaitDataTimeout);
-}
-
-void DocumentSourceMergeCursors::addNewShardCursors(std::vector<RemoteCursor>&& newCursors) {
-    tassert(9535000, "_blockingResultsMerger must be set", _blockingResultsMerger);
-    recordRemoteCursorShardIds(newCursors);
-    _blockingResultsMerger->addNewShardCursors(std::move(newCursors));
-}
-
-void DocumentSourceMergeCursors::closeShardCursors(const stdx::unordered_set<ShardId>& shardIds) {
-    tassert(8456113, "_blockingResultsMerger must be set", _blockingResultsMerger);
-    _blockingResultsMerger->closeShardCursors(shardIds);
-}
-
-void DocumentSourceMergeCursors::populateMerger() {
+std::shared_ptr<BlockingResultsMerger>& DocumentSourceMergeCursors::populateMerger() {
     tassert(9535001, "_blockingResultsMerger must not yet be set", !_blockingResultsMerger);
     tassert(9535002, "_armParams must be set", _armParams);
 
-    _blockingResultsMerger.emplace(
-        pExpCtx->getOperationContext(),
+    auto* opCtx = getExpCtx()->getOperationContext();
+    _blockingResultsMerger = std::make_shared<BlockingResultsMerger>(
+        opCtx,
         std::move(*_armParams),
-        pExpCtx->getMongoProcessInterface()->taskExecutor,
+        getExpCtx()->getMongoProcessInterface()->taskExecutor,
         // Assumes this is only called from the 'aggregate' or 'getMore' commands.  The code which
         // relies on this parameter does not distinguish/care about the difference so we simply
         // always pass 'aggregate'.
-        ResourceYielderFactory::get(*pExpCtx->getOperationContext()->getService())
-            .make(pExpCtx->getOperationContext(), "aggregate"_sd));
+        ResourceYielderFactory::get(*opCtx->getService()).make(opCtx, "aggregate"_sd));
     _armParams = boost::none;
+
     // '_blockingResultsMerger' now owns the cursors.
     _ownCursors = false;
+
+    // Returning the created 'BlockingResultsMerger' instance for convenience.
+    return _blockingResultsMerger;
 }
 
 std::unique_ptr<RouterStageMerge> DocumentSourceMergeCursors::convertToRouterStage() {
-    tassert(9535003, "Expected conversion to happen before execution", !_blockingResultsMerger);
-    return std::make_unique<RouterStageMerge>(pExpCtx->getOperationContext(),
-                                              pExpCtx->getMongoProcessInterface()->taskExecutor,
-                                              std::move(*_armParams));
-}
-
-DocumentSource::GetNextResult DocumentSourceMergeCursors::doGetNext() {
-    if (!_blockingResultsMerger) {
-        populateMerger();
-    }
-
-    auto next = uassertStatusOK(_blockingResultsMerger->next(pExpCtx->getOperationContext()));
-    _stats.dataBearingNodeMetrics.add(_blockingResultsMerger->takeMetrics());
-    if (next.isEOF()) {
-        return GetNextResult::makeEOF();
-    }
-    return Document::fromBsonWithMetaData(*next.getResult());
-}
-
-void DocumentSourceMergeCursors::doForceSpill() {
-    tassert(
-        10249800, "releaseMemory command requires BlockingResultsMerger", _blockingResultsMerger);
-    auto status = _blockingResultsMerger->releaseMemory();
-    uassertStatusOK(status);
-}
-
-void DocumentSourceMergeCursors::setInitialHighWaterMark(const BSONObj& highWaterMark) {
-    tassert(
-        10359100, "setInitialHighWaterMark requires BlockingResultsMerger", _blockingResultsMerger);
-    _blockingResultsMerger->setInitialHighWaterMark(highWaterMark);
-}
-
-void DocumentSourceMergeCursors::setNextHighWaterMarkDeterminingStrategy(
-    NextHighWaterMarkDeterminingStrategyPtr nextHighWaterMarkDeterminer) {
-    _blockingResultsMerger->setNextHighWaterMarkDeterminingStrategy(
-        std::move(nextHighWaterMarkDeterminer));
+    tassert(9535003, "Expected conversion to happen before execution", _armParams);
+    auto result =
+        std::make_unique<RouterStageMerge>(getExpCtx()->getOperationContext(),
+                                           getExpCtx()->getMongoProcessInterface()->taskExecutor,
+                                           std::move(*_armParams));
+    _armParams = boost::none;
+    _ownCursors = false;
+    return result;
 }
 
 Value DocumentSourceMergeCursors::serialize(const SerializationOptions& opts) const {
+    // This method is the only reason 'DocumentSourceMergeCursors' needs '_blockingResultsMerger'.
+    // We cannot cache '_armParams->toBSON()', because remotes can change during the execution in
+    // case of change streams.
     if (_blockingResultsMerger) {
         return Value(Document{
             {kStageName, _blockingResultsMerger->asyncResultsMergerParams().toBSON(opts)}});
@@ -184,61 +139,28 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
     uassert(17026,
             "$mergeCursors stage expected an object as argument",
             elem.type() == BSONType::object);
-    auto ownedObj = elem.embeddedObject().getOwned();
-    auto armParams = AsyncResultsMergerParams::parse(
+    auto armParams = AsyncResultsMergerParams::parseOwned(
         IDLParserContext(kStageName,
                          auth::ValidatedTenancyScope::get(expCtx->getOperationContext()),
                          expCtx->getNamespaceString().tenantId(),
                          SerializationContext::stateDefault()),
-        ownedObj);
-    return new DocumentSourceMergeCursors(expCtx, std::move(armParams), std::move(ownedObj));
+        elem.embeddedObject().getOwned());
+    return new DocumentSourceMergeCursors(expCtx, std::move(armParams));
 }
 
 boost::intrusive_ptr<DocumentSourceMergeCursors> DocumentSourceMergeCursors::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, AsyncResultsMergerParams params) {
     return new DocumentSourceMergeCursors(expCtx, std::move(params));
 }
-
-void DocumentSourceMergeCursors::detachFromOperationContext() {
-    if (_blockingResultsMerger) {
-        _blockingResultsMerger->detachFromOperationContext();
-    }
-}
-
 void DocumentSourceMergeCursors::detachSourceFromOperationContext() {
     if (_blockingResultsMerger) {
         _blockingResultsMerger->detachFromOperationContext();
     }
 }
 
-
-void DocumentSourceMergeCursors::reattachToOperationContext(OperationContext* opCtx) {
-    if (_blockingResultsMerger) {
-        _blockingResultsMerger->reattachToOperationContext(opCtx);
-    }
-}
-
 void DocumentSourceMergeCursors::reattachSourceToOperationContext(OperationContext* opCtx) {
     if (_blockingResultsMerger) {
         _blockingResultsMerger->reattachToOperationContext(opCtx);
-    }
-}
-
-void DocumentSourceMergeCursors::doDispose() {
-    if (_blockingResultsMerger) {
-        tassert(9535005, "_ownCursors must not be set", !_ownCursors);
-        _blockingResultsMerger->kill(pExpCtx->getOperationContext());
-    } else if (_ownCursors) {
-        populateMerger();
-        _blockingResultsMerger->kill(pExpCtx->getOperationContext());
-    }
-}
-
-void DocumentSourceMergeCursors::recordRemoteCursorShardIds(
-    const std::vector<RemoteCursor>& remoteCursors) {
-    for (const auto& remoteCursor : remoteCursors) {
-        tassert(5549103, "Encountered invalid shard ID", !remoteCursor.getShardId().empty());
-        _shardsWithCursors.emplace(std::string{remoteCursor.getShardId()});
     }
 }
 

@@ -43,6 +43,7 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -275,9 +276,9 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldReportEOFWithNoCursors) {
                          CursorResponse(expCtx->getNamespaceString(), kExhaustedCursorID, {})));
     armParams.setRemotes(std::move(cursors));
     auto pipeline = Pipeline::create({}, expCtx);
-    auto mergeCursorsStage = DocumentSourceMergeCursors::create(expCtx, std::move(armParams));
-
-    ASSERT_TRUE(mergeCursorsStage->getNext().isEOF());
+    auto source = DocumentSourceMergeCursors::create(expCtx, std::move(armParams));
+    auto stage = exec::agg::buildStage(source);
+    ASSERT_TRUE(stage->getNext().isEOF());
 }
 
 BSONObj cursorResponseObj(const NamespaceString& nss,
@@ -595,6 +596,9 @@ TEST_F(DocumentSourceMergeCursorsShapeTest, QueryShape) {
         kTestShardIds[1], kTestShardHosts[1], CursorResponse(expCtx->getNamespaceString(), 2, {})));
     armParams.setRemotes(std::move(cursors));
     auto stage = DocumentSourceMergeCursors::create(expCtx, std::move(armParams));
+
+    // There is no need for closing remote cursors within this unit-test.
+    stage->dismissCursorOwnership();
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({

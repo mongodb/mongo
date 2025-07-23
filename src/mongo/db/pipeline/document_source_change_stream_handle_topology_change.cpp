@@ -184,7 +184,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamHandleTopologyChange::do
     // For the first call to the 'doGetNext', the '_mergeCursors' will be null and must be
     // populated. We also resolve the original aggregation command from the expression context.
     if (!_mergeCursors) {
-        _mergeCursors = dynamic_cast<DocumentSourceMergeCursors*>(pSource);
+        _mergeCursors = dynamic_cast<exec::agg::MergeCursorsStage*>(pSource);
         _originalAggregateCommand = pExpCtx->getOriginalAggregateCommand().getOwned();
 
         tassert(5549100, "Missing $mergeCursors stage", _mergeCursors);
@@ -223,7 +223,7 @@ DocumentSourceChangeStreamHandleTopologyChange::establishShardCursorsOnNewShards
     auto newShard = uassertStatusOK(ShardType::fromBSON(newShardSpec.getDocument().toBson()));
 
     // Make sure we are not attempting to open a cursor on a shard that already has one.
-    if (_mergeCursors->getShardIds().count(newShard.getName()) != 0) {
+    if (_mergeCursors->hasShardId(newShard.getName())) {
         return {};
     }
 
