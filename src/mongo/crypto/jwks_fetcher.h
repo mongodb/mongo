@@ -53,6 +53,11 @@ public:
     virtual bool quiesce() const {
         return false;
     }
+
+    /**
+     * Sets a date to be used as the latest time a fetch happened.
+     */
+    virtual void setQuiesce(Date_t quiesce) = 0;
 };
 
 }  // namespace mongo::crypto

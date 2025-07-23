@@ -54,7 +54,7 @@ public:
         }
 
         auto jwkSet = JWKSet::parse(IDLParserContext("JWKSet"), _keys);
-        _lastSuccessfulFetch = _clock->now();
+        _lastFetchQuiesceTime = _clock->now();
         return jwkSet;
     }
 

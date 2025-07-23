@@ -50,11 +50,12 @@ public:
 
     JWKSet fetch() override;
     bool quiesce() const override;
+    void setQuiesce(Date_t quiesce) override;
 
 protected:
     std::string _issuer;
     ClockSource* _clock;
-    synchronized_value<Date_t> _lastSuccessfulFetch;
+    synchronized_value<Date_t> _lastFetchQuiesceTime;
 };
 
 }  // namespace crypto
