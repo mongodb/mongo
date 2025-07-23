@@ -6,18 +6,21 @@
  * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     getCoordinatorFailpoints,
     waitForFailpoint
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 import {
+    checkDecisionIs,
     runCommitThroughMongosInParallelThread
 } from "jstests/sharding/libs/txn_two_phase_commit_util.js";
 
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
+const hangBeforeDeletingCoordinatorDocFpName = "hangBeforeDeletingCoordinatorDoc";
 
 let st = new ShardingTest({shards: 3, causallyConsistent: true});
 
@@ -82,7 +85,7 @@ const testCommitProtocol = function(shouldCommit, failpointData) {
         }));
     }
 
-    // Turn on failpoint to make the coordinator hang at a the specified point.
+    // Turn on failpoint to make the coordinator hang at a specified point.
     assert.commandWorked(coordinator.adminCommand({
         configureFailPoint: failpointData.failpoint,
         mode: "alwaysOn",
@@ -143,10 +146,34 @@ const testCommitProtocol = function(shouldCommit, failpointData) {
     coordinatorOpsToKill.forEach(function(coordinatorOp) {
         coordinator.getDB("admin").killOp(coordinatorOp.opid);
     });
+
+    // If we're hanging after the decision is written and before it is removed, then we can read the
+    // decision.
+    let commitTimestamp;
+    const canReadDecision = (failpointData.data || {}).twoPhaseCommitStage === "decision" ||
+        failpointData.failpoint === hangBeforeDeletingCoordinatorDocFpName;
+    let hangBeforeDeletingCoordinatorDocFp;
+    if (canReadDecision && shouldCommit) {
+        commitTimestamp = checkDecisionIs(coordinator, lsid, txnNumber, "commit");
+    } else if (shouldCommit) {
+        // We're hanging before the decision is written, so we need to read the decision later
+        // but before it's deleted.
+        const coordinatorPrimary = coordinator.rs.getPrimary();
+        hangBeforeDeletingCoordinatorDocFp = configureFailPoint(
+            coordinatorPrimary, hangBeforeDeletingCoordinatorDocFpName, {}, "alwaysOn");
+    }
+
     assert.commandWorked(coordinator.adminCommand({
         configureFailPoint: failpointData.failpoint,
         mode: "off",
     }));
+
+    if (!canReadDecision && shouldCommit) {
+        // Wait to delete the coordinator doc, then read the commitTimestamp.
+        hangBeforeDeletingCoordinatorDocFp.wait();
+        commitTimestamp = checkDecisionIs(coordinator, lsid, txnNumber, "commit");
+        hangBeforeDeletingCoordinatorDocFp.off();
+    }
 
     // If the commit coordination was not robust to killOp, then commitTransaction would fail
     // with an Interrupted error rather than fail with NoSuchTransaction or return success.
@@ -164,14 +191,12 @@ const testCommitProtocol = function(shouldCommit, failpointData) {
         assert.eq(0, st.s.getDB(dbName).getCollection(collName).find().itcount());
     } else {
         jsTest.log("Verify that the transaction was committed on all shards.");
-        // Use assert.soon(), because although coordinateCommitTransaction currently blocks
-        // until the commit process is fully complete, it will eventually be changed to only
-        // block until the decision is *written*, at which point the test can pass the
-        // operationTime returned by coordinateCommitTransaction as 'afterClusterTime' in the
-        // read to ensure the read sees the transaction's writes (TODO SERVER-37165).
-        assert.soon(function() {
-            return 3 === st.s.getDB(dbName).getCollection(collName).find().itcount();
-        });
+        const res = assert.commandWorked(st.s.getDB(dbName).runCommand({
+            find: collName,
+            readConcern: {level: "majority", afterClusterTime: commitTimestamp},
+            maxTimeMS: 10000
+        }));
+        assert.eq(3, res.cursor.firstBatch.length);
     }
 
     st.s.getDB(dbName).getCollection(collName).drop();

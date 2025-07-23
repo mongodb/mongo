@@ -10,6 +10,7 @@
 // test causes failovers on a shard, so the cached connection is not usable.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {
     getCoordinatorFailpoints,
     waitForFailpoint,
@@ -18,6 +19,7 @@ import {
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
+    checkDecisionIs,
     runCommitThroughMongosInParallelThread
 } from 'jstests/sharding/libs/txn_two_phase_commit_util.js';
 import {TxnUtil} from "jstests/libs/txns/txn_util.js";
@@ -25,6 +27,7 @@ import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
+const hangBeforeDeletingCoordinatorDocFpName = "hangBeforeDeletingCoordinatorDoc";
 
 // Lower the transaction timeout for participants, since this test exercises the case where the
 // coordinator fails over before writing the participant list and then checks that the
@@ -142,10 +145,33 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
         assert.commandWorked(coordPrimary.adminCommand({replSetFreeze: 0}));
         assert.commandWorked(coordPrimary.adminCommand({replSetStepUp: 1}));
 
+        // If we're hanging after the decision is written and before it is removed, then we can read
+        // the decision.
+        const shouldCommit = !expectAbortResponse;
+        let commitTimestamp;
+        const canReadDecision = (failpointData.data || {}).twoPhaseCommitStage === "decision" ||
+            failpointData.failpoint === hangBeforeDeletingCoordinatorDocFpName;
+        let hangBeforeDeletingCoordinatorDocFp;
+        if (canReadDecision && shouldCommit) {
+            commitTimestamp = checkDecisionIs(coordPrimary, lsid, txnNumber, "commit");
+        } else if (shouldCommit) {
+            // We're hanging before the decision is written, so we need to read the decision later
+            // but before it's deleted.
+            hangBeforeDeletingCoordinatorDocFp = configureFailPoint(
+                coordPrimary, hangBeforeDeletingCoordinatorDocFpName, {}, "alwaysOn");
+        }
+
         assert.commandWorked(coordPrimary.adminCommand({
             configureFailPoint: failpointData.failpoint,
             mode: "off",
         }));
+
+        if (!canReadDecision && shouldCommit) {
+            // Wait to delete the coordinator doc, then read the commitTimestamp.
+            hangBeforeDeletingCoordinatorDocFp.wait();
+            commitTimestamp = checkDecisionIs(coordPrimary, lsid, txnNumber, "commit");
+            hangBeforeDeletingCoordinatorDocFp.off();
+        }
 
         // The router should retry commitTransaction against the new primary.
         commitThread.join();
@@ -156,13 +182,12 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
             assert.eq(0, st.s.getDB(dbName).getCollection(collName).find().itcount());
         } else {
             jsTest.log("Verify that the transaction was committed on all shards.");
-            // Use assert.soon(), because although coordinateCommitTransaction currently blocks
-            // until the commit process is fully complete, it will eventually be changed to only
-            // block until the decision is *written*, so the documents may not be visible
-            // immediately.
-            assert.soon(function() {
-                return 3 === st.s.getDB(dbName).getCollection(collName).find().itcount();
-            });
+            const res = assert.commandWorked(st.s.getDB(dbName).runCommand({
+                find: collName,
+                readConcern: {level: "majority", afterClusterTime: commitTimestamp},
+                maxTimeMS: 10000
+            }));
+            assert.eq(3, res.cursor.firstBatch.length);
         }
 
         cleanUp();
@@ -212,8 +237,7 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
         // in-progress transaction could survive failover.
         let expectAbort = (failpointData.failpoint == "hangBeforeWritingParticipantList") ||
             (failpointData.failpoint == "hangWhileTargetingLocalHost" &&
-             (failpointData.data.twoPhaseCommitStage == "prepare")) ||
-            false;
+             (failpointData.data.twoPhaseCommitStage == "prepare"));
         testCommitProtocolWithRetry(
             false /* make a participant abort */, failpointData, expectAbort);
     });
@@ -222,5 +246,5 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
 
 const failpointDataArr = getCoordinatorFailpoints();
 
-runTest(true /* same node always steps up after stepping down */, false);
-runTest(false /* same node always steps up after stepping down */, false);
+runTest(true /* same node always steps up after stepping down */);
+runTest(false /* different node always steps up after stepping down */);

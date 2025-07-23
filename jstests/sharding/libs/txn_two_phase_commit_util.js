@@ -16,6 +16,7 @@ export const checkDecisionIs = function(coordinatorConn, lsid, txnNumber, expect
     } else {
         assert.eq(null, coordDoc.decision.commitTimestamp);
     }
+    return coordDoc.decision.commitTimestamp;
 };
 
 export const checkDocumentDeleted = function(coordinatorConn, lsid, txnNumber) {

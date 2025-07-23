@@ -8,6 +8,7 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {checkDecisionIs} from "jstests/sharding/libs/txn_two_phase_commit_util.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -57,28 +58,37 @@ const session = st.s.startSession();
 session.startTransaction();
 
 // Insert a document onto each shard to make this a cross-shard transaction.
-assert.commandWorked(session.getDatabase(dbName).runCommand({
+let res = assert.commandWorked(session.getDatabase(dbName).runCommand({
     insert: collName,
     documents: [{_id: -5}, {_id: 5}, {_id: 15}],
 }));
+const lsid = session.getSessionId();
+const txnNumber = session.getTxnNumber_forTesting();
 
 // Set a failpoint to make oplog application hang on one secondary after applying the
 // operations in the transaction but before preparing the TransactionParticipant.
 const applyOpsHangBeforePreparingTransaction = "applyOpsHangBeforePreparingTransaction";
 const firstSecondary = st.rs0.getSecondary();
-let failPoint = configureFailPoint(firstSecondary, applyOpsHangBeforePreparingTransaction);
+const failPoint = configureFailPoint(firstSecondary, applyOpsHangBeforePreparingTransaction);
+
+const coordinatorPrimary = coordinator.rs.getPrimary();
+const hangBeforeDeletingCoordinatorDocFp =
+    configureFailPoint(coordinatorPrimary, "hangBeforeDeletingCoordinatorDoc", {}, "alwaysOn");
 
 // Commit the transaction, which will execute two-phase commit.
 assert.commandWorked(session.commitTransaction_forTesting());
 
+hangBeforeDeletingCoordinatorDocFp.wait();
+const commitTimestamp = checkDecisionIs(coordinator, lsid, txnNumber, "commit");
+hangBeforeDeletingCoordinatorDocFp.off();
+
 jsTest.log("Verify that the transaction was committed on all shards.");
-// Use assert.soon(), because although coordinateCommitTransaction currently blocks
-// until the commit process is fully complete, it will eventually be changed to only
-// block until the decision is *written*, so the documents may not be visible
-// immediately.
-assert.soon(function() {
-    return 3 === st.s.getDB(dbName).getCollection(collName).find().itcount();
-});
+res = assert.commandWorked(st.s.getDB(dbName).runCommand({
+    find: collName,
+    readConcern: {level: "majority", afterClusterTime: commitTimestamp},
+    maxTimeMS: 10000
+}));
+assert.eq(3, res.cursor.firstBatch.length);
 
 jsTest.log("Waiting for secondary to apply the prepare oplog entry.");
 failPoint.wait();

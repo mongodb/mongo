@@ -66,12 +66,12 @@ const testCommitProtocol = function() {
     const hangBeforeWaitingForDecisionWriteConcernFp = configureFailPoint(
         coordinatorPrimary, "hangBeforeWaitingForDecisionWriteConcern", {}, "alwaysOn");
 
-    let commitThread = runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host);
+    const commitThread = runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host);
     commitThread.start();
 
     // Check that the coordinator wrote the decision.
     hangBeforeWaitingForDecisionWriteConcernFp.wait();
-    checkDecisionIs(coordinator, lsid, txnNumber, "commit");
+    const commitTimestamp = checkDecisionIs(coordinator, lsid, txnNumber, "commit");
 
     assert.commandWorked(
         coordinatorPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
@@ -97,13 +97,12 @@ const testCommitProtocol = function() {
     // Check that the transaction committed as expected.
 
     jsTest.log("Verify that the transaction was committed on all shards.");
-    // Use assert.soon(), because although coordinateCommitTransaction currently blocks
-    // until the commit process is fully complete, it will eventually be changed to only
-    // block until the decision is *written*, so the documents may not be visible
-    // immediately.
-    assert.soon(function() {
-        return 3 === st.s.getDB(dbName).getCollection(collName).find().itcount();
-    });
+    const res = assert.commandWorked(st.s.getDB(dbName).runCommand({
+        find: collName,
+        readConcern: {level: "majority", afterClusterTime: commitTimestamp},
+        maxTimeMS: 10000
+    }));
+    assert.eq(3, res.cursor.firstBatch.length);
 };
 
 testCommitProtocol();

@@ -168,7 +168,8 @@ const testCommitProtocol = function(shouldCommit, simulateNetworkFailures) {
     // Check that the coordinator wrote the decision.
     hangBeforeWaitingForDecisionWriteConcernFp.wait();
     checkParticipantListMatches(coordinator, lsid, txnNumber, expectedParticipantList);
-    checkDecisionIs(coordinator, lsid, txnNumber, (shouldCommit ? "commit" : "abort"));
+    const commitTimestamp =
+        checkDecisionIs(coordinator, lsid, txnNumber, (shouldCommit ? "commit" : "abort"));
     hangBeforeWaitingForDecisionWriteConcernFp.off();
 
     // Check that the coordinator deleted its persisted state.
@@ -187,13 +188,12 @@ const testCommitProtocol = function(shouldCommit, simulateNetworkFailures) {
         assert.eq(0, st.s.getDB(dbName).getCollection(collName).find().itcount());
     } else {
         jsTest.log("Verify that the transaction was committed on all shards.");
-        // Use assert.soon(), because although coordinateCommitTransaction currently blocks
-        // until the commit process is fully complete, it will eventually be changed to only
-        // block until the decision is *written*, so the documents may not be visible
-        // immediately.
-        assert.soon(function() {
-            return 3 === st.s.getDB(dbName).getCollection(collName).find().itcount();
-        });
+        const res = assert.commandWorked(st.s.getDB(dbName).runCommand({
+            find: collName,
+            readConcern: {level: "majority", afterClusterTime: commitTimestamp},
+            maxTimeMS: 10000
+        }));
+        assert.eq(3, res.cursor.firstBatch.length);
     }
 
     st.s.getDB(dbName).getCollection(collName).drop();
