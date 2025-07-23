@@ -92,6 +92,9 @@ export var RetryableWritesUtil = (function() {
     function isFailedToSatisfyPrimaryReadPreferenceError(res) {
         const kReplicaSetMonitorError =
             /Could not find host matching read preference.*mode:.*primary/;
+        if (res.code === ErrorCodes.FailedToSatisfyReadPreference && res.hasOwnProperty("reason")) {
+            return res.reason.match(kReplicaSetMonitorError);
+        }
         if (res.hasOwnProperty("errmsg")) {
             return res.errmsg.match(kReplicaSetMonitorError);
         }
