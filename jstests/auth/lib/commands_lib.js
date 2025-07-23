@@ -564,7 +564,7 @@ export const authCommandsLib = {
           skipUnlessSharded: true,
           testcases: [{
               runOnDb: "config",
-              roles: {...roles_clusterManager, searchCoordinator: 1},
+              roles: {...roles_clusterManager},
           }]
         },
         {
@@ -1719,7 +1719,7 @@ export const authCommandsLib = {
           testcases: [{
               runOnDb: "config",
               roles:
-                  {clusterAdmin: 1, clusterMonitor: 1, clusterManager: 1, root: 1, searchCoordinator: 1, __system: 1}
+                  {clusterAdmin: 1, clusterMonitor: 1, clusterManager: 1, root: 1, __system: 1, searchCoordinator: 1}
           }],
           skipSharded: true
         },
@@ -1739,7 +1739,7 @@ export const authCommandsLib = {
           testcases: [{
               runOnDb: "config",
               roles:
-                  {clusterAdmin: 1, clusterMonitor: 1, clusterManager: 1, root: 1, searchCoordinator: 1, __system: 1}
+                  {clusterAdmin: 1, clusterMonitor: 1, clusterManager: 1, root: 1, __system: 1, searchCoordinator: 1}
           }]
         },
         {
@@ -4616,7 +4616,7 @@ export const authCommandsLib = {
                     "backup": 1,
                     "root": 1,
                     "__system": 1,
-                    searchCoordinator: 1,
+                    "searchCoordinator": 1
                 },
                 privileges:
                     [{resource: {db: "config", collection: "changelog"}, actions: ["find"]}]
@@ -5178,7 +5178,7 @@ export const authCommandsLib = {
           testcases: [{
               runOnDb: "config",
               roles:
-                  {"clusterAdmin": 1, "clusterManager": 1, "root": 1, "__system": 1, "restore": 1, searchCoordinator: 1},
+                  {"clusterAdmin": 1, "clusterManager": 1, "root": 1, "__system": 1, "restore": 1},
               privileges:
                   [{resource: {db: "config", collection: "changelog"}, actions: ["insert"]}],
           }]
@@ -6972,7 +6972,7 @@ export const authCommandsLib = {
               },
               {
                 runOnDb: adminDbName,
-                roles: {...roles_clusterManager, searchCoordinator: 1},
+                roles: {...roles_clusterManager},
                 expectFail: true, // shard0name doesn't exist
               },
               {
@@ -7005,7 +7005,7 @@ export const authCommandsLib = {
               },
               {
                 runOnDb: adminDbName,
-                roles: {...roles_clusterManager, searchCoordinator: 1},
+                roles: {...roles_clusterManager},
                 expectFail: true, // shard0name doesn't exist
               },
               {
@@ -7041,7 +7041,7 @@ export const authCommandsLib = {
               },
               {
                 runOnDb: adminDbName,
-                roles: {...roles_clusterManager, searchCoordinator: 1},
+                roles: {...roles_clusterManager},
                 expectFail: true,
               },
               {
