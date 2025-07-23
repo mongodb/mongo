@@ -30,6 +30,7 @@
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -86,12 +87,18 @@ public:
         return entry;
     }
 
-    void assertBulkWriteRequest(BSONObj cmdObj,
-                                std::vector<BSONObj> expectedOps,
-                                std::vector<NamespaceInfoEntry> expectedNsInfos,
-                                boost::optional<LogicalSessionId> expectedLsid,
-                                boost::optional<TxnNumber> expectedTxnNumber,
-                                boost::optional<const WriteConcernOptions&> expectedWriteConcern) {
+    void assertBulkWriteRequest(
+        BSONObj cmdObj,
+        std::vector<BSONObj> expectedOps,
+        std::vector<NamespaceInfoEntry> expectedNsInfos,
+        boost::optional<LogicalSessionId> expectedLsid,
+        boost::optional<TxnNumber> expectedTxnNumber,
+        boost::optional<const WriteConcernOptions&> expectedWriteConcern,
+        boost::optional<bool> expectedBypassDocumentValidation = boost::none,
+        boost::optional<bool> expectedErrorsOnly = boost::none,
+        boost::optional<mongo::BSONObj> expectedLet = boost::none,
+        boost::optional<mongo::IDLAnyTypeOwned> expectedComment = boost::none,
+        boost::optional<std::int64_t> expectedMaxTimeMS = boost::none) {
         BSONObjBuilder builder;
         builder.appendElements(cmdObj);
         // The serialized command object does not have '$db' field, which is required for parsing.
@@ -128,6 +135,23 @@ public:
         }
         if (expectedWriteConcern) {
             ASSERT_EQ(*expectedWriteConcern, *bulkWrite.getWriteConcern());
+        }
+        if (expectedBypassDocumentValidation) {
+            ASSERT_EQ(expectedBypassDocumentValidation,
+                      cmdObj.getField("bypassDocumentValidation").boolean());
+        }
+        if (expectedErrorsOnly) {
+            ASSERT_EQ(expectedErrorsOnly, cmdObj.getField("errorsOnly").boolean());
+        }
+        if (expectedLet) {
+            ASSERT_BSONOBJ_EQ(*expectedLet, cmdObj.getField("let").Obj());
+        }
+        if (expectedComment) {
+            ASSERT_EQ(expectedComment->getElement().checkAndGetStringData(),
+                      cmdObj.getField("comment").checkAndGetStringData());
+        }
+        if (expectedMaxTimeMS) {
+            ASSERT_EQ(*expectedMaxTimeMS, cmdObj.getField("maxTimeMS").number());
         }
     }
 };
@@ -223,6 +247,145 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
             },
             {
                 getNamespaceInfoEntry(nss2, nss2ShardVersion2, boost::none),
+            },
+            lsid,
+            txnNumber,
+            operationContext()->getWriteConcern());
+        return BSON("ok" << 1);
+    });
+
+    future.default_timed_get();
+}
+
+TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSpecifiedWriteOptions) {
+    const DatabaseVersion nss1DbVersion(UUID::gen(), Timestamp(1, 0));
+    const ShardEndpoint nss1Shard1(shardId1, ShardVersion::UNSHARDED(), nss1DbVersion);
+
+    // We create a bulkRequest with an insert op that runs against
+    // the same namespace nss1 and targets shard1.
+    BulkWriteCommandRequest bulkRequest({BulkWriteInsertOp(1, BSON("a" << 0))},
+                                        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
+    // Assert that bulkRequest's write options are set to default values.
+    ASSERT_EQ(false, bulkRequest.getBypassDocumentValidation());
+    ASSERT_EQ(false, bulkRequest.getErrorsOnly());
+    ASSERT_EQ(boost::none, bulkRequest.getLet());
+    ASSERT_EQ(boost::none, bulkRequest.getComment());
+    ASSERT_EQ(boost::none, bulkRequest.getMaxTimeMS());
+
+    auto batch = SimpleWriteBatch{{{shardId1,
+                                    {
+                                        {{nss1, nss1Shard1}},
+                                        {WriteOp(bulkRequest, 0)},
+                                    }}}};
+    auto lsid = LogicalSessionId(UUID::gen(), SHA256Block());
+    operationContext()->setLogicalSessionId(lsid);
+    auto txnNumber = 0;
+    operationContext()->setTxnNumber(txnNumber);
+
+    // Create a WriteOpContext with write options that WriteBatchExecutor should attach to the
+    // request.
+    bulkRequest.setBypassDocumentValidation(true);
+    bulkRequest.setLet(BSON("key" << "value"));
+    bulkRequest.setErrorsOnly(true);
+    bulkRequest.setComment(IDLAnyTypeOwned(BSON("key" << "value")["key"]));
+    bulkRequest.setMaxTimeMS(25);
+    WriteOpContext context(bulkRequest);
+
+    auto future = launchAsync([&]() {
+        WriteBatchExecutor executor(context);
+        auto resps = executor.execute(operationContext(), {batch});
+
+        ASSERT_TRUE(holds_alternative<SimpleWriteBatchResponse>(resps));
+
+        auto& responses = get<SimpleWriteBatchResponse>(resps);
+
+        std::set<ShardId> expectedShardIds{shardId1};
+        ASSERT_EQ(1, responses.size());
+        for (auto& [shardId, response] : responses) {
+            ASSERT(expectedShardIds.contains(shardId));
+            ASSERT(response.swResponse.getStatus().isOK());
+            ASSERT_BSONOBJ_EQ(BSON("ok" << 1), response.swResponse.getValue().data);
+        }
+    });
+
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        assertBulkWriteRequest(request.cmdObj,
+                               {
+                                   BSON("insert" << 0 << "document" << BSON("a" << 0)),
+                               },
+                               {
+                                   getNamespaceInfoEntry(nss1, boost::none, nss1DbVersion),
+                               },
+                               lsid,
+                               txnNumber,
+                               operationContext()->getWriteConcern(),
+                               bulkRequest.getBypassDocumentValidation(),
+                               bulkRequest.getErrorsOnly(),
+                               bulkRequest.getLet(),
+                               bulkRequest.getComment(),
+                               bulkRequest.getMaxTimeMS());
+        return BSON("ok" << 1);
+    });
+
+    future.default_timed_get();
+}
+
+TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchBulkOpOptions) {
+    const DatabaseVersion nss1DbVersion(UUID::gen(), Timestamp(1, 0));
+    const ShardEndpoint nss1Shard1(shardId1, ShardVersion::UNSHARDED(), nss1DbVersion);
+
+    // We create a bulkRequest with an update op specifying hint, sort, and arrayFilters
+    // options. It runs against the same namespace nss1 and targets shard1.
+    auto arrayFiltersBSON = BSON("x.a" << BSON("$gt" << 2));
+    auto sortBSON = BSON("a" << 1);
+    auto hintBSON = BSON("_id" << 1);
+    BulkWriteUpdateOp updateOp = BulkWriteUpdateOp(
+        1, BSON("a" << 1), write_ops::UpdateModification(BSON("$set" << BSON("b" << 1))));
+    updateOp.setArrayFilters(std::vector<BSONObj>{arrayFiltersBSON});
+    updateOp.setSort(sortBSON);
+    updateOp.setHint(hintBSON);
+    BulkWriteCommandRequest bulkRequest({updateOp},
+                                        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
+    WriteOpContext context(bulkRequest);
+
+    auto batch = SimpleWriteBatch{{{shardId1,
+                                    {
+                                        {{nss1, nss1Shard1}},
+                                        {WriteOp(bulkRequest, 0)},
+                                    }}}};
+    auto lsid = LogicalSessionId(UUID::gen(), SHA256Block());
+    operationContext()->setLogicalSessionId(lsid);
+    auto txnNumber = 0;
+    operationContext()->setTxnNumber(txnNumber);
+
+    auto future = launchAsync([&]() {
+        WriteBatchExecutor executor(context);
+        auto resps = executor.execute(operationContext(), {batch});
+
+        ASSERT_TRUE(holds_alternative<SimpleWriteBatchResponse>(resps));
+
+        auto& responses = get<SimpleWriteBatchResponse>(resps);
+
+        std::set<ShardId> expectedShardIds{shardId1};
+        ASSERT_EQ(1, responses.size());
+        for (auto& [shardId, response] : responses) {
+            ASSERT(expectedShardIds.contains(shardId));
+            ASSERT(response.swResponse.getStatus().isOK());
+            ASSERT_BSONOBJ_EQ(BSON("ok" << 1), response.swResponse.getValue().data);
+        }
+    });
+
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        assertBulkWriteRequest(
+            request.cmdObj,
+            {
+                BSON("update" << 0 << "filter" << BSON("a" << 1) << "sort" << sortBSON << "multi"
+                              << false << "updateMods" << BSON("$set" << BSON("b" << 1)) << "upsert"
+                              << false << "arrayFilters" << BSON_ARRAY(arrayFiltersBSON) << "hint"
+                              << hintBSON),
+            },
+            {
+                getNamespaceInfoEntry(nss1, boost::none, nss1DbVersion),
             },
             lsid,
             txnNumber,

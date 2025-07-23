@@ -54,11 +54,59 @@ public:
     WriteOpContext(const BatchedCommandRequest& request)
         : _bulkWriteRequest(nullptr), _batchedRequest(&request) {}
 
+    bool isBulkWrite() const {
+        if (_bulkWriteRequest) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     bool getOrdered() const {
         if (_bulkWriteRequest) {
             return _bulkWriteRequest->getOrdered();
         } else {
             return _batchedRequest->getOrdered();
+        }
+    }
+
+    bool getBypassDocumentValidation() const {
+        if (_bulkWriteRequest) {
+            return _bulkWriteRequest->getBypassDocumentValidation();
+        } else {
+            return _batchedRequest->getBypassDocumentValidation();
+        }
+    }
+
+    bool getErrorsOnly() const {
+        if (_bulkWriteRequest) {
+            return _bulkWriteRequest->getErrorsOnly();
+        } else {
+            MONGO_UNREACHABLE_TASSERT(10412900);
+        }
+    }
+
+    const boost::optional<mongo::BSONObj>& getLet() const {
+        if (_bulkWriteRequest) {
+            return _bulkWriteRequest->getLet();
+        } else {
+            return _batchedRequest->getLet();
+        }
+    }
+
+    const boost::optional<mongo::IDLAnyTypeOwned>& getComment() const {
+        if (_bulkWriteRequest) {
+            return _bulkWriteRequest->getComment();
+        } else {
+            MONGO_UNREACHABLE_TASSERT(10412901);
+        }
+    }
+
+    boost::optional<std::int64_t> getMaxTimeMS() const {
+        if (_bulkWriteRequest) {
+            return _bulkWriteRequest->getMaxTimeMS();
+        } else {
+            MONGO_UNREACHABLE_TASSERT(10412902);
         }
     }
 
