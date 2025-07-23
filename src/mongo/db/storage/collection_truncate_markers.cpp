@@ -238,7 +238,8 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
         auto record = [&] {
             const bool forward = true;
             auto rs = collectionIterator.getRecordStore();
-            return rs->getCursor(opCtx, forward)->next();
+            return rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), forward)
+                ->next();
         }();
         if (!record) {
             // This shouldn't really happen unless the size storer values are far off from reality.
@@ -261,7 +262,8 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
         auto record = [&] {
             const bool forward = false;
             auto rs = collectionIterator.getRecordStore();
-            return rs->getCursor(opCtx, forward)->next();
+            return rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), forward)
+                ->next();
         }();
         if (!record) {
             // This shouldn't really happen unless the size storer values are far off from reality.

@@ -170,8 +170,6 @@ public:
     }
 
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
-                                                    bool forward = true) const final;
-    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                     RecoveryUnit& ru,
                                                     bool forward = true) const final;
 

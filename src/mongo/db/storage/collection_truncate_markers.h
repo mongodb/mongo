@@ -482,7 +482,7 @@ public:
     }
 
     void reset(OperationContext* opCtx) final {
-        _directionalCursor = _rs->getCursor(opCtx);
+        _directionalCursor = _rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
         _randomCursor = _rs->getRandomCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     }
 

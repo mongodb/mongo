@@ -1234,7 +1234,8 @@ boost::optional<OpTimeAndWallTime> StorageInterfaceImpl::findOplogOpTimeLessThan
     RecordId desiredRecordId = RecordId(timestamp.asULL());
     // Define a backward cursor so that the seek operation returns the first recordId less than or
     // equal to the 'desiredRecordId', if it exists.
-    auto cursor = oplog->getRecordStore()->getCursor(opCtx, false /* forward */);
+    auto cursor = oplog->getRecordStore()->getCursor(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), false /* forward */);
     if (auto record =
             cursor->seek(desiredRecordId, SeekableRecordCursor::BoundInclusion::kInclude)) {
         invariant(record->id <= desiredRecordId,

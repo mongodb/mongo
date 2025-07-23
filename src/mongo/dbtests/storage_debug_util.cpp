@@ -68,7 +68,7 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
 
     // Iterate and print the collection table (record store) documents.
     RecordStore* rs = coll->getRecordStore();
-    auto rsCursor = rs->getCursor(opCtx);
+    auto rsCursor = rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     boost::optional<Record> rec = rsCursor->next();
     LOGV2(51808, "[Debugging] Collection table entries:");
     while (rec) {

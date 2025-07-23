@@ -179,7 +179,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
 
     auto ns = coll->ns();
     auto rs = coll->getRecordStore();
-    auto cursor = rs->getCursor(opCtx);
+    auto cursor = rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     auto record = cursor->next();
     while (record) {
         opCtx->checkForInterrupt();

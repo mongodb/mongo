@@ -328,7 +328,8 @@ void _logOplogEntriesForInvalidResults(OperationContext* opCtx, ValidateResults*
                 "index entries",
                 recordStore);
 
-        auto cursor = recordStore->getCursor(opCtx, /*forward=*/false);
+        auto cursor = recordStore->getCursor(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx), /*forward=*/false);
         uassert(ErrorCodes::CursorNotFound,
                 "Validation failed: Unable to get cursor to oplog collection.",
                 cursor);

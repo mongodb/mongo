@@ -92,7 +92,8 @@ protected:
         auto table = getSideWritesTable(std::move(interceptor));
 
         std::vector<BSONObj> contents;
-        auto cursor = table->rs()->getCursor(operationContext());
+        auto cursor = table->rs()->getCursor(
+            operationContext(), *shard_role_details::getRecoveryUnit(operationContext()));
         while (auto record = cursor->next()) {
             contents.push_back(record->data.toBson().getOwned());
         }

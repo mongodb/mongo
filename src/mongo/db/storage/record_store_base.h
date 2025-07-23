@@ -97,8 +97,6 @@ public:
                                              const DamageVector&) final;
 
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext*,
-                                                    bool forward = true) const final;
-    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext*,
                                                     RecoveryUnit&,
                                                     bool forward = true) const override = 0;
 

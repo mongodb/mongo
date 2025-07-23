@@ -211,7 +211,7 @@ TEST_F(RecoveryUnitTestHarness, AbandonSnapshotCommitMode) {
 
     // Now create a cursor. We will check that the cursor is still positioned after a call to
     // abandonSnapshot().
-    auto cursor = rs->getCursor(opCtx.get());
+    auto cursor = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
 
     auto record = cursor->next();
     ASSERT(record);

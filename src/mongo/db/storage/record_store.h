@@ -521,11 +521,7 @@ public:
      * collection so that Record will be returned on the first call to next(). Implementations
      * are allowed to lazily seek to the first Record when next() is called rather than doing
      * it on construction.
-     *
-     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
-    virtual std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext*,
-                                                            bool forward = true) const = 0;
     virtual std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext*,
                                                             RecoveryUnit&,
                                                             bool forward = true) const = 0;

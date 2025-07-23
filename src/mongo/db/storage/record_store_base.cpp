@@ -140,11 +140,6 @@ StatusWith<RecordData> RecordStoreBase::updateWithDamages(OperationContext* opCt
     return _updateWithDamages(opCtx, ru, id, data, damageSource, damages);
 }
 
-std::unique_ptr<SeekableRecordCursor> RecordStoreBase::getCursor(OperationContext* opCtx,
-                                                                 bool forward) const {
-    return getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), forward);
-}
-
 Status RecordStoreBase::truncate(OperationContext* opCtx, RecoveryUnit& ru) {
     validateWriteAllowed(opCtx);
     return _truncate(opCtx, ru);

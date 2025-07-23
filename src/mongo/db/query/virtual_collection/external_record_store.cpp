@@ -48,17 +48,13 @@ ExternalRecordStore::ExternalRecordStore(boost::optional<UUID> uuid,
  * for this record store type, so if 'forward' is false this asserts.
  */
 std::unique_ptr<SeekableRecordCursor> ExternalRecordStore::getCursor(OperationContext* opCtx,
+                                                                     RecoveryUnit& ru,
                                                                      bool forward) const {
     if (forward) {
         return std::make_unique<MultiBsonStreamCursor>(getOptions());
     }
     tasserted(6968302, "MultiBsonStreamCursor does not support reverse scans");
     return nullptr;
-}
-std::unique_ptr<SeekableRecordCursor> ExternalRecordStore::getCursor(OperationContext* opCtx,
-                                                                     RecoveryUnit& ru,
-                                                                     bool forward) const {
-    return getCursor(opCtx, forward);
 }
 
 }  // namespace mongo

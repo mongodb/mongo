@@ -103,7 +103,8 @@ bool isExpired(OperationContext* opCtx,
 boost::optional<std::tuple<RecordId, Date_t, int>> getLastRecordInfo(
     OperationContext* opCtx, const CollectionAcquisition& preImagesCollection, const UUID& nsUUID) {
     const auto rs = preImagesCollection.getCollectionPtr()->getRecordStore();
-    auto cursor = rs->getCursor(opCtx, false /** forward **/);
+    auto cursor =
+        rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), false /** forward **/);
 
     // A reverse inclusive 'seek' will return the previous entry in the collection if the record
     // searched does not exist. This should ensure that the record's id is less than or equal to the

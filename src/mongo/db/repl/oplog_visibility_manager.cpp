@@ -198,8 +198,8 @@ void OplogVisibilityManager::waitForAllEarlierOplogWritesToBeVisible(OperationCo
 
     // Use a reverse oplog cursor that is not subject to the oplog visibility rules to see the
     // latest oplog entry timestamp. Then we will wait for that timestamp to become visible.
-    std::unique_ptr<SeekableRecordCursor> cursor =
-        _rs->getCursor(opCtx, false /* select a reverse cursor */);
+    std::unique_ptr<SeekableRecordCursor> cursor = _rs->getCursor(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), false /* select a reverse cursor */);
     auto lastOplogRecord = cursor->next();
     if (!lastOplogRecord) {
         LOGV2_DEBUG(

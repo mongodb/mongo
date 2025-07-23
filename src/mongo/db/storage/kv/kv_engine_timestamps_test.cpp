@@ -166,7 +166,7 @@ public:
      */
     int itCountOn(OperationContext* opCtx) {
         Lock::GlobalLock globalLock(opCtx, MODE_IS);
-        auto cursor = rs->getCursor(opCtx);
+        auto cursor = rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
         int count = 0;
         while (auto record = cursor->next()) {
             count++;
@@ -192,7 +192,7 @@ public:
 
     boost::optional<Record> readRecordOn(OperationContext* op, RecordId id) {
         Lock::GlobalLock globalLock(op, MODE_IS);
-        auto cursor = rs->getCursor(op);
+        auto cursor = rs->getCursor(op, *shard_role_details::getRecoveryUnit(op));
         auto record = cursor->seekExact(id);
         if (record)
             record->data.makeOwned();

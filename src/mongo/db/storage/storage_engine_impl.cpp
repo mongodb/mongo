@@ -795,7 +795,7 @@ Timestamp StorageEngineImpl::getPinnedOplog() const {
 
 void StorageEngineImpl::_dumpCatalog(OperationContext* opCtx) {
     auto catalogRs = _catalogRecordStore.get();
-    auto cursor = catalogRs->getCursor(opCtx);
+    auto cursor = catalogRs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     boost::optional<Record> rec = cursor->next();
     stdx::unordered_set<std::string> nsMap;
     while (rec) {

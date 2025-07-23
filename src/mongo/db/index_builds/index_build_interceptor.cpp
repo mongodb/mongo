@@ -220,7 +220,8 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
         int32_t batchSize = 0;
         int64_t batchSizeBytes = 0;
 
-        auto cursor = _sideWritesTable->rs()->getCursor(opCtx);
+        auto cursor =
+            _sideWritesTable->rs()->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
 
         // We use an ordered container because the order of deletion for the records in the side
         // table matters.
@@ -421,7 +422,8 @@ bool IndexBuildInterceptor::_checkAllWritesApplied(OperationContext* opCtx, bool
     invariant(_sideWritesTable);
 
     // The table is empty only when all writes are applied.
-    auto cursor = _sideWritesTable->rs()->getCursor(opCtx);
+    auto cursor =
+        _sideWritesTable->rs()->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     auto record = cursor->next();
     if (fatal) {
         invariant(

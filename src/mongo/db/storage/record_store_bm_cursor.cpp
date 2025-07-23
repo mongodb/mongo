@@ -60,7 +60,9 @@ struct Fixture {
           harness(newRecordStoreHarnessHelper()),
           rs(harness->newRecordStore("ns", RecordStore::Options{.isCapped = capped})),
           opCtx(harness->newOperationContext()),
-          cursor(rs->getCursor(opCtx.get(), direction == kForward)) {
+          cursor(rs->getCursor(opCtx.get(),
+                               *shard_role_details::getRecoveryUnit(opCtx.get()),
+                               direction == kForward)) {
         char data[] = "data";
         int inserted = 0;
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());

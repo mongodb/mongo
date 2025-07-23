@@ -180,7 +180,6 @@ public:
     void printRecordMetadata(const RecordId& recordId,
                              std::set<Timestamp>* recordTimestamps) const override;
 
-    using RecordStoreBase::getCursor;
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                     RecoveryUnit& ru,
                                                     bool forward = true) const override;
@@ -390,7 +389,6 @@ class WiredTigerRecordStore::Capped : public WiredTigerRecordStore, public Recor
 public:
     Capped(WiredTigerKVEngine*, WiredTigerRecoveryUnit&, Params);
 
-    using RecordStoreBase::getCursor;
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext*,
                                                     RecoveryUnit&,
                                                     bool forward = true) const override;
@@ -428,7 +426,6 @@ public:
 
     ~Oplog() override;
 
-    using RecordStoreBase::getCursor;
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext*,
                                                     RecoveryUnit&,
                                                     bool forward = true) const override;

@@ -41,6 +41,7 @@
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 
@@ -103,7 +104,8 @@ bool collectionMayRequireExtendedRangeSupport(OperationContext* opCtx,
     // document in the record store and test this high bit of it's _id.
 
     auto* rs = collection.getRecordStore();
-    auto cursor = rs->getCursor(opCtx, /* forward */ false);
+    auto cursor =
+        rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), /* forward */ false);
     if (auto record = cursor->next()) {
         const auto& obj = record->data.toBson();
         OID id = obj.getField(kBucketIdFieldName).OID();

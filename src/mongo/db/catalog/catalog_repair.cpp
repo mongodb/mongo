@@ -81,7 +81,7 @@ bool identHandler(StorageEngine* engine,
     auto rs = engine->getEngine()->getRecordStore(
         opCtx, NamespaceString::kEmpty, ident, RecordStore::Options{}, boost::none /* uuid */);
 
-    auto cursor = rs->getCursor(opCtx);
+    auto cursor = rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     auto record = cursor->next();
     if (record) {
         auto doc = record.value().data.toBson();

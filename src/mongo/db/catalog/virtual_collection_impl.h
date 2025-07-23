@@ -59,6 +59,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 #include "mongo/util/version/releases.h"
@@ -189,7 +190,8 @@ public:
 
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                     bool forward = true) const final {
-        return _shared->_recordStore->getCursor(opCtx, forward);
+        return _shared->_recordStore->getCursor(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx), forward);
     }
 
     bool updateWithDamagesSupported() const final {

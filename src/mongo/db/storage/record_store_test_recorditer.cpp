@@ -86,7 +86,7 @@ TEST(RecordStoreTest, IterateOverMultipleRecords) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto cursor = rs->getCursor(opCtx.get());
+        auto cursor = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         for (int i = 0; i < nToInsert; i++) {
             const auto record = cursor->next();
             ASSERT(record);
@@ -136,7 +136,8 @@ TEST(RecordStoreTest, IterateOverMultipleRecordsReversed) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        auto cursor = rs->getCursor(opCtx.get(), false);
+        auto cursor =
+            rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), false);
         for (int i = nToInsert - 1; i >= 0; i--) {
             const auto record = cursor->next();
             ASSERT(record);
@@ -186,7 +187,7 @@ TEST(RecordStoreTest, IterateStartFromMiddle) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
         int start = nToInsert / 2;
-        auto cursor = rs->getCursor(opCtx.get());
+        auto cursor = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         for (int i = start; i < nToInsert; i++) {
             const auto record = (i == start) ? cursor->seekExact(locs[i]) : cursor->next();
             ASSERT(record);
@@ -236,7 +237,8 @@ TEST(RecordStoreTest, IterateStartFromMiddleReversed) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
         int start = nToInsert / 2;
-        auto cursor = rs->getCursor(opCtx.get(), false);
+        auto cursor =
+            rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), false);
         for (int i = start; i >= 0; i--) {
             const auto record = (i == start) ? cursor->seekExact(locs[i]) : cursor->next();
             ASSERT(record);
@@ -288,7 +290,7 @@ TEST(RecordStoreTest, RecordIteratorEOF) {
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
         // Get a forward iterator starting at the beginning of the record store.
-        auto cursor = rs->getCursor(opCtx.get());
+        auto cursor = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
 
         // Iterate, checking EOF along the way.
         for (int i = 0; i < nToInsert; i++) {
@@ -360,7 +362,7 @@ TEST(RecordStoreTest, RecordIteratorSaveRestore) {
 
     {
         // Get a forward iterator starting at the beginning of the record store.
-        auto cursor = rs->getCursor(opCtx.get());
+        auto cursor = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
 
         // Iterate, checking EOF along the way.
         for (int i = 0; i < nToInsert; i++) {
@@ -414,7 +416,7 @@ TEST(RecordStoreTest, SeekAfterEofAndContinue) {
 
 
     // Get a forward iterator starting at the beginning of the record store.
-    auto cursor = rs->getCursor(opCtx.get());
+    auto cursor = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
 
     // Iterate, checking EOF along the way.
     for (int i = 0; i < nToInsert; i++) {
@@ -479,7 +481,8 @@ TEST(RecordStoreTest, SeekExactForMissingRecordReturnsNone) {
     // Seeking to the second record should now return boost::none, for both forward and reverse
     // cursors.
     for (bool direction : {true, false}) {
-        auto cursor = recordStore->getCursor(opCtx.get(), direction);
+        auto cursor = recordStore->getCursor(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), direction);
         ASSERT(!cursor->seekExact(recordIds[1]));
     }
 

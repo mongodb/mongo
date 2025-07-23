@@ -228,7 +228,8 @@ stdx::unordered_map<UUID, RecordIdAndWallTime, UUID::Hash> sampleLastRecordPerNs
     const auto rs = preImagesCollection.getCollectionPtr()->getRecordStore();
     stdx::unordered_map<UUID, RecordIdAndWallTime, UUID::Hash> lastRecords;
 
-    auto cursor = rs->getCursor(opCtx, false /** forward **/);
+    auto cursor =
+        rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), false /** forward **/);
     boost::optional<Record> record = cursor->next();
 
     while (record) {

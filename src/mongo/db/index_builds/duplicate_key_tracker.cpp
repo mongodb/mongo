@@ -131,7 +131,8 @@ boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkCon
     OperationContext* opCtx, const IndexCatalogEntry* indexCatalogEntry) const {
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
-    auto constraintsCursor = _keyConstraintsTable->rs()->getCursor(opCtx);
+    auto constraintsCursor =
+        _keyConstraintsTable->rs()->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     auto record = constraintsCursor->next();
 
     auto index = indexCatalogEntry->accessMethod()->asSortedData()->getSortedDataInterface();

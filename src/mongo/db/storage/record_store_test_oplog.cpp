@@ -146,7 +146,7 @@ TEST(RecordStoreTest, SeekOplog) {
     // Forward cursor seeks
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto cur = rs->getCursor(opCtx.get());
+        auto cur = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         auto rec = cur->seek(RecordId(0, 1), SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT(rec);
         ASSERT_EQ(rec->id, RecordId(1, 1));
@@ -154,7 +154,7 @@ TEST(RecordStoreTest, SeekOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto cur = rs->getCursor(opCtx.get());
+        auto cur = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         auto rec = cur->seek(RecordId(2, 1), SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT(rec);
         ASSERT_EQ(rec->id, RecordId(2, 2));
@@ -162,7 +162,7 @@ TEST(RecordStoreTest, SeekOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto cur = rs->getCursor(opCtx.get());
+        auto cur = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         auto rec = cur->seek(RecordId(2, 2), SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT(rec);
         ASSERT_EQ(rec->id, RecordId(2, 2));
@@ -170,7 +170,7 @@ TEST(RecordStoreTest, SeekOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto cur = rs->getCursor(opCtx.get());
+        auto cur = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         auto rec = cur->seek(RecordId(2, 3), SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT_FALSE(rec);
     }
@@ -178,14 +178,16 @@ TEST(RecordStoreTest, SeekOplog) {
     // Reverse cursor seeks
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto cur = rs->getCursor(opCtx.get(), false /* forward */);
+        auto cur = rs->getCursor(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), /*forward=*/false);
         auto rec = cur->seek(RecordId(0, 1), SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT_FALSE(rec);
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto cur = rs->getCursor(opCtx.get(), false /* forward */);
+        auto cur = rs->getCursor(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), /*forward=*/false);
         auto rec = cur->seek(RecordId(2, 1), SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT(rec);
         ASSERT_EQ(rec->id, RecordId(1, 2));
@@ -193,7 +195,8 @@ TEST(RecordStoreTest, SeekOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto cur = rs->getCursor(opCtx.get(), false /* forward */);
+        auto cur = rs->getCursor(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), /*forward=*/false);
         auto rec = cur->seek(RecordId(2, 2), SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT(rec);
         ASSERT_EQ(rec->id, RecordId(2, 2));
@@ -201,7 +204,8 @@ TEST(RecordStoreTest, SeekOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto cur = rs->getCursor(opCtx.get(), false /* forward */);
+        auto cur = rs->getCursor(
+            opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), /*forward=*/false);
         auto rec = cur->seek(RecordId(2, 3), SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT(rec);
         ASSERT_EQ(rec->id, RecordId(2, 2));
@@ -219,7 +223,7 @@ TEST(RecordStoreTest, SeekOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto cur = rs->getCursor(opCtx.get());
+        auto cur = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         auto rec = cur->seek(RecordId(2, 3), SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT_FALSE(rec);
     }
@@ -241,7 +245,7 @@ TEST(RecordStoreTest, OplogInsertOutOfOrder) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs.get());
-        auto cursor = rs->getCursor(opCtx.get());
+        auto cursor = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         ASSERT_EQ(cursor->next()->id, RecordId(1, 1));
         ASSERT_EQ(cursor->next()->id, RecordId(1, 2));
         ASSERT_EQ(cursor->next()->id, RecordId(2, 2));
@@ -304,7 +308,7 @@ TEST(RecordStoreTest, OplogOrder) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto cursor = rs->getCursor(opCtx.get());
+        auto cursor = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         auto record = cursor->seekExact(id1);
         ASSERT(record);
         ASSERT_EQ(id1, record->id);
@@ -320,7 +324,8 @@ TEST(RecordStoreTest, OplogOrder) {
         // now we insert 2 docs, but commit the 2nd one first.
         // we make sure we can't find the 2nd until the first is committed.
         ServiceContext::UniqueOperationContext earlyReader(harnessHelper->newOperationContext());
-        auto earlyCursor = rs->getCursor(earlyReader.get());
+        auto earlyCursor = rs->getCursor(earlyReader.get(),
+                                         *shard_role_details::getRecoveryUnit(earlyReader.get()));
         ASSERT_EQ(earlyCursor->seekExact(id1)->id, id1);
         earlyCursor->save();
         shard_role_details::getRecoveryUnit(earlyReader.get())->abandonSnapshot();
@@ -349,7 +354,8 @@ TEST(RecordStoreTest, OplogOrder) {
 
             auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
-            auto cursor = rs->getCursor(opCtx.get());
+            auto cursor =
+                rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
             auto record = cursor->seekExact(id1);
             ASSERT(record) << stringifyForDebug(opCtx.get(), record, cursor.get());
             ASSERT_EQ(id1, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
@@ -377,7 +383,8 @@ TEST(RecordStoreTest, OplogOrder) {
         {
             auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
-            auto cursor = rs->getCursor(opCtx.get());
+            auto cursor =
+                rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
             auto record = cursor->seek(id2, SeekableRecordCursor::BoundInclusion::kInclude);
             ASSERT(!record) << stringifyForDebug(opCtx.get(), record, cursor.get());
         }
@@ -385,7 +392,8 @@ TEST(RecordStoreTest, OplogOrder) {
         {  // Test reverse cursors and visibility
             auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
-            auto cursor = rs->getCursor(opCtx.get(), false);
+            auto cursor = rs->getCursor(
+                opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), false);
             // 2nd doc (id3) is committed and visibility filter does not apply to reverse cursor
             auto record = cursor->seekExact(id3);
             ASSERT(record) << stringifyForDebug(opCtx.get(), record, cursor.get());
@@ -419,7 +427,7 @@ TEST(RecordStoreTest, OplogOrder) {
     {  // now all 3 docs should be visible
         auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
         auto opCtx = harnessHelper->newOperationContext(client2.get());
-        auto cursor = rs->getCursor(opCtx.get());
+        auto cursor = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         auto record = cursor->seekExact(id1);
         ASSERT_EQ(id1, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
         auto nextRecord = cursor->next();
@@ -461,7 +469,8 @@ TEST(RecordStoreTest, OplogOrder) {
         // Now we insert 2 docs with timestamps earlier than before, but commit the 2nd one first.
         // We make sure we can't find the 2nd until the first is committed.
         ServiceContext::UniqueOperationContext earlyReader(harnessHelper->newOperationContext());
-        auto earlyCursor = rs->getCursor(earlyReader.get());
+        auto earlyCursor = rs->getCursor(earlyReader.get(),
+                                         *shard_role_details::getRecoveryUnit(earlyReader.get()));
         ASSERT_EQ(earlyCursor->seekExact(id1)->id, id1);
         earlyCursor->save();
         shard_role_details::getRecoveryUnit(earlyReader.get())->abandonSnapshot();
@@ -492,7 +501,8 @@ TEST(RecordStoreTest, OplogOrder) {
 
             auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
-            auto cursor = rs->getCursor(opCtx.get());
+            auto cursor =
+                rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
             auto record = cursor->seekExact(id1);
             ASSERT(record);
             ASSERT_EQ(id1, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
@@ -503,7 +513,8 @@ TEST(RecordStoreTest, OplogOrder) {
         {
             auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
-            auto cursor = rs->getCursor(opCtx.get());
+            auto cursor =
+                rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
             auto record = cursor->seek(id2, SeekableRecordCursor::BoundInclusion::kInclude);
             ASSERT_FALSE(record);
         }
@@ -511,7 +522,8 @@ TEST(RecordStoreTest, OplogOrder) {
         {
             auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
-            auto cursor = rs->getCursor(opCtx.get());
+            auto cursor =
+                rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
             auto record = cursor->seek(id3, SeekableRecordCursor::BoundInclusion::kInclude);
             ASSERT_FALSE(record);
         }
@@ -526,7 +538,7 @@ TEST(RecordStoreTest, OplogOrder) {
 
     {  // now all 3 docs should be visible
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto cursor = rs->getCursor(opCtx.get());
+        auto cursor = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         auto record = cursor->seekExact(id1);
         ASSERT_EQ(id1, record->id);
         auto nextRecord = cursor->next();
@@ -575,7 +587,7 @@ TEST(RecordStoreTest, OplogVisibilityStandalone) {
     // verify that we can read it
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto cursor = rs->getCursor(opCtx.get());
+        auto cursor = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         auto record = cursor->seekExact(id1);
         ASSERT(record);
         ASSERT_EQ(id1, record->id);
@@ -584,7 +596,7 @@ TEST(RecordStoreTest, OplogVisibilityStandalone) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto cursor = rs->getCursor(opCtx.get());
+        auto cursor = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         auto record = cursor->seek(RecordId(id1.getLong() + 1),
                                    SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT_FALSE(record);

@@ -122,7 +122,8 @@ bool SkippedRecordTracker::areAllRecordsApplied(OperationContext* opCtx) const {
     if (!_skippedRecordsTable) {
         return true;
     }
-    auto cursor = _skippedRecordsTable->rs()->getCursor(opCtx);
+    auto cursor =
+        _skippedRecordsTable->rs()->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     auto record = cursor->next();
 
     // The table is empty only when all writes are applied.
@@ -179,7 +180,7 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
     auto& containerPool = PreallocatedContainerPool::get(opCtx);
 
     auto recordStore = _skippedRecordsTable->rs();
-    auto cursor = recordStore->getCursor(opCtx);
+    auto cursor = recordStore->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     while (auto record = cursor->next()) {
         const BSONObj doc = record->data.toBson();
 

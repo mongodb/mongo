@@ -587,7 +587,7 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterNext) {
 
         auto& ru = *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx.get()));
 
-        auto cursor = rs->getCursor(opCtx.get());
+        auto cursor = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         ASSERT(cursor->next());
         ASSERT_TRUE(ru.isActive());
 
@@ -632,7 +632,7 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
 
         auto& ru = *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx.get()));
 
-        auto cursor = rs->getCursor(opCtx.get());
+        auto cursor = rs->getCursor(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()));
         ASSERT(cursor->seekExact(rid1));
         ASSERT_TRUE(ru.isActive());
 

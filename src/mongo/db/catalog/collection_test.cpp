@@ -827,7 +827,8 @@ TEST_F(CatalogTestFixture, CappedDeleteRecord) {
 
     ASSERT_EQUALS(1, coll->numRecords(operationContext()));
 
-    auto cursor = coll->getRecordStore()->getCursor(operationContext());
+    auto cursor = coll->getRecordStore()->getCursor(
+        operationContext(), *shard_role_details::getRecoveryUnit(operationContext()));
     auto record = cursor->next();
     ASSERT(record);
     ASSERT(record->data.toBson().woCompare(secondDoc) == 0);
@@ -879,7 +880,8 @@ TEST_F(CatalogTestFixture, CappedDeleteMultipleRecords) {
     const int firstExpectedId = nToInsertFirst + nToInsertSecond - options.cappedMaxDocs;
 
     int numSeen = 0;
-    auto cursor = coll->getRecordStore()->getCursor(operationContext());
+    auto cursor = coll->getRecordStore()->getCursor(
+        operationContext(), *shard_role_details::getRecoveryUnit(operationContext()));
     while (auto record = cursor->next()) {
         const BSONObj expectedDoc = BSON("_id" << firstExpectedId + numSeen);
         ASSERT(record->data.toBson().woCompare(expectedDoc) == 0);
@@ -912,8 +914,14 @@ TEST_F(CatalogTestFixture, CappedVisibilityEmptyInitialState) {
     WriteUnitOfWork longLivedWUOW(longLivedOpCtx.get());
 
     // Collection is really empty.
-    ASSERT(!rs->getCursor(longLivedOpCtx.get(), true)->next());
-    ASSERT(!rs->getCursor(longLivedOpCtx.get(), false)->next());
+    ASSERT(!rs->getCursor(longLivedOpCtx.get(),
+                          *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()),
+                          true)
+                ->next());
+    ASSERT(!rs->getCursor(longLivedOpCtx.get(),
+                          *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()),
+                          false)
+                ->next());
 
     RecordId lowestHiddenId = doInsert(longLivedOpCtx.get());
     RecordId otherId;
@@ -922,34 +930,80 @@ TEST_F(CatalogTestFixture, CappedVisibilityEmptyInitialState) {
         WriteUnitOfWork wuow(operationContext());
 
         // Can't see uncommitted write from other operation.
-        ASSERT(!rs->getCursor(operationContext())->seekExact(lowestHiddenId));
+        ASSERT(!rs->getCursor(operationContext(),
+                              *shard_role_details::getRecoveryUnit(operationContext()))
+                    ->seekExact(lowestHiddenId));
 
-        ASSERT(!rs->getCursor(operationContext(), true)->next());
-        ASSERT(!rs->getCursor(operationContext(), false)->next());
+        ASSERT(!rs->getCursor(operationContext(),
+                              *shard_role_details::getRecoveryUnit(operationContext()),
+                              true)
+                    ->next());
+        ASSERT(!rs->getCursor(operationContext(),
+                              *shard_role_details::getRecoveryUnit(operationContext()),
+                              false)
+                    ->next());
 
         otherId = doInsert(operationContext());
 
         // Can read own writes.
-        ASSERT_ID_EQ(rs->getCursor(operationContext(), true)->next(), otherId);
-        ASSERT_ID_EQ(rs->getCursor(operationContext(), false)->next(), otherId);
-        ASSERT_ID_EQ(rs->getCursor(operationContext())->seekExact(otherId), otherId);
+        ASSERT_ID_EQ(rs->getCursor(operationContext(),
+                                   *shard_role_details::getRecoveryUnit(operationContext()),
+                                   true)
+                         ->next(),
+                     otherId);
+        ASSERT_ID_EQ(rs->getCursor(operationContext(),
+                                   *shard_role_details::getRecoveryUnit(operationContext()),
+                                   false)
+                         ->next(),
+                     otherId);
+        ASSERT_ID_EQ(rs->getCursor(operationContext(),
+                                   *shard_role_details::getRecoveryUnit(operationContext()))
+                         ->seekExact(otherId),
+                     otherId);
 
         wuow.commit();
     }
 
     // longLivedOpCtx is still on old snapshot so it can't see otherId yet.
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), true)->next(), lowestHiddenId);
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), false)->next(), lowestHiddenId);
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(lowestHiddenId), lowestHiddenId);
-    ASSERT(!rs->getCursor(longLivedOpCtx.get())->seekExact(otherId));
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()),
+                               true)
+                     ->next(),
+                 lowestHiddenId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()),
+                               false)
+                     ->next(),
+                 lowestHiddenId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()))
+                     ->seekExact(lowestHiddenId),
+                 lowestHiddenId);
+    ASSERT(!rs->getCursor(longLivedOpCtx.get(),
+                          *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()))
+                ->seekExact(otherId));
 
     // Make all documents visible and let longLivedOp get a new snapshot.
     longLivedWUOW.commit();
 
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), true)->next(), lowestHiddenId);
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), false)->next(), otherId);
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(lowestHiddenId), lowestHiddenId);
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(otherId), otherId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()),
+                               true)
+                     ->next(),
+                 lowestHiddenId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()),
+                               false)
+                     ->next(),
+                 otherId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()))
+                     ->seekExact(lowestHiddenId),
+                 lowestHiddenId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()))
+                     ->seekExact(otherId),
+                 otherId);
 }
 
 TEST_F(CatalogTestFixture, CappedVisibilityNonEmptyInitialState) {
@@ -985,56 +1039,145 @@ TEST_F(CatalogTestFixture, CappedVisibilityNonEmptyInitialState) {
     WriteUnitOfWork longLivedWUOW(longLivedOpCtx.get());
 
     // Can see initial doc.
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), true)->next(), initialId);
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), false)->next(), initialId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()),
+                               true)
+                     ->next(),
+                 initialId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()),
+                               false)
+                     ->next(),
+                 initialId);
 
     RecordId lowestHiddenId = doInsert(longLivedOpCtx.get());
 
     // Collection still looks like it only has a single doc to iteration but not seekExact.
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), true)->next(), initialId);
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), false)->next(), lowestHiddenId);
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(initialId), initialId);
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(lowestHiddenId), lowestHiddenId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()),
+                               true)
+                     ->next(),
+                 initialId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()),
+                               false)
+                     ->next(),
+                 lowestHiddenId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()))
+                     ->seekExact(initialId),
+                 initialId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()))
+                     ->seekExact(lowestHiddenId),
+                 lowestHiddenId);
 
     RecordId otherId;
     {
         WriteUnitOfWork wuow(operationContext());
 
         // Can only see committed writes from other operation.
-        ASSERT_ID_EQ(rs->getCursor(operationContext())->seekExact(initialId), initialId);
-        ASSERT(!rs->getCursor(operationContext())->seekExact(lowestHiddenId));
+        ASSERT_ID_EQ(rs->getCursor(operationContext(),
+                                   *shard_role_details::getRecoveryUnit(operationContext()))
+                         ->seekExact(initialId),
+                     initialId);
+        ASSERT(!rs->getCursor(operationContext(),
+                              *shard_role_details::getRecoveryUnit(operationContext()))
+                    ->seekExact(lowestHiddenId));
 
-        ASSERT_ID_EQ(rs->getCursor(operationContext(), true)->next(), initialId);
-        ASSERT_ID_EQ(rs->getCursor(operationContext(), false)->next(), initialId);
+        ASSERT_ID_EQ(rs->getCursor(operationContext(),
+                                   *shard_role_details::getRecoveryUnit(operationContext()),
+                                   true)
+                         ->next(),
+                     initialId);
+        ASSERT_ID_EQ(rs->getCursor(operationContext(),
+                                   *shard_role_details::getRecoveryUnit(operationContext()),
+                                   false)
+                         ->next(),
+                     initialId);
 
         otherId = doInsert(operationContext());
 
-        ASSERT_ID_EQ(rs->getCursor(operationContext(), true)->next(), initialId);
-        ASSERT_ID_EQ(rs->getCursor(operationContext(), false)->next(), otherId);
-        ASSERT_ID_EQ(rs->getCursor(operationContext())->seekExact(otherId), otherId);
+        ASSERT_ID_EQ(rs->getCursor(operationContext(),
+                                   *shard_role_details::getRecoveryUnit(operationContext()),
+                                   true)
+                         ->next(),
+                     initialId);
+        ASSERT_ID_EQ(rs->getCursor(operationContext(),
+                                   *shard_role_details::getRecoveryUnit(operationContext()),
+                                   false)
+                         ->next(),
+                     otherId);
+        ASSERT_ID_EQ(rs->getCursor(operationContext(),
+                                   *shard_role_details::getRecoveryUnit(operationContext()))
+                         ->seekExact(otherId),
+                     otherId);
 
         wuow.commit();
 
-        ASSERT_ID_EQ(rs->getCursor(operationContext(), true)->next(), initialId);
-        ASSERT_ID_EQ(rs->getCursor(operationContext(), false)->next(), otherId);
-        ASSERT_ID_EQ(rs->getCursor(operationContext())->seekExact(otherId), otherId);
-        ASSERT(!rs->getCursor(operationContext())->seekExact(lowestHiddenId));
+        ASSERT_ID_EQ(rs->getCursor(operationContext(),
+                                   *shard_role_details::getRecoveryUnit(operationContext()),
+                                   true)
+                         ->next(),
+                     initialId);
+        ASSERT_ID_EQ(rs->getCursor(operationContext(),
+                                   *shard_role_details::getRecoveryUnit(operationContext()),
+                                   false)
+                         ->next(),
+                     otherId);
+        ASSERT_ID_EQ(rs->getCursor(operationContext(),
+                                   *shard_role_details::getRecoveryUnit(operationContext()))
+                         ->seekExact(otherId),
+                     otherId);
+        ASSERT(!rs->getCursor(operationContext(),
+                              *shard_role_details::getRecoveryUnit(operationContext()))
+                    ->seekExact(lowestHiddenId));
     }
 
     // longLivedOpCtx is still on old snapshot so it can't see otherId yet.
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), true)->next(), initialId);
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), false)->next(), lowestHiddenId);
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(lowestHiddenId), lowestHiddenId);
-    ASSERT(!rs->getCursor(longLivedOpCtx.get())->seekExact(otherId));
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()),
+                               true)
+                     ->next(),
+                 initialId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()),
+                               false)
+                     ->next(),
+                 lowestHiddenId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()))
+                     ->seekExact(lowestHiddenId),
+                 lowestHiddenId);
+    ASSERT(!rs->getCursor(longLivedOpCtx.get(),
+                          *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()))
+                ->seekExact(otherId));
 
     // This makes all documents visible and lets longLivedOpCtx get a new snapshot.
     longLivedWUOW.commit();
 
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), true)->next(), initialId);
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), false)->next(), otherId);
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(initialId), initialId);
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(lowestHiddenId), lowestHiddenId);
-    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(otherId), otherId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()),
+                               true)
+                     ->next(),
+                 initialId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()),
+                               false)
+                     ->next(),
+                 otherId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()))
+                     ->seekExact(initialId),
+                 initialId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()))
+                     ->seekExact(lowestHiddenId),
+                 lowestHiddenId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(),
+                               *shard_role_details::getRecoveryUnit(longLivedOpCtx.get()))
+                     ->seekExact(otherId),
+                 otherId);
 }
 
 TEST_F(CollectionTest, CappedCursorRollover) {
@@ -1067,7 +1210,8 @@ TEST_F(CollectionTest, CappedCursorRollover) {
     auto otherClient = getServiceContext()->getService()->makeClient("otherClient");
     auto otherOpCtx = otherClient->makeOperationContext();
     Lock::GlobalLock globalLock{otherOpCtx.get(), MODE_IS};
-    auto cursor = rs->getCursor(otherOpCtx.get());
+    auto cursor =
+        rs->getCursor(otherOpCtx.get(), *shard_role_details::getRecoveryUnit(otherOpCtx.get()));
     ASSERT(cursor->next());
     cursor->save();
     shard_role_details::getRecoveryUnit(otherOpCtx.get())->abandonSnapshot();
@@ -1122,42 +1266,55 @@ TEST_F(CollectionTest, BoundedSeek) {
     }
 
     // Forward inclusive seek
-    ASSERT_ID_EQ(rs->getCursor(operationContext())
-                     ->seek(recordIds[1], SeekableRecordCursor::BoundInclusion::kInclude),
-                 recordIds[1]);
-    ASSERT_ID_EQ(rs->getCursor(operationContext())
-                     ->seek(recordIds[0], SeekableRecordCursor::BoundInclusion::kInclude),
-                 recordIds[1]);
-    ASSERT(!rs->getCursor(operationContext())
-                ->seek(RecordId(recordIds[numToInsert - 1].getLong() + 1),
-                       SeekableRecordCursor::BoundInclusion::kInclude));
+    ASSERT_ID_EQ(
+        rs->getCursor(operationContext(), *shard_role_details::getRecoveryUnit(operationContext()))
+            ->seek(recordIds[1], SeekableRecordCursor::BoundInclusion::kInclude),
+        recordIds[1]);
+    ASSERT_ID_EQ(
+        rs->getCursor(operationContext(), *shard_role_details::getRecoveryUnit(operationContext()))
+            ->seek(recordIds[0], SeekableRecordCursor::BoundInclusion::kInclude),
+        recordIds[1]);
+    ASSERT(
+        !rs->getCursor(operationContext(), *shard_role_details::getRecoveryUnit(operationContext()))
+             ->seek(RecordId(recordIds[numToInsert - 1].getLong() + 1),
+                    SeekableRecordCursor::BoundInclusion::kInclude));
 
     // Forward exclusive seek
-    ASSERT_ID_EQ(rs->getCursor(operationContext())
-                     ->seek(recordIds[1], SeekableRecordCursor::BoundInclusion::kExclude),
-                 recordIds[2]);
-    ASSERT(!rs->getCursor(operationContext())
-                ->seek(RecordId(recordIds[numToInsert - 1]),
-                       SeekableRecordCursor::BoundInclusion::kExclude));
+    ASSERT_ID_EQ(
+        rs->getCursor(operationContext(), *shard_role_details::getRecoveryUnit(operationContext()))
+            ->seek(recordIds[1], SeekableRecordCursor::BoundInclusion::kExclude),
+        recordIds[2]);
+    ASSERT(
+        !rs->getCursor(operationContext(), *shard_role_details::getRecoveryUnit(operationContext()))
+             ->seek(RecordId(recordIds[numToInsert - 1]),
+                    SeekableRecordCursor::BoundInclusion::kExclude));
 
     // Reverse inclusive seek
     ASSERT_ID_EQ(
-        rs->getCursor(operationContext(), false)
+        rs->getCursor(
+              operationContext(), *shard_role_details::getRecoveryUnit(operationContext()), false)
             ->seek(recordIds[numToInsert - 1], SeekableRecordCursor::BoundInclusion::kInclude),
         recordIds[numToInsert - 1]);
-    ASSERT_ID_EQ(rs->getCursor(operationContext(), false)
+    ASSERT_ID_EQ(rs->getCursor(operationContext(),
+                               *shard_role_details::getRecoveryUnit(operationContext()),
+                               false)
                      ->seek(RecordId(recordIds[numToInsert - 1].getLong() + 1),
                             SeekableRecordCursor::BoundInclusion::kInclude),
                  recordIds[numToInsert - 1]);
-    ASSERT(!rs->getCursor(operationContext(), false)
+    ASSERT(!rs->getCursor(operationContext(),
+                          *shard_role_details::getRecoveryUnit(operationContext()),
+                          false)
                 ->seek(recordIds[0], SeekableRecordCursor::BoundInclusion::kInclude));
 
     // Reverse exclusive seek
     ASSERT_ID_EQ(
-        rs->getCursor(operationContext(), false)
+        rs->getCursor(
+              operationContext(), *shard_role_details::getRecoveryUnit(operationContext()), false)
             ->seek(recordIds[numToInsert - 1], SeekableRecordCursor::BoundInclusion::kExclude),
         recordIds[numToInsert - 2]);
-    ASSERT(!rs->getCursor(operationContext(), false)
+    ASSERT(!rs->getCursor(operationContext(),
+                          *shard_role_details::getRecoveryUnit(operationContext()),
+                          false)
                 ->seek(RecordId(recordIds[1]), SeekableRecordCursor::BoundInclusion::kExclude));
 }
 
@@ -1186,7 +1343,8 @@ TEST_F(CatalogTestFixture, CappedCursorYieldFirst) {
         wuow.commit();
     }
 
-    auto cursor = rs->getCursor(operationContext());
+    auto cursor =
+        rs->getCursor(operationContext(), *shard_role_details::getRecoveryUnit(operationContext()));
     auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
 
     // See that things work if you yield before you first call next().

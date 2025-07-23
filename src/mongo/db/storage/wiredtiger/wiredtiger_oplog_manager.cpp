@@ -62,8 +62,8 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
                                    RecordStore& oplog,
                                    bool isReplSet) {
     // Prime the oplog read timestamp.
-    std::unique_ptr<SeekableRecordCursor> reverseOplogCursor =
-        oplog.getCursor(opCtx, false /* false = reverse cursor */);
+    std::unique_ptr<SeekableRecordCursor> reverseOplogCursor = oplog.getCursor(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), false /* false = reverse cursor */);
     auto lastRecord = reverseOplogCursor->next();
     if (lastRecord) {
         // Although the oplog may have holes, using the top of the oplog should be safe. In the
@@ -152,8 +152,8 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
     // Use a reverse oplog cursor that is not subject to the oplog visibility rules to see the
     // latest oplog entry timestamp. Then we will wait for that timestamp to become visible.
     //
-    std::unique_ptr<SeekableRecordCursor> cursor =
-        oplogRecordStore->getCursor(opCtx, false /* select a reverse cursor */);
+    std::unique_ptr<SeekableRecordCursor> cursor = oplogRecordStore->getCursor(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), false /* select a reverse cursor */);
     auto lastOplogRecord = cursor->next();
     if (!lastOplogRecord) {
         LOGV2_DEBUG(22369, 2, "The oplog does not exist. Not going to wait for oplog visibility.");

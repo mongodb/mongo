@@ -432,7 +432,7 @@ public:
         const auto oplogCollAcq = acquireCollForRead(_opCtx, NamespaceString::kRsOplogNamespace);
         const CollectionPtr& oplogColl = oplogCollAcq.getCollectionPtr();
         auto oplogRs = oplogColl->getRecordStore();
-        auto oplogCursor = oplogRs->getCursor(_opCtx);
+        auto oplogCursor = oplogRs->getCursor(_opCtx, *shard_role_details::getRecoveryUnit(_opCtx));
 
         while (true) {
             auto doc = oplogCursor->next();
@@ -519,7 +519,8 @@ public:
 
     std::int32_t itCount(const CollectionPtr& coll) {
         std::uint64_t ret = 0;
-        auto cursor = coll->getRecordStore()->getCursor(_opCtx);
+        auto cursor =
+            coll->getRecordStore()->getCursor(_opCtx, *shard_role_details::getRecoveryUnit(_opCtx));
         while (cursor->next() != boost::none) {
             ++ret;
         }
@@ -528,7 +529,8 @@ public:
     }
 
     BSONObj findOne(const CollectionPtr& coll) {
-        auto cursor = coll->getRecordStore()->getCursor(_opCtx);
+        auto cursor =
+            coll->getRecordStore()->getCursor(_opCtx, *shard_role_details::getRecoveryUnit(_opCtx));
         auto optRecord = cursor->next();
         if (optRecord == boost::none) {
             // Print a stack trace to help disambiguate which `findOne` failed.
