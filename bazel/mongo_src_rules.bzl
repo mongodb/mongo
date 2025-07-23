@@ -971,7 +971,13 @@ def mongo_cc_test(
         features,
         exec_properties,
         skip_global_deps,
-        env,
+        # This flag is already always set when running bazel test. Setting it
+        # here ensures that it is also set when running bazel run. This avoids
+        # test-setup.sh piping stdout through tee, so that the binary will be
+        # directly connected to the terminal and able to detect color support.
+        # We can remove this once we are on bazel 9 because it has removed the
+        # logic that looks for this var always behaves as if it is set.
+        env | {"EXPERIMENTAL_SPLIT_XML_GENERATION": "1"},
         _program_type = "test",
         **kwargs
     )
