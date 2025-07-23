@@ -24,3 +24,6 @@ filters:
   - "/generated_suites/bulk_write_*":
     approvers:
       - 10gen/query-execution-router
+  - "generated_suites/sharding_auth_audit.yml":
+    approvers:
+      - 10gen/server-security

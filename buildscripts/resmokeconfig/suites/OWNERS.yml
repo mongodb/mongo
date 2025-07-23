@@ -153,3 +153,6 @@ filters:
   - "timeseries_crud_jscore_passthrough.yml":
     approvers:
       - 10gen/query-integration-timeseries
+  - "sharding_auth.yml":
+    approvers:
+      - 10gen/server-security

@@ -82,9 +82,3 @@ structs:
                 type: object
                 description: "The API parameter attached to the config server command"
                 optional: true
-            isPromotion:
-                type: bool
-                description: >
-                    "Specifies if the operation is adding a clean shard or a promotion of a
-                    replicaset"
-                default: false

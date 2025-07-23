@@ -176,8 +176,8 @@ describe("transitions", function() {
     before(() => {
         this.doRollingRestart = (rs, startupFlags) => {
             for (const node of rs.getSecondaries()) {
-                const id = this.rs.getNodeId(node);
-                this.rs.stop(id, null, {}, {
+                const id = rs.getNodeId(node);
+                rs.stop(id, null, {}, {
                     forRestart: true,
                     waitPid: true,
                 });

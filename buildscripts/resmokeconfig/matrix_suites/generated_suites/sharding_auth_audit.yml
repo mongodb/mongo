@@ -35,6 +35,7 @@ selector:
     - jstests/sharding/query/agg/agg_currentop.js
     - jstests/sharding/internal_txns/internal_client_restrictions.js
     - jstests/sharding/kill_sessions.js
+    - jstests/sharding/replica_set_promotion_demotion.js
     - jstests/sharding/parallel.js
     - jstests/sharding/migration_ignore_interrupts_1.js
     - jstests/sharding/migration_ignore_interrupts_2.js

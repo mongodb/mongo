@@ -140,25 +140,8 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
                 _blockFCVChangesOnReplicaSet(opCtx, **executor);
 
-                // For the first shard we check if it's a promotion of a populated replicaset or
-                // adding a clean state replicaset.
-                // If the replicaset is the configserver or it's not the first shard, we always
-                // expect the replicaset to be clean.
-                // First we do an optimistic data check. If the replicaset is not empty, then it's a
-                // promotion. If the replicaset is empty, then we block the user writes to avoid
-                // race conditions, and do a second check. If the replicaset has data, then it's a
-                // promotion and we restore the user writes.
-                if (_isFirstShard(opCtx) && !_doc.getIsConfigShard()) {
-                    if (!_isPristineReplicaset(opCtx, targeter)) {
-                        _doc.setIsPromotion(true);
-                    } else {
-                        _blockUserWrites(opCtx);
-                        if (!_isPristineReplicaset(opCtx, targeter)) {
-                            _doc.setIsPromotion(true);
-                            _restoreUserWrites(opCtx);
-                        }
-                    }
-                } else {
+                // If it's not the first shard, we always expect the replicaset to be clean.
+                if (!_isFirstShard(opCtx)) {
                     if (!_doc.getIsConfigShard()) {
                         _blockUserWrites(opCtx);
                     }
