@@ -869,8 +869,8 @@ void findAndOptimizeSequentialDocumentCache(Pipeline& pipeline) {
     auto& container = pipeline.getSources();
     auto itr = (&container)->begin();
     while (itr != (&container)->end()) {
-        if (dynamic_cast<DocumentSourceSequentialDocumentCache*>(itr->get())) {
-            auto sequentialCache = dynamic_cast<DocumentSourceSequentialDocumentCache*>(itr->get());
+        if (auto* sequentialCache =
+                dynamic_cast<DocumentSourceSequentialDocumentCache*>(itr->get())) {
             if (!sequentialCache->hasOptimizedPos()) {
                 sequentialCache->optimizeAt(itr, &container);
             }

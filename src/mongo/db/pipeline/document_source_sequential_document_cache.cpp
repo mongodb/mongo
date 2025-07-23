@@ -143,7 +143,6 @@ DocumentSourceContainer::iterator DocumentSourceSequentialDocumentCache::doOptim
     //     $search is an exception to rule 1, as it doesn't depend on other stages.
     //  2. depends on a variable defined in this scope, or
     //  3. generates random numbers.
-    DocumentSource* lastPtr = nullptr;
     std::set<Variables::Id> prefixVarRefs;
     for (; prefixSplit != container->end(); ++prefixSplit) {
         (*prefixSplit)->addVariableRefs(&prefixVarRefs);
@@ -157,8 +156,6 @@ DocumentSourceContainer::iterator DocumentSourceSequentialDocumentCache::doOptim
               deps.needRandomGenerator))) {
             break;
         }
-
-        lastPtr = prefixSplit->get();
     }
 
     // The 'prefixSplit' iterator is now pointing to the first stage of the correlated suffix. If
@@ -171,9 +168,6 @@ DocumentSourceContainer::iterator DocumentSourceSequentialDocumentCache::doOptim
 
     // If the cache has been populated and is serving results, remove the non-correlated prefix.
     if (_cache->isServing()) {
-        // Need to dispose last stage to be removed.
-        auto& source = dynamic_cast<exec::agg::Stage&>(*lastPtr);
-        source.dispose();
         container->erase(container->begin(), prefixSplit);
     }
 
