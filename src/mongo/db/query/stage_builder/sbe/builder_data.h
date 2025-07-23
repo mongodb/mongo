@@ -308,7 +308,7 @@ struct PlanStageData {
         return *this;
     }
 
-    std::string debugString() const;
+    std::string debugString(boost::optional<size_t> lengthCap = boost::none) const;
 
     // This field holds the RuntimeEnvironment and the CompileCtx.
     Environment env;

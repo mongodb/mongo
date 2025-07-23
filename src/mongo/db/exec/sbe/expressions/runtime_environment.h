@@ -186,7 +186,7 @@ public:
     /**
      * Dumps all the slots currently defined in this environment into the given string builder.
      */
-    void debugString(StringBuilder* builder) const;
+    void debugString(StringBuilder* builder, boost::optional<size_t> lengthCap = boost::none) const;
     std::string toDebugString() const;
 
 private:
