@@ -16,6 +16,10 @@ def _setup_bolt_data(repository_ctx):
     # Incase you want to bolt a binary instead of the main binary mongod
     bolt_binary_name = repository_ctx.os.environ.get("bolt_binary_name", None)
 
+    # Perf2bolt will use the path to call the perf tool
+    path_env = repository_ctx.os.environ.get("PATH", None)
+    perf_path_env = str(repository_ctx.path(repository_ctx.attr._perf_binary).dirname) + ":" + path_env
+
     if bolt_binary_name == None:
         bolt_binary_name = "mongod"
 
@@ -62,7 +66,10 @@ def _setup_bolt_data(repository_ctx):
                 for file in data_files:
                     fdata_file_name = "bolt" + str(processed_fdata_files) + ".fdata"
                     arguments = [repository_ctx.attr._perf2bolt_binary, "-nl", "-p", file, "-o", fdata_file_name, binary]
-                    result = repository_ctx.execute(arguments)
+
+                    # We execute perf through path so it doesn't get executable permissions normally
+                    repository_ctx.execute(["chmod", "+x", repository_ctx.attr._perf_binary])
+                    result = repository_ctx.execute(arguments, environment = {"PATH": perf_path_env})
                     print(result.stdout)
                     if result.return_code != 0:
                         print(result.stderr)
@@ -98,10 +105,11 @@ filegroup(
 
 setup_bolt_data = repository_rule(
     implementation = _setup_bolt_data,
-    environ = ["bolt_profile_url", "bolt_binary_url", "bolt_binary_name"],
+    environ = ["bolt_profile_url", "bolt_binary_url", "bolt_binary_name", "PATH"],
     attrs = {
         # There is a bug where the repo rule does not properly evaluate these labels so we have to list the full path to the binaries
         "_merge_fdata_binary": attr.label(allow_single_file = True, default = "@bolt_binaries//:bolt/bin/merge-fdata", executable = True, cfg = "host"),
         "_perf2bolt_binary": attr.label(allow_single_file = True, default = "@bolt_binaries//:bolt/bin/perf2bolt", executable = True, cfg = "host"),
+        "_perf_binary": attr.label(allow_single_file = True, default = "@bolt_binaries//:bolt/bin/perf", executable = True, cfg = "host"),
     },
 )

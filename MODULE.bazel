@@ -46,13 +46,18 @@ filegroup(
 )
 
 filegroup(
+    name = "perf",
+    srcs = ["bolt/bin/perf"],
+)
+
+filegroup(
     name = "libbolt_rt_instr",
     srcs = ["bolt/lib/libbolt_rt_instr.a"],
 )
     """,
-    sha256 = "3075be7271266550a02a0fce25622a7130a9fdf947d708e0abd45213ee17e0cf",
+    sha256 = "9bf3a978edd852b7975c65921ad207a5dad44254fd39eb223830057d35bb9c94",
     urls = [
-        "https://mdb-build-public.s3.us-east-1.amazonaws.com/andrew_pgo_scratch/bolt_good.tar.gz",
+        "https://mdb-build-public.s3.us-east-1.amazonaws.com/andrew_pgo_scratch/bolt_perf.tar.gz",
     ] * 5,
 )
 
