@@ -88,6 +88,8 @@ public:
      * A drop time is considered old enough when:
      * - (Timestamp) The op cannot be rolled back nor new users access the record store data.
      * - (CheckpointIteration) The catalog has made its changes durable.
+     *
+     * onDrop must not call dropIdentsOlderThan() or immediatelyCompletePendingDrop().
      */
     void addDropPendingIdent(
         const std::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
@@ -142,10 +144,19 @@ public:
     void clearDropPendingState(OperationContext* opCtx);
 
     /**
-     * Ensures 'ident' is no longer tracked as drop-pending. If reaper is in the process of
-     * dropping the ident from the storage engine, waits until the drop is complete.
+     * If the given ident has been registered with the reaper, attempts to immediately drop it,
+     * possibly blocking while the background thread is reaping idents. Returns ObjectIsBusy if the
+     * ident could not be dropped due to being in use. Returns Status::OK() if the ident was not
+     * tracked as the reaper cannot distinguish "ident has already been dropped" from "ident was
+     * never drop pending".
+     *
+     * This function currently ignores drop timestamps. This is incorrect but required because
+     * the startup process can produce drops which have timestamps greater than the oldest timestamp
+     * even though there can't be snapshot reads on those idents.
+     * TODO(SERVER-107862): Fix cases where idents are dropped with overly conservative drop
+     * timestamps so that this can honor them.
      */
-    void clearDropPendingStateForIdent(OperationContext* opCtx, StringData ident);
+    Status immediatelyCompletePendingDrop(OperationContext* opCtx, StringData ident);
 
 private:
     // Contains information identifying what collection/index data to drop as well as determining
@@ -175,10 +186,12 @@ private:
     boost::optional<std::pair<Timestamp, std::shared_ptr<IdentInfo>>> _getDropPendingTSAndInfo(
         WithLock, StringData ident) const;
 
-    // Removes the ident from both maps and notifies '_identStateResetOrRemovedCV' waiters.
-    void _stopTrackingIdentAndNotify(WithLock,
-                                     const Timestamp& dropTimestamp,
-                                     const std::shared_ptr<IdentInfo>& identInfo);
+    Status _tryToDrop(WithLock,  // Must hold _dropMutex but *not* _mutex
+                      OperationContext* opCtx,
+                      Timestamp dropTimestamp,
+                      IdentInfo& identInfo);
+
+    Status _immediatelyAttemptToCompletePendingDrop(OperationContext* opCtx, StringData ident);
 
     // Container type for drop-pending namespaces. We use a multimap so that we can order the
     // namespaces by drop optime. Additionally, it is possible for certain user operations (such
@@ -189,11 +202,30 @@ private:
     // Used to access the KV engine for the purposes of dropping the ident.
     KVEngine* const _engine;
 
+    /**
+     * Mutex which is held while performing drop operations to ensure that concurrent calls to
+     * immediatelyCompletePendingDrop() or dropIdentsOlderThan() are serialized. Must be acquired
+     * *before* `_mutex`. The full flow for dropping is:
+     *
+     * 1. Acquire _dropMutex
+     * 2. Acquire _mutex
+     * 3. Find ident(s) to drop.
+     * 4. Set identState = State::kBeingDropped
+     * 5. Release _mutex
+     * 6. Attempt to drop ident
+     * 7. Acquire _mutex
+     * 8. Either set identState = State::kNotDropped or remove ident from maps
+     * 9. Release _mutex
+     * 10. Release _dropMutex
+     *
+     * Note that identState should only ever be State::kBeingDropped while a thread holds
+     * _dropMutex. This is used so that markIdentInUse() can avoid returning an ident which is being
+     * dropped without having to acquire _dropMutex.
+     */
+    mutable stdx::mutex _dropMutex;
+
     // Guards access to member variables below.
     mutable stdx::mutex _mutex;
-
-    // Notifies when ident states are reset to 'kNotDropped' or idents are removed from the map.
-    stdx::condition_variable _identStateResetOrRemovedCV;
 
     // Drop-pending idents. Ordered by drop timestamp.
     DropPendingIdents _dropPendingIdents;

@@ -776,8 +776,9 @@ void StorageEngineImpl::clearDropPendingState(OperationContext* opCtx) {
     _dropPendingIdentReaper.clearDropPendingState(opCtx);
 }
 
-void StorageEngineImpl::clearDropPendingStateForIdent(OperationContext* opCtx, StringData ident) {
-    _dropPendingIdentReaper.clearDropPendingStateForIdent(opCtx, ident);
+Status StorageEngineImpl::immediatelyCompletePendingDrop(OperationContext* opCtx,
+                                                         StringData ident) {
+    return _dropPendingIdentReaper.immediatelyCompletePendingDrop(opCtx, ident);
 }
 
 Timestamp StorageEngineImpl::getAllDurableTimestamp() const {

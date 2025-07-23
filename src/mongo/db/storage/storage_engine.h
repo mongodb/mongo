@@ -607,10 +607,13 @@ public:
     virtual void clearDropPendingState(OperationContext* opCtx) = 0;
 
     /**
-     * Ensures the ident is not in a drop-pending state. If the second phase of a two-phase
-     * table drop is in progress, this either aborts that process or waits until it completes.
+     * If the given ident has been registered with the reaper, attempts to immediately drop it,
+     * possibly blocking while the background thread is reaping idents. Returns ObjectIsBusy if the
+     * ident could not be dropped due to being in use. Returns Status::OK() if the ident was not
+     * tracked as the reaper cannot distinguish "ident has already been dropped" from "ident was
+     * never drop pending".
      */
-    virtual void clearDropPendingStateForIdent(OperationContext* opCtx, StringData ident) = 0;
+    virtual Status immediatelyCompletePendingDrop(OperationContext* opCtx, StringData ident) = 0;
 
     BOOST_STRONG_TYPEDEF(uint64_t, CheckpointIteration);
 

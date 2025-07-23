@@ -116,7 +116,9 @@ public:
         return false;
     }
     void clearDropPendingState(OperationContext* opCtx) final {}
-    void clearDropPendingStateForIdent(OperationContext* opCtx, StringData ident) final {}
+    Status immediatelyCompletePendingDrop(OperationContext* opCtx, StringData ident) final {
+        return Status::OK();
+    }
     StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) final {
         fassertFailed(40547);
     }
