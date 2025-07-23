@@ -1844,11 +1844,11 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         // below.
         LOGV2_OPTIONS(4784912, {LogComponent::kDefault}, "Killing all operations for shutdown");
         {
-            const std::set<std::string> excludedClients = {std::string(kFTDCThreadName)};
             SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                            TimedSectionId::killAllOperations,
                                            &shutdownTimeElapsedBuilder);
-            serviceContext->setKillAllOperations(excludedClients);
+            serviceContext->setKillAllOperations(
+                [](const StringData t) { return t == kFTDCThreadName; });
 
             if (MONGO_unlikely(pauseWhileKillingOperationsAtShutdown.shouldFail())) {
                 LOGV2_OPTIONS(4701700,

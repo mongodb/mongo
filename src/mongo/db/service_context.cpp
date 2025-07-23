@@ -379,7 +379,8 @@ ClientLock Service::LockedClientsCursor::next() {
     return {};
 }
 
-void ServiceContext::setKillAllOperations(const std::set<std::string>& excludedClients) {
+void ServiceContext::setKillAllOperations(
+    std::function<bool(const StringData)> excludedClientPredicate) {
     ServiceContextLock svcCtxLock(this);
 
     // Ensure that all newly created operation contexts will immediately be in the interrupted state
@@ -391,7 +392,7 @@ void ServiceContext::setKillAllOperations(const std::set<std::string>& excludedC
         ClientLock lk(client);
 
         // Do not kill operations from the excluded clients.
-        if (excludedClients.find(client->desc()) != excludedClients.end()) {
+        if (excludedClientPredicate && excludedClientPredicate(client->desc())) {
             continue;
         }
 

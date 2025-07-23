@@ -322,7 +322,8 @@ TEST_F(ServiceContextOpContextTest, SetKillAllOperationsExcludedClients) {
         auto opCtxNotExcluded = clientNotExcluded->makeOperationContext();
         auto opCtxExcluded = clientExcluded->makeOperationContext();
 
-        getServiceContext()->setKillAllOperations({"Excluded"});
+        getServiceContext()->setKillAllOperations(
+            [](const StringData threadName) { return threadName == "Excluded"; });
 
         ASSERT_EQUALS(opCtxNotExcluded->getKillStatus(), ErrorCodes::InterruptedAtShutdown);
         ASSERT_THROWS_CODE(
