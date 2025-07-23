@@ -47,7 +47,12 @@ public:
      * Get a read-only view of the contents of MongoExtensionByteBuf.
      */
     StringData getView() const {
-        return isValid() ? sdk::byteViewAsStringData(vtable().get_view(get())) : StringData();
+        if (!isValid()) {
+            return StringData();
+        }
+
+        auto stringView = sdk::byteViewAsStringView(vtable().get_view(get()));
+        return StringData{stringView.data(), stringView.size()};
     }
 };
 }  // namespace mongo::extension::host

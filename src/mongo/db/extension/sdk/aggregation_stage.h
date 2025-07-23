@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 #pragma once
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/byte_buf_utils.h"
@@ -35,6 +34,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace mongo::extension::sdk {
 /**
@@ -88,8 +88,8 @@ class AggregationStageDescriptor {
 public:
     virtual ~AggregationStageDescriptor() = default;
 
-    StringData getName() const {
-        return StringData(_name);
+    std::string_view getName() const {
+        return std::string_view(_name);
     }
 
     ::MongoExtensionAggregationStageType getType() const {
@@ -136,7 +136,7 @@ public:
 private:
     static ::MongoExtensionByteView _extGetName(
         const ::MongoExtensionAggregationStageDescriptor* descriptor) noexcept {
-        return stringDataAsByteView(
+        return stringViewAsByteView(
             static_cast<const extension::sdk::ExtensionAggregationStageDescriptor*>(descriptor)
                 ->getImpl()
                 .getName());

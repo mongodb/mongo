@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 #pragma once
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/byte_buf_utils.h"
@@ -39,6 +38,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 namespace mongo::extension::sdk {
 
@@ -62,7 +62,7 @@ public:
     /**
      * Return a utf-8 string associated with `error`. May be empty.
      */
-    StringData getReason() const {
+    std::string_view getReason() const {
         return _reason;
     }
 
@@ -90,7 +90,7 @@ private:
     }
 
     static MongoExtensionByteView _extGetReason(const ::MongoExtensionStatus* status) noexcept {
-        return stringDataAsByteView(
+        return stringViewAsByteView(
             static_cast<const mongo::extension::sdk::ExtensionStatus*>(status)->getReason());
     }
     /**
@@ -110,8 +110,8 @@ public:
         sInstanceCount--;
     }
 
-    StringData getReason() const {
-        return StringData();
+    std::string_view getReason() const {
+        return std::string_view();
     }
 
     int32_t getCode() const {
@@ -144,7 +144,7 @@ private:
     }
 
     static MongoExtensionByteView _extGetReason(const ::MongoExtensionStatus* status) noexcept {
-        return stringDataAsByteView(
+        return stringViewAsByteView(
             static_cast<const mongo::extension::sdk::ExtensionStatusOK*>(status)->getReason());
     }
 
@@ -168,7 +168,7 @@ public:
     /**
      * Return a utf-8 string associated with `error`. May be empty.
      */
-    StringData getReason() const {
+    std::string_view getReason() const {
         return _reason;
     }
 
@@ -195,7 +195,7 @@ private:
     }
 
     static MongoExtensionByteView _extGetReason(const ::MongoExtensionStatus* status) noexcept {
-        return stringDataAsByteView(
+        return stringViewAsByteView(
             static_cast<const mongo::extension::sdk::ExtensionStatusException*>(status)
                 ->getReason());
     }
@@ -231,9 +231,9 @@ public:
     /**
      * Return a utf-8 string associated with `MongoExtensionStatus`. May be empty.
      */
-    StringData getReason() const {
+    std::string_view getReason() const {
         assertValid();
-        return byteViewAsStringData(vtable().get_reason(get()));
+        return byteViewAsStringView(vtable().get_reason(get()));
     }
 };
 

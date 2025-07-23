@@ -65,7 +65,8 @@ public:
      * Returns a StringData containing the name of this aggregation stage.
      */
     StringData getName() const {
-        return sdk::byteViewAsStringData(vtable().get_name(get()));
+        auto stringView = sdk::byteViewAsStringView(vtable().get_name(get()));
+        return StringData{stringView.data(), stringView.size()};
     }
 
     /**

@@ -27,14 +27,16 @@
  *    it in the license file.
  */
 #pragma once
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/util/assert_util.h"
 
+#include <string_view>
+
+
 namespace mongo::extension::sdk {
-inline StringData byteViewAsStringData(const MongoExtensionByteView& view) {
-    return StringData(reinterpret_cast<const char*>(view.data), view.len);
+inline std::string_view byteViewAsStringView(const MongoExtensionByteView& view) {
+    return std::string_view(reinterpret_cast<const char*>(view.data), view.len);
 }
 
 inline BSONObj bsonObjFromByteView(const MongoExtensionByteView& view) {
@@ -58,7 +60,7 @@ inline MongoExtensionByteView objAsByteView(const BSONObj& obj) {
                                   static_cast<size_t>(obj.objsize())};
 }
 
-inline MongoExtensionByteView stringDataAsByteView(StringData strData) {
-    return MongoExtensionByteView{reinterpret_cast<const uint8_t*>(strData.data()), strData.size()};
+inline MongoExtensionByteView stringViewAsByteView(std::string_view str) {
+    return MongoExtensionByteView{reinterpret_cast<const uint8_t*>(str.data()), str.size()};
 }
 }  // namespace mongo::extension::sdk

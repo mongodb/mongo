@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 #pragma once
-#include "mongo/base/string_data.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/byte_buf_utils.h"
 
 #include <cstddef>
+#include <string_view>
 #include <vector>
 
 namespace mongo::extension::sdk {
@@ -41,8 +41,8 @@ public:
     static const ::MongoExtensionByteBufVTable VTABLE;
     // TODO: Fill out VecByteBuf interface as needed.
     VecByteBuf() : ::MongoExtensionByteBuf{&VTABLE}, _buffer() {}
-    StringData getView() const {
-        return StringData{reinterpret_cast<const char*>(_buffer.data()), _buffer.size()};
+    std::string_view getView() const {
+        return std::string_view{reinterpret_cast<const char*>(_buffer.data()), _buffer.size()};
     }
 
 private:

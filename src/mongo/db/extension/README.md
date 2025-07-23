@@ -55,3 +55,14 @@ C++ SDK API which extension developers are expected to use to build their extens
 things like convenience methods, relevant base classes, etc. This allows us to encapsulate and
 control where conversions across the API boundary between C and C++ take place, leading to more
 maintainable code and minimizing the risk of programmer errors in extension code.
+
+### Important Note: Avoid new SDK dependencies on mongo/base
+
+TODO SERVER-107651 Remove SDK dependency on mongo/base library.
+
+Currently, the SDK relies on the mongo/base library for BSON/BSONObj representation,
+as well as DBException and other exception handling functionality. Ideally we should remove that
+dependency since it's possible that linking mongo/base in an extension library could cause issues like
+host<>extension symbol conflicts at load time or run time. SERVER-107651 tracks the work to remove
+that dependency entirely. In the meantime, please avoid adding new usages of that library outside
+of BSON representation and exception handling.
