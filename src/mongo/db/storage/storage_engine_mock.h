@@ -90,6 +90,7 @@ public:
     void dropSpillTable(RecoveryUnit& ru, StringData ident) final {};
 
     std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
+                                                                   StringData ident,
                                                                    KeyFormat keyFormat) final {
         return {};
     }

@@ -39,10 +39,9 @@ std::unique_ptr<SpillTable> SpillingTestMongoProcessInterface::createSpillTable(
     shard_role_details::getRecoveryUnit(expCtx->getOperationContext())->abandonSnapshot();
     shard_role_details::getRecoveryUnit(expCtx->getOperationContext())
         ->setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
-    return expCtx->getOperationContext()
-        ->getServiceContext()
-        ->getStorageEngine()
-        ->makeTemporaryRecordStore(expCtx->getOperationContext(), keyFormat);
+    auto storageEngine = expCtx->getOperationContext()->getServiceContext()->getStorageEngine();
+    return storageEngine->makeTemporaryRecordStore(
+        expCtx->getOperationContext(), storageEngine->generateNewInternalIdent(), keyFormat);
 }
 
 void SpillingTestMongoProcessInterface::writeRecordsToSpillTable(

@@ -65,23 +65,11 @@ namespace {
 static constexpr StringData kKeyField = "key"_sd;
 }
 
-DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx, const IndexCatalogEntry* entry)
-    : _keyConstraintsTable(opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
-          opCtx, KeyFormat::Long)) {
-
-    invariant(entry->descriptor()->unique());
-}
-
 DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx,
-                                         const IndexCatalogEntry* entry,
-                                         StringData ident) {
-    _keyConstraintsTable =
-        opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStoreFromExistingIdent(
-            opCtx, ident, KeyFormat::Long);
-
-    invariant(entry->descriptor()->unique(),
-              str::stream() << "Duplicate key tracker table exists on disk with ident: " << ident
-                            << " but the index is not unique: " << entry->descriptor());
+                                         std::unique_ptr<TemporaryRecordStore> keyConstraintsTable,
+                                         const IndexCatalogEntry* entry)
+    : _keyConstraintsTable(std::move(keyConstraintsTable)) {
+    invariant(entry->descriptor()->unique());
 }
 
 void DuplicateKeyTracker::keepTemporaryTable() {

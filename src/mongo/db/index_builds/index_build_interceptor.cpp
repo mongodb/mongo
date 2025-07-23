@@ -90,11 +90,21 @@ MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringDrainWritesPhaseSecond);
 IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
                                              const IndexCatalogEntry* entry)
     : _sideWritesTable(opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
-          opCtx, KeyFormat::Long)),
-      _skippedRecordTracker(opCtx, boost::none) {
-
+          opCtx,
+          opCtx->getServiceContext()->getStorageEngine()->generateNewInternalIdent(),
+          KeyFormat::Long)),
+      _skippedRecordTracker([&]() {
+          auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+          auto skippedRecordsTable = storageEngine->makeTemporaryRecordStore(
+              opCtx, storageEngine->generateNewInternalIdent(), KeyFormat::Long);
+          return SkippedRecordTracker(opCtx, std::move(skippedRecordsTable));
+      }()) {
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     if (entry->descriptor()->unique()) {
-        _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(opCtx, entry);
+        auto keyConstraintsTable = storageEngine->makeTemporaryRecordStore(
+            opCtx, storageEngine->generateNewInternalIdent(), KeyFormat::Long);
+        _duplicateKeyTracker =
+            std::make_unique<DuplicateKeyTracker>(opCtx, std::move(keyConstraintsTable), entry);
     }
 }
 
@@ -106,9 +116,19 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
     : _sideWritesTable(
           opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStoreFromExistingIdent(
               opCtx, sideWritesIdent, KeyFormat::Long)),
-      _skippedRecordTracker(opCtx, skippedRecordTrackerIdent),
+      _skippedRecordTracker([&]() {
+          auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+          std::unique_ptr<TemporaryRecordStore> skippedRecordsTable;
+          if (skippedRecordTrackerIdent) {
+              skippedRecordsTable = storageEngine->makeTemporaryRecordStoreFromExistingIdent(
+                  opCtx, skippedRecordTrackerIdent.value(), KeyFormat::Long);
+          } else {
+              skippedRecordsTable = storageEngine->makeTemporaryRecordStore(
+                  opCtx, storageEngine->generateNewInternalIdent(), KeyFormat::Long);
+          }
+          return SkippedRecordTracker(opCtx, std::move(skippedRecordsTable));
+      }()),
       _skipNumAppliedCheck(true) {
-
     auto dupKeyTrackerIdentExists = duplicateKeyTrackerIdent ? true : false;
     uassert(ErrorCodes::BadValue,
             str::stream() << "Resume info must contain the duplicate key tracker ident ["
@@ -116,8 +136,11 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
                           << "] if and only if the index is unique: " << entry->descriptor(),
             entry->descriptor()->unique() == dupKeyTrackerIdentExists);
     if (duplicateKeyTrackerIdent) {
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        auto keyConstraintsTable = storageEngine->makeTemporaryRecordStoreFromExistingIdent(
+            opCtx, duplicateKeyTrackerIdent.value(), KeyFormat::Long);
         _duplicateKeyTracker =
-            std::make_unique<DuplicateKeyTracker>(opCtx, entry, duplicateKeyTrackerIdent.value());
+            std::make_unique<DuplicateKeyTracker>(opCtx, std::move(keyConstraintsTable), entry);
     }
 }
 

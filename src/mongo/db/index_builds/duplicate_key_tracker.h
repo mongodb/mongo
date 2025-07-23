@@ -58,19 +58,9 @@ class DuplicateKeyTracker {
     DuplicateKeyTracker& operator=(const DuplicateKeyTracker&) = delete;
 
 public:
-    /**
-     * Creates a temporary table in which to store any duplicate key constraint violations.
-     */
-    DuplicateKeyTracker(OperationContext* opCtx, const IndexCatalogEntry* indexCatalogEntry);
-
-    /**
-     * Finds the temporary table associated with storing any duplicate key constraint violations for
-     * this index build. Only used when resuming an index build and the temporary table already
-     * exists on disk.
-     */
     DuplicateKeyTracker(OperationContext* opCtx,
-                        const IndexCatalogEntry* indexCatalogEntry,
-                        StringData ident);
+                        std::unique_ptr<TemporaryRecordStore> keyConstraintsTable,
+                        const IndexCatalogEntry* indexCatalogEntry);
 
     /**
      * Keeps the temporary table for the duplicate key constraint violations.

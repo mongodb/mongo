@@ -564,7 +564,8 @@ TEST_F(StorageEngineTimestampMonitorTest, TemporaryRecordStoreEventuallyDropped)
 
     std::string ident;
     {
-        auto tempRs = _storageEngine->makeTemporaryRecordStore(opCtx.get(), KeyFormat::Long);
+        auto tempRs = _storageEngine->makeTemporaryRecordStore(
+            opCtx.get(), _storageEngine->generateNewInternalIdent(), KeyFormat::Long);
         ASSERT(tempRs.get());
         ident = std::string{tempRs->rs()->getIdent()};
 
@@ -582,7 +583,8 @@ TEST_F(StorageEngineTimestampMonitorTest, TemporaryRecordStoreKeep) {
 
     std::string ident;
     {
-        auto tempRs = _storageEngine->makeTemporaryRecordStore(opCtx.get(), KeyFormat::Long);
+        auto tempRs = _storageEngine->makeTemporaryRecordStore(
+            opCtx.get(), _storageEngine->generateNewInternalIdent(), KeyFormat::Long);
         ASSERT(tempRs.get());
         ident = std::string{tempRs->rs()->getIdent()};
 

@@ -667,9 +667,13 @@ void StorageEngineImpl::dropSpillTable(RecoveryUnit& ru, StringData ident) {
 }
 
 std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStore(
-    OperationContext* opCtx, KeyFormat keyFormat) {
+    OperationContext* opCtx, StringData ident, KeyFormat keyFormat) {
+    tassert(10709200,
+            "Cannot use a non-internal ident to create a temporary RecordStore instance",
+            ident::isInternalIdent(ident));
+
     std::unique_ptr<RecordStore> rs = _engine->makeTemporaryRecordStore(
-        *shard_role_details::getRecoveryUnit(opCtx), ident::generateNewInternalIdent(), keyFormat);
+        *shard_role_details::getRecoveryUnit(opCtx), ident, keyFormat);
     LOGV2_DEBUG(22258, 1, "Created temporary record store", "ident"_attr = rs->getIdent());
     return std::make_unique<DeferredDropRecordStore>(std::move(rs), this);
 }

@@ -70,7 +70,8 @@ public:
         kKeyGenerationAndInsertion
     };
 
-    SkippedRecordTracker(OperationContext* opCtx, boost::optional<StringData> ident);
+    SkippedRecordTracker(OperationContext* opCtx,
+                         std::unique_ptr<TemporaryRecordStore> skippedRecordsTable);
 
     /**
      * Records a RecordId that was unable to be indexed due to a key generation error. At the
@@ -102,10 +103,8 @@ public:
         const IndexCatalogEntry* indexCatalogEntry,
         RetrySkippedRecordMode mode = RetrySkippedRecordMode::kKeyGenerationAndInsertion);
 
-    boost::optional<std::string> getTableIdent() const {
-        return _skippedRecordsTable
-            ? boost::make_optional(std::string{_skippedRecordsTable->rs()->getIdent()})
-            : boost::none;
+    std::string getTableIdent() const {
+        return std::string{_skippedRecordsTable->rs()->getIdent()};
     }
 
     boost::optional<MultikeyPaths> getMultikeyPaths() const {

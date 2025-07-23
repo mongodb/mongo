@@ -103,11 +103,13 @@ public:
     }
 
     std::unique_ptr<TemporaryRecordStore> makeTemporary(OperationContext* opCtx) {
-        return _storageEngine->makeTemporaryRecordStore(opCtx, KeyFormat::Long);
+        return _storageEngine->makeTemporaryRecordStore(
+            opCtx, _storageEngine->generateNewInternalIdent(), KeyFormat::Long);
     }
 
     std::unique_ptr<TemporaryRecordStore> makeTemporaryClustered(OperationContext* opCtx) {
-        return _storageEngine->makeTemporaryRecordStore(opCtx, KeyFormat::String);
+        return _storageEngine->makeTemporaryRecordStore(
+            opCtx, _storageEngine->generateNewInternalIdent(), KeyFormat::String);
     }
 
     /**
