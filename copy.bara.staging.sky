@@ -7,12 +7,12 @@ core.workflow(
     name = "default",
     origin = git.origin(
         url = sourceUrl,
-        ref = "master",
+        ref = "v8.2",
     ),
     destination = git.destination(
         url = destinationUrl,
-        fetch = "master",
-        push = "master",
+        fetch = "v8.2",
+        push = "v8.2",
     ),
     # Change path to the folder you want to publish publicly
     origin_files = glob(["**"], exclude = ["src/mongo/db/modules/**"]),

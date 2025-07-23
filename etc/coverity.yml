@@ -53,5 +53,5 @@ analyze:
 
 commit:
   connect:
-    stream: mongo.master
+    stream: mongo.v8.2
     project: "MongoDB master"
