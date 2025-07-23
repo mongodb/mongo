@@ -2019,7 +2019,6 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
 }
 
 DEATH_TEST_REGEX_F(StepDownTest, StepDownHangsCantGetRSTL, "5675600.*lockRep") {
-    // TODO SERVER-99671 Get rid of this once the unittest framework handles it automatically.
     startSignalProcessingThread();
 
     const auto repl = getReplCoord();
