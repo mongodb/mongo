@@ -207,7 +207,6 @@ public:
 
     RecordId getLargestKey(OperationContext* opCtx, RecoveryUnit& ru) const override;
 
-    using RecordStoreBase::reserveRecordIds;
     void reserveRecordIds(OperationContext* opCtx,
                           RecoveryUnit& ru,
                           std::vector<RecordId>* out,

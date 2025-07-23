@@ -617,10 +617,7 @@ public:
     /**
      * Reserve a range of contiguous RecordIds. Returns the first valid RecordId in the range. Must
      * only be called on a RecordStore with KeyFormat::Long.
-     *
-     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
-    virtual void reserveRecordIds(OperationContext*, std::vector<RecordId>*, size_t numRecords) = 0;
     virtual void reserveRecordIds(OperationContext*,
                                   RecoveryUnit&,
                                   std::vector<RecordId>*,

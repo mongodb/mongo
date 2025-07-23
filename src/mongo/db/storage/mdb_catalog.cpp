@@ -84,7 +84,7 @@ void MDBCatalog::init(OperationContext* opCtx) {
 
 RecordId MDBCatalog::reserveCatalogId(OperationContext* opCtx) {
     std::vector<RecordId> reservedRids;
-    _rs->reserveRecordIds(opCtx, &reservedRids, 1);
+    _rs->reserveRecordIds(opCtx, *shard_role_details::getRecoveryUnit(opCtx), &reservedRids, 1);
     invariant(reservedRids.size() == 1);
     return std::move(reservedRids[0]);
 }

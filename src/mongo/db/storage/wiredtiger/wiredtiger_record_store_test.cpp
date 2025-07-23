@@ -827,7 +827,8 @@ TEST(WiredTigerRecordStoreTest, LargestRecordIdSeenIsCorrectWhenGivenRecordIds) 
     }
 
     // The next recordId reserved is higher than 7.
-    rs->reserveRecordIds(ctx.get(), &reservedRids, 1);
+    rs->reserveRecordIds(
+        ctx.get(), *shard_role_details::getRecoveryUnit(ctx.get()), &reservedRids, 1);
     ASSERT_GT(reservedRids[0].getLong(), RecordId(7).getLong());
     ASSERT_EQ(1, rs->numRecords());
 
@@ -848,7 +849,8 @@ TEST(WiredTigerRecordStoreTest, LargestRecordIdSeenIsCorrectWhenGivenRecordIds) 
 
     // The next recordId reserved is higher than 14.
     reservedRids.clear();
-    rs->reserveRecordIds(ctx.get(), &reservedRids, 1);
+    rs->reserveRecordIds(
+        ctx.get(), *shard_role_details::getRecoveryUnit(ctx.get()), &reservedRids, 1);
     ASSERT_GT(reservedRids[0].getLong(), RecordId(14).getLong());
     ASSERT_EQ(3, rs->numRecords());
 
@@ -868,7 +870,8 @@ TEST(WiredTigerRecordStoreTest, LargestRecordIdSeenIsCorrectWhenGivenRecordIds) 
 
     // The next recordId reserved is higher than 20.
     reservedRids.clear();
-    rs->reserveRecordIds(ctx.get(), &reservedRids, 1);
+    rs->reserveRecordIds(
+        ctx.get(), *shard_role_details::getRecoveryUnit(ctx.get()), &reservedRids, 1);
     ASSERT_GT(reservedRids[0].getLong(), RecordId(20).getLong());
     ASSERT_EQ(5, rs->numRecords());
 }

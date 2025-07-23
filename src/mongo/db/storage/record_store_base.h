@@ -116,7 +116,6 @@ public:
 
     RecordId getLargestKey(OperationContext*, RecoveryUnit&) const override = 0;
 
-    void reserveRecordIds(OperationContext*, std::vector<RecordId>*, size_t numRecords) final;
     void reserveRecordIds(OperationContext*,
                           RecoveryUnit&,
                           std::vector<RecordId>*,
