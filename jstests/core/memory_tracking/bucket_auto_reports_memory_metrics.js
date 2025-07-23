@@ -41,7 +41,7 @@ assert.commandWorked(coll.insertMany(docs));
                 {"count": {$sum: 1}, "valueList": {$push: "$value"}, "avgValue": {$avg: "$value"}}
         }
     }];
-    jsTestLog("Running basic pipeline test : " + tojson(pipeline));
+    jsTest.log.info("Running basic pipeline test : " + tojson(pipeline));
 
     runMemoryStatsTest({
         db: db,
@@ -73,7 +73,7 @@ assert.commandWorked(coll.insertMany(docs));
         },
         {$limit: 1}
     ];
-    jsTestLog("Running pipeline with $limit : " + tojson(pipeline));
+    jsTest.log.info("Running pipeline with $limit : " + tojson(pipeline));
 
     runMemoryStatsTest({
         db: db,
@@ -106,7 +106,7 @@ assert.commandWorked(coll.insertMany(docs));
             }
         },
     ];
-    jsTestLog("Running pipeline that will spill : " + tojson(pipeline));
+    jsTest.log.info("Running pipeline that will spill : " + tojson(pipeline));
 
     // Set a low memory limit to force spilling to disk.
     const originalMemoryLimit =

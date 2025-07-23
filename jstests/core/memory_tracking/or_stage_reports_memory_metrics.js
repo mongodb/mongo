@@ -21,7 +21,7 @@ import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 if (checkSbeFullyEnabled(db)) {
     // This test is specifically for the classic "or" stage, so don't run the test if the stage
     // might be executed in SBE
-    jsTestLog("Skipping test for classic 'or' stage when SBE is fully enabled.");
+    jsTest.log.info("Skipping test for classic 'or' stage when SBE is fully enabled.");
     quit();
 }
 

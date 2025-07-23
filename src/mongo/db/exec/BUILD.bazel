@@ -203,6 +203,7 @@ mongo_cc_unit_test(
         "recordid_deduplicator_test.cpp",
         "sort_test.cpp",
         "spool_test.cpp",
+        "text_or_test.cpp",
         "working_set_test.cpp",
         "//src/mongo/db/exec/agg:exec_pipeline_test.cpp",
         "//src/mongo/db/exec/agg:pipeline_builder_test.cpp",

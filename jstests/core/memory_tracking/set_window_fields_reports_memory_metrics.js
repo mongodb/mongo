@@ -59,7 +59,7 @@ assert.commandWorked(coll.insertMany(docs));
         {$setWindowFields: {sortBy: {date: 1}, output: {movingAvgPrice: {$avg: "$price"}}}},
         {$match: {symbol: "AAPL"}},
     ];
-    jsTestLog("Running pipeline " + tojson(pipeline));
+    jsTest.log.info("Running pipeline " + tojson(pipeline));
 
     runMemoryStatsTest({
         db: db,

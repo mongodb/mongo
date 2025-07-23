@@ -65,7 +65,7 @@ function setUpCollectionForTest() {
         updates: [{q: {str: "even"}, u: {$set: {str: "not even"}}, multi: true}],
         comment: "memory stats spool test"
     };
-    jsTestLog("Running spool test with no spilling: " + tojson(updateCommand));
+    jsTest.log.info("Running spool test with no spilling: " + tojson(updateCommand));
 
     const memoryLimitBytes = 100 * 1024 * 1024;
     assert.commandWorked(db.adminCommand(
@@ -84,7 +84,7 @@ function setUpCollectionForTest() {
         updates: [{q: {str: "even"}, u: {$set: {str: "not even"}}, multi: true}],
         comment: "memory stats spool test with spilling"
     };
-    jsTestLog("Running spool test with spilling: " + tojson(updateCommand));
+    jsTest.log.info("Running spool test with spilling: " + tojson(updateCommand));
 
     // The spool stage will spill 32-byte record ids in this instance. Set a limit just under that
     // size so that we will need to spill on every other record.

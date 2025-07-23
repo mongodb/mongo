@@ -589,6 +589,10 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
             bob->appendNumber(
                 "spilledDataStorageSize",
                 static_cast<long long>(spec->spillingStats.getSpilledDataStorageSize()));
+            if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+                bob->appendNumber("maxUsedMemBytes",
+                                  static_cast<long long>(spec->maxUsedMemoryBytes));
+            }
         }
     } else if (STAGE_TIMESERIES_MODIFY == stats.stageType) {
         TimeseriesModifyStats* spec = static_cast<TimeseriesModifyStats*>(stats.specific.get());

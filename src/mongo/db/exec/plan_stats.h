@@ -1046,6 +1046,8 @@ struct TextOrStats : public SpecificStats {
 
     size_t fetches;
     SpillingStats spillingStats;
+
+    int64_t maxUsedMemoryBytes = 0;
 };
 
 struct TrialStats : public SpecificStats {

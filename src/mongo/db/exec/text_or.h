@@ -101,6 +101,10 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
+    const SimpleMemoryUsageTracker& getMemoryTracker_forTest() const {
+        return _memoryTracker;
+    }
+
     static const char* kStageType;
 
 protected:
@@ -165,11 +169,6 @@ private:
     typedef absl::flat_hash_map<RecordId, TextRecordData, RecordId::Hasher> ScoreMap;
     ScoreMap _scores;
 
-    // Max allowed consumption by _scores map in bytes.
-    const int64_t _maxMemoryBytes = internalTextOrStageMaxMemoryBytes.loadRelaxed();
-    // Current estimated memory consumption by _scores map in bytes.
-    int64_t _currentMemoryBytes = 0;
-
     struct TextRecordDataForSorter {
         SortableWorkingSetMember document;
         double score;
@@ -208,6 +207,8 @@ private:
     std::unique_ptr<Sorter<RecordId, TextRecordDataForSorter>::Iterator> _sorterIterator;
 
     TextOrStats _specificStats;
+
+    SimpleMemoryUsageTracker _memoryTracker;
 
     // Members needed only for using the TextMatchableDocument.
     const MatchExpression* _filter;

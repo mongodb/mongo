@@ -36,6 +36,7 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/record_id.h"
@@ -67,6 +68,8 @@ TextOrStage::TextOrStage(ExpressionContext* expCtx,
     : RequiresCollectionStage(kStageType, expCtx, collection),
       _keyPrefixSize(keyPrefixSize),
       _ws(ws),
+      _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
+          *expCtx, internalTextOrStageMaxMemoryBytes.loadRelaxed())),
       _filter(filter),
       _idRetrying(WorkingSet::INVALID_ID) {}
 
@@ -219,6 +222,8 @@ PlanStage::StageState TextOrStage::readFromChildren(WorkingSetID* out) {
 }
 
 PlanStage::StageState TextOrStage::returnResults(WorkingSetID* out) {
+    _specificStats.maxUsedMemoryBytes = _memoryTracker.maxMemoryBytes();
+
     if (_sorter) {
         return returnResultsSpilled(out);
     } else {
@@ -235,6 +240,7 @@ PlanStage::StageState TextOrStage::returnResultsInMemory(WorkingSetID* out) {
     // Retrieve the record that contains the text score.
     auto it = _scores.begin();
     TextRecordData textRecordData = it->second;
+    _memoryTracker.add(-1 * (it->first.memUsage() + sizeof(TextRecordData)));
     _scores.erase(it);
 
     // Ignore non-matched documents.
@@ -285,7 +291,7 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
 
     auto [it, inserted] = _scores.try_emplace(wsm->recordId, TextRecordData{});
     if (inserted) {
-        _currentMemoryBytes += it->first.memUsage() + sizeof(TextRecordData);
+        _memoryTracker.add(it->first.memUsage() + sizeof(TextRecordData));
     }
 
     TextRecordData* textRecordData = &it->second;
@@ -341,7 +347,7 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
 
         // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
         wsm->makeObjOwnedIfNeeded();
-        _currentMemoryBytes += wsm->getMemUsage();
+        _memoryTracker.add(wsm->getMemUsage());
     } else {
         // We already have a working set member for this RecordId. Free the new WSM and retrieve the
         // old one. Note that since we don't keep all index keys, we could get a score that doesn't
@@ -366,7 +372,7 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
     // Aggregate relevance score, term keys.
     textRecordData->score += documentTermScore;
 
-    if (_currentMemoryBytes > _maxMemoryBytes) {
+    if (!_memoryTracker.withinMemoryLimit()) {
         doForceSpill();
     }
 
@@ -386,6 +392,7 @@ void TextOrStage::doForceSpill() {
         expCtx()->getTempDir(), internalQuerySpillingMinAvailableDiskSpaceBytes.loadRelaxed()));
 
     size_t recordsToSpill = _scores.size();
+    auto prevMemUsage = _sorter->stats().memUsage();
     for (auto it = _scores.begin(); it != _scores.end();) {
         const auto& [recordId, textRecordData] = (*it);
         SortableWorkingSetMember wsm = textRecordData.wsid != WorkingSet::INVALID_ID
@@ -396,16 +403,27 @@ void TextOrStage::doForceSpill() {
             textRecordData.score,
         };
         _sorter->add(recordId, dataForSorter);
+
+        // To provide as accurate memory accounting as possible, we update the memory tracker after
+        // we add each document to the sorter, instead of updating it after the sorter is completely
+        // populated.
+        auto currMemUsage = _sorter->stats().memUsage();
+        _memoryTracker.add(currMemUsage - prevMemUsage);
+        prevMemUsage = currMemUsage;
         _scores.erase(it++);
     }
     _sorter->spill();
 
-    auto spilledDataStorageIncrease = _specificStats.spillingStats.updateSpillingStats(
-        1 /*spills*/, _currentMemoryBytes, recordsToSpill, _sorterStats->bytesSpilled());
-    textOrCounters.incrementPerSpilling(
-        1 /*spills*/, _currentMemoryBytes, recordsToSpill, spilledDataStorageIncrease);
-
-    _currentMemoryBytes = 0;
+    auto spilledDataStorageIncrease =
+        _specificStats.spillingStats.updateSpillingStats(1 /*spills*/,
+                                                         _memoryTracker.currentMemoryBytes(),
+                                                         recordsToSpill,
+                                                         _sorterStats->bytesSpilled());
+    textOrCounters.incrementPerSpilling(1 /*spills*/,
+                                        _memoryTracker.currentMemoryBytes(),
+                                        recordsToSpill,
+                                        spilledDataStorageIncrease);
+    _memoryTracker.set(0);
 
     if (_internalState == State::kReturningResults) {
         _sorterIterator = _sorter->done();
