@@ -454,7 +454,7 @@ Collator* U_EXPORT2 Collator::createInstance(const Locale& desiredLocale,
     // to be optimized out of the delete even though setAttributesFromKeywords returns
     // immediately if U_FAILURE(status), so we add a check here.
     if (U_FAILURE(status)) {
-         return NULL;
+        return NULL;
     }
     setAttributesFromKeywords(desiredLocale, *coll, status);
     if (U_FAILURE(status)) {
