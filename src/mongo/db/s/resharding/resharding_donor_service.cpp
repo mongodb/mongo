@@ -1304,8 +1304,8 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_updateCoordinat
         .waitUntilMajorityForWrite(clientOpTime, CancellationToken::uncancelable())
         .thenRunOn(**executor)
         .then([this, &factory] {
-            auto opCtx = factory.makeOperationContext(&cc());
-            auto shardId = _externalState->myShardId(opCtx->getServiceContext());
+            auto localOpCtx = factory.makeOperationContext(&cc());
+            auto shardId = _externalState->myShardId(localOpCtx->getServiceContext());
             _metrics->updateDonorCtx(_donorCtx);
 
             BSONObjBuilder updateBuilder;
@@ -1319,7 +1319,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_updateCoordinat
             }
 
             _externalState->updateCoordinatorDocument(
-                opCtx.get(),
+                localOpCtx.get(),
                 _makeQueryForCoordinatorUpdate(shardId, _donorCtx.getState()),
                 updateBuilder.done());
         });
