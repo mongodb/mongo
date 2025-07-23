@@ -583,7 +583,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void onDeregisterFromCatalog(OperationContext* opCtx) override {
+    void onDeregisterFromCatalog(ServiceContext* svcCtx) override {
         MONGO_UNREACHABLE;
     }
 
