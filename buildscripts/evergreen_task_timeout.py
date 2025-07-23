@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import math
 import os
+import re
 import shlex
 import sys
 from datetime import timedelta
@@ -115,7 +116,7 @@ class TimeoutOverrides(BaseModel):
         overrides = [
             override
             for override in self.overrides.get(build_variant, [])
-            if override.task == task_name
+            if re.search(override.task, task_name)
         ]
         if overrides:
             if len(overrides) > 1:
