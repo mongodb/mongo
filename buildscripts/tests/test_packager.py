@@ -47,3 +47,57 @@ class TestPackager(TestCase):
             with self.subTest(name=case.name):
                 spec = Spec(ver=case.version)
                 self.assertEqual(spec.is_nightly(), case.want)
+
+    def test_community_suffix(self) -> None:
+        """Test community suffix"""
+
+        @dataclass
+        class Case:
+            """Test case data."""
+
+            name: str
+            version: str
+            want: str
+
+        cases = [
+            Case(
+                name="Old unstable",
+                version="4.3.0",
+                want="-org-unstable"
+            ),
+            Case(
+                name="Old stable 4.2",
+                version="4.2.0",
+                want="-org"
+            ),
+            Case(
+                name="Old stable 4.4",
+                version="4.4.0",
+                want="-org"
+            ),
+            Case(
+                name="New stable standard",
+                version="8.0.0",
+                want="-org",
+            ),
+            Case(
+                name="New unstable standard 8.1",
+                version="8.1.0",
+                want="-org-unstable",
+            ),
+            Case(
+                name="New unstable standard 7.2",
+                version="7.2.0",
+                want="-org-unstable",
+            ),
+            Case(
+                name="New stable special case",
+                version="8.2.0",
+                want="-org",
+            ),
+        ]
+
+        for case in cases:
+            with self.subTest(name=case.name):
+                spec = Spec(ver=case.version)
+                self.assertEqual(spec.suffix(), case.want)
