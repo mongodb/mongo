@@ -21,6 +21,9 @@ DEFAULT_EVG_NIGHTLY_PROJECT_NAME = "mongodb-mongo-master-nightly"
 DEFAULT_EVG_PROJECT_CONFIG = "etc/evergreen.yml"
 DEFAULT_EVG_NIGHTLY_PROJECT_CONFIG = "etc/evergreen_nightly.yml"
 
+# SET TO TRUE IN RAPID RELEASE BRANCHES - see docs/branching/README.md
+RELEASE_BRANCH = False
+
 UNMATCHED_REGEXES = [
     re.compile(r".*buildvariant .+ has unmatched selector: .+"),
     re.compile(r".*buildvariant .+ has unmatched criteria: .+"),
@@ -69,9 +72,25 @@ def main(
     evg_project_config_map = {evg_project_name: DEFAULT_EVG_NIGHTLY_PROJECT_CONFIG}
     if evg_project_name == DEFAULT_EVG_PROJECT_NAME:
         evg_project_config_map = {
-            DEFAULT_EVG_PROJECT_NAME: DEFAULT_EVG_PROJECT_CONFIG,
             DEFAULT_EVG_NIGHTLY_PROJECT_NAME: DEFAULT_EVG_NIGHTLY_PROJECT_CONFIG,
         }
+    
+    if RELEASE_BRANCH:
+        for _, project_config in evg_project_config_map.items():
+            cmd = [
+                evergreen_bin,
+                "--config",
+                evg_auth_config,
+                "evaluate",
+                "--path",
+                project_config,
+            ]
+            LOGGER.info(f"Running command: {cmd}")
+            subprocess.run(cmd, capture_output=True, text=True, check=True)
+            sys.exit(0)
+
+    if evg_project_name == DEFAULT_EVG_PROJECT_NAME:
+        evg_project_config_map[DEFAULT_EVG_PROJECT_NAME] = DEFAULT_EVG_PROJECT_CONFIG
 
     shared_evg_validate_messages = []
     error_on_evg_validate_messages = defaultdict(list)
