@@ -30,125 +30,87 @@
 
 #include "mongo/db/query/query_stats/rate_limiting.h"
 
-#include "mongo/util/duration.h"
-#include "mongo/util/system_clock_source.h"
-#include "mongo/util/time_support.h"
-
-#include <climits>
-#include <memory>
-
 #include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {
 
-// Local testing determined that these parameter values drove the most lock contention, which is
-// what we want to capture in this benchmark.
-constexpr long long rateLimitedWorkTimeMicros = 5;
-constexpr long long consistentWorkTimeMicros = 10;
-
 constexpr long long numThreads = 256;
 
-// Rate limit some fraction of the overall work for a request with a sliding window.
-int handleRequest(RateLimiter& limit) {
-    if (limit.handle()) {
-        sleepmicros(rateLimitedWorkTimeMicros);
+// This benchmark simulates a request that is handled by the rate limiter and
+// checks the overhead of calling limiter.handle(), specifically to see how it handles lock
+// contention. This BM does not include the overhead of the rate limiting logic itself, such as
+// accessing the query stats store.
+
+int handleRequest(RateLimiter& limiter) {
+    if (limiter.handle()) {
+        benchmark::DoNotOptimize(1);
     }
-    sleepmicros(consistentWorkTimeMicros);
+
+    benchmark::DoNotOptimize(0);
     return 0;
 }
 
 // Represent a request that bypasses the rate limiter.
-int requestUnlimited() {
-    constexpr long long totalTime = rateLimitedWorkTimeMicros + consistentWorkTimeMicros;
-    sleepmicros(totalTime);
-    return 0;
-}
-
-// Represent a request without the rate limited work.
-int requestDeactivated() {
-    sleepmicros(consistentWorkTimeMicros);
+int baselineRequest() {
+    benchmark::DoNotOptimize(0);
     return 0;
 }
 
 // Benchmark sliding window rate limiting.
 void BM_SlidingWindow(benchmark::State& state) {
-    // The rate limiter needs a clock source passed in.
-    static RateLimiter rateLimit;
-
-    // Configure the rate limiter only on the first thread to start up.
+    static RateLimiter limiter;
+    // Initialize the rate limiter only on the first thread to start up.
     if (state.thread_index == 0) {
-        rateLimit.configureWindowBased(state.range(0));
+        limiter.configureWindowBased(state.range(0));
     }
 
-    // Run the benchmark.
-    for (auto keepRunning : state) {
-        benchmark::DoNotOptimize(handleRequest(rateLimit));
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(handleRequest(limiter));
     }
 }
 
 // Benchmark sample based rate limiting.
 void BM_SampleBased(benchmark::State& state) {
-    static RateLimiter rateLimit;
-
+    static RateLimiter limiter;
     // Initialize the rate limiter only on the first thread to start up.
     if (state.thread_index == 0) {
-        rateLimit.configureSampleBased(state.range(0), /* random seed */ 17);
+        limiter.configureSampleBased(state.range(0), 17 /* seed */);
     }
 
-    // Run the benchmark.
-    for (auto keepRunning : state) {
-        benchmark::DoNotOptimize(handleRequest(rateLimit));
-    }
-}
-
-// "Control" benchmark that does not rate limit requests. In other words, the extra work is always
-// done for every request. This benchmark can be thought of as the "goal" performance for the peak,
-// or the highest rate limit in BM_SlidingWindow, to compare against.
-void BM_Unlimited(benchmark::State& state) {
-    for (auto keepRunning : state) {
-        benchmark::DoNotOptimize(requestUnlimited());
-    }
-}
-// Another control benchmark, where the extra work is never done for any request. This can be
-// thought of as the goal performance for when rate limit equals 0.
-void BM_Deactivated(benchmark::State& state) {
-    for (auto keepRunning : state) {
-        benchmark::DoNotOptimize(requestDeactivated());
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(handleRequest(limiter));
     }
 }
 
-// Google microbenchmarks report time T (in nanoseconds) spent per operation. But at Mongo we are
-// interested in total opereations performed per second. The former can easily be converted to the
-// latter by diving 10^6 by T. Use this benchmark to determine the natural throughput of the
-// operation. This can be compared to the rate limited benchmarks (BM_SlidingWindow) to determine
-// the overhead of rate limiting. Looking at the percentage change in throughput between the control
-// benchmarks and the rate limited benchmark, will indicate how much overhead is due to lock
-// contention.
-BENCHMARK(BM_Unlimited)->Threads(numThreads);
+void BM_Baseline(benchmark::State& state) {
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(baselineRequest());
+    }
+}
 
-BENCHMARK(BM_Deactivated)->Threads(numThreads);
+BENCHMARK(BM_Baseline)->Threads(numThreads);
 
-// Local testing has confirmed that the higher the rate limit, the worse the throughput. This makes
-// sense as putting a higher upper bound on number of requests allowed in a given time period, means
-// longer wait times for the lock.
+// Benchmark sliding window rate limiting.
+// The overhead should be higher than sample based rate limiting
+// but also consistent regardless of the rate limit due to the sliding window implementation.
 BENCHMARK(BM_SlidingWindow)
-    ->ArgName("rate limit")
+    ->ArgName("rate limit in number of captured queries per second")
     ->Arg(0)
-    ->Arg(64)
-    ->Arg(128)
-    ->Arg(256)
-    ->Arg(512)
-    ->Arg(1024)
-    ->Arg(2048)
-    ->Arg(4816)
+    ->Arg(100)  // 100 queries a second, default on server
+    ->Arg(1000)
+    ->Arg(10000)
+    ->Arg(100000)
     ->Threads(numThreads);
 
-
+// Benchmark sample based rate limiting.
+// The overhead should be constant regardless of the sample rate as
+// it only uses a thread-local random number generator to determine whether the request should
+// be handled or not.
 BENCHMARK(BM_SampleBased)
     ->ArgName("rate limit in % denominated by 1000")
     ->Arg(0)
-    ->Arg(10)
+    ->Arg(10)  // 1% sample rate
     ->Arg(20)
     ->Arg(30)
     ->Arg(40)
