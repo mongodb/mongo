@@ -769,7 +769,7 @@ class FieldTypeArray(FieldType):
 
     def debug_string(self):
         """Display this field type in error messages."""
-        return f"array<{self.element_type.type_name}>"
+        return f"array<{self.element_type.debug_string()}>"
 
 
 class FieldTypeVariant(FieldType):
