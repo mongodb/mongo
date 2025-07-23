@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/db/commands/notify_sharding_event_utils.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/balancer/balance_stats.h"
@@ -426,6 +427,20 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
     const ReshardingCoordinatorDocument& updatedCoordinatorDoc) {
     return resharding::WithAutomaticRetry([this, executor, updatedCoordinatorDoc] {
                return ExecutorFuture<void>(**executor)
+                   .then([this, executor] {
+                       auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                       if (feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
+                               VersionContext::getDecoration(opCtx.get()),
+                               serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                           // V2 change stream readers expect to see an op entry concerning the
+                           // commit before this materializes into the global catalog. (Multiple
+                           // copies of this event notification are acceptable)
+                           _generateCommitNotificationForChangeStreams(
+                               opCtx.get(),
+                               executor,
+                               ChangeStreamCommitNotificationMode::BeforeWriteOnCatalog);
+                       }
+                   })
                    .then(
                        [this, executor, updatedCoordinatorDoc] { _commit(updatedCoordinatorDoc); });
            })
@@ -451,8 +466,28 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                                                                   *_cancelableOpCtxFactory);
                            })
                            .thenRunOn(**executor)
-                           .then(
-                               [this, executor] { _generateOpEventOnCoordinatingShard(executor); })
+                           .then([this, executor] {
+                               auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                               if (feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting
+                                       .isEnabled(VersionContext::getDecoration(opCtx.get()),
+                                                  serverGlobalParams.featureCompatibility
+                                                      .acquireFCVSnapshot())) {
+                                   // V2 change stream readers expect to see an op entry concerning
+                                   // on the placement change caused by the commit after this has
+                                   // been majority written on the global catalog.
+                                   _generatePlacementChangeNotificationForChangeStreams(opCtx.get(),
+                                                                                        executor);
+                               } else {
+                                   // Legacy change stream readers are only able to consume
+                                   // notifications concerning the commit once this has been
+                                   // majority written on the global catalog.
+                                   _generateCommitNotificationForChangeStreams(
+                                       opCtx.get(),
+                                       executor,
+                                       ChangeStreamCommitNotificationMode::
+                                           AfterWriteOnCatalogLegacy);
+                               }
+                           })
                            .then([this, executor] {
                                _tellAllParticipantsToCommit(_coordinatorDoc.getSourceNss(),
                                                             executor);
@@ -1483,9 +1518,15 @@ void ReshardingCoordinator::_commit(const ReshardingCoordinatorDocument& coordin
     installCoordinatorDocOnStateTransition(opCtx.get(), updatedCoordinatorDoc);
 }
 
-void ReshardingCoordinator::_generateOpEventOnCoordinatingShard(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+void ReshardingCoordinator::_generateCommitNotificationForChangeStreams(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    ChangeStreamCommitNotificationMode mode) {
+
+    if (mode == ChangeStreamCommitNotificationMode::BeforeWriteOnCatalog &&
+        _coordinatorDoc.getState() >= CoordinatorStateEnum::kCommitting) {
+        return;
+    }
 
     CollectionResharded eventNotification(_coordinatorDoc.getSourceNss(),
                                           _coordinatorDoc.getSourceUUID(),
@@ -1495,18 +1536,20 @@ void ReshardingCoordinator::_generateOpEventOnCoordinatingShard(
     eventNotification.setNumInitialChunks(_coordinatorDoc.getNumInitialChunks());
     eventNotification.setUnique(_coordinatorDoc.getUnique());
     eventNotification.setCollation(_coordinatorDoc.getCollation());
+    // Set the identity of the collection that is currently associated to the set of zones
+    // created during resharding, based on whether this notification is being generated
+    // before of after committing on the global catalog.
+    eventNotification.setReferenceToZoneList(
+        mode == ChangeStreamCommitNotificationMode::BeforeWriteOnCatalog
+            ? _coordinatorDoc.getTempReshardingNss()
+            : _coordinatorDoc.getSourceNss());
     if (const auto& provenance = _metadata.getProvenance()) {
         eventNotification.setProvenance(provenance);
     }
     ShardsvrNotifyShardingEventRequest request(notify_sharding_event::kCollectionResharded,
                                                eventNotification.toBSON());
 
-    const auto dbPrimaryShard = Grid::get(opCtx.get())
-                                    ->catalogClient()
-                                    ->getDatabase(opCtx.get(),
-                                                  _coordinatorDoc.getSourceNss().dbName(),
-                                                  repl::ReadConcernLevel::kMajorityReadConcern)
-                                    .getPrimary();
+    const auto& notifierShard = _getChangeStreamNotifierShardId();
 
     // In case the recipient is running a legacy binary, swallow the error.
     try {
@@ -1515,8 +1558,7 @@ void ReshardingCoordinator::_generateOpEventOnCoordinatingShard(
             std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrNotifyShardingEventRequest>>(
                 **executor, _ctHolder->getStepdownToken(), request);
         opts->cmd.setDbName(DatabaseName::kAdmin);
-        _reshardingCoordinatorExternalState->sendCommandToShards(
-            opCtx.get(), opts, {dbPrimaryShard});
+        _reshardingCoordinatorExternalState->sendCommandToShards(opCtx, opts, {notifierShard});
     } catch (const ExceptionFor<ErrorCodes::UnsupportedShardingEventNotification>& e) {
         LOGV2_WARNING(7403100,
                       "Unable to generate op entry on reshardCollection commit",
@@ -1524,6 +1566,37 @@ void ReshardingCoordinator::_generateOpEventOnCoordinatingShard(
     }
 }
 
+void ReshardingCoordinator::_generatePlacementChangeNotificationForChangeStreams(
+    OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+
+    const auto placementChangeTime = [&] {
+        const auto reshardedColl =
+            ShardingCatalogManager::get(opCtx)->localCatalogClient()->getCollection(
+                opCtx, _coordinatorDoc.getSourceNss());
+        return reshardedColl.getTimestamp();
+    }();
+    NamespacePlacementChanged eventNotification(_coordinatorDoc.getSourceNss(),
+                                                placementChangeTime);
+    ShardsvrNotifyShardingEventRequest request(notify_sharding_event::kNamespacePlacementChanged,
+                                               eventNotification.toBSON());
+
+    const auto& notifierShard = _getChangeStreamNotifierShardId();
+
+    // In case the recipient is running a legacy binary, swallow the error.
+    try {
+        generic_argument_util::setMajorityWriteConcern(request, &resharding::kMajorityWriteConcern);
+        const auto opts =
+            std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrNotifyShardingEventRequest>>(
+                **executor, _ctHolder->getStepdownToken(), request);
+        opts->cmd.setDbName(DatabaseName::kAdmin);
+        _reshardingCoordinatorExternalState->sendCommandToShards(opCtx, opts, {notifierShard});
+    } catch (const ExceptionFor<ErrorCodes::UnsupportedShardingEventNotification>& e) {
+        tasserted(
+            10674000,
+            str::stream() << "Unable to generate op entry on namespacePlacementChanged commit:"
+                          << redact(e.toStatus()));
+    }
+}
 
 ExecutorFuture<void> ReshardingCoordinator::_awaitAllParticipantShardsDone(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
@@ -2017,6 +2090,12 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
 
     builder.append("statistics", statsBuilder.obj());
     LOGV2(7763800, "Resharding complete", "info"_attr = builder.obj());
+}
+
+const ShardId& ReshardingCoordinator::_getChangeStreamNotifierShardId() const {
+    // Change stream readers expect to receive pre & post commit event notifications
+    // from one of the shards holding data before the beginning of the resharding.
+    return _coordinatorDoc.getDonorShards().front().getId();
 }
 #endif  // RESHARDING_COORDINATOR_PART_4
 

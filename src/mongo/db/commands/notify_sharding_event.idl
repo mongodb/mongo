@@ -84,6 +84,12 @@ structs:
                 type: long
                 description: "The number of chunks the new collection should have after resharding."
                 optional: true
+            referenceToZoneList:
+                type: namespacestring
+                description:
+                    "The full collection name that is currently associated to the set of zones created as part of this operation.
+                    When no value is specified, the nss field will be used instead."
+                optional: true
             provenance:
                 type: ReshardingProvenance
                 description: "The type of user/system request that originated

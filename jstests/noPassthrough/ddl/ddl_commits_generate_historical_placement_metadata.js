@@ -262,6 +262,24 @@ function makeOpEntryOnEmptiedDonor(nss, donor) {
     };
 }
 
+function makeReshardCollectionEntryTemplate(
+    nss, oldShardKey, newShardKey, reshardUUID, numInitialChunks, zones) {
+    return {
+        op: 'n',
+        ns: nss,
+        o2: {
+            reshardCollection: nss,
+            reshardUUID: reshardUUID,
+            shardKey: newShardKey,
+            oldShardKey: oldShardKey,
+            unique: false,
+            numInitialChunks: NumberLong(numInitialChunks),
+            provenance: 'reshardCollection',
+            zones: zones,
+        }
+    };
+};
+
 function makePlacementChangedEntryTemplate(commitTime, dbName, collName = null) {
     const nss = collName ? dbName + '.' + collName : dbName;
     const o2Value = {namespacePlacementChanged: 1, ns: {db: dbName}, committedAt: commitTime};
@@ -297,13 +315,21 @@ function verifyCommitOpEntriesOnShards(expectedOpEntryTemplates, shards, orderSt
                                    .toArray()
                                    .reverse();
 
-        // Strip out timing-related entry fields before performing the comparison.
+        // Strip out non-relevant or hard-to-handle entry fields before performing the equality
+        // comparison.
         const redactedOpEntries = foundOpEntries.map((opEntry) => {
+            // - Disregard information about op write time and version;
+            // - Skip the handling of 'fromMigrate' (which will be delegated to the callers of this
+            // method);
             let {ui, ts, t, v, wall, versionContext, fromMigrate, ...strippedOpEntry} = opEntry;
             if (opEntry.o.create || opEntry.o.createIndexes) {
                 // Also strip out the 'o2' field, containing references to the ident values for the
                 // created collection & index.
                 delete strippedOpEntry.o2;
+            } else if (opEntry.o2 && opEntry.o2.reshardCollection) {
+                // Also remove the 'o' field, containing a human-readable message on the commit
+                // (equivalent information is expected to also be present within 'o2').
+                delete strippedOpEntry.o;
             }
             return strippedOpEntry;
         });
@@ -1065,28 +1091,36 @@ function testReshardCollection() {
     const nss = dbName + '.' + collName;
     let db = st.s.getDB(dbName);
 
-    // Start with a collection with a single chunk on shard0.
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: shard0}));
-    assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {oldShardKey: 1}}));
+    // Start with a collection with a single chunk outside the primary shard.
+    const primaryShard = shard0;
+    const dataBearingShardBeforeReshard = shard1;
+    const oldShardKeySpec = {oldShardKey: 1};
+
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: oldShardKeySpec}));
+    assert.commandWorked(st.s.adminCommand(
+        {moveChunk: nss, find: {oldShardKey: MinKey}, to: dataBearingShardBeforeReshard}));
+
     const initialNumPlacementEntries = configDB.placementHistory.count({});
     const initialCollPlacementInfo =
-        getValidatedPlacementInfoForCollection(dbName, collName, [shard0], true);
+        getValidatedPlacementInfoForCollection(dbName, collName, [dataBearingShardBeforeReshard]);
 
-    // Create a set of zones that will force the new set of chunk to be distributed across all
+    // Create a zone to force the assignment of the chunks produced by resharding to a third shard.
     // the shards of the cluster.
-    const zone1Name = 'zone1';
-    assert.commandWorked(st.s.adminCommand({addShardToZone: shard1, zone: zone1Name}));
-    const zone1Descriptor = {zone: zone1Name, min: {newShardKey: 0}, max: {newShardKey: 100}};
-    const zone2Name = 'zone2';
-    assert.commandWorked(st.s.adminCommand({addShardToZone: shard2, zone: zone2Name}));
-    const zone2Descriptor = {zone: zone2Name, min: {newShardKey: 200}, max: {newShardKey: 300}};
+    const dataBearingShardAfterReshard = shard2;
+    const zoneName = 'zone';
+    assert.commandWorked(
+        st.s.adminCommand({addShardToZone: dataBearingShardAfterReshard, zone: zoneName}));
+    const zoneDescriptor = {zone: zoneName, min: {newShardKey: MinKey}, max: {newShardKey: MaxKey}};
 
     // Launch the reshard operation.
+    const newShardKeySpec = {newShardKey: 1};
+
     assert.commandWorked(db.adminCommand({
         reshardCollection: nss,
-        key: {newShardKey: 1},
+        key: newShardKeySpec,
         numInitialChunks: 1,
-        zones: [zone1Descriptor, zone2Descriptor]
+        zones: [zoneDescriptor]
     }));
 
     // A single new placement document should have been added (the temp collection created by
@@ -1094,11 +1128,35 @@ function testReshardCollection() {
     assert.eq(1 + initialNumPlacementEntries, configDB.placementHistory.count({}));
 
     // Verify that the latest placement info matches the expectations.
-    const finalCollPlacementInfo =
-        getValidatedPlacementInfoForCollection(dbName, collName, [shard0, shard1, shard2], false);
+    const finalCollPlacementInfo = getValidatedPlacementInfoForCollection(
+        dbName, collName, [dataBearingShardAfterReshard], false);
 
     // The resharded collection maintains its nss, but changes its uuid.
     assert.neq(initialCollPlacementInfo.uuid, finalCollPlacementInfo.uuid);
+
+    // Verify that the data bearing shard prior to the resharding produced the expected sequence of
+    // op entries as part of the commit sequence.
+    const expectedEntryTemplates = [
+        // nss, oldShardKey, newShardKey, reshardUUID, numInitialChunks, zones
+        makeReshardCollectionEntryTemplate(nss,
+                                           oldShardKeySpec,
+                                           newShardKeySpec,
+                                           finalCollPlacementInfo.uuid,
+                                           1,
+                                           [zoneDescriptor]),
+        makePlacementChangedEntryTemplate(finalCollPlacementInfo.timestamp, dbName, collName)
+    ];
+
+    const [reshardCommitOpEntry, collPlacementChangeEntry] = verifyCommitOpEntriesOnShards(
+        expectedEntryTemplates, [dataBearingShardBeforeReshard])[dataBearingShardBeforeReshard];
+
+    // The commit entry must be visible to the end user.
+    assert(!reshardCommitOpEntry.fromMigrate || reshardCommitOpEntry.fromMigrate === false);
+
+    // Timestamps in the config.placementHistory doc and the op entries produceed by the shard
+    // match the expected ordering.
+    assert(timestampCmp(reshardCommitOpEntry.ts, finalCollPlacementInfo.timestamp) <= 0);
+    assert(timestampCmp(finalCollPlacementInfo.timestamp, collPlacementChangeEntry.ts) <= 0);
 }
 
 jsTest.log('Verifying metadata generated by explicit DB creation');

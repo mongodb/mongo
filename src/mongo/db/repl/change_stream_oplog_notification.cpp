@@ -188,8 +188,12 @@ void notifyChangeStreamsOnReshardCollectionComplete(OperationContext* opCtx,
     // redacted version.
     try {
         auto catalogClient = Grid::get(opCtx)->catalogClient();
-        const auto zones =
-            uassertStatusOK(catalogClient->getTagsForCollection(opCtx, notification.getNss()));
+        // Due to the size constraints mentioned above, the zone list is not embedded into this
+        // notification and it needs to be fetched from the config database.
+        const auto& collectionCurrentlyHoldingZones =
+            notification.getReferenceToZoneList().value_or(notification.getNss());
+        const auto zones = uassertStatusOK(
+            catalogClient->getTagsForCollection(opCtx, collectionCurrentlyHoldingZones));
         auto oplogEntry = buildOpEntry(zones);
         insertNotificationOplogEntries(
             opCtx, {std::move(oplogEntry)}, "ReshardCollectionWritesOplog");
