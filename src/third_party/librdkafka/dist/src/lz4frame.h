@@ -1,7 +1,7 @@
 /*
-   KLZ4F - KLZ4-Frame library
+   KLZ4 auto-framing library
    Header File
-   Copyright (C) 2011-2020, Yann Collet.
+   Copyright (C) 2011-2017, Yann Collet.
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
@@ -39,7 +39,7 @@
  * KLZ4F also offers streaming capabilities.
  *
  * lz4.h is not required when using lz4frame.h,
- * except to extract common constants such as KLZ4_VERSION_NUMBER.
+ * except to extract common constant such as KLZ4_VERSION_NUMBER.
  * */
 
 #ifndef KLZ4F_H_09782039843
@@ -54,12 +54,12 @@ extern "C" {
 
 
 /**
- * Introduction
- *
- * lz4frame.h implements KLZ4 frame specification: see doc/lz4_Frame_format.md .
- * KLZ4 Frames are compatible with `lz4` CLI,
- * and designed to be interoperable with any system.
-**/
+  Introduction
+
+  lz4frame.h implements KLZ4 frame specification (doc/lz4_Frame_format.md).
+  lz4frame.h provides frame compression functions that take care
+  of encoding standard metadata alongside KLZ4-compressed blocks.
+*/
 
 /*-***************************************************************
  *  Compiler specifics
@@ -210,7 +210,7 @@ KLZ4FLIB_API int KLZ4F_compressionLevel_max(void);   /* v1.8.0+ */
  *  Returns the maximum possible compressed size with KLZ4F_compressFrame() given srcSize and preferences.
  * `preferencesPtr` is optional. It can be replaced by NULL, in which case, the function will assume default preferences.
  *  Note : this result is only usable with KLZ4F_compressFrame().
- *         It may also be relevant to KLZ4F_compressUpdate() _only if_ no flush() operation is ever performed.
+ *         It may also be used with KLZ4F_compressUpdate() _if no flush() operation_ is performed.
  */
 KLZ4FLIB_API size_t KLZ4F_compressFrameBound(size_t srcSize, const KLZ4F_preferences_t* preferencesPtr);
 
@@ -230,7 +230,7 @@ KLZ4FLIB_API size_t KLZ4F_compressFrame(void* dstBuffer, size_t dstCapacity,
 *  Advanced compression functions
 *************************************/
 typedef struct KLZ4F_cctx_s KLZ4F_cctx;   /* incomplete type */
-typedef KLZ4F_cctx* KLZ4F_compressionContext_t;  /* for compatibility with older APIs, prefer using KLZ4F_cctx */
+typedef KLZ4F_cctx* KLZ4F_compressionContext_t;   /* for compatibility with previous API version */
 
 typedef struct {
   unsigned stableSrc;    /* 1 == src content will remain present on future calls to KLZ4F_compress(); skip copying src content within tmp buffer */
@@ -243,27 +243,20 @@ typedef struct {
 KLZ4FLIB_API unsigned KLZ4F_getVersion(void);
 
 /*! KLZ4F_createCompressionContext() :
- *  The first thing to do is to create a compressionContext object,
- *  which will keep track of operation state during streaming compression.
- *  This is achieved using KLZ4F_createCompressionContext(), which takes as argument a version,
- *  and a pointer to KLZ4F_cctx*, to write the resulting pointer into.
- *  @version provided MUST be KLZ4F_VERSION. It is intended to track potential version mismatch, notably when using DLL.
- *  The function provides a pointer to a fully allocated KLZ4F_cctx object.
- *  @cctxPtr MUST be != NULL.
- *  If @return != zero, context creation failed.
- *  A created compression context can be employed multiple times for consecutive streaming operations.
- *  Once all streaming compression jobs are completed,
- *  the state object can be released using KLZ4F_freeCompressionContext().
- *  Note1 : KLZ4F_freeCompressionContext() is always successful. Its return value can be ignored.
- *  Note2 : KLZ4F_freeCompressionContext() works fine with NULL input pointers (do nothing).
-**/
+ * The first thing to do is to create a compressionContext object, which will be used in all compression operations.
+ * This is achieved using KLZ4F_createCompressionContext(), which takes as argument a version.
+ * The version provided MUST be KLZ4F_VERSION. It is intended to track potential version mismatch, notably when using DLL.
+ * The function will provide a pointer to a fully allocated KLZ4F_cctx object.
+ * If @return != zero, there was an error during context creation.
+ * Object can release its memory using KLZ4F_freeCompressionContext();
+ */
 KLZ4FLIB_API KLZ4F_errorCode_t KLZ4F_createCompressionContext(KLZ4F_cctx** cctxPtr, unsigned version);
 KLZ4FLIB_API KLZ4F_errorCode_t KLZ4F_freeCompressionContext(KLZ4F_cctx* cctx);
 
 
 /*----    Compression    ----*/
 
-#define KLZ4F_HEADER_SIZE_MIN  7   /* KLZ4 Frame header size can vary, depending on selected parameters */
+#define KLZ4F_HEADER_SIZE_MIN  7   /* KLZ4 Frame header size can vary, depending on selected paramaters */
 #define KLZ4F_HEADER_SIZE_MAX 19
 
 /* Size in bytes of a block header in little-endian format. Highest bit indicates if block data is uncompressed */
@@ -308,9 +301,8 @@ KLZ4FLIB_API size_t KLZ4F_compressBound(size_t srcSize, const KLZ4F_preferences_
  *  Important rule: dstCapacity MUST be large enough to ensure operation success even in worst case situations.
  *  This value is provided by KLZ4F_compressBound().
  *  If this condition is not respected, KLZ4F_compress() will fail (result is an errorCode).
- *  After an error, the state is left in a UB state, and must be re-initialized or freed.
- *  If previously an uncompressed block was written, buffered data is flushed
- *  before appending compressed data is continued.
+ *  KLZ4F_compressUpdate() doesn't guarantee error recovery.
+ *  When an error occurs, compression context must be freed or resized.
  * `cOptPtr` is optional : NULL can be provided, in which case all options are set to default.
  * @return : number of bytes written into `dstBuffer` (it can be zero, meaning input data was just buffered).
  *           or an error code if it fails (which can be tested using KLZ4F_isError())
@@ -355,12 +347,8 @@ typedef struct KLZ4F_dctx_s KLZ4F_dctx;   /* incomplete type */
 typedef KLZ4F_dctx* KLZ4F_decompressionContext_t;   /* compatibility with previous API versions */
 
 typedef struct {
-  unsigned stableDst;     /* pledges that last 64KB decompressed data will remain available unmodified between invocations.
-                           * This optimization skips storage operations in tmp buffers. */
-  unsigned skipChecksums; /* disable checksum calculation and verification, even when one is present in frame, to save CPU time.
-                           * Setting this option to 1 once disables all checksums for the rest of the frame. */
-  unsigned reserved1;     /* must be set to zero for forward compatibility */
-  unsigned reserved0;     /* idem */
+  unsigned stableDst;    /* pledges that last 64KB decompressed data will remain available unmodified. This optimization skips storage operations in tmp buffers. */
+  unsigned reserved[3];  /* must be set to zero for forward compatibility */
 } KLZ4F_decompressOptions_t;
 
 
@@ -368,10 +356,9 @@ typedef struct {
 
 /*! KLZ4F_createDecompressionContext() :
  *  Create an KLZ4F_dctx object, to track all decompression operations.
- *  @version provided MUST be KLZ4F_VERSION.
- *  @dctxPtr MUST be valid.
- *  The function fills @dctxPtr with the value of a pointer to an allocated and initialized KLZ4F_dctx object.
- *  The @return is an errorCode, which can be tested using KLZ4F_isError().
+ *  The version provided MUST be KLZ4F_VERSION.
+ *  The function provides a pointer to an allocated and initialized KLZ4F_dctx object.
+ *  The result is an errorCode, which can be tested using KLZ4F_isError().
  *  dctx memory can be released using KLZ4F_freeDecompressionContext();
  *  Result of KLZ4F_freeDecompressionContext() indicates current state of decompressionContext when being released.
  *  That is, it should be == 0 if decompression has been completed fully and correctly.
@@ -384,8 +371,6 @@ KLZ4FLIB_API KLZ4F_errorCode_t KLZ4F_freeDecompressionContext(KLZ4F_dctx* dctx);
 *  Streaming decompression functions
 *************************************/
 
-#define KLZ4F_MAGICNUMBER 0x184D2204U
-#define KLZ4F_MAGIC_SKIPPABLE_START 0x184D2A50U
 #define KLZ4F_MIN_SIZE_TO_KNOW_HEADER_LENGTH 5
 
 /*! KLZ4F_headerSize() : v1.9.0+
@@ -401,7 +386,7 @@ KLZ4FLIB_API size_t KLZ4F_headerSize(const void* src, size_t srcSize);
 
 /*! KLZ4F_getFrameInfo() :
  *  This function extracts frame parameters (max blockSize, dictID, etc.).
- *  Its usage is optional: user can also invoke KLZ4F_decompress() directly.
+ *  Its usage is optional: user can call KLZ4F_decompress() directly.
  *
  *  Extracted information will fill an existing KLZ4F_frameInfo_t structure.
  *  This can be useful for allocation and dictionary identification purposes.
@@ -442,10 +427,9 @@ KLZ4FLIB_API size_t KLZ4F_headerSize(const void* src, size_t srcSize);
  *  note 1 : in case of error, dctx is not modified. Decoding operation can resume from beginning safely.
  *  note 2 : frame parameters are *copied into* an already allocated KLZ4F_frameInfo_t structure.
  */
-KLZ4FLIB_API size_t
-KLZ4F_getFrameInfo(KLZ4F_dctx* dctx,
-                  KLZ4F_frameInfo_t* frameInfoPtr,
-            const void* srcBuffer, size_t* srcSizePtr);
+KLZ4FLIB_API size_t KLZ4F_getFrameInfo(KLZ4F_dctx* dctx,
+                                     KLZ4F_frameInfo_t* frameInfoPtr,
+                                     const void* srcBuffer, size_t* srcSizePtr);
 
 /*! KLZ4F_decompress() :
  *  Call this function repetitively to regenerate data compressed in `srcBuffer`.
@@ -478,11 +462,10 @@ KLZ4F_getFrameInfo(KLZ4F_dctx* dctx,
  *
  *  After a frame is fully decoded, dctx can be used again to decompress another frame.
  */
-KLZ4FLIB_API size_t
-KLZ4F_decompress(KLZ4F_dctx* dctx,
-                void* dstBuffer, size_t* dstSizePtr,
-          const void* srcBuffer, size_t* srcSizePtr,
-          const KLZ4F_decompressOptions_t* dOptPtr);
+KLZ4FLIB_API size_t KLZ4F_decompress(KLZ4F_dctx* dctx,
+                                   void* dstBuffer, size_t* dstSizePtr,
+                                   const void* srcBuffer, size_t* srcSizePtr,
+                                   const KLZ4F_decompressOptions_t* dOptPtr);
 
 
 /*! KLZ4F_resetDecompressionContext() : added in v1.8.0
@@ -546,8 +529,6 @@ extern "C" {
         ITEM(ERROR_headerChecksum_invalid) \
         ITEM(ERROR_contentChecksum_invalid) \
         ITEM(ERROR_frameDecoding_alreadyStarted) \
-        ITEM(ERROR_compressionState_uninitialized) \
-        ITEM(ERROR_parameter_null) \
         ITEM(ERROR_maxCode)
 
 #define KLZ4F_GENERATE_ENUM(ENUM) KLZ4F_##ENUM,
@@ -558,31 +539,7 @@ typedef enum { KLZ4F_LIST_ERRORS(KLZ4F_GENERATE_ENUM)
 
 KLZ4FLIB_STATIC_API KLZ4F_errorCodes KLZ4F_getErrorCode(size_t functionResult);
 
-
-/*! KLZ4F_getBlockSize() :
- *  Return, in scalar format (size_t),
- *  the maximum block size associated with blockSizeID.
-**/
-KLZ4FLIB_STATIC_API size_t KLZ4F_getBlockSize(KLZ4F_blockSizeID_t blockSizeID);
-
-/*! KLZ4F_uncompressedUpdate() :
- *  KLZ4F_uncompressedUpdate() can be called repetitively to add as much data uncompressed data as necessary.
- *  Important rule: dstCapacity MUST be large enough to store the entire source buffer as
- *  no compression is done for this operation
- *  If this condition is not respected, KLZ4F_uncompressedUpdate() will fail (result is an errorCode).
- *  After an error, the state is left in a UB state, and must be re-initialized or freed.
- *  If previously a compressed block was written, buffered data is flushed
- *  before appending uncompressed data is continued.
- *  This is only supported when KLZ4F_blockIndependent is used
- * `cOptPtr` is optional : NULL can be provided, in which case all options are set to default.
- * @return : number of bytes written into `dstBuffer` (it can be zero, meaning input data was just buffered).
- *           or an error code if it fails (which can be tested using KLZ4F_isError())
- */
-KLZ4FLIB_STATIC_API size_t
-KLZ4F_uncompressedUpdate(KLZ4F_cctx* cctx,
-                        void* dstBuffer, size_t dstCapacity,
-                  const void* srcBuffer, size_t srcSize,
-                  const KLZ4F_compressOptions_t* cOptPtr);
+KLZ4FLIB_STATIC_API size_t KLZ4F_getBlockSize(unsigned);
 
 /**********************************
  *  Bulk processing dictionary API
@@ -626,12 +583,12 @@ KLZ4FLIB_STATIC_API void        KLZ4F_freeCDict(KLZ4F_CDict* CDict);
  *  but it's not recommended, as it's the only way to provide dictID in the frame header.
  * @return : number of bytes written into dstBuffer.
  *           or an error code if it fails (can be tested using KLZ4F_isError()) */
-KLZ4FLIB_STATIC_API size_t
-KLZ4F_compressFrame_usingCDict(KLZ4F_cctx* cctx,
-                              void* dst, size_t dstCapacity,
-                        const void* src, size_t srcSize,
-                        const KLZ4F_CDict* cdict,
-                        const KLZ4F_preferences_t* preferencesPtr);
+KLZ4FLIB_STATIC_API size_t KLZ4F_compressFrame_usingCDict(
+    KLZ4F_cctx* cctx,
+    void* dst, size_t dstCapacity,
+    const void* src, size_t srcSize,
+    const KLZ4F_CDict* cdict,
+    const KLZ4F_preferences_t* preferencesPtr);
 
 
 /*! KLZ4F_compressBegin_usingCDict() :
@@ -641,49 +598,23 @@ KLZ4F_compressFrame_usingCDict(KLZ4F_cctx* cctx,
  *  however, it's the only way to provide dictID in the frame header.
  * @return : number of bytes written into dstBuffer for the header,
  *           or an error code (which can be tested using KLZ4F_isError()) */
-KLZ4FLIB_STATIC_API size_t
-KLZ4F_compressBegin_usingCDict(KLZ4F_cctx* cctx,
-                              void* dstBuffer, size_t dstCapacity,
-                        const KLZ4F_CDict* cdict,
-                        const KLZ4F_preferences_t* prefsPtr);
+KLZ4FLIB_STATIC_API size_t KLZ4F_compressBegin_usingCDict(
+    KLZ4F_cctx* cctx,
+    void* dstBuffer, size_t dstCapacity,
+    const KLZ4F_CDict* cdict,
+    const KLZ4F_preferences_t* prefsPtr);
 
 
 /*! KLZ4F_decompress_usingDict() :
  *  Same as KLZ4F_decompress(), using a predefined dictionary.
  *  Dictionary is used "in place", without any preprocessing.
-**  It must remain accessible throughout the entire frame decoding. */
-KLZ4FLIB_STATIC_API size_t
-KLZ4F_decompress_usingDict(KLZ4F_dctx* dctxPtr,
-                          void* dstBuffer, size_t* dstSizePtr,
-                    const void* srcBuffer, size_t* srcSizePtr,
-                    const void* dict, size_t dictSize,
-                    const KLZ4F_decompressOptions_t* decompressOptionsPtr);
-
-
-/*! Custom memory allocation :
- *  These prototypes make it possible to pass custom allocation/free functions.
- *  KLZ4F_customMem is provided at state creation time, using KLZ4F_create*_advanced() listed below.
- *  All allocation/free operations will be completed using these custom variants instead of regular <stdlib.h> ones.
- */
-typedef void* (*KLZ4F_AllocFunction) (void* opaqueState, size_t size);
-typedef void* (*KLZ4F_CallocFunction) (void* opaqueState, size_t size);
-typedef void  (*KLZ4F_FreeFunction) (void* opaqueState, void* address);
-typedef struct {
-    KLZ4F_AllocFunction customAlloc;
-    KLZ4F_CallocFunction customCalloc; /* optional; when not defined, uses customAlloc + memset */
-    KLZ4F_FreeFunction customFree;
-    void* opaqueState;
-} KLZ4F_CustomMem;
-static
-#ifdef __GNUC__
-__attribute__((__unused__))
-#endif
-KLZ4F_CustomMem const KLZ4F_defaultCMem = { NULL, NULL, NULL, NULL };  /**< this constant defers to stdlib's functions */
-
-KLZ4FLIB_STATIC_API KLZ4F_cctx* KLZ4F_createCompressionContext_advanced(KLZ4F_CustomMem customMem, unsigned version);
-KLZ4FLIB_STATIC_API KLZ4F_dctx* KLZ4F_createDecompressionContext_advanced(KLZ4F_CustomMem customMem, unsigned version);
-KLZ4FLIB_STATIC_API KLZ4F_CDict* KLZ4F_createCDict_advanced(KLZ4F_CustomMem customMem, const void* dictBuffer, size_t dictSize);
-
+ *  It must remain accessible throughout the entire frame decoding. */
+KLZ4FLIB_STATIC_API size_t KLZ4F_decompress_usingDict(
+    KLZ4F_dctx* dctxPtr,
+    void* dstBuffer, size_t* dstSizePtr,
+    const void* srcBuffer, size_t* srcSizePtr,
+    const void* dict, size_t dictSize,
+    const KLZ4F_decompressOptions_t* decompressOptionsPtr);
 
 #if defined (__cplusplus)
 }

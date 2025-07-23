@@ -1,8 +1,7 @@
 /*
  * librdkafka - The Apache Kafka C/C++ library
  *
- * Copyright (c) 2016-2022, Magnus Edenhill,
- *               2023, Confluent Inc.
+ * Copyright (c) 2016 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -76,11 +75,6 @@ struct rd_kafka_q_s {
              * by triggering the cond-var                                      \
              * but without having to enqueue                                   \
              * an op. */
-#define RD_KAFKA_Q_F_CONSUMER                                                  \
-        0x10 /* If this flag is set, this queue might contain fetched messages \
-                from partitions. Polling this queue will reset the             \
-                max.poll.interval.ms timer. Once set, this flag is never       \
-                reset. */
 
         rd_kafka_t *rkq_rk;
         struct rd_kafka_q_io *rkq_qio; /* FD-based application signalling */
@@ -91,12 +85,6 @@ struct rd_kafka_q_s {
          * Shall return 1 if op was handled, else 0. */
         rd_kafka_q_serve_cb_t *rkq_serve;
         void *rkq_opaque;
-        rd_ts_t rkq_ts_last_poll_start; /**< Timestamp of last queue
-                                         *   poll() call start
-                                         *   Only relevant for a consumer. */
-        rd_ts_t rkq_ts_last_poll_end;   /**< Timestamp of last queue
-                                         *   poll() call end
-                                         *   Only relevant for a consumer. */
 
 #if ENABLE_DEVEL
         char rkq_name[64]; /* Debugging: queue name (FUNC:LINE) */
@@ -135,20 +123,12 @@ static RD_INLINE RD_UNUSED int rd_kafka_q_ready(rd_kafka_q_t *rkq) {
 
 void rd_kafka_q_init0(rd_kafka_q_t *rkq,
                       rd_kafka_t *rk,
-                      rd_bool_t for_consume,
                       const char *func,
                       int line);
 #define rd_kafka_q_init(rkq, rk)                                               \
-        rd_kafka_q_init0(rkq, rk, rd_false, __FUNCTION__, __LINE__)
-#define rd_kafka_consume_q_init(rkq, rk)                                       \
-        rd_kafka_q_init0(rkq, rk, rd_true, __FUNCTION__, __LINE__)
-rd_kafka_q_t *rd_kafka_q_new0(rd_kafka_t *rk,
-                              rd_bool_t for_consume,
-                              const char *func,
-                              int line);
-#define rd_kafka_q_new(rk) rd_kafka_q_new0(rk, rd_false, __FUNCTION__, __LINE__)
-#define rd_kafka_consume_q_new(rk)                                             \
-        rd_kafka_q_new0(rk, rd_true, __FUNCTION__, __LINE__)
+        rd_kafka_q_init0(rkq, rk, __FUNCTION__, __LINE__)
+rd_kafka_q_t *rd_kafka_q_new0(rd_kafka_t *rk, const char *func, int line);
+#define rd_kafka_q_new(rk) rd_kafka_q_new0(rk, __FUNCTION__, __LINE__)
 void rd_kafka_q_destroy_final(rd_kafka_q_t *rkq);
 
 #define rd_kafka_q_lock(rkqu)   mtx_lock(&(rkqu)->rkq_lock)
@@ -847,13 +827,6 @@ rd_kafka_op_t *rd_kafka_q_pop_serve(rd_kafka_q_t *rkq,
                                     rd_kafka_q_serve_cb_t *callback,
                                     void *opaque);
 rd_kafka_op_t *
-rd_kafka_q_pop_serve_maybe_consume(rd_kafka_q_t *rkq,
-                                   rd_ts_t timeout_us,
-                                   int32_t version,
-                                   rd_kafka_q_cb_type_t cb_type,
-                                   rd_kafka_q_serve_cb_t *callback,
-                                   void *opaque);
-rd_kafka_op_t *
 rd_kafka_q_pop(rd_kafka_q_t *rkq, rd_ts_t timeout_us, int32_t version);
 int rd_kafka_q_serve(rd_kafka_q_t *rkq,
                      int timeout_ms,
@@ -861,12 +834,6 @@ int rd_kafka_q_serve(rd_kafka_q_t *rkq,
                      rd_kafka_q_cb_type_t cb_type,
                      rd_kafka_q_serve_cb_t *callback,
                      void *opaque);
-int rd_kafka_q_serve_maybe_consume(rd_kafka_q_t *rkq,
-                                   int timeout_ms,
-                                   int max_cnt,
-                                   rd_kafka_q_cb_type_t cb_type,
-                                   rd_kafka_q_serve_cb_t *callback,
-                                   void *opaque);
 
 
 int rd_kafka_q_move_cnt(rd_kafka_q_t *dstq,
@@ -1195,22 +1162,6 @@ rd_kafka_enq_once_disable(rd_kafka_enq_once_t *eonce) {
         }
 
         return rko;
-}
-
-/**
- * @brief Returns true if the queue can contain fetched messages.
- *
- * @locks rd_kafka_q_lock(rkq) if do_lock is set.
- */
-static RD_INLINE RD_UNUSED rd_bool_t
-rd_kafka_q_can_contain_fetched_msgs(rd_kafka_q_t *rkq, rd_bool_t do_lock) {
-        rd_bool_t val;
-        if (do_lock)
-                mtx_lock(&rkq->rkq_lock);
-        val = rkq->rkq_flags & RD_KAFKA_Q_F_CONSUMER;
-        if (do_lock)
-                mtx_unlock(&rkq->rkq_lock);
-        return val;
 }
 
 

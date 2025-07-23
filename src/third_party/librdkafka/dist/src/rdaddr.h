@@ -1,7 +1,7 @@
 /*
  * librd - Rapid Development C library
  *
- * Copyright (c) 2012-2022, Magnus Edenhill
+ * Copyright (c) 2012, Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -54,13 +54,14 @@ typedef union {
 #define sinx_family in.sin_family
 #define sinx_addr   in.sin_addr
 #define RD_SOCKADDR_INX_LEN(sinx)                                              \
-        ((sinx)->sinx_family == AF_INET    ? sizeof(struct sockaddr_in)        \
-         : (sinx)->sinx_family == AF_INET6 ? sizeof(struct sockaddr_in6)       \
-                                           : sizeof(rd_sockaddr_inx_t))
+        ((sinx)->sinx_family == AF_INET                                        \
+             ? sizeof(struct sockaddr_in)                                      \
+             : (sinx)->sinx_family == AF_INET6 ? sizeof(struct sockaddr_in6)   \
+                                               : sizeof(rd_sockaddr_inx_t))
 #define RD_SOCKADDR_INX_PORT(sinx)                                             \
-        ((sinx)->sinx_family == AF_INET    ? (sinx)->in.sin_port               \
-         : (sinx)->sinx_family == AF_INET6 ? (sinx)->in6.sin6_port             \
-                                           : 0)
+        ((sinx)->sinx_family == AF_INET                                        \
+             ? (sinx)->in.sin_port                                             \
+             : (sinx)->sinx_family == AF_INET6 ? (sinx)->in6.sin6_port : 0)
 
 #define RD_SOCKADDR_INX_PORT_SET(sinx, port)                                   \
         do {                                                                   \
@@ -138,7 +139,7 @@ rd_sockaddr_list_next(rd_sockaddr_list_t *rsal) {
 
 #define RD_SOCKADDR_LIST_FOREACH(sinx, rsal)                                   \
         for ((sinx) = &(rsal)->rsal_addr[0];                                   \
-             (sinx) < &(rsal)->rsal_addr[(rsal)->rsal_cnt]; (sinx)++)
+             (sinx) < &(rsal)->rsal_addr[(rsal)->rsal_len]; (sinx)++)
 
 /**
  * Wrapper for getaddrinfo(3) that performs these additional tasks:

@@ -1,8 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2017-2022, Magnus Edenhill
- *               2023, Confluent Inc.
+ * Copyright (c) 2017 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,7 +45,7 @@
 
 
 /** @brief The maxium ProduceRequestion ApiVersion supported by librdkafka */
-static const int16_t rd_kafka_ProduceRequest_max_version = 10;
+static const int16_t rd_kafka_ProduceRequest_max_version = 7;
 
 
 typedef struct rd_kafka_msgset_writer_s {
@@ -114,9 +113,9 @@ rd_kafka_msgset_writer_select_MsgVersion(rd_kafka_msgset_writer_t *msetw) {
                 int feature;
                 int16_t ApiVersion;
         } compr_req[RD_KAFKA_COMPRESSION_NUM] = {
-            [RD_KAFKA_COMPRESSION_KLZ4] = {RD_KAFKA_FEATURE_KLZ4, 0},
+                [RD_KAFKA_COMPRESSION_KLZ4] = {RD_KAFKA_FEATURE_KLZ4, 0},
 #if WITH_ZSTD
-            [RD_KAFKA_COMPRESSION_ZSTD] = {RD_KAFKA_FEATURE_ZSTD, 7},
+                [RD_KAFKA_COMPRESSION_ZSTD] = {RD_KAFKA_FEATURE_ZSTD, 7},
 #endif
         };
 
@@ -268,9 +267,6 @@ static void rd_kafka_msgset_writer_alloc_buf(rd_kafka_msgset_writer_t *msetw) {
          * ProduceRequest header sizes
          */
         switch (msetw->msetw_ApiVersion) {
-        case 10:
-        case 9:
-        case 8:
         case 7:
         case 6:
         case 5:
@@ -356,10 +352,9 @@ static void rd_kafka_msgset_writer_alloc_buf(rd_kafka_msgset_writer_t *msetw) {
          * Allocate iovecs to hold all headers and messages,
          * and allocate auxilliery space for message headers, etc.
          */
-        msetw->msetw_rkbuf = rd_kafka_buf_new_flexver_request(
-            msetw->msetw_rkb, RD_KAFKAP_Produce,
-            msetw->msetw_msgcntmax / 2 + 10, bufsize,
-            msetw->msetw_ApiVersion >= 9);
+        msetw->msetw_rkbuf =
+            rd_kafka_buf_new_request(msetw->msetw_rkb, RD_KAFKAP_Produce,
+                                     msetw->msetw_msgcntmax / 2 + 10, bufsize);
 
         rd_kafka_buf_ApiVersion_set(msetw->msetw_rkbuf, msetw->msetw_ApiVersion,
                                     msetw->msetw_features);
@@ -446,19 +441,19 @@ rd_kafka_msgset_writer_write_Produce_header(rd_kafka_msgset_writer_t *msetw) {
         rd_kafka_buf_write_i32(rkbuf, rkt->rkt_conf.request_timeout_ms);
 
         /* TopicArrayCnt */
-        rd_kafka_buf_write_arraycnt(rkbuf, 1);
+        rd_kafka_buf_write_i32(rkbuf, 1);
 
         /* Insert topic */
         rd_kafka_buf_write_kstr(rkbuf, rkt->rkt_topic);
 
         /* PartitionArrayCnt */
-        rd_kafka_buf_write_arraycnt(rkbuf, 1);
+        rd_kafka_buf_write_i32(rkbuf, 1);
 
         /* Partition */
         rd_kafka_buf_write_i32(rkbuf, msetw->msetw_rktp->rktp_partition);
 
         /* MessageSetSize: Will be finalized later*/
-        msetw->msetw_of_MessageSetSize = rd_kafka_buf_write_arraycnt_pos(rkbuf);
+        msetw->msetw_of_MessageSetSize = rd_kafka_buf_write_i32(rkbuf, 0);
 
         if (msetw->msetw_MsgVersion == 2) {
                 /* MessageSet v2 header */
@@ -705,8 +700,8 @@ rd_kafka_msgset_writer_write_msg_v2(rd_kafka_msgset_writer_t *msetw,
                                             sizeof(varint_OffsetDelta), Offset);
         sz_KeyLen   = rd_uvarint_enc_i32(varint_KeyLen, sizeof(varint_KeyLen),
                                        rkm->rkm_key
-                                             ? (int32_t)rkm->rkm_key_len
-                                             : (int32_t)RD_KAFKAP_BYTES_LEN_NULL);
+                                           ? (int32_t)rkm->rkm_key_len
+                                           : (int32_t)RD_KAFKAP_BYTES_LEN_NULL);
         sz_ValueLen = rd_uvarint_enc_i32(
             varint_ValueLen, sizeof(varint_ValueLen),
             rkm->rkm_payload ? (int32_t)rkm->rkm_len
@@ -946,18 +941,21 @@ static int rd_kafka_msgset_writer_write_msgq(rd_kafka_msgset_writer_t *msetw,
 
 #if WITH_ZLIB
 /**
- * @brief Compress slice using gzip/zlib
+ * @brief Compress messageset using gzip/zlib
  */
-rd_kafka_resp_err_t rd_kafka_gzip_compress(rd_kafka_broker_t *rkb,
-                                           int comp_level,
-                                           rd_slice_t *slice,
-                                           void **outbuf,
-                                           size_t *outlenp) {
+static int rd_kafka_msgset_writer_compress_gzip(rd_kafka_msgset_writer_t *msetw,
+                                                rd_slice_t *slice,
+                                                struct iovec *ciov) {
+
+        rd_kafka_broker_t *rkb  = msetw->msetw_rkb;
+        rd_kafka_toppar_t *rktp = msetw->msetw_rktp;
         z_stream strm;
         size_t len = rd_slice_remains(slice);
         const void *p;
         size_t rlen;
         int r;
+        int comp_level =
+            msetw->msetw_rktp->rktp_rkt->rkt_conf.compression_level;
 
         memset(&strm, 0, sizeof(strm));
         r = deflateInit2(&strm, comp_level, Z_DEFLATED, 15 + 16, 8,
@@ -966,21 +964,23 @@ rd_kafka_resp_err_t rd_kafka_gzip_compress(rd_kafka_broker_t *rkb,
                 rd_rkb_log(rkb, LOG_ERR, "GZIP",
                            "Failed to initialize gzip for "
                            "compressing %" PRIusz
-                           " bytes: "
-                           "%s (%i): "
+                           " bytes in "
+                           "topic %.*s [%" PRId32
+                           "]: %s (%i): "
                            "sending uncompressed",
-                           len, strm.msg ? strm.msg : "", r);
-                return RD_KAFKA_RESP_ERR__BAD_COMPRESSION;
+                           len, RD_KAFKAP_STR_PR(rktp->rktp_rkt->rkt_topic),
+                           rktp->rktp_partition, strm.msg ? strm.msg : "", r);
+                return -1;
         }
 
         /* Calculate maximum compressed size and
          * allocate an output buffer accordingly, being
          * prefixed with the Message header. */
-        *outlenp = deflateBound(&strm, (uLong)rd_slice_remains(slice));
-        *outbuf  = rd_malloc(*outlenp);
+        ciov->iov_len  = deflateBound(&strm, (uLong)rd_slice_remains(slice));
+        ciov->iov_base = rd_malloc(ciov->iov_len);
 
-        strm.next_out  = *outbuf;
-        strm.avail_out = (uInt)*outlenp;
+        strm.next_out  = (void *)ciov->iov_base;
+        strm.avail_out = (uInt)ciov->iov_len;
 
         /* Iterate through each segment and compress it. */
         while ((rlen = rd_slice_reader(slice, &p))) {
@@ -993,14 +993,18 @@ rd_kafka_resp_err_t rd_kafka_gzip_compress(rd_kafka_broker_t *rkb,
                         rd_rkb_log(rkb, LOG_ERR, "GZIP",
                                    "Failed to gzip-compress "
                                    "%" PRIusz " bytes (%" PRIusz
-                                   " total): "
+                                   " total) for "
+                                   "topic %.*s [%" PRId32
+                                   "]: "
                                    "%s (%i): "
                                    "sending uncompressed",
-                                   rlen, len, strm.msg ? strm.msg : "", r);
+                                   rlen, len,
+                                   RD_KAFKAP_STR_PR(rktp->rktp_rkt->rkt_topic),
+                                   rktp->rktp_partition,
+                                   strm.msg ? strm.msg : "", r);
                         deflateEnd(&strm);
-                        rd_free(*outbuf);
-                        *outbuf = NULL;
-                        return RD_KAFKA_RESP_ERR__BAD_COMPRESSION;
+                        rd_free(ciov->iov_base);
+                        return -1;
                 }
 
                 rd_kafka_assert(rkb->rkb_rk, strm.avail_in == 0);
@@ -1011,62 +1015,51 @@ rd_kafka_resp_err_t rd_kafka_gzip_compress(rd_kafka_broker_t *rkb,
                 rd_rkb_log(rkb, LOG_ERR, "GZIP",
                            "Failed to finish gzip compression "
                            " of %" PRIusz
-                           " bytes: "
+                           " bytes for "
+                           "topic %.*s [%" PRId32
+                           "]: "
                            "%s (%i): "
                            "sending uncompressed",
-                           len, strm.msg ? strm.msg : "", r);
+                           len, RD_KAFKAP_STR_PR(rktp->rktp_rkt->rkt_topic),
+                           rktp->rktp_partition, strm.msg ? strm.msg : "", r);
                 deflateEnd(&strm);
-                rd_free(*outbuf);
-                *outbuf = NULL;
-                return RD_KAFKA_RESP_ERR__BAD_COMPRESSION;
+                rd_free(ciov->iov_base);
+                return -1;
         }
 
-        *outlenp = strm.total_out;
+        ciov->iov_len = strm.total_out;
 
         /* Deinitialize compression */
         deflateEnd(&strm);
 
-        return RD_KAFKA_RESP_ERR_NO_ERROR;
-}
-
-/**
- * @brief Compress messageset using gzip/zlib
- */
-static int rd_kafka_msgset_writer_compress_gzip(rd_kafka_msgset_writer_t *msetw,
-                                                rd_slice_t *slice,
-                                                struct iovec *ciov) {
-        rd_kafka_resp_err_t err;
-        int comp_level =
-            msetw->msetw_rktp->rktp_rkt->rkt_conf.compression_level;
-        err = rd_kafka_gzip_compress(msetw->msetw_rkb, comp_level, slice,
-                                     &ciov->iov_base, &ciov->iov_len);
-        return (err ? -1 : 0);
+        return 0;
 }
 #endif
 
 
 #if WITH_SNAPPY
 /**
- * @brief Compress slice using Snappy
+ * @brief Compress messageset using Snappy
  */
-rd_kafka_resp_err_t rd_kafka_snappy_compress_slice(rd_kafka_broker_t *rkb,
-                                                   rd_slice_t *slice,
-                                                   void **outbuf,
-                                                   size_t *outlenp) {
+static int
+rd_kafka_msgset_writer_compress_snappy(rd_kafka_msgset_writer_t *msetw,
+                                       rd_slice_t *slice,
+                                       struct iovec *ciov) {
+        rd_kafka_broker_t *rkb  = msetw->msetw_rkb;
+        rd_kafka_toppar_t *rktp = msetw->msetw_rktp;
         struct iovec *iov;
         size_t iov_max, iov_cnt;
         struct snappy_env senv;
         size_t len = rd_slice_remains(slice);
         int r;
-        struct iovec ciov;
 
         /* Initialize snappy compression environment */
         rd_kafka_snappy_init_env_sg(&senv, 1 /*iov enable*/);
 
         /* Calculate maximum compressed size and
          * allocate an output buffer accordingly. */
-        ciov.iov_len  = rd_kafka_snappy_max_compressed_length(len);
-        ciov.iov_base = rd_malloc(ciov.iov_len);
+        ciov->iov_len  = rd_kafka_snappy_max_compressed_length(len);
+        ciov->iov_base = rd_malloc(ciov->iov_len);
 
         iov_max = slice->buf->rbuf_segment_cnt;
         iov     = rd_alloca(sizeof(*iov) * iov_max);
@@ -1075,37 +1068,24 @@ rd_kafka_resp_err_t rd_kafka_snappy_compress_slice(rd_kafka_broker_t *rkb,
 
         /* Compress each message */
         if ((r = rd_kafka_snappy_compress_iov(&senv, iov, iov_cnt, len,
-                                              &ciov)) != 0) {
+                                              ciov)) != 0) {
                 rd_rkb_log(rkb, LOG_ERR, "SNAPPY",
                            "Failed to snappy-compress "
                            "%" PRIusz
-                           " bytes: %s:"
+                           " bytes for "
+                           "topic %.*s [%" PRId32
+                           "]: %s: "
                            "sending uncompressed",
-                           len, rd_strerror(-r));
-                rd_free(ciov.iov_base);
-                return RD_KAFKA_RESP_ERR__BAD_COMPRESSION;
+                           len, RD_KAFKAP_STR_PR(rktp->rktp_rkt->rkt_topic),
+                           rktp->rktp_partition, rd_strerror(-r));
+                rd_free(ciov->iov_base);
+                return -1;
         }
 
         /* rd_free snappy environment */
         rd_kafka_snappy_free_env(&senv);
 
-        *outbuf  = ciov.iov_base;
-        *outlenp = ciov.iov_len;
-
-        return RD_KAFKA_RESP_ERR_NO_ERROR;
-}
-
-/**
- * @brief Compress messageset using Snappy
- */
-static int
-rd_kafka_msgset_writer_compress_snappy(rd_kafka_msgset_writer_t *msetw,
-                                       rd_slice_t *slice,
-                                       struct iovec *ciov) {
-        rd_kafka_resp_err_t err;
-        err = rd_kafka_snappy_compress_slice(msetw->msetw_rkb, slice,
-                                             &ciov->iov_base, &ciov->iov_len);
-        return (err ? -1 : 0);
+        return 0;
 }
 #endif
 
@@ -1335,9 +1315,9 @@ rd_kafka_msgset_writer_finalize_MessageSet(rd_kafka_msgset_writer_t *msetw) {
                     RD_KAFKAP_MSGSET_V0_SIZE + msetw->msetw_messages_len;
 
         /* Update MessageSetSize */
-        rd_kafka_buf_finalize_arraycnt(msetw->msetw_rkbuf,
-                                       msetw->msetw_of_MessageSetSize,
-                                       (int32_t)msetw->msetw_MessageSetSize);
+        rd_kafka_buf_update_i32(msetw->msetw_rkbuf,
+                                msetw->msetw_of_MessageSetSize,
+                                (int32_t)msetw->msetw_MessageSetSize);
 }
 
 
@@ -1396,11 +1376,6 @@ rd_kafka_msgset_writer_finalize(rd_kafka_msgset_writer_t *msetw,
 
         /* Finalize MessageSet header fields */
         rd_kafka_msgset_writer_finalize_MessageSet(msetw);
-
-        /* Partition tags */
-        rd_kafka_buf_write_tags_empty(rkbuf);
-        /* Topics tags */
-        rd_kafka_buf_write_tags_empty(rkbuf);
 
         /* Return final MessageSetSize */
         *MessageSetSizep = msetw->msetw_MessageSetSize;

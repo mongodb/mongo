@@ -1,8 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2017-2022, Magnus Edenhill
- *               2025, Confluent Inc.
+ * Copyright (c) 2017 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,7 +34,6 @@
 
 extern rd_bool_t rd_unittest_assert_on_failure;
 extern rd_bool_t rd_unittest_on_ci;
-extern rd_bool_t rd_unittest_with_valgrind;
 extern rd_bool_t rd_unittest_slow;
 
 #define ENABLE_CODECOV ENABLE_DEVEL

@@ -1,8 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2016-2022, Magnus Edenhill
- *               2023, Confluent Inc.
+ * Copyright (c) 2016, Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -111,28 +110,17 @@ static const struct rd_kafka_feature_map {
             },
     },
     {
-        /* @brief >=0.9.0: Broker-based balanced consumer groups (classic). */
+        /* @brief >=0.9.0: Broker-based balanced consumer groups. */
         .feature = RD_KAFKA_FEATURE_BROKER_BALANCED_CONSUMER,
         .depends =
             {
-                {RD_KAFKAP_FindCoordinator, 0, INT16_MAX},
-                {RD_KAFKAP_OffsetCommit, 1, INT16_MAX},
-                {RD_KAFKAP_OffsetFetch, 1, INT16_MAX},
-                {RD_KAFKAP_JoinGroup, 0, INT16_MAX},
-                {RD_KAFKAP_SyncGroup, 0, INT16_MAX},
-                {RD_KAFKAP_Heartbeat, 0, INT16_MAX},
-                {RD_KAFKAP_LeaveGroup, 0, INT16_MAX},
-                {-1},
-            },
-    },
-    {
-        /* @brief Broker-based balanced consumer groups (KIP 848). */
-        .feature = RD_KAFKA_FEATURE_BROKER_BALANCED_CONSUMER,
-        .depends =
-            {
-                {RD_KAFKAP_ConsumerGroupHeartbeat, 0, INT16_MAX},
-                {RD_KAFKAP_OffsetCommit, 9, INT16_MAX},
-                {RD_KAFKAP_OffsetFetch, 9, INT16_MAX},
+                {RD_KAFKAP_FindCoordinator, 0, 0},
+                {RD_KAFKAP_OffsetCommit, 1, 2},
+                {RD_KAFKAP_OffsetFetch, 1, 1},
+                {RD_KAFKAP_JoinGroup, 0, 0},
+                {RD_KAFKAP_SyncGroup, 0, 0},
+                {RD_KAFKAP_Heartbeat, 0, 0},
+                {RD_KAFKAP_LeaveGroup, 0, 0},
                 {-1},
             },
     },
@@ -156,18 +144,7 @@ static const struct rd_kafka_feature_map {
         .feature = RD_KAFKA_FEATURE_SASL_GSSAPI,
         .depends =
             {
-                {RD_KAFKAP_JoinGroup, 0, INT16_MAX},
-                {-1},
-            },
-    },
-    {
-        /* @brief >=0.10.0: SASL (GSSAPI) authentication.
-         * Fallback in case JoinGroup is removed along with the
-         * "classic" consumer group protocol. */
-        .feature = RD_KAFKA_FEATURE_SASL_GSSAPI,
-        .depends =
-            {
-                {RD_KAFKAP_SaslHandshake, 0, INT16_MAX},
+                {RD_KAFKAP_JoinGroup, 0, 0},
                 {-1},
             },
     },
@@ -227,7 +204,7 @@ static const struct rd_kafka_feature_map {
         .depends =
             {
                 {RD_KAFKAP_SaslHandshake, 1, 1},
-                {RD_KAFKAP_SaslAuthenticate, 0, 1},
+                {RD_KAFKAP_SaslAuthenticate, 0, 0},
                 {-1},
             },
     },
@@ -295,20 +272,20 @@ int rd_kafka_get_legacy_ApiVersions(const char *broker_version,
                                     struct rd_kafka_ApiVersion **apisp,
                                     size_t *api_cntp,
                                     const char *fallback) {
-#define _VERMAP(PFX, APIS)                                                     \
-        { PFX, APIS, RD_ARRAYSIZE(APIS) }
         static const struct {
                 const char *pfx;
                 struct rd_kafka_ApiVersion *apis;
                 size_t api_cnt;
-        } vermap[] = {_VERMAP("0.9.0", rd_kafka_ApiVersion_0_9_0),
-                      _VERMAP("0.8.2", rd_kafka_ApiVersion_0_8_2),
-                      _VERMAP("0.8.1", rd_kafka_ApiVersion_0_8_1),
-                      _VERMAP("0.8.0", rd_kafka_ApiVersion_0_8_0),
-                      {"0.7.", NULL}, /* Unsupported */
-                      {"0.6.", NULL}, /* Unsupported */
-                      _VERMAP("", rd_kafka_ApiVersion_Queryable),
-                      {NULL}};
+        } vermap[] = {
+#define _VERMAP(PFX, APIS) {PFX, APIS, RD_ARRAYSIZE(APIS)}
+            _VERMAP("0.9.0", rd_kafka_ApiVersion_0_9_0),
+            _VERMAP("0.8.2", rd_kafka_ApiVersion_0_8_2),
+            _VERMAP("0.8.1", rd_kafka_ApiVersion_0_8_1),
+            _VERMAP("0.8.0", rd_kafka_ApiVersion_0_8_0),
+            {"0.7.", NULL}, /* Unsupported */
+            {"0.6.", NULL}, /* Unsupported */
+            _VERMAP("", rd_kafka_ApiVersion_Queryable),
+            {NULL}};
         int i;
         int fallback_i = -1;
         int ret        = 0;

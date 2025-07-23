@@ -1,7 +1,7 @@
 /*
  * librdkafka - The Apache Kafka C/C++ library
  *
- * Copyright (c) 2021-2022, Magnus Edenhill
+ * Copyright (c) 2021 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,9 +42,8 @@ typedef struct rd_http_error_s {
 
 void rd_http_error_destroy(rd_http_error_t *herr);
 
-rd_http_error_t *rd_http_get(rd_kafka_t *rk, const char *url, rd_buf_t **rbufp);
-rd_http_error_t *
-rd_http_get_json(rd_kafka_t *rk, const char *url, cJSON **jsonp);
+rd_http_error_t *rd_http_get(const char *url, rd_buf_t **rbufp);
+rd_http_error_t *rd_http_get_json(const char *url, cJSON **jsonp);
 
 void rd_http_global_init(void);
 
@@ -63,8 +62,7 @@ typedef struct rd_http_req_s {
                                                  *   write to. */
 } rd_http_req_t;
 
-rd_http_error_t *
-rd_http_req_init(rd_kafka_t *rk, rd_http_req_t *hreq, const char *url);
+rd_http_error_t *rd_http_req_init(rd_http_req_t *hreq, const char *url);
 rd_http_error_t *rd_http_req_perform_sync(rd_http_req_t *hreq);
 rd_http_error_t *rd_http_parse_json(rd_http_req_t *hreq, cJSON **jsonp);
 rd_http_error_t *rd_http_post_expect_json(rd_kafka_t *rk,

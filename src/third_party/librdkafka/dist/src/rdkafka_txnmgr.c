@@ -1,7 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2019-2022, Magnus Edenhill
+ * Copyright (c) 2019 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1496,12 +1496,8 @@ static void rd_kafka_txn_handle_TxnOffsetCommit(rd_kafka_t *rk,
 
         rd_kafka_buf_read_throttle_time(rkbuf);
 
-        const rd_kafka_topic_partition_field_t fields[] = {
-            RD_KAFKA_TOPIC_PARTITION_FIELD_PARTITION,
-            RD_KAFKA_TOPIC_PARTITION_FIELD_ERR,
-            RD_KAFKA_TOPIC_PARTITION_FIELD_END};
-        partitions = rd_kafka_buf_read_topic_partitions(
-            rkbuf, rd_false /*don't use topic_id*/, rd_true, 0, fields);
+        partitions =
+            rd_kafka_buf_read_topic_partitions(rkbuf, 0, rd_false, rd_true);
         if (!partitions)
                 goto err_parse;
 
@@ -1708,17 +1704,11 @@ rd_kafka_txn_send_TxnOffsetCommitRequest(rd_kafka_broker_t *rkb,
         }
 
         /* Write per-partition offsets list */
-        const rd_kafka_topic_partition_field_t fields[] = {
-            RD_KAFKA_TOPIC_PARTITION_FIELD_PARTITION,
-            RD_KAFKA_TOPIC_PARTITION_FIELD_OFFSET,
-            ApiVersion >= 2 ? RD_KAFKA_TOPIC_PARTITION_FIELD_EPOCH
-                            : RD_KAFKA_TOPIC_PARTITION_FIELD_NOOP,
-            RD_KAFKA_TOPIC_PARTITION_FIELD_METADATA,
-            RD_KAFKA_TOPIC_PARTITION_FIELD_END};
         cnt = rd_kafka_buf_write_topic_partitions(
             rkbuf, rko->rko_u.txn.offsets, rd_true /*skip invalid offsets*/,
-            rd_false /*any offset*/, rd_false /*don't use topic id*/,
-            rd_true /*use topic name*/, fields);
+            rd_false /*any offset*/, rd_true /*write offsets*/,
+            ApiVersion >= 2 /*write Epoch (-1) */, rd_true /*write Metadata*/);
+
         if (!cnt) {
                 /* No valid partition offsets, don't commit. */
                 rd_kafka_buf_destroy(rkbuf);
@@ -2029,7 +2019,7 @@ rd_kafka_error_t *rd_kafka_send_offsets_to_transaction(
         rd_kafka_topic_partition_list_sort_by_topic(valid_offsets);
 
         rko                    = rd_kafka_op_new_cb(rk, RD_KAFKA_OP_TXN,
-                                                    rd_kafka_txn_op_send_offsets_to_transaction);
+                                 rd_kafka_txn_op_send_offsets_to_transaction);
         rko->rko_u.txn.offsets = valid_offsets;
         rko->rko_u.txn.cgmetadata =
             rd_kafka_consumer_group_metadata_dup(cgmetadata);
@@ -2956,11 +2946,6 @@ static void rd_kafka_txn_handle_FindCoordinator(rd_kafka_t *rk,
                 rd_snprintf(errstr, sizeof(errstr),
                             "Transaction coordinator %" PRId32 " is unknown",
                             NodeId);
-                err = RD_KAFKA_RESP_ERR__UNKNOWN_BROKER;
-        }
-        if (rkb && rkb->rkb_source != RD_KAFKA_LEARNED) {
-                rd_kafka_broker_destroy(rkb);
-                rkb = NULL;
                 err = RD_KAFKA_RESP_ERR__UNKNOWN_BROKER;
         }
         rd_kafka_rdunlock(rk);

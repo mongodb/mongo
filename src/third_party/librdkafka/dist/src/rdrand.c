@@ -1,7 +1,7 @@
 /*
  * librd - Rapid Development C library
  *
- * Copyright (c) 2012-2022, Magnus Edenhill
+ * Copyright (c) 2012, Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,7 +30,6 @@
 #include "rdrand.h"
 #include "rdtime.h"
 #include "tinycthread.h"
-#include "rdmurmur2.h"
 
 int rd_jitter(int low, int high) {
         int rand_num;
@@ -41,17 +40,8 @@ int rd_jitter(int low, int high) {
         if (unlikely(seed == 0)) {
                 struct timeval tv;
                 rd_gettimeofday(&tv, NULL);
-                seed = (unsigned int)(tv.tv_usec);
+                seed = (unsigned int)(tv.tv_usec / 1000);
                 seed ^= (unsigned int)(intptr_t)thrd_current();
-
-                /* When many threads are created at the same time and the
-                 * thread id is different only by a few bits it's possible that
-                 * `rand_r`, that is initially multiplying by `1103515245`,
-                 * truncates the variable bits and uses the same seed for
-                 * different threads. By applying `murmur2` we ensure that seed
-                 * variability is distributed across various bits at different
-                 * positions. */
-                seed = (unsigned int)rd_murmur2(&seed, sizeof(seed));
         }
 
         rand_num = rand_r(&seed);

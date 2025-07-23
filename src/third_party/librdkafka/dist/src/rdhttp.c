@@ -1,7 +1,7 @@
 /*
  * librdkafka - The Apache Kafka C/C++ library
  *
- * Copyright (c) 2021-2022, Magnus Edenhill
+ * Copyright (c) 2021 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,10 +39,6 @@
 
 #include <curl/curl.h>
 #include "rdhttp.h"
-
-#if WITH_SSL
-#include "rdkafka_ssl.h"
-#endif
 
 /** Maximum response size, increase as necessary. */
 #define RD_HTTP_RESPONSE_SIZE_MAX 1024 * 1024 * 500 /* 500kb */
@@ -132,145 +128,8 @@ rd_http_req_write_cb(char *ptr, size_t size, size_t nmemb, void *userdata) {
         return nmemb;
 }
 
-#if WITH_SSL
-/**
- * @brief Callback function for setting up the SSL_CTX for HTTPS requests.
- *
- * This function sets the default CA paths for the SSL_CTX, and if that fails,
- * it attempts to probe and set a default CA location. If `probe` is forced
- * it skips the default CA paths and directly probes for CA certificates.
- *
- * On Windows, it attempts to load CA root certificates from the
- * configured Windows certificate stores before falling back to the default.
- *
- * @return `CURLE_OK` on success, or `CURLE_SSL_CACERT_BADFILE` on failure.
- */
-static CURLcode
-rd_http_ssl_ctx_function(CURL *curl, void *sslctx, void *userptr) {
-        SSL_CTX *ctx   = (SSL_CTX *)sslctx;
-        rd_kafka_t *rk = (rd_kafka_t *)userptr;
-        int r          = -1;
-        rd_bool_t force_probe =
-            !rd_strcmp(rk->rk_conf.https.ca_location, "probe");
-        rd_bool_t use_probe = force_probe;
+rd_http_error_t *rd_http_req_init(rd_http_req_t *hreq, const char *url) {
 
-#if WITH_STATIC_LIB_libcrypto
-        /* We fallback to `probe` when statically linked. */
-        use_probe = rd_true;
-#endif
-
-#ifdef _WIN32
-        /* Attempt to load CA root certificates from the
-         * configured Windows certificate stores. */
-        r = rd_kafka_ssl_win_load_cert_stores(rk, "https", ctx,
-                                              rk->rk_conf.ssl.ca_cert_stores);
-        if (r == 0) {
-                rd_kafka_log(rk, LOG_NOTICE, "CERTSTORE",
-                             "No CA certificates loaded for `https` from "
-                             "Windows certificate stores: "
-                             "falling back to default OpenSSL CA paths");
-                r = -1;
-        } else if (r == -1)
-                rd_kafka_log(rk, LOG_NOTICE, "CERTSTORE",
-                             "Failed to load CA certificates for `https` from "
-                             "Windows certificate stores: "
-                             "falling back to default OpenSSL CA paths");
-
-        if (r != -1) {
-                rd_kafka_dbg(rk, SECURITY, "SSL",
-                             "Successfully loaded CA certificates for `https` "
-                             "from Windows certificate stores");
-                return CURLE_OK; /* Success, CA certs loaded on Windows */
-        }
-#endif
-
-        if (!force_probe) {
-                /* Previous default behavior: use predefined paths set when
-                 * building OpenSSL. */
-                char errstr[512];
-                r = SSL_CTX_set_default_verify_paths(ctx);
-                if (r == 1) {
-                        rd_kafka_dbg(rk, SECURITY, "SSL",
-                                     "SSL_CTX_set_default_verify_paths() "
-                                     "for `https` "
-                                     "succeeded");
-                        return CURLE_OK; /* Success */
-                }
-
-                /* Read error and clear the error stack. */
-                rd_kafka_ssl_error0(rk, NULL, "https", errstr, sizeof(errstr));
-                rd_kafka_dbg(rk, SECURITY, "SSL",
-                             "SSL_CTX_set_default_verify_paths() "
-                             "for `https` "
-                             "failed: %s",
-                             errstr);
-        }
-
-        if (use_probe) {
-                /* We asked for probing or we're using
-                 * a statically linked version of OpenSSL. */
-
-                r = rd_kafka_ssl_probe_and_set_default_ca_location(rk, "https",
-                                                                   ctx);
-                if (r == 0)
-                        return CURLE_OK;
-        }
-
-        return CURLE_SSL_CACERT_BADFILE;
-}
-
-static void rd_http_ssl_configure(rd_kafka_t *rk, CURL *hreq_curl) {
-        rd_bool_t force_probe =
-            !rd_strcmp(rk->rk_conf.https.ca_location, "probe");
-
-        if (!force_probe && rk->rk_conf.https.ca_location) {
-                rd_bool_t is_dir;
-                rd_kafka_dbg(rk, SECURITY, "SSL",
-                             "Setting `https` CA certs from "
-                             "configured location: %s",
-                             rk->rk_conf.https.ca_location);
-                if (rd_file_stat(rk->rk_conf.https.ca_location, &is_dir)) {
-                        if (is_dir) {
-                                curl_easy_setopt(hreq_curl, CURLOPT_CAPATH,
-                                                 rk->rk_conf.https.ca_location);
-                                curl_easy_setopt(hreq_curl, CURLOPT_CAINFO,
-                                                 NULL);
-                        } else {
-                                curl_easy_setopt(hreq_curl, CURLOPT_CAPATH,
-                                                 NULL);
-                                curl_easy_setopt(hreq_curl, CURLOPT_CAINFO,
-                                                 rk->rk_conf.https.ca_location);
-                        }
-                } else {
-                        /* Path doesn't exist, don't set any trusted
-                         * certificate. */
-                        curl_easy_setopt(hreq_curl, CURLOPT_CAINFO, NULL);
-                        curl_easy_setopt(hreq_curl, CURLOPT_CAPATH, NULL);
-                }
-        } else if (!force_probe && rk->rk_conf.https.ca_pem) {
-#if CURL_AT_LEAST_VERSION(7, 77, 0)
-                struct curl_blob ca_blob = {
-                    .data  = rk->rk_conf.https.ca_pem,
-                    .len   = strlen(rk->rk_conf.https.ca_pem),
-                    .flags = CURL_BLOB_COPY};
-                rd_kafka_dbg(rk, SECURITY, "SSL",
-                             "Setting `https` CA certs from "
-                             "configured PEM string");
-                curl_easy_setopt(hreq_curl, CURLOPT_CAINFO_BLOB, &ca_blob);
-#endif
-                /* Only the blob should be set, no default paths. */
-                curl_easy_setopt(hreq_curl, CURLOPT_CAINFO, NULL);
-                curl_easy_setopt(hreq_curl, CURLOPT_CAPATH, NULL);
-        } else {
-                curl_easy_setopt(hreq_curl, CURLOPT_SSL_CTX_FUNCTION,
-                                 rd_http_ssl_ctx_function);
-                curl_easy_setopt(hreq_curl, CURLOPT_SSL_CTX_DATA, rk);
-        }
-}
-#endif
-
-rd_http_error_t *
-rd_http_req_init(rd_kafka_t *rk, rd_http_req_t *hreq, const char *url) {
         memset(hreq, 0, sizeof(*hreq));
 
         hreq->hreq_curl = curl_easy_init();
@@ -280,15 +139,8 @@ rd_http_req_init(rd_kafka_t *rk, rd_http_req_t *hreq, const char *url) {
         hreq->hreq_buf = rd_buf_new(1, 1024);
 
         curl_easy_setopt(hreq->hreq_curl, CURLOPT_URL, url);
-#if CURL_AT_LEAST_VERSION(7, 85, 0)
-        curl_easy_setopt(hreq->hreq_curl, CURLOPT_PROTOCOLS_STR, "http,https");
-#else
-        /* As of 06/10/2025 Debian 10 and CentOS Stream 9 ship with
-         * older CURL versions, remove this condition once they're not supported
-         * anymore. */
         curl_easy_setopt(hreq->hreq_curl, CURLOPT_PROTOCOLS,
                          CURLPROTO_HTTP | CURLPROTO_HTTPS);
-#endif
         curl_easy_setopt(hreq->hreq_curl, CURLOPT_MAXREDIRS, 16);
         curl_easy_setopt(hreq->hreq_curl, CURLOPT_TIMEOUT, 30);
         curl_easy_setopt(hreq->hreq_curl, CURLOPT_ERRORBUFFER,
@@ -297,10 +149,6 @@ rd_http_req_init(rd_kafka_t *rk, rd_http_req_t *hreq, const char *url) {
         curl_easy_setopt(hreq->hreq_curl, CURLOPT_WRITEFUNCTION,
                          rd_http_req_write_cb);
         curl_easy_setopt(hreq->hreq_curl, CURLOPT_WRITEDATA, (void *)hreq);
-
-#if WITH_SSL
-        rd_http_ssl_configure(rk, hreq->hreq_curl);
-#endif
 
         return NULL;
 }
@@ -352,14 +200,13 @@ const char *rd_http_req_get_content_type(rd_http_req_t *hreq) {
  * by calling rd_http_error_destroy(). In case of HTTP error the \p *rbufp
  * may be filled with the error response.
  */
-rd_http_error_t *
-rd_http_get(rd_kafka_t *rk, const char *url, rd_buf_t **rbufp) {
+rd_http_error_t *rd_http_get(const char *url, rd_buf_t **rbufp) {
         rd_http_req_t hreq;
         rd_http_error_t *herr;
 
         *rbufp = NULL;
 
-        herr = rd_http_req_init(rk, &hreq, url);
+        herr = rd_http_req_init(&hreq, url);
         if (unlikely(herr != NULL))
                 return herr;
 
@@ -422,7 +269,6 @@ static rd_bool_t rd_http_is_failure_temporary(int error_code) {
         switch (error_code) {
         case 408: /**< Request timeout */
         case 425: /**< Too early */
-        case 429: /**< Too many requests */
         case 500: /**< Internal server error */
         case 502: /**< Bad gateway */
         case 503: /**< Service unavailable */
@@ -463,7 +309,7 @@ rd_http_error_t *rd_http_post_expect_json(rd_kafka_t *rk,
         size_t len;
         const char *content_type;
 
-        herr = rd_http_req_init(rk, &hreq, url);
+        herr = rd_http_req_init(&hreq, url);
         if (unlikely(herr != NULL))
                 return herr;
 
@@ -528,8 +374,7 @@ rd_http_error_t *rd_http_post_expect_json(rd_kafka_t *rk,
  *
  * Same error semantics as rd_http_get().
  */
-rd_http_error_t *
-rd_http_get_json(rd_kafka_t *rk, const char *url, cJSON **jsonp) {
+rd_http_error_t *rd_http_get_json(const char *url, cJSON **jsonp) {
         rd_http_req_t hreq;
         rd_http_error_t *herr;
         rd_slice_t slice;
@@ -540,7 +385,7 @@ rd_http_get_json(rd_kafka_t *rk, const char *url, cJSON **jsonp) {
 
         *jsonp = NULL;
 
-        herr = rd_http_req_init(rk, &hreq, url);
+        herr = rd_http_req_init(&hreq, url);
         if (unlikely(herr != NULL))
                 return herr;
 
@@ -615,21 +460,19 @@ int unittest_http(void) {
         cJSON *json, *jval;
         rd_http_error_t *herr;
         rd_bool_t empty;
-        rd_kafka_t *rk;
 
         if (!base_url || !*base_url)
                 RD_UT_SKIP("RD_UT_HTTP_URL environment variable not set");
 
         RD_UT_BEGIN();
 
-        rk             = rd_calloc(1, sizeof(*rk));
         error_url_size = strlen(base_url) + strlen("/error") + 1;
         error_url      = rd_alloca(error_url_size);
         rd_snprintf(error_url, error_url_size, "%s/error", base_url);
 
         /* Try the base url first, parse its JSON and extract a key-value. */
         json = NULL;
-        herr = rd_http_get_json(rk, base_url, &json);
+        herr = rd_http_get_json(base_url, &json);
         RD_UT_ASSERT(!herr, "Expected get_json(%s) to succeed, got: %s",
                      base_url, herr->errstr);
 
@@ -649,7 +492,7 @@ int unittest_http(void) {
 
         /* Try the error URL, verify error code. */
         json = NULL;
-        herr = rd_http_get_json(rk, error_url, &json);
+        herr = rd_http_get_json(error_url, &json);
         RD_UT_ASSERT(herr != NULL, "Expected get_json(%s) to fail", error_url);
         RD_UT_ASSERT(herr->code >= 400,
                      "Expected get_json(%s) error code >= "
@@ -663,7 +506,6 @@ int unittest_http(void) {
         if (json)
                 cJSON_Delete(json);
         rd_http_error_destroy(herr);
-        rd_free(rk);
 
         RD_UT_PASS();
 }

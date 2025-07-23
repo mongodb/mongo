@@ -1,8 +1,7 @@
 /*
  * librdkafka - Apache Kafka C/C++ library
  *
- * Copyright (c) 2014-2022, Magnus Edenhill
- *               2023, Confluent Inc.
+ * Copyright (c) 2014-2022 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -121,7 +120,7 @@ namespace RdKafka {
  * @remark This value should only be used during compile time,
  *         for runtime checks of version use RdKafka::version()
  */
-#define RD_KAFKA_VERSION 0x020b00ff
+#define RD_KAFKA_VERSION 0x020002ff
 
 /**
  * @brief Returns the librdkafka version as integer.
@@ -334,13 +333,6 @@ enum ErrorCode {
   ERR__NOOP = -141,
   /** No offset to automatically reset to */
   ERR__AUTO_OFFSET_RESET = -140,
-  /** Partition log truncation detected */
-  ERR__LOG_TRUNCATION = -139,
-  /** A different record in the batch was invalid
-   *  and this message failed persisting. */
-  ERR__INVALID_DIFFERENT_RECORD = -138,
-  /** Broker is going away but client isn't terminating */
-  ERR__DESTROY_BROKER = -137,
 
   /** End internal error codes */
   ERR__END = -100,
@@ -558,28 +550,7 @@ enum ErrorCode {
   /** Unable to update finalized features due to server error */
   ERR_FEATURE_UPDATE_FAILED = 96,
   /** Request principal deserialization failed during forwarding */
-  ERR_PRINCIPAL_DESERIALIZATION_FAILURE = 97,
-  /** Unknown Topic Id */
-  ERR_UNKNOWN_TOPIC_ID = 100,
-  /** The member epoch is fenced by the group coordinator */
-  ERR_FENCED_MEMBER_EPOCH = 110,
-  /** The instance ID is still used by another member in the
-   *  consumer group */
-  ERR_UNRELEASED_INSTANCE_ID = 111,
-  /** The assignor or its version range is not supported by the consumer
-   *  group */
-  ERR_UNSUPPORTED_ASSIGNOR = 112,
-  /** The member epoch is stale */
-  ERR_STALE_MEMBER_EPOCH = 113,
-  /** Client sent a push telemetry request with an invalid or outdated
-   *  subscription ID. */
-  ERR_UNKNOWN_SUBSCRIPTION_ID = 117,
-  /** Client sent a push telemetry request larger than the maximum size
-   *  the broker will accept. */
-  ERR_TELEMETRY_TOO_LARGE = 118,
-  /** Client metadata is stale,
-   *  client should rebootstrap to obtain new metadata. */
-  ERR_REBOOTSTRAP_REQUIRED = 129
+  ERR_PRINCIPAL_DESERIALIZATION_FAILURE = 97
 };
 
 
@@ -2090,18 +2061,6 @@ class RD_EXPORT TopicPartition {
 
   /** @returns error code (if applicable) */
   virtual ErrorCode err() const = 0;
-
-  /** @brief Get partition leader epoch, or -1 if not known or relevant. */
-  virtual int32_t get_leader_epoch() = 0;
-
-  /** @brief Set partition leader epoch. */
-  virtual void set_leader_epoch(int32_t leader_epoch) = 0;
-
-  /** @brief Get partition metadata. */
-  virtual std::vector<unsigned char> get_metadata() = 0;
-
-  /** @brief Set partition metadata. */
-  virtual void set_metadata(std::vector<unsigned char> &metadata) = 0;
 };
 
 
@@ -2158,11 +2117,6 @@ class RD_EXPORT Topic {
    * @brief Store offset \p offset + 1 for topic partition \p partition.
    * The offset will be committed (written) to the broker (or file) according
    * to \p auto.commit.interval.ms or next manual offset-less commit call.
-   *
-   * @deprecated This API lacks support for partition leader epochs, which makes
-   *             it at risk for unclean leader election log truncation issues.
-   *             Use KafkaConsumer::offsets_store() or
-   *             Message::offset_store() instead.
    *
    * @remark \c enable.auto.offset.store must be set to \c false when using
    *         this API.
@@ -2594,31 +2548,6 @@ class RD_EXPORT Message {
   /** @returns the broker id of the broker the message was produced to or
    *           fetched from, or -1 if not known/applicable. */
   virtual int32_t broker_id() const = 0;
-
-  /** @returns the message's partition leader epoch at the time the message was
-   *           fetched and if known, else -1. */
-  virtual int32_t leader_epoch() const = 0;
-
-  /**
-   * @brief Store offset +1 for the consumed message.
-   *
-   * The message offset + 1 will be committed to broker according
-   * to \c `auto.commit.interval.ms` or manual offset-less commit()
-   *
-   * @warning This method may only be called for partitions that are currently
-   *          assigned.
-   *          Non-assigned partitions will fail with ERR__STATE.
-   *
-   * @warning Avoid storing offsets after calling seek() (et.al) as
-   *          this may later interfere with resuming a paused partition, instead
-   *          store offsets prior to calling seek.
-   *
-   * @remark \c `enable.auto.offset.store` must be set to "false" when using
-   *         this API.
-   *
-   * @returns NULL on success or an error object on failure.
-   */
-  virtual Error *offset_store() = 0;
 };
 
 /**@}*/
@@ -3018,9 +2947,6 @@ class RD_EXPORT KafkaConsumer : public virtual Handle {
    *
    * @remark \c enable.auto.offset.store must be set to \c false when using
    *         this API.
-   *
-   * @remark The leader epoch, if set, will be used to fence outdated partition
-   *         leaders. See TopicPartition::set_leader_epoch().
    *
    * @returns RdKafka::ERR_NO_ERROR on success, or
    *          RdKafka::ERR___UNKNOWN_PARTITION if none of the offsets could

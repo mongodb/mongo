@@ -1,8 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2012,2022, Magnus Edenhill
- *               2023 Confluent Inc.
+ * Copyright (c) 2012,2013 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -51,10 +50,10 @@ typedef enum {
         /* Any state >= STATE_UP means the Kafka protocol layer
          * is operational (to some degree). */
         RD_KAFKA_BROKER_STATE_UP,
+        RD_KAFKA_BROKER_STATE_UPDATE,
         RD_KAFKA_BROKER_STATE_APIVERSION_QUERY,
         RD_KAFKA_BROKER_STATE_AUTH_HANDSHAKE,
         RD_KAFKA_BROKER_STATE_AUTH_REQ,
-        RD_KAFKA_BROKER_STATE_REAUTH,
 } rd_kafka_broker_state_t;
 
 /**
@@ -81,7 +80,8 @@ typedef struct rd_kafka_broker_monitor_s {
 struct rd_kafka_broker_s { /* rd_kafka_broker_t */
         TAILQ_ENTRY(rd_kafka_broker_s) rkb_link;
 
-        int32_t rkb_nodeid; /**< Broker Node Id, read only. */
+        int32_t rkb_nodeid; /**< Broker Node Id.
+                             *   @locks rkb_lock */
 #define RD_KAFKA_NODEID_UA -1
 
         rd_sockaddr_list_t *rkb_rsal;
@@ -191,40 +191,6 @@ struct rd_kafka_broker_s { /* rd_kafka_broker_t */
                 rd_atomic64_t ts_recv; /**< Timestamp of last receive */
         } rkb_c;
 
-        struct {
-                struct {
-                        int32_t connects; /**< Connection attempts,
-                                           *   successful or not. */
-                } rkb_historic_c;
-
-                struct {
-                        rd_avg_t rkb_avg_rtt;      /* Current RTT avg */
-                        rd_avg_t rkb_avg_throttle; /* Current throttle avg */
-                        rd_avg_t
-                            rkb_avg_outbuf_latency;       /**< Current latency
-                                                           *   between buf_enq0
-                                                           *   and writing to socket
-                                                           */
-                        rd_avg_t rkb_avg_fetch_latency;   /**< Current fetch
-                                                           *   latency avg */
-                        rd_avg_t rkb_avg_produce_latency; /**< Current produce
-                                                           *   latency avg */
-                } rd_avg_current;
-
-                struct {
-                        rd_avg_t rkb_avg_rtt; /**< Rolled over RTT avg */
-                        rd_avg_t
-                            rkb_avg_throttle; /**< Rolled over throttle avg */
-                        rd_avg_t rkb_avg_outbuf_latency; /**< Rolled over outbuf
-                                                          *   latency avg */
-                        rd_avg_t rkb_avg_fetch_latency;  /**< Rolled over fetch
-                                                          *   latency avg */
-                        rd_avg_t
-                            rkb_avg_produce_latency; /**< Rolled over produce
-                                                      *   latency avg */
-                } rd_avg_rollover;
-        } rkb_telemetry;
-
         int rkb_req_timeouts; /* Current value */
 
         thrd_t rkb_thread;
@@ -285,9 +251,6 @@ struct rd_kafka_broker_s { /* rd_kafka_broker_t */
 
         /** Absolute time of last connection attempt. */
         rd_ts_t rkb_ts_connect;
-
-        /** True if a reauthentication is in progress. */
-        rd_bool_t rkb_reauth_in_progress;
 
         /**< Persistent connection demand is tracked by
          *   a counter for each type of demand.
@@ -360,12 +323,6 @@ struct rd_kafka_broker_s { /* rd_kafka_broker_t */
                 rd_kafka_resp_err_t err; /**< Last error code */
                 int cnt;                 /**< Number of identical errors */
         } rkb_last_err;
-
-
-        rd_kafka_timer_t rkb_sasl_reauth_tmr;
-
-        /** > 0 if this broker thread is terminating */
-        rd_atomic32_t termination_in_progress;
 };
 
 #define rd_kafka_broker_keep(rkb) rd_refcnt_add(&(rkb)->rkb_refcnt)
@@ -393,28 +350,12 @@ rd_kafka_broker_get_state(rd_kafka_broker_t *rkb) {
 
 
 /**
- * @returns true if the broker state is UP
+ * @returns true if the broker state is UP or UPDATE
  */
-#define rd_kafka_broker_state_is_up(state) ((state) == RD_KAFKA_BROKER_STATE_UP)
+#define rd_kafka_broker_state_is_up(state)                                     \
+        ((state) == RD_KAFKA_BROKER_STATE_UP ||                                \
+         (state) == RD_KAFKA_BROKER_STATE_UPDATE)
 
-/**
- * @returns true if the broker state is DOWN
- */
-#define rd_kafka_broker_state_is_down(state)                                   \
-        ((state) == RD_KAFKA_BROKER_STATE_DOWN)
-
-/**
- * @returns true if the error is a broker destroy error, because of
- *          termination or because of decommissioning.
- */
-#define rd_kafka_broker_is_any_err_destroy(err)                                \
-        ((err) == RD_KAFKA_RESP_ERR__DESTROY ||                                \
-         (err) == RD_KAFKA_RESP_ERR__DESTROY_BROKER)
-
-
-#define rd_kafka_broker_or_instance_terminating(rkb)                           \
-        (rd_kafka_broker_termination_in_progress(rkb) ||                       \
-         rd_kafka_terminating((rkb)->rkb_rk))
 
 /**
  * @returns true if the broker connection is up, else false.
@@ -427,14 +368,6 @@ rd_kafka_broker_is_up(rd_kafka_broker_t *rkb) {
         return rd_kafka_broker_state_is_up(state);
 }
 
-/**
- * @returns true if the broker needs a persistent connection
- * @locality any
- */
-static RD_UNUSED RD_INLINE rd_bool_t
-rd_kafka_broker_termination_in_progress(rd_kafka_broker_t *rkb) {
-        return rd_atomic32_get(&rkb->termination_in_progress) > 0;
-}
 
 /**
  * @brief Broker comparator
@@ -469,13 +402,6 @@ int16_t rd_kafka_broker_ApiVersion_supported(rd_kafka_broker_t *rkb,
                                              int16_t minver,
                                              int16_t maxver,
                                              int *featuresp);
-
-int16_t rd_kafka_broker_ApiVersion_supported0(rd_kafka_broker_t *rkb,
-                                              int16_t ApiKey,
-                                              int16_t minver,
-                                              int16_t maxver,
-                                              int *featuresp,
-                                              rd_bool_t do_lock);
 
 rd_kafka_broker_t *rd_kafka_broker_find_by_nodeid0_fl(const char *func,
                                                       int line,
@@ -535,9 +461,7 @@ rd_kafka_broker_t *rd_kafka_broker_controller_async(rd_kafka_t *rk,
                                                     int state,
                                                     rd_kafka_enq_once_t *eonce);
 
-int rd_kafka_brokers_add0(rd_kafka_t *rk,
-                          const char *brokerlist,
-                          rd_bool_t is_bootstrap_server_list);
+int rd_kafka_brokers_add0(rd_kafka_t *rk, const char *brokerlist);
 void rd_kafka_broker_set_state(rd_kafka_broker_t *rkb, int state);
 
 void rd_kafka_broker_fail(rd_kafka_broker_t *rkb,
@@ -583,13 +507,9 @@ void rd_kafka_broker_connect_done(rd_kafka_broker_t *rkb, const char *errstr);
 int rd_kafka_send(rd_kafka_broker_t *rkb);
 int rd_kafka_recv(rd_kafka_broker_t *rkb);
 
-#define rd_kafka_dr_msgq(rkt, rkmq, err)                                       \
-        rd_kafka_dr_msgq0(rkt, rkmq, err, NULL /*no produce result*/)
-
-void rd_kafka_dr_msgq0(rd_kafka_topic_t *rkt,
-                       rd_kafka_msgq_t *rkmq,
-                       rd_kafka_resp_err_t err,
-                       const rd_kafka_Produce_result_t *presult);
+void rd_kafka_dr_msgq(rd_kafka_topic_t *rkt,
+                      rd_kafka_msgq_t *rkmq,
+                      rd_kafka_resp_err_t err);
 
 void rd_kafka_dr_implicit_ack(rd_kafka_broker_t *rkb,
                               rd_kafka_toppar_t *rktp,
@@ -638,25 +558,6 @@ int rd_kafka_brokers_wait_state_change_async(rd_kafka_t *rk,
                                              rd_kafka_enq_once_t *eonce);
 void rd_kafka_brokers_broadcast_state_change(rd_kafka_t *rk);
 
-rd_kafka_broker_t *rd_kafka_broker_random0(const char *func,
-                                           int line,
-                                           rd_kafka_t *rk,
-                                           rd_bool_t is_up,
-                                           int state,
-                                           int *filtered_cnt,
-                                           int (*filter)(rd_kafka_broker_t *rk,
-                                                         void *opaque),
-                                           void *opaque);
-
-#define rd_kafka_broker_random(rk, state, filter, opaque)                      \
-        rd_kafka_broker_random0(__FUNCTION__, __LINE__, rk, rd_false, state,   \
-                                NULL, filter, opaque)
-
-#define rd_kafka_broker_random_up(rk, filter, opaque)                          \
-        rd_kafka_broker_random0(__FUNCTION__, __LINE__, rk, rd_true,           \
-                                RD_KAFKA_BROKER_STATE_UP, NULL, filter,        \
-                                opaque)
-
 
 
 /**
@@ -700,15 +601,6 @@ void rd_kafka_broker_monitor_add(rd_kafka_broker_monitor_t *rkbmon,
                                  void (*callback)(rd_kafka_broker_t *rkb));
 
 void rd_kafka_broker_monitor_del(rd_kafka_broker_monitor_t *rkbmon);
-
-void rd_kafka_broker_start_reauth_timer(rd_kafka_broker_t *rkb,
-                                        int64_t connections_max_reauth_ms);
-
-void rd_kafka_broker_start_reauth_cb(rd_kafka_timers_t *rkts, void *rkb);
-
-void rd_kafka_broker_decommission(rd_kafka_t *rk,
-                                  rd_kafka_broker_t *rkb,
-                                  rd_list_t *wait_thrds);
 
 int unittest_broker(void);
 

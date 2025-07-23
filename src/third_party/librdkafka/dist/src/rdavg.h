@@ -1,7 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2018-2022, Magnus Edenhill
+ * Copyright (c) 2018 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,9 +45,8 @@ typedef struct rd_avg_s {
         } ra_v;
         mtx_t ra_lock;
         int ra_enabled;
-        enum {
-                RD_AVG_GAUGE,
-                RD_AVG_COUNTER,
+        enum { RD_AVG_GAUGE,
+               RD_AVG_COUNTER,
         } ra_type;
 #if WITH_HDRHISTOGRAM
         rd_hdr_histogram_t *ra_hdr;

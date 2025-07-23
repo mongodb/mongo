@@ -1,8 +1,7 @@
 /*
  * librdkafka - The Apache Kafka C/C++ library
  *
- * Copyright (c) 2022, Magnus Edenhill
- *               2023, Confluent Inc.
+ * Copyright (c) 2022 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,7 +36,6 @@
 #include "rdkafka_offset.h"
 #include "rdkafka_msgset.h"
 #include "rdkafka_fetcher.h"
-#include "rdkafka_request.h"
 
 
 /**
@@ -53,29 +51,15 @@ static void rd_kafka_broker_fetch_backoff(rd_kafka_broker_t *rkb,
 
 /**
  * @brief Backoff the next Fetch for specific partition
- *
- * @returns the absolute backoff time (the current time for no backoff).
  */
-static rd_ts_t rd_kafka_toppar_fetch_backoff(rd_kafka_broker_t *rkb,
-                                             rd_kafka_toppar_t *rktp,
-                                             rd_kafka_resp_err_t err) {
-        int backoff_ms;
+static void rd_kafka_toppar_fetch_backoff(rd_kafka_broker_t *rkb,
+                                          rd_kafka_toppar_t *rktp,
+                                          rd_kafka_resp_err_t err) {
+        int backoff_ms = rkb->rkb_rk->rk_conf.fetch_error_backoff_ms;
 
         /* Don't back off on reaching end of partition */
-        if (err == RD_KAFKA_RESP_ERR__PARTITION_EOF) {
-                rktp->rktp_ts_fetch_backoff = 0;
-                return rd_clock(); /* Immediate: No practical backoff */
-        }
-
-        if (err == RD_KAFKA_RESP_ERR__QUEUE_FULL)
-                backoff_ms = rkb->rkb_rk->rk_conf.fetch_queue_backoff_ms;
-        else
-                backoff_ms = rkb->rkb_rk->rk_conf.fetch_error_backoff_ms;
-
-        if (unlikely(!backoff_ms)) {
-                rktp->rktp_ts_fetch_backoff = 0;
-                return rd_clock(); /* Immediate: No practical backoff */
-        }
+        if (err == RD_KAFKA_RESP_ERR__PARTITION_EOF)
+                return;
 
         /* Certain errors that may require manual intervention should have
          * a longer backoff time. */
@@ -89,9 +73,8 @@ static rd_ts_t rd_kafka_toppar_fetch_backoff(rd_kafka_broker_t *rkb,
                    rktp->rktp_rkt->rkt_topic->str, rktp->rktp_partition,
                    backoff_ms, err ? ": " : "",
                    err ? rd_kafka_err2str(err) : "");
-
-        return rktp->rktp_ts_fetch_backoff;
 }
+
 
 /**
  * @brief Handle preferred replica in fetch response.
@@ -188,89 +171,55 @@ static void rd_kafka_fetch_reply_handle_partition_error(
     rd_kafka_resp_err_t err,
     int64_t HighwaterMarkOffset) {
 
-        rd_rkb_dbg(rkb, FETCH, "FETCHERR",
-                   "%.*s [%" PRId32 "]: Fetch failed at %s: %s",
-                   RD_KAFKAP_STR_PR(rktp->rktp_rkt->rkt_topic),
-                   rktp->rktp_partition,
-                   rd_kafka_fetch_pos2str(rktp->rktp_offsets.fetch_pos),
-                   rd_kafka_err2name(err));
-
         /* Some errors should be passed to the
          * application while some handled by rdkafka */
         switch (err) {
                 /* Errors handled by rdkafka */
-        case RD_KAFKA_RESP_ERR_OFFSET_NOT_AVAILABLE:
         case RD_KAFKA_RESP_ERR_UNKNOWN_TOPIC_OR_PART:
         case RD_KAFKA_RESP_ERR_LEADER_NOT_AVAILABLE:
-        case RD_KAFKA_RESP_ERR_NOT_LEADER_OR_FOLLOWER:
+        case RD_KAFKA_RESP_ERR_NOT_LEADER_FOR_PARTITION:
         case RD_KAFKA_RESP_ERR_BROKER_NOT_AVAILABLE:
         case RD_KAFKA_RESP_ERR_REPLICA_NOT_AVAILABLE:
         case RD_KAFKA_RESP_ERR_KAFKA_STORAGE_ERROR:
-        case RD_KAFKA_RESP_ERR_UNKNOWN_LEADER_EPOCH:
         case RD_KAFKA_RESP_ERR_FENCED_LEADER_EPOCH:
-        case RD_KAFKA_RESP_ERR_UNKNOWN_TOPIC_ID:
-                if (err == RD_KAFKA_RESP_ERR_OFFSET_NOT_AVAILABLE) {
-                        /* Occurs when:
-                         *   - Msg exists on broker but
-                         *     offset > HWM, or:
-                         *   - HWM is >= offset, but msg not
-                         *     yet available at that offset
-                         *     (replica is out of sync).
-                         *   - partition leader is out of sync.
-                         *
-                         * Handle by requesting metadata update, changing back
-                         * to the leader, and then retrying FETCH
-                         * (with backoff).
-                         */
-                        rd_rkb_dbg(rkb, MSG, "FETCH",
-                                   "Topic %s [%" PRId32
-                                   "]: %s not "
-                                   "available on broker %" PRId32
-                                   " (leader %" PRId32
-                                   "): updating metadata and retrying",
-                                   rktp->rktp_rkt->rkt_topic->str,
-                                   rktp->rktp_partition,
-                                   rd_kafka_fetch_pos2str(
-                                       rktp->rktp_offsets.fetch_pos),
-                                   rktp->rktp_broker_id, rktp->rktp_leader_id);
-                }
-
-                if (err == RD_KAFKA_RESP_ERR_UNKNOWN_LEADER_EPOCH) {
-                        rd_rkb_dbg(rkb, MSG | RD_KAFKA_DBG_CONSUMER, "FETCH",
-                                   "Topic %s [%" PRId32
-                                   "]: Fetch failed at %s: %s: broker %" PRId32
-                                   "has not yet caught up on latest metadata: "
-                                   "retrying",
-                                   rktp->rktp_rkt->rkt_topic->str,
-                                   rktp->rktp_partition,
-                                   rd_kafka_fetch_pos2str(
-                                       rktp->rktp_offsets.fetch_pos),
-                                   rd_kafka_err2str(err), rktp->rktp_broker_id);
-                }
-
-                if (rktp->rktp_broker_id != rktp->rktp_leader_id) {
-                        rd_kafka_toppar_delegate_to_leader(rktp);
-                }
                 /* Request metadata information update*/
                 rd_kafka_toppar_leader_unavailable(rktp, "fetch", err);
                 break;
 
+        case RD_KAFKA_RESP_ERR_OFFSET_NOT_AVAILABLE:
+                /* Occurs when:
+                 *   - Msg exists on broker but
+                 *     offset > HWM, or:
+                 *   - HWM is >= offset, but msg not
+                 *     yet available at that offset
+                 *     (replica is out of sync).
+                 *
+                 * Handle by retrying FETCH (with backoff).
+                 */
+                rd_rkb_dbg(rkb, MSG, "FETCH",
+                           "Topic %s [%" PRId32 "]: Offset %" PRId64
+                           " not "
+                           "available on broker %" PRId32 " (leader %" PRId32
+                           "): retrying",
+                           rktp->rktp_rkt->rkt_topic->str, rktp->rktp_partition,
+                           rktp->rktp_offsets.fetch_offset,
+                           rktp->rktp_broker_id, rktp->rktp_leader_id);
+                break;
+
         case RD_KAFKA_RESP_ERR_OFFSET_OUT_OF_RANGE: {
-                rd_kafka_fetch_pos_t err_pos;
+                int64_t err_offset;
 
                 if (rktp->rktp_broker_id != rktp->rktp_leader_id &&
-                    rktp->rktp_offsets.fetch_pos.offset > HighwaterMarkOffset) {
+                    rktp->rktp_offsets.fetch_offset > HighwaterMarkOffset) {
                         rd_kafka_log(rkb->rkb_rk, LOG_WARNING, "FETCH",
-                                     "Topic %s [%" PRId32
-                                     "]: %s "
+                                     "Topic %s [%" PRId32 "]: Offset %" PRId64
                                      " out of range (HighwaterMark %" PRId64
                                      " fetching from "
                                      "broker %" PRId32 " (leader %" PRId32
                                      "): reverting to leader",
                                      rktp->rktp_rkt->rkt_topic->str,
                                      rktp->rktp_partition,
-                                     rd_kafka_fetch_pos2str(
-                                         rktp->rktp_offsets.fetch_pos),
+                                     rktp->rktp_offsets.fetch_offset,
                                      HighwaterMarkOffset, rktp->rktp_broker_id,
                                      rktp->rktp_leader_id);
 
@@ -283,10 +232,9 @@ static void rd_kafka_fetch_reply_handle_partition_error(
                 }
 
                 /* Application error */
-                err_pos = rktp->rktp_offsets.fetch_pos;
-                rktp->rktp_offsets.fetch_pos.offset = RD_KAFKA_OFFSET_INVALID;
-                rktp->rktp_offsets.fetch_pos.leader_epoch = -1;
-                rd_kafka_offset_reset(rktp, rd_kafka_broker_id(rkb), err_pos,
+                err_offset = rktp->rktp_offsets.fetch_offset;
+                rktp->rktp_offsets.fetch_offset = RD_KAFKA_OFFSET_INVALID;
+                rd_kafka_offset_reset(rktp, rd_kafka_broker_id(rkb), err_offset,
                                       err,
                                       "fetch failed due to requested offset "
                                       "not available on the broker");
@@ -300,7 +248,7 @@ static void rd_kafka_fetch_reply_handle_partition_error(
                         rd_kafka_consumer_err(
                             rktp->rktp_fetchq, rd_kafka_broker_id(rkb), err,
                             tver->version, NULL, rktp,
-                            rktp->rktp_offsets.fetch_pos.offset,
+                            rktp->rktp_offsets.fetch_offset,
                             "Fetch from broker %" PRId32 " failed: %s",
                             rd_kafka_broker_id(rkb), rd_kafka_err2str(err));
                         rktp->rktp_last_error = err;
@@ -311,17 +259,17 @@ static void rd_kafka_fetch_reply_handle_partition_error(
                 /* Application errors */
         case RD_KAFKA_RESP_ERR__PARTITION_EOF:
                 if (rkb->rkb_rk->rk_conf.enable_partition_eof)
-                        rd_kafka_consumer_err(
-                            rktp->rktp_fetchq, rd_kafka_broker_id(rkb), err,
-                            tver->version, NULL, rktp,
-                            rktp->rktp_offsets.fetch_pos.offset,
-                            "Fetch from broker %" PRId32
-                            " reached end of "
-                            "partition at offset %" PRId64
-                            " (HighwaterMark %" PRId64 ")",
-                            rd_kafka_broker_id(rkb),
-                            rktp->rktp_offsets.fetch_pos.offset,
-                            HighwaterMarkOffset);
+                        rd_kafka_consumer_err(rktp->rktp_fetchq,
+                                              rd_kafka_broker_id(rkb), err,
+                                              tver->version, NULL, rktp,
+                                              rktp->rktp_offsets.fetch_offset,
+                                              "Fetch from broker %" PRId32
+                                              " reached end of "
+                                              "partition at offset %" PRId64
+                                              " (HighwaterMark %" PRId64 ")",
+                                              rd_kafka_broker_id(rkb),
+                                              rktp->rktp_offsets.fetch_offset,
+                                              HighwaterMarkOffset);
                 break;
 
         case RD_KAFKA_RESP_ERR_MSG_SIZE_TOO_LARGE:
@@ -329,12 +277,9 @@ static void rd_kafka_fetch_reply_handle_partition_error(
                 rd_dassert(tver->version > 0);
                 rd_kafka_consumer_err(
                     rktp->rktp_fetchq, rd_kafka_broker_id(rkb), err,
-                    tver->version, NULL, rktp,
-                    rktp->rktp_offsets.fetch_pos.offset,
-                    "Fetch from broker %" PRId32 " failed at %s: %s",
-                    rd_kafka_broker_id(rkb),
-                    rd_kafka_fetch_pos2str(rktp->rktp_offsets.fetch_pos),
-                    rd_kafka_err2str(err));
+                    tver->version, NULL, rktp, rktp->rktp_offsets.fetch_offset,
+                    "Fetch from broker %" PRId32 " failed: %s",
+                    rd_kafka_broker_id(rkb), rd_kafka_err2str(err));
                 break;
         }
 
@@ -342,173 +287,20 @@ static void rd_kafka_fetch_reply_handle_partition_error(
         rd_kafka_toppar_fetch_backoff(rkb, rktp, err);
 }
 
-static void rd_kafkap_Fetch_reply_tags_set_topic_cnt(
-    rd_kafkap_Fetch_reply_tags_t *reply_tags,
-    int32_t TopicCnt) {
-        reply_tags->TopicCnt = TopicCnt;
-        rd_dassert(!reply_tags->Topics);
-        reply_tags->Topics = rd_calloc(TopicCnt, sizeof(*reply_tags->Topics));
-}
 
-static void
-rd_kafkap_Fetch_reply_tags_set_topic(rd_kafkap_Fetch_reply_tags_t *reply_tags,
-                                     int TopicIdx,
-                                     rd_kafka_Uuid_t TopicId,
-                                     int32_t PartitionCnt) {
-        reply_tags->Topics[TopicIdx].TopicId      = TopicId;
-        reply_tags->Topics[TopicIdx].PartitionCnt = PartitionCnt;
-        rd_dassert(!reply_tags->Topics[TopicIdx].Partitions);
-        reply_tags->Topics[TopicIdx].Partitions = rd_calloc(
-            PartitionCnt, sizeof(*reply_tags->Topics[TopicIdx].Partitions));
-}
-
-
-static void
-rd_kafkap_Fetch_reply_tags_destroy(rd_kafkap_Fetch_reply_tags_t *reply_tags) {
-        int i;
-        for (i = 0; i < reply_tags->TopicCnt; i++) {
-                RD_IF_FREE(reply_tags->Topics[i].Partitions, rd_free);
-        }
-        RD_IF_FREE(reply_tags->Topics, rd_free);
-        RD_IF_FREE(reply_tags->NodeEndpoints.NodeEndpoints, rd_free);
-}
-
-static int rd_kafkap_Fetch_reply_tags_partition_parse(
-    rd_kafka_buf_t *rkbuf,
-    uint64_t tagtype,
-    uint64_t taglen,
-    rd_kafkap_Fetch_reply_tags_Topic_t *TopicTags,
-    rd_kafkap_Fetch_reply_tags_Partition_t *PartitionTags) {
-        switch (tagtype) {
-        case 1: /* CurrentLeader */
-                if (rd_kafka_buf_read_CurrentLeader(
-                        rkbuf, &PartitionTags->CurrentLeader) == -1)
-                        goto err_parse;
-                TopicTags->partitions_with_leader_change_cnt++;
-                return 1;
-        default:
-                return 0;
-        }
-err_parse:
-        return -1;
-}
-
-static int
-rd_kafkap_Fetch_reply_tags_parse(rd_kafka_buf_t *rkbuf,
-                                 uint64_t tagtype,
-                                 uint64_t taglen,
-                                 rd_kafkap_Fetch_reply_tags_t *tags) {
-        switch (tagtype) {
-        case 0: /* NodeEndpoints */
-                if (rd_kafka_buf_read_NodeEndpoints(rkbuf,
-                                                    &tags->NodeEndpoints) == -1)
-                        goto err_parse;
-                return 1;
-        default:
-                return 0;
-        }
-err_parse:
-        return -1;
-}
-
-static void
-rd_kafka_handle_Fetch_metadata_update(rd_kafka_broker_t *rkb,
-                                      rd_kafkap_Fetch_reply_tags_t *FetchTags) {
-        if (FetchTags->topics_with_leader_change_cnt &&
-            FetchTags->NodeEndpoints.NodeEndpoints) {
-                rd_kafka_metadata_t *md           = NULL;
-                rd_kafka_metadata_internal_t *mdi = NULL;
-                rd_tmpabuf_t tbuf;
-                int32_t nodeid;
-                rd_kafka_op_t *rko;
-                int i, changed_topic, changed_partition;
-
-                rd_kafka_broker_lock(rkb);
-                nodeid = rkb->rkb_nodeid;
-                rd_kafka_broker_unlock(rkb);
-
-                rd_tmpabuf_new(&tbuf, 0, rd_true /*assert on fail*/);
-                rd_tmpabuf_add_alloc(&tbuf, sizeof(*mdi));
-                rd_kafkap_leader_discovery_tmpabuf_add_alloc_brokers(
-                    &tbuf, &FetchTags->NodeEndpoints);
-                rd_kafkap_leader_discovery_tmpabuf_add_alloc_topics(
-                    &tbuf, FetchTags->topics_with_leader_change_cnt);
-                for (i = 0; i < FetchTags->TopicCnt; i++) {
-                        if (!FetchTags->Topics[i]
-                                 .partitions_with_leader_change_cnt)
-                                continue;
-                        rd_kafkap_leader_discovery_tmpabuf_add_alloc_topic(
-                            &tbuf, NULL,
-                            FetchTags->Topics[i]
-                                .partitions_with_leader_change_cnt);
-                }
-                rd_tmpabuf_finalize(&tbuf);
-
-                mdi = rd_tmpabuf_alloc(&tbuf, sizeof(*mdi));
-                md  = &mdi->metadata;
-
-                rd_kafkap_leader_discovery_metadata_init(mdi, nodeid);
-
-                rd_kafkap_leader_discovery_set_brokers(
-                    &tbuf, mdi, &FetchTags->NodeEndpoints);
-
-                rd_kafkap_leader_discovery_set_topic_cnt(
-                    &tbuf, mdi, FetchTags->topics_with_leader_change_cnt);
-
-                changed_topic = 0;
-                for (i = 0; i < FetchTags->TopicCnt; i++) {
-                        int j;
-                        if (!FetchTags->Topics[i]
-                                 .partitions_with_leader_change_cnt)
-                                continue;
-
-                        rd_kafkap_leader_discovery_set_topic(
-                            &tbuf, mdi, changed_topic,
-                            FetchTags->Topics[i].TopicId, NULL,
-                            FetchTags->Topics[i]
-                                .partitions_with_leader_change_cnt);
-
-                        changed_partition = 0;
-                        for (j = 0; j < FetchTags->Topics[i].PartitionCnt;
-                             j++) {
-                                if (FetchTags->Topics[i]
-                                        .Partitions[j]
-                                        .CurrentLeader.LeaderId < 0)
-                                        continue;
-
-                                rd_kafkap_Fetch_reply_tags_Partition_t
-                                    *Partition =
-                                        &FetchTags->Topics[i].Partitions[j];
-                                rd_kafkap_leader_discovery_set_CurrentLeader(
-                                    &tbuf, mdi, changed_topic,
-                                    changed_partition, Partition->Partition,
-                                    &Partition->CurrentLeader);
-                                changed_partition++;
-                        }
-                        changed_topic++;
-                }
-
-                rko = rd_kafka_op_new(RD_KAFKA_OP_METADATA_UPDATE);
-                rko->rko_u.metadata.md  = md;
-                rko->rko_u.metadata.mdi = mdi;
-                rd_kafka_q_enq(rkb->rkb_rk->rk_ops, rko);
-        }
-}
 
 /**
  * @brief Per-partition FetchResponse parsing and handling.
  *
  * @returns an error on buffer parse failure, else RD_KAFKA_RESP_ERR_NO_ERROR.
  */
-static rd_kafka_resp_err_t rd_kafka_fetch_reply_handle_partition(
-    rd_kafka_broker_t *rkb,
-    const rd_kafkap_str_t *topic,
-    rd_kafka_topic_t *rkt /*possibly NULL*/,
-    rd_kafka_buf_t *rkbuf,
-    rd_kafka_buf_t *request,
-    int16_t ErrorCode,
-    rd_kafkap_Fetch_reply_tags_Topic_t *TopicTags,
-    rd_kafkap_Fetch_reply_tags_Partition_t *PartitionTags) {
+static rd_kafka_resp_err_t
+rd_kafka_fetch_reply_handle_partition(rd_kafka_broker_t *rkb,
+                                      const rd_kafkap_str_t *topic,
+                                      rd_kafka_topic_t *rkt /*possibly NULL*/,
+                                      rd_kafka_buf_t *rkbuf,
+                                      rd_kafka_buf_t *request,
+                                      int16_t ErrorCode) {
         const int log_decode_errors = LOG_ERR;
         struct rd_kafka_toppar_ver *tver, tver_skel;
         rd_kafka_toppar_t *rktp               = NULL;
@@ -529,8 +321,6 @@ static rd_kafka_resp_err_t rd_kafka_fetch_reply_handle_partition(
 
         rd_kafka_buf_read_i32(rkbuf, &hdr.Partition);
         rd_kafka_buf_read_i16(rkbuf, &hdr.ErrorCode);
-        if (PartitionTags)
-                PartitionTags->Partition = hdr.Partition;
         if (ErrorCode)
                 hdr.ErrorCode = ErrorCode;
         rd_kafka_buf_read_i64(rkbuf, &hdr.HighwaterMarkOffset);
@@ -541,13 +331,11 @@ static rd_kafka_resp_err_t rd_kafka_fetch_reply_handle_partition(
         hdr.LogStartOffset   = RD_KAFKA_OFFSET_INVALID;
         if (rd_kafka_buf_ApiVersion(request) >= 4) {
                 int32_t AbortedTxnCnt;
-                int k;
                 rd_kafka_buf_read_i64(rkbuf, &hdr.LastStableOffset);
                 if (rd_kafka_buf_ApiVersion(request) >= 5)
                         rd_kafka_buf_read_i64(rkbuf, &hdr.LogStartOffset);
 
-                rd_kafka_buf_read_arraycnt(rkbuf, &AbortedTxnCnt,
-                                           RD_KAFKAP_ABORTED_TRANSACTIONS_MAX);
+                rd_kafka_buf_read_i32(rkbuf, &AbortedTxnCnt);
 
                 if (rkb->rkb_rk->rk_conf.isolation_level ==
                     RD_KAFKA_READ_UNCOMMITTED) {
@@ -562,11 +350,9 @@ static rd_kafka_resp_err_t rd_kafka_fetch_reply_handle_partition(
                                            "fetch response: ignoring.",
                                            RD_KAFKAP_STR_PR(topic),
                                            hdr.Partition, AbortedTxnCnt);
-                                for (k = 0; k < AbortedTxnCnt; k++) {
-                                        rd_kafka_buf_skip(rkbuf, (8 + 8));
-                                        /* AbortedTransaction tags */
-                                        rd_kafka_buf_skip_tags(rkbuf);
-                                }
+
+                                rd_kafka_buf_skip(rkbuf,
+                                                  AbortedTxnCnt * (8 + 8));
                         }
                 } else {
                         /* Older brokers may return LSO -1,
@@ -575,6 +361,17 @@ static rd_kafka_resp_err_t rd_kafka_fetch_reply_handle_partition(
                                 end_offset = hdr.LastStableOffset;
 
                         if (AbortedTxnCnt > 0) {
+                                int k;
+
+                                if (unlikely(AbortedTxnCnt > 1000000))
+                                        rd_kafka_buf_parse_fail(
+                                            rkbuf,
+                                            "%.*s [%" PRId32
+                                            "]: "
+                                            "invalid AbortedTxnCnt %" PRId32,
+                                            RD_KAFKAP_STR_PR(topic),
+                                            hdr.Partition, AbortedTxnCnt);
+
                                 aborted_txns =
                                     rd_kafka_aborted_txns_new(AbortedTxnCnt);
                                 for (k = 0; k < AbortedTxnCnt; k++) {
@@ -583,8 +380,6 @@ static rd_kafka_resp_err_t rd_kafka_fetch_reply_handle_partition(
                                         rd_kafka_buf_read_i64(rkbuf, &PID);
                                         rd_kafka_buf_read_i64(rkbuf,
                                                               &FirstOffset);
-                                        /* AbortedTransaction tags */
-                                        rd_kafka_buf_skip_tags(rkbuf);
                                         rd_kafka_aborted_txns_add(
                                             aborted_txns, PID, FirstOffset);
                                 }
@@ -597,8 +392,8 @@ static rd_kafka_resp_err_t rd_kafka_fetch_reply_handle_partition(
                 rd_kafka_buf_read_i32(rkbuf, &hdr.PreferredReadReplica);
         else
                 hdr.PreferredReadReplica = -1;
-        /* Compact Records Array */
-        rd_kafka_buf_read_arraycnt(rkbuf, &hdr.MessageSetSize, -1);
+
+        rd_kafka_buf_read_i32(rkbuf, &hdr.MessageSetSize);
 
         if (unlikely(hdr.MessageSetSize < 0))
                 rd_kafka_buf_parse_fail(
@@ -621,7 +416,9 @@ static rd_kafka_resp_err_t rd_kafka_fetch_reply_handle_partition(
                            hdr.ErrorCode, RD_KAFKAP_STR_PR(topic),
                            hdr.Partition);
                 rd_kafka_buf_skip(rkbuf, hdr.MessageSetSize);
-                goto done;
+                if (aborted_txns)
+                        rd_kafka_aborted_txns_destroy(aborted_txns);
+                return RD_KAFKA_RESP_ERR_NO_ERROR;
         }
 
         rd_kafka_toppar_lock(rktp);
@@ -649,7 +446,11 @@ static rd_kafka_resp_err_t rd_kafka_fetch_reply_handle_partition(
                                    rktp->rktp_partition, hdr.MessageSetSize);
                         rd_kafka_buf_skip(rkbuf, hdr.MessageSetSize);
                 }
-                goto done;
+
+                if (aborted_txns)
+                        rd_kafka_aborted_txns_destroy(aborted_txns);
+                rd_kafka_toppar_destroy(rktp); /* from get */
+                return RD_KAFKA_RESP_ERR_NO_ERROR;
         }
 
         rd_kafka_toppar_lock(rktp);
@@ -663,8 +464,11 @@ static rd_kafka_resp_err_t rd_kafka_fetch_reply_handle_partition(
                            "]: partition broker has changed: "
                            "discarding fetch response",
                            RD_KAFKAP_STR_PR(topic), hdr.Partition);
+                rd_kafka_toppar_destroy(rktp); /* from get */
                 rd_kafka_buf_skip(rkbuf, hdr.MessageSetSize);
-                goto done;
+                if (aborted_txns)
+                        rd_kafka_aborted_txns_destroy(aborted_txns);
+                return RD_KAFKA_RESP_ERR_NO_ERROR;
         }
 
         fetch_version = rktp->rktp_fetch_version;
@@ -677,7 +481,7 @@ static rd_kafka_resp_err_t rd_kafka_fetch_reply_handle_partition(
          * desynchronized clusters): if so ignore it. */
         tver_skel.rktp = rktp;
         tver           = rd_list_find(request->rkbuf_rktp_vers, &tver_skel,
-                                      rd_kafka_toppar_ver_cmp);
+                            rd_kafka_toppar_ver_cmp);
         rd_kafka_assert(NULL, tver);
         if (tver->rktp != rktp || tver->version < fetch_version) {
                 rd_rkb_dbg(rkb, MSG, "DROP",
@@ -687,8 +491,11 @@ static rd_kafka_resp_err_t rd_kafka_fetch_reply_handle_partition(
                            rktp->rktp_rkt->rkt_topic->str, rktp->rktp_partition,
                            tver->version, fetch_version);
                 rd_atomic64_add(&rktp->rktp_c.rx_ver_drops, 1);
+                rd_kafka_toppar_destroy(rktp); /* from get */
                 rd_kafka_buf_skip(rkbuf, hdr.MessageSetSize);
-                goto done;
+                if (aborted_txns)
+                        rd_kafka_aborted_txns_destroy(aborted_txns);
+                return RD_KAFKA_RESP_ERR_NO_ERROR;
         }
 
         rd_rkb_dbg(rkb, MSG, "FETCH",
@@ -701,10 +508,10 @@ static rd_kafka_resp_err_t rd_kafka_fetch_reply_handle_partition(
 
         /* If this is the last message of the queue,
          * signal EOF back to the application. */
-        if (end_offset == rktp->rktp_offsets.fetch_pos.offset &&
-            rktp->rktp_offsets.eof_offset != end_offset) {
+        if (end_offset == rktp->rktp_offsets.fetch_offset &&
+            rktp->rktp_offsets.eof_offset != rktp->rktp_offsets.fetch_offset) {
                 hdr.ErrorCode = RD_KAFKA_RESP_ERR__PARTITION_EOF;
-                rktp->rktp_offsets.eof_offset = end_offset;
+                rktp->rktp_offsets.eof_offset = rktp->rktp_offsets.fetch_offset;
         }
 
         if (unlikely(hdr.ErrorCode != RD_KAFKA_RESP_ERR_NO_ERROR)) {
@@ -712,15 +519,24 @@ static rd_kafka_resp_err_t rd_kafka_fetch_reply_handle_partition(
                 rd_kafka_fetch_reply_handle_partition_error(
                     rkb, rktp, tver, hdr.ErrorCode, hdr.HighwaterMarkOffset);
 
+                rd_kafka_toppar_destroy(rktp); /* from get()*/
+
                 rd_kafka_buf_skip(rkbuf, hdr.MessageSetSize);
-                goto done;
+
+                if (aborted_txns)
+                        rd_kafka_aborted_txns_destroy(aborted_txns);
+                return RD_KAFKA_RESP_ERR_NO_ERROR;
         }
 
         /* No error, clear any previous fetch error. */
         rktp->rktp_last_error = RD_KAFKA_RESP_ERR_NO_ERROR;
 
-        if (unlikely(hdr.MessageSetSize <= 0))
-                goto done;
+        if (unlikely(hdr.MessageSetSize <= 0)) {
+                rd_kafka_toppar_destroy(rktp); /*from get()*/
+                if (aborted_txns)
+                        rd_kafka_aborted_txns_destroy(aborted_txns);
+                return RD_KAFKA_RESP_ERR_NO_ERROR;
+        }
 
         /**
          * Parse MessageSet
@@ -732,6 +548,8 @@ static rd_kafka_resp_err_t rd_kafka_fetch_reply_handle_partition(
         /* Parse messages */
         err = rd_kafka_msgset_parse(rkbuf, request, rktp, aborted_txns, tver);
 
+        if (aborted_txns)
+                rd_kafka_aborted_txns_destroy(aborted_txns);
 
         rd_slice_widen(&rkbuf->rkbuf_reader, &save_slice);
         /* Continue with next partition regardless of
@@ -741,31 +559,15 @@ static rd_kafka_resp_err_t rd_kafka_fetch_reply_handle_partition(
         if (unlikely(err))
                 rd_kafka_toppar_fetch_backoff(rkb, rktp, err);
 
-        goto done;
-
-err_parse:
-        if (aborted_txns)
-                rd_kafka_aborted_txns_destroy(aborted_txns);
-        if (rktp)
-                rd_kafka_toppar_destroy(rktp); /*from get()*/
-        return rkbuf->rkbuf_err;
-
-done:
-        if (aborted_txns)
-                rd_kafka_aborted_txns_destroy(aborted_txns);
-        if (likely(rktp != NULL))
-                rd_kafka_toppar_destroy(rktp); /*from get()*/
-
-        if (PartitionTags) {
-                /* Set default LeaderId and LeaderEpoch */
-                PartitionTags->CurrentLeader.LeaderId    = -1;
-                PartitionTags->CurrentLeader.LeaderEpoch = -1;
-        }
-        rd_kafka_buf_read_tags(rkbuf,
-                               rd_kafkap_Fetch_reply_tags_partition_parse,
-                               TopicTags, PartitionTags);
+        rd_kafka_toppar_destroy(rktp); /*from get()*/
 
         return RD_KAFKA_RESP_ERR_NO_ERROR;
+
+err_parse:
+        if (rktp)
+                rd_kafka_toppar_destroy(rktp); /*from get()*/
+
+        return rkbuf->rkbuf_err;
 }
 
 /**
@@ -778,11 +580,9 @@ rd_kafka_fetch_reply_handle(rd_kafka_broker_t *rkb,
                             rd_kafka_buf_t *request) {
         int32_t TopicArrayCnt;
         int i;
-        const int log_decode_errors            = LOG_ERR;
-        rd_kafka_topic_t *rkt                  = NULL;
-        int16_t ErrorCode                      = RD_KAFKA_RESP_ERR_NO_ERROR;
-        rd_kafkap_Fetch_reply_tags_t FetchTags = RD_ZERO_INIT;
-        rd_bool_t has_fetch_tags               = rd_false;
+        const int log_decode_errors = LOG_ERR;
+        rd_kafka_topic_t *rkt       = NULL;
+        int16_t ErrorCode           = RD_KAFKA_RESP_ERR_NO_ERROR;
 
         if (rd_kafka_buf_ApiVersion(request) >= 1) {
                 int32_t Throttle_Time;
@@ -798,68 +598,34 @@ rd_kafka_fetch_reply_handle(rd_kafka_broker_t *rkb,
                 rd_kafka_buf_read_i32(rkbuf, &SessionId);
         }
 
-        rd_kafka_buf_read_arraycnt(rkbuf, &TopicArrayCnt, RD_KAFKAP_TOPICS_MAX);
+        rd_kafka_buf_read_i32(rkbuf, &TopicArrayCnt);
         /* Verify that TopicArrayCnt seems to be in line with remaining size */
         rd_kafka_buf_check_len(rkbuf,
                                TopicArrayCnt * (3 /*topic min size*/ +
                                                 4 /*PartitionArrayCnt*/ + 4 +
                                                 2 + 8 + 4 /*inner header*/));
 
-        if (rd_kafka_buf_ApiVersion(request) >= 12) {
-                has_fetch_tags = rd_true;
-                rd_kafkap_Fetch_reply_tags_set_topic_cnt(&FetchTags,
-                                                         TopicArrayCnt);
-        }
-
         for (i = 0; i < TopicArrayCnt; i++) {
-                rd_kafkap_str_t topic    = RD_ZERO_INIT;
-                rd_kafka_Uuid_t topic_id = RD_KAFKA_UUID_ZERO;
+                rd_kafkap_str_t topic;
                 int32_t PartitionArrayCnt;
                 int j;
 
-                if (rd_kafka_buf_ApiVersion(request) > 12) {
-                        rd_kafka_buf_read_uuid(rkbuf, &topic_id);
-                        rkt = rd_kafka_topic_find_by_topic_id(rkb->rkb_rk,
-                                                              topic_id);
-                        if (rkt)
-                                topic = *rkt->rkt_topic;
-                } else {
-                        rd_kafka_buf_read_str(rkbuf, &topic);
-                        rkt = rd_kafka_topic_find0(rkb->rkb_rk, &topic);
-                }
+                rd_kafka_buf_read_str(rkbuf, &topic);
+                rd_kafka_buf_read_i32(rkbuf, &PartitionArrayCnt);
 
-                rd_kafka_buf_read_arraycnt(rkbuf, &PartitionArrayCnt,
-                                           RD_KAFKAP_PARTITIONS_MAX);
-                if (rd_kafka_buf_ApiVersion(request) >= 12) {
-                        rd_kafkap_Fetch_reply_tags_set_topic(
-                            &FetchTags, i, topic_id, PartitionArrayCnt);
-                }
+                rkt = rd_kafka_topic_find0(rkb->rkb_rk, &topic);
 
                 for (j = 0; j < PartitionArrayCnt; j++) {
                         if (rd_kafka_fetch_reply_handle_partition(
-                                rkb, &topic, rkt, rkbuf, request, ErrorCode,
-                                has_fetch_tags ? &FetchTags.Topics[i] : NULL,
-                                has_fetch_tags
-                                    ? &FetchTags.Topics[i].Partitions[j]
-                                    : NULL))
+                                rkb, &topic, rkt, rkbuf, request, ErrorCode))
                                 goto err_parse;
-                }
-                if (has_fetch_tags &&
-                    FetchTags.Topics[i].partitions_with_leader_change_cnt) {
-                        FetchTags.topics_with_leader_change_cnt++;
                 }
 
                 if (rkt) {
                         rd_kafka_topic_destroy0(rkt);
                         rkt = NULL;
                 }
-                /* Topic Tags */
-                rd_kafka_buf_skip_tags(rkbuf);
         }
-
-        /* Top level tags */
-        rd_kafka_buf_read_tags(rkbuf, rd_kafkap_Fetch_reply_tags_parse,
-                               &FetchTags);
 
         if (rd_kafka_buf_read_remain(rkbuf) != 0) {
                 rd_kafka_buf_parse_fail(rkbuf,
@@ -868,15 +634,12 @@ rd_kafka_fetch_reply_handle(rd_kafka_broker_t *rkb,
                                         rd_kafka_buf_read_remain(rkbuf));
                 RD_NOTREACHED();
         }
-        rd_kafka_handle_Fetch_metadata_update(rkb, &FetchTags);
-        rd_kafkap_Fetch_reply_tags_destroy(&FetchTags);
 
         return 0;
 
 err_parse:
         if (rkt)
                 rd_kafka_topic_destroy0(rkt);
-        rd_kafkap_Fetch_reply_tags_destroy(&FetchTags);
         rd_rkb_dbg(rkb, MSG, "BADMSG",
                    "Bad message (Fetch v%d): "
                    "is broker.version.fallback incorrectly set?",
@@ -886,11 +649,6 @@ err_parse:
 
 
 
-/**
- * @broker FetchResponse handling.
- *
- * @locality broker thread  (or any thread if err == __DESTROY).
- */
 static void rd_kafka_broker_fetch_reply(rd_kafka_t *rk,
                                         rd_kafka_broker_t *rkb,
                                         rd_kafka_resp_err_t err,
@@ -919,7 +677,6 @@ static void rd_kafka_broker_fetch_reply(rd_kafka_t *rk,
                 case RD_KAFKA_RESP_ERR_NOT_LEADER_FOR_PARTITION:
                 case RD_KAFKA_RESP_ERR_BROKER_NOT_AVAILABLE:
                 case RD_KAFKA_RESP_ERR_REPLICA_NOT_AVAILABLE:
-                case RD_KAFKA_RESP_ERR_UNKNOWN_TOPIC_ID:
                         /* Request metadata information update */
                         rd_snprintf(tmp, sizeof(tmp), "FetchRequest failed: %s",
                                     rd_kafka_err2str(err));
@@ -943,21 +700,7 @@ static void rd_kafka_broker_fetch_reply(rd_kafka_t *rk,
         }
 }
 
-/**
- * @brief Check if any toppars have a zero topic id.
- *
- */
-static rd_bool_t can_use_topic_ids(rd_kafka_broker_t *rkb) {
-        rd_kafka_toppar_t *rktp = rkb->rkb_active_toppar_next;
-        do {
-                if (RD_KAFKA_UUID_IS_ZERO(rktp->rktp_rkt->rkt_topic_id))
-                        return rd_false;
-        } while ((rktp = CIRCLEQ_LOOP_NEXT(&rkb->rkb_active_toppars, rktp,
-                                           rktp_activelink)) !=
-                 rkb->rkb_active_toppar_next);
 
-        return rd_true;
-}
 
 /**
  * @brief Build and send a Fetch request message for all underflowed toppars
@@ -991,28 +734,21 @@ int rd_kafka_broker_fetch_toppars(rd_kafka_broker_t *rkb, rd_ts_t now) {
         if (unlikely(rkb->rkb_active_toppar_cnt == 0))
                 return 0;
 
-        ApiVersion = rd_kafka_broker_ApiVersion_supported(rkb, RD_KAFKAP_Fetch,
-                                                          0, 16, NULL);
-
-        /* Fallback to version 12 if topic id is null which can happen if
-         * inter.broker.protocol.version is < 2.8 */
-        if (ApiVersion > 12 && !can_use_topic_ids(rkb))
-                ApiVersion = 12;
-
-        rkbuf = rd_kafka_buf_new_flexver_request(
+        rkbuf = rd_kafka_buf_new_request(
             rkb, RD_KAFKAP_Fetch, 1,
-            /* MaxWaitTime+MinBytes+MaxBytes+IsolationLevel+
+            /* ReplicaId+MaxWaitTime+MinBytes+MaxBytes+IsolationLevel+
              *   SessionId+Epoch+TopicCnt */
-            4 + 4 + 4 + 1 + 4 + 4 + 4 +
+            4 + 4 + 4 + 4 + 1 + 4 + 4 + 4 +
                 /* N x PartCnt+Partition+CurrentLeaderEpoch+FetchOffset+
-                 * LastFetchedEpoch+LogStartOffset+MaxBytes+?TopicNameLen?*/
-                (rkb->rkb_active_toppar_cnt *
-                 (4 + 4 + 4 + 8 + 4 + 8 + 4 + 40)) +
+                 *       LogStartOffset+MaxBytes+?TopicNameLen?*/
+                (rkb->rkb_active_toppar_cnt * (4 + 4 + 4 + 8 + 8 + 4 + 40)) +
                 /* ForgottenTopicsCnt */
                 4 +
                 /* N x ForgottenTopicsData */
-                0,
-            ApiVersion >= 12);
+                0);
+
+        ApiVersion = rd_kafka_broker_ApiVersion_supported(rkb, RD_KAFKAP_Fetch,
+                                                          0, 11, NULL);
 
         if (rkb->rkb_features & RD_KAFKA_FEATURE_MSGVER2)
                 rd_kafka_buf_ApiVersion_set(rkbuf, ApiVersion,
@@ -1026,10 +762,8 @@ int rd_kafka_broker_fetch_toppars(rd_kafka_broker_t *rkb, rd_ts_t now) {
 
 
         /* FetchRequest header */
-        if (rd_kafka_buf_ApiVersion(rkbuf) <= 14)
-                /* ReplicaId */
-                rd_kafka_buf_write_i32(rkbuf, -1);
-
+        /* ReplicaId */
+        rd_kafka_buf_write_i32(rkbuf, -1);
         /* MaxWaitTime */
         rd_kafka_buf_write_i32(rkbuf, rkb->rkb_rk->rk_conf.fetch_wait_max_ms);
         /* MinBytes */
@@ -1053,7 +787,7 @@ int rd_kafka_broker_fetch_toppars(rd_kafka_broker_t *rkb, rd_ts_t now) {
         }
 
         /* Write zero TopicArrayCnt but store pointer for later update */
-        of_TopicArrayCnt = rd_kafka_buf_write_arraycnt_pos(rkbuf);
+        of_TopicArrayCnt = rd_kafka_buf_write_i32(rkbuf, 0);
 
         /* Prepare map for storing the fetch version for each partition,
          * this will later be checked in Fetch response to purge outdated
@@ -1072,31 +806,19 @@ int rd_kafka_broker_fetch_toppars(rd_kafka_broker_t *rkb, rd_ts_t now) {
                 if (rkt_last != rktp->rktp_rkt) {
                         if (rkt_last != NULL) {
                                 /* Update PartitionArrayCnt */
-                                rd_kafka_buf_finalize_arraycnt(
-                                    rkbuf, of_PartitionArrayCnt,
-                                    PartitionArrayCnt);
-                                /* Topic tags */
-                                rd_kafka_buf_write_tags_empty(rkbuf);
-                        }
-                        if (rd_kafka_buf_ApiVersion(rkbuf) > 12) {
-                                /* Topic id must be non-zero here */
-                                rd_dassert(!RD_KAFKA_UUID_IS_ZERO(
-                                    rktp->rktp_rkt->rkt_topic_id));
-                                /* Topic ID */
-                                rd_kafka_buf_write_uuid(
-                                    rkbuf, &rktp->rktp_rkt->rkt_topic_id);
-                        } else {
-                                /* Topic name */
-                                rd_kafka_buf_write_kstr(
-                                    rkbuf, rktp->rktp_rkt->rkt_topic);
+                                rd_kafka_buf_update_i32(rkbuf,
+                                                        of_PartitionArrayCnt,
+                                                        PartitionArrayCnt);
                         }
 
+                        /* Topic name */
+                        rd_kafka_buf_write_kstr(rkbuf,
+                                                rktp->rktp_rkt->rkt_topic);
                         TopicArrayCnt++;
                         rkt_last = rktp->rktp_rkt;
                         /* Partition count */
-                        of_PartitionArrayCnt =
-                            rd_kafka_buf_write_arraycnt_pos(rkbuf);
-                        PartitionArrayCnt = 0;
+                        of_PartitionArrayCnt = rd_kafka_buf_write_i32(rkbuf, 0);
+                        PartitionArrayCnt    = 0;
                 }
 
                 PartitionArrayCnt++;
@@ -1104,30 +826,13 @@ int rd_kafka_broker_fetch_toppars(rd_kafka_broker_t *rkb, rd_ts_t now) {
                 /* Partition */
                 rd_kafka_buf_write_i32(rkbuf, rktp->rktp_partition);
 
-                if (rd_kafka_buf_ApiVersion(rkbuf) >= 9) {
+                if (rd_kafka_buf_ApiVersion(rkbuf) >= 9)
                         /* CurrentLeaderEpoch */
-                        if (rktp->rktp_leader_epoch < 0 &&
-                            rd_kafka_has_reliable_leader_epochs(rkb)) {
-                                /* If current leader epoch is set to -1 and
-                                 * the broker has reliable leader epochs,
-                                 * send 0 instead, so that epoch is checked
-                                 * and optionally metadata is refreshed.
-                                 * This can happen if metadata is read initially
-                                 * without an existing topic (see
-                                 * rd_kafka_topic_metadata_update2).
-                                 */
-                                rd_kafka_buf_write_i32(rkbuf, 0);
-                        } else {
-                                rd_kafka_buf_write_i32(rkbuf,
-                                                       rktp->rktp_leader_epoch);
-                        }
-                }
-                /* FetchOffset */
-                rd_kafka_buf_write_i64(rkbuf,
-                                       rktp->rktp_offsets.fetch_pos.offset);
-                if (rd_kafka_buf_ApiVersion(rkbuf) >= 12)
-                        /* LastFetchedEpoch - only used by follower replica */
                         rd_kafka_buf_write_i32(rkbuf, -1);
+
+                /* FetchOffset */
+                rd_kafka_buf_write_i64(rkbuf, rktp->rktp_offsets.fetch_offset);
+
                 if (rd_kafka_buf_ApiVersion(rkbuf) >= 5)
                         /* LogStartOffset - only used by follower replica */
                         rd_kafka_buf_write_i64(rkbuf, -1);
@@ -1135,21 +840,16 @@ int rd_kafka_broker_fetch_toppars(rd_kafka_broker_t *rkb, rd_ts_t now) {
                 /* MaxBytes */
                 rd_kafka_buf_write_i32(rkbuf, rktp->rktp_fetch_msg_max_bytes);
 
-                /* Partition tags */
-                rd_kafka_buf_write_tags_empty(rkbuf);
-
                 rd_rkb_dbg(rkb, FETCH, "FETCH",
                            "Fetch topic %.*s [%" PRId32 "] at offset %" PRId64
-                           " (leader epoch %" PRId32
-                           ", current leader epoch %" PRId32 ", v%d)",
+                           " (v%d)",
                            RD_KAFKAP_STR_PR(rktp->rktp_rkt->rkt_topic),
                            rktp->rktp_partition,
-                           rktp->rktp_offsets.fetch_pos.offset,
-                           rktp->rktp_offsets.fetch_pos.leader_epoch,
-                           rktp->rktp_leader_epoch, rktp->rktp_fetch_version);
+                           rktp->rktp_offsets.fetch_offset,
+                           rktp->rktp_fetch_version);
 
                 /* We must have a valid fetch offset when we get here */
-                rd_dassert(rktp->rktp_offsets.fetch_pos.offset >= 0);
+                rd_dassert(rktp->rktp_offsets.fetch_offset >= 0);
 
                 /* Add toppar + op version mapping. */
                 tver          = rd_list_add(rkbuf->rkbuf_rktp_vers, NULL);
@@ -1176,20 +876,18 @@ int rd_kafka_broker_fetch_toppars(rd_kafka_broker_t *rkb, rd_ts_t now) {
 
         if (rkt_last != NULL) {
                 /* Update last topic's PartitionArrayCnt */
-                rd_kafka_buf_finalize_arraycnt(rkbuf, of_PartitionArrayCnt,
-                                               PartitionArrayCnt);
-                /* Topic tags */
-                rd_kafka_buf_write_tags_empty(rkbuf);
+                rd_kafka_buf_update_i32(rkbuf, of_PartitionArrayCnt,
+                                        PartitionArrayCnt);
         }
 
         /* Update TopicArrayCnt */
-        rd_kafka_buf_finalize_arraycnt(rkbuf, of_TopicArrayCnt, TopicArrayCnt);
+        rd_kafka_buf_update_i32(rkbuf, of_TopicArrayCnt, TopicArrayCnt);
 
 
         if (rd_kafka_buf_ApiVersion(rkbuf) >= 7)
                 /* Length of the ForgottenTopics list (KIP-227). Broker
                  * use only - not used by the consumer. */
-                rd_kafka_buf_write_arraycnt(rkbuf, 0);
+                rd_kafka_buf_write_i32(rkbuf, 0);
 
         if (rd_kafka_buf_ApiVersion(rkbuf) >= 11)
                 /* RackId */
@@ -1215,45 +913,7 @@ int rd_kafka_broker_fetch_toppars(rd_kafka_broker_t *rkb, rd_ts_t now) {
         return cnt;
 }
 
-/**
- * @brief Decide whether it should start fetching from next fetch start
- *        or continue with current fetch pos.
- *
- * @param rktp the toppar
- *
- * @returns rd_true if it should start fetching from next fetch start,
- *          rd_false otherwise.
- *
- * @locality any
- * @locks toppar_lock() MUST be held
- */
-static rd_bool_t rd_kafka_toppar_fetch_decide_start_from_next_fetch_start(
-    rd_kafka_toppar_t *rktp) {
-        return rktp->rktp_op_version > rktp->rktp_fetch_version ||
-               rd_kafka_fetch_pos_cmp(&rktp->rktp_next_fetch_start,
-                                      &rktp->rktp_last_next_fetch_start) ||
-               rktp->rktp_offsets.fetch_pos.offset == RD_KAFKA_OFFSET_INVALID;
-}
 
-/**
- * @brief Return next fetch start position:
- *        if it should start fetching from next fetch start
- *        or continue with current fetch pos.
- *
- * @param rktp The toppar
- *
- * @returns Next fetch start position
- *
- * @locality any
- * @locks toppar_lock() MUST be held
- */
-rd_kafka_fetch_pos_t
-rd_kafka_toppar_fetch_decide_next_fetch_start_pos(rd_kafka_toppar_t *rktp) {
-        if (rd_kafka_toppar_fetch_decide_start_from_next_fetch_start(rktp))
-                return rktp->rktp_next_fetch_start;
-        else
-                return rktp->rktp_offsets.fetch_pos;
-}
 
 /**
  * @brief Decide whether this toppar should be on the fetch list or not.
@@ -1283,7 +943,7 @@ rd_ts_t rd_kafka_toppar_fetch_decide(rd_kafka_toppar_t *rktp,
                         rd_interval(&rktp->rktp_lease_intvl,
                                     5 * 60 * 1000 * 1000 /*5 minutes*/, 0) > 0;
         if (lease_expired) {
-                /* delegate_to_leader() requires no locks to be held */
+                /* delete_to_leader() requires no locks to be held */
                 rd_kafka_toppar_unlock(rktp);
                 rd_kafka_toppar_delegate_to_leader(rktp);
                 rd_kafka_toppar_lock(rktp);
@@ -1315,7 +975,9 @@ rd_ts_t rd_kafka_toppar_fetch_decide(rd_kafka_toppar_t *rktp,
 
         /* Update broker thread's fetch op version */
         version = rktp->rktp_op_version;
-        if (rd_kafka_toppar_fetch_decide_start_from_next_fetch_start(rktp)) {
+        if (version > rktp->rktp_fetch_version ||
+            rktp->rktp_next_offset != rktp->rktp_last_next_offset ||
+            rktp->rktp_offsets.fetch_offset == RD_KAFKA_OFFSET_INVALID) {
                 /* New version barrier, something was modified from the
                  * control plane. Reset and start over.
                  * Alternatively only the next_offset changed but not the
@@ -1323,22 +985,21 @@ rd_ts_t rd_kafka_toppar_fetch_decide(rd_kafka_toppar_t *rktp,
                  * offset.reset (such as on PARTITION_EOF or
                  * OFFSET_OUT_OF_RANGE). */
 
-                rd_kafka_dbg(
-                    rktp->rktp_rkt->rkt_rk, TOPIC, "FETCHDEC",
-                    "Topic %s [%" PRId32
-                    "]: fetch decide: "
-                    "updating to version %d (was %d) at %s "
-                    "(was %s)",
-                    rktp->rktp_rkt->rkt_topic->str, rktp->rktp_partition,
-                    version, rktp->rktp_fetch_version,
-                    rd_kafka_fetch_pos2str(rktp->rktp_next_fetch_start),
-                    rd_kafka_fetch_pos2str(rktp->rktp_offsets.fetch_pos));
+                rd_kafka_dbg(rktp->rktp_rkt->rkt_rk, TOPIC, "FETCHDEC",
+                             "Topic %s [%" PRId32
+                             "]: fetch decide: "
+                             "updating to version %d (was %d) at "
+                             "offset %" PRId64 " (was %" PRId64 ")",
+                             rktp->rktp_rkt->rkt_topic->str,
+                             rktp->rktp_partition, version,
+                             rktp->rktp_fetch_version, rktp->rktp_next_offset,
+                             rktp->rktp_offsets.fetch_offset);
 
                 rd_kafka_offset_stats_reset(&rktp->rktp_offsets);
 
                 /* New start offset */
-                rktp->rktp_offsets.fetch_pos     = rktp->rktp_next_fetch_start;
-                rktp->rktp_last_next_fetch_start = rktp->rktp_next_fetch_start;
+                rktp->rktp_offsets.fetch_offset = rktp->rktp_next_offset;
+                rktp->rktp_last_next_offset     = rktp->rktp_next_offset;
 
                 rktp->rktp_fetch_version = version;
 
@@ -1355,28 +1016,25 @@ rd_ts_t rd_kafka_toppar_fetch_decide(rd_kafka_toppar_t *rktp,
                 should_fetch = 0;
                 reason       = "paused";
 
-        } else if (RD_KAFKA_OFFSET_IS_LOGICAL(
-                       rktp->rktp_next_fetch_start.offset)) {
+        } else if (RD_KAFKA_OFFSET_IS_LOGICAL(rktp->rktp_next_offset)) {
                 should_fetch = 0;
                 reason       = "no concrete offset";
-        } else if (rktp->rktp_ts_fetch_backoff > rd_clock()) {
-                reason       = "fetch backed off";
-                ts_backoff   = rktp->rktp_ts_fetch_backoff;
-                should_fetch = 0;
+
         } else if (rd_kafka_q_len(rktp->rktp_fetchq) >=
                    rkb->rkb_rk->rk_conf.queued_min_msgs) {
                 /* Skip toppars who's local message queue is already above
                  * the lower threshold. */
-                reason     = "queued.min.messages exceeded";
-                ts_backoff = rd_kafka_toppar_fetch_backoff(
-                    rkb, rktp, RD_KAFKA_RESP_ERR__QUEUE_FULL);
+                reason       = "queued.min.messages exceeded";
                 should_fetch = 0;
 
         } else if ((int64_t)rd_kafka_q_size(rktp->rktp_fetchq) >=
                    rkb->rkb_rk->rk_conf.queued_max_msg_bytes) {
-                reason     = "queued.max.messages.kbytes exceeded";
-                ts_backoff = rd_kafka_toppar_fetch_backoff(
-                    rkb, rktp, RD_KAFKA_RESP_ERR__QUEUE_FULL);
+                reason       = "queued.max.messages.kbytes exceeded";
+                should_fetch = 0;
+
+        } else if (rktp->rktp_ts_fetch_backoff > rd_clock()) {
+                reason       = "fetch backed off";
+                ts_backoff   = rktp->rktp_ts_fetch_backoff;
                 should_fetch = 0;
         }
 
@@ -1388,13 +1046,13 @@ done:
                 rd_rkb_dbg(
                     rkb, FETCH, "FETCH",
                     "Topic %s [%" PRId32
-                    "] in state %s at %s "
+                    "] in state %s at offset %s "
                     "(%d/%d msgs, %" PRId64
                     "/%d kb queued, "
                     "opv %" PRId32 ") is %s%s",
                     rktp->rktp_rkt->rkt_topic->str, rktp->rktp_partition,
                     rd_kafka_fetch_states[rktp->rktp_fetch_state],
-                    rd_kafka_fetch_pos2str(rktp->rktp_next_fetch_start),
+                    rd_kafka_offset2str(rktp->rktp_next_offset),
                     rd_kafka_q_len(rktp->rktp_fetchq),
                     rkb->rkb_rk->rk_conf.queued_min_msgs,
                     rd_kafka_q_size(rktp->rktp_fetchq) / 1024,

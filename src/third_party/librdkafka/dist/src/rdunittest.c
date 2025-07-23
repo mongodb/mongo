@@ -1,8 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2017-2022, Magnus Edenhill
- *               2023, Confluent Inc.
+ * Copyright (c) 2017 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -55,7 +54,6 @@
 #include "rdkafka_txnmgr.h"
 
 rd_bool_t rd_unittest_assert_on_failure = rd_false;
-rd_bool_t rd_unittest_with_valgrind     = rd_false;
 rd_bool_t rd_unittest_on_ci             = rd_false;
 rd_bool_t rd_unittest_slow              = rd_false;
 
@@ -417,7 +415,6 @@ static int unittest_rdclock(void) {
 
 extern int unittest_string(void);
 extern int unittest_cgrp(void);
-extern int unittest_mock_cluster(void);
 #if WITH_SASL_SCRAM
 extern int unittest_scram(void);
 #endif
@@ -428,11 +425,7 @@ extern int unittest_http(void);
 #endif
 #if WITH_OAUTHBEARER_OIDC
 extern int unittest_sasl_oauthbearer_oidc(void);
-extern int unittest_sasl_oauthbearer_oidc_jwt_bearer(void);
-extern int unittest_sasl_oauthbearer_oidc_assertion(void);
 #endif
-extern int unittest_telemetry(void);
-extern int unittest_telemetry_decode(void);
 
 int rd_unittest(void) {
         int fails = 0;
@@ -440,47 +433,41 @@ int rd_unittest(void) {
                 const char *name;
                 int (*call)(void);
         } unittests[] = {
-            {"sysqueue", unittest_sysqueue},
-            {"string", unittest_string},
-            {"map", unittest_map},
-            {"rdbuf", unittest_rdbuf},
-            {"rdvarint", unittest_rdvarint},
-            {"crc32c", unittest_rd_crc32c},
-            {"msg", unittest_msg},
-            {"murmurhash", unittest_murmur2},
-            {"fnv1a", unittest_fnv1a},
-            {"mock", unittest_mock_cluster},
+                {"sysqueue", unittest_sysqueue},
+                {"string", unittest_string},
+                {"map", unittest_map},
+                {"rdbuf", unittest_rdbuf},
+                {"rdvarint", unittest_rdvarint},
+                {"crc32c", unittest_rd_crc32c},
+                {"msg", unittest_msg},
+                {"murmurhash", unittest_murmur2},
+                {"fnv1a", unittest_fnv1a},
 #if WITH_HDRHISTOGRAM
-            {"rdhdrhistogram", unittest_rdhdrhistogram},
+                {"rdhdrhistogram", unittest_rdhdrhistogram},
 #endif
 #ifdef _WIN32
-            {"rdclock", unittest_rdclock},
+                {"rdclock", unittest_rdclock},
 #endif
-            {"conf", unittest_conf},
-            {"broker", unittest_broker},
-            {"request", unittest_request},
+                {"conf", unittest_conf},
+                {"broker", unittest_broker},
+                {"request", unittest_request},
 #if WITH_SASL_OAUTHBEARER
-            {"sasl_oauthbearer", unittest_sasl_oauthbearer},
+                {"sasl_oauthbearer", unittest_sasl_oauthbearer},
 #endif
-            {"aborted_txns", unittest_aborted_txns},
-            {"cgrp", unittest_cgrp},
+                {"aborted_txns", unittest_aborted_txns},
+                {"cgrp", unittest_cgrp},
 #if WITH_SASL_SCRAM
-            {"scram", unittest_scram},
+                {"scram", unittest_scram},
 #endif
-            {"assignors", unittest_assignors},
+                {"assignors", unittest_assignors},
 #if WITH_CURL
-            {"http", unittest_http},
+                {"http", unittest_http},
 #endif
 #if WITH_OAUTHBEARER_OIDC
-            {"sasl_oauthbearer_oidc", unittest_sasl_oauthbearer_oidc},
-            {"sasl_oauthbearer_oidc_jwt_bearer",
-             unittest_sasl_oauthbearer_oidc_jwt_bearer},
-            {"sasl_oauthbearer_oidc_assertion",
-             unittest_sasl_oauthbearer_oidc_assertion},
+                {"sasl_oauthbearer_oidc", unittest_sasl_oauthbearer_oidc},
 #endif
-            {"telemetry", unittest_telemetry},
-            {"telemetry_decode", unittest_telemetry_decode},
-            {NULL}};
+                {NULL}
+        };
         int i;
         const char *match = rd_getenv("RD_UT_TEST", NULL);
         int cnt           = 0;
@@ -492,13 +479,7 @@ int rd_unittest(void) {
                 rd_unittest_on_ci = rd_true;
         }
 
-        if (rd_strcmp(rd_getenv("TEST_MODE", NULL), "valgrind") == 0) {
-                RD_UT_SAY("Unittests running with valgrind");
-                rd_unittest_with_valgrind = rd_true;
-        }
-
-        if (rd_unittest_on_ci || rd_unittest_with_valgrind ||
-            (ENABLE_DEVEL + 0)) {
+        if (rd_unittest_on_ci || (ENABLE_DEVEL + 0)) {
                 RD_UT_SAY("Unittests will not error out on slow CPUs");
                 rd_unittest_slow = rd_true;
         }

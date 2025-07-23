@@ -1,7 +1,7 @@
 /*
  * librdkafka - The Apache Kafka C/C++ library
  *
- * Copyright (c) 2022, Magnus Edenhill
+ * Copyright (c) 2022 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,9 +32,6 @@
 
 
 int rd_kafka_broker_fetch_toppars(rd_kafka_broker_t *rkb, rd_ts_t now);
-
-rd_kafka_fetch_pos_t
-rd_kafka_toppar_fetch_decide_next_fetch_start_pos(rd_kafka_toppar_t *rktp);
 
 rd_ts_t rd_kafka_toppar_fetch_decide(rd_kafka_toppar_t *rktp,
                                      rd_kafka_broker_t *rkb,

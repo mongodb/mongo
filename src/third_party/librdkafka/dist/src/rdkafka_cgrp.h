@@ -1,8 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2012-2022, Magnus Edenhill
- *               2023, Confluent Inc.
+ * Copyright (c) 2012-2015, Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -57,7 +56,6 @@ typedef struct rd_kafka_cgrp_s {
         rd_kafkap_str_t *rkcg_member_id; /* Last assigned MemberId */
         rd_kafkap_str_t *rkcg_group_instance_id;
         const rd_kafkap_str_t *rkcg_client_id;
-        rd_kafkap_str_t *rkcg_client_rack;
 
         enum {
                 /* Init state */
@@ -165,10 +163,6 @@ typedef struct rd_kafka_cgrp_s {
 
         rd_interval_t rkcg_coord_query_intvl;  /* Coordinator query intvl*/
         rd_interval_t rkcg_heartbeat_intvl;    /* Heartbeat intvl */
-        rd_kafka_timer_t rkcg_serve_timer;     /* Timer for next serve. */
-        int rkcg_heartbeat_intvl_ms;           /* KIP 848: received
-                                                * heartbeat interval in
-                                                * milliseconds */
         rd_interval_t rkcg_join_intvl;         /* JoinGroup interval */
         rd_interval_t rkcg_timeout_scan_intvl; /* Timeout scanner */
 
@@ -185,8 +179,7 @@ typedef struct rd_kafka_cgrp_s {
 
         rd_list_t rkcg_toppars; /* Toppars subscribed to*/
 
-        int32_t rkcg_generation_id; /* Current generation id (classic)
-                                     * or member epoch (consumer). */
+        int32_t rkcg_generation_id; /* Current generation id */
 
         rd_kafka_assignor_t *rkcg_assignor; /**< The current partition
                                              *   assignor. used by both
@@ -196,12 +189,6 @@ typedef struct rd_kafka_cgrp_s {
 
         int32_t rkcg_coord_id; /**< Current coordinator id,
                                 *   or -1 if not known. */
-
-        rd_kafka_group_protocol_t
-            rkcg_group_protocol; /**< Group protocol to use */
-
-        rd_kafkap_str_t *rkcg_group_remote_assignor; /**< Group remote
-                                                      *   assignor to use */
 
         rd_kafka_broker_t *rkcg_curr_coord; /**< Current coordinator
                                              *   broker handle, or NULL.
@@ -230,33 +217,9 @@ typedef struct rd_kafka_cgrp_s {
         rd_kafka_topic_partition_list_t *rkcg_errored_topics;
         /** If a SUBSCRIBE op is received during a COOPERATIVE rebalance,
          *  actioning this will be postponed until after the rebalance
-         *  completes. The waiting subscription is stored here. */
+         *  completes. The waiting subscription is stored here.
+         *  Mutually exclusive with rkcg_next_subscription. */
         rd_kafka_topic_partition_list_t *rkcg_next_subscription;
-
-        /**
-         * Subscription regex pattern. All the provided regex patterns are
-         * stored as a single string with each pattern separated by '|'.
-         *
-         * Only applicable for the consumer protocol introduced in KIP-848.
-         *
-         * rkcg_subscription = rkcg_subscription_topics +
-         * rkcg_subscription_regex
-         */
-        rd_kafkap_str_t *rkcg_subscription_regex;
-
-        /**
-         * Full topic names extracted out from the rkcg_subscription.
-         *
-         * Only applicable for the consumer protocol introduced in KIP-848.
-         *
-         *  For the consumer protocol, this field doesn't include regex
-         *  subscriptions. For that please refer `rkcg_subscription_regex`
-         *
-         * rkcg_subscription = rkcg_subscription_topics +
-         * rkcg_subscription_regex
-         */
-        rd_kafka_topic_partition_list_t *rkcg_subscription_topics;
-
         /** If a (un)SUBSCRIBE op is received during a COOPERATIVE rebalance,
          *  actioning this will be posponed until after the rebalance
          *  completes. This flag is used to signal a waiting unsubscribe
@@ -292,52 +255,10 @@ typedef struct rd_kafka_cgrp_s {
          *  currently in-progress incremental unassign. */
         rd_kafka_topic_partition_list_t *rkcg_rebalance_incr_assignment;
 
-        /** Current acked assignment, start with an empty list. */
-        rd_kafka_topic_partition_list_t *rkcg_current_assignment;
-
-        /** Assignment the is currently reconciling.
-         *  Can be NULL in case there's no reconciliation ongoing. */
-        rd_kafka_topic_partition_list_t *rkcg_target_assignment;
-
-        /** Next assignment that will be reconciled once current
-         *  reconciliation finishes. Can be NULL. */
-        rd_kafka_topic_partition_list_t *rkcg_next_target_assignment;
-
-        /** Number of backoff retries when expediting next heartbeat. */
-        int rkcg_expedite_heartbeat_retries;
-
-        /** Flags for KIP-848 state machine. */
-        int rkcg_consumer_flags;
-/** Coordinator is waiting for an acknowledgement of currently reconciled
- *  target assignment. Cleared when an HB succeeds
- *  after reconciliation finishes. */
-#define RD_KAFKA_CGRP_CONSUMER_F_WAIT_ACK 0x1
-/** Member is sending an acknowledgement for a reconciled assignment */
-#define RD_KAFKA_CGRP_CONSUMER_F_SENDING_ACK 0x2
-/** A new subscription needs to be sent to the Coordinator. */
-#define RD_KAFKA_CGRP_CONSUMER_F_SEND_NEW_SUBSCRIPTION 0x4
-/** A new subscription is being sent to the Coordinator. */
-#define RD_KAFKA_CGRP_CONSUMER_F_SENDING_NEW_SUBSCRIPTION 0x8
-/** Consumer has subscribed at least once,
- *  if it didn't happen rebalance protocol is still
- *  considered NONE, otherwise it depends on the
- *  configured partition assignors. */
-#define RD_KAFKA_CGRP_CONSUMER_F_SUBSCRIBED_ONCE 0x10
-/** Send a complete request in next heartbeat */
-#define RD_KAFKA_CGRP_CONSUMER_F_SEND_FULL_REQUEST 0x20
-/** Member is fenced, need to rejoin */
-#define RD_KAFKA_CGRP_CONSUMER_F_WAIT_REJOIN 0x40
-/** Member is fenced, rejoining */
-#define RD_KAFKA_CGRP_CONSUMER_F_WAIT_REJOIN_TO_COMPLETE 0x80
-/** Serve pending assignments after heartbeat */
-#define RD_KAFKA_CGRP_CONSUMER_F_SERVE_PENDING 0x100
-
         /** Rejoin the group following a currently in-progress
          *  incremental unassign. */
         rd_bool_t rkcg_rebalance_rejoin;
 
-        rd_ts_t rkcg_ts_last_err;          /* Timestamp of last error
-                                            * propagated to application */
         rd_kafka_resp_err_t rkcg_last_err; /* Last error propagated to
                                             * application.
                                             * This is for silencing
@@ -359,8 +280,6 @@ typedef struct rd_kafka_cgrp_s {
 
         rd_atomic32_t rkcg_terminated; /**< Consumer has been closed */
 
-        rd_atomic32_t rkcg_subscription_version; /**< Subscription version */
-
         /* Protected by rd_kafka_*lock() */
         struct {
                 rd_ts_t ts_rebalance;       /* Timestamp of
@@ -373,9 +292,6 @@ typedef struct rd_kafka_cgrp_s {
                                              * of last rebalance
                                              * assignment */
         } rkcg_c;
-
-        /* Timestamp of last rebalance start */
-        rd_ts_t rkcg_ts_rebalance_start;
 
 } rd_kafka_cgrp_t;
 
@@ -397,7 +313,6 @@ extern const char *rd_kafka_cgrp_join_state_names[];
 
 void rd_kafka_cgrp_destroy_final(rd_kafka_cgrp_t *rkcg);
 rd_kafka_cgrp_t *rd_kafka_cgrp_new(rd_kafka_t *rk,
-                                   rd_kafka_group_protocol_t group_protocol,
                                    const rd_kafkap_str_t *group_id,
                                    const rd_kafkap_str_t *client_id);
 void rd_kafka_cgrp_serve(rd_kafka_cgrp_t *rkcg);
@@ -431,12 +346,6 @@ void rd_kafka_cgrp_metadata_update_check(rd_kafka_cgrp_t *rkcg,
                                          rd_bool_t do_join);
 #define rd_kafka_cgrp_get(rk) ((rk)->rk_cgrp)
 
-#define rd_kafka_cgrp_same_subscription_version(rk_cgrp,                       \
-                                                cgrp_subscription_version)     \
-        ((rk_cgrp) &&                                                          \
-         (cgrp_subscription_version == -1 ||                                   \
-          rd_atomic32_get(&(rk_cgrp)->rkcg_subscription_version) ==            \
-              cgrp_subscription_version))
 
 void rd_kafka_cgrp_assigned_offsets_commit(
     rd_kafka_cgrp_t *rkcg,
@@ -470,8 +379,5 @@ rd_kafka_rebalance_protocol2str(rd_kafka_rebalance_protocol_t protocol) {
                 return "NONE";
         }
 }
-
-void rd_kafka_cgrp_consumer_expedite_next_heartbeat(rd_kafka_cgrp_t *rkcg,
-                                                    const char *reason);
 
 #endif /* _RDKAFKA_CGRP_H_ */

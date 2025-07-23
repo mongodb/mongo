@@ -1,8 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2018-2022, Magnus Edenhill
- *               2025, Confluent Inc.
+ * Copyright (c) 2018 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,7 +40,6 @@
 #include <pthread.h> /* needed for rwlock_t */
 #endif
 
-#include "rdtypes.h"
 
 /**
  * @brief Set thread system name if platform supports it (pthreads)
@@ -85,15 +83,13 @@ int cnd_timedwait_ms(cnd_t *cnd, mtx_t *mtx, int timeout_ms);
 int cnd_timedwait_msp(cnd_t *cnd, mtx_t *mtx, int *timeout_msp);
 
 /**
- * @brief Same as cnd_timedwait() but takes an ansolute timeout in microseconds.
- *        Honours
+ * @brief Same as cnd_timedwait() but honours
  *        RD_POLL_INFINITE (uses cnd_wait()),
  *        and RD_POLL_NOWAIT (return thrd_timedout immediately).
  *
- *  @remark Set up \p abs_timeout with rd_timeout_init() or
- *          rd_timeout_init_us().
+ *  @remark Set up \p tspec with rd_timeout_init_timespec().
  */
-int cnd_timedwait_abs(cnd_t *cnd, mtx_t *mtx, rd_ts_t abs_timeout);
+int cnd_timedwait_abs(cnd_t *cnd, mtx_t *mtx, const struct timespec *tspec);
 
 
 

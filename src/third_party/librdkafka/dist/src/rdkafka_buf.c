@@ -1,8 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2012-2022, Magnus Edenhill
- *               2023, Confluent Inc.
+ * Copyright (c) 2012-2015, Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,10 +37,11 @@ void rd_kafka_buf_destroy_final(rd_kafka_buf_t *rkbuf) {
         case RD_KAFKAP_Metadata:
                 if (rkbuf->rkbuf_u.Metadata.topics)
                         rd_list_destroy(rkbuf->rkbuf_u.Metadata.topics);
-                if (rkbuf->rkbuf_u.Metadata.topic_ids)
-                        rd_list_destroy(rkbuf->rkbuf_u.Metadata.topic_ids);
                 if (rkbuf->rkbuf_u.Metadata.reason)
                         rd_free(rkbuf->rkbuf_u.Metadata.reason);
+                if (rkbuf->rkbuf_u.Metadata.rko)
+                        rd_kafka_op_reply(rkbuf->rkbuf_u.Metadata.rko,
+                                          RD_KAFKA_RESP_ERR__DESTROY);
                 if (rkbuf->rkbuf_u.Metadata.decr) {
                         /* Decrease metadata cache's full_.._sent state. */
                         mtx_lock(rkbuf->rkbuf_u.Metadata.decr_lock);
@@ -120,18 +120,6 @@ rd_kafka_buf_t *rd_kafka_buf_new0(int segcnt, size_t size, int flags) {
         return rkbuf;
 }
 
-/**
- * @brief Upgrade request header to flexver by writing header tags.
- */
-void rd_kafka_buf_upgrade_flexver_request(rd_kafka_buf_t *rkbuf) {
-        if (likely(!(rkbuf->rkbuf_flags & RD_KAFKA_OP_F_FLEXVER))) {
-                rkbuf->rkbuf_flags |= RD_KAFKA_OP_F_FLEXVER;
-
-                /* Empty request header tags */
-                rd_kafka_buf_write_i8(rkbuf, 0);
-        }
-}
-
 
 /**
  * @brief Create new request buffer with the request-header written (will
@@ -177,7 +165,12 @@ rd_kafka_buf_t *rd_kafka_buf_new_request0(rd_kafka_broker_t *rkb,
         rd_kafka_buf_write_kstr(rkbuf, rkb->rkb_rk->rk_client_id);
 
         if (is_flexver) {
-                rd_kafka_buf_upgrade_flexver_request(rkbuf);
+                /* Must set flexver after writing the client id since
+                 * it is still a standard non-compact string. */
+                rkbuf->rkbuf_flags |= RD_KAFKA_OP_F_FLEXVER;
+
+                /* Empty request header tags */
+                rd_kafka_buf_write_i8(rkbuf, 0);
         }
 
         return rkbuf;
@@ -241,12 +234,6 @@ void rd_kafka_bufq_init(rd_kafka_bufq_t *rkbufq) {
         rd_atomic32_init(&rkbufq->rkbq_msg_cnt, 0);
 }
 
-static void rd_kafka_bufq_reset(rd_kafka_bufq_t *rkbufq) {
-        TAILQ_INIT(&rkbufq->rkbq_bufs);
-        rd_atomic32_set(&rkbufq->rkbq_cnt, 0);
-        rd_atomic32_set(&rkbufq->rkbq_msg_cnt, 0);
-}
-
 /**
  * Concat all buffers from 'src' to tail of 'dst'
  */
@@ -255,7 +242,7 @@ void rd_kafka_bufq_concat(rd_kafka_bufq_t *dst, rd_kafka_bufq_t *src) {
         (void)rd_atomic32_add(&dst->rkbq_cnt, rd_atomic32_get(&src->rkbq_cnt));
         (void)rd_atomic32_add(&dst->rkbq_msg_cnt,
                               rd_atomic32_get(&src->rkbq_msg_cnt));
-        rd_kafka_bufq_reset(src);
+        rd_kafka_bufq_init(src);
 }
 
 /**
@@ -396,7 +383,7 @@ int rd_kafka_buf_retry(rd_kafka_broker_t *rkb, rd_kafka_buf_t *rkbuf) {
         rd_assert(rd_buf_len(&rkbuf->rkbuf_buf) > 0);
 
         if (unlikely(!rkb || rkb->rkb_source == RD_KAFKA_INTERNAL ||
-                     rd_kafka_broker_or_instance_terminating(rkb) ||
+                     rd_kafka_terminating(rkb->rkb_rk) ||
                      rkbuf->rkbuf_retries + incr_retry >
                          rkbuf->rkbuf_max_retries))
                 return 0;

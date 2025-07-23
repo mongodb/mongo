@@ -1,7 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2012-2022, Magnus Edenhill
+ * Copyright (c) 2012-2015 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -125,17 +125,16 @@
 #define be32toh(x) (x)
 #define be16toh(x) (x)
 #define le32toh(x)                                                             \
-        ((((x) & 0xff) << 24) | (((x) & 0xff00) << 8) |                        \
-         (((x) & 0xff0000) >> 8) | (((x) & 0xff000000) >> 24))
+        ((((x)&0xff) << 24) | (((x)&0xff00) << 8) | (((x)&0xff0000) >> 8) |    \
+         (((x)&0xff000000) >> 24))
 #define le64toh(x)                                                             \
-        ((((x) & 0x00000000000000ffL) << 56) |                                 \
-         (((x) & 0x000000000000ff00L) << 40) |                                 \
-         (((x) & 0x0000000000ff0000L) << 24) |                                 \
-         (((x) & 0x00000000ff000000L) << 8) |                                  \
-         (((x) & 0x000000ff00000000L) >> 8) |                                  \
-         (((x) & 0x0000ff0000000000L) >> 24) |                                 \
-         (((x) & 0x00ff000000000000L) >> 40) |                                 \
-         (((x) & 0xff00000000000000L) >> 56))
+        ((((x)&0x00000000000000ffL) << 56) |                                   \
+         (((x)&0x000000000000ff00L) << 40) |                                   \
+         (((x)&0x0000000000ff0000L) << 24) |                                   \
+         (((x)&0x00000000ff000000L) << 8) | (((x)&0x000000ff00000000L) >> 8) | \
+         (((x)&0x0000ff0000000000L) >> 24) |                                   \
+         (((x)&0x00ff000000000000L) >> 40) |                                   \
+         (((x)&0xff00000000000000L) >> 56))
 #else
 #include <endian.h>
 #endif

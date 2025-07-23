@@ -1,7 +1,7 @@
 /*
  * librdkafka - The Apache Kafka C/C++ library
  *
- * Copyright (c) 2019-2022, Magnus Edenhill
+ * Copyright (c) 2019 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -78,8 +78,6 @@ static void rd_kafka_cert_destroy(rd_kafka_cert_t *cert) {
 
         if (cert->x509)
                 X509_free(cert->x509);
-        if (cert->chain)
-                sk_X509_pop_free(cert->chain, X509_free);
         if (cert->pkey)
                 EVP_PKEY_free(cert->pkey);
         if (cert->store)
@@ -316,11 +314,10 @@ static rd_kafka_cert_t *rd_kafka_cert_new(const rd_kafka_conf_t *conf,
                 switch (encoding) {
                 case RD_KAFKA_CERT_ENC_PKCS12: {
                         EVP_PKEY *ign_pkey;
-                        STACK_OF(X509) *ca = NULL;
 
                         action = "parse PKCS#12";
                         if (!PKCS12_parse(p12, conf->ssl.key_password,
-                                          &ign_pkey, &cert->x509, &ca))
+                                          &ign_pkey, &cert->x509, NULL))
                                 goto fail;
 
                         EVP_PKEY_free(ign_pkey);
@@ -328,13 +325,6 @@ static rd_kafka_cert_t *rd_kafka_cert_new(const rd_kafka_conf_t *conf,
                         action = "retrieve public key";
                         if (!cert->x509)
                                 goto fail;
-
-                        if (ca) {
-                                if (sk_X509_num(ca) > 0)
-                                        cert->chain = ca;
-                                else
-                                        sk_X509_pop_free(ca, X509_free);
-                        }
                 } break;
 
                 case RD_KAFKA_CERT_ENC_DER:
@@ -351,20 +341,6 @@ static rd_kafka_cert_t *rd_kafka_cert_new(const rd_kafka_conf_t *conf,
                             (void *)conf);
                         if (!cert->x509)
                                 goto fail;
-
-                        cert->chain = sk_X509_new_null();
-                        if (rd_kafka_ssl_read_cert_chain_from_BIO(
-                                bio, cert->chain, rd_kafka_conf_ssl_passwd_cb,
-                                (void *)conf) != 0) {
-                                sk_X509_pop_free(cert->chain, X509_free);
-                                cert->chain = NULL;
-                                goto fail;
-                        }
-
-                        if (sk_X509_num(cert->chain) == 0) {
-                                sk_X509_pop_free(cert->chain, X509_free);
-                                cert->chain = NULL;
-                        }
                         break;
 
                 default:

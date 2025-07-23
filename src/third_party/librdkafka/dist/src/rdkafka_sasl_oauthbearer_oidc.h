@@ -1,7 +1,7 @@
 /*
  * librdkafka - The Apache Kafka C/C++ library
  *
- * Copyright (c) 2021-2022, Magnus Edenhill
+ * Copyright (c) 2021 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,14 +28,9 @@
 
 #ifndef _RDKAFKA_SASL_OAUTHBEARER_OIDC_H_
 #define _RDKAFKA_SASL_OAUTHBEARER_OIDC_H_
-void rd_kafka_oidc_token_jwt_bearer_refresh_cb(rd_kafka_t *rk,
-                                               const char *oauthbearer_config,
-                                               void *opaque);
-
-void rd_kafka_oidc_token_client_credentials_refresh_cb(
-    rd_kafka_t *rk,
-    const char *oauthbearer_config,
-    void *opaque);
+void rd_kafka_oidc_token_refresh_cb(rd_kafka_t *rk,
+                                    const char *oauthbearer_config,
+                                    void *opaque);
 
 int unittest_sasl_oauthbearer_oidc(void);
 

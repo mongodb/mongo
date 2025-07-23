@@ -1,8 +1,7 @@
 /*
  * librd - Rapid Development C library
  *
- * Copyright (c) 2012-2022, Magnus Edenhill
- *               2025, Confluent Inc.
+ * Copyright (c) 2012, Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -165,44 +164,9 @@ static RD_INLINE int rd_timeout_ms(rd_ts_t timeout_us) {
                 return (int)((timeout_us + 999) / 1000);
 }
 
-/**
- * @brief Initialize an absolute timeout based on the provided \p timeout_ms
- *        and given clock \p now
- *
- * To be used with rd_timeout_remains() or rd_timeout_remains_us().
- *
- * Honours RD_POLL_INFINITE, RD_POLL_NOWAIT.
- *
- * @returns the absolute timeout.
- */
-static RD_INLINE rd_ts_t rd_timeout_init0(rd_ts_t now, int timeout_ms) {
-        if (timeout_ms == RD_POLL_INFINITE || timeout_ms == RD_POLL_NOWAIT)
-                return timeout_ms;
-
-        return now + ((rd_ts_t)timeout_ms * 1000);
-}
-
-/**
- * @brief Initialize an absolute timeout based on the provided \p timeout_us
- *        and given clock \p now
- *
- * To be used with rd_timeout_remains() or rd_timeout_remains_us().
- *
- * Honours RD_POLL_INFINITE, RD_POLL_NOWAIT.
- *
- * @returns the absolute timeout.
- */
-static RD_INLINE rd_ts_t rd_timeout_init_us0(rd_ts_t now, rd_ts_t timeout_us) {
-        if (timeout_us == RD_POLL_INFINITE || timeout_us == RD_POLL_NOWAIT)
-                return timeout_us;
-
-        return now + timeout_us;
-}
-
 
 /**
  * @brief Initialize an absolute timeout based on the provided \p timeout_ms
- *        and current clock.
  *
  * To be used with rd_timeout_adjust().
  *
@@ -212,35 +176,12 @@ static RD_INLINE rd_ts_t rd_timeout_init_us0(rd_ts_t now, rd_ts_t timeout_us) {
  *          to rd_timeout_adjust().
  */
 static RD_INLINE rd_ts_t rd_timeout_init(int timeout_ms) {
-        return rd_timeout_init0(rd_clock(), timeout_ms);
+        if (timeout_ms == RD_POLL_INFINITE || timeout_ms == RD_POLL_NOWAIT)
+                return timeout_ms;
+
+        return rd_clock() + ((rd_ts_t)timeout_ms * 1000);
 }
 
-/**
- * @brief Initialize an absolute timeout based on the provided \p timeout_us
- *        and current clock.
- *
- * To be used with rd_timeout_remains() or rd_timeout_remains_us().
- *
- * Honours RD_POLL_INFINITE, RD_POLL_NOWAIT.
- *
- * @returns the absolute timeout.
- */
-static RD_INLINE rd_ts_t rd_timeout_init_us(rd_ts_t timeout_us) {
-        return rd_timeout_init_us0(rd_clock(), timeout_us);
-}
-
-/**
- * @brief Gets time since epoch (UTC).
- */
-static RD_INLINE void rd_timespec_get(struct timespec *tspec) {
-#if defined(__APPLE__) || (defined(__ANDROID__) && __ANDROID_API__ < 29)
-        struct timeval tv;
-        gettimeofday(&tv, NULL);
-        TIMEVAL_TO_TIMESPEC(&tv, tspec);
-#else
-        timespec_get(tspec, TIME_UTC);
-#endif
-}
 
 /**
  * @brief Initialize an absolute timespec timeout based on the provided
@@ -256,7 +197,13 @@ static RD_INLINE void rd_timeout_init_timespec_us(struct timespec *tspec,
                 tspec->tv_sec  = timeout_us;
                 tspec->tv_nsec = 0;
         } else {
-                rd_timespec_get(tspec);
+#if defined(__APPLE__) || (defined(__ANDROID__) && __ANDROID_API__ < 29)
+                struct timeval tv;
+                gettimeofday(&tv, NULL);
+                TIMEVAL_TO_TIMESPEC(&tv, tspec);
+#else
+                timespec_get(tspec, TIME_UTC);
+#endif
                 tspec->tv_sec += timeout_us / 1000000;
                 tspec->tv_nsec += (timeout_us % 1000000) * 1000;
                 if (tspec->tv_nsec >= 1000000000) {
@@ -280,7 +227,13 @@ static RD_INLINE void rd_timeout_init_timespec(struct timespec *tspec,
                 tspec->tv_sec  = timeout_ms;
                 tspec->tv_nsec = 0;
         } else {
-                rd_timespec_get(tspec);
+#if defined(__APPLE__) || (defined(__ANDROID__) && __ANDROID_API__ < 29)
+                struct timeval tv;
+                gettimeofday(&tv, NULL);
+                TIMEVAL_TO_TIMESPEC(&tv, tspec);
+#else
+                timespec_get(tspec, TIME_UTC);
+#endif
                 tspec->tv_sec += timeout_ms / 1000;
                 tspec->tv_nsec += (timeout_ms % 1000) * 1000000;
                 if (tspec->tv_nsec >= 1000000000) {

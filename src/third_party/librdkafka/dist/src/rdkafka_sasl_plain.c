@@ -1,7 +1,7 @@
 /*
  * librdkafka - The Apache Kafka C/C++ library
  *
- * Copyright (c) 2017-2022, Magnus Edenhill
+ * Copyright (c) 2017 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -81,9 +81,9 @@ int rd_kafka_sasl_plain_client_new(rd_kafka_transport_t *rktrans,
         cidlen = rk->rk_conf.sasl.username
                      ? (int)strlen(rk->rk_conf.sasl.username)
                      : 0;
-        pwlen  = rk->rk_conf.sasl.password
-                     ? (int)strlen(rk->rk_conf.sasl.password)
-                     : 0;
+        pwlen = rk->rk_conf.sasl.password
+                    ? (int)strlen(rk->rk_conf.sasl.password)
+                    : 0;
 
         buf = rd_alloca(zidlen + 1 + cidlen + 1 + pwlen + 1);
 
