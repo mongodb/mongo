@@ -679,7 +679,7 @@ Status runAggregateImpl(OperationContext* opCtx,
 
     const auto& involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
 
-    const auto cri = routingCtx.hasNss(namespaces.executionNss)
+    const auto& cri = routingCtx.hasNss(namespaces.executionNss)
         ? boost::optional<CollectionRoutingInfo>(
               routingCtx.getCollectionRoutingInfo(namespaces.executionNss))
         : boost::none;

@@ -1634,7 +1634,7 @@ Status translateEncryptionKeywords(StringMap<BSONElement>& keywordMap,
             // This checks the types of all the fields. Will throw on any parsing error.
             const IDLParserContext encryptCtxt("encrypt");
             auto encryptInfo = EncryptionInfo::parse(encryptCtxt, encryptElt.embeddedObject());
-            auto infoType = encryptInfo.getBsonType();
+            const auto& infoType = encryptInfo.getBsonType();
 
             andExpr->add(std::make_unique<InternalSchemaBinDataSubTypeExpression>(
                 path,

@@ -1791,7 +1791,7 @@ std::unique_ptr<Expression> ExpressionFieldPath::copyWithSubstitution(
     for (const auto& rename : renameList) {
         if (FieldRef oldName(rename.first); oldName.isPrefixOfOrEqualTo(path)) {
             // Remove the path components of 'oldName' from 'path'.
-            auto suffix = (path == oldName)
+            const auto& suffix = (path == oldName)
                 ? ""
                 : "." + path.dottedSubstring(oldName.numParts(), path.numParts());
             return std::unique_ptr<Expression>(new ExpressionFieldPath(

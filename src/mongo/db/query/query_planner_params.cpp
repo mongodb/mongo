@@ -338,7 +338,7 @@ void QueryPlannerParams::applyQuerySettingsForCollection(
     CollectionInfo& collectionInfo,
     const boost::optional<TimeseriesOptions>& timeseriesOptions = boost::none) {
     // Retrieving the allowed indexes for the given collection.
-    auto allowedIndexes = [&]() {
+    const auto& allowedIndexes = [&]() {
         const bool isTimeseriesColl = timeseriesOptions.has_value();
 
         // For legacy time series collections (view + buckets), we need to compare time series view

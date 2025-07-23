@@ -1631,7 +1631,7 @@ StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedR
     CostEstimate bestCost = maxCost;
     std::unique_ptr<QuerySolution> bestSoln;
     for (auto&& soln : allSoln) {
-        auto ceRes = cbrMode == QueryPlanRankerModeEnum::kExactCE
+        const auto& ceRes = cbrMode == QueryPlanRankerModeEnum::kExactCE
             ? exactCardinality->calculateExactCardinality(*soln, estimates)
             : cardEstimator.estimatePlan(*soln);
         if (!ceRes.isOK()) {
