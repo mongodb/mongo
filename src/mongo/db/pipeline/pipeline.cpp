@@ -463,6 +463,9 @@ void Pipeline::checkValidOperationContext() const {
 }
 
 void Pipeline::dispose(OperationContext* opCtx) {
+    if (_disposed) {
+        return;
+    }
     try {
         pCtx->setOperationContext(opCtx);
 
