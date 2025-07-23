@@ -675,12 +675,7 @@ public:
      * collection.  The collection cannot be completely emptied using this
      * function.  An assertion will be thrown if that is attempted.
      * @param inclusive - Truncate 'end' as well iff true
-     *
-     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
-    virtual TruncateAfterResult truncateAfter(OperationContext*,
-                                              const RecordId&,
-                                              bool inclusive) = 0;
     virtual TruncateAfterResult truncateAfter(OperationContext*,
                                               RecoveryUnit&,
                                               const RecordId&,

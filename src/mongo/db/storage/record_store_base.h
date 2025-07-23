@@ -169,7 +169,6 @@ public:
 
     void notifyWaitersIfNeeded() final;
 
-    TruncateAfterResult truncateAfter(OperationContext*, const RecordId&, bool inclusive) final;
     TruncateAfterResult truncateAfter(OperationContext*,
                                       RecoveryUnit&,
                                       const RecordId&,

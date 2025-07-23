@@ -933,7 +933,10 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
     WriteUnitOfWork wunit(opCtx);
     RecordStore::Capped::TruncateAfterResult result =
         oplogCollection->getRecordStore()->capped()->truncateAfter(
-            opCtx, truncateAfterRecordId, false /*inclusive*/);
+            opCtx,
+            *shard_role_details::getRecoveryUnit(opCtx),
+            truncateAfterRecordId,
+            false /*inclusive*/);
     wunit.commit();
     if (result.recordsRemoved > 0) {
         if (auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers()) {

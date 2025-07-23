@@ -343,7 +343,10 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
     {
         WriteUnitOfWork wunit(opCtx);
         RecordStore::Capped::TruncateAfterResult result =
-            rs->capped()->truncateAfter(opCtx, RecordId(1, 8), true /* inclusive */);
+            rs->capped()->truncateAfter(opCtx,
+                                        *shard_role_details::getRecoveryUnit(opCtx),
+                                        RecordId(1, 8),
+                                        true /* inclusive */);
         wunit.commit();
         oplogTruncateMarkers->updateMarkersAfterCappedTruncateAfter(
             result.recordsRemoved, result.bytesRemoved, result.firstRemovedId);
@@ -361,7 +364,10 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
     {
         WriteUnitOfWork wunit(opCtx);
         RecordStore::Capped::TruncateAfterResult result =
-            rs->capped()->truncateAfter(opCtx, RecordId(1, 6), true /* inclusive */);
+            rs->capped()->truncateAfter(opCtx,
+                                        *shard_role_details::getRecoveryUnit(opCtx),
+                                        RecordId(1, 6),
+                                        true /* inclusive */);
         wunit.commit();
         oplogTruncateMarkers->updateMarkersAfterCappedTruncateAfter(
             result.recordsRemoved, result.bytesRemoved, result.firstRemovedId);

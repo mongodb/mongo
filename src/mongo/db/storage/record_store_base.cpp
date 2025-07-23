@@ -195,10 +195,6 @@ void RecordStoreBase::Capped::notifyWaitersIfNeeded() {
 }
 
 RecordStoreBase::Capped::TruncateAfterResult RecordStoreBase::Capped::truncateAfter(
-    OperationContext* opCtx, const RecordId& id, bool inclusive) {
-    return truncateAfter(opCtx, *shard_role_details::getRecoveryUnit(opCtx), id, inclusive);
-}
-RecordStoreBase::Capped::TruncateAfterResult RecordStoreBase::Capped::truncateAfter(
     OperationContext* opCtx, RecoveryUnit& ru, const RecordId& id, bool inclusive) {
     validateWriteAllowed(opCtx);
     return _truncateAfter(opCtx, ru, id, inclusive);
