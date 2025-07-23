@@ -36,9 +36,9 @@ from typing import Any, Mapping, NewType, Sequence
 from config import DatabaseConfig, RestoreMode
 from pymongo import AsyncMongoClient
 
-__all__ = ["DatabaseInstance", "Pipeline"]
+__all__ = ["DatabaseInstance", "Find"]
 """MongoDB Aggregate's Pipeline"""
-Pipeline = NewType("Pipeline", Sequence[Mapping[str, Any]])
+Find = NewType("Find", Mapping[str, Any])
 
 
 class DatabaseInstance:
@@ -91,11 +91,11 @@ class DatabaseInstance:
             "internalQueryFrameworkControl", "trySbeEngine" if state else "forceClassicEngine"
         )
 
-    async def explain(self, collection_name: str, pipeline: Pipeline) -> dict[str, any]:
-        """Return explain for the given pipeline."""
+    async def explain(self, collection_name: str, find: Find) -> dict[str, any]:
+        """Return explain for the given find command."""
         return await self.database.command(
             "explain",
-            {"aggregate": collection_name, "pipeline": pipeline, "cursor": {}},
+            {"find": collection_name, **find},
             verbosity="executionStats",
         )
 

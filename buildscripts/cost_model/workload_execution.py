@@ -36,16 +36,16 @@ import bson.json_util as json
 from bson.objectid import ObjectId
 from config import WorkloadExecutionConfig, WriteMode
 from data_generator import CollectionInfo
-from database_instance import DatabaseInstance, Pipeline
+from database_instance import DatabaseInstance, Find
 
 __all__ = ["execute"]
 
 
 @dataclass
 class Query:
-    """Query pipleline and related model input parameters."""
+    """Query command and related model input parameters."""
 
-    pipeline: Pipeline
+    find_cmd: Find
     keys_length_in_bytes: int = 0
     number_of_fields: int = 0
     note: any = None
@@ -105,7 +105,7 @@ class WorkloadExecution:
         for coll_info in collection_infos:
             print(f"\n>>>>> running queries on collection {coll_info.name}")
             for query in queries:
-                print(f">>>>>>> running query {query.pipeline}")
+                print(f">>>>>>> running query {query.find_cmd}")
                 await self._run_query(coll_info, query, measurements)
 
         await self.database.insert_many(self.config.output_collection_name, measurements)
@@ -113,7 +113,7 @@ class WorkloadExecution:
     async def _run_query(self, coll_info: CollectionInfo, query: Query, result: Sequence):
         # warm up
         for _ in range(self.config.warmup_runs):
-            await self.database.explain(coll_info.name, query.pipeline)
+            await self.database.explain(coll_info.name, query.find_cmd)
 
         run_id = ObjectId()
         avg_doc_size = await self.database.get_average_document_size(coll_info.name)
@@ -124,13 +124,13 @@ class WorkloadExecution:
             note=query.note,
         )
         for _ in range(self.config.runs):
-            explain = await self.database.explain(coll_info.name, query.pipeline)
+            explain = await self.database.explain(coll_info.name, query.find_cmd)
             if explain["ok"] == 1:
                 result.append(
                     {
                         "run_id": run_id,
                         "collection": coll_info.name,
-                        "pipeline": json.dumps(query.pipeline),
+                        "command": json.dumps(query.find_cmd),
                         "explain": json.dumps(explain),
                         "query_parameters": parameters.to_json(),
                     }

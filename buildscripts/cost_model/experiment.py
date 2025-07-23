@@ -133,7 +133,7 @@ def remove_outliers(
         return (df_seq >= low) & (df_seq <= high)
 
     return df[
-        df.groupby(["run_id", "collection", "pipeline"])
+        df.groupby(["run_id", "collection", "command"])
         .total_execution_time.transform(is_not_outlier)
         .eq(1)
     ]
@@ -182,7 +182,7 @@ def extract_qsn_nodes(df: pd.DataFrame) -> pd.DataFrame:
                     **dataclasses.asdict(stat),
                     **json.loads(df_seq["query_parameters"]),
                     "run_id": df_seq.run_id,
-                    "pipeline": df_seq.pipeline,
+                    "command": df_seq.command,
                     "source": df_seq.name,
                 }
                 rows.append(row)

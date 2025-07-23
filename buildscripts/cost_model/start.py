@@ -92,30 +92,6 @@ async def execute_index_scan_queries(
     )
 
 
-async def execute_physical_scan_queries(
-    database: DatabaseInstance, collections: Sequence[CollectionInfo]
-):
-    collections = [ci for ci in collections if ci.name.startswith("physical_scan")]
-    fields = [f for f in collections[0].fields if f.name == "choice"]
-    requests = []
-    for field in fields:
-        for val in field.distribution.get_values()[::3]:
-            if val.startswith("_"):
-                continue
-            keys_length = len(val) + 2
-            requests.append(
-                Query(
-                    pipeline=[{"$match": {field.name: val}}, {"$limit": 10}],
-                    keys_length_in_bytes=keys_length,
-                    note="PhysicalScan",
-                )
-            )
-
-    await workload_execution.execute(
-        database, main_config.workload_execution, collections, requests
-    )
-
-
 async def execute_index_intersections_with_requests(
     database: DatabaseInstance, collections: Sequence[CollectionInfo], requests: Sequence[Query]
 ):
@@ -158,11 +134,28 @@ async def execute_index_intersections(
     await execute_index_intersections_with_requests(database, collections, requests)
 
 
+async def execute_collection_scans(
+    database: DatabaseInstance, collections: Sequence[CollectionInfo], forwards=True
+):
+    collections = [c for c in collections if c.name.startswith("coll_scan")]
+    # Even though these numbers are not representative of the way COLLSCANs are usually used,
+    # we can use them for calibration based on the assumption that the cost scales linearly.
+    limits = [5, 10, 50, 75, 100, 150, 300, 500, 1000]
+    direction = 1 if forwards else -1
+    requests = [
+        Query({"limit": limit, "sort": {"$natural": direction}}, note="COLLSCAN")
+        for limit in limits
+    ]
+    await workload_execution.execute(
+        database, main_config.workload_execution, collections, requests
+    )
+
+
 async def execute_limits(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
     collection = [c for c in collections if c.name.startswith("index_scan")][0]
     limits = [1, 2, 5, 10, 15, 20, 25, 50]  # , 100, 250, 500, 1000, 2500, 5000, 10000]
 
-    requests = [Query([{"$limit": limit}], note="LIMIT") for limit in limits]
+    requests = [Query({"limit": limit}, note="LIMIT") for limit in limits]
     await workload_execution.execute(
         database, main_config.workload_execution, [collection], requests
     )
@@ -176,7 +169,7 @@ async def execute_skips(database: DatabaseInstance, collections: Sequence[Collec
     # We add a LIMIT on top of the SKIP in order to easily vary the number of processed documents.
     for limit in limits:
         for skip in skips:
-            requests.append(Query(pipeline=[{"$skip": skip}, {"$limit": limit}], note="SKIP"))
+            requests.append(Query(find_cmd={"skip": skip, "limit": limit}, note="SKIP"))
     await workload_execution.execute(
         database, main_config.workload_execution, [collection], requests
     )
@@ -195,7 +188,11 @@ async def main():
         await generator.populate_collections()
         # 3. Collecting data for calibration (optional).
         # It runs the pipelines and stores explains to the database.
-        execution_query_functions = [execute_limits, execute_skips]
+        # NOTE: you must run the collection scan workload twice, once to get the coefficients for a forward scan,
+        # and another for backwards ones. To toggle this, change the argument 'forwards' in the signature of
+        # 'execute_collection_scans'. We need to do this as otherwise data from both directions will be used
+        # for the same calibration, which we explicitly want to avoid.
+        execution_query_functions = [execute_collection_scans, execute_limits, execute_skips]
         for execute_query in execution_query_functions:
             await execute_query(database, generator.collection_infos)
             main_config.workload_execution.write_mode = WriteMode.APPEND
