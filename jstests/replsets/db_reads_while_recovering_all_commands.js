@@ -211,7 +211,6 @@ const allCommands = {
     commitTransaction: {skip: isPrimaryOnly},
     compact: {skip: isNotAUserDataRead},
     compactStructuredEncryptionData: {skip: isPrimaryOnly},
-    configureBackgroundTask: {skip: isPrimaryOnly},
     configureFailPoint: {skip: isNotAUserDataRead},
     configureCollectionBalancing: {skip: isPrimaryOnly},
     configureQueryAnalyzer: {skip: isPrimaryOnly},

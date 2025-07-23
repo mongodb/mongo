@@ -15,6 +15,7 @@ export const commandsRemovedFromMongodSinceLastLTS = [
     "_shardsvrUnregisterIndex",
     "_configsvrCommitIndex",
     "_configsvrDropIndexCatalogEntry",
+    "configureBackgroundTask",
 ];
 
 // These commands were added in mongod since the last LTS version, so will not appear in the

@@ -517,7 +517,6 @@ ddl:
     - src/mongo/s/request_types/migration_blocking_operation*
     - src/mongo/s/migration_blocking_operation*
     - src/mongo/db/metadata_consistency_types.idl
-    - src/mongo/db/commands/configure_background_task_command*
     - src/mongo/db/commands/shuffle_list_command_results*
     - src/mongo/db/s/shardsvr_validate_shard_key_candidate.cpp
     - src/mongo/db/s/config/configsvr_run_restore*

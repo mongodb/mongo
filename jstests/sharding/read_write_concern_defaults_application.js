@@ -367,7 +367,6 @@ let testCases = {
     },
     compact: {skip: "does not accept read or write concern"},
     compactStructuredEncryptionData: {skip: "does not accept read or write concern"},
-    configureBackgroundTask: {skip: "does not accept read or write concern"},
     configureCollectionBalancing: {skip: "does not accept read or write concern"},
     configureFailPoint: {skip: "does not accept read or write concern"},
     configureQueryAnalyzer: {skip: "does not accept read or write concern"},

@@ -1417,7 +1417,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/**/addShard* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/custom_write_concern.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/check_metadata* @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/jstests/sharding/**/*configure_background_tasks* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/direct_shard* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/start_shard_draining* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/shard_draining_status_test.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -1751,7 +1750,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/**/async_command_execution_test.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/commands/**/authentication_commands.* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/commands/**/buildinfo_common.* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/db/commands/**/configure_background_task* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/commands/**/*cluster*parameter* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/commands/**/cluster_server_parameter_cmds.idl @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/commands/**/collmod_cmd.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
