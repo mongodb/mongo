@@ -151,6 +151,14 @@ public:
     bool canDeclareIntent(Intent intent, OperationContext* opCtx);
 
     /**
+     * Returns true if there is an active Replication state transition ongoing, false otherwise.
+     */
+    bool activeStateTransition() {
+        stdx::unique_lock lock(_stateMutex);
+        return _interruptionCtx != nullptr;
+    }
+
+    /**
      * Provides a way for transition threads to kill operations with intents
      * which conflict with the state transition, and wait for all of those
      * operations to deregister. While active, it will also prevent operations
