@@ -172,7 +172,6 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
             : SamplingBasedSplitPolicy::kDefaultSamplesPerChunk;
 
         ShardKeyPattern shardKey(coordinatorDoc.getReshardingKey());
-        const auto tempNs = coordinatorDoc.getTempReshardingNss();
 
         boost::optional<std::vector<mongo::TagsType>> parsedZones;
         if (rawZones.size() != 0) {
