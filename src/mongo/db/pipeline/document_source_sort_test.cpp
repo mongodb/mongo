@@ -290,8 +290,7 @@ class DocumentSourceSortExecutionTest : public DocumentSourceSortTest {
 public:
     void checkResults(deque<DocumentSource::GetNextResult> inputDocs,
                       DocumentSourceSort* sort,
-                      string expectedResultSetString,
-                      bool expectMemUse = true) {
+                      string expectedResultSetString) {
         auto source = DocumentSourceMock::createForTest(inputDocs, getExpCtx());
         sort->setSource(source.get());
 
@@ -310,11 +309,6 @@ public:
         for (auto&& result : resultSet) {
             bsonResultSet << result;
         }
-
-        if (expectMemUse) {
-            ASSERT_EQ(sort->getMemoryTracker_forTest()->currentMemoryBytes(), 0);
-            ASSERT_GT(sort->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
-        }
         // Check the result set.
         ASSERT_BSONOBJ_EQ(expectedResultSet(expectedResultSetString), bsonResultSet.arr());
     }
@@ -330,7 +324,7 @@ protected:
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldGiveNoOutputIfGivenNoInputs) {
     createSort(BSON("a" << 1));
-    checkResults({}, sort(), "[]", false);
+    checkResults({}, sort(), "[]");
 }
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldGiveOneOutputIfGivenOneInput) {
@@ -541,8 +535,6 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldPauseWhenAskedTo) {
     auto result = sort->getNext();
     ASSERT_TRUE(result.isAdvanced());
     ASSERT_DOCUMENT_EQ(result.releaseDocument(), (Document{{"a", 0}}));
-    ASSERT_GT(sort->getMemoryTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(sort->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
 }
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldResumePopulationBetweenPauses) {
@@ -569,8 +561,6 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldResumePopulationBetweenPauses) {
     ASSERT_TRUE(sort->getNext().isEOF());
     ASSERT_TRUE(sort->getNext().isEOF());
     ASSERT_TRUE(sort->getNext().isEOF());
-    ASSERT_EQ(sort->getMemoryTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(sort->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
 }
 
 std::pair<boost::intrusive_ptr<DocumentSourceMock>, boost::intrusive_ptr<DocumentSourceSort>>
@@ -612,34 +602,6 @@ void assertSpillingTestReturn(boost::intrusive_ptr<DocumentSourceSort> sort) {
     ASSERT_TRUE(sort->getNext().isEOF());
 }
 
-std::pair<boost::intrusive_ptr<DocumentSourceMock>, boost::intrusive_ptr<DocumentSourceSort>>
-initSpillingTestForBoundedSort(boost::intrusive_ptr<ExpressionContext> expCtx,
-                               const unittest::TempDir& tempDir,
-                               size_t maxMemoryUsageBytes,
-                               size_t largeStrSize) {
-    // Allow the $sort stage to spill to disk.
-    expCtx->setTempDir(tempDir.path());
-    expCtx->setAllowDiskUse(true);
-    auto sort = DocumentSourceSort::createBoundedSort(
-        {BSON("time" << 1), expCtx}, DocumentSourceSort::kMin, -1, boost::none, expCtx);
-
-    string largeStr(largeStrSize, 'x');
-    std::vector<Document> data = {
-        Document{{"time", Date_t::fromMillisSinceEpoch(0)}, {"largeStr", largeStr}},
-        Document{{"time", Date_t::fromMillisSinceEpoch(1)}, {"largeStr", largeStr}},
-        Document{{"time", Date_t::fromMillisSinceEpoch(2)}, {"largeStr", largeStr}}};
-    for (auto& doc : data) {
-        MutableDocument mdoc{doc};
-        DocumentMetadataFields metadata;
-        metadata.setTimeseriesBucketMinTime(doc.getField("time").getDate());
-        mdoc.setMetadata(std::move(metadata));
-        doc = mdoc.freeze();
-    }
-    auto mock = DocumentSourceMock::createForTest(std::move(data), expCtx);
-    sort->setSource(mock.get());
-    return {std::move(mock), std::move(sort)};
-}
-
 TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToPauseLoadingWhileSpilled) {
     unittest::TempDir tempDir("DocumentSourceSortTest");
     auto [mock, sort] = initSpillingTest(getExpCtx(), tempDir, 1000000, 1000000);
@@ -650,9 +612,6 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToPauseLoadingWhileSpilled) 
 
     assertSpillingTestReturn(sort);
 
-    ASSERT_EQ(sort->getMemoryTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_EQ(sort->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
-
     const auto* sortStats = static_cast<const SortStats*>(sort->getSpecificStats());
     ASSERT_EQ(sortStats->spillingStats.getSpills(), 3);
     ASSERT_EQ(sortStats->spillingStats.getSpilledRecords(), 3);
@@ -661,7 +620,7 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToPauseLoadingWhileSpilled) 
     ASSERT_GT(sortStats->spillingStats.getSpilledDataStorageSize(), 0);
 }
 
-TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillBeforeReturningFirstDocument) {
+TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillBeforeReturingFirstDocument) {
     unittest::TempDir tempDir("DocumentSourceSortTest");
     auto [mock, sort] = initSpillingTest(getExpCtx(), tempDir, 1000000, 10);
 
@@ -671,9 +630,6 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillBeforeReturni
     sort->forceSpill();
     assertSpillingTestReturn(sort);
 
-    ASSERT_EQ(sort->getMemoryTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(sort->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
-
     const auto* sortStats = static_cast<const SortStats*>(sort->getSpecificStats());
     ASSERT_EQ(sortStats->spillingStats.getSpills(), 2);
     ASSERT_EQ(sortStats->spillingStats.getSpilledRecords(), 3);
@@ -682,7 +638,7 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillBeforeReturni
     ASSERT_GT(sortStats->spillingStats.getSpilledDataStorageSize(), 0);
 }
 
-TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillAfterReturningFirstDocument) {
+TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillAfterReturingFirstDocument) {
     unittest::TempDir tempDir("DocumentSourceSortTest");
     auto [mock, sort] = initSpillingTest(getExpCtx(), tempDir, 1000000, 10);
 
@@ -705,64 +661,12 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillAfterReturnin
 
     ASSERT_TRUE(sort->getNext().isEOF());
 
-    ASSERT_EQ(sort->getMemoryTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(sort->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
-
     const auto* sortStats = static_cast<const SortStats*>(sort->getSpecificStats());
     ASSERT_EQ(sortStats->spillingStats.getSpills(), 1);
     ASSERT_EQ(sortStats->spillingStats.getSpilledRecords(), 2);
     ASSERT_EQ(sortStats->spillingStats.getSpilledBytes(), 86);
     ASSERT_LT(sortStats->spillingStats.getSpilledDataStorageSize(), 200);
     ASSERT_GT(sortStats->spillingStats.getSpilledDataStorageSize(), 0);
-}
-
-TEST_F(DocumentSourceSortExecutionTest,
-       ShouldBeAbleToForceSpillOnBoundedSortBeforeReturningFirstDocument) {
-    unittest::TempDir tempDir("DocumentSourceSortTest");
-    auto [mock, sort] = initSpillingTestForBoundedSort(getExpCtx(), tempDir, 1000000, 16777215);
-
-    sort->forceSpill();
-    auto next = sort->getNext();
-    ASSERT_TRUE(next.isAdvanced());
-    ASSERT_VALUE_EQ(next.releaseDocument()["time"], Value(Date_t::fromMillisSinceEpoch(0)));
-
-    next = sort->getNext();
-    ASSERT_TRUE(next.isAdvanced());
-    ASSERT_VALUE_EQ(next.releaseDocument()["time"], Value(Date_t::fromMillisSinceEpoch(1)));
-
-    next = sort->getNext();
-    ASSERT_TRUE(next.isAdvanced());
-    ASSERT_VALUE_EQ(next.releaseDocument()["time"], Value(Date_t::fromMillisSinceEpoch(2)));
-
-    ASSERT_TRUE(sort->getNext().isEOF());
-
-    ASSERT_EQ(sort->getMemoryTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(sort->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
-}
-
-TEST_F(DocumentSourceSortExecutionTest,
-       ShouldBeAbleToForceSpillOnBoundedSortAfterReturningFirstDocument) {
-    unittest::TempDir tempDir("DocumentSourceSortTest");
-    auto [mock, sort] = initSpillingTestForBoundedSort(getExpCtx(), tempDir, 1000000, 10);
-
-    auto next = sort->getNext();
-    ASSERT_TRUE(next.isAdvanced());
-    ASSERT_VALUE_EQ(next.releaseDocument()["time"], Value(Date_t::fromMillisSinceEpoch(0)));
-
-    sort->forceSpill();
-
-    next = sort->getNext();
-    ASSERT_TRUE(next.isAdvanced());
-    ASSERT_VALUE_EQ(next.releaseDocument()["time"], Value(Date_t::fromMillisSinceEpoch(1)));
-
-    next = sort->getNext();
-    ASSERT_TRUE(next.isAdvanced());
-    ASSERT_VALUE_EQ(next.releaseDocument()["time"], Value(Date_t::fromMillisSinceEpoch(2)));
-
-    ASSERT_TRUE(sort->getNext().isEOF());
-
-    ASSERT_EQ(sort->getMemoryTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(sort->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
 }
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToReportSpillingStatsInBoundedSort) {
@@ -811,9 +715,6 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToReportSpillingStatsInBound
     ASSERT_VALUE_EQ(next.releaseDocument()["time"], Value(Date_t::fromMillisSinceEpoch(3)));
 
     ASSERT_TRUE(sort->getNext().isEOF());
-
-    ASSERT_EQ(sort->getMemoryTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(sort->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
 
     const auto* sortStats = static_cast<const SortStats*>(sort->getSpecificStats());
     ASSERT_EQ(sortStats->spillingStats.getSpills(), 2);
@@ -865,12 +766,9 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldCorrectlyTrackMemoryUsageBetweenPa
     // The next should realize it's used too much memory.
     ASSERT_THROWS_CODE(
         sort->getNext(), AssertionException, ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
-
-    ASSERT_GT(sort->getMemoryTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(sort->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
 }
 
-TEST_F(DocumentSourceSortTest, RedactionWithoutMemoryTracking) {
+TEST_F(DocumentSourceSortTest, Redaction) {
     createSort(BSON("a" << 1));
     auto boundedSort = DocumentSourceSort::createBoundedSort(
         sort()->getSortKeyPattern(), DocumentSourceSort::kMin, 1337, 10, getExpCtx());
@@ -942,86 +840,6 @@ TEST_F(DocumentSourceSortTest, RedactionWithoutMemoryTracking) {
             "usedDisk": "?bool",
             "spills": "?number",
             "spilledDataStorageSize": "?number"
-        })",
-        redact(*boundedSort, true, ExplainOptions::Verbosity::kExecStats));
-}
-
-TEST_F(DocumentSourceSortTest, RedactionWithMemoryTracking) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
-                                                               true);
-    createSort(BSON("a" << 1));
-    auto boundedSort = DocumentSourceSort::createBoundedSort(
-        sort()->getSortKeyPattern(), DocumentSourceSort::kMin, 1337, 10, getExpCtx());
-
-    ASSERT_BSONOBJ_EQ_AUTO(  //
-        R"({"$sort":{"HASH<a>":1}})",
-        redact(*sort(), true));
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$_internalBoundedSort": {
-                "sortKey": {
-                    "HASH<a>": 1
-                },
-                "bound": {
-                    "base": "min",
-                    "offsetSeconds": "?number"
-                },
-                "limit": "?number"
-            }
-        })",
-        redact(*boundedSort, true));
-
-    ASSERT_BSONOBJ_EQ_AUTO(  //
-        R"({"$sort":{"sortKey":{"HASH<a>":1}}})",
-        redact(*sort(), true, ExplainOptions::Verbosity::kQueryPlanner));
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$_internalBoundedSort": {
-                "sortKey": {
-                    "HASH<a>": 1
-                },
-                "bound": {
-                    "base": "min",
-                    "offsetSeconds": "?number"
-                },
-                "limit": "?number"
-            }
-        })",
-        redact(*boundedSort, true, ExplainOptions::Verbosity::kQueryPlanner));
-
-    ASSERT_BSONOBJ_EQ_AUTO(  //
-        R"({
-            "$sort": {
-                "sortKey": {
-                    "HASH<a>": 1
-                }
-            },
-            "totalDataSizeSortedBytesEstimate": "?number",
-            "usedDisk": "?bool",
-            "spills": "?number",
-            "spilledDataStorageSize": "?number",
-            "maxUsedMemBytes": "?number"
-        })",
-        redact(*sort(), true, ExplainOptions::Verbosity::kExecStats));
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$_internalBoundedSort": {
-                "sortKey": {
-                    "HASH<a>": 1
-                },
-                "bound": {
-                    "base": "min",
-                    "offsetSeconds": "?number"
-                },
-                "limit": "?number"
-            },
-            "totalDataSizeSortedBytesEstimate": "?number",
-            "usedDisk": "?bool",
-            "spills": "?number",
-            "spilledDataStorageSize": "?number",
-            "maxUsedMemBytes": "?number"
         })",
         redact(*boundedSort, true, ExplainOptions::Verbosity::kExecStats));
 }
@@ -1038,9 +856,6 @@ void assertProducesSortKeyMetadata(auto expCtx, auto sortStage) {
     ASSERT(output2.isAdvanced());
     ASSERT(output2.getDocument().metadata().hasSortKey());
     ASSERT(stage->getNext().isEOF());
-    auto casted = static_cast<DocumentSourceSort*>(sortStage.get());
-    ASSERT_EQ(casted->getMemoryTracker_forTest()->currentMemoryBytes(), 0);
-    ASSERT_GT(casted->getMemoryTracker_forTest()->maxMemoryBytes(), 0);
 }
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldOutputSortKeyMetadataIfRequested) {

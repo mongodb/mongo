@@ -37,44 +37,36 @@ function assertNoMatchInLog(logLine, regex) {
 
 /**
  * Runs the aggregation and fetches the corresponding diagnostics from the source -- the slow query
- * log or profiler. The query's cursorId is used to identify the log lines or profiler entries
+ * log or profiler. A pipeline comment is used to identify the log lines or profiler entries
  * corresponding to this aggregation.
  */
 function runPipelineAndGetDiagnostics({db, collName, commandObj, source}) {
-    // Retrieve the cursor.
-    const aggregateCommandResult = db.runCommand({
-        aggregate: collName,
-        pipeline: commandObj.pipeline,
-        cursor: commandObj.cursor,
-    });
-    const cursorId = aggregateCommandResult.cursor.id;
-    let currentCursorId = cursorId;
+    const pipelineComment = commandObj.comment;
 
-    // Iteratively call getMore until the cursor is exhausted.
-    while (currentCursorId.toString() !== "NumberLong(0)") {
-        const getMoreResult = db.runCommand({
-            getMore: currentCursorId,
-            collection: collName,
-            batchSize: commandObj.cursor.batchSize,
-        });
-        currentCursorId = getMoreResult.cursor.id;
-    }
+    // Use toArray() to exhaust the cursor.
+    const options = {
+        comment: pipelineComment,
+        cursor: commandObj.cursor,
+        allowDiskUse: commandObj.allowDiskUse,
+    };
+    db[collName].aggregate(commandObj.pipeline, options).toArray();
 
     if (source === "log") {
         let logLines = [];
         assert.soon(() => {
             const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
             logLines = [...iterateMatchingLogLines(globalLog.log,
-                                                   {msg: "Slow query", cursorid: cursorId})];
+                                                   {msg: "Slow query", comment: pipelineComment})];
             return logLines.length >= 1;
-        }, "Failed to find a log line for cursorid: " + cursorId.toString());
+        }, "Failed to find a log line for comment: " + pipelineComment);
         return logLines;
     } else if (source === "profiler") {
         let profilerEntries = [];
         assert.soon(() => {
-            profilerEntries = db.system.profile.find({"cursorid": cursorId}).toArray();
+            profilerEntries =
+                db.system.profile.find({"command.comment": pipelineComment}).toArray();
             return profilerEntries.length >= 1;
-        }, "Failed to find a profiler entry for cursorid: " + cursorId.toString());
+        }, "Failed to find a profiler entry for comment: " + pipelineComment);
         return profilerEntries;
     }
 }

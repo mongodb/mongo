@@ -36,7 +36,6 @@
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -149,11 +148,7 @@ DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionCont
       // The SortKeyGenerator expects the expressions to be serialized in order to detect a sort
       // by a metadata field.
       _sortKeyGen({sortOrder, pExpCtx->getCollator()}),
-      _outputSortKeyMetadata(options.outputSortKeyMetadata),
-      _memoryTracker{OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
-          *pExpCtx,
-          options.maxMemoryUsageBytes.value_or(
-              internalQueryMaxBlockingSortMemoryUsageBytes.load()))} {
+      _outputSortKeyMetadata(options.outputSortKeyMetadata) {
     uassert(15976,
             "$sort stage must have at least one sort key",
             !_sortExecutor->sortPattern().empty());
@@ -260,8 +255,6 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
             _timeSorterCurrentPartition.reset();
         }
 
-        auto prevMemUsage = _timeSorter->stats().memUsage();
-
         // Only pull input as necessary to get _timeSorter to have a result.
         while (_timeSorter->getState() == TimeSorterInterface::State::kWait) {
             auto status = timeSorterPeekSamePartition();
@@ -283,10 +276,8 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
                 }
                 case GetNextResult::ReturnStatus::kAdvanced: {
                     auto [time, doc] = extractTime(timeSorterGetNext());
+
                     _timeSorter->add({time}, doc);
-                    auto currMemUsage = _timeSorter->stats().memUsage();
-                    _memoryTracker.add(currMemUsage - prevMemUsage);
-                    prevMemUsage = currMemUsage;
                     continue;
                 }
                 case GetNextResult::ReturnStatus::kAdvancedControlDocument: {
@@ -300,13 +291,7 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
             return GetNextResult::makeEOF();
         }
 
-        // In the bounded sort case, memory is released incrementally as documents are returned via
-        // next(). The memory tracker is updated to reflect these changes.
-        prevMemUsage = _timeSorter->stats().memUsage();
-        Document nextDocument = _timeSorter->next().second;
-        auto currMemUsage = _timeSorter->stats().memUsage();
-        _memoryTracker.add(currMemUsage - prevMemUsage);
-        return nextDocument;
+        return _timeSorter->next().second;
     }
 
     if (!_populated) {
@@ -321,13 +306,9 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
     }
 
     if (!_sortExecutor->hasNext()) {
-        _memoryTracker.set(0);
         return GetNextResult::makeEOF();
     }
 
-    // In the general case (without _timeSorter), memory is not released incrementally while
-    // returning sorted results. Memory is ultimately cleared in bulk once EOF is reached via
-    // _sortExecutor's call to clearSortTable() during hasNext().
     return GetNextResult{_sortExecutor->getNext().second};
 }
 
@@ -357,10 +338,6 @@ void DocumentSourceSort::serializeForBoundedSort(std::vector<Value>& array,
             opts.serializeLiteral(static_cast<long long>(_timeSorter->stats().spilledRanges()));
         mutDoc["spilledDataStorageSize"] =
             opts.serializeLiteral(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
-        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-            mutDoc["maxUsedMemBytes"] =
-                opts.serializeLiteral(static_cast<long long>(_memoryTracker.maxMemoryBytes()));
-        }
     }
 
     array.push_back(Value{mutDoc.freeze()});
@@ -383,6 +360,7 @@ void DocumentSourceSort::serializeForCloning(std::vector<Value>& array,
 void DocumentSourceSort::serializeWithVerbosity(std::vector<Value>& array,
                                                 const SerializationOptions& opts) const {
     tassert(9028701, "SerializationOptions do not specify verbosity", opts.verbosity);
+
     uint64_t limit = _sortExecutor->getLimit();
     MutableDocument mutDoc(
         DOC(kStageName << DOC(
@@ -408,10 +386,6 @@ void DocumentSourceSort::serializeWithVerbosity(std::vector<Value>& array,
             opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpills()));
         mutDoc["spilledDataStorageSize"] =
             opts.serializeLiteral(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
-        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-            mutDoc["maxUsedMemBytes"] =
-                opts.serializeLiteral(static_cast<long long>(_memoryTracker.maxMemoryBytes()));
-        }
     }
     array.push_back(Value(mutDoc.freeze()));
 }
@@ -692,12 +666,8 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
 
 DocumentSource::GetNextResult DocumentSourceSort::populate() {
     auto nextInput = pSource->getNext();
-    auto prevMemUsage = _sortExecutor->stats().memoryUsageBytes;
     for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
         loadDocument(nextInput.releaseDocument());
-        auto currMemUsage = _sortExecutor->stats().memoryUsageBytes;
-        _memoryTracker.add(currMemUsage - prevMemUsage);
-        prevMemUsage = currMemUsage;
     }
     if (nextInput.isEOF()) {
         loadingDone();
@@ -793,16 +763,10 @@ bool DocumentSourceSort::canRunInParallelBeforeWriteStage(
 
 void DocumentSourceSort::doForceSpill() {
     if (_sortExecutor) {
-        auto prevSorterSize = _sortExecutor->stats().memoryUsageBytes;
         _sortExecutor->forceSpill();
-        auto currSorterSize = _sortExecutor->stats().memoryUsageBytes;
-        _memoryTracker.add(currSorterSize - prevSorterSize);
     }
     if (_timeSorter) {
-        auto prevSorterSize = _timeSorter->stats().memUsage();
         _timeSorter->forceSpill();
-        auto currSorterSize = _timeSorter->stats().memUsage();
-        _memoryTracker.add(currSorterSize - prevSorterSize);
     }
 }
 
