@@ -162,8 +162,7 @@ void setSocketKeepAliveParams(int sock,
     }
 #elif defined(__APPLE__) || defined(__linux__)
     const auto updateSockOpt = [&](int level, int optnum, Seconds maxVal, StringData optname) {
-        Seconds optVal{1};
-        unsigned int rawOptVal = durationCount<Seconds>(optVal);
+        unsigned int rawOptVal = 1;
         socklen_t optValLen = sizeof(rawOptVal);
 
         if (getsockopt(sock, level, optnum, reinterpret_cast<char*>(&rawOptVal), &optValLen)) {
@@ -176,6 +175,7 @@ void setSocketKeepAliveParams(int sock,
                         "error"_attr = errorMessage(ec));
         }
 
+        Seconds optVal = Seconds{rawOptVal};
         if (optVal > maxVal) {
             unsigned int rawMaxVal = durationCount<Seconds>(maxVal);
             socklen_t maxValLen = sizeof(rawMaxVal);
