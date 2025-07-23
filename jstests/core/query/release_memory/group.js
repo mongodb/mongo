@@ -15,8 +15,6 @@
  *   assumes_superuser_permissions,
  *   # This test relies on aggregations returning specific batch-sized responses.
  *   assumes_no_implicit_cursor_exhaustion,
- *   # TODO (SERVER-107034): Re-enable this test in in-memory configurations.
- *   requires_persistence,
  * ]
  */
 

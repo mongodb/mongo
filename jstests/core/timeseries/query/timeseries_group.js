@@ -11,8 +11,6 @@
  *   # others -- not. For this test we need control over whether the flag is set on the node that
  *   # ends up executing the query.
  *   assumes_standalone_mongod,
- *   # TODO (SERVER-107034): Re-enable this test in in-memory configurations.
- *   requires_persistence,
  * ]
  */
 
