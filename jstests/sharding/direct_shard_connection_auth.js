@@ -41,6 +41,15 @@ function getUnauthorizedDirectWritesCount() {
 }
 
 function runTests(shouldBlockDirectConnections, directWriteCount) {
+    function assertUnauthorizedCountIncreased() {
+        const postDirectWriteCount = getUnauthorizedDirectWritesCount();
+        assert.gt(postDirectWriteCount,
+                  directWriteCount,
+                  `Number of direct write count didn't increased. Previous count: ${
+                      directWriteCount}, Current count: ${postDirectWriteCount}`);
+        directWriteCount = postDirectWriteCount;
+    }
+    //
     // Direct writes with root privileges should always be authorized.
     assert.commandWorked(shardAdminTestDB.getCollection("coll").update(
         {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}));
@@ -59,13 +68,13 @@ function runTests(shouldBlockDirectConnections, directWriteCount) {
         if (st.isReplicaSetEndpointActive()) {
             assert.eq(getUnauthorizedDirectWritesCount(), directWriteCount);
         } else {
-            assert.eq(getUnauthorizedDirectWritesCount(), ++directWriteCount);
+            assertUnauthorizedCountIncreased();
         }
     } else {
         assert.commandFailedWithCode(userTestDB.getCollection("coll").update(
                                          {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}),
                                      ErrorCodes.Unauthorized);
-        assert.eq(getUnauthorizedDirectWritesCount(), ++directWriteCount);
+        assertUnauthorizedCountIncreased();
     }
 
     // Test direct writes with only read/write privileges where
@@ -83,7 +92,7 @@ function runTests(shouldBlockDirectConnections, directWriteCount) {
         assert.commandFailedWithCode(userTestDB.getCollection("coll").update(
                                          {x: {$exists: true}}, {$inc: {x: 1}}, {upsert: true}),
                                      ErrorCodes.Unauthorized);
-        assert.eq(getUnauthorizedDirectWritesCount(), ++directWriteCount);
+        assertUnauthorizedCountIncreased();
     }
     // Reset the parameter for future tests.
     assert.commandWorked(

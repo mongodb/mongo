@@ -58,6 +58,9 @@ filters:
   - "*configure_background_tasks*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "direct_shard*":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "start_shard_draining*":
     approvers:
       - 10gen/server-catalog-and-routing

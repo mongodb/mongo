@@ -1416,6 +1416,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/**/custom_write_concern.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/check_metadata* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/*configure_background_tasks* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/sharding/**/direct_shard* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/start_shard_draining* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/shard_draining_status_test.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/sharding/**/replica_set_to_csrs_promotion.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
