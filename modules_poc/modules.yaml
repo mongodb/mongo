@@ -48,8 +48,19 @@ storage_engine:
 access_control:
   - src/mongo/db/auth/
 
-admission:
-  - src/mongo/db/admission/
+replication.server_rw_concerns:
+  meta:
+    slack: server-replication
+    jira: Server Replication
+  files:
+    - src/mongo/db/commands/read_write_concern_defaults_server_status.cpp
+    - src/mongo/db/*read_concern*
+    - src/mongo/db/read_write_concern*
+    - src/mongo/db/repl/*read_concern*
+    - src/mongo/db/repl/*write_concern*
+    - src/mongo/db/stats/server_write_concern*
+    - src/mongo/db/stats/server_read_concern*
+    - src/mongo/db/write_concern*
 
 security:
   - src/mongo/crypto

@@ -36,3 +36,6 @@ filters:
   - "*zone*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "check_metadata*":
+    approvers:
+      - 10gen/server-catalog-and-routing
