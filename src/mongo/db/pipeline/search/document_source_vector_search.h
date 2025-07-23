@@ -55,7 +55,7 @@ public:
                                std::shared_ptr<executor::TaskExecutor> taskExecutor,
                                BSONObj originalSpec);
 
-    static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     std::list<boost::intrusive_ptr<DocumentSource>> desugar();

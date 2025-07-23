@@ -222,7 +222,7 @@ DocumentSource::GetNextResult DocumentSourceVectorSearch::doGetNext() {
     return getNextAfterSetup();
 }
 
-std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::createFromBson(
+intrusive_ptr<DocumentSource> DocumentSourceVectorSearch::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     mongot_cursor::throwIfNotRunningWithMongotHostConfigured(expCtx);
 
@@ -247,10 +247,8 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::createFromB
     }
 
     auto serviceContext = expCtx->getOperationContext()->getServiceContext();
-    std::list<intrusive_ptr<DocumentSource>> desugaredPipeline = {
-        make_intrusive<DocumentSourceVectorSearch>(
-            expCtx, executor::getMongotTaskExecutor(serviceContext), spec.getOwned())};
-    return desugaredPipeline;
+    return make_intrusive<DocumentSourceVectorSearch>(
+        expCtx, executor::getMongotTaskExecutor(serviceContext), spec.getOwned());
 }
 
 

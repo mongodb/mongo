@@ -420,6 +420,18 @@ public:
                                FeatureFlag* featureFlag);
 
     /**
+     * Registers a DocumentSource parser for extension aggregation stages.
+     * Unlike registerParser(), this allows the $vectorSearch extension stage to safely override the
+     * original implementation.
+     *
+     * This function differs from the REGISTER_DOCUMENT_SOURCE macro family in that those are
+     * invoked with the global initializers during server startup, but extensions are loaded
+     * afterwards. This method provides a safe way for dynamically-loaded extensions to register
+     * their stages after the server has already started.
+     */
+    static void registerExtensionParser(std::string name, SimpleParser simpleParser);
+
+    /**
      * Allocate and return a new, unique DocumentSource::Id value.
      *
      * DO NOT call this method directly. Instead, use the ALLOCATE_DOCUMENT_SOURCE_ID macro defined

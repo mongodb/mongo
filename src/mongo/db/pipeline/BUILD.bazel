@@ -1401,6 +1401,7 @@ mongo_cc_unit_test(
         "document_source_skip_test.cpp",
         "document_source_sort_by_count_test.cpp",
         "document_source_sort_test.cpp",
+        "document_source_test.cpp",
         "document_source_test_optimizations.h",
         "document_source_union_with_test.cpp",
         "document_source_unwind_test.cpp",

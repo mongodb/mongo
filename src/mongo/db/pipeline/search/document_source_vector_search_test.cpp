@@ -157,7 +157,7 @@ TEST_F(DocumentSourceVectorSearchTest, UnexpectedArgumentIsSerialized) {
     auto dsVectorSearch =
         DocumentSourceVectorSearch::createFromBson(spec.firstElement(), getExpCtx());
     std::vector<Value> vec;
-    dsVectorSearch.front()->serializeToArray(vec);
+    dsVectorSearch->serializeToArray(vec);
     ASSERT(
         !vec[0].getDocument().getField("$vectorSearch").getDocument().getField("extra").missing());
 }
@@ -175,7 +175,7 @@ TEST_F(DocumentSourceVectorSearchTest, EOFWhenCollDoesNotExist) {
     })");
 
     auto vectorSearch = DocumentSourceVectorSearch::createFromBson(spec.firstElement(), expCtx);
-    auto vectorSearchStage = exec::agg::buildStage(vectorSearch.front());
+    auto vectorSearchStage = exec::agg::buildStage(vectorSearch);
     ASSERT_TRUE(vectorSearchStage->getNext().isEOF());
 }
 
@@ -205,9 +205,10 @@ TEST_F(DocumentSourceVectorSearchTest, HasTheCorrectStagesWhenCreated) {
         }
     })");
 
-    auto vectorStage = DocumentSourceVectorSearch::createFromBson(spec.firstElement(), expCtx);
-
-    vectorStage = dynamic_cast<DocumentSourceVectorSearch*>(vectorStage.front().get())->desugar();
+    auto singleVectorStage =
+        DocumentSourceVectorSearch::createFromBson(spec.firstElement(), expCtx);
+    auto vectorStage =
+        dynamic_cast<DocumentSourceVectorSearch*>(singleVectorStage.get())->desugar();
 
     ASSERT_EQUALS(vectorStage.size(), 2UL);
 
@@ -249,7 +250,7 @@ TEST_F(DocumentSourceVectorSearchTest, RedactsCorrectly) {
                 "index": "HASH<x_index>"
             }
         })",
-        redact(*(vectorStage.front())));
+        redact(*vectorStage));
 }
 
 TEST_F(DocumentSourceVectorSearchTest, EmptyStageRedactsCorrectly) {
@@ -267,7 +268,7 @@ TEST_F(DocumentSourceVectorSearchTest, EmptyStageRedactsCorrectly) {
             "$vectorSearch": {
             }
         })",
-        redact(*(vectorStage.front())));
+        redact(*vectorStage));
 }
 
 TEST_F(DocumentSourceVectorSearchTest, BadInputsRedactCorrectly) {
@@ -289,7 +290,7 @@ TEST_F(DocumentSourceVectorSearchTest, BadInputsRedactCorrectly) {
                 "index":"HASH<>"
             }
         })",
-        redact(*(vectorStage.front())));
+        redact(*vectorStage));
 }
 
 }  // namespace
