@@ -5134,19 +5134,15 @@ export function makeMovieVectorQuery({queryVector, limit}) {
     };
 }
 
-export function getMovieVectorSearchIndexSpec() {
-    return {
-        name: "vector_search_movie",
-        type: "vectorSearch",
-        definition: {
-            "fields": [{
-                "type": "vector",
-                "numDimensions": 1536,
-                "path": "plot_embedding",
-                "similarity": "euclidean"
-            }]
-        }
-    };
+export function getMovieVectorSearchIndexSpec({filterFields = []} = {}) {
+    const fields = [{
+                       "type": "vector",
+                       "numDimensions": 1536,
+                       "path": "plot_embedding",
+                       "similarity": "euclidean"
+                   }].concat(filterFields);
+
+    return {name: "vector_search_movie", type: "vectorSearch", definition: {"fields": fields}};
 }
 
 export function getMovieSearchIndexSpec() {

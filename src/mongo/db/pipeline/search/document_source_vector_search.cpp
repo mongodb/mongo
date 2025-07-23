@@ -70,7 +70,7 @@ DocumentSourceVectorSearch::DocumentSourceVectorSearch(
         _limit = limitElem.safeNumberLong();
         uassert(7912700, "Expected limit to be positive", *_limit > 0);
     }
-    if (auto filterElem = originalSpec.getField(kFilterFieldName)) {
+    if (auto filterElem = _originalSpec.getField(kFilterFieldName)) {
         _filterExpr = uassertStatusOK(MatchExpressionParser::parse(filterElem.Obj(), expCtx));
     }
 
