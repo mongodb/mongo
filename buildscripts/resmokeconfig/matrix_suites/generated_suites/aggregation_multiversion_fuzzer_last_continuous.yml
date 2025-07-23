@@ -16,6 +16,7 @@ executor:
           clusterType: standalone
           internalQueryAppendIdToSetWindowFieldsSort: true
           internalQueryMaxAllowedDensifyDocs: 1000
+          mongosBinVersion: last-continuous
           traceExceptions: false
           useRandomBinVersionsWithinReplicaSet: last-continuous
       nodb: ""
