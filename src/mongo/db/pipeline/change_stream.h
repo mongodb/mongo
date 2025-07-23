@@ -39,13 +39,15 @@
 namespace mongo {
 
 enum class ChangeStreamType {
-    // Change stream is opened on a single collection.
+    // Collection-level change stream: change stream is opened on a single collection.
     kCollection,
 
-    // Change stream is opened on all collections of a single database.
+    // Database-level change stream: change stream is opened on all collections of a single
+    // database.
     kDatabase,
 
-    // Change stream is opened on all databases / all collections that have existed or will exist in
+    // Deployment-level change stream: change stream is opened on all databases / all collections
+    // that have existed or will exist in
     // the system.
     kAllDatabases,
 };
@@ -77,6 +79,11 @@ public:
      * - Nothing, if the change stream is of type 'ChangeStreamType::kAllDatabases'.
      */
     boost::optional<NamespaceString> getNamespace() const;
+
+    /**
+     * Extract the change stream type from the given nss.
+     */
+    static ChangeStreamType getChangeStreamType(const NamespaceString& nss);
 
     /**
      * Builds a 'ChangeStream' object from the parameters stored in the 'ExpressionContext'.

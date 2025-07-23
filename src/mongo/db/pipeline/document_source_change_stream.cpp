@@ -31,6 +31,7 @@
 
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
@@ -93,15 +94,6 @@ void DocumentSourceChangeStream::checkValueTypeOrMissing(const Value v,
     }
 }
 
-DocumentSourceChangeStream::ChangeStreamType DocumentSourceChangeStream::getChangeStreamType(
-    const NamespaceString& nss) {
-    // If we have been permitted to run on admin, 'allChangesForCluster' must be true.
-    return (nss.isAdminDB()
-                ? ChangeStreamType::kAllChangesForCluster
-                : (nss.isCollectionlessAggregateNS() ? ChangeStreamType::kSingleDatabase
-                                                     : ChangeStreamType::kSingleCollection));
-}
-
 StringData DocumentSourceChangeStream::resolveAllCollectionsRegex(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     // We never expect this method to be called except when building a change stream pipeline.
@@ -117,8 +109,8 @@ StringData DocumentSourceChangeStream::resolveAllCollectionsRegex(
 std::string DocumentSourceChangeStream::getNsRegexForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     const auto& nss = expCtx->getNamespaceString();
-    switch (getChangeStreamType(nss)) {
-        case ChangeStreamType::kSingleCollection:
+    switch (ChangeStream::getChangeStreamType(nss)) {
+        case ChangeStreamType::kCollection:
             // Match the target namespace exactly.
             return fmt::format(
                 "^{}$",
@@ -126,7 +118,7 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(
                 // featureFlag are on, therefore we don't have a tenantid prefix.
                 regexEscapeNsForChangeStream(
                     NamespaceStringUtil::serialize(nss, expCtx->getSerializationContext())));
-        case ChangeStreamType::kSingleDatabase:
+        case ChangeStreamType::kDatabase:
             // Match all namespaces that start with db name, followed by ".", then NOT followed by
             // '$' or 'system.' unless 'showSystemEvents' is set.
             return fmt::format(
@@ -136,7 +128,7 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(
                 regexEscapeNsForChangeStream(
                     DatabaseNameUtil::serialize(nss.dbName(), expCtx->getSerializationContext())),
                 resolveAllCollectionsRegex(expCtx));
-        case ChangeStreamType::kAllChangesForCluster:
+        case ChangeStreamType::kAllDatabases:
             // Match all namespaces that start with any db name other than admin, config, or local,
             // followed by ".", then NOT '$' or 'system.' unless 'showSystemEvents' is set.
             return fmt::format("{}\\.{}", kRegexAllDBs, resolveAllCollectionsRegex(expCtx));
@@ -157,14 +149,14 @@ BSONObj DocumentSourceChangeStream::getNsMatchObjForChangeStream(
 std::string DocumentSourceChangeStream::getViewNsRegexForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     const auto& nss = expCtx->getNamespaceString();
-    switch (getChangeStreamType(nss)) {
-        case ChangeStreamType::kSingleDatabase:
+    switch (ChangeStream::getChangeStreamType(nss)) {
+        case ChangeStreamType::kDatabase:
             // For a single database, match any events on the system.views collection on that
             // database.
             return fmt::format("^{}\\.system\\.views$",
                                regexEscapeNsForChangeStream(DatabaseNameUtil::serialize(
                                    nss.dbName(), expCtx->getSerializationContext())));
-        case ChangeStreamType::kAllChangesForCluster:
+        case ChangeStreamType::kAllDatabases:
             // Match all system.views collections on all databases.
             return fmt::format("{}\\.system\\.views$", kRegexAllDBs);
         default:
@@ -186,12 +178,12 @@ BSONObj DocumentSourceChangeStream::getViewNsMatchObjForChangeStream(
 std::string DocumentSourceChangeStream::getCollRegexForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     const auto& nss = expCtx->getNamespaceString();
-    switch (getChangeStreamType(nss)) {
-        case ChangeStreamType::kSingleCollection:
+    switch (ChangeStream::getChangeStreamType(nss)) {
+        case ChangeStreamType::kCollection:
             // Match the target collection exactly.
             return fmt::format("^{}$", regexEscapeNsForChangeStream(nss.coll()));
-        case ChangeStreamType::kSingleDatabase:
-        case ChangeStreamType::kAllChangesForCluster:
+        case ChangeStreamType::kDatabase:
+        case ChangeStreamType::kAllDatabases:
             // Match any collection; database filtering will be done elsewhere.
             return fmt::format("^{}", resolveAllCollectionsRegex(expCtx));
         default:
@@ -212,14 +204,14 @@ BSONObj DocumentSourceChangeStream::getCollMatchObjForChangeStream(
 std::string DocumentSourceChangeStream::getCmdNsRegexForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     const auto& nss = expCtx->getNamespaceString();
-    switch (getChangeStreamType(nss)) {
-        case ChangeStreamType::kSingleCollection:
-        case ChangeStreamType::kSingleDatabase:
+    switch (ChangeStream::getChangeStreamType(nss)) {
+        case ChangeStreamType::kCollection:
+        case ChangeStreamType::kDatabase:
             // Match the target database command namespace exactly.
             return fmt::format("^{}$",
                                regexEscapeNsForChangeStream(NamespaceStringUtil::serialize(
                                    nss.getCommandNS(), SerializationContext::stateDefault())));
-        case ChangeStreamType::kAllChangesForCluster:
+        case ChangeStreamType::kAllDatabases:
             // Match all command namespaces on any database.
             return fmt::format("{}\\.{}", kRegexAllDBs, kRegexCmdColl);
         default:

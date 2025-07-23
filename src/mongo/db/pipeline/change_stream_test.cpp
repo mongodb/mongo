@@ -125,6 +125,24 @@ TEST(ChangeStreamTest, AllDatabasesChangeStream) {
     ASSERT_FALSE(changeStream.getNamespace().has_value());
 }
 
+TEST(ChangeStreamTest, ChangeStreamGetTypeCollection) {
+    auto nss = NamespaceString::createNamespaceString_forTest("unittest"_sd, "someCollection"_sd);
+    ASSERT_EQ(ChangeStreamType::kCollection, ChangeStream::getChangeStreamType(nss));
+}
+
+TEST(ChangeStreamTest, ChangeStreamGetTypeDatabase) {
+    auto nss = NamespaceString::makeCollectionlessAggregateNSS(
+        NamespaceString::createNamespaceString_forTest("unittest"_sd).dbName());
+    ASSERT_TRUE(nss.isCollectionlessAggregateNS());
+    ASSERT_EQ(ChangeStreamType::kDatabase, ChangeStream::getChangeStreamType(nss));
+}
+
+TEST(ChangeStreamTest, ChangeStreamGetTypeAllDatabases) {
+    auto nss = NamespaceString::createNamespaceString_forTest("admin"_sd);
+    ASSERT_TRUE(nss.isAdminDB());
+    ASSERT_EQ(ChangeStreamType::kAllDatabases, ChangeStream::getChangeStreamType(nss));
+}
+
 DEATH_TEST_REGEX(ChangeStreamTest,
                  AllDatabasesChangeStreamWithNamespace,
                  "Tripwire assertion.*10656200") {

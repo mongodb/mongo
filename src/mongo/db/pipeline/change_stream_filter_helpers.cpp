@@ -35,6 +35,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_rewrite_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
@@ -113,7 +114,7 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     // stream type.
     BSONObj nsMatch = DocumentSourceChangeStream::getNsMatchObjForChangeStream(expCtx);
     BSONObj collMatch = DocumentSourceChangeStream::getCollMatchObjForChangeStream(expCtx);
-    auto streamType = DocumentSourceChangeStream::getChangeStreamType(expCtx->getNamespaceString());
+    auto streamType = ChangeStream::getChangeStreamType(expCtx->getNamespaceString());
 
     /**
      * IMPORTANT: Any new operationType added here must also add corresponding oplog rewrites in the
@@ -189,7 +190,7 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
 
     // Omit dropDatabase on single-collection streams. While the stream will be invalidated before
     // it sees this event, the user will incorrectly see it if they startAfter the invalidate.
-    if (streamType != DocumentSourceChangeStream::ChangeStreamType::kSingleCollection) {
+    if (streamType != ChangeStreamType::kCollection) {
         auto dropDbEvent =
             backingBsonObjs.emplace_back(BSON("o.dropDatabase" << BSON("$exists" << true)));
         orCmdEvents->add(MatchExpressionParser::parseAndNormalize(dropDbEvent, expCtx));
@@ -240,15 +241,15 @@ std::unique_ptr<MatchExpression> buildInvalidationFilter(
     const MatchExpression* userMatch,
     std::vector<BSONObj>& backingBsonObjs) {
     auto nss = expCtx->getNamespaceString();
-    auto streamType = DocumentSourceChangeStream::getChangeStreamType(nss);
+    auto streamType = ChangeStream::getChangeStreamType(nss);
 
     // A whole-cluster change stream is not invalidated by anything.
-    if (streamType == DocumentSourceChangeStream::ChangeStreamType::kAllChangesForCluster) {
+    if (streamType == ChangeStreamType::kAllDatabases) {
         return std::make_unique<AlwaysFalseMatchExpression>();
     }
 
     BSONArrayBuilder invalidatingCommands;
-    if (streamType == DocumentSourceChangeStream::ChangeStreamType::kSingleCollection) {
+    if (streamType == ChangeStreamType::kCollection) {
         // A single-collection stream is invalidated by drop and rename events.
         invalidatingCommands.append(BSON("o.drop" << nss.coll()));
         invalidatingCommands.append(BSON("o.renameCollection" << NamespaceStringUtil::serialize(

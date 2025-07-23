@@ -339,27 +339,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamRegexEscape) {
               DocumentSourceChangeStream::regexEscapeNsForChangeStream("*+|()^?[]./\\$"));
 }
 
-TEST_F(ChangeStreamStageTest, ChangeStreamGetTypeSingleCollection) {
-    auto nss = NamespaceString::createNamespaceString_forTest("unittest"_sd, "someCollection"_sd);
-    ASSERT_EQ(DocumentSourceChangeStream::ChangeStreamType::kSingleCollection,
-              DocumentSourceChangeStream::getChangeStreamType(nss));
-}
-
-TEST_F(ChangeStreamStageTest, ChangeStreamGetTypeSingleDatabase) {
-    auto nss = NamespaceString::makeCollectionlessAggregateNSS(
-        NamespaceString::createNamespaceString_forTest("unittest"_sd).dbName());
-    ASSERT_TRUE(nss.isCollectionlessAggregateNS());
-    ASSERT_EQ(DocumentSourceChangeStream::ChangeStreamType::kSingleDatabase,
-              DocumentSourceChangeStream::getChangeStreamType(nss));
-}
-
-TEST_F(ChangeStreamStageTest, ChangeStreamGetTypeWholeCluster) {
-    auto nss = NamespaceString::createNamespaceString_forTest("admin"_sd);
-    ASSERT_TRUE(nss.isAdminDB());
-    ASSERT_EQ(DocumentSourceChangeStream::ChangeStreamType::kAllChangesForCluster,
-              DocumentSourceChangeStream::getChangeStreamType(nss));
-}
-
 TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleCollection) {
     auto expCtx = getExpCtx();
 

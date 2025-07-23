@@ -34,6 +34,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/change_stream_document_diff_parser.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
@@ -716,9 +717,8 @@ ChangeStreamEventTransformer::ChangeStreamEventTransformer(
     : _defaultEventBuilder(std::make_unique<ChangeStreamDefaultEventTransformation>(expCtx, spec)),
       _viewNsEventBuilder(
           std::make_unique<ChangeStreamViewDefinitionEventTransformation>(expCtx, spec)),
-      _isSingleCollStream(
-          DocumentSourceChangeStream::getChangeStreamType(expCtx->getNamespaceString()) ==
-          DocumentSourceChangeStream::ChangeStreamType::kSingleCollection) {}
+      _isSingleCollStream(ChangeStream::getChangeStreamType(expCtx->getNamespaceString()) ==
+                          ChangeStreamType::kCollection) {}
 
 ChangeStreamEventTransformation* ChangeStreamEventTransformer::getBuilder(
     const Document& oplog) const {

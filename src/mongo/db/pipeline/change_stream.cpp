@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/change_stream.h"
 
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -66,26 +65,20 @@ boost::optional<NamespaceString> ChangeStream::getNamespace() const {
     return _nss;
 }
 
+ChangeStreamType ChangeStream::getChangeStreamType(const NamespaceString& nss) {
+    // If we have been permitted to run on admin, 'allChangesForCluster' must be true.
+    return (nss.isAdminDB() ? ChangeStreamType::kAllDatabases
+                            : (nss.isCollectionlessAggregateNS() ? ChangeStreamType::kDatabase
+                                                                 : ChangeStreamType::kCollection));
+}
+
 ChangeStream ChangeStream::buildFromExpressionContext(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     const auto& nss = expCtx->getNamespaceString();
 
-    // Translate the type from DocumentSourceChangeStream::ChangeStreamType to ChangeStreamType.
-    // TODO SERVER-107677: Remove one of the enums.
-    auto translateType = [](DocumentSourceChangeStream::ChangeStreamType type) {
-        switch (type) {
-            case DocumentSourceChangeStream::ChangeStreamType::kSingleCollection:
-                return ChangeStreamType::kCollection;
-            case DocumentSourceChangeStream::ChangeStreamType::kSingleDatabase:
-                return ChangeStreamType::kDatabase;
-            case DocumentSourceChangeStream::ChangeStreamType::kAllChangesForCluster:
-                return ChangeStreamType::kAllDatabases;
-        }
-        MONGO_UNREACHABLE_TASSERT(10767904);
-    };
     return ChangeStream(fromIgnoreRemovedShardsParameter(static_cast<bool>(
                             expCtx->getChangeStreamSpec()->getIgnoreRemovedShards())),
-                        translateType(DocumentSourceChangeStream::getChangeStreamType(nss)),
+                        getChangeStreamType(nss),
                         nss);
 }
 

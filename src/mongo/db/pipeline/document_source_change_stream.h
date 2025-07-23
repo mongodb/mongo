@@ -302,12 +302,9 @@ public:
     static constexpr StringData kRegexAllDBs = R"(^(?!(admin|config|local)\.)[^.]+)"_sd;
     static constexpr StringData kRegexCmdColl = R"(\$cmd$)"_sd;
 
-    enum class ChangeStreamType { kSingleCollection, kSingleDatabase, kAllChangesForCluster };
-
     /**
      * Helpers for determining which regex to match a change stream against.
      */
-    static ChangeStreamType getChangeStreamType(const NamespaceString& nss);
     static std::string regexEscapeNsForChangeStream(StringData source);
     static StringData resolveAllCollectionsRegex(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
