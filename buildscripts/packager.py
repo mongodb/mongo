@@ -48,6 +48,21 @@ ARCH_CHOICES = ["x86_64", "arm64", "aarch64", "s390x"]
 # Made up names for the flavors of distribution we package for.
 DISTROS = ["suse", "debian", "redhat", "ubuntu", "amazon", "amazon2", "amazon2023"]
 
+unexpected_lts_release_series = ("8.2",)
+
+def get_suffix(version, stable_name: str, unstable_name: str) -> str:
+    parts = version.split(".")
+
+    major = int(parts[0])
+    minor = int(parts[1])
+
+    series = f"{major}.{minor}"
+
+    if major >= 5:
+        is_stable_version = (minor == 0 or series in unexpected_lts_release_series)
+        return stable_name if is_stable_version else unstable_name
+    else:
+        return stable_name if minor % 2 == 0 else unstable_name
 
 class Spec(object):
     """Spec class."""
@@ -104,12 +119,9 @@ class Spec(object):
         # e.g., "1.8.2" < "1.8.10", "1.8.2" < "1.8.2-rc1"
         return self.ver > version_string
 
-    def suffix(self):
+    def suffix(self) -> str:
         """Return suffix."""
-        if int(self.ver.split(".")[0]) >= 5:
-            return "-org" if int(self.ver.split(".")[1]) == 0 else "-org-unstable"
-        else:
-            return "-org" if int(self.ver.split(".")[1]) % 2 == 0 else "-org-unstable"
+        return get_suffix(self.ver, "-org", "-org-unstable")
 
     def prelease(self):
         """Return pre-release verison suffix."""

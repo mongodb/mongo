@@ -54,11 +54,8 @@ class EnterpriseSpec(packager.Spec):
     """EnterpriseSpec class."""
 
     def suffix(self):
+        return packager.get_suffix(self.ver, "-enterprise", "-enterprise-unstable")
         """Suffix."""
-        if int(self.ver.split(".")[0]) >= 5:
-            return "-enterprise" if int(self.ver.split(".")[1]) == 0 else "-enterprise-unstable"
-        else:
-            return "-enterprise" if int(self.ver.split(".")[1]) % 2 == 0 else "-enterprise-unstable"
 
     def move_required_contents(self):
         """Move the required contents to the current working directory.
