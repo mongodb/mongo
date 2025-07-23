@@ -129,17 +129,24 @@ public:
                           << config.clusterParameterTime.asTimestamp());
     }
 
+    LogicalTime nextClusterParameterTime() {
+        auto clusterParameterTime = service().getClusterParameterTime(/* tenantId */ boost::none);
+        clusterParameterTime.addTicks(1);
+        return clusterParameterTime;
+    }
+
     void assertTransformInvalidQuerySettings(
         const std::list<std::pair<const IndexHintSpecs, const IndexHintSpecs>>&
             listOfIndexHintSpecs) {
         auto sp = std::make_unique<QuerySettingsClusterParameter>(
             QuerySettingsService::getQuerySettingsClusterParameterName(),
             ServerParameterType::kClusterWide);
-        QueryShapeConfigurationsWithTimestamp configsWithTs;
         std::vector<QueryShapeConfiguration> expectedQueryShapeConfigurations;
         size_t collIndex = 0;
 
         // Create the 'querySettingsClusterParamValue' as BSON.
+        QueryShapeConfigurationsWithTimestamp configsWithTs;
+        configsWithTs.clusterParameterTime = nextClusterParameterTime();
         for (const auto& [initialIndexHintSpecs, expectedIndexHintSpecs] : listOfIndexHintSpecs) {
             QueryInstance representativeQuery =
                 BSON("find" << "coll_" + std::to_string(collIndex) << "$db"

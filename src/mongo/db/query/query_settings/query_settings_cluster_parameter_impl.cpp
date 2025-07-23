@@ -114,6 +114,15 @@ Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
                          tenantId,
                          SerializationContext::stateDefault()),
         newValueElement.Obj());
+
+    // Skip installing the new settings if the incoming 'clusterParameterTime' did not change.
+    // The cluster parameter time acts as the version of the configuration, meaning if it hasn't
+    // changed, the configuration hasn't either, making this a no-op.
+    if (newSettings.getClusterParameterTime() ==
+        querySettingsService.getClusterParameterTime(tenantId)) {
+        return Status::OK();
+    }
+
     auto& settingsArray = newSettings.getSettingsArray();
 
     // TODO SERVER-97546 Remove PQS index hint sanitization.
