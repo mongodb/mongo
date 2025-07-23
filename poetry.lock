@@ -809,14 +809,14 @@ dev = ["black", "build", "commitizen", "isort", "pip-tools", "pre-commit", "twin
 
 [[package]]
 name = "evergreen-lint"
-version = "0.1.6"
+version = "0.1.10"
 description = ""
 optional = false
 python-versions = "<4.0,>=3.9"
 groups = ["lint"]
 files = [
-    {file = "evergreen_lint-0.1.6-py3-none-any.whl", hash = "sha256:75b0605682d0382ad7cb3ed620869abf719b52fc8fb29ef77e6c4b8f1e52d343"},
-    {file = "evergreen_lint-0.1.6.tar.gz", hash = "sha256:fe7a4bfdcd1c3fc02ab7bc4b566b97bdb581fb274515ae3a44e9068baebd57b3"},
+    {file = "evergreen_lint-0.1.10-py3-none-any.whl", hash = "sha256:925b91ecf0dfbca9d42a8afc268aa606da9abb2b7edc831b52a156ea246fcc7b"},
+    {file = "evergreen_lint-0.1.10.tar.gz", hash = "sha256:46beb783c9578b34792885f63dfb5a00c55d936f4b207558e11daf522692efb3"},
 ]
 
 [package.dependencies]
@@ -4294,4 +4294,4 @@ oldcrypt = []
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "92fe1742fc3186364ece803540045d4a5b883eb6f42ae01ae2f36b3dba0f2ecb"
+content-hash = "5f944a6c9d71e6a67a2ce9f888c6c623e2270e963a6c08e1226696b11e34e80a"

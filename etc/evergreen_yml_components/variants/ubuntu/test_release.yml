@@ -70,7 +70,10 @@ buildvariants:
     distros:
     - ubuntu2204-large
   - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: .release_critical !.incompatible_community !.requires_large_host
+  - name: .release_critical !.incompatible_community .requires_large_host
+    distros:
+    - ubuntu2204-large
 
 - <<: *ubuntu2204-template
   name: ubuntu2204-powercycle
@@ -120,7 +123,10 @@ buildvariants:
     distros:
     - ubuntu2204-large
   - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: .release_critical !.incompatible_community !.requires_large_host
+  - name: .release_critical !.incompatible_community .requires_large_host
+    distros:
+    - ubuntu2204-large
 
 - &ubuntu2404-template
   name: &ubuntu2404 ubuntu2404
@@ -222,7 +228,10 @@ buildvariants:
     distros:
     - ubuntu2204-large
   - name: .development_critical
-  - name: .release_critical
+  - name: .release_critical !.requires_large_host
+  - name: .release_critical .requires_large_host
+    distros:
+    - ubuntu2204-large
 
 # This variant is owned by the security team and is special
 # because these tests require headless support to run
@@ -283,7 +292,10 @@ buildvariants:
     distros:
     - ubuntu2204-large
   - name: .development_critical
-  - name: .release_critical
+  - name: .release_critical !.requires_large_host
+  - name: .release_critical .requires_large_host
+    distros:
+    - ubuntu2204-large
 
 - name: enterprise-ubuntu2204-jepsen
   display_name: Jepsen Tests on Enterprise Ubuntu 22.04
@@ -351,7 +363,10 @@ buildvariants:
     distros:
     - ubuntu1804-arm64-build
   - name: .development_critical
-  - name: .release_critical
+  - name: .release_critical !.requires_large_host
+  - name: .release_critical .requires_large_host
+    distros:
+    - ubuntu2004-arm64-large
 
 - name: ubuntu2004-arm64
   display_name: Ubuntu 20.04 arm64
@@ -393,7 +408,10 @@ buildvariants:
     distros:
     - ubuntu1804-arm64-build
   - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: .release_critical !.incompatible_community !.requires_large_host
+  - name: .release_critical !.incompatible_community .requires_large_host
+    distros:
+    - ubuntu2004-arm64-large
 
 - name: enterprise-ubuntu2204-arm64
   display_name: Enterprise Ubuntu 22.04 arm64
@@ -433,7 +451,10 @@ buildvariants:
     distros:
     - ubuntu2204-arm64-large
   - name: .development_critical
-  - name: .release_critical
+  - name: .release_critical !.requires_large_host
+  - name: .release_critical .requires_large_host
+    distros:
+    - ubuntu2204-arm64-large
 
 - name: ubuntu2204-arm64
   display_name: Ubuntu 22.04 arm64
@@ -474,7 +495,10 @@ buildvariants:
     distros:
     - ubuntu2204-arm64-large
   - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: .release_critical !.incompatible_community !.requires_large_host
+  - name: .release_critical !.incompatible_community .requires_large_host
+    distros:
+    - ubuntu2204-arm64-large
 
 - name: enterprise-ubuntu2404
   display_name: Enterprise Ubuntu 24.04
