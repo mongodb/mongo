@@ -633,8 +633,6 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommand) {
 }
 
 TEST_F(OplogApplierImplTest, CreateCollectionCommandDisaggBasic) {
-    // 'catalogId' is only replicated when DSS is enabled. Validate expected behavior for DSS.
-    // TODO SERVER-105262: Validate idents.
     RAIIServerParameterControllerForTest disaggServer("disaggregatedStorageEnabled", true);
     RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
@@ -664,6 +662,7 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandDisaggBasic) {
             ASSERT_EQUALS(nss, collNss);
             ASSERT(collCatalogIdentifier);
             ASSERT_EQUALS(catalogIdentifier.catalogId, collCatalogIdentifier->catalogId);
+            ASSERT_EQUALS(catalogIdentifier.ident, collCatalogIdentifier->ident);
         };
     ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
         _opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kInitialSync));

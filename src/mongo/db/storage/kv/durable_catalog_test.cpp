@@ -94,6 +94,21 @@
 
 namespace mongo {
 namespace {
+CollectionAcquisition acquireCollectionForWrite(OperationContext* opCtx,
+                                                const NamespaceString& nss) {
+    return acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+}
+CollectionAcquisition acquireCollectionForRead(OperationContext* opCtx,
+                                               const NamespaceString& nss) {
+    return acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+        MODE_IS);
+}
+
 
 class DurableCatalogTest : public CatalogTestFixture {
 public:
@@ -999,6 +1014,190 @@ TEST_F(DurableCatalogTest, ScanForCatalogEntryByNssBasic) {
         NamespaceString::createNamespaceString_forTest("foo", "bar"),
         mdbCatalog);
     ASSERT(catalogEntryDoesNotExist == boost::none);
+}
+
+TEST_F(DurableCatalogTest, CreateCollectionSucceedsWithExistingIdent) {
+    auto opCtx = operationContext();
+    auto mdbCatalog = getMDBCatalog();
+    const auto catalogId = mdbCatalog->reserveCatalogId(operationContext());
+
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    const auto ident = storageEngine->generateNewIndexIdent(nss.dbName());
+    {
+        auto collection = acquireCollectionForWrite(opCtx, nss);
+        WriteUnitOfWork wuow(opCtx);
+        auto recordStore = unittest::assertGet(durable_catalog::createCollection(
+            opCtx, catalogId, nss, ident, CollectionOptions{.uuid = UUID::gen()}, mdbCatalog));
+        wuow.commit();
+    }
+    auto parsedEntry = mdbCatalog->getEntry(catalogId);
+    ASSERT_EQUALS(catalogId, parsedEntry.catalogId);
+    ASSERT_EQUALS(nss, parsedEntry.nss);
+    ASSERT_EQUALS(ident, parsedEntry.ident);
+
+    // Remove the catalog entry to simulate the first phase of a two phase collection drop. This
+    // mimics a scenario where a 'create' operation with replicated catalog identifiers is applied,
+    // rolled back, and reapplied.
+    {
+
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(mdbCatalog->removeEntry(opCtx, catalogId));
+        storageEngine->addDropPendingIdent(Timestamp(), std::make_shared<Ident>(ident));
+        wuow.commit();
+    }
+
+    {
+        auto collection = acquireCollectionForWrite(opCtx, nss);
+        WriteUnitOfWork wuow(opCtx);
+        auto recordStore = unittest::assertGet(durable_catalog::createCollection(
+            opCtx, catalogId, nss, ident, CollectionOptions{.uuid = UUID::gen()}, mdbCatalog));
+        wuow.commit();
+    }
+    parsedEntry = mdbCatalog->getEntry(catalogId);
+    ASSERT_EQUALS(catalogId, parsedEntry.catalogId);
+    ASSERT_EQUALS(nss, parsedEntry.nss);
+    ASSERT_EQUALS(ident, parsedEntry.ident);
+}
+
+TEST_F(DurableCatalogTest, CreateCollectionRemovesPriorDocumentsAfterRecreate) {
+    auto opCtx = operationContext();
+    auto mdbCatalog = getMDBCatalog();
+    const auto catalogId = mdbCatalog->reserveCatalogId(operationContext());
+
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    const auto ident = storageEngine->generateNewIndexIdent(nss.dbName());
+
+    std::unique_ptr<RecordStore> collectionRecordStore;
+    // 1. Create the collection entry in the catalog.
+    {
+        auto collection = acquireCollectionForWrite(opCtx, nss);
+        WriteUnitOfWork wuow(opCtx);
+        collectionRecordStore = unittest::assertGet(durable_catalog::createCollection(
+            opCtx, catalogId, nss, ident, CollectionOptions{.uuid = UUID::gen()}, mdbCatalog));
+        wuow.commit();
+    }
+    auto parsedEntry = mdbCatalog->getEntry(catalogId);
+    ASSERT_EQUALS(catalogId, parsedEntry.catalogId);
+    ASSERT_EQUALS(nss, parsedEntry.nss);
+    ASSERT_EQUALS(ident, parsedEntry.ident);
+
+
+    // 2. Insert a document into the newly created collection.
+    {
+        auto collection = acquireCollectionForWrite(opCtx, nss);
+        WriteUnitOfWork wuow(opCtx);
+        RecordId rid(1);
+        BSONObj obj = BSON("_id" << 1 << "x" << "doc1");
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+        ASSERT_OK(collectionRecordStore
+                      ->insertRecord(opCtx, ru, obj.objdata(), obj.objsize(), Timestamp())
+                      .getStatus());
+        wuow.commit();
+    }
+
+    // Confirm document is present before catalog removal.
+    {
+        auto collection = acquireCollectionForRead(opCtx, nss);
+        auto cursor =
+            collectionRecordStore->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+        ASSERT(cursor->next());
+    }
+
+    // 3. Remove the catalog entry simulating phase one of a two-phase drop.
+    {
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(mdbCatalog->removeEntry(opCtx, catalogId));
+        storageEngine->addDropPendingIdent(Timestamp(), std::make_shared<Ident>(ident));
+        wuow.commit();
+    }
+
+    // 4. Recreate the catalog entry for the same ident with a new UUID.
+    std::unique_ptr<RecordStore> newCollectionRecordStore;
+    {
+        auto collection = acquireCollectionForWrite(opCtx, nss);
+        WriteUnitOfWork wuow(opCtx);
+        newCollectionRecordStore = unittest::assertGet(durable_catalog::createCollection(
+            opCtx, catalogId, nss, ident, CollectionOptions{.uuid = UUID::gen()}, mdbCatalog));
+        wuow.commit();
+    }
+    parsedEntry = mdbCatalog->getEntry(catalogId);
+    ASSERT_EQUALS(catalogId, parsedEntry.catalogId);
+    ASSERT_EQUALS(nss, parsedEntry.nss);
+    ASSERT_EQUALS(ident, parsedEntry.ident);
+
+    // 5. Confirm documents inserted before catalog drop are now gone.
+    {
+        auto collection = acquireCollectionForRead(opCtx, nss);
+        auto cursor =
+            newCollectionRecordStore->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+        ASSERT(!cursor->next());
+    }
+}
+
+TEST_F(DurableCatalogTest, CreateCollectionWithFailsExistingIdentButDifferentCatalogId) {
+    auto opCtx = operationContext();
+    auto mdbCatalog = getMDBCatalog();
+    const auto catalogId = mdbCatalog->reserveCatalogId(operationContext());
+
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    const auto ident = storageEngine->generateNewIndexIdent(nss.dbName());
+
+    {
+        auto collection = acquireCollectionForWrite(opCtx, nss);
+        WriteUnitOfWork wuow(opCtx);
+        auto recordStore = unittest::assertGet(durable_catalog::createCollection(
+            opCtx, catalogId, nss, ident, CollectionOptions{.uuid = UUID::gen()}, mdbCatalog));
+        wuow.commit();
+    }
+    const auto parsedEntry = mdbCatalog->getEntry(catalogId);
+    ASSERT_EQUALS(catalogId, parsedEntry.catalogId);
+    ASSERT_EQUALS(nss, parsedEntry.nss);
+    ASSERT_EQUALS(ident, parsedEntry.ident);
+
+    {
+        auto collection = acquireCollectionForWrite(opCtx, nss);
+        auto newCatalogId = mdbCatalog->reserveCatalogId(operationContext());
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_EQUALS(
+            ErrorCodes::ObjectAlreadyExists,
+            durable_catalog::createCollection(
+                opCtx, newCatalogId, nss, ident, CollectionOptions{.uuid = UUID::gen()}, mdbCatalog)
+                .getStatus());
+    }
+}
+
+TEST_F(DurableCatalogTest, CreateCollectionWithCatalogIdentifierSucceedsAfterRollback) {
+    auto opCtx = operationContext();
+    auto mdbCatalog = getMDBCatalog();
+    const auto catalogId = mdbCatalog->reserveCatalogId(operationContext());
+
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    const auto ident = storageEngine->generateNewIndexIdent(nss.dbName());
+
+    {
+        // Abort the first attempt to create the collection.
+        auto collection = acquireCollectionForWrite(opCtx, nss);
+        WriteUnitOfWork wuow(opCtx);
+        auto recordStore = unittest::assertGet(durable_catalog::createCollection(
+            opCtx, catalogId, nss, ident, CollectionOptions{.uuid = UUID::gen()}, mdbCatalog));
+    }
+    ASSERT_FALSE(mdbCatalog->getEntry_forTest(catalogId));
+
+    {
+        auto collection = acquireCollectionForWrite(opCtx, nss);
+        WriteUnitOfWork wuow(opCtx);
+        auto recordStore = unittest::assertGet(durable_catalog::createCollection(
+            opCtx, catalogId, nss, ident, CollectionOptions{.uuid = UUID::gen()}, mdbCatalog));
+        wuow.commit();
+    }
+    const auto parsedEntry = mdbCatalog->getEntry(catalogId);
+    ASSERT_EQUALS(catalogId, parsedEntry.catalogId);
+    ASSERT_EQUALS(nss, parsedEntry.nss);
+    ASSERT_EQUALS(ident, parsedEntry.ident);
 }
 
 }  // namespace

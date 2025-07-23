@@ -141,9 +141,20 @@ protected:
             ident, BSONObj() /* idxIdent */, md, NamespaceStringUtil::serializeForCatalog(nss));
 
         // An 'orphaned' entry is one without a RecordStore explicitly created to back it.
-        auto swEntry = mdbCatalog->addOrphanedEntry(opCtx, ident, nss, rawMDBCatalogEntry);
+        auto swEntry = mdbCatalog->addEntry(
+            opCtx, ident, nss, rawMDBCatalogEntry, mdbCatalog->reserveCatalogId(opCtx));
         ASSERT_OK(swEntry.getStatus());
         return swEntry.getValue().catalogId;
+    }
+
+    StatusWith<MDBCatalog::EntryIdentifier> addEntry(OperationContext* opCtx,
+                                                     const std::string& ident,
+                                                     const NamespaceString& nss,
+                                                     const BSONObj& catalogEntryObj,
+                                                     const RecordId& catalogId,
+                                                     MDBCatalog* mdbCatalog) {
+        Lock::DBLock dbLk(opCtx, nss.dbName(), MODE_IX);
+        return mdbCatalog->addEntry(opCtx, ident, nss, catalogEntryObj, catalogId);
     }
 
     Status dropCollection(OperationContext* opCtx, RecordId catalogId, MDBCatalog* catalog) {
@@ -1170,6 +1181,45 @@ TEST_F(MDBCatalogTest, BackupImplemented) {
     ASSERT(engine);
     ASSERT_OK(engine->beginBackup());
     engine->endBackup();
+}
+
+TEST_F(MDBCatalogTest, AddRemoveAddRollBack) {
+    std::unique_ptr<RecordStore> catalogRS = createCatalogRS();
+    std::unique_ptr<MDBCatalog> catalog = createMDBCatalog(catalogRS.get());
+
+    RecordId catalogId;
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    {
+        auto clientAndCtx = makeClientAndCtx("opCtx");
+        auto opCtx = clientAndCtx.opCtx();
+        WriteUnitOfWork uow(opCtx);
+        catalogId = addNewCatalogEntry(opCtx, nss, CollectionOptions(), catalog.get());
+        auto entry = catalog->getEntry(catalogId);
+        auto rawEntry = catalog->getRawCatalogEntry(opCtx, catalogId);
+        ASSERT_OK(catalog->removeEntry(opCtx, catalogId));
+        ASSERT_OK(addEntry(opCtx, entry.ident, entry.nss, rawEntry, catalogId, catalog.get()));
+    }
+    ASSERT_FALSE(catalog->getEntry_forTest(catalogId).has_value());
+}
+
+TEST_F(MDBCatalogTest, AddRemoveAddCommit) {
+    std::unique_ptr<RecordStore> catalogRS = createCatalogRS();
+    std::unique_ptr<MDBCatalog> catalog = createMDBCatalog(catalogRS.get());
+
+    RecordId catalogId;
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    {
+        auto clientAndCtx = makeClientAndCtx("opCtx");
+        auto opCtx = clientAndCtx.opCtx();
+        WriteUnitOfWork wuow(opCtx);
+        catalogId = addNewCatalogEntry(opCtx, nss, CollectionOptions(), catalog.get());
+        auto entry = catalog->getEntry(catalogId);
+        auto rawEntry = catalog->getRawCatalogEntry(opCtx, catalogId);
+        ASSERT_OK(catalog->removeEntry(opCtx, catalogId));
+        ASSERT_OK(addEntry(opCtx, entry.ident, entry.nss, rawEntry, catalogId, catalog.get()));
+        wuow.commit();
+    }
+    ASSERT_TRUE(catalog->getEntry_forTest(catalogId).has_value());
 }
 
 TEST_F(MDBCatalogTest, EntryIncludesTenantIdInMultitenantEnv) {

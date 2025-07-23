@@ -206,9 +206,13 @@ CreateCollCatalogIdentifier acquireCatalogIdentifierForCreate(
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     CreateCollCatalogIdentifier catalogIdentifiers;
 
-    // TODO(SERVER-105262): Use the replicated idents rather than always generating new ones
-    catalogIdentifiers.ident = storageEngine->generateNewCollectionIdent(nss.dbName());
-    catalogIdentifiers.idIndexIdent = storageEngine->generateNewIndexIdent(nss.dbName());
+    if (providedIdentifier) {
+        catalogIdentifiers.ident = providedIdentifier->ident;
+        catalogIdentifiers.idIndexIdent = storageEngine->generateNewIndexIdent(nss.dbName());
+    } else {
+        catalogIdentifiers.ident = storageEngine->generateNewCollectionIdent(nss.dbName());
+        catalogIdentifiers.idIndexIdent = storageEngine->generateNewIndexIdent(nss.dbName());
+    }
 
     // The acquired catalogId can be different than one specified in the 'providedIdentifier' unless
     // disaggregated storage is enabled.

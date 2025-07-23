@@ -133,25 +133,22 @@ public:
                                                     bool forward = true) const;
 
     /*
-     * Adds a new 'catalogEntry' to the _mdb_catalog, but does not attempt to create a backing
-     * 'RecordStore'.
+     * Adds a new 'catalogEntry' at 'catalogId' to the _mdb_catalog, but does not attempt to create
+     * a backing 'RecordStore'.
      */
-    StatusWith<MDBCatalog::EntryIdentifier> addOrphanedEntry(OperationContext* opCtx,
-                                                             const std::string& ident,
-                                                             const NamespaceString& nss,
-                                                             const BSONObj& catalogEntryObj);
-
+    StatusWith<MDBCatalog::EntryIdentifier> addEntry(OperationContext* opCtx,
+                                                     const std::string& ident,
+                                                     const NamespaceString& nss,
+                                                     const BSONObj& catalogEntryObj,
+                                                     const RecordId& catalogId);
     /**
-     * Both adds a new catalog entry to the _mdb_catalog and initializes a 'RecordStore' to back it.
+     * Creates a new record store to back the catalog entry.
      */
-    StatusWith<std::unique_ptr<RecordStore>> initializeNewEntry(
+    StatusWith<std::unique_ptr<RecordStore>> createRecordStoreForEntry(
         OperationContext* opCtx,
-        boost::optional<UUID>& uuid,
-        const std::string& ident,
-        const NamespaceString& nss,
-        const RecordStore::Options& recordStoreOptions,
-        const BSONObj& catalogEntryObj,
-        const RecordId& catalogId);
+        const MDBCatalog::EntryIdentifier& entry,
+        const boost::optional<UUID>& uuid,
+        const RecordStore::Options& recordStoreOptions);
 
     StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> importCatalogEntry(
         OperationContext* opCtx,
@@ -181,18 +178,10 @@ public:
                                              const std::string& ident,
                                              bool isClustered);
 
+    boost::optional<EntryIdentifier> getEntry_forTest(const RecordId& catalogId) const;
+
 private:
     class AddIdentChange;
-
-    /**
-     * Inserts a new entry to the '_mdb_catalog'. If 'catalogId' is a null RecordId, the storage
-     * engine will automatically assign it one.
-     */
-    StatusWith<MDBCatalog::EntryIdentifier> _addEntry(OperationContext* opCtx,
-                                                      const std::string& ident,
-                                                      const NamespaceString& nss,
-                                                      const BSONObj& catalogEntryObj,
-                                                      const RecordId& catalogId = RecordId());
 
     BSONObj _findRawEntry(SeekableRecordCursor& cursor, const RecordId& catalogId) const;
 

@@ -80,6 +80,88 @@ std::shared_ptr<CatalogEntryMetaData> parseMetaData(const BSONElement& mdElement
     }
     return md;
 }
+
+// Ensures that only one catalog entry has the same ident as 'expectedCatalogEntry'.  This check is
+// potentially expensive, as it iterates over all catalog entries, and should only be used after an
+// 'ObjectAlreadyExists' error occurs after the first attempt to persist a new collection in
+// storage. Such cases are expected to be rare.
+Status validateNoIdentConflictInCatalog(OperationContext* opCtx,
+                                        const MDBCatalog::EntryIdentifier& expectedCatalogEntry,
+                                        MDBCatalog* mdbCatalog) {
+    std::vector<MDBCatalog::EntryIdentifier> entriesWithIdent;
+    auto cursor = mdbCatalog->getCursor(opCtx);
+    while (auto record = cursor->next()) {
+        BSONObj obj = record->data.releaseToBson();
+
+        if (feature_document_util::isFeatureDocument(obj)) {
+            // Skip over the version document because it doesn't correspond to a collection.
+            continue;
+        }
+
+        auto entryIdent = obj["ident"].String();
+        if (entryIdent == expectedCatalogEntry.ident &&
+            expectedCatalogEntry.catalogId != record->id) {
+            return Status(
+                ErrorCodes::ObjectAlreadyExists,
+                fmt::format("Could not create collection {} with ident {} because the ident was "
+                            "already in use by another table recorded in the catalog",
+                            expectedCatalogEntry.nss.toStringForErrorMsg(),
+                            expectedCatalogEntry.ident));
+        }
+    }
+    return Status::OK();
+}
+
+// Retries creating new collection's table on disk after the first attempt returns
+// 'ObjectAlreadyExists'. This can happen if idents are replicated, the initial create attempt was
+// rolled back, and the same operation gets applied again. In which case, the ident may correspond
+// to a table still on disk.
+StatusWith<std::unique_ptr<RecordStore>> retryCreateCollectionIfObjectAlreadyExists(
+    OperationContext* opCtx,
+    const MDBCatalog::EntryIdentifier& catalogEntry,
+    const boost::optional<UUID>& uuid,
+    const RecordStore::Options& recordStoreOptions,
+    const Status& originalFailure,
+    MDBCatalog* mdbCatalog) {
+    // First, validate the ident doesn't appear in multiple catalog entries. This should never
+    // happen unless there is manual oplog work or applyOps intervention which has caused
+    // corruption.
+    Status validateStatus = validateNoIdentConflictInCatalog(opCtx, catalogEntry, mdbCatalog);
+    if (!validateStatus.isOK()) {
+        return validateStatus;
+    }
+
+    // Rollback only guarantees the first state of two-phase table drop. If the initial create for
+    // the table was rolled back, it can still exist in the storage engine. The ident is likely in
+    // the drop-pending reaper, so we must remove it before trying to create the same collection
+    // again.
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    const auto& ident = catalogEntry.ident;
+    auto dropStatus = storageEngine->immediatelyCompletePendingDrop(opCtx, ident);
+    if (!dropStatus.isOK()) {
+        LOGV2(10526201,
+              "Attempted to drop and recreate a collection ident which already existed, but failed "
+              "the drop",
+              "ident"_attr = ident,
+              "uuid"_attr = uuid,
+              "nss"_attr = catalogEntry.nss.toStringForErrorMsg(),
+              "dropResult"_attr = dropStatus,
+              "originalCreateFailure"_attr = originalFailure);
+        return originalFailure;
+    }
+
+    auto createResult =
+        mdbCatalog->createRecordStoreForEntry(opCtx, catalogEntry, uuid, recordStoreOptions);
+    LOGV2(10526200,
+          "Attempted to drop and recreate a collection ident which already existed",
+          "ident"_attr = ident,
+          "uuid"_attr = uuid,
+          "nss"_attr = catalogEntry.nss.toStringForErrorMsg(),
+          "dropResult"_attr = dropStatus,
+          "createResult"_attr = createResult.getStatus());
+    return createResult;
+}
+
 }  // namespace
 
 namespace internal {
@@ -219,9 +301,24 @@ StatusWith<std::unique_ptr<RecordStore>> createCollection(
     const auto ns = NamespaceStringUtil::serializeForCatalog(nss);
     auto mdbCatalogEntryObj =
         internal::buildRawMDBCatalogEntry(ident, BSONObj() /* idxIdent */, md, ns);
+    auto swCatalogEntry = mdbCatalog->addEntry(opCtx, ident, nss, mdbCatalogEntryObj, catalogId);
+    if (!swCatalogEntry.isOK()) {
+        return swCatalogEntry.getStatus();
+    }
+    const auto& catalogEntry = swCatalogEntry.getValue();
+    invariant(catalogEntry.catalogId == catalogId);
 
-    return mdbCatalog->initializeNewEntry(
-        opCtx, md.options.uuid, ident, nss, recordStoreOptions, mdbCatalogEntryObj, catalogId);
+    auto createResult = mdbCatalog->createRecordStoreForEntry(
+        opCtx, catalogEntry, md.options.uuid, recordStoreOptions);
+    if (createResult.getStatus() == ErrorCodes::ObjectAlreadyExists) {
+        createResult = retryCreateCollectionIfObjectAlreadyExists(opCtx,
+                                                                  catalogEntry,
+                                                                  md.options.uuid,
+                                                                  recordStoreOptions,
+                                                                  createResult.getStatus(),
+                                                                  mdbCatalog);
+    }
+    return createResult;
 }
 
 Status createIndex(OperationContext* opCtx,
