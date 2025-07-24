@@ -122,8 +122,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 ...this.rawOperationSpec,
             }));
             if (res.value) {
-                assert.commandWorked(
+                let insertRes = assert.commandWorkedIgnoringWriteErrors(
                     db.runCommand({insert: data.bucketValidationCollName, documents: [res.value]}));
+                if (insertRes.writeErrors) {
+                    assert.eq(insertRes.writeErrors[0].code, ErrorCodes.DuplicateKey);
+                }
             }
         }
     };
