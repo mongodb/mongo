@@ -762,6 +762,13 @@ def _impl(ctx):
                                 # floating-point contractions with /fp:precise, but previous versions can.
                                 # Disable contractions altogether by using /fp:strict.
                                 "/fp:strict",
+
+                                # Below are MongoDB specific definitions
+                                "/D_UNICODE",
+                                "/DUNICODE",
+                                "/D_CONSOLE",
+                                "/D_ENABLE_EXTENDED_ALIGNED_STORAGE",
+                                "/D_SCL_SECURE_NO_WARNINGS",
                             ],
                         ),
                     ],
@@ -1241,6 +1248,36 @@ def _impl(ctx):
             ],
         )
 
+        mongodb_boost_all_no_lib_link_feature = feature(
+            name = "mongodb_boost_no_lib_link",
+            enabled = True,
+            flag_sets = [
+                flag_set(
+                    actions = [
+                        ACTION_NAMES.assemble,
+                        ACTION_NAMES.preprocess_assemble,
+                        ACTION_NAMES.linkstamp_compile,
+                        ACTION_NAMES.c_compile,
+                        ACTION_NAMES.cpp_compile,
+                        ACTION_NAMES.cpp_header_parsing,
+                        ACTION_NAMES.cpp_module_compile,
+                        ACTION_NAMES.cpp_module_codegen,
+                        ACTION_NAMES.lto_backend,
+                        ACTION_NAMES.clif_match,
+                    ],
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                # This tells the Windows compiler not to link against the .lib files and
+                                # to use boost as a bunch of header-only libraries.
+                                "/DBOOST_ALL_NO_LIB",
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        )
+
         features = [
             no_legacy_features_feature,
             nologo_feature,
@@ -1293,6 +1330,7 @@ def _impl(ctx):
             supports_dynamic_linker_feature,
             supports_interface_shared_libraries_feature,
             symbol_check_feature,
+            mongodb_boost_all_no_lib_link_feature,
         ]
     else:
         targets_windows_feature = feature(

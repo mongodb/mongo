@@ -4,11 +4,9 @@
 load(
     "//bazel/toolchains/cc:mongo_errors.bzl",
     "GLIBCXX_DEBUG_ERROR_MESSAGE",
-    "LIBCXX_ERROR_MESSAGE",
     "SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE",
     "THREAD_SANITIZER_ERROR_MESSAGE",
 )
-load("//bazel/toolchains/cc/mongo_windows:mongo_defines.bzl", "WINDOWS_DEFINES")
 
 # Defines are only visible to within //bazel directory where
 # toolchains and rules are defined.
@@ -98,7 +96,6 @@ TCMALLOC_DEFINES = select({
 })
 
 MONGO_GLOBAL_DEFINES = (
-    WINDOWS_DEFINES +
     DEBUG_DEFINES +
     ADDRESS_SANITIZER_DEFINES +
     THREAD_SANITIZER_DEFINES +
