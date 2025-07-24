@@ -148,7 +148,7 @@ bool DocumentSourceGroup::pushDotRenamedMatch(DocumentSourceContainer::iterator 
 
     // Perform all changes on a copy of the match source.
     boost::intrusive_ptr<DocumentSource> currentMatchCopyDocument =
-        prospectiveMatch->clone(prospectiveMatch->getContext());
+        prospectiveMatch->clone(prospectiveMatch->getExpCtx());
 
     auto currentMatchCopyDocumentMatch =
         dynamic_cast<DocumentSourceMatch*>(currentMatchCopyDocument.get());

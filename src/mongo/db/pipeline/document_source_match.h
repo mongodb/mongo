@@ -58,7 +58,7 @@
 
 namespace mongo {
 
-class DocumentSourceMatch : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceMatch : public DocumentSource {
 public:
     static bool containsTextOperator(const MatchExpression& expr);
 
@@ -156,7 +156,7 @@ public:
     }
 
     MatchProcessor* getMatchProcessor() {
-        return _matchProcessor.get_ptr();
+        return _matchProcessor.get();
     }
 
     /**
@@ -236,18 +236,19 @@ protected:
                         const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
         : DocumentSourceMatch(
               other.serialize().getDocument().toBson().firstElement().embeddedObject(),
-              newExpCtx ? newExpCtx : other.pExpCtx) {}
+              newExpCtx ? newExpCtx : other.getExpCtx()) {}
 
     DocumentSourceMatch(const BSONObj& query,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    GetNextResult doGetNext() override;
-
     const BSONObj& getPredicate() const {
-        return _backingBsonForPredicate;
+        return _matchProcessor->getPredicate();
     }
 
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceMatchToStageFn(
+        const boost::intrusive_ptr<const DocumentSource>& documentSource);
+
     void rebuild(BSONObj predicate, std::unique_ptr<MatchExpression> expr);
 
     DepsTracker::State getDependencies(const MatchExpression* expr, DepsTracker* deps) const;
@@ -257,13 +258,9 @@ private:
                       const StringMap<std::string>& renames,
                       expression::ShouldSplitExprFunc func) &&;
 
-    // The original BSON that this DocumentSourceMatch was built with (note that a call to 'rebuild'
-    // changes this). This value does NOT change during optimization of this $match stage, only the
-    // MatchExpression stored in the '_matchProcessor' does.
-    BSONObj _backingBsonForPredicate;
-    bool _isTextQuery{false};
-    boost::optional<MatchProcessor> _matchProcessor;
+    std::shared_ptr<MatchProcessor> _matchProcessor;
     SbeCompatibility _sbeCompatibility{SbeCompatibility::notCompatible};
+    bool _isTextQuery{false};
 };
 
 /**
@@ -303,7 +300,7 @@ protected:
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
         : DocumentSourceMatch(
               other.serialize().getDocument().toBson().firstElement().embeddedObject(),
-              newExpCtx ? newExpCtx : other.pExpCtx) {}
+              newExpCtx ? newExpCtx : other.getExpCtx()) {}
 };
 
 }  // namespace mongo

@@ -47,7 +47,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-#include <algorithm>
 #include <cstddef>
 #include <iterator>
 #include <list>
@@ -70,6 +69,7 @@ REGISTER_DOCUMENT_SOURCE(match,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceMatch::createFromBson,
                          AllowedWithApiStrict::kAlways);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(match, DocumentSourceMatch::id)
 
 bool DocumentSourceMatch::containsTextOperator(const MatchExpression& expr) {
@@ -84,36 +84,36 @@ bool DocumentSourceMatch::containsTextOperator(const MatchExpression& expr) {
 
 DocumentSourceMatch::DocumentSourceMatch(std::unique_ptr<MatchExpression> expr,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(kStageName, expCtx), exec::agg::Stage(kStageName, expCtx) {
+    : DocumentSource(kStageName, expCtx) {
     auto bsonObj = expr->serialize();
     rebuild(std::move(bsonObj), std::move(expr));
 }
 
 DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
                                          const intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(kStageName, expCtx), exec::agg::Stage(kStageName, expCtx) {
+    : DocumentSource(kStageName, expCtx) {
     rebuild(query);
 }
 
 void DocumentSourceMatch::rebuild(BSONObj predicate) {
     predicate = predicate.getOwned();
     SbeCompatibility originalSbeCompatibility =
-        pExpCtx->sbeCompatibilityExchange(SbeCompatibility::noRequirements);
-    ON_BLOCK_EXIT([&] { pExpCtx->setSbeCompatibility(originalSbeCompatibility); });
+        getExpCtx()->sbeCompatibilityExchange(SbeCompatibility::noRequirements);
+    ON_BLOCK_EXIT([&] { getExpCtx()->setSbeCompatibility(originalSbeCompatibility); });
     std::unique_ptr<MatchExpression> expr = uassertStatusOK(MatchExpressionParser::parse(
-        predicate, pExpCtx, ExtensionsCallbackNoop(), Pipeline::kAllowedMatcherFeatures));
-    _sbeCompatibility = pExpCtx->getSbeCompatibility();
+        predicate, getExpCtx(), ExtensionsCallbackNoop(), Pipeline::kAllowedMatcherFeatures));
+    _sbeCompatibility = getExpCtx()->getSbeCompatibility();
     rebuild(std::move(predicate), std::move(expr));
 }
 
 void DocumentSourceMatch::rebuild(BSONObj predicate, std::unique_ptr<MatchExpression> expr) {
     invariant(predicate.isOwned());
-    _backingBsonForPredicate = std::move(predicate);
     _isTextQuery = containsTextOperator(*expr);
     DepsTracker dependencies =
         DepsTracker(_isTextQuery ? DepsTracker::kOnlyTextScore : DepsTracker::kNoMetadata);
     getDependencies(expr.get(), &dependencies);
-    _matchProcessor.emplace(std::move(expr), std::move(dependencies));
+    _matchProcessor = std::make_shared<MatchProcessor>(
+        std::move(expr), std::move(dependencies), std::move(predicate));
 }
 
 const char* DocumentSourceMatch::getSourceName() const {
@@ -133,31 +133,11 @@ intrusive_ptr<DocumentSource> DocumentSourceMatch::optimize() {
         return nullptr;
     }
 
-    _matchProcessor->setExpression(MatchExpression::optimize(
-        std::move(_matchProcessor->getExpression()), /* enableSimplification */ false));
+    _matchProcessor->setExpression(
+        MatchExpression::optimize(std::move(_matchProcessor->getExpression()),
+                                  /* enableSimplification */ false));
 
     return this;
-}
-
-DocumentSource::GetNextResult DocumentSourceMatch::doGetNext() {
-    // The user facing error should have been generated earlier.
-    massert(17309, "Should never call getNext on a $match stage with $text clause", !_isTextQuery);
-
-    auto nextInput = pSource->getNext();
-    for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
-        if (_matchProcessor->process(nextInput.getDocument())) {
-            return nextInput;
-        }
-
-        // For performance reasons, a streaming stage must not keep references to documents across
-        // calls to getNext(). Such stages must retrieve a result from their child and then release
-        // it (or return it) before asking for another result. Failing to do so can result in extra
-        // work, since the Document/Value library must copy data on write when that data has a
-        // refcount above one.
-        nextInput.releaseDocument();
-    }
-
-    return nextInput;
 }
 
 DocumentSourceContainer::iterator DocumentSourceMatch::doOptimizeAt(
@@ -453,8 +433,8 @@ void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other
             }
         }
     };
-    addPredicates(_backingBsonForPredicate);
-    addPredicates(other->_backingBsonForPredicate);
+    addPredicates(_matchProcessor->getPredicate());
+    addPredicates(other->_matchProcessor->getPredicate());
 
     arrBob.doneFast();
     rebuild(bob.obj());
@@ -499,11 +479,11 @@ DocumentSourceMatch::splitSourceByFunc(const OrderedPathSet& fields,
     // the corresponding BSONObj may not exist. Therefore, we take each of these expressions,
     // serialize them, and then re-parse them, constructing new BSON that is owned by the
     // DocumentSourceMatch.
-    auto firstMatch = DocumentSourceMatch::create(newExpr.first->serialize(), pExpCtx);
+    auto firstMatch = DocumentSourceMatch::create(newExpr.first->serialize(), getExpCtx());
 
     intrusive_ptr<DocumentSourceMatch> secondMatch;
     if (newExpr.second) {
-        secondMatch = DocumentSourceMatch::create(newExpr.second->serialize(), pExpCtx);
+        secondMatch = DocumentSourceMatch::create(newExpr.second->serialize(), getExpCtx());
     }
 
     return {std::move(firstMatch), std::move(secondMatch)};
@@ -601,7 +581,7 @@ BSONObj DocumentSourceMatch::getQuery() const {
     // the result of 'getQuery' during pushdown to the find layer in order to keep alive the
     // MatchExpression's backing BSON, since we use the MatchExpression to construct the
     // CanonicalQuery and require that it holds pointers into valid BSON during execution.
-    return _backingBsonForPredicate;
+    return _matchProcessor->getPredicate();
 }
 
 DepsTracker::State DocumentSourceMatch::getDependencies(DepsTracker* deps) const {

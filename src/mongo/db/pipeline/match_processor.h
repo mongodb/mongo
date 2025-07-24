@@ -42,7 +42,9 @@ namespace mongo {
 // to perform the document processing needed for $match.
 class MatchProcessor {
 public:
-    MatchProcessor(std::unique_ptr<MatchExpression> expr, DepsTracker dependencies);
+    MatchProcessor(std::unique_ptr<MatchExpression> expr,
+                   DepsTracker dependencies,
+                   BSONObj&& predicate);
 
     // Processes the given document and returns true if it matches the conditions specified in
     // the MatchExpression.
@@ -60,6 +62,10 @@ public:
         _expression = std::move(expression);
     }
 
+    const BSONObj& getPredicate() const {
+        return _predicate;
+    }
+
 private:
     // Determines whether all fields have unique prefixes. This is called once during object
     // construction to determine the value of '_hasUniquePrefixes'.
@@ -75,6 +81,10 @@ private:
     // uniqueness check outcome the match processor may be able to use an optimized code path when
     // converting input Documents to BSONObjs.
     const bool _hasUniquePrefixes;
+
+    // Store the BSONObj that backs this '_expression' so that it doesn't get disposed before the
+    // match expression does.
+    BSONObj _predicate;
 };
 
 }  // namespace mongo

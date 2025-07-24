@@ -37,11 +37,16 @@
 
 namespace mongo {
 
-MatchProcessor::MatchProcessor(std::unique_ptr<MatchExpression> expr, DepsTracker dependencies)
+MatchProcessor::MatchProcessor(std::unique_ptr<MatchExpression> expr,
+                               DepsTracker dependencies,
+                               BSONObj&& predicate)
     : _expression(std::move(expr)),
       _dependencies(std::move(dependencies)),
       _hasUniquePrefixes(_dependencies.fields.size() < 2 ||
-                         hasUniquePrefixes(_dependencies.fields)) {}
+                         hasUniquePrefixes(_dependencies.fields)),
+      _predicate(std::move(predicate)) {
+    tassert(10422701, "expecting 'predicate' to be owned", _predicate.isOwned());
+}
 
 bool MatchProcessor::process(const Document& input) const {
     // MatchExpression only takes BSON documents, so we have to make one. As an optimization,

@@ -166,7 +166,7 @@ StageConstraints DocumentSourceChangeStreamOplogMatch::constraints(
                                  UnionRequirement::kNotAllowed,
                                  ChangeStreamRequirement::kChangeStreamStage);
     constraints.isIndependentOfAnyCollection =
-        pExpCtx->getNamespaceString().isCollectionlessAggregateNS() ? true : false;
+        getExpCtx()->getNamespaceString().isCollectionlessAggregateNS() ? true : false;
     constraints.consumesLogicalCollectionData = false;
     return constraints;
 }
@@ -180,7 +180,7 @@ DocumentSourceContainer::iterator DocumentSourceChangeStreamOplogMatch::doOptimi
     // It is not safe to combine any parts of a user $match with this stage when the $user match has
     // a non-simple collation, because this stage's MatchExpression always executes wtih the simple
     // collation.
-    if (pExpCtx->getCollator()) {
+    if (getExpCtx()->getCollator()) {
         return nextChangeStreamStageItr;
     }
 
@@ -222,7 +222,7 @@ DocumentSourceContainer::iterator DocumentSourceChangeStreamOplogMatch::doOptimi
     // Recreate the change stream filter with additional predicates from the user's $match.
     std::vector<BSONObj> backingBsonObjs;
     auto filterWithUserPredicates = change_stream_filter::buildOplogMatchFilter(
-        pExpCtx, *_clusterTime, backingBsonObjs, matchStage->getMatchExpression());
+        getExpCtx(), *_clusterTime, backingBsonObjs, matchStage->getMatchExpression());
 
     // Set the internal DocumentSourceMatch state to the new filter.
     rebuild(filterWithUserPredicates->serialize());

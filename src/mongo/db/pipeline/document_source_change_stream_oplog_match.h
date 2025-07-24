@@ -42,7 +42,6 @@
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/tailable_mode_gen.h"
-#include "mongo/util/assert_util.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -82,14 +81,6 @@ public:
         const DocumentSourceChangeStreamSpec& spec);
 
     const char* getSourceName() const final;
-
-    GetNextResult doGetNext() final {
-        // We should never execute this stage directly. We expect this stage to be absorbed into the
-        // cursor feeding the pipeline, and executing this stage may result in the use of the wrong
-        // collation. The comparisons against the oplog must use the simple collation, regardless of
-        // the collation on the ExpressionContext.
-        MONGO_UNREACHABLE;
-    }
 
     StageConstraints constraints(PipelineSplitState pipeState) const final;
 
