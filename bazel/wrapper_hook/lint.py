@@ -1,3 +1,4 @@
+import argparse
 import os
 import pathlib
 import platform
@@ -178,13 +179,52 @@ def _get_files_changed_since_fork_point(origin_branch: str = "origin/master") ->
 
     return list(file_set)
 
+def get_parsed_args(args):
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--lint-yaml-project",
+        type=str,
+        default="mongodb-mongo-master",
+        required=False,
+        help="Run evergreen yaml linter for specified project",
+    )
+    parser.add_argument(
+        "--fix",
+        action="store_true",
+        default=False,
+        help="Apply linter fixes",
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        default=False,
+        help="Run linter on all targets",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "--fail-on-validation",
+        type=bool,
+        default=False,
+    )
+    parser.add_argument(
+        "--origin-branch",
+        type=str,
+        default="origin/master",
+        help="Base branch to compare changes against",
+    )
+    return parser.parse_known_args(args)
 
 def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
+    parsed_args, args = get_parsed_args(args)
     if platform.system() == "Windows":
         print("eslint not supported on windows")
         return False
 
-    if "--fix" in args:
+    if parsed_args.fix:
         create_build_files_in_new_js_dirs()
 
     files_with_targets = list_files_with_targets(bazel_bin)
@@ -201,15 +241,10 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
     ):
         return False
 
-    lint_all = "..." in args or "--all" in args or "//..." in args
-    files_to_lint = args
-    if not lint_all and len([arg for arg in args if not arg.startswith("--")]) == 0:
-        origin_branch = "origin/master"
-        for arg in args:
-            if arg.startswith("--origin-branch="):
-                origin_branch = arg.split("=")[1]
-                args.remove(arg)
-
+    lint_all = parsed_args.all or "..." in args or "//..." in args
+    files_to_lint = [arg for arg in args if not arg.startswith("-")]
+    if not lint_all and files_to_lint:
+        origin_branch = parsed_args.origin_branch
         max_distance = 100
         distance = _git_distance([f"{origin_branch}..HEAD"])
         if distance > max_distance:
@@ -227,10 +262,6 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
                 if file.endswith((".cpp", ".c", ".h", ".py", ".js", ".mjs", ".json", ".lock", ".toml"))
             ]
 
-    # Default to linting everything in rules_lint if no path was passed in.
-    if len([arg for arg in args if not arg.startswith("--")]) == 0:
-        args = ["//..."] + args
-
     if lint_all or "sbom.json" in files_to_lint:
         subprocess.run([bazel_bin, "run", "//buildscripts:sbom_linter"], check=True)
 
@@ -247,6 +278,9 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
 
     if lint_all or "poetry.lock" in files_to_lint or "pyproject.toml" in files_to_lint:
         subprocess.run([bazel_bin, "run", "//buildscripts:poetry_lock_check"], check=True)
+
+    if lint_all or any(file.endswith(".yml") for file in files_to_lint):
+        subprocess.run([bazel_bin, "run", "//buildscripts:validate_evg_project_config", "--", f"--evg-project-name={parsed_args.lint_yaml_project}", "--evg-auth-config=.evergreen.yml"], check=True)
 
     fix = ""
     with tempfile.NamedTemporaryFile(delete=False) as buildevents:
@@ -267,23 +301,20 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
     )
 
     # This is a rudimentary flag parser.
-    if "--fail-on-violation" in args:
+    if parsed_args.fail_on_validation:
         args.extend(["--@aspect_rules_lint//lint:fail_on_violation", "--keep_going"])
-        args.remove("--fail-on-violation")
 
     # Allow a `--fix` option on the command-line.
     # This happens to make output of the linter such as ruff's
     # [*] 1 fixable with the `--fix` option.
     # so that the naive thing of pasting that flag to lint.sh will do what the user expects.
-    if "--fix" in args:
+    if parsed_args.fix:
         fix = "patch"
         args.extend(["--@aspect_rules_lint//lint:fix", "--output_groups=rules_lint_patch"])
-        args.remove("--fix")
 
     # the --dry-run flag must immediately follow the --fix flag
-    if "--dry-run" in args:
+    if parsed_args.dry_run:
         fix = "print"
-        args.remove("--dry-run")
 
     args = (
         [arg for arg in args if arg.startswith("--") and arg != "--"]

@@ -764,7 +764,7 @@ tasks:
       - func: "bazel run"
         vars:
           target: >-
-            lint //...
+            lint //... --lint-yaml=${project}
 
   # Check that the mutational fuzzer can parse all JS filess.
   - name: lint_fuzzer_sanity_all
@@ -853,46 +853,6 @@ tasks:
             - "lint-pyright"
             - "buildscripts/pyrightlint.py"
             - "lint-all"
-
-  - name: lint_yaml
-    tags:
-      [
-        "assigned_to_jira_team_devprod_correctness",
-        "development_critical_single_variant",
-        "lint",
-      ]
-    depends_on: []
-    commands:
-      - command: timeout.update
-        params:
-          # 20 mins
-          exec_timeout_secs: 1200
-      - func: "f_expansions_write"
-      - command: manifest.load
-      - func: "git get project and add git tag"
-      - func: "f_expansions_write"
-      - func: "kill processes"
-      - func: "cleanup environment"
-      - func: "set up venv"
-      - func: "upload pip requirements"
-      - func: "f_expansions_write"
-      - command: subprocess.exec
-        type: test
-        params:
-          binary: bash
-          args:
-            - "src/evergreen/lint_yaml.sh"
-      - func: "configure evergreen api credentials"
-      - command: subprocess.exec
-        type: test
-        params:
-          binary: bash
-          args:
-            - "src/evergreen/run_python_script_with_report.sh"
-            - "validate-evergreen-project-config-yaml"
-            - "buildscripts/validate_evg_project_config.py"
-            - "--evg-project-name=${project}"
-            - "--evg-auth-config=.evergreen.yml"
 
   - name: lint_modules
     tags:
