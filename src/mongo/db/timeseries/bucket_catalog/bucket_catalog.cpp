@@ -784,7 +784,6 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
                           const Date_t& measurementTimestamp,
                           const TimeseriesOptions& options,
                           const StringDataComparator* comparator,
-                          BucketStateRegistry::Era era,
                           uint64_t storageCacheSizeBytes,
                           const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
                           ExecutionStatsController& stats,
@@ -823,6 +822,12 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
         }
 
         // 2. Attempt to reopen a bucket.
+        // Save the catalog era value from before trying to reopen a bucket. This guarantees that we
+        // don't miss a direct write that happens sometime in between our decision to potentially
+        // reopen a bucket below, and actually reopening it in a subsequent reentrant call. Any
+        // direct write will increment the era, so the reentrant call can check the current value
+        // and return a write conflict if it sees a newer era.
+        const auto catalogEra = getCurrentEra(catalog.bucketStateRegistry);
         // Explicitly pass in the lock which can be unlocked and relocked during reopening.
         auto swReopenedBucket = potentiallyReopenBucket(opCtx,
                                                         catalog,
@@ -832,7 +837,7 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
                                                         bucketKey,
                                                         measurementTimestamp,
                                                         options,
-                                                        era,
+                                                        catalogEra,
                                                         allowQueryBasedReopening,
                                                         storageCacheSizeBytes,
                                                         compressAndWriteBucketFunc,
@@ -1151,12 +1156,6 @@ TimeseriesWriteBatches stageInsertBatch(
     uint64_t storageCacheSizeBytes,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
     BatchedInsertContext& batch) {
-    // Save the catalog era value from before we make any further checks. This guarantees that we
-    // don't miss a direct write that happens sometime in between our decision to potentially reopen
-    // a bucket below, and actually reopening it in a subsequent reentrant call. Any direct write
-    // will increment the era, so the reentrant call can check the current value and return a write
-    // conflict if it sees a newer era.
-    const auto catalogEra = getCurrentEra(bucketCatalog.bucketStateRegistry);
     auto& stripe = *bucketCatalog.stripes[batch.stripeNumber];
     stdx::unique_lock<stdx::mutex> stripeLock{stripe.mutex};
     TimeseriesWriteBatches writeBatches;
@@ -1177,7 +1176,6 @@ TimeseriesWriteBatches stageInsertBatch(
                                                  measurementTimestamp,
                                                  batch.options,
                                                  comparator,
-                                                 catalogEra,
                                                  storageCacheSizeBytes,
                                                  compressAndWriteBucketFunc,
                                                  batch.stats,

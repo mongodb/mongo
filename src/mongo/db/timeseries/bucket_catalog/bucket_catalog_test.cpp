@@ -3420,7 +3420,6 @@ TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
 
     auto batchedInsertCtx = batchedInsertContexts[0];
     auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
-    auto era = getCurrentEra(_bucketCatalog->bucketStateRegistry);
 
     ASSERT(_bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.empty());
     ASSERT(_bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsById.empty());
@@ -3439,7 +3438,6 @@ TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
                                          measurementTimestamp,
                                          batchedInsertCtx.options,
                                          bucketsColl->getDefaultCollator(),
-                                         era,
                                          _storageCacheSizeBytes,
                                          _compressBucketFuncUnused,
                                          batchedInsertCtx.stats,
@@ -3472,7 +3470,6 @@ TEST_F(BucketCatalogTest, GetEligibleBucketOpenBucket) {
 
     auto batchedInsertCtx = batchedInsertContexts[0];
     auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
-    auto era = getCurrentEra(_bucketCatalog->bucketStateRegistry);
 
     Bucket& bucketAllocated =
         internal::allocateBucket(*_bucketCatalog,
@@ -3502,7 +3499,6 @@ TEST_F(BucketCatalogTest, GetEligibleBucketOpenBucket) {
                               measurementTimestamp,
                               batchedInsertCtx.options,
                               bucketsColl->getDefaultCollator(),
-                              era,
                               _storageCacheSizeBytes,
                               _compressBucketFuncUnused,
                               batchedInsertCtx.stats,
