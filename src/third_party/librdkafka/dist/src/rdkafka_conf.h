@@ -1,7 +1,8 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2014-2018 Magnus Edenhill
+ * Copyright (c) 2014-2022, Magnus Edenhill
+ *               2023, Confluent Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -158,6 +159,16 @@ typedef enum {
         RD_KAFKA_SSL_ENDPOINT_ID_HTTPS, /**< RFC2818 */
 } rd_kafka_ssl_endpoint_id_t;
 
+typedef enum {
+        RD_KAFKA_USE_ALL_DNS_IPS,
+        RD_KAFKA_RESOLVE_CANONICAL_BOOTSTRAP_SERVERS_ONLY,
+} rd_kafka_client_dns_lookup_t;
+
+typedef enum {
+        RD_KAFKA_GROUP_PROTOCOL_CLASSIC,
+        RD_KAFKA_GROUP_PROTOCOL_CONSUMER,
+} rd_kafka_group_protocol_t;
+
 /* Increase in steps of 64 as needed.
  * This must be larger than sizeof(rd_kafka_[topic_]conf_t) */
 #define RD_KAFKA_CONF_PROPS_IDX_MAX (64 * 33)
@@ -224,6 +235,7 @@ struct rd_kafka_conf_s {
         int api_version_fallback_ms;
         char *broker_version_fallback;
         rd_kafka_secproto_t security_protocol;
+        rd_kafka_client_dns_lookup_t client_dns_lookup;
 
         struct {
 #if WITH_SSL
@@ -342,6 +354,7 @@ struct rd_kafka_conf_s {
         /* Client group configuration */
         int coord_query_intvl_ms;
         int max_poll_interval_ms;
+        int enable_metrics_push;
 
         int builtin_features;
         /*
@@ -355,9 +368,12 @@ struct rd_kafka_conf_s {
         int fetch_msg_max_bytes;
         int fetch_max_bytes;
         int fetch_min_bytes;
+        int fetch_queue_backoff_ms;
         int fetch_error_backoff_ms;
+        rd_kafka_group_protocol_t group_protocol;
         char *group_id_str;
         char *group_instance_id;
+        char *group_remote_assignor;
         int allow_auto_create_topics;
 
         rd_kafka_pattern_list_t *topic_blacklist;
@@ -372,6 +388,7 @@ struct rd_kafka_conf_s {
         rd_kafkap_str_t *group_protocol_type;
         char *partition_assignment_strategy;
         rd_list_t partition_assignors;
+        rd_bool_t partition_assignors_cooperative;
         int enabled_assignor_cnt;
 
         void (*rebalance_cb)(rd_kafka_t *rk,
@@ -416,6 +433,7 @@ struct rd_kafka_conf_s {
         int queue_backpressure_thres;
         int max_retries;
         int retry_backoff_ms;
+        int retry_backoff_max_ms;
         int batch_num_messages;
         int batch_size;
         rd_kafka_compression_t compression_codec;

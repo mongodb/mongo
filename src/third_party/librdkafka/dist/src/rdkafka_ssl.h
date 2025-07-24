@@ -1,7 +1,7 @@
 /*
  * librdkafka - The Apache Kafka C/C++ library
  *
- * Copyright (c) 2019 Magnus Edenhill
+ * Copyright (c) 2019-2022, Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -53,5 +53,12 @@ void rd_kafka_ssl_term(void);
 void rd_kafka_ssl_init(void);
 
 const char *rd_kafka_ssl_last_error_str(void);
+
+int rd_kafka_ssl_hmac(rd_kafka_broker_t *rkb,
+                      const EVP_MD *evp,
+                      const rd_chariov_t *in,
+                      const rd_chariov_t *salt,
+                      int itcnt,
+                      rd_chariov_t *out);
 
 #endif /* _RDKAFKA_SSL_H_ */

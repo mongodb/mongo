@@ -1,8 +1,8 @@
 /*
  * librd - Rapid Development C library
  *
- * Copyright (c) 2012-2013, Magnus Edenhill
- * Copyright (c) 2012-2013, Andreas Öman
+ * Copyright (c) 2012-2022, Magnus Edenhill
+ * Copyright (c) 2012-2022, Andreas Öman
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

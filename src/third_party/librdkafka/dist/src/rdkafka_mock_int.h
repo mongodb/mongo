@@ -1,7 +1,8 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2019 Magnus Edenhill
+ * Copyright (c) 2019-2022, Magnus Edenhill
+ *               2023, Confluent Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -217,6 +218,7 @@ typedef struct rd_kafka_mock_msgset_s {
         TAILQ_ENTRY(rd_kafka_mock_msgset_s) link;
         int64_t first_offset; /**< First offset in batch */
         int64_t last_offset;  /**< Last offset in batch */
+        int32_t leader_epoch; /**< Msgset leader epoch */
         rd_kafkap_bytes_t bytes;
         /* Space for bytes.data is allocated after the msgset_t */
 } rd_kafka_mock_msgset_t;
@@ -233,6 +235,18 @@ typedef struct rd_kafka_mock_committed_offset_s {
         rd_kafkap_str_t *metadata; /**< Metadata, allocated separately */
 } rd_kafka_mock_committed_offset_t;
 
+/**
+ * @struct Leader id and epoch to return in a Metadata call.
+ */
+typedef struct rd_kafka_mock_partition_leader_s {
+        /**< Link to prev/next entries */
+        TAILQ_ENTRY(rd_kafka_mock_partition_leader_s) link;
+        int32_t leader_id;    /**< Leader id */
+        int32_t leader_epoch; /**< Leader epoch */
+} rd_kafka_mock_partition_leader_t;
+
+
+TAILQ_HEAD(rd_kafka_mock_msgset_tailq_s, rd_kafka_mock_msgset_s);
 
 /**
  * @struct Mock partition
@@ -241,6 +255,8 @@ typedef struct rd_kafka_mock_partition_s {
         TAILQ_ENTRY(rd_kafka_mock_partition_s) leader_link;
         int32_t id;
 
+        int32_t leader_epoch;          /**< Leader epoch, bumped on each
+                                        *   partition leader change. */
         int64_t start_offset;          /**< Actual/leader start offset */
         int64_t end_offset;            /**< Actual/leader end offset */
         int64_t follower_start_offset; /**< Follower's start offset */
@@ -252,7 +268,7 @@ typedef struct rd_kafka_mock_partition_s {
                                                  *   in synch with end_offset
                                                  */
 
-        TAILQ_HEAD(, rd_kafka_mock_msgset_s) msgsets;
+        struct rd_kafka_mock_msgset_tailq_s msgsets;
         size_t size;     /**< Total size of all .msgsets */
         size_t cnt;      /**< Total count of .msgsets */
         size_t max_size; /**< Maximum size of all .msgsets, may be overshot. */
@@ -270,6 +286,10 @@ typedef struct rd_kafka_mock_partition_s {
         int32_t follower_id; /**< Preferred replica/follower */
 
         struct rd_kafka_mock_topic_s *topic;
+
+        /**< Leader responses */
+        TAILQ_HEAD(, rd_kafka_mock_partition_leader_s)
+        leader_responses;
 } rd_kafka_mock_partition_t;
 
 
@@ -279,6 +299,7 @@ typedef struct rd_kafka_mock_partition_s {
 typedef struct rd_kafka_mock_topic_s {
         TAILQ_ENTRY(rd_kafka_mock_topic_s) link;
         char *name;
+        rd_kafka_Uuid_t id;
 
         rd_kafka_mock_partition_t *partitions;
         int partition_cnt;
@@ -373,6 +394,8 @@ struct rd_kafka_mock_cluster_s {
         struct {
                 int partition_cnt;      /**< Auto topic create part cnt */
                 int replication_factor; /**< Auto topic create repl factor */
+                /** Group initial rebalance delay */
+                int32_t group_initial_rebalance_delay_ms;
         } defaults;
 
         /**< Dynamic array of IO handlers for corresponding fd in .fds */
@@ -387,9 +410,28 @@ struct rd_kafka_mock_cluster_s {
         /**< Request handlers */
         struct rd_kafka_mock_api_handler api_handlers[RD_KAFKAP__NUM];
 
+        /** Requested metrics. */
+        char **metrics;
+
+        /** Requested metric count. */
+        size_t metrics_cnt;
+
+        /** Telemetry push interval ms. Default is 5 min */
+        int64_t telemetry_push_interval_ms;
+
+        /**< Appends the requests received to mock cluster if set to true,
+         *   defaulted to false for less memory usage. */
+        rd_bool_t track_requests;
+        /**< List of API requests for this broker. Type:
+         *   rd_kafka_mock_request_t*
+         */
+        rd_list_t request_list;
+
         /**< Mutex for:
          *   .errstacks
          *   .apiversions
+         *   .track_requests
+         *   .request_list
          */
         mtx_t lock;
 
@@ -399,8 +441,13 @@ struct rd_kafka_mock_cluster_s {
 
 
 rd_kafka_buf_t *rd_kafka_mock_buf_new_response(const rd_kafka_buf_t *request);
-void rd_kafka_mock_connection_send_response(rd_kafka_mock_connection_t *mconn,
-                                            rd_kafka_buf_t *resp);
+
+#define rd_kafka_mock_connection_send_response(mconn, resp)                    \
+        rd_kafka_mock_connection_send_response0(mconn, resp, rd_false)
+
+void rd_kafka_mock_connection_send_response0(rd_kafka_mock_connection_t *mconn,
+                                             rd_kafka_buf_t *resp,
+                                             rd_bool_t tags_written);
 void rd_kafka_mock_connection_set_blocking(rd_kafka_mock_connection_t *mconn,
                                            rd_bool_t blocking);
 
@@ -418,6 +465,11 @@ rd_kafka_mock_topic_find(const rd_kafka_mock_cluster_t *mcluster,
 rd_kafka_mock_topic_t *
 rd_kafka_mock_topic_find_by_kstr(const rd_kafka_mock_cluster_t *mcluster,
                                  const rd_kafkap_str_t *kname);
+
+rd_kafka_mock_topic_t *
+rd_kafka_mock_topic_find_by_id(const rd_kafka_mock_cluster_t *mcluster,
+                               rd_kafka_Uuid_t id);
+
 rd_kafka_mock_broker_t *
 rd_kafka_mock_cluster_get_coord(rd_kafka_mock_cluster_t *mcluster,
                                 rd_kafka_coordtype_t KeyType,
@@ -446,6 +498,21 @@ rd_kafka_mock_partition_log_append(rd_kafka_mock_partition_t *mpart,
                                    const rd_kafkap_bytes_t *records,
                                    const rd_kafkap_str_t *TransactionalId,
                                    int64_t *BaseOffset);
+
+rd_kafka_resp_err_t rd_kafka_mock_partition_leader_epoch_check(
+    const rd_kafka_mock_partition_t *mpart,
+    int32_t leader_epoch);
+
+int64_t rd_kafka_mock_partition_offset_for_leader_epoch(
+    const rd_kafka_mock_partition_t *mpart,
+    int32_t leader_epoch);
+
+rd_kafka_mock_partition_leader_t *
+rd_kafka_mock_partition_next_leader_response(rd_kafka_mock_partition_t *mpart);
+
+void rd_kafka_mock_partition_leader_destroy(
+    rd_kafka_mock_partition_t *mpart,
+    rd_kafka_mock_partition_leader_t *mpart_leader);
 
 
 /**
@@ -492,6 +559,7 @@ rd_kafka_mock_cgrp_member_add(rd_kafka_mock_cgrp_t *mcgrp,
                               rd_kafka_mock_connection_t *mconn,
                               rd_kafka_buf_t *resp,
                               const rd_kafkap_str_t *MemberId,
+                              const rd_kafkap_str_t *GroupInstanceId,
                               const rd_kafkap_str_t *ProtocolType,
                               rd_kafka_mock_cgrp_proto_t *protos,
                               int proto_cnt,
@@ -513,8 +581,6 @@ rd_kafka_mock_cgrp_get(rd_kafka_mock_cluster_t *mcluster,
                        const rd_kafkap_str_t *ProtocolType);
 void rd_kafka_mock_cgrps_connection_closed(rd_kafka_mock_cluster_t *mcluster,
                                            rd_kafka_mock_connection_t *mconn);
-
-
 /**
  *@}
  */

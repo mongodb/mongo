@@ -1,7 +1,7 @@
 /*
  * librd - Rapid Development C library
  *
- * Copyright (c) 2012, Magnus Edenhill
+ * Copyright (c) 2012-2022, Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -164,9 +164,28 @@ static RD_INLINE int rd_timeout_ms(rd_ts_t timeout_us) {
                 return (int)((timeout_us + 999) / 1000);
 }
 
+/**
+ * @brief Initialize an absolute timeout based on the provided \p timeout_ms
+ *        and given clock \p now
+ *
+ * To be used with rd_timeout_adjust().
+ *
+ * Honours RD_POLL_INFINITE, RD_POLL_NOWAIT.
+ *
+ * @returns the absolute timeout which should later be passed
+ *          to rd_timeout_adjust().
+ */
+static RD_INLINE rd_ts_t rd_timeout_init0(rd_ts_t now, int timeout_ms) {
+        if (timeout_ms == RD_POLL_INFINITE || timeout_ms == RD_POLL_NOWAIT)
+                return timeout_ms;
+
+        return now + ((rd_ts_t)timeout_ms * 1000);
+}
+
 
 /**
  * @brief Initialize an absolute timeout based on the provided \p timeout_ms
+ *        and current clock.
  *
  * To be used with rd_timeout_adjust().
  *
@@ -176,10 +195,7 @@ static RD_INLINE int rd_timeout_ms(rd_ts_t timeout_us) {
  *          to rd_timeout_adjust().
  */
 static RD_INLINE rd_ts_t rd_timeout_init(int timeout_ms) {
-        if (timeout_ms == RD_POLL_INFINITE || timeout_ms == RD_POLL_NOWAIT)
-                return timeout_ms;
-
-        return rd_clock() + ((rd_ts_t)timeout_ms * 1000);
+        return rd_timeout_init0(rd_clock(), timeout_ms);
 }
 
 

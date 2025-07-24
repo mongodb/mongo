@@ -1,7 +1,8 @@
 /*
  * librdkafka - The Apache Kafka C/C++ library
  *
- * Copyright (c) 2015 Magnus Edenhill
+ * Copyright (c) 2015-2022, Magnus Edenhill
+ *               2023 Confluent Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -59,6 +60,9 @@ void rd_kafka_group_member_clear(rd_kafka_group_member_t *rkgm) {
         if (rkgm->rkgm_member_metadata)
                 rd_kafkap_bytes_destroy(rkgm->rkgm_member_metadata);
 
+        if (rkgm->rkgm_rack_id)
+                rd_kafkap_str_destroy(rkgm->rkgm_rack_id);
+
         memset(rkgm, 0, sizeof(*rkgm));
 }
 
@@ -106,7 +110,9 @@ rd_kafkap_bytes_t *rd_kafka_consumer_protocol_member_metadata_new(
     const rd_list_t *topics,
     const void *userdata,
     size_t userdata_size,
-    const rd_kafka_topic_partition_list_t *owned_partitions) {
+    const rd_kafka_topic_partition_list_t *owned_partitions,
+    int generation,
+    const rd_kafkap_str_t *rack_id) {
 
         rd_kafka_buf_t *rkbuf;
         rd_kafkap_bytes_t *kbytes;
@@ -124,12 +130,14 @@ rd_kafkap_bytes_t *rd_kafka_consumer_protocol_member_metadata_new(
          *   OwnedPartitions => [Topic Partitions] // added in v1
          *     Topic => string
          *     Partitions => [int32]
+         *   GenerationId => int32 // added in v2
+         *   RackId => string // added in v3
          */
 
         rkbuf = rd_kafka_buf_new(1, 100 + (topic_cnt * 100) + userdata_size);
 
         /* Version */
-        rd_kafka_buf_write_i16(rkbuf, 1);
+        rd_kafka_buf_write_i16(rkbuf, 3);
         rd_kafka_buf_write_i32(rkbuf, topic_cnt);
         RD_LIST_FOREACH(tinfo, topics, i)
         rd_kafka_buf_write_str(rkbuf, tinfo->topic, -1);
@@ -144,13 +152,22 @@ rd_kafkap_bytes_t *rd_kafka_consumer_protocol_member_metadata_new(
                 /* If there are no owned partitions, this is specified as an
                  * empty array, not NULL. */
                 rd_kafka_buf_write_i32(rkbuf, 0); /* Topic count */
-        else
+        else {
+                const rd_kafka_topic_partition_field_t fields[] = {
+                    RD_KAFKA_TOPIC_PARTITION_FIELD_PARTITION,
+                    RD_KAFKA_TOPIC_PARTITION_FIELD_END};
                 rd_kafka_buf_write_topic_partitions(
                     rkbuf, owned_partitions,
                     rd_false /*don't skip invalid offsets*/,
-                    rd_false /*any offset*/, rd_false /*don't write offsets*/,
-                    rd_false /*don't write epoch*/,
-                    rd_false /*don't write metadata*/);
+                    rd_false /*any offset*/, rd_false /*don't use topic id*/,
+                    rd_true /*use topic name*/, fields);
+        }
+
+        /* Following data is ignored by consumer version < 2 */
+        rd_kafka_buf_write_i32(rkbuf, generation);
+
+        /* Following data is ignored by consumer version < 3 */
+        rd_kafka_buf_write_kstr(rkbuf, rack_id);
 
         /* Get binary buffer and allocate a new Kafka Bytes with a copy. */
         rd_slice_init_full(&rkbuf->rkbuf_reader, &rkbuf->rkbuf_buf);
@@ -168,9 +185,13 @@ rd_kafkap_bytes_t *rd_kafka_assignor_get_metadata_with_empty_userdata(
     const rd_kafka_assignor_t *rkas,
     void *assignor_state,
     const rd_list_t *topics,
-    const rd_kafka_topic_partition_list_t *owned_partitions) {
-        return rd_kafka_consumer_protocol_member_metadata_new(topics, NULL, 0,
-                                                              owned_partitions);
+    const rd_kafka_topic_partition_list_t *owned_partitions,
+    const rd_kafkap_str_t *rack_id) {
+        /* Generation was earlier populated inside userData, and older versions
+         * of clients still expect that. So, in case the userData is empty, we
+         * set the explicit generation field to the default value, -1 */
+        return rd_kafka_consumer_protocol_member_metadata_new(
+            topics, NULL, 0, owned_partitions, -1 /* generation */, rack_id);
 }
 
 
@@ -242,6 +263,8 @@ rd_kafka_member_subscriptions_map(rd_kafka_cgrp_t *rkcg,
                                   int member_cnt) {
         int ti;
         rd_kafka_assignor_topic_t *eligible_topic = NULL;
+        rd_kafka_metadata_internal_t *mdi =
+            rd_kafka_metadata_get_internal(metadata);
 
         rd_list_init(eligible_topics, RD_MIN(metadata->topic_cnt, 10),
                      (void *)rd_kafka_assignor_topic_destroy);
@@ -283,7 +306,8 @@ rd_kafka_member_subscriptions_map(rd_kafka_cgrp_t *rkcg,
                         continue;
                 }
 
-                eligible_topic->metadata = &metadata->topics[ti];
+                eligible_topic->metadata          = &metadata->topics[ti];
+                eligible_topic->metadata_internal = &mdi->topics[ti];
                 rd_list_add(eligible_topics, eligible_topic);
                 eligible_topic = NULL;
         }
@@ -483,7 +507,8 @@ rd_kafka_resp_err_t rd_kafka_assignor_add(
         const struct rd_kafka_assignor_s *rkas,
         void *assignor_state,
         const rd_list_t *topics,
-        const rd_kafka_topic_partition_list_t *owned_partitions),
+        const rd_kafka_topic_partition_list_t *owned_partitions,
+        const rd_kafkap_str_t *rack_id),
     void (*on_assignment_cb)(const struct rd_kafka_assignor_s *rkas,
                              void **assignor_state,
                              const rd_kafka_topic_partition_list_t *assignment,
@@ -634,6 +659,676 @@ void rd_kafka_assignors_term(rd_kafka_t *rk) {
         rd_list_destroy(&rk->rk_conf.partition_assignors);
 }
 
+/**
+ * @brief Computes whether rack-aware assignment needs to be used, or not.
+ */
+rd_bool_t
+rd_kafka_use_rack_aware_assignment(rd_kafka_assignor_topic_t **topics,
+                                   size_t topic_cnt,
+                                   const rd_kafka_metadata_internal_t *mdi) {
+        /* Computing needs_rack_aware_assignment requires the evaluation of
+           three criteria:
+
+           1. At least one of the member has a non-null rack.
+           2. At least one common rack exists between members and partitions.
+           3. There is a partition which doesn't have replicas on all possible
+           racks, or in other words, all partitions don't have replicas on all
+           racks. Note that 'all racks' here means racks across all replicas of
+           all partitions, not including consumer racks. Also note that 'all
+           racks' are computed per-topic for range assignor, and across topics
+           for sticky assignor.
+        */
+
+        int i;
+        size_t t;
+        rd_kafka_group_member_t *member;
+        rd_list_t *all_consumer_racks  = NULL; /* Contained Type: char* */
+        rd_list_t *all_partition_racks = NULL; /* Contained Type: char* */
+        char *rack_id                  = NULL;
+        rd_bool_t needs_rack_aware_assignment = rd_true; /* assume true */
+
+        /* Criteria 1 */
+        /* We don't copy racks, so the free function is NULL. */
+        all_consumer_racks = rd_list_new(0, NULL);
+
+        for (t = 0; t < topic_cnt; t++) {
+                RD_LIST_FOREACH(member, &topics[t]->members, i) {
+                        if (member->rkgm_rack_id &&
+                            RD_KAFKAP_STR_LEN(member->rkgm_rack_id)) {
+                                /* Repetitions are fine, we will dedup it later.
+                                 */
+                                rd_list_add(
+                                    all_consumer_racks,
+                                    /* The const qualifier has to be discarded
+                                       because of how rd_list_t and
+                                       rd_kafkap_str_t are, but we never modify
+                                       items in all_consumer_racks. */
+                                    (char *)member->rkgm_rack_id->str);
+                        }
+                }
+        }
+        if (rd_list_cnt(all_consumer_racks) == 0) {
+                needs_rack_aware_assignment = rd_false;
+                goto done;
+        }
+
+
+        /* Critera 2 */
+        /* We don't copy racks, so the free function is NULL. */
+        all_partition_racks = rd_list_new(0, NULL);
+
+        for (t = 0; t < topic_cnt; t++) {
+                const int partition_cnt = topics[t]->metadata->partition_cnt;
+                for (i = 0; i < partition_cnt; i++) {
+                        size_t j;
+                        for (j = 0; j < topics[t]
+                                            ->metadata_internal->partitions[i]
+                                            .racks_cnt;
+                             j++) {
+                                char *rack =
+                                    topics[t]
+                                        ->metadata_internal->partitions[i]
+                                        .racks[j];
+                                rd_list_add(all_partition_racks, rack);
+                        }
+                }
+        }
+
+        /* If there are no partition racks, Criteria 2 cannot possibly be met.
+         */
+        if (rd_list_cnt(all_partition_racks) == 0) {
+                needs_rack_aware_assignment = rd_false;
+                goto done;
+        }
+
+        /* Sort and dedup the racks. */
+        rd_list_deduplicate(&all_consumer_racks, rd_strcmp2);
+        rd_list_deduplicate(&all_partition_racks, rd_strcmp2);
+
+
+        /* Iterate through each list in order, and see if there's anything in
+         * common */
+        RD_LIST_FOREACH(rack_id, all_consumer_racks, i) {
+                /* Break if there's even a single match. */
+                if (rd_list_find(all_partition_racks, rack_id, rd_strcmp2)) {
+                        break;
+                }
+        }
+        if (i == rd_list_cnt(all_consumer_racks)) {
+                needs_rack_aware_assignment = rd_false;
+                goto done;
+        }
+
+        /* Criteria 3 */
+        for (t = 0; t < topic_cnt; t++) {
+                const int partition_cnt = topics[t]->metadata->partition_cnt;
+                for (i = 0; i < partition_cnt; i++) {
+                        /* Since partition_racks[i] is a subset of
+                         * all_partition_racks, and both of them are deduped,
+                         * the same size indicates that they're equal. */
+                        if ((size_t)(rd_list_cnt(all_partition_racks)) !=
+                            topics[t]
+                                ->metadata_internal->partitions[i]
+                                .racks_cnt) {
+                                break;
+                        }
+                }
+                if (i < partition_cnt) {
+                        /* Break outer loop if inner loop was broken. */
+                        break;
+                }
+        }
+
+        /* Implies that all partitions have replicas on all racks. */
+        if (t == topic_cnt)
+                needs_rack_aware_assignment = rd_false;
+
+done:
+        RD_IF_FREE(all_consumer_racks, rd_list_destroy);
+        RD_IF_FREE(all_partition_racks, rd_list_destroy);
+
+        return needs_rack_aware_assignment;
+}
+
+
+/* Helper to populate the racks for brokers in the metadata for unit tests.
+ * Passing num_broker_racks = 0 will return NULL racks. */
+void ut_populate_internal_broker_metadata(rd_kafka_metadata_internal_t *mdi,
+                                          int num_broker_racks,
+                                          rd_kafkap_str_t *all_racks[],
+                                          size_t all_racks_cnt) {
+        int i;
+
+        rd_assert(num_broker_racks < (int)all_racks_cnt);
+
+        for (i = 0; i < mdi->metadata.broker_cnt; i++) {
+                mdi->brokers[i].id = i;
+                /* Cast from const to non-const. We don't intend to modify it,
+                 * but unfortunately neither implementation of rd_kafkap_str_t
+                 * or rd_kafka_metadata_broker_internal_t can be changed. So,
+                 * this cast is used - in unit tests only. */
+                mdi->brokers[i].rack_id =
+                    (char *)(num_broker_racks
+                                 ? all_racks[i % num_broker_racks]->str
+                                 : NULL);
+        }
+}
+
+/* Helper to populate the deduplicated racks inside each partition. It's assumed
+ * that `mdi->brokers` is set, maybe using
+ * `ut_populate_internal_broker_metadata`. */
+void ut_populate_internal_topic_metadata(rd_kafka_metadata_internal_t *mdi) {
+        int ti;
+        rd_kafka_metadata_broker_internal_t *brokers_internal;
+        size_t broker_cnt;
+
+        rd_assert(mdi->brokers);
+
+        brokers_internal = mdi->brokers;
+        broker_cnt       = mdi->metadata.broker_cnt;
+
+        for (ti = 0; ti < mdi->metadata.topic_cnt; ti++) {
+                int i;
+                rd_kafka_metadata_topic_t *mdt = &mdi->metadata.topics[ti];
+                rd_kafka_metadata_topic_internal_t *mdti = &mdi->topics[ti];
+
+                for (i = 0; i < mdt->partition_cnt; i++) {
+                        int j;
+                        rd_kafka_metadata_partition_t *partition =
+                            &mdt->partitions[i];
+                        rd_kafka_metadata_partition_internal_t
+                            *partition_internal = &mdti->partitions[i];
+
+                        rd_list_t *curr_list;
+                        char *rack;
+
+                        if (partition->replica_cnt == 0)
+                                continue;
+
+                        curr_list = rd_list_new(
+                            0, NULL); /* use a list for de-duplication */
+                        for (j = 0; j < partition->replica_cnt; j++) {
+                                rd_kafka_metadata_broker_internal_t key = {
+                                    .id = partition->replicas[j]};
+                                rd_kafka_metadata_broker_internal_t *broker =
+                                    bsearch(
+                                        &key, brokers_internal, broker_cnt,
+                                        sizeof(
+                                            rd_kafka_metadata_broker_internal_t),
+                                        rd_kafka_metadata_broker_internal_cmp);
+                                if (!broker || !broker->rack_id)
+                                        continue;
+                                rd_list_add(curr_list, broker->rack_id);
+                        }
+                        rd_list_deduplicate(&curr_list, rd_strcmp2);
+
+                        partition_internal->racks_cnt = rd_list_cnt(curr_list);
+                        partition_internal->racks     = rd_malloc(
+                            sizeof(char *) * partition_internal->racks_cnt);
+                        RD_LIST_FOREACH(rack, curr_list, j) {
+                                partition_internal->racks[j] =
+                                    rack; /* no duplication */
+                        }
+                        rd_list_destroy(curr_list);
+                }
+        }
+}
+
+/* Helper to destroy test metadata. Destroying the metadata has some additional
+ * steps in case of tests. */
+void ut_destroy_metadata(rd_kafka_metadata_t *md) {
+        int ti;
+        rd_kafka_metadata_internal_t *mdi = rd_kafka_metadata_get_internal(md);
+
+        for (ti = 0; ti < md->topic_cnt; ti++) {
+                int i;
+                rd_kafka_metadata_topic_t *mdt           = &md->topics[ti];
+                rd_kafka_metadata_topic_internal_t *mdti = &mdi->topics[ti];
+
+                for (i = 0; mdti && i < mdt->partition_cnt; i++) {
+                        rd_free(mdti->partitions[i].racks);
+                }
+        }
+
+        rd_kafka_metadata_destroy(md);
+}
+
+
+/**
+ * @brief Set a member's owned partitions based on its assignment.
+ *
+ * For use between assignor_run(). This is mimicing a consumer receiving
+ * its new assignment and including it in the next rebalance as its
+ * owned-partitions.
+ */
+void ut_set_owned(rd_kafka_group_member_t *rkgm) {
+        if (rkgm->rkgm_owned)
+                rd_kafka_topic_partition_list_destroy(rkgm->rkgm_owned);
+
+        rkgm->rkgm_owned =
+            rd_kafka_topic_partition_list_copy(rkgm->rkgm_assignment);
+}
+
+
+void ut_print_toppar_list(const rd_kafka_topic_partition_list_t *partitions) {
+        int i;
+
+        for (i = 0; i < partitions->cnt; i++)
+                RD_UT_SAY(" %s [%" PRId32 "]", partitions->elems[i].topic,
+                          partitions->elems[i].partition);
+}
+
+
+/* Implementation for ut_init_member and ut_init_member_with_rackv. */
+static void ut_init_member_internal(rd_kafka_group_member_t *rkgm,
+                                    const char *member_id,
+                                    const rd_kafkap_str_t *rack_id,
+                                    va_list ap) {
+        const char *topic;
+
+        memset(rkgm, 0, sizeof(*rkgm));
+
+        rkgm->rkgm_member_id         = rd_kafkap_str_new(member_id, -1);
+        rkgm->rkgm_group_instance_id = rd_kafkap_str_new(member_id, -1);
+        rkgm->rkgm_rack_id = rack_id ? rd_kafkap_str_copy(rack_id) : NULL;
+
+        rd_list_init(&rkgm->rkgm_eligible, 0, NULL);
+
+        rkgm->rkgm_subscription = rd_kafka_topic_partition_list_new(4);
+
+        while ((topic = va_arg(ap, const char *)))
+                rd_kafka_topic_partition_list_add(rkgm->rkgm_subscription,
+                                                  topic, RD_KAFKA_PARTITION_UA);
+
+        rkgm->rkgm_assignment =
+            rd_kafka_topic_partition_list_new(rkgm->rkgm_subscription->size);
+
+        rkgm->rkgm_generation = 1;
+}
+
+/**
+ * @brief Initialize group member struct for testing.
+ *
+ * va-args is a NULL-terminated list of (const char *) topics.
+ *
+ * Use rd_kafka_group_member_clear() to free fields.
+ */
+void ut_init_member(rd_kafka_group_member_t *rkgm, const char *member_id, ...) {
+        va_list ap;
+        va_start(ap, member_id);
+        ut_init_member_internal(rkgm, member_id, NULL, ap);
+        va_end(ap);
+}
+
+/**
+ * @brief Initialize group member struct for testing with a rackid.
+ *
+ * va-args is a NULL-terminated list of (const char *) topics.
+ *
+ * Use rd_kafka_group_member_clear() to free fields.
+ */
+void ut_init_member_with_rackv(rd_kafka_group_member_t *rkgm,
+                               const char *member_id,
+                               const rd_kafkap_str_t *rack_id,
+                               ...) {
+        va_list ap;
+        va_start(ap, rack_id);
+        ut_init_member_internal(rkgm, member_id, rack_id, ap);
+        va_end(ap);
+}
+
+/**
+ * @brief Initialize group member struct for testing with a rackid.
+ *
+ * Topics that the member is subscribed to are specified in an array with the
+ * size specified separately.
+ *
+ * Use rd_kafka_group_member_clear() to free fields.
+ */
+void ut_init_member_with_rack(rd_kafka_group_member_t *rkgm,
+                              const char *member_id,
+                              const rd_kafkap_str_t *rack_id,
+                              char *topics[],
+                              size_t topic_cnt) {
+        size_t i;
+
+        memset(rkgm, 0, sizeof(*rkgm));
+
+        rkgm->rkgm_member_id         = rd_kafkap_str_new(member_id, -1);
+        rkgm->rkgm_group_instance_id = rd_kafkap_str_new(member_id, -1);
+        rkgm->rkgm_rack_id = rack_id ? rd_kafkap_str_copy(rack_id) : NULL;
+        rd_list_init(&rkgm->rkgm_eligible, 0, NULL);
+
+        rkgm->rkgm_subscription = rd_kafka_topic_partition_list_new(4);
+
+        for (i = 0; i < topic_cnt; i++) {
+                rd_kafka_topic_partition_list_add(
+                    rkgm->rkgm_subscription, topics[i], RD_KAFKA_PARTITION_UA);
+        }
+        rkgm->rkgm_assignment =
+            rd_kafka_topic_partition_list_new(rkgm->rkgm_subscription->size);
+}
+
+/**
+ * @brief Verify that member's assignment matches the expected partitions.
+ *
+ * The va-list is a NULL-terminated list of (const char *topic, int partition)
+ * tuples.
+ *
+ * @returns 0 on success, else raises a unittest error and returns 1.
+ */
+int verifyAssignment0(const char *function,
+                      int line,
+                      rd_kafka_group_member_t *rkgm,
+                      ...) {
+        va_list ap;
+        int cnt = 0;
+        const char *topic;
+        int fails = 0;
+
+        va_start(ap, rkgm);
+        while ((topic = va_arg(ap, const char *))) {
+                int partition = va_arg(ap, int);
+                cnt++;
+
+                if (!rd_kafka_topic_partition_list_find(rkgm->rkgm_assignment,
+                                                        topic, partition)) {
+                        RD_UT_WARN(
+                            "%s:%d: Expected %s [%d] not found in %s's "
+                            "assignment (%d partition(s))",
+                            function, line, topic, partition,
+                            rkgm->rkgm_member_id->str,
+                            rkgm->rkgm_assignment->cnt);
+                        fails++;
+                }
+        }
+        va_end(ap);
+
+        if (cnt != rkgm->rkgm_assignment->cnt) {
+                RD_UT_WARN(
+                    "%s:%d: "
+                    "Expected %d assigned partition(s) for %s, not %d",
+                    function, line, cnt, rkgm->rkgm_member_id->str,
+                    rkgm->rkgm_assignment->cnt);
+                fails++;
+        }
+
+        if (fails)
+                ut_print_toppar_list(rkgm->rkgm_assignment);
+
+        RD_UT_ASSERT(!fails, "%s:%d: See previous errors", function, line);
+
+        return 0;
+}
+
+/**
+ * @brief Verify that all members' assignment matches the expected partitions.
+ *
+ * The va-list is a list of (const char *topic, int partition)
+ * tuples, and NULL to demarcate different members' assignment.
+ *
+ * @returns 0 on success, else raises a unittest error and returns 1.
+ */
+int verifyMultipleAssignment0(const char *function,
+                              int line,
+                              rd_kafka_group_member_t *rkgms,
+                              size_t member_cnt,
+                              ...) {
+        va_list ap;
+        const char *topic;
+        int fails = 0;
+        size_t i  = 0;
+
+        if (member_cnt == 0) {
+                return 0;
+        }
+
+        va_start(ap, member_cnt);
+        for (i = 0; i < member_cnt; i++) {
+                rd_kafka_group_member_t *rkgm = &rkgms[i];
+                int cnt                       = 0;
+                int local_fails               = 0;
+
+                while ((topic = va_arg(ap, const char *))) {
+                        int partition = va_arg(ap, int);
+                        cnt++;
+
+                        if (!rd_kafka_topic_partition_list_find(
+                                rkgm->rkgm_assignment, topic, partition)) {
+                                RD_UT_WARN(
+                                    "%s:%d: Expected %s [%d] not found in %s's "
+                                    "assignment (%d partition(s))",
+                                    function, line, topic, partition,
+                                    rkgm->rkgm_member_id->str,
+                                    rkgm->rkgm_assignment->cnt);
+                                local_fails++;
+                        }
+                }
+
+                if (cnt != rkgm->rkgm_assignment->cnt) {
+                        RD_UT_WARN(
+                            "%s:%d: "
+                            "Expected %d assigned partition(s) for %s, not %d",
+                            function, line, cnt, rkgm->rkgm_member_id->str,
+                            rkgm->rkgm_assignment->cnt);
+                        fails++;
+                }
+
+                if (local_fails)
+                        ut_print_toppar_list(rkgm->rkgm_assignment);
+                fails += local_fails;
+        }
+        va_end(ap);
+
+        RD_UT_ASSERT(!fails, "%s:%d: See previous errors", function, line);
+
+        return 0;
+}
+
+
+#define verifyNumPartitionsWithRackMismatchPartition(rktpar, metadata,         \
+                                                     increase)                 \
+        do {                                                                   \
+                if (!rktpar)                                                   \
+                        break;                                                 \
+                int i;                                                         \
+                rd_bool_t noneMatch = rd_true;                                 \
+                rd_kafka_metadata_internal_t *metadata_internal =              \
+                    rd_kafka_metadata_get_internal(metadata);                  \
+                                                                               \
+                for (i = 0; i < metadata->topics[j].partitions[k].replica_cnt; \
+                     i++) {                                                    \
+                        int32_t replica_id =                                   \
+                            metadata->topics[j].partitions[k].replicas[i];     \
+                        rd_kafka_metadata_broker_internal_t *broker;           \
+                        rd_kafka_metadata_broker_internal_find(                \
+                            metadata_internal, replica_id, broker);            \
+                                                                               \
+                        if (broker && !strcmp(rack_id, broker->rack_id)) {     \
+                                noneMatch = rd_false;                          \
+                                break;                                         \
+                        }                                                      \
+                }                                                              \
+                                                                               \
+                if (noneMatch)                                                 \
+                        increase++;                                            \
+        } while (0);
+
+/**
+ * @brief Verify number of partitions with rack mismatch.
+ */
+int verifyNumPartitionsWithRackMismatch0(const char *function,
+                                         int line,
+                                         rd_kafka_metadata_t *metadata,
+                                         rd_kafka_group_member_t *rkgms,
+                                         size_t member_cnt,
+                                         int expectedNumMismatch) {
+        size_t i;
+        int j, k;
+
+        int numMismatched = 0;
+        for (i = 0; i < member_cnt; i++) {
+                rd_kafka_group_member_t *rkgm = &rkgms[i];
+                const char *rack_id           = rkgm->rkgm_rack_id->str;
+                if (rack_id) {
+                        for (j = 0; j < metadata->topic_cnt; j++) {
+                                for (k = 0;
+                                     k < metadata->topics[j].partition_cnt;
+                                     k++) {
+                                        rd_kafka_topic_partition_t *rktpar =
+                                            rd_kafka_topic_partition_list_find(
+                                                rkgm->rkgm_assignment,
+                                                metadata->topics[j].topic, k);
+                                        verifyNumPartitionsWithRackMismatchPartition(
+                                            rktpar, metadata, numMismatched);
+                                }
+                        }
+                }
+        }
+
+        RD_UT_ASSERT(expectedNumMismatch == numMismatched,
+                     "%s:%d: Expected %d mismatches, got %d", function, line,
+                     expectedNumMismatch, numMismatched);
+
+        return 0;
+}
+
+
+int verifyValidityAndBalance0(const char *func,
+                              int line,
+                              rd_kafka_group_member_t *members,
+                              size_t member_cnt,
+                              const rd_kafka_metadata_t *metadata) {
+        int fails = 0;
+        int i;
+        rd_bool_t verbose = rd_false; /* Enable for troubleshooting */
+
+        RD_UT_SAY("%s:%d: verifying assignment for %d member(s):", func, line,
+                  (int)member_cnt);
+
+        for (i = 0; i < (int)member_cnt; i++) {
+                const char *consumer = members[i].rkgm_member_id->str;
+                const rd_kafka_topic_partition_list_t *partitions =
+                    members[i].rkgm_assignment;
+                int p, j;
+
+                if (verbose)
+                        RD_UT_SAY(
+                            "%s:%d:   "
+                            "consumer \"%s\", %d subscribed topic(s), "
+                            "%d assigned partition(s):",
+                            func, line, consumer,
+                            members[i].rkgm_subscription->cnt, partitions->cnt);
+
+                for (p = 0; p < partitions->cnt; p++) {
+                        const rd_kafka_topic_partition_t *partition =
+                            &partitions->elems[p];
+
+                        if (verbose)
+                                RD_UT_SAY("%s:%d:     %s [%" PRId32 "]", func,
+                                          line, partition->topic,
+                                          partition->partition);
+
+                        if (!rd_kafka_topic_partition_list_find(
+                                members[i].rkgm_subscription, partition->topic,
+                                RD_KAFKA_PARTITION_UA)) {
+                                RD_UT_WARN("%s [%" PRId32
+                                           "] is assigned to "
+                                           "%s but it is not subscribed to "
+                                           "that topic",
+                                           partition->topic,
+                                           partition->partition, consumer);
+                                fails++;
+                        }
+                }
+
+                /* Update the member's owned partitions to match
+                 * the assignment. */
+                ut_set_owned(&members[i]);
+
+                if (i == (int)member_cnt - 1)
+                        continue;
+
+                for (j = i + 1; j < (int)member_cnt; j++) {
+                        const char *otherConsumer =
+                            members[j].rkgm_member_id->str;
+                        const rd_kafka_topic_partition_list_t *otherPartitions =
+                            members[j].rkgm_assignment;
+                        rd_bool_t balanced =
+                            abs(partitions->cnt - otherPartitions->cnt) <= 1;
+
+                        for (p = 0; p < partitions->cnt; p++) {
+                                const rd_kafka_topic_partition_t *partition =
+                                    &partitions->elems[p];
+
+                                if (rd_kafka_topic_partition_list_find(
+                                        otherPartitions, partition->topic,
+                                        partition->partition)) {
+                                        RD_UT_WARN(
+                                            "Consumer %s and %s are both "
+                                            "assigned %s [%" PRId32 "]",
+                                            consumer, otherConsumer,
+                                            partition->topic,
+                                            partition->partition);
+                                        fails++;
+                                }
+
+
+                                /* If assignment is imbalanced and this topic
+                                 * is also subscribed by the other consumer
+                                 * it means the assignment strategy failed to
+                                 * properly balance the partitions. */
+                                if (!balanced &&
+                                    rd_kafka_topic_partition_list_find_topic_by_name(
+                                        otherPartitions, partition->topic)) {
+                                        RD_UT_WARN(
+                                            "Some %s partition(s) can be "
+                                            "moved from "
+                                            "%s (%d partition(s)) to "
+                                            "%s (%d partition(s)) to "
+                                            "achieve a better balance",
+                                            partition->topic, consumer,
+                                            partitions->cnt, otherConsumer,
+                                            otherPartitions->cnt);
+                                        fails++;
+                                }
+                        }
+                }
+        }
+
+        RD_UT_ASSERT(!fails, "%s:%d: See %d previous errors", func, line,
+                     fails);
+
+        return 0;
+}
+
+/**
+ * @brief Checks that all assigned partitions are fully balanced.
+ *
+ * Only works for symmetrical subscriptions.
+ */
+int isFullyBalanced0(const char *function,
+                     int line,
+                     const rd_kafka_group_member_t *members,
+                     size_t member_cnt) {
+        int min_assignment = INT_MAX;
+        int max_assignment = -1;
+        size_t i;
+
+        for (i = 0; i < member_cnt; i++) {
+                int size = members[i].rkgm_assignment->cnt;
+                if (size < min_assignment)
+                        min_assignment = size;
+                if (size > max_assignment)
+                        max_assignment = size;
+        }
+
+        RD_UT_ASSERT(max_assignment - min_assignment <= 1,
+                     "%s:%d: Assignment not balanced: min %d, max %d", function,
+                     line, min_assignment, max_assignment);
+
+        return 0;
+}
 
 
 /**
@@ -879,6 +1574,7 @@ static int ut_assignors(void) {
         /* Run through test cases */
         for (i = 0; tests[i].name; i++) {
                 int ie, it, im;
+                rd_kafka_metadata_internal_t metadata_internal;
                 rd_kafka_metadata_t metadata;
                 rd_kafka_group_member_t *members;
 
@@ -886,14 +1582,38 @@ static int ut_assignors(void) {
                 metadata.topic_cnt = tests[i].topic_cnt;
                 metadata.topics =
                     rd_alloca(sizeof(*metadata.topics) * metadata.topic_cnt);
+                metadata_internal.topics = rd_alloca(
+                    sizeof(*metadata_internal.topics) * metadata.topic_cnt);
+
                 memset(metadata.topics, 0,
                        sizeof(*metadata.topics) * metadata.topic_cnt);
+                memset(metadata_internal.topics, 0,
+                       sizeof(*metadata_internal.topics) * metadata.topic_cnt);
+
                 for (it = 0; it < metadata.topic_cnt; it++) {
+                        int pt;
                         metadata.topics[it].topic =
                             (char *)tests[i].topics[it].name;
                         metadata.topics[it].partition_cnt =
                             tests[i].topics[it].partition_cnt;
-                        metadata.topics[it].partitions = NULL; /* Not used */
+                        metadata.topics[it].partitions =
+                            rd_alloca(metadata.topics[it].partition_cnt *
+                                      sizeof(rd_kafka_metadata_partition_t));
+                        metadata_internal.topics[it].partitions = rd_alloca(
+                            metadata.topics[it].partition_cnt *
+                            sizeof(rd_kafka_metadata_partition_internal_t));
+                        for (pt = 0; pt < metadata.topics[it].partition_cnt;
+                             pt++) {
+                                metadata.topics[it].partitions[pt].id = pt;
+                                metadata.topics[it].partitions[pt].replica_cnt =
+                                    0;
+                                metadata_internal.topics[it]
+                                    .partitions[pt]
+                                    .racks_cnt = 0;
+                                metadata_internal.topics[it]
+                                    .partitions[pt]
+                                    .racks = NULL;
+                        }
                 }
 
                 /* Create members */
@@ -944,9 +1664,12 @@ static int ut_assignors(void) {
                         }
 
                         /* Run assignor */
-                        err = rd_kafka_assignor_run(
-                            rk->rk_cgrp, rkas, &metadata, members,
-                            tests[i].member_cnt, errstr, sizeof(errstr));
+                        metadata_internal.metadata = metadata;
+                        err                        = rd_kafka_assignor_run(
+                            rk->rk_cgrp, rkas,
+                            (rd_kafka_metadata_t *)(&metadata_internal),
+                            members, tests[i].member_cnt, errstr,
+                            sizeof(errstr));
 
                         RD_UT_ASSERT(!err, "Assignor case %s for %s failed: %s",
                                      tests[i].name,
