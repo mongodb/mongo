@@ -411,9 +411,20 @@ StatusWith<BSONObj> validateIndexSpec(
 
     boost::optional<IndexVersion> resolvedIndexVersion;
     std::string indexType;
+    std::set<StringData> fieldsNames;
 
     for (auto&& indexSpecElem : indexSpec) {
         auto indexSpecElemFieldName = indexSpecElem.fieldNameStringData();
+
+        if (fieldsNames.count(indexSpecElemFieldName)) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "The field '" << indexSpecElemFieldName
+                    << "' appears more than one times in the index specification "
+                    << indexSpec
+            };
+        }
+        fieldsNames.insert(indexSpecElemFieldName);
+
         if (IndexDescriptor::kKeyPatternFieldName == indexSpecElemFieldName) {
             if (indexSpecElem.type() != BSONType::object) {
                 return {ErrorCodes::TypeMismatch,
