@@ -261,13 +261,18 @@ testCaseArb =
     testCaseArb.filter(({metaField, metaReferencingStageName}) =>
                            (metaReferencingStageName !== "$sort" || metaField.validSortKey));
 
-function generateMetaReferencingStage(stageName, metaFieldName) {
+function generateMetaReferencingStages(stageName, metaFieldName) {
     if (stageName === "$project") {
-        return {$project: {a: 0, textField: 0, metaField: {$meta: metaFieldName}}};
+        // TODO SERVER-107874 There is a metadata dependency validation bug with $project's that
+        // have both inclusion/exclusions. This can be changed back to a single $project stage once
+        // that bug is fixed.
+        // TODO SERVER-107875 Note that the order here matters, because there is a separate bug with
+        // referencing {$meta: sortKey} with multiple $project stages.
+        return [{$project: {metaField: {$meta: metaFieldName}}}, {$project: {a: 0, textField: 0}}];
     } else if (stageName === "$sort") {
-        return {$sort: {a: {$meta: metaFieldName}, _id: 1}};
+        return [{$sort: {a: {$meta: metaFieldName}, _id: 1}}];
     } else if (stageName === "$group") {
-        return {$group: {_id: "$a", allMetaVals: {$addToSet: {$meta: metaFieldName}}}};
+        return [{$group: {_id: "$a", allMetaVals: {$addToSet: {$meta: metaFieldName}}}}];
     }
 }
 
@@ -329,9 +334,9 @@ const expectedErrCodes = [kUnavailableMetadataErrCode, ErrorCodes.BadValue];
 // First, test just the pipeline with two stages: the first stage may or may not generate metadtata
 // fields, and the second stage attempts to reference some metadata field.
 fc.assert(fc.property(testCaseArb, ({firstStage, metaField, metaReferencingStageName}) => {
-    let metaStage = generateMetaReferencingStage(metaReferencingStageName, metaField.name);
+    let metaStages = generateMetaReferencingStages(metaReferencingStageName, metaField.name);
 
-    let pipeline = [firstStage, metaStage];
+    let pipeline = [firstStage, ...metaStages];
     if (shouldQuerySucceed(metaField, firstStage, metaReferencingStageName)) {
         assert.commandWorked(db.runCommand({aggregate: collName, pipeline, cursor: {}}));
     } else {
@@ -342,8 +347,8 @@ fc.assert(fc.property(testCaseArb, ({firstStage, metaField, metaReferencingStage
 // Also test when we insert a $group stage (which drops all metadata) between the stage that
 // generates the metadata and the stage that attempts to reference the metadata.
 fc.assert(fc.property(testCaseArb, ({firstStage, metaField, metaReferencingStageName}) => {
-    let metaStage = generateMetaReferencingStage(metaReferencingStageName, metaField.name);
-    let pipeline = [firstStage, {$group: {_id: null}}, metaStage];
+    let metaStages = generateMetaReferencingStages(metaReferencingStageName, metaField.name);
+    let pipeline = [firstStage, {$group: {_id: null}}, ...metaStages];
 
     // TODO SERVER-100443 Since the $group drops per-document metadata, this should always fail for
     // every meta stage that is validated, not just "score" and "scoreDetails".

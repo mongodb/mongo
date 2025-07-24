@@ -58,7 +58,7 @@ const coll = db[jsTestName()];
     const nDocs = 10;
 
     for (let i = 1; i <= nDocs; i++) {
-        bulk.insert({i, "single": i, "double": i * 2});
+        bulk.insert({i, "single": i, "double": i * 2, "multiplier": 5});
     }
     assert.commandWorked(bulk.execute());
 })();
@@ -343,35 +343,43 @@ const coll = db[jsTestName()];
     // that $docs.single is a valid root field specification because "single" is a field on the
     // original input document. The avg will be computed with respect to the following three fields:
     // "single", "double", and "single" (again) where the last field "single" is a collection field.
-    const actualResults =
-        coll.aggregate([
-                {
-                    $scoreFusion: {
-                        input: {pipelines, normalization: "none"},
-                        combination: {
-                            method: "expression",
-                            expression: {$avg: ["$$single", "$$double", "$docs.single"]}
-                        }
-                    }
-                },
-                projectScore
-            ])
-            .toArray();
+    const actualResults = coll.aggregate([
+                                  {
+                                      $scoreFusion: {
+                                          input: {pipelines, normalization: "none"},
+                                          combination: {
+                                              method: "expression",
+                                              expression: {
+                                                  $avg: [
+                                                      "$$single",
+                                                      "$$double",
+                                                      {$multiply: ["$single", "$multiplier"]}
+                                                  ]
+                                              }
+                                          }
+                                      }
+                                  },
+                                  projectScore
+                              ])
+                              .toArray();
 
     // Pipeline returns an array of documents, each with the calculated expected score that
     // $scoreFusion should have computed.
-    const expectedResults = coll.aggregate([
-                                    {
-                                        $project: {
-                                            _id: 1,
-                                            single: 1,
-                                            double: 1,
-                                            score: {$avg: ["$single", "$double", "$single"]}
-                                        }
-                                    },
-                                    sortScore
-                                ])
-                                .toArray();
+    const expectedResults =
+        coll.aggregate([
+                {
+                    $project: {
+                        _id: 1,
+                        single: 1,
+                        double: 1,
+                        score:
+                            {$avg:
+                                 ["$single", "$double", {$multiply: ["$single", "$multiplier"]}]}
+                    }
+                },
+                sortScore
+            ])
+            .toArray();
 
     // Assert that every document returned by $scoreFusion is scored as expected using the
     // "avg" combination.expression.
@@ -389,7 +397,7 @@ const coll = db[jsTestName()];
                         input: {pipelines, normalization: "none"},
                         combination: {
                             method: "expression",
-                            expression: {$avg: ["$$single", "$$double", "$docs.dne"]}
+                            expression: {$avg: ["$$single", "$$double", "$dne"]}
                         }
                     }
                 },
@@ -432,6 +440,76 @@ const coll = db[jsTestName()];
     // Assert that every document returned by $scoreFusion is scored as expected using the
     // "avg" combination.expression.
     assert.eq(actualResultsWithPoorlyStatedVar, expectedResultsForUndefinedDocsField);
+})();
+
+//-------------------------------------------------------------------------------------------------
+
+// Test Explanation: Stress testing complex combination pipeline scores and field variable
+// references in combination method expression.
+(function testCombinationExpressionComplexCombinationOfPipelineScoresAndDocVars() {
+    // Pipeline returns an array of documents, each with the score that $scoreFusion computed.
+    const actualResults =
+        coll.aggregate([
+                {
+                    $scoreFusion: {
+                        input: {
+                            pipelines: {
+                                pipeline_a: [{$score: {score: {$add: ["$single", "$double"]}}}],
+                                pipeline_b:
+                                    [{$score: {score: {$multiply: ["$single", "$double"]}}}]
+                            },
+                            normalization: "none"
+                        },
+                        combination: {
+                            method: "expression",
+                            expression: {
+                                $multiply: [
+                                    "$multiplier",
+                                    {$divide:
+                                         [{$avg: ["$$pipeline_a", "$$pipeline_b"]}, "$single"]}
+                                ]
+                            }
+                        }
+                    }
+                },
+                projectScore
+            ])
+            .toArray();
+
+    // Pipeline returns an array of documents, each with the calculated expected score that
+    // $scoreFusion should have computed.
+    const expectedResults =
+        coll.aggregate([
+                {
+                    $project: {
+                        _id: 1,
+                        single: 1,
+                        double: 1,
+                        score: {
+                            $multiply: [
+                                "$multiplier",
+                                {
+                                    $divide: [
+                                        {
+                                            $avg: [
+                                                {$add: ["$single", "$double"]},
+                                                {$multiply: ["$single", "$double"]}
+                                            ]
+                                        },
+                                        "$single"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                sortScore
+            ])
+            .toArray();
+
+    // Assert that every document returned by $scoreFusion is scored as expected using the
+    // combination.method expression.
+    assert.eq(actualResults, expectedResults);
 })();
 
 //-------------------------------------------------------------------------------------------------

@@ -406,50 +406,6 @@ std::pair<std::string, BSONObj> constructScoreDetailsForGrouping(const std::stri
                           BSON("$mergeObjects" << fmt::format("${}", scoreDetailsName)));
 }
 
-boost::intrusive_ptr<DocumentSource> constructCalculatedFinalScoreDetails(
-    const std::vector<std::string>& pipelineNames,
-    const StringMap<double>& weights,
-    const bool isRankFusion,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    std::vector<boost::intrusive_ptr<Expression>> detailsChildren;
-    for (const auto& pipelineName : pipelineNames) {
-        const std::string scoreDetailsFieldName = fmt::format("${}_scoreDetails", pipelineName);
-        double weight = hybrid_scoring_util::getPipelineWeight(weights, pipelineName);
-
-        BSONObjBuilder mergeObjectsArrSubObj;
-        mergeObjectsArrSubObj.append("inputPipelineName"_sd, pipelineName);
-        if (isRankFusion) {
-            mergeObjectsArrSubObj.append("rank"_sd, fmt::format("${}_rank", pipelineName));
-        } else {
-            // ScoreFusion case.
-            mergeObjectsArrSubObj.append("inputPipelineRawScore"_sd,
-                                         fmt::format("${}_rawScore", pipelineName));
-        }
-        mergeObjectsArrSubObj.append("weight"_sd, weight);
-        if (!isRankFusion) {
-            mergeObjectsArrSubObj.append("value"_sd, fmt::format("${}_score", pipelineName));
-        }
-        mergeObjectsArrSubObj.done();
-        BSONArrayBuilder mergeObjectsArr;
-        mergeObjectsArr.append(mergeObjectsArrSubObj.obj());
-        mergeObjectsArr.append(scoreDetailsFieldName);
-        mergeObjectsArr.done();
-        BSONObj mergeObjectsObj = BSON("$mergeObjects"_sd << mergeObjectsArr.arr());
-        boost::intrusive_ptr<Expression> mergeObjectsExpr =
-            ExpressionFromAccumulator<AccumulatorMergeObjects>::parse(
-                expCtx.get(), mergeObjectsObj.firstElement(), expCtx->variablesParseState);
-
-        detailsChildren.push_back(std::move(mergeObjectsExpr));
-    }
-
-    boost::intrusive_ptr<Expression> arrayExpr =
-        ExpressionArray::create(expCtx.get(), std::move(detailsChildren));
-
-    auto addFields = DocumentSourceAddFields::create(
-        "calculatedScoreDetails"_sd, std::move(arrayExpr), expCtx.get());
-    return addFields;
-}
-
 std::string stringifyExpression(boost::optional<IDLAnyType> expression) {
     BSONObjBuilder expressionBob;
     expression->serializeToBSON("string", &expressionBob);

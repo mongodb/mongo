@@ -389,6 +389,46 @@ boost::intrusive_ptr<DocumentSource> constructScoreDetailsMetadata(
         DocumentMetadataFields::kScoreDetails);
     return setScoreDetails;
 }
+/*
+ * Builds an $addFields stage that constructs the value of the 'details' field array
+ * in final top-level 'scoreDetails' object, and stores it in the path "$calculatedScoreDetails".
+ *
+ * Later, this field is used to set the value of the 'details' key when setting the 'scoreDetails'
+ * metadata field.
+ */
+boost::intrusive_ptr<DocumentSource> constructCalculatedFinalScoreDetails(
+    const std::vector<std::string>& pipelineNames,
+    const StringMap<double>& weights,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    std::vector<boost::intrusive_ptr<Expression>> detailsChildren;
+    for (const auto& pipelineName : pipelineNames) {
+        const std::string scoreDetailsFieldName = fmt::format("${}_scoreDetails", pipelineName);
+        double weight = hybrid_scoring_util::getPipelineWeight(weights, pipelineName);
+
+        BSONObjBuilder mergeObjectsArrSubObj;
+        mergeObjectsArrSubObj.append("inputPipelineName"_sd, pipelineName);
+        mergeObjectsArrSubObj.append("rank"_sd, fmt::format("${}_rank", pipelineName));
+        mergeObjectsArrSubObj.append("weight"_sd, weight);
+        mergeObjectsArrSubObj.done();
+        BSONArrayBuilder mergeObjectsArr;
+        mergeObjectsArr.append(mergeObjectsArrSubObj.obj());
+        mergeObjectsArr.append(scoreDetailsFieldName);
+        mergeObjectsArr.done();
+        BSONObj mergeObjectsObj = BSON("$mergeObjects"_sd << mergeObjectsArr.arr());
+        boost::intrusive_ptr<Expression> mergeObjectsExpr =
+            ExpressionFromAccumulator<AccumulatorMergeObjects>::parse(
+                expCtx.get(), mergeObjectsObj.firstElement(), expCtx->variablesParseState);
+
+        detailsChildren.push_back(std::move(mergeObjectsExpr));
+    }
+
+    boost::intrusive_ptr<Expression> arrayExpr =
+        ExpressionArray::create(expCtx.get(), std::move(detailsChildren));
+
+    auto addFields = DocumentSourceAddFields::create(
+        "calculatedScoreDetails"_sd, std::move(arrayExpr), expCtx.get());
+    return addFields;
+}
 
 std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
     const std::vector<std::string>& pipelineNames,
@@ -414,8 +454,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
 
     if (includeScoreDetails) {
         boost::intrusive_ptr<DocumentSource> addFieldsDetails =
-            hybrid_scoring_util::score_details::constructCalculatedFinalScoreDetails(
-                pipelineNames, weights, true, expCtx);
+            constructCalculatedFinalScoreDetails(pipelineNames, weights, expCtx);
         auto setScoreDetails =
             constructScoreDetailsMetadata(rankFusionScoreDetailsDescription, expCtx);
         return {group, addFields, addFieldsDetails, setScoreDetails, sort, restoreUserDocs};
