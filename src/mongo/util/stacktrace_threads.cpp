@@ -500,6 +500,10 @@ void State::printStacks() {
 }
 
 void State::printAllThreadStacksBlocking() {
+    if (!_signal) {
+        LOGV2_ERROR(9967000, "Failed to print all thread stacks: signal handler not initialized.");
+        return;
+    }
     auto waiter = _printAllStacksSession.waiter();
     kill(getpid(), _signal);  // The SignalHandler thread calls printAllThreadStacks.
 }
