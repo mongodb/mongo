@@ -1092,7 +1092,7 @@ Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
     //       {"measurement1": value, "measurement2": value, ...},
     //   ...
     // }
-    std::map<string, BSONObjBuilder*> measurementsMappedByCategory;
+    std::map<string, BSONObjBuilder> measurementsMappedByCategory;
     const char* statisticDescription;
     uint64_t statisticValue;
     while (cursor->next(cursor) == 0 &&
@@ -1129,22 +1129,16 @@ Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
                     continue;
                 }
 
-                BSONObjBuilder*& measurementsSubObj =
-                    measurementsMappedByCategory[std::string{category}];
-                if (!measurementsSubObj)
-                    measurementsSubObj = new BSONObjBuilder();
-                measurementsSubObj->appendNumber(str::ltrim(std::string{measurement}), value);
+                measurementsMappedByCategory[std::string{category}].appendNumber(
+                    str::ltrim(std::string{measurement}), value);
                 break;
             }
             case FilterBehavior::kIncludeStats: {
                 bool shouldIncludeField =
                     std::find(filter.begin(), filter.end(), statisticDescription) != filter.end();
                 if (shouldIncludeField) {
-                    BSONObjBuilder*& measurementsSubObj =
-                        measurementsMappedByCategory[std::string{category}];
-                    if (!measurementsSubObj)
-                        measurementsSubObj = new BSONObjBuilder();
-                    measurementsSubObj->appendNumber(str::ltrim(std::string{measurement}), value);
+                    measurementsMappedByCategory[std::string{category}].appendNumber(
+                        str::ltrim(std::string{measurement}), value);
                 }
                 break;
             }
@@ -1152,13 +1146,11 @@ Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
     }
 
     // Attach the table statistics to the BSONObjBuilder provided in the function arguments.
-    for (std::map<string, BSONObjBuilder*>::const_iterator it =
-             measurementsMappedByCategory.begin();
+    for (std::map<string, BSONObjBuilder>::iterator it = measurementsMappedByCategory.begin();
          it != measurementsMappedByCategory.end();
          ++it) {
         const std::string& category = it->first;
-        bob.append(category, it->second->obj());
-        delete it->second;
+        bob.append(category, it->second.obj());
     }
     return Status::OK();
 }
