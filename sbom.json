@@ -2148,7 +2148,7 @@
           }
         ]
       },
-      "scope": "excluded"
+      "scope": "required"
     },
     {
       "supplier": {
@@ -2191,7 +2191,7 @@
           }
         ]
       },
-      "scope": "excluded"
+      "scope": "required"
     },
     {
       "supplier": {
@@ -2234,7 +2234,7 @@
           }
         ]
       },
-      "scope": "excluded"
+      "scope": "required"
     }
   ],
   "dependencies": [
