@@ -17,26 +17,62 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_base_partitioned.js";
-import {
     randomUpdateDelete
 } from "jstests/concurrency/fsm_workload_modifiers/random_update_delete.js";
+
+const $baseConfig = {
+    threadCount: 5,
+    iterations: 10,
+    passConnectionCache: true,
+    startState: 'init',
+    states: {
+        init: function init(db, collName, connCache) {},
+    },
+    transitions: {init: {init: 1}},
+    setup: function(db, collName, cluster) {
+        if (!TestData.runningWithShardStepdowns) {
+            // Set reshardingMinimumOperationDurationMillis so that reshardCollection runs faster.
+            cluster.executeOnConfigNodes((db) => {
+                const res = assert.commandWorked(db.adminCommand(
+                    {setParameter: 1, reshardingMinimumOperationDurationMillis: 0}));
+                this.originalReshardingMinimumOperationDurationMillis = res.was;
+            });
+        }
+        const bulk = db[collName].initializeUnorderedBulkOp();
+        for (let i = 0; i < this.threadCount * 200; ++i) {
+            bulk.insert({_id: i});
+        }
+        assert.commandWorked(bulk.execute());
+    },
+
+    teardown: function(db, collName, cluster) {
+        if (!TestData.runningWithShardStepdowns) {
+            cluster.executeOnConfigNodes((db) => {
+                const res = assert.commandWorked(db.adminCommand({
+                    setParameter: 1,
+                    reshardingMinimumOperationDurationMillis:
+                        this.originalReshardingMinimumOperationDurationMillis
+                }));
+            });
+        }
+    },
+};
 
 const $partialConfig = extendWorkload($baseConfig, randomUpdateDelete);
 
 export const $config = extendWorkload($partialConfig, function($config, $super) {
-    $config.threadCount = 5;
-    $config.data.partitionSize = 200;
-
-    // reshardCollection committing may kill an ongoing operation, which will lead to partial multi
-    // writes as it won't be retried.
+    // reshardCollection committing may kill an ongoing operation, which will lead to partial
+    // multi writes as it won't be retried.
     $config.data.expectPartialMultiWrites = true;
-
-    // multi:true writes on sharded collections broadcast using ShardVersion::IGNORED, which can
-    // cause the operation to execute on one shard before resharding commit, and on another after.
-    // This can cause extra writes when a document moves shards as a result of resharding.
+    // multi:true writes on sharded collections broadcast using ShardVersion::IGNORED, which
+    // can cause the operation to execute on one shard before resharding commit, and on
+    // another after. This can cause extra writes when a document moves shards as a result
+    // of resharding.
     $config.data.expectExtraMultiWrites = true;
+
+    $config.states.init = function init(db, collName, connCache) {
+        $super.states.init.apply(this, arguments);
+    };
 
     $config.states.reshardCollection = function reshardCollection(db, collName, connCache) {
         const namespace = `${db}.${collName}`;
@@ -48,33 +84,6 @@ export const $config = extendWorkload($partialConfig, function($config, $super) 
             forceRedistribution: true
         }));
         jsTestLog(`Reshard collection result for ${namespace}: ${tojson(result)}`);
-    };
-
-    $config.setup = function(db, collName, cluster) {
-        $super.setup.apply(this, arguments);
-
-        if (!TestData.runningWithShardStepdowns) {
-            // Set reshardingMinimumOperationDurationMillis so that reshardCollection runs faster.
-            cluster.executeOnConfigNodes((db) => {
-                const res = assert.commandWorked(db.adminCommand(
-                    {setParameter: 1, reshardingMinimumOperationDurationMillis: 0}));
-                this.originalReshardingMinimumOperationDurationMillis = res.was;
-            });
-        }
-    };
-
-    $config.teardown = function(db, collName, cluster) {
-        $super.teardown.apply(this, arguments);
-
-        if (!TestData.runningWithShardStepdowns) {
-            cluster.executeOnConfigNodes((db) => {
-                const res = assert.commandWorked(db.adminCommand({
-                    setParameter: 1,
-                    reshardingMinimumOperationDurationMillis:
-                        this.originalReshardingMinimumOperationDurationMillis
-                }));
-            });
-        }
     };
 
     const weights = {reshardCollection: 0.1, performUpdates: 0.45, performDeletes: 0.45};

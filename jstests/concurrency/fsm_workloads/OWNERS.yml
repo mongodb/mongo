@@ -15,3 +15,6 @@ filters:
   - "crud/crud_clustered_collection.js":
     approvers:
       - 10gen/server-storage-execution
+  - "cleanup_orphaned_with_balancer.js":
+    approvers:
+      - 10gen/server-catalog-and-routing

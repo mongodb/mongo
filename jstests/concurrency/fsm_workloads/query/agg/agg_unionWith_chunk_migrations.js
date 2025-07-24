@@ -11,7 +11,7 @@
  *
  * @tags: [
  *  requires_sharding,
- *  assumes_balancer_off,
+ *  assumes_balancer_on,
  *  requires_non_retryable_writes,
  *  requires_getmore,
  *  # The $unionWith stage cannot be run within a transaction. Therefore the original aggregation

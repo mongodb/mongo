@@ -6,7 +6,7 @@
  *
  * @tags: [
  *  requires_sharding,
- *  assumes_balancer_off,
+ *  assumes_balancer_on,
  *  requires_non_retryable_writes,
  * ]
  */

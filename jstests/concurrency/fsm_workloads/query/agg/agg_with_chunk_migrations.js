@@ -10,29 +10,38 @@
  *
  * @tags: [
  *  requires_sharding,
- *  assumes_balancer_off,
+ *  assumes_balancer_on,
  *  requires_non_retryable_writes,
  *  requires_getmore,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_moveChunk_partitioned.js";
+    randomManualMigration
+} from "jstests/concurrency/fsm_workload_modifiers/random_manual_migrations.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
-    // The base setup will insert 'partitionSize' number of documents per thread, evenly
-    // distributing across the chunks. Documents will only have the "_id" field.
-    $config.data.partitionSize = 50;
-    $config.threadCount = 2;
-    $config.iterations = 50;
-    $config.data.numDocs = $config.data.partitionSize * $config.threadCount;
+const $baseConfig = (function() {
+    let data = {
+        numDocs: 100,
+        shardKey: {_id: 1},
+        shardKeyField: '_id',
+        // By default, the collection that will be sharded with concurrent chunk migrations will be
+        // the one that the aggregate is run against.
+        collWithMigrations: undefined,
+    };
 
-    // By default, the collection that will be sharded with concurrent chunk migrations will be the
-    // one that the aggregate is run against.
-    $config.data.collWithMigrations = $config.collName;
+    let states = {
+        init: function init(db, collName, connCache) {},
+        aggregate: function aggregate(db, collName, connCache) {
+            const res = db[collName].aggregate([]);
+            assert.eq(this.numDocs, res.itcount());
+        },
+        // Will be overridden by the extendWorkload below, included just so that our transitions are
+        // correct.
+        moveChunk: function(db, collName, connCache) {},
+    };
 
-    $config.transitions = {
+    let transitions = {
         init: {aggregate: 1},
         aggregate: {
             moveChunk: 0.2,
@@ -41,51 +50,35 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         moveChunk: {aggregate: 1},
     };
 
-    /**
-     * Moves a random chunk in the target collection.
-     */
-    $config.states.moveChunk = function moveChunk(db, collName, connCache) {
-        // As the test adds new documents, the document count should not be checked.
-        $super.states.moveChunk.apply(
-            this, [db, this.collWithMigrations, connCache, /*skipDocumentCountCheck=*/ true]);
-    };
-
-    /**
-     * Default behavior executes an aggregation with an empty pipeline.
-     */
-    $config.states.aggregate = function aggregate(db, collName, connCache) {
-        const res = db[collName].aggregate([]);
-        assert.eq(this.numDocs, res.itcount());
-    };
-
-    /**
-     * Uses the base class init() to initialize this thread for both collections.
-     */
-    $config.states.init = function init(db, collName, connCache) {
-        $super.states.init.apply(this, [db, collName, connCache]);
-
-        // Init the target collection in a similar manner, if it is different than the default
-        // collection.
-        if (collName != this.collWithMigrations) {
-            $super.states.init.apply(this, [db, this.collWithMigrations, connCache]);
+    let setup = function setup(db, collName, cluster) {
+        let bulk = db[collName].initializeUnorderedBulkOp();
+        for (let index = 0; index < this.numDocs; index++) {
+            bulk.insert({_id: index});
         }
-    };
-
-    /**
-     * Initializes the aggregate collection and the target collection for chunk migrations as
-     * sharded with an even distribution across each thread ID.
-     */
-    $config.setup = function setup(db, collName, cluster) {
-        $super.setup.apply(this, [db, collName, cluster]);
-
-        if (collName != this.collWithMigrations) {
+        assert.commandWorked(bulk.execute());
+        if (this.collWithMigrations && collName != this.collWithMigrations) {
             // Setup the target collection in a similar manner. Note that the FSM infrastructure
             // will have already enabled sharded on collName, but we need to manually do it for the
             // output collection.
             cluster.shardCollection(db[this.collWithMigrations], this.shardKey, false);
-            $super.setup.apply(this, [db, this.collWithMigrations, cluster]);
+            let bulk = db[this.collWithMigrations].initializeUnorderedBulkOp();
+            for (let index = 0; index < this.numDocs; index++) {
+                bulk.insert({_id: index});
+            }
+            assert.commandWorked(bulk.execute());
         }
     };
 
-    return $config;
-});
+    return {
+        threadCount: 2,
+        iterations: 50,
+        startState: 'init',
+        data: data,
+        states: states,
+        transitions: transitions,
+        setup: setup,
+        passConnectionCache: true,
+    };
+})();
+
+export const $config = extendWorkload($baseConfig, randomManualMigration);

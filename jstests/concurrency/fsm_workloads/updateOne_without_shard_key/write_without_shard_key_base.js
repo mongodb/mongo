@@ -14,26 +14,20 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-// This workload does not make use of random moveChunks, but other workloads that extend this base
-// workload may.
-import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
-import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {
     $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+} from "jstests/concurrency/fsm_workloads/sharded_partitioned/crud_base_partitioned.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 10;
     $config.iterations = 50;
-    $config.startState = "init";  // Inherited from random_moveChunk_base.js.
+    $config.startState = "init";  // Inherited from crud_base_partitioned.js.
     $config.data.partitionSize = 100;
     $config.data.secondaryDocField = 'y';
     $config.data.idField = '_id';
     $config.data.tertiaryDocField = 'tertiaryField';
     $config.data.runningWithStepdowns =
         TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
-    $config.data.disableBalancingForSetup = true;
 
     /**
      * Returns a random integer between min (inclusive) and max (inclusive).
@@ -646,49 +640,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.setup = function setup(db, collName, cluster) {
-        const nss = db + "." + collName;
-
-        const shards = Object.keys(cluster.getSerializedCluster().shards);
-        ChunkHelper.moveChunk(
-            db,
-            collName,
-            [{[this.defaultShardKeyField]: MinKey}, {[this.defaultShardKeyField]: MaxKey}],
-            shards[0]);
-
-        for (let tid = 0; tid < this.threadCount; ++tid) {
-            const partition = this.makePartition(nss, tid, this.partitionSize);
-
-            // Create two chunks for the partition assigned to this thread:
-            // [partition.lower, partition.mid] and [partition.mid, partition.upper].
-
-            // The lower bound for a low chunk partition is minKey, so a split is not necessary.
-            if (!partition.isLowChunk) {
-                assert.commandWorked(db.adminCommand(
-                    {split: nss, middle: {[this.defaultShardKeyField]: partition.lower}}));
-            }
-
-            assert.commandWorked(db.adminCommand(
-                {split: nss, middle: {[this.defaultShardKeyField]: partition.mid}}));
-
-            // Move one of the two chunks assigned to this thread to one of the other shards.
-            ChunkHelper.moveChunk(
-                db,
-                collName,
-                [
-                    {[this.defaultShardKeyField]: partition.isLowChunk ? MinKey : partition.lower},
-                    {[this.defaultShardKeyField]: partition.mid}
-                ],
-                shards[this.generateRandomInt(1, shards.length - 1)]);
-        }
-
         // There isn't a way to determine what the thread ids are in setup phase so just assume
         // that they are [0, 1, ..., this.threadCount-1].
         for (let tid = 0; tid < this.threadCount; ++tid) {
             this.insertInitialDocuments(db, collName, tid);
         }
-
-        // Allow balancing 'nss' again - this may have been disabled during the workload setup.
-        BalancerHelper.enableBalancerForCollection(db, nss);
     };
 
     $config.transitions = {

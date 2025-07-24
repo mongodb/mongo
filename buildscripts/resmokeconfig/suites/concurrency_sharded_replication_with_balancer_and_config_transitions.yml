@@ -57,7 +57,7 @@ selector:
 
     # Exclude tests that run cleanupOrphaned, which can fail running on a config shard if a
     # concurrent migration fails due to the config shard transitioning to dedicated.
-    - jstests/concurrency/fsm_workloads/cleanup_orphaned_while_migrating.js
+    - jstests/concurrency/fsm_workloads/cleanup_orphaned_with_balancer.js
 
   exclude_with_any_tags:
     - requires_standalone

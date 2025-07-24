@@ -15,11 +15,15 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
+    randomManualMigration
+} from "jstests/concurrency/fsm_workload_modifiers/random_manual_migrations.js";
+import {
     $config as $baseConfig
 } from
     "jstests/concurrency/fsm_workloads/txns/internal_transactions/internal_transactions_sharded.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+const $partialConfig = extendWorkload($baseConfig, randomManualMigration);
+export const $config = extendWorkload($partialConfig, function($config, $super) {
     $config.transitions = {
         init: {
             moveChunk: 0.2,

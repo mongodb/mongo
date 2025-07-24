@@ -465,6 +465,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/concurrency/fsm_workload_modifiers/OWNERS.yml
 /jstests/concurrency/fsm_workload_modifiers/**/drop_all_indexes.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/concurrency/fsm_workload_modifiers/**/random_manual_migrations.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/concurrency/fsm_workload_modifiers/collection_write_path/OWNERS.yml
 /jstests/concurrency/fsm_workload_modifiers/collection_write_path/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
@@ -475,6 +476,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/concurrency/fsm_workloads/**/timeseries_agg* @10gen/query-integration-timeseries @svc-auto-approve-bot
 /jstests/concurrency/fsm_workloads/**/timeseries_deletes_and_inserts.js @10gen/query-integration-timeseries @svc-auto-approve-bot
 /jstests/concurrency/fsm_workloads/crud/crud_clustered_collection.js @10gen/server-storage-execution @svc-auto-approve-bot
+/jstests/concurrency/fsm_workloads/**/cleanup_orphaned_with_balancer.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/concurrency/fsm_workloads/auth/OWNERS.yml
 /jstests/concurrency/fsm_workloads/auth/**/* @10gen/server-security @svc-auto-approve-bot

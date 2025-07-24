@@ -3,3 +3,6 @@ filters:
   - "drop_all_indexes.js":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "random_manual_migrations.js":
+    approvers:
+      - 10gen/server-catalog-and-routing

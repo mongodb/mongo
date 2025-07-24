@@ -14,10 +14,8 @@
  *   does_not_support_transactions,
  *  ]
  */
-import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
 
-const numChunks = 20;
-const documentsPerChunk = 5;
+const numDocs = 100;
 const dbNames = ['db0', 'db1'];
 const collNames =
     ['rename_sharded_collectionA', 'rename_sharded_collectionB', 'rename_sharded_collectionC'];
@@ -25,41 +23,16 @@ const collNames =
 /*
  * Initialize a collection with expected number of chunks/documents and randomly distribute chunks
  */
-function initAndFillShardedCollection(db, collName, shardNames) {
+function initAndFillShardedCollection(db, collName) {
     const coll = db[collName];
     const ns = coll.getFullName();
     db.adminCommand({shardCollection: ns, key: {x: 1}});
 
-    // Disallow balancing 'ns' during $setup so it does not interfere with the splits.
-    BalancerHelper.disableBalancerForCollection(db, ns);
-    BalancerHelper.joinBalancerRound(db);
-
-    var nextShardKeyValue = 0;
-    for (var i = 0; i < numChunks; i++) {
-        for (var j = 0; j < documentsPerChunk; j++) {
-            coll.insert({x: nextShardKeyValue++});
-        }
-
-        assert.commandWorked(db.adminCommand({split: ns, middle: {x: nextShardKeyValue}}));
-
-        const lastInsertedShardKeyValue = nextShardKeyValue - 1;
-
-        // When balancer is enabled, move chunks could overlap and fail with
-        // ConflictingOperationInProgress
-        const res = db.adminCommand({
-            moveChunk: ns,
-            find: {x: lastInsertedShardKeyValue},
-            to: shardNames[Random.randInt(shardNames.length)],
-        });
-        let allowedErrorCodes = [ErrorCodes.ConflictingOperationInProgress];
-        if (TestData.hasRandomShardsAddedRemoved) {
-            allowedErrorCodes.push(ErrorCodes.ShardNotFound);
-        }
-        assert.commandWorkedOrFailedWithCode(res, allowedErrorCodes);
+    let bulk = coll.initializeUnorderedBulkOp();
+    for (let i = 0; i < numDocs; i++) {
+        bulk.insert({x: i});
     }
-
-    // Allow balancing 'ns' again.
-    BalancerHelper.enableBalancerForCollection(db, ns);
+    assert.commandWorked(bulk.execute());
 }
 
 /*
@@ -127,17 +100,13 @@ export const $config = (function() {
     };
 
     let setup = function(db, collName, cluster) {
-        const shardNames = Object.keys(cluster.getSerializedCluster().shards);
-        const numShards = shardNames.length;
-
         // Initialize databases
         for (var i = 0; i < dbNames.length; i++) {
             const dbName = dbNames[i];
             const newDb = db.getSiblingDB(dbName);
 
             // Initialize one sharded collection per db
-            initAndFillShardedCollection(
-                newDb, collNames[Random.randInt(collNames.length)], shardNames);
+            initAndFillShardedCollection(newDb, collNames[Random.randInt(collNames.length)]);
         }
     };
 
@@ -155,8 +124,8 @@ export const $config = (function() {
             const listColl = db.getCollectionNames();
             assert.eq(1, listColl.length);
             collName = listColl[0];
-            const numDocs = db[collName].countDocuments({});
-            assert.eq(numChunks * documentsPerChunk, numDocs, 'Unexpected number of chunks');
+            const docCount = db[collName].countDocuments({});
+            assert.eq(numDocs, docCount, 'Unexpected number of chunks');
         }
     };
 

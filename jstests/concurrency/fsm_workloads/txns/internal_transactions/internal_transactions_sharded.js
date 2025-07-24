@@ -13,11 +13,9 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {parseConfig} from "jstests/concurrency/fsm_libs/parse_config.js";
-import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
-import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {
     $config as $baseConfig
-} from 'jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js';
+} from 'jstests/concurrency/fsm_workloads/sharded_partitioned/crud_base_partitioned.js';
 import {
     extendWithInternalTransactionsUnsharded
 } from
@@ -28,13 +26,6 @@ const $extendedBaseConfig = extendWithInternalTransactionsUnsharded(
     Object.extend({}, parsedBaseConfig, true), parsedBaseConfig);
 
 export const $config = extendWorkload($extendedBaseConfig, function($config, $super) {
-    $config.data.disableBalancingForSetup = true;
-    // When the balancer is enabled, the manual chunk migrations done by the moveChunk base might
-    // conflict with the splits being done by the balancer.
-    $config.data.isMoveChunkErrorAcceptable = (err) => {
-        return TestData.runningWithBalancer && err.code == 656452;
-    };
-
     $config.data.getQueryForDocument = function getQueryForDocument(doc) {
         // The query for a write command against a sharded collection must contain the shard key.
         const query = $super.data.getQueryForDocument.apply(this, arguments);
@@ -77,46 +68,6 @@ export const $config = extendWorkload($extendedBaseConfig, function($config, $su
      * Creates chunks for the collection that the commands in this workload runs against.
      */
     $config.setup = function setup(db, collName, cluster) {
-        const ns = db.getName() + "." + collName;
-
-        // Move the initial chunk to shard0.
-        const shards = Object.keys(cluster.getSerializedCluster().shards);
-        ChunkHelper.moveChunk(
-            db,
-            collName,
-            [{[this.defaultShardKeyField]: MinKey}, {[this.defaultShardKeyField]: MaxKey}],
-            shards[0]);
-
-        for (let tid = 0; tid < this.threadCount; ++tid) {
-            const partition = this.makePartition(ns, tid, this.partitionSize);
-
-            // Create two chunks for the partition assigned to this thread:
-            // [partition.lower, partition.mid] and [partition.mid, partition.upper]
-            if (!partition.isLowChunk) {
-                // The lower bound for a low chunk partition is minKey, so a split is not
-                // necessary.
-                assert.commandWorked(db.adminCommand(
-                    {split: ns, middle: {[this.defaultShardKeyField]: partition.lower}}));
-            }
-
-            assert.commandWorked(
-                db.adminCommand({split: ns, middle: {[this.defaultShardKeyField]: partition.mid}}));
-
-            // Move one of the two chunks assigned to this thread to one of the other shards so
-            // that about half of the internal transactions run on this thread are cross-shard
-            // transactions.
-            ChunkHelper.moveChunk(
-                db,
-                collName,
-                [
-                    {[this.defaultShardKeyField]: partition.isLowChunk ? MinKey : partition.lower},
-                    {[this.defaultShardKeyField]: partition.mid}
-                ],
-                shards[this.generateRandomInt(1, shards.length - 1)]);
-        }
-
-        db.printShardingStatus();
-
         if (this.insertInitialDocsOnSetUp) {
             // There isn't a way to determine what the thread ids are in setup phase so just assume
             // that they are [0, 1, ..., this.threadCount-1].
@@ -124,9 +75,6 @@ export const $config = extendWorkload($extendedBaseConfig, function($config, $su
                 this.insertInitialDocuments(db, collName, tid);
             }
         }
-
-        // Allow balancing 'ns' again - this may have been disabled during the workload setup.
-        BalancerHelper.enableBalancerForCollection(db, ns);
 
         this.overrideInternalTransactionsReapThreshold(cluster);
         if (this.lowerTransactionLifetimeLimitSeconds) {

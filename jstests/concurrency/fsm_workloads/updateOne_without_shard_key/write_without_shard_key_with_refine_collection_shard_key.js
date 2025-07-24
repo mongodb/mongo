@@ -6,7 +6,6 @@
  *  requires_fcv_81,
  *  requires_sharding,
  *  uses_transactions,
- *  assumes_balancer_off,
  *  operations_longer_than_stepdown_interval_in_txns,
  * ]
  */
@@ -34,18 +33,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.latch = new CountDownLatch($config.data.latchCount);
 
     $config.data.shardKey = {a: 1};
-    $config.data.defaultShardKeyField = 'a';
     $config.data.defaultShardKey = {a: 1};
-
-    // The variables used by the random_moveChunk_base config in order to move chunks.
     $config.data.newShardKey = {a: 1, b: 1};
-    $config.data.newShardKeyFields = ["a", "b"];
-
-    $config.data.isMoveChunkErrorAcceptable = (err) => {
-        // When running with the balancer, manual chunk migrations might conflict with the
-        // balancer issued splits.
-        return TestData.runningWithBalancer && err.code == 656452;
-    };
 
     $config.setup = function setup(db, collName, cluster) {
         // Proactively create and shard all possible collections suffixed with this.latch.getCount()
@@ -96,7 +85,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             throw e;
         }
 
-        this.shardKeyField[latchCollName] = this.newShardKeyFields;
         this.latch.countDown();
     };
 
