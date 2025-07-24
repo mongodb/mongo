@@ -355,7 +355,6 @@ BaseCloner::AfterStageBehavior CollectionCloner::setupIndexBuildersForUnfinished
     }
 
     auto opCtx = cc().makeOperationContext();
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
     for (const auto& groupedIndexSpec : groupedIndexSpecs) {
         std::vector<std::string> indexNames;
@@ -366,10 +365,6 @@ BaseCloner::AfterStageBehavior CollectionCloner::setupIndexBuildersForUnfinished
             indexNames.push_back(indexName);
             indexSpecs.push_back(indexSpec.getOwned());
         }
-
-        // TODO(SERVER-107069): obtain the ident from the sync source rather than generating them
-        std::vector<std::string> indexIdents =
-            storageEngine->generateNewIndexIdents(_sourceNss.dbName(), indexSpecs.size());
 
         UnreplicatedWritesBlock uwb(opCtx.get());
 
@@ -385,7 +380,6 @@ BaseCloner::AfterStageBehavior CollectionCloner::setupIndexBuildersForUnfinished
                                         groupedIndexSpec.first,
                                         std::move(indexNames),
                                         std::move(indexSpecs),
-                                        std::move(indexIdents),
                                         boost::none});
         } catch (const ExceptionFor<ErrorCodes::IndexAlreadyExists>&) {
             // Suppress the IndexAlreadyExists error code.

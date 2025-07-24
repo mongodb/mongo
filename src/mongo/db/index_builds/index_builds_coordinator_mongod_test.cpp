@@ -241,7 +241,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
                                                      _othertestFooNss.dbName(),
                                                      _othertestFooUUID,
                                                      makeSpecs(_othertestFooNss, {"r", "s"}),
-                                                     {"index-7", "index-8"},
+                                                     {"index-6", "index-7"},
                                                      UUID::gen(),
                                                      IndexBuildProtocol::kTwoPhase,
                                                      _indexBuildOptions));

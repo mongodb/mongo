@@ -98,8 +98,7 @@ OplogEntry makeStartIndexBuildOplogEntry(OpTime opTime,
                                          const std::string& indexName,
                                          const BSONObj& keyPattern,
                                          const UUID& uuid,
-                                         const UUID& indexBuildUUID,
-                                         StringData ident);
+                                         const UUID& indexBuildUUID);
 
 /**
  * Creates a two-phase index build commit oplog entry with a given optime, namespace, and index

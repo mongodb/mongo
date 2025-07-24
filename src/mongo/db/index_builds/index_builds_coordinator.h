@@ -487,8 +487,7 @@ public:
 
     /**
      * Creates the specified index without yielding locks.
-     * The caller must ensure exclusive access to the collection either by holding a MODE_X lock on
-     * the collection or the collection must be uncommitted. Generates a new ident for the index.
+     * Assumes the caller has collection MODE_X lock.
      * Throws exception on error.
      */
     void createIndex(OperationContext* opCtx,
@@ -496,17 +495,6 @@ public:
                      const BSONObj& spec,
                      IndexBuildsManager::IndexConstraints indexConstraints,
                      bool fromMigrate);
-
-    /**
-     * Creates the specified index with an already generated ident without yielding locks.
-     * The caller must ensure exclusive access to the collection either by holding a MODE_X lock on
-     * the collection or the collection must be uncommitted. Throws exception on error.
-     */
-    void createIndex(OperationContext* opCtx,
-                     UUID collectionUUID,
-                     const BSONObj& spec,
-                     StringData ident,
-                     IndexBuildsManager::IndexConstraints indexConstraints);
 
     /**
      * Creates the specified indexes on an empty collection without yielding locks.
@@ -587,13 +575,6 @@ private:
     void _abortAllIndexBuildsWithReason(OperationContext* opCtx,
                                         IndexBuildAction signalAction,
                                         const std::string& reason);
-
-    void _createIndex(OperationContext* opCtx,
-                      CollectionWriter& collection,
-                      const BSONObj& spec,
-                      StringData ident,
-                      IndexBuildsManager::IndexConstraints indexConstraints,
-                      bool fromMigrate);
 
 protected:
     /**
