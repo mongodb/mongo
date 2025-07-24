@@ -208,10 +208,12 @@ protected:
         return ret;
     }
 
-    std::unique_ptr<SpillTable> makeSpillTable(OperationContext* opCtx) {
+    std::unique_ptr<RecordStore> makeSpillTable(OperationContext* opCtx) {
         Lock::GlobalLock lk{opCtx, MODE_IS};
-        auto spillTable = StorageEngineTest::makeSpillTable(opCtx, KeyFormat::Long, 1024);
-        ASSERT_TRUE(spillIdentExists(opCtx, spillTable->ident()));
+        auto spillEngine = opCtx->getServiceContext()->getStorageEngine()->getSpillEngine();
+        auto spillTable = spillEngine->makeTemporaryRecordStore(
+            *spillEngine->newRecoveryUnit(), ident::generateNewInternalIdent(), KeyFormat::Long);
+        ASSERT_TRUE(spillIdentExists(opCtx, spillTable->getIdent()));
         return spillTable;
     }
 
@@ -345,7 +347,7 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryForUncleanShutdown) {
     ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->rs()->getIdent()));
     ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->rs()->getIdent()));
     ASSERT_FALSE(identExists(opCtx.get(), necessaryRs->rs()->getIdent()));
-    ASSERT_FALSE(spillIdentExists(opCtx.get(), spillTable->ident()));
+    ASSERT_FALSE(spillIdentExists(opCtx.get(), spillTable->getIdent()));
 }
 
 // Abort the two-phase index build since it hangs in vote submission, because we are not running

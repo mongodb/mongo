@@ -550,6 +550,9 @@ public:
     /**
      * Removes all Records.
      *
+     * The operation context parameter is optional and, if non-null, will only be used to check the
+     * "read-only" flag.
+     *
      * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
     virtual Status truncate(OperationContext*) = 0;
@@ -562,6 +565,9 @@ public:
      * order to update numRecords and dataSize correctly. Implementations are free to ignore the
      * hints if they have a way of obtaining the correct values without the help of external
      * callers.
+     *
+     * The operation context parameter is optional and, if non-null, will only be used to check the
+     * "read-only" flag.
      */
     virtual Status rangeTruncate(OperationContext*,
                                  RecoveryUnit&,

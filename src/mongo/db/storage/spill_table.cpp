@@ -118,9 +118,25 @@ SpillTable::SpillTable(std::unique_ptr<RecoveryUnit> ru,
 }
 
 SpillTable::~SpillTable() {
-    if (_storageEngine) {
-        _storageEngine->dropSpillTable(*_ru, ident());
+    if (!_storageEngine) {
+        return;
     }
+
+    // As an optimization, truncate the table before dropping it so that the checkpoint taken at
+    // shutdown never has to do the work to write the data to disk.
+    try {
+        _ru->setIsolation(RecoveryUnit::Isolation::snapshot);
+        StorageWriteTransaction txn{*_ru};
+        uassertStatusOK(_rs->truncate(nullptr, *_ru));
+        txn.commit();
+    } catch (...) {
+        LOGV2(10659600,
+              "Failed to truncate spill table, ignoring and continuing to drop",
+              "ident"_attr = ident(),
+              "error"_attr = exceptionToStatus());
+    }
+
+    _storageEngine->dropSpillTable(*_ru, ident());
 }
 
 StringData SpillTable::ident() const {

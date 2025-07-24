@@ -38,7 +38,7 @@ namespace {
 void validateWriteAllowed(OperationContext* opCtx) {
     uassert(ErrorCodes::IllegalOperation,
             "Cannot execute a write operation in read-only mode",
-            !opCtx->readOnly());
+            !opCtx || !opCtx->readOnly());
 }
 
 }  // namespace
