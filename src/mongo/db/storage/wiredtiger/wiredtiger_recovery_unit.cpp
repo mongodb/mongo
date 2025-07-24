@@ -73,6 +73,18 @@ logv2::LogSeverity kSlowTransactionSeverity = logv2::LogSeverity::Debug(1);
 
 MONGO_FAIL_POINT_DEFINE(doUntimestampedWritesForIdempotencyTests);
 
+const char* getIsolationConfig(RecoveryUnit::Isolation isolation) {
+    switch (isolation) {
+        case RecoveryUnit::Isolation::readUncommitted:
+            return "isolation=read-uncommitted";
+        case RecoveryUnit::Isolation::readCommitted:
+            return "isolation=read-committed";
+        case RecoveryUnit::Isolation::snapshot:
+            return "isolation=snapshot";
+    }
+    MONGO_UNREACHABLE;
+}
+
 void handleWriteContextForDebugging(WiredTigerRecoveryUnit& ru, Timestamp& ts) {
     if (ru.shouldGatherWriteContextForDebugging()) {
         BSONObjBuilder builder;
@@ -106,9 +118,9 @@ void WiredTigerRecoveryUnit::_ensureSession() {
 
     invariant(!_session);
     if (_opCtx) {
-        _managedSession = _connection->getSession(*_opCtx);
+        _managedSession = _connection->getSession(*_opCtx, getIsolationConfig(_isolation));
     } else {
-        _managedSession = _connection->getUninterruptibleSession();
+        _managedSession = _connection->getUninterruptibleSession(getIsolationConfig(_isolation));
     }
     _session = _managedSession.get();
 }
@@ -120,7 +132,9 @@ WiredTigerSession* WiredTigerRecoveryUnit::getSessionNoTxn() {
 
 WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
     invariant(!_inUnitOfWork(), toString(_getState()));
-    _abort();
+    if (_isolation == Isolation::snapshot) {
+        _abort();
+    }
 }
 
 void WiredTigerRecoveryUnit::_commit() {
@@ -239,6 +253,9 @@ void WiredTigerRecoveryUnit::setOplogVisibilityTs(boost::optional<int64_t> oplog
 }
 
 WiredTigerSession* WiredTigerRecoveryUnit::getSession() {
+    if (_isolation != Isolation::snapshot) {
+        return getSessionNoTxn();
+    }
     if (!_isActive()) {
         _optionsUsedToOpenSnapshot = kDefaultOpenSnapshotOptions;
         _txnOpen();
@@ -490,6 +507,10 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     invariant(!_isCommittingOrAborting(),
               str::stream() << "commit or rollback handler reopened transaction: "
                             << toString(_getState()));
+
+    tassert(10775300,
+            "Must be using snapshot isolation to open a WT transaction",
+            _isolation == Isolation::snapshot);
 
     ensureSnapshot();
     _ensureSession();
@@ -886,6 +907,12 @@ void WiredTigerRecoveryUnit::unpinReadSource() {
 
 bool WiredTigerRecoveryUnit::isReadSourcePinned() const {
     return _readSourcePinned;
+}
+
+void WiredTigerRecoveryUnit::_setIsolation(Isolation isolation) {
+    if (_session) {
+        _session->reconfigure(getIsolationConfig(isolation));
+    }
 }
 
 void WiredTigerRecoveryUnit::beginIdle() {

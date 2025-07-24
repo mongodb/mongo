@@ -244,6 +244,16 @@ void RecoveryUnit::validateInUnitOfWork() const {
               fmt::format("state: {}, readOnly: {}", toString(_getState()), _readOnly));
 }
 
+void RecoveryUnit::setIsolation(Isolation isolation) {
+    if (isolation == _isolation) {
+        return;
+    }
+
+    tassert(10775301, "Cannot change isolation level on an active recovery unit", !isActive());
+    _setIsolation(isolation);
+    _isolation = isolation;
+}
+
 StorageWriteTransaction::StorageWriteTransaction(RecoveryUnit& ru, bool readOnly) : _ru(ru) {
     // Cannot nest
     invariant(!_ru.inUnitOfWork());

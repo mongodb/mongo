@@ -39,11 +39,13 @@
 namespace mongo {
 
 WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection)
-    : WiredTigerSession(connection, nullptr, "isolation=snapshot") {}
+    : WiredTigerSession(connection, nullptr, nullptr) {}
 
-WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection, uint64_t epoch)
+WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
+                                     uint64_t epoch,
+                                     const char* config)
     : _epoch(epoch),
-      _session(connection->_openSession(this, nullptr, "isolation=snapshot")),
+      _session(connection->_openSession(this, nullptr, config)),
       _cursorGen(0),
       _cursorsOut(0),
       _connection(connection),
@@ -62,7 +64,7 @@ WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
 WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
                                      StatsCollectionPermit& permit)
     : _epoch(0),
-      _session(connection->_openSession(this, permit, "isolation=snapshot")),
+      _session(connection->_openSession(this, permit, nullptr)),
       _cursorGen(0),
       _cursorsOut(0),
       _connection(connection),
@@ -72,7 +74,7 @@ WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
                                      WT_EVENT_HANDLER* handler,
                                      StatsCollectionPermit& permit)
     : _epoch(0),
-      _session(connection->_openSession(this, handler, permit, "isolation=snapshot")),
+      _session(connection->_openSession(this, handler, permit, nullptr)),
       _cursorGen(0),
       _cursorsOut(0),
       _connection(connection),

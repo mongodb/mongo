@@ -154,6 +154,10 @@ public:
         invariantWTOK(session->open_cursor(wt_uri, nullptr, nullptr, cursor), *session);
     }
 
+    void getCursor(WiredTigerSession& session, WT_CURSOR*& cursor) {
+        invariantWTOK(session.open_cursor(wt_uri, nullptr, nullptr, &cursor), session);
+    }
+
     void setUp() override {
         harnessHelper = std::make_unique<WiredTigerRecoveryUnitHarnessHelper>();
         clientAndCtx1 = makeClientAndOpCtx(harnessHelper.get(), "writer");
@@ -387,6 +391,88 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, WriteOnADocumentBeingPreparedTriggersW
     ru1->abortUnitOfWork();
     ru2->abortUnitOfWork();
 }
+
+TEST_F(WiredTigerRecoveryUnitTestFixture, ReadUncommittedIsolation) {
+    ru2->setIsolation(RecoveryUnit::Isolation::readUncommitted);
+    auto session = ru2->getSession();
+
+    ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
+    ScopeGuard guard{[this] {
+        ru1->abortUnitOfWork();
+    }};
+    WT_CURSOR* cursor;
+    getCursor(ru1, &cursor);
+
+    cursor->set_key(cursor, "key");
+    cursor->set_value(cursor, "value");
+    ASSERT_EQ(wiredTigerCursorInsert(*ru1, cursor), 0);
+
+    getCursor(*session, cursor);
+    cursor->set_key(cursor, "key");
+    ASSERT_EQ(cursor->search(cursor), 0);
+
+    ru1->commitUnitOfWork();
+    guard.dismiss();
+
+    getCursor(*session, cursor);
+    cursor->set_key(cursor, "key");
+    ASSERT_EQ(cursor->search(cursor), 0);
+}
+
+TEST_F(WiredTigerRecoveryUnitTestFixture, ReadCommittedIsolation) {
+    ru2->setIsolation(RecoveryUnit::Isolation::readCommitted);
+    auto session = ru2->getSession();
+
+    ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
+    ScopeGuard guard{[this] {
+        ru1->abortUnitOfWork();
+    }};
+
+    WT_CURSOR* cursor;
+    getCursor(ru1, &cursor);
+    cursor->set_key(cursor, "key");
+    cursor->set_value(cursor, "value");
+    ASSERT_EQ(wiredTigerCursorInsert(*ru1, cursor), 0);
+
+    getCursor(*session, cursor);
+    cursor->set_key(cursor, "key");
+    ASSERT_EQ(cursor->search(cursor), WT_NOTFOUND);
+
+    ru1->commitUnitOfWork();
+    guard.dismiss();
+
+    getCursor(*session, cursor);
+    cursor->set_key(cursor, "key");
+    ASSERT_EQ(cursor->search(cursor), 0);
+}
+
+TEST_F(WiredTigerRecoveryUnitTestFixture, SnapshotIsolation) {
+    ru2->setIsolation(RecoveryUnit::Isolation::snapshot);
+    auto session = ru2->getSession();
+
+    ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
+    ScopeGuard guard{[this] {
+        ru1->abortUnitOfWork();
+    }};
+
+    WT_CURSOR* cursor;
+    getCursor(ru1, &cursor);
+    cursor->set_key(cursor, "key");
+    cursor->set_value(cursor, "value");
+    ASSERT_EQ(wiredTigerCursorInsert(*ru1, cursor), 0);
+
+    getCursor(*session, cursor);
+    cursor->set_key(cursor, "key");
+    ASSERT_EQ(cursor->search(cursor), WT_NOTFOUND);
+
+    ru1->commitUnitOfWork();
+    guard.dismiss();
+
+    getCursor(*session, cursor);
+    cursor->set_key(cursor, "key");
+    ASSERT_EQ(cursor->search(cursor), WT_NOTFOUND);
+}
+
 
 DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixture,
                    PrepareTimestampOlderThanStableTimestamp,

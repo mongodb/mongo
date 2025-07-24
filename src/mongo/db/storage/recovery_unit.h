@@ -113,6 +113,12 @@ class RecoveryUnit {
     RecoveryUnit& operator=(const RecoveryUnit&) = delete;
 
 public:
+    enum class Isolation {
+        readUncommitted,
+        readCommitted,
+        snapshot,
+    };
+
     virtual ~RecoveryUnit() = default;
 
     /**
@@ -565,6 +571,12 @@ public:
     virtual void setTxnModified() {}
 
     /**
+     * Sets the isolation to use for subsequent operations. The isolation cannot be changed if the
+     * recovery unit is active.
+     */
+    void setIsolation(Isolation);
+
+    /**
      * Registers a callback to be called prior to a WriteUnitOfWork committing the storage
      * transaction. This callback may throw a WriteConflictException which will abort the
      * transaction.
@@ -960,6 +972,7 @@ protected:
     }
 
     OperationContext* _opCtx{nullptr};
+    Isolation _isolation{Isolation::snapshot};
 
     bool _gatherWriteContextForDebugging{false};
     std::vector<BSONObj> _writeContextForDebugging;
@@ -969,6 +982,8 @@ private:
     virtual void doAbandonSnapshot() = 0;
     virtual void doCommitUnitOfWork() = 0;
     virtual void doAbortUnitOfWork() = 0;
+
+    virtual void _setIsolation(Isolation) = 0;
 
     virtual void validateInUnitOfWork() const;
 

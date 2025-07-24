@@ -209,6 +209,8 @@ private:
 
     void doAbandonSnapshot() override;
 
+    void _setIsolation(Isolation) override;
+
     void _abort();
     void _commit();
 
