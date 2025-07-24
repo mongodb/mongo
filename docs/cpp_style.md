@@ -793,20 +793,47 @@ file, and it is useful to define related classes together in a single component.
 
 ### Ordering and Grouping of C++ `#include` Directives
 
-We have a standard order for the include directives at the top of a C++ file:
+We have a standard order for the include directives at the top of a C++ file.
+It is automatically applied by our configuration of clang-format.
+The purpose of this ordering is to keep the list organized to aid in visual
+scanning, and to catch headers that are missing includes.
 
-- For the `.cpp` and `_test.cpp` files of a component, include the component's
+The include directives are organized into several blocks.
+Within each block, the include directives are sorted alphabetically.
+Follow each block with a blank line.
+
+- Main header
+
+  For the `.cpp` and `_test.cpp` files of a component, include the component's
   `.h` file if applicable as the first include. This is a safety practice that
   helps us ensure that a `.h` file doesn't rely on any preceding inclusions.
-  Follow this with a blank line.
 
-- Sorted block of include directives using `<>` (system and third party).
-  Follow the block with a blank line.
+- First-party headers
 
-- Sorted block of include directives using `""` (local). Follow the block
-  with a blank line.
+  All include directives using `""` and starting with `mongo/`.
 
-To summarize, a typical .cpp file "classy.cpp" might have three sorted blocks of
+  E.g. `"mongo/db/db.h"`.
+
+- C++ stdlib headers
+
+  Include directives using `<>`, with no `/` or `.` in path.
+
+  E.g. `<vector>`, `<cmath>`.
+
+- Unnamespaced headers
+
+  Include directives using `<>`, with no `/` in path.
+  Typically these are system C headers ending in `.h`
+
+  E.g. `<unistd.h>`.
+
+- Remaining third-party headers
+
+  Include directives using `<>`, with `/` in path.
+
+  E.g. `<boost/optional/optional.hpp>`, `<sys/types.h>`.
+
+To summarize, a typical .cpp file "classy.cpp" might have up to 5 sorted blocks of
 include directives:
 
 ```c++
@@ -814,14 +841,36 @@ include directives:
 
 #include "mongo/db/classy.h"
 
-#include <boost/thread/thread.hpp>
-#include <cstdio>
-#include <string>
-
 #include "mongo/db/db.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/util/concurrency/qlock.h"
+
+#include <cstdio>
+#include <string>
+
+#include <unistd.h>
+
+#include <boost/thread/thread.hpp>
 ```
+
+Any headers that are conditionally included under the control of `#if`
+directives (if technically possible) will appear after these blocks.
+
+Clang-format will not reorder includes across anything other than a blank line
+or other includes. In the rare case where some header must be included before
+or after all other headers, you can use a comment line to separate it from
+other includes like:
+
+```cpp
+#include <last/normal/header.h>
+
+// This header must be after all others:
+#include <a/weird/header.h>
+```
+
+If you see a comment line in old code that is unintentionally preventing proper
+header ordering, you are encouraged to clean that up when adding or removing
+includes.
 
 ### For `js` Files (JavaScript only)
 
