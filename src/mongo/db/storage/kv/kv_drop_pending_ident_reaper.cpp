@@ -206,7 +206,8 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
 void KVDropPendingIdentReaper::clearDropPendingState(OperationContext* opCtx) {
     invariant(shard_role_details::getLocker(opCtx)->isW());
 
-    stdx::lock_guard lock(_mutex);
+    stdx::lock_guard dropLock(_dropMutex);
+    stdx::lock_guard stateLock(_mutex);
     // We only delete the timestamped drops. Non-timestamped drops cannot be rolled back, and the
     // drops should still go through.
     auto firstElem = std::find_if_not(_dropPendingIdents.begin(),
