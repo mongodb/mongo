@@ -162,6 +162,7 @@ protected:
         Date_t timeValue = Date_t::now();
         boost::optional<BSONObj> metaValue = boost::none;
         boost::optional<BSONType> metaValueType = BSONType::string;
+        size_t extraPayload = 0;  // padding on rollover measurement
     };
 
     // _generateMeasurementsWithRolloverReason enables us to easily get measurement vectors that

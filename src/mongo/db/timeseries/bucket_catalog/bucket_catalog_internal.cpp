@@ -1183,7 +1183,8 @@ RolloverReason determineRolloverReason(const BSONObj& doc,
                 bucket.keptOpenDueToLargeMeasurements = true;
                 stats.incNumBucketsKeptOpenDueToLargeMeasurements();
             }
-            return RolloverReason::kNone;
+
+            // Fall through to remaining checks
         } else {
             if (effectiveMaxSize == gTimeseriesBucketMaxSize) {
                 return RolloverReason::kSize;

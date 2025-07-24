@@ -310,8 +310,13 @@ std::vector<BSONObj> TimeseriesTestFixture::_generateMeasurementsWithRolloverRea
     invariant(numMeasurements == 1 ||
               (idxWithDiffMeasurement >= 1 && idxWithDiffMeasurement < numMeasurements));
 
-    auto measurement = (metaValue) ? _generateMeasurement(metaValue, timeValue).obj()
-                                   : _generateMeasurement(metaValueType, timeValue).obj();
+    auto measurementBuilder = (metaValue) ? _generateMeasurement(metaValue, timeValue)
+                                          : _generateMeasurement(metaValueType, timeValue);
+    if (options.extraPayload) {
+        std::string padding(options.extraPayload, 'a');
+        measurementBuilder.append("padField", padding);
+    }
+    auto measurement = measurementBuilder.obj();
 
     switch (reason) {
         case bucket_catalog::RolloverReason::kNone:
