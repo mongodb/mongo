@@ -296,8 +296,14 @@ std::shared_ptr<WiredTigerRecordStore::OplogTruncateMarkers>
 WiredTigerRecordStore::OplogTruncateMarkers::createOplogTruncateMarkers(OperationContext* opCtx,
                                                                         WiredTigerRecordStore* rs,
                                                                         const NamespaceString& ns) {
-    if (!feature_flags::gOplogSamplingAsyncEnabled.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    bool samplingAsynchronously =
+        feature_flags::gOplogSamplingAsyncEnabled.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        gOplogSamplingAsyncEnabled;
+    LOGV2(10621000,
+          "Creating oplog markers",
+          "sampling asynchronously"_attr = samplingAsynchronously);
+    if (!samplingAsynchronously) {
         return sampleAndUpdate(opCtx, rs, ns);
     }
     return createEmptyOplogTruncateMarkers(rs);

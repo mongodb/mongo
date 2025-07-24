@@ -73,3 +73,11 @@ server_parameters:
         default: 300
         validator: { gt: 300 }
         redact: false
+
+    oplogSamplingAsyncEnabled:
+        description: "Whether or not oplog sampling is running asynchronously to startup."
+        set_at: [startup]
+        cpp_vartype: "bool"
+        cpp_varname: gOplogSamplingAsyncEnabled
+        default: true
+        redact: false
