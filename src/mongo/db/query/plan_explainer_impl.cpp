@@ -555,6 +555,9 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
             bob->appendNumber(
                 "spilledDataStorageSize",
                 static_cast<long long>(spec->spillingStats.getSpilledDataStorageSize()));
+            if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+                bob->appendNumber("maxUsedMemBytes", static_cast<long long>(spec->maxUsedMemBytes));
+            }
         }
     } else if (STAGE_SORT_MERGE == stats.stageType) {
         MergeSortStats* spec = static_cast<MergeSortStats*>(stats.specific.get());

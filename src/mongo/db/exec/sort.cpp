@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/util/assert_util.h"
 
@@ -49,7 +50,8 @@ SortStage::SortStage(boost::intrusive_ptr<ExpressionContext> expCtx,
     : PlanStage(kStageType.data(), expCtx.get()),
       _ws(ws),
       _sortKeyGen(sortPattern, expCtx->getCollator()),
-      _addSortKeyMetadata(addSortKeyMetadata) {
+      _addSortKeyMetadata(addSortKeyMetadata),
+      _memoryTracker{OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx)} {
     _children.emplace_back(std::move(child));
 }
 
@@ -117,11 +119,15 @@ SortStageDefault::SortStageDefault(boost::intrusive_ptr<ExpressionContext> expCt
 void SortStageDefault::spool(WorkingSetID wsid) {
     SortableWorkingSetMember extractedMember{_ws->extract(wsid)};
     auto sortKey = _sortKeyGen.computeSortKey(*extractedMember);
+    uint64_t prevMemBytes = _sortExecutor.stats().memoryUsageBytes;
     _sortExecutor.add(sortKey, extractedMember);
+    _memoryTracker.add(_sortExecutor.stats().maxMemoryUsageBytes - prevMemBytes);
 }
 
 PlanStage::StageState SortStageDefault::unspool(WorkingSetID* out) {
     if (!_sortExecutor.hasNext()) {
+        // Storage is freed once all the documents have been returned.
+        _memoryTracker.set(0);
         return PlanStage::IS_EOF;
     }
 
@@ -158,16 +164,22 @@ void SortStageSimple::spool(WorkingSetID wsid) {
 
     auto sortKey = _sortKeyGen.computeSortKeyFromDocument(member->doc.value());
 
+    uint64_t prevMemBytes = _sortExecutor.stats().memoryUsageBytes;
     _sortExecutor.add(sortKey, member->doc.value().toBson());
+    _memoryTracker.add(_sortExecutor.stats().memoryUsageBytes - prevMemBytes);
     _ws->free(wsid);
 }
 
 PlanStage::StageState SortStageSimple::unspool(WorkingSetID* out) {
     if (!_sortExecutor.hasNext()) {
+        // Storage is freed once all the documents have been returned.
+        _memoryTracker.set(0);
         return PlanStage::IS_EOF;
     }
 
+    uint64_t prevMemBytes = _sortExecutor.stats().memoryUsageBytes;
     auto&& [key, nextObj] = _sortExecutor.getNext();
+    _memoryTracker.add(_sortExecutor.stats().memoryUsageBytes - prevMemBytes);
 
     *out = _ws->allocate();
     auto member = _ws->get(*out);

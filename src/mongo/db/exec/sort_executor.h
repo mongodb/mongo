@@ -129,6 +129,7 @@ public:
     const SortStats& stats() const {
         if (_sorter) {
             _stats.memoryUsageBytes = _sorter->stats().memUsage();
+            _stats.maxUsedMemBytes = std::max(_stats.maxUsedMemBytes, _stats.memoryUsageBytes);
         }
         return _stats;
     }

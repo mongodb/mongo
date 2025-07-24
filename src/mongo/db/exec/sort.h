@@ -36,6 +36,7 @@
 #include "mongo/db/exec/sort_executor.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/sort_key_generator.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
@@ -93,6 +94,10 @@ public:
 
     std::unique_ptr<PlanStageStats> getStats() final;
 
+    const SimpleMemoryUsageTracker& getMemoryUsageTracker_forTest() const {
+        return _memoryTracker;
+    }
+
 protected:
     // Not owned by us.
     WorkingSet* _ws;
@@ -100,6 +105,8 @@ protected:
     const SortKeyGenerator _sortKeyGen;
 
     const bool _addSortKeyMetadata;
+
+    SimpleMemoryUsageTracker _memoryTracker;
 
 private:
     // Whether or not we have finished loading data into '_sortExecutor'.

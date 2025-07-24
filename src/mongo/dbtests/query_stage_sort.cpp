@@ -53,8 +53,10 @@
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
@@ -187,12 +189,41 @@ public:
     }
 
     /**
+     * This method is called after we have produced a row of sorted output. We should be showing
+     * memory usage to account for the rows buffered in memory.
+     *
+     * This method returns the new peak memory usage reported by the tracker, so that we can verify
+     * the peak usage only goes up over time.
+     */
+    uint64_t checkMemoryTracking(const SimpleMemoryUsageTracker& tracker,
+                                 uint64_t oldPeakMemBytes) {
+        uint64_t currentMemBytes = tracker.currentMemoryBytes();
+        // If we have processed any rows, we should have seen some memory usage.
+        ASSERT_GT(currentMemBytes, 0);
+
+        uint64_t actualPeakMemBytes = tracker.maxMemoryBytes();
+        ASSERT_GTE(actualPeakMemBytes, currentMemBytes);
+        ASSERT_GTE(actualPeakMemBytes, oldPeakMemBytes);
+        return actualPeakMemBytes;
+    }
+
+    /**
      * A template used by many tests below.
      * Fill out numObj objects, sort them in the order provided by 'direction'.
      * If extAllowed is true, sorting will use use external sorting if available.
      * If limit is not zero, we limit the output of the sort stage to 'limit' results.
+     *
+     * Tests out both the default and "simple" sort.
      */
     void sortAndCheck(int direction, const CollectionPtr& coll) {
+        // Test both default sort (which will use metadata if available) and simple sort, which
+        // works with no metadata.
+        doSortAndCheck<false /* default sort */>(direction, coll);
+        doSortAndCheck<true /* simple sort */>(direction, coll);
+    }
+
+    template <bool useSortStageSimple>
+    void doSortAndCheck(int direction, const CollectionPtr& coll) {
         auto ws = std::make_unique<WorkingSet>();
         auto queuedDataStage = std::make_unique<QueuedDataStage>(_expCtx.get(), ws.get());
 
@@ -200,16 +231,31 @@ public:
         insertVarietyOfObjects(ws.get(), queuedDataStage.get(), coll);
 
         auto sortPattern = BSON("foo" << direction);
-        auto keyGenStage = std::make_unique<SortKeyGeneratorStage>(
-            _expCtx, std::move(queuedDataStage), ws.get(), sortPattern);
+        std::unique_ptr<SortStage> sortStage;
+        if constexpr (!useSortStageSimple) {
+            auto keyGenStage = std::make_unique<SortKeyGeneratorStage>(
+                _expCtx, std::move(queuedDataStage), ws.get(), sortPattern);
 
-        auto sortStage = std::make_unique<SortStageDefault>(_expCtx,
-                                                            ws.get(),
-                                                            SortPattern{sortPattern, _expCtx},
-                                                            limit(),
-                                                            maxMemoryUsageBytes(),
-                                                            false,  // addSortKeyMetadata
-                                                            std::move(keyGenStage));
+            sortStage = std::make_unique<SortStageDefault>(_expCtx,
+                                                           ws.get(),
+                                                           SortPattern{sortPattern, _expCtx},
+                                                           limit(),
+                                                           maxMemoryUsageBytes(),
+                                                           false,  // addSortKeyMetadata
+                                                           std::move(keyGenStage));
+        } else {
+            // Create a SortStageSimple instance. Skip the KeyGenStage, which creates the metadata
+            // which is not needed for this case.
+            sortStage = std::make_unique<SortStageSimple>(_expCtx,
+                                                          ws.get(),
+                                                          SortPattern{sortPattern, _expCtx},
+                                                          limit(),
+                                                          maxMemoryUsageBytes(),
+                                                          false,  // addSortKeyMetadata
+                                                          std::move(queuedDataStage));
+        }
+        // We use this below for showing we track memory as the query executes.
+        const SimpleMemoryUsageTracker& memoryTracker = sortStage->getMemoryUsageTracker_forTest();
 
         auto fetchStage = std::make_unique<FetchStage>(
             _expCtx.get(), ws.get(), std::move(sortStage), nullptr, &coll);
@@ -236,6 +282,7 @@ public:
 
         BSONObj current;
         PlanExecutor::ExecState state;
+        uint64_t peakMemBytes = 0;
         while (PlanExecutor::ADVANCED == (state = exec->getNext(&current, nullptr))) {
             int cmp = sgn(::mongo::bson::compareObjectsAccordingToSort(current, last, sortPattern));
             // The next object should be equal to the previous or oriented according to the sort
@@ -243,9 +290,13 @@ public:
             ASSERT(cmp == 0 || cmp == 1);
             ++count;
             last = current.getOwned();
+
+            peakMemBytes = checkMemoryTracking(memoryTracker, peakMemBytes);
         }
         ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
         checkCount(count);
+
+        ASSERT_EQUALS(memoryTracker.currentMemoryBytes(), 0);
     }
 
     /**
