@@ -937,6 +937,11 @@ LockResult Locker::_lockBegin(OperationContext* opCtx, ResourceId resId, LockMod
         // but is planned to be released at the end of this WUOW due to two-phase locking. Rather
         // than unlocking the existing request, we can reuse it.
         if (request->unlockPending) {
+            if (!opCtx->uninterruptibleLocksRequested_DO_NOT_USE()) {  // NOLINT
+                // Lock acquisitions are not allowed to succeed when opCtx is marked as interrupted,
+                // unless the caller requested an uninterruptible lock.
+                opCtx->checkForInterrupt();
+            }
             request->unlockPending--;
             if (!request->unlockPending) {
                 _numResourcesToUnlockAtEndUnitOfWork--;
