@@ -109,13 +109,6 @@ BSONObj makeMigrationStatusDocumentDestination(
     boost::optional<long long> sessionOplogEntriesMigrated);
 
 /**
- * Returns a chunk range with extended or truncated boundaries to match the number of fields in the
- * given metadata's shard key pattern.
- */
-ChunkRange extendOrTruncateBoundsForMetadata(const CollectionMetadata& metadata,
-                                             const ChunkRange& range);
-
-/**
  * Writes the migration coordinator document to config.migrationCoordinators and waits for majority
  * write concern.
  */

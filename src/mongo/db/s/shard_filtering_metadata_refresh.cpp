@@ -54,6 +54,7 @@
 #include "mongo/db/s/read_only_catalog_cache_loader.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/shard_filtering_util.h"
+#include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
@@ -603,7 +604,7 @@ void FilteringMetadataCache::_recoverMigrationCoordinations(OperationContext* op
             // Note this should only extend the range boundaries (if there has been a shard key
             // refine since the migration began) and never truncate them.
             auto chunkRangeToCompareToMetadata =
-                migrationutil::extendOrTruncateBoundsForMetadata(currentMetadata, doc.getRange());
+                shardkeyutil::extendOrTruncateBoundsForMetadata(currentMetadata, doc.getRange());
             if (currentMetadata.keyBelongsToMe(chunkRangeToCompareToMetadata.getMin())) {
                 coordinator.setMigrationDecision(DecisionEnum::kAborted);
             } else {

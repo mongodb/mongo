@@ -240,44 +240,6 @@ BSONObj makeMigrationStatusDocumentDestination(
     return builder.obj();
 }
 
-ChunkRange extendOrTruncateBoundsForMetadata(const CollectionMetadata& metadata,
-                                             const ChunkRange& range) {
-    auto metadataShardKeyPattern = KeyPattern(metadata.getKeyPattern());
-
-    // If the input range is shorter than the range in the ChunkManager inside
-    // 'metadata', we must extend its bounds to get a correct comparison. If the input
-    // range is longer than the range in the ChunkManager, we likewise must shorten it.
-    // We make sure to match what's in the ChunkManager instead of the other way around,
-    // since the ChunkManager only stores ranges and compares overlaps using a string version of the
-    // key, rather than a BSONObj. This logic is necessary because the _metadata list can
-    // contain ChunkManagers with different shard keys if the shard key has been refined.
-    //
-    // Note that it's safe to use BSONObj::nFields() (which returns the number of top level
-    // fields in the BSONObj) to compare the two, since shard key refine operations can only add
-    // top-level fields.
-    //
-    // Using extractFieldsUndotted to shorten the input range is correct because the ChunkRange and
-    // the shard key pattern will both already store nested shard key fields as top-level dotted
-    // fields, and extractFieldsUndotted uses the top-level fields verbatim rather than treating
-    // dots as accessors for subfields.
-    auto metadataShardKeyPatternBson = metadataShardKeyPattern.toBSON();
-    auto numFieldsInMetadataShardKey = metadataShardKeyPatternBson.nFields();
-    auto numFieldsInInputRangeShardKey = range.getMin().nFields();
-    if (numFieldsInInputRangeShardKey < numFieldsInMetadataShardKey) {
-        auto extendedRangeMin = metadataShardKeyPattern.extendRangeBound(
-            range.getMin(), false /* makeUpperInclusive */);
-        auto extendedRangeMax = metadataShardKeyPattern.extendRangeBound(
-            range.getMax(), false /* makeUpperInclusive */);
-        return ChunkRange(extendedRangeMin, extendedRangeMax);
-    } else if (numFieldsInInputRangeShardKey > numFieldsInMetadataShardKey) {
-        auto shortenedRangeMin = range.getMin().extractFieldsUndotted(metadataShardKeyPatternBson);
-        auto shortenedRangeMax = range.getMax().extractFieldsUndotted(metadataShardKeyPatternBson);
-        return ChunkRange(shortenedRangeMin, shortenedRangeMax);
-    } else {
-        return range;
-    }
-}
-
 bool deletionTaskUuidMatchesFilteringMetadataUuid(
     OperationContext* opCtx,
     const boost::optional<mongo::CollectionMetadata>& optCollDescr,

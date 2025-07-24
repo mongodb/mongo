@@ -30,6 +30,7 @@
 #include "mongo/db/s/metadata_manager.h"
 
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/shard_key_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/chunk_manager.h"
 
@@ -53,7 +54,7 @@ bool metadataOverlapsRange(const CollectionMetadata& metadata, const ChunkRange&
         return true;
     }
     auto chunkRangeToCompareToMetadata =
-        migrationutil::extendOrTruncateBoundsForMetadata(metadata, range);
+        shardkeyutil::extendOrTruncateBoundsForMetadata(metadata, range);
     return metadata.rangeOverlapsChunk(chunkRangeToCompareToMetadata);
 }
 

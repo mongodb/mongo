@@ -242,5 +242,12 @@ void validateTimeseriesShardKey(StringData timeFieldName,
                                 boost::optional<StringData> metaFieldName,
                                 const BSONObj& shardKeyPattern);
 
+/**
+ * Returns a chunk range with extended or truncated boundaries to match the number of fields in the
+ * given metadata's shard key pattern.
+ */
+ChunkRange extendOrTruncateBoundsForMetadata(const CollectionMetadata& metadata,
+                                             const ChunkRange& range);
+
 }  // namespace shardkeyutil
 }  // namespace mongo
