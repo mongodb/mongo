@@ -124,3 +124,6 @@
 
 // Defined if the build includes OpenTelemetry
 @mongo_config_otel@
+
+// Defined if the build includes mutex observation
+@mongo_config_mutex_observation@

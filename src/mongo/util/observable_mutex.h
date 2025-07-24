@@ -117,6 +117,7 @@ concept ImplementsLockShared = requires(MutexType m) { m.lock_shared(); };
  * invalidated when the wrapper's destructor runs. The token is provided with a callback function
  * that collects contention stats for the wrapped mutex and returns it to the collector.
  */
+#ifdef MONGO_CONFIG_MUTEX_OBSERVATION
 template <typename MutexType>
 class ObservableMutex {
 public:
@@ -213,6 +214,10 @@ private:
 
     std::shared_ptr<ObservationToken> _token;
 };
+#else
+template <typename MutexType>
+using ObservableMutex = MutexType;
+#endif
 
 using ObservableExclusiveMutex = ObservableMutex<stdx::mutex>;
 using ObservableSharedMutex = ObservableMutex<std::shared_mutex>;  // NOLINT
