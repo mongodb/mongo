@@ -174,7 +174,11 @@ if [[ $* =~ ^.*--output_base=/tmp/.*-completion-$USER.*$ ]]; then
   autocomplete_query=1
 fi
 # zsh autocomplete detection
-if [[ $* == *"--noblock_for_lock query kind(\".*_test\", //:all)"* ]] || [[ $* == *"--noblock_for_lock query kind(\".*_test\", :all)"* ]]; then
+# Note that this is a little weird because it is a regex that matches another regex.
+# The gist is that it looks for ".*_test" or ".*_test|.*_binary" with :all or //:all
+# Bash has odd quoting rules for the RHS of =~, which are avoided by using a variable.
+zsh_autocomplete_regex='--noblock_for_lock query kind\("\.\*_test(\|\.\*_binary)?", (//)?:all\)'
+if [[ $* =~ $zsh_autocomplete_regex ]]; then
   autocomplete_query=1
 fi
 
