@@ -91,7 +91,8 @@ queryList.forEach(function(q) {
         const nonIndexedRes = coll.find(query, projOutId).hint({$natural: 1}).toArray().sort();
         const nonIndexedPlan = coll.find(query, projOutId).hint({$natural: 1}).explain();
         assert(isCollscan(db, nonIndexedPlan), nonIndexedPlan);
-        assert(arrayEq(indexRes, nonIndexedRes), buildErrorString(query, indexRes, nonIndexedRes));
+        assert(arrayEq(indexRes, nonIndexedRes),
+               () => buildErrorString(query, indexRes, nonIndexedRes));
     });
 });
 // Test queries with multiple intervals.
@@ -110,5 +111,5 @@ multiIntQueryList.forEach(function(q) {
     const projOutId = {_id: 0, val: 1};
     const indexRes = coll.find(q, projOutId).toArray().sort();
     const nonIndexedRes = coll.find(q, projOutId).hint({$natural: 1}).toArray().sort();
-    assert(arrayEq(indexRes, nonIndexedRes), buildErrorString(q, indexRes, nonIndexedRes));
+    assert(arrayEq(indexRes, nonIndexedRes), () => buildErrorString(q, indexRes, nonIndexedRes));
 });
