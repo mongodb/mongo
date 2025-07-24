@@ -7,10 +7,12 @@ import os.path
 import platform
 import random
 import shlex
+import statistics
 import subprocess
 import sys
 import textwrap
 import time
+from abc import ABC, abstractmethod
 from logging import Logger
 from typing import List, Optional
 
@@ -42,6 +44,7 @@ from buildscripts.resmokelib.suitesconfig import get_suite_files
 from buildscripts.resmokelib.testing.docker_cluster_image_builder import build_images
 from buildscripts.resmokelib.testing.suite import Suite
 from buildscripts.resmokelib.utils.dictionary import get_dict_value
+from buildscripts.util.teststats import HistoricTaskData
 
 _INTERNAL_OPTIONS_TITLE = "Internal Options"
 _MONGODB_SERVER_OPTIONS_TITLE = "MongoDB Server Options"
@@ -806,7 +809,7 @@ class TestRunner(Subcommand):
 
     @TRACER.start_as_current_span("run.__init__._execute_suite")
     def _execute_suite(self, suite: Suite) -> bool:
-        """Execute Fa suite and return True if interrupted, False otherwise."""
+        """Execute a suite and return True if interrupted, False otherwise."""
         execute_suite_span = trace.get_current_span()
         execute_suite_span.set_attributes(attributes=suite.get_suite_otel_attributes())
         self._shuffle_tests(suite)
@@ -903,10 +906,93 @@ class TestRunner(Subcommand):
         )
         return False
 
+    class ShuffleStrategy(ABC):
+        @abstractmethod
+        def shuffle(self, tests):
+            pass
+
+    class RandomShuffle(ShuffleStrategy):
+        """A completely random shuffle."""
+
+        def shuffle(self, tests):
+            random.shuffle(tests)
+            return tests
+
+    class LongestFirstPartialShuffle(ShuffleStrategy):
+        """
+        A partial shuffle that prioritizes starting longer running tests earlier.
+
+        For an illustration of typical shuffling results, see the test for this
+        in buildscripts/tests/resmokelib/run/test_shuffle_tests.py
+        """
+
+        def __init__(self, historic_task_data: HistoricTaskData):
+            self.runtimes_historic = {}
+            for result in historic_task_data.historic_test_results:
+                self.runtimes_historic[result.test_name] = result.avg_duration
+
+        def shuffle(self, tests):
+            """
+            Performs a weighted_shuffle, where tests with a higher weight are more likely to be started earlier.
+            The weight is determined by how many standard deviations above the mean runtime a particular test is.
+            All tests below the mean or without historic data are equal weighted.
+            """
+            total, mean, stdev = self.compute_stats(tests)
+            if not total:
+                # Zero tests had historic runtime information
+                return TestRunner.RandomShuffle().shuffle(tests)
+            arr = []
+            for test in tests:
+                if test in self.runtimes_historic:
+                    stdevs_above_mean = (self.runtimes_historic[test] - mean) / stdev
+                    weight = max(
+                        stdevs_above_mean * len(tests), 1
+                    )  # max(_, 1) ensures positive, non-zero weight.
+                else:
+                    weight = 1
+                arr.append((test, weight))
+            return self.weighted_shuffle(arr)
+
+        def compute_stats(self, tests):
+            total = 0
+            runtimes = []
+            for test in tests:
+                if not isinstance(test, str):
+                    # `test` is itself many tests, in parallel_fsm_workload_test suites
+                    return None, None, None
+                if test in self.runtimes_historic:
+                    total += self.runtimes_historic[test]
+                    runtimes.append(self.runtimes_historic[test])
+            if len(runtimes) < 2:
+                # There is not enough tests with historic data to compute stdev
+                return None, None, None
+            mean = statistics.mean(runtimes)
+            stdev = statistics.stdev(runtimes)
+            return total, mean, stdev
+
+        def weighted_shuffle(self, arr):
+            """Shuffle an array of tuples (element, weight). Weights should be positive, non-zero."""
+            for i, _ in enumerate(arr):
+                v = self.weighted_index_choice(arr[i:])
+                arr[i + v], arr[i] = arr[i], arr[i + v]
+            return [test for test, _ in arr]
+
+        def weighted_index_choice(self, arr):
+            total_weight = sum(weight for _, weight in arr)
+            choice = random.random() * total_weight
+            i = 0
+            cur = 0
+            while True:
+                weight = arr[i][1]
+                cur += weight
+                if choice <= cur:
+                    return i
+                i += 1
+
     def _shuffle_tests(self, suite: Suite):
         """Shuffle the tests if the shuffle cli option was set."""
         random.seed(config.RANDOM_SEED)
-        if not config.SHUFFLE:
+        if not config.SHUFFLE_STRATEGY:
             return
         self._exec_logger.info(
             "Shuffling order of tests for %ss in suite %s. The seed is %d.",
@@ -914,7 +1000,7 @@ class TestRunner(Subcommand):
             suite.get_display_name(),
             config.RANDOM_SEED,
         )
-        random.shuffle(suite.tests)
+        suite.tests = config.SHUFFLE_STRATEGY.shuffle(suite.tests)
 
     def _get_suites(self) -> List[Suite]:
         """Return the list of suites for this resmoke invocation."""
@@ -1550,11 +1636,11 @@ class RunPlugin(PluginInterface):
         parser.add_argument(
             "--shuffle",
             action="store_const",
-            const="on",
+            const="random",
             dest="shuffle",
             help=(
                 "Randomizes the order in which tests are executed. This is equivalent"
-                " to specifying --shuffleMode=on."
+                " to specifying --shuffleMode=random."
             ),
         )
 
@@ -1562,12 +1648,12 @@ class RunPlugin(PluginInterface):
             "--shuffleMode",
             action="store",
             dest="shuffle",
-            choices=("on", "off", "auto"),
-            metavar="ON|OFF|AUTO",
+            choices=("random", "longest-first", "off"),
+            metavar="random|longest-first|off",
             help=(
                 "Controls whether to randomize the order in which tests are executed."
-                " Defaults to auto when not supplied. auto enables randomization in"
-                " all cases except when the number of jobs requested is 1."
+                " The longest-first option requires historic runtime information via the evergreen"
+                " project/variant/task name, otherwise fallsback to completely random."
             ),
         )
 

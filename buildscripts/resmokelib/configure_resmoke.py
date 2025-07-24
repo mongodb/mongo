@@ -28,9 +28,12 @@ from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
 from buildscripts.idl import gen_all_feature_flag_list
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import mongo_fuzzer_configs, multiversionsetupconstants, utils
+from buildscripts.resmokelib.run import TestRunner
 from buildscripts.resmokelib.utils.batched_baggage_span_processor import BatchedBaggageSpanProcessor
 from buildscripts.resmokelib.utils.file_span_exporter import FileSpanExporter
 from buildscripts.util.read_config import read_config_file
+from buildscripts.util.taskname import determine_task_base_name
+from buildscripts.util.teststats import HistoricTaskData
 from evergreen.config import get_auth
 
 BASE_16_TO_INT = 16
@@ -876,13 +879,21 @@ flags in common: {common_set}
     _config.LOGGER_DIR = os.path.join(_config.CONFIG_DIR, "loggers")
 
     shuffle = config.pop("shuffle")
-    if shuffle == "auto":
-        # If the user specified a value for --jobs > 1 (or -j > 1), then default to randomize
-        # the order in which tests are executed. This is because with multiple threads the tests
-        # wouldn't run in a deterministic order anyway.
-        _config.SHUFFLE = _config.JOBS > 1
-    else:
-        _config.SHUFFLE = shuffle == "on"
+    if (
+        shuffle == "longest-first"
+        and _config.EVERGREEN_TASK_NAME
+        and _config.EVERGREEN_VARIANT_NAME
+        and _config.EVERGREEN_PROJECT_NAME
+    ):
+        base_task = determine_task_base_name(
+            _config.EVERGREEN_TASK_NAME, _config.EVERGREEN_VARIANT_NAME
+        )
+        historic_task_data = HistoricTaskData.from_s3(
+            _config.EVERGREEN_PROJECT_NAME, base_task, _config.EVERGREEN_VARIANT_NAME
+        )
+        _config.SHUFFLE_STRATEGY = TestRunner.LongestFirstPartialShuffle(historic_task_data)
+    elif shuffle != "off":
+        _config.SHUFFLE_STRATEGY = TestRunner.RandomShuffle()
 
     conn_string = config.pop("shell_conn_string")
     port = config.pop("shell_port")

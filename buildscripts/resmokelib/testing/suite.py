@@ -110,6 +110,10 @@ class Suite(object):
             self._tests, self._excluded = self._get_tests_for_kind(self.test_kind)
         return self._tests
 
+    @tests.setter
+    def tests(self, tests):
+      self._tests = tests
+
     @property
     def excluded(self):
         """Get the excluded."""
