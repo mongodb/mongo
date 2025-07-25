@@ -107,6 +107,13 @@ public:
     BSONObj doc;
 };
 
+namespace internal {
+Status insertDocumentsForOplog(OperationContext* opCtx,
+                               const CollectionPtr& oplogCollection,
+                               std::vector<Record>* records,
+                               const std::vector<Timestamp>& timestamps);
+}
+
 namespace repl {
 class ReplSettings;
 

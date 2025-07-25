@@ -101,6 +101,14 @@ public:
     static std::shared_ptr<OplogTruncateMarkers> createOplogTruncateMarkers(
         OperationContext* opCtx, WiredTigerRecordStore* rs, const NamespaceString& ns);
 
+    CollectionTruncateMarkers::MarkersCreationMethod getMarkersCreationMethod() const {
+        return _creationMethod;
+    }
+
+    Microseconds getCreationProcessingTime() const {
+        return _totalTimeProcessing;
+    }
+
 private:
     bool _hasExcessMarkers(OperationContext* opCtx) const final;
 

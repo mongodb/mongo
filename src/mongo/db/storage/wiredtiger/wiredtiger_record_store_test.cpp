@@ -1027,7 +1027,8 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_NoMarkersGeneratedFromScann
     wtrs->postConstructorInit(opCtx.get(), NamespaceString::kRsOplogNamespace);
 
     auto oplogTruncateMarkers = wtrs->oplogTruncateMarkers();
-    ASSERT_FALSE(oplogTruncateMarkers->processedBySampling());
+    ASSERT_TRUE(oplogTruncateMarkers->getMarkersCreationMethod() ==
+                CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
 
     auto numMarkers = oplogTruncateMarkers->numMarkers_forTest();
     ASSERT_EQ(numMarkers, 0U);
@@ -1078,7 +1079,8 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Duplicates) {
     auto oplogTruncateMarkers = wtrs->oplogTruncateMarkers();
 
     // Confirm that sampling occurred and that some truncate markers were generated.
-    ASSERT(oplogTruncateMarkers->processedBySampling());
+    ASSERT_TRUE(oplogTruncateMarkers->getMarkersCreationMethod() ==
+                CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
     auto truncateMarkersBefore = oplogTruncateMarkers->numMarkers_forTest();
     ASSERT_GT(truncateMarkersBefore, 0U);
     ASSERT_GT(oplogTruncateMarkers->currentBytes_forTest(), 0);
