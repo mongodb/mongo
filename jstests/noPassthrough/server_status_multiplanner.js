@@ -34,15 +34,10 @@ assert.commandWorked(coll.insert({_id: 5, a: 1, b: 1}));
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
 
-function assertSbeMultiPlannerMetrics(multiPlannerMetrics, expectedCount, checkHistograms = true) {
-    if (checkHistograms) {
-        assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeMicros),
-                  expectedCount);
-        assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeNumReads),
-                  expectedCount);
-        assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeNumPlans),
-                  expectedCount);
-    }
+function assertSbeMultiPlannerMetrics(multiPlannerMetrics, expectedCount) {
+    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeMicros), expectedCount);
+    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeNumReads), expectedCount);
+    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeNumPlans), expectedCount);
     assert.eq(multiPlannerMetrics.sbeCount, expectedCount);
     if (expectedCount > 0) {
         assert.gt(multiPlannerMetrics.sbeMicros, 0);
@@ -53,16 +48,12 @@ function assertSbeMultiPlannerMetrics(multiPlannerMetrics, expectedCount, checkH
     }
 }
 
-function assertClassicMultiPlannerMetrics(
-    multiPlannerMetrics, expectedCount, checkHistograms = true) {
-    if (checkHistograms) {
-        assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicMicros),
-                  expectedCount);
-        assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicNumPlans),
-                  expectedCount);
-        assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicWorks),
-                  expectedCount);
-    }
+function assertClassicMultiPlannerMetrics(multiPlannerMetrics, expectedCount) {
+    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicMicros),
+              expectedCount);
+    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicNumPlans),
+              expectedCount);
+    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicWorks), expectedCount);
     assert.eq(multiPlannerMetrics.classicCount, expectedCount);
     if (expectedCount > 0) {
         assert.gt(multiPlannerMetrics.classicMicros, 0);
@@ -125,12 +116,8 @@ assert.soon(() => {
         return false;
     }
 
-    assertSbeMultiPlannerMetrics(
-        multiPlannerMetricsFtdc, expectedSbeCount, false /*checkHistograms*/);
-    assertClassicMultiPlannerMetrics(
-        multiPlannerMetricsFtdc, expectedClassicCount, false /*checkHistograms*/);
-    // Verify FTDC omits detailed histograms.
-    assert(!multiPlannerMetricsFtdc.hasOwnProperty("histograms"));
+    assertSbeMultiPlannerMetrics(multiPlannerMetricsFtdc, expectedSbeCount);
+    assertClassicMultiPlannerMetrics(multiPlannerMetricsFtdc, expectedClassicCount);
     return true;
 }, "FTDC output should eventually reflect observed serverStatus metrics.");
 
