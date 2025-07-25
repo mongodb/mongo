@@ -194,10 +194,14 @@ void ReplOperation::setTid(boost::optional<mongo::TenantId> value) & {
 ReplOperation MutableOplogEntry::makeInsertOperation(const NamespaceString& nss,
                                                      UUID uuid,
                                                      const BSONObj& docToInsert,
-                                                     const BSONObj& docKey) {
+                                                     const BSONObj& docKey,
+                                                     boost::optional<bool> isViewlessTimeseries) {
     ReplOperation op;
     op.setOpType(OpTypeEnum::kInsert);
 
+    if (isViewlessTimeseries && *isViewlessTimeseries) {
+        op.setIsViewlessTimeseries(true);
+    }
     op.setTid(nss.tenantId());
     op.setNss(nss);
     op.setUuid(uuid);
@@ -209,10 +213,14 @@ ReplOperation MutableOplogEntry::makeInsertOperation(const NamespaceString& nss,
 ReplOperation MutableOplogEntry::makeUpdateOperation(const NamespaceString nss,
                                                      UUID uuid,
                                                      const BSONObj& update,
-                                                     const BSONObj& criteria) {
+                                                     const BSONObj& criteria,
+                                                     boost::optional<bool> isViewlessTimeseries) {
     ReplOperation op;
     op.setOpType(OpTypeEnum::kUpdate);
 
+    if (isViewlessTimeseries && *isViewlessTimeseries) {
+        op.setIsViewlessTimeseries(true);
+    }
     op.setTid(nss.tenantId());
     op.setNss(nss);
     op.setUuid(uuid);
@@ -223,10 +231,14 @@ ReplOperation MutableOplogEntry::makeUpdateOperation(const NamespaceString nss,
 
 ReplOperation MutableOplogEntry::makeDeleteOperation(const NamespaceString& nss,
                                                      UUID uuid,
-                                                     const BSONObj& docToDelete) {
+                                                     const BSONObj& docToDelete,
+                                                     boost::optional<bool> isViewlessTimeseries) {
     ReplOperation op;
     op.setOpType(OpTypeEnum::kDelete);
 
+    if (isViewlessTimeseries && *isViewlessTimeseries) {
+        op.setIsViewlessTimeseries(true);
+    }
     op.setTid(nss.tenantId());
     op.setNss(nss);
     op.setUuid(uuid);
@@ -679,6 +691,10 @@ const mongo::BSONObj& OplogEntry::getObject() const {
 
 const boost::optional<mongo::BSONObj>& OplogEntry::getObject2() const {
     return _entry.getObject2();
+}
+
+boost::optional<bool> OplogEntry::getIsViewlessTimeseries() const {
+    return _entry.getIsViewlessTimeseries();
 }
 
 boost::optional<bool> OplogEntry::getUpsert() const {

@@ -34,6 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
@@ -41,7 +42,9 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options_gen.h"
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/import_collection_oplog_entry_gen.h"
 #include "mongo/db/catalog/local_oplog_info.h"
@@ -113,6 +116,7 @@
 #include <utility>
 
 #include <boost/cstdint.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
@@ -796,6 +800,106 @@ TEST_F(OpObserverTest, AbortIndexBuildExpectedOplogEntry) {
 
     // Should be able to extract a Status from the 'cause' field.
     ASSERT_EQUALS(cause, getStatusFromCommandResult(o.getObjectField("cause")));
+}
+
+TEST_F(OpObserverTest, checkIsViewlessTimeseriesOnReplLogUpdate) {
+    RAIIServerParameterControllerForTest viewlessController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+
+    NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.tsColl");
+
+    auto opCtx = cc().makeOperationContext();
+    auto tsOptions = TimeseriesOptions("t");
+    CreateCommand cmd = CreateCommand(curNss);
+    cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
+    uassertStatusOK(createCollection(opCtx.get(), cmd));
+
+    const auto criteria = BSON("_id" << 0 << "data" << "original" << "timestamp" << Date_t::now());
+    const auto preImageDoc = criteria;
+    CollectionUpdateArgs updateArgs{preImageDoc};
+    updateArgs.criteria = criteria;
+    updateArgs.updatedDoc =
+        BSON("_id" << 0 << "data" << "original" << "timestamp" << Date_t::now());
+    updateArgs.update = BSON("$set" << BSON("data" << "x"));
+
+    WriteUnitOfWork wuow(opCtx.get());
+    AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+    AutoGetCollection autoColl(opCtx.get(), curNss, MODE_X);
+    OplogUpdateEntryArgs update(&updateArgs, *autoColl);
+
+    OpObserverRegistry opObserver;
+    opObserver.addObserver(
+        std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
+
+    opObserver.onUpdate(opCtx.get(), update);
+    wuow.commit();
+
+    auto oplogEntry = getSingleOplogEntry(opCtx.get());
+    bool isViewlessTimeseries = oplogEntry.getBoolField("isViewlessTimeseries");
+    ASSERT(isViewlessTimeseries);
+}
+
+TEST_F(OpObserverTest, checkIsTimeseriesOnReplLogDelete) {
+    RAIIServerParameterControllerForTest viewlessController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+    auto opCtx = cc().makeOperationContext();
+
+    NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.tsColl");
+    auto tsOptions = TimeseriesOptions("t");
+
+    CreateCommand cmd = CreateCommand(curNss);
+    cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
+    uassertStatusOK(createCollection(opCtx.get(), cmd));
+
+    AutoGetCollection autoColl(opCtx.get(), curNss, MODE_X);
+    WriteUnitOfWork wunit(opCtx.get());
+    OplogDeleteEntryArgs args;
+    auto doc = BSON("_id" << 0 << "data" << "original" << "timestamp" << Date_t::now());
+    const auto& documentKey = getDocumentKey(*autoColl, doc);
+    opObserver.onDelete(opCtx.get(), *autoColl, kUninitializedStmtId, doc, documentKey, args);
+
+    auto oplogEntry = getSingleOplogEntry(opCtx.get());
+    wunit.commit();
+
+    bool isViewlessTimeseries = oplogEntry.getBoolField("isViewlessTimeseries");
+    ASSERT(isViewlessTimeseries);
+}
+
+TEST_F(OpObserverTest, checkIsTimeseriesOnInserts) {
+    RAIIServerParameterControllerForTest viewlessController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+
+    NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.tsColl");
+    auto opCtx = cc().makeOperationContext();
+    auto tsOptions = TimeseriesOptions("t");
+    CreateCommand cmd = CreateCommand(curNss);
+    cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
+    uassertStatusOK(createCollection(opCtx.get(), cmd));
+
+    const auto criteria = BSON("_id" << 0 << "data" << "original" << "timestamp" << Date_t::now());
+    std::vector<InsertStatement> insert;
+    insert.emplace_back(criteria);
+
+    WriteUnitOfWork wuow(opCtx.get());
+    AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+    AutoGetCollection autoColl(opCtx.get(), curNss, MODE_X);
+
+    OpObserverRegistry opObserver;
+    opObserver.addObserver(
+        std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
+    opObserver.onInserts(opCtx.get(),
+                         *autoColl,
+                         insert.begin(),
+                         insert.end(),
+                         /*recordIds=*/{},
+                         /*fromMigrate=*/std::vector<bool>(insert.size(), false),
+                         /*defaultFromMigrate=*/false);
+    wuow.commit();
+
+    auto oplogEntry = getSingleOplogEntry(opCtx.get());
+    bool isViewlessTimeseries = oplogEntry.getBoolField("isViewlessTimeseries");
+    ASSERT(isViewlessTimeseries);
 }
 
 TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
@@ -1660,6 +1764,25 @@ protected:
         }
     }
 };
+
+TEST_F(OpObserverTransactionTest, checkIsTimeseriesOnMultiDocTransaction) {
+    RAIIServerParameterControllerForTest viewlessController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.unstashTransactionResources(opCtx(), "delete");
+
+    NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.tsColl");
+    WriteUnitOfWork wuow(opCtx());
+
+    auto tsOptions = TimeseriesOptions("t");
+    CreateCommand cmd = CreateCommand(curNss);
+    cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
+    ASSERT_THROWS_CODE(createCollection(opCtx(), cmd),
+                       AssertionException,
+                       ErrorCodes::OperationNotSupportedInTransaction);
+    wuow.commit();
+}
 
 TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -3012,6 +3135,7 @@ TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
             if (!testCase.isRetryableWrite) {
                 ASSERT_FALSE(entry.getSessionId());
                 ASSERT_FALSE(entry.getTxnNumber());
+                ASSERT(!entry.getIsViewlessTimeseries());
                 ASSERT_EQ(0, entry.getStatementIds().size());
                 continue;
             }
@@ -3230,6 +3354,7 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
         ASSERT(0 ==
                innerEntry.getObject().woCompare(BSON("_id" << 0 << "data"
                                                            << "x")));
+        ASSERT(!innerEntry.getIsViewlessTimeseries());
     }
     {
         const auto innerEntry = innerEntries[1];
@@ -3237,6 +3362,7 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
         ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kDelete);
         ASSERT(innerEntry.getNss() == _nss);
         ASSERT(0 == innerEntry.getObject().woCompare(BSON("_id" << 1)));
+        ASSERT(!innerEntry.getIsViewlessTimeseries());
     }
     {
         const auto innerEntry = innerEntries[2];
@@ -3244,6 +3370,88 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
         ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kUpdate);
         ASSERT(innerEntry.getNss() == _nss);
         ASSERT(0 == innerEntry.getObject().woCompare(BSON("fieldToUpdate" << "valueToUpdate")));
+        ASSERT(!innerEntry.getIsViewlessTimeseries());
+    }
+}
+
+TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateOnViewlessTimeseries) {
+    RAIIServerParameterControllerForTest viewlessController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+    NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.tsColl");
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+
+    auto tsOptions = TimeseriesOptions("t");
+    CreateCommand cmd = CreateCommand(curNss);
+    cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
+    uassertStatusOK(createCollection(opCtx, cmd));
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+
+    AutoGetCollection autoColl(opCtx, curNss, MODE_IX);
+    auto& bwc = BatchedWriteContext::get(opCtx);
+    ASSERT(!bwc.writesAreBatched());
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    ASSERT(bwc.writesAreBatched());
+
+    auto doc = BSON("_id" << 0 << "data" << "original" << "timestamp" << Date_t::now());
+    auto doc2 = BSON("_id" << 1 << "data" << "original" << "timestamp" << Date_t::now());
+
+    // (0) Insert
+    {
+        std::vector<InsertStatement> insert;
+        insert.emplace_back(doc);
+        insert.emplace_back(doc2);
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            insert.begin(),
+            insert.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(insert.size(), false),
+            /*defaultFromMigrate=*/false);
+    }
+    // (1) Delete
+    {
+        OplogDeleteEntryArgs args;
+        const auto& documentKey = getDocumentKey(*autoColl, doc);
+        opCtx->getServiceContext()->getOpObserver()->onDelete(
+            opCtx, *autoColl, kUninitializedStmtId, doc, documentKey, args);
+    }
+    // (2) Update
+    {
+        const auto criteria =
+            BSON("_id" << 0 << "data" << "original" << "timestamp" << Date_t::now());
+        const auto preImageDoc = doc;
+        CollectionUpdateArgs collUpdateArgs{preImageDoc};
+        collUpdateArgs.criteria = criteria;
+        collUpdateArgs.update = BSON("fieldToUpdate" << "valueToUpdate");
+        auto args = OplogUpdateEntryArgs(&collUpdateArgs, *autoColl);
+        opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, args);
+    }
+    wuow.commit();
+
+    std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, 1);
+    auto lastOplogEntry = oplogs.back();
+    auto lastOplogEntryParsed = assertGet(OplogEntry::parse(oplogs.back()));
+
+    ASSERT(lastOplogEntryParsed.getCommandType() == OplogEntry::CommandType::kApplyOps);
+    std::vector<repl::OplogEntry> innerEntries;
+    repl::ApplyOps::extractOperationsTo(
+        lastOplogEntryParsed, lastOplogEntryParsed.getEntry().toBSON(), &innerEntries);
+    ASSERT_EQ(innerEntries.size(), 4);
+
+    std::vector<repl::OpTypeEnum> expectedOpTypes = {repl::OpTypeEnum::kInsert,
+                                                     repl::OpTypeEnum::kInsert,
+                                                     repl::OpTypeEnum::kDelete,
+                                                     repl::OpTypeEnum::kUpdate};
+
+    for (size_t i = 0; i < innerEntries.size(); ++i) {
+        const auto& innerEntry = innerEntries[i];
+        ASSERT(innerEntry.getCommandType() == OplogEntry::CommandType::kNotCommand);
+        ASSERT(innerEntry.getOpType() == expectedOpTypes[i]);
+        ASSERT(innerEntry.getIsViewlessTimeseries() == true);
     }
 }
 
@@ -4077,6 +4285,7 @@ TEST_F(OnDeleteOutputsTest, TestNonTransactionFundamentalOnDeleteOutputs) {
         auto deleteOplogEntry = assertGet(OplogEntry::parse(oplogs.back()));
         checkSideCollectionIfNeeded(opCtx, testCase, deleteEntryArgs, oplogs, deleteOplogEntry);
         checkChangeStreamImagesIfNeeded(opCtx, testCase, deleteEntryArgs, deleteOplogEntry);
+        ASSERT(!deleteOplogEntry.getIsViewlessTimeseries());
     }
 }
 

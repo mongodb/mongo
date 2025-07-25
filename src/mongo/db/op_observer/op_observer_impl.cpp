@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/backwards_compatible_collection_options_util.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -60,6 +61,7 @@
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -232,6 +234,9 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
     oplogEntry->setNss(args.coll->ns());
     oplogEntry->setUuid(args.coll->uuid());
 
+    if (args.coll->isNewTimeseriesWithoutView()) {
+        oplogEntry->setIsViewlessTimeseries();
+    }
     repl::OplogLink oplogLink;
     operationLogger->appendOplogEntryChainInfo(
         opCtx, oplogEntry, &oplogLink, args.updateArgs->stmtIds);
@@ -264,12 +269,16 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
                            bool fromMigrate,
                            const DocumentKey& documentKey,
                            const boost::optional<ShardId>& destinedRecipient,
+                           bool isViewlessTimeseries,
                            OperationLogger* operationLogger) {
     oplogEntry->setTid(nss.tenantId());
     oplogEntry->setNss(nss);
     oplogEntry->setUuid(uuid);
     oplogEntry->setDestinedRecipient(destinedRecipient);
 
+    if (isViewlessTimeseries) {
+        oplogEntry->setIsViewlessTimeseries();
+    }
     repl::OplogLink oplogLink;
     operationLogger->appendOplogEntryChainInfo(opCtx, oplogEntry, &oplogLink, {stmtId});
 
@@ -546,6 +555,9 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
         if (!recordIds.empty()) {
             oplogEntry.setRecordId(recordIds[i]);
         }
+        if (collectionPtr->isNewTimeseriesWithoutView()) {
+            oplogEntry.setIsViewlessTimeseries();
+        }
         oplogEntry.setObject(begin[i].doc);
         oplogEntry.setObject2(docKey);
         oplogEntry.setOpTime(insertStatementOplogSlot);
@@ -656,7 +668,13 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         size_t i = 0;
         for (auto iter = first; iter != last; iter++) {
             const auto docKey = getDocumentKey(coll, iter->doc).getShardKeyAndId();
-            auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc, docKey);
+            repl::ReplOperation operation;
+            operation = MutableOplogEntry::makeInsertOperation(
+                nss,
+                uuid,
+                iter->doc,
+                docKey,
+                /*isViewlessTimeseries=*/coll->isNewTimeseriesWithoutView());
             operation.setDestinedRecipient(
                 shardingWriteRouter->getReshardingDestinedRecipient(iter->doc));
 
@@ -702,6 +720,9 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         // Ensure well-formed embedded ReplOperation for logging.
         // This means setting optype, nss, and object at the minimum.
         MutableOplogEntry oplogEntryTemplate;
+        if (coll->isNewTimeseriesWithoutView()) {
+            oplogEntryTemplate.setIsViewlessTimeseries();
+        }
         oplogEntryTemplate.setOpType(repl::OpTypeEnum::kInsert);
         oplogEntryTemplate.setTid(nss.tenantId());
         oplogEntryTemplate.setNss(nss);
@@ -788,8 +809,13 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
     auto shardingWriteRouter = std::make_unique<ShardingWriteRouter>(opCtx, nss);
     OpTimeBundle opTime;
     if (inBatchedWrite) {
-        auto operation = MutableOplogEntry::makeUpdateOperation(
-            nss, args.coll->uuid(), args.updateArgs->update, args.updateArgs->criteria);
+        repl::ReplOperation operation;
+        operation = MutableOplogEntry::makeUpdateOperation(
+            nss,
+            args.coll->uuid(),
+            args.updateArgs->update,
+            args.updateArgs->criteria,
+            /*isViewlessTimeseries=*/args.coll->isNewTimeseriesWithoutView());
         operation.setDestinedRecipient(
             shardingWriteRouter->getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
         operation.setFromMigrateIfTrue(args.updateArgs->source == OperationSource::kFromMigrate);
@@ -950,8 +976,12 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
     OpTimeBundle opTime;
     if (inBatchedWrite) {
-        auto operation =
-            MutableOplogEntry::makeDeleteOperation(nss, uuid, documentKey.getShardKeyAndId());
+        repl::ReplOperation operation;
+        operation = MutableOplogEntry::makeDeleteOperation(
+            nss,
+            uuid,
+            documentKey.getShardKeyAndId(),
+            /*isViewlessTimeseries=*/coll->isNewTimeseriesWithoutView());
         operation.setDestinedRecipient(destinedRecipient);
         operation.setFromMigrateIfTrue(args.fromMigrate);
 
@@ -1028,6 +1058,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                                args.fromMigrate,
                                documentKey,
                                destinedRecipient,
+                               coll->isNewTimeseriesWithoutView(),
                                _operationLogger.get());
         if (opAccumulator) {
             opAccumulator->opTime.writeOpTime = opTime.writeOpTime;
