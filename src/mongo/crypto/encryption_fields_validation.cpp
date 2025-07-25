@@ -329,6 +329,23 @@ void validateRangeIndex(BSONType fieldType, StringData fieldPath, QueryTypeConfi
             fmt::format("Type '{}' is not a supported range indexed type", typeName(fieldType)),
             isFLE2RangeIndexedSupportedType(fieldType));
 
+    // Text search fields are not allowed.
+    uassert(10774906,
+            "The field 'strMaxLength' is not allowed for range index but is present",
+            !query.getStrMaxLength().has_value());
+    uassert(10774907,
+            "The field 'strMinQueryLength' is not allowed for range index but is present",
+            !query.getStrMinQueryLength().has_value());
+    uassert(10774908,
+            "The field 'strMaxQueryLength' is not allowed for range index but is present",
+            !query.getStrMaxQueryLength().has_value());
+    uassert(10774909,
+            "The field 'caseSensitive' is not allowed for range index but is present",
+            !query.getCaseSensitive().has_value());
+    uassert(10774910,
+            "The field 'diacriticSensitive' is not allowed for range index but is present",
+            !query.getDiacriticSensitive().has_value());
+
     auto& indexMin = query.getMin();
     auto& indexMax = query.getMax();
 
@@ -447,6 +464,23 @@ void validateTextSearchIndex(BSONType fieldType,
                     typeName(fieldType),
                     fieldPath),
         fieldType == BSONType::string);
+
+    // Range search fields not allowed.
+    uassert(10774911,
+            "The field 'sparsity' is not allowed for text-based index but is present",
+            !query.getSparsity().has_value());
+    uassert(10774912,
+            "The field 'min' is not allowed for text-based index but is present",
+            !query.getMin().has_value());
+    uassert(10774913,
+            "The field 'max' is not allowed for text-based index but is present",
+            !query.getMax().has_value());
+    uassert(10774914,
+            "The field 'trimFactor' is not allowed for text-based index but is present",
+            !query.getTrimFactor().has_value());
+    uassert(10774915,
+            "The field 'precision' is not allowed for text-based index but is present",
+            !query.getPrecision().has_value());
     auto qTypeStr = QueryType_serializer(query.getQueryType());
 
     uassert(9783401,
@@ -609,6 +643,28 @@ void validateEncryptedField(const EncryptedField* field) {
                 uassert(8574104,
                         "The field 'trimFactor' is not allowed for equality index but is present",
                         !encryptedIndex.getTrimFactor().has_value());
+                uassert(10774900,
+                        "The field 'precision' is not allowed for equality index but is present",
+                        !encryptedIndex.getPrecision().has_value());
+                uassert(10774901,
+                        "The field 'strMaxLength' is not allowed for equality index but is present",
+                        !encryptedIndex.getStrMaxLength().has_value());
+                uassert(10774902,
+                        "The field 'strMinQueryLength' is not allowed for equality index but is "
+                        "present",
+                        !encryptedIndex.getStrMinQueryLength().has_value());
+                uassert(10774903,
+                        "The field 'strMaxQueryLength' is not allowed for equality index but is "
+                        "present",
+                        !encryptedIndex.getStrMaxQueryLength().has_value());
+                uassert(
+                    10774904,
+                    "The field 'caseSensitive' is not allowed for equality index but is present",
+                    !encryptedIndex.getCaseSensitive().has_value());
+                uassert(10774905,
+                        "The field 'diacriticSensitive' is not allowed for equality index but is "
+                        "present",
+                        !encryptedIndex.getDiacriticSensitive().has_value());
                 break;
             case QueryTypeEnum::RangePreviewDeprecated:
                 // rangePreview is renamed to range in Range V2, but we still need to accept it as

@@ -798,6 +798,90 @@ TEST(FLECollectionOptions, Equality_ExtraFields) {
                 }
             ]
         }})")));
+
+    ASSERT_STATUS_CODE(8574104, CollectionOptions::parse(fromjson(R"({
+    encryptedFields: {
+        "fields": [
+            {
+                "path": "firstName",
+                "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                "bsonType": "int",
+                "queries": {"queryType": "equality", trimFactor:1}
+            }
+        ]
+    }})")));
+
+    ASSERT_STATUS_CODE(10774900, CollectionOptions::parse(fromjson(R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "int",
+                    "queries": {"queryType": "equality", precision:1}
+                }
+            ]
+        }})")));
+
+    ASSERT_STATUS_CODE(10774901, CollectionOptions::parse(fromjson(R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "int",
+                    "queries": {"queryType": "equality", strMaxLength:1}
+                }
+            ]
+        }})")));
+
+    ASSERT_STATUS_CODE(10774902, CollectionOptions::parse(fromjson(R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "int",
+                    "queries": {"queryType": "equality", strMinQueryLength:1}
+                }
+            ]
+        }})")));
+
+    ASSERT_STATUS_CODE(10774903, CollectionOptions::parse(fromjson(R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "int",
+                    "queries": {"queryType": "equality", strMaxQueryLength:1}
+                }
+            ]
+        }})")));
+
+    ASSERT_STATUS_CODE(10774904, CollectionOptions::parse(fromjson(R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "int",
+                    "queries": {"queryType": "equality", caseSensitive:true}
+                }
+            ]
+        }})")));
+
+    ASSERT_STATUS_CODE(10774905, CollectionOptions::parse(fromjson(R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "int",
+                    "queries": {"queryType": "equality", diacriticSensitive:true}
+                }
+            ]
+        }})")));
 }
 
 
@@ -1022,6 +1106,130 @@ TEST(FLECollectionOptions, Range_Sparsity) {
                     "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
                     "bsonType": "int",
                     "queries": {"queryType": "range", "sparsity" : 9}
+                }
+            ]
+        }})")));
+}
+
+TEST(FLECollectionOptions, Range_ExtraFields) {
+    ASSERT_STATUS_CODE(10774906, CollectionOptions::parse(fromjson(R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "int",
+                    "queries": {"queryType": "range", strMaxLength:1}
+                }
+            ]
+        }})")));
+
+    ASSERT_STATUS_CODE(10774907, CollectionOptions::parse(fromjson(R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "int",
+                    "queries": {"queryType": "range", strMinQueryLength:1}
+                }
+            ]
+        }})")));
+
+    ASSERT_STATUS_CODE(10774908, CollectionOptions::parse(fromjson(R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "int",
+                    "queries": {"queryType": "range", strMaxQueryLength:1}
+                }
+            ]
+        }})")));
+
+    ASSERT_STATUS_CODE(10774909, CollectionOptions::parse(fromjson(R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "int",
+                    "queries": {"queryType": "range", caseSensitive:true}
+                }
+            ]
+        }})")));
+
+    ASSERT_STATUS_CODE(10774910, CollectionOptions::parse(fromjson(R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "int",
+                    "queries": {"queryType": "range", diacriticSensitive:true}
+                }
+            ]
+        }})")));
+}
+
+TEST(FLECollectionOptions, Text_ExtraFields) {
+    ASSERT_STATUS_CODE(10774911, CollectionOptions::parse(fromjson(R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "string",
+                    "queries": {"queryType": "substringPreview", sparsity:1}
+                }
+            ]
+        }})")));
+
+    ASSERT_STATUS_CODE(10774912, CollectionOptions::parse(fromjson(R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "string",
+                    "queries": {"queryType": "substringPreview", min:1}
+                }
+            ]
+        }})")));
+
+    ASSERT_STATUS_CODE(10774913, CollectionOptions::parse(fromjson(R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "string",
+                    "queries": {"queryType": "substringPreview", max:1}
+                }
+            ]
+        }})")));
+
+    ASSERT_STATUS_CODE(10774914, CollectionOptions::parse(fromjson(R"({
+    encryptedFields: {
+        "fields": [
+            {
+                "path": "firstName",
+                "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                "bsonType": "string",
+                "queries": {"queryType": "substringPreview", trimFactor:1}
+            }
+        ]
+    }})")));
+
+    ASSERT_STATUS_CODE(10774915, CollectionOptions::parse(fromjson(R"({
+        encryptedFields: {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": { '$uuid': '5f34e99a-b214-451f-b6f6-d3d28e933d15' },
+                    "bsonType": "string",
+                    "queries": {"queryType": "substringPreview", precision:1}
                 }
             ]
         }})")));
