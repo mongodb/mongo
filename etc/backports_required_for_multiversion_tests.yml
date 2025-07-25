@@ -871,6 +871,8 @@ last-lts:
       ticket: SERVER-102477
     - test_file: jstests/sharding/config_shards_on_repl_set_changes.js
       ticket: SERVER-106614
+    - test_file: jstests/replsets/sync_source_override_secondary_read_preference.js
+      ticket: SERVER-104343
     - test_file: jstests/replsets/auth_coordinateCommitTransaction.js
       ticket: SERVER-103618
   suites: null
