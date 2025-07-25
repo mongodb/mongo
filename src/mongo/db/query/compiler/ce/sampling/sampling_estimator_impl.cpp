@@ -30,11 +30,14 @@
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 
 #include "mongo/db/exec/matcher/matcher.h"
+#include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
+#include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/find_command.h"
@@ -53,11 +56,21 @@ namespace mongo::ce {
 using CardinalityType = mongo::cost_based_ranker::CardinalityType;
 using EstimationSource = mongo::cost_based_ranker::EstimationSource;
 
-std::unique_ptr<CanonicalQuery> SamplingEstimatorImpl::makeCanonicalQuery(
-    const NamespaceString& nss, OperationContext* opCtx, boost::optional<size_t> sampleSize) {
+std::unique_ptr<CanonicalQuery> SamplingEstimatorImpl::makeEmptyCanonicalQuery(
+    const NamespaceString& nss,
+    OperationContext* opCtx,
+    boost::optional<size_t> sampleSize,
+    const std::vector<std::string>& topLevelSampleFieldNames) {
     auto findCommand = std::make_unique<FindCommandRequest>(NamespaceStringOrUUID(nss));
     if (sampleSize) {
         findCommand->setLimit(*sampleSize);
+    }
+    if (!topLevelSampleFieldNames.empty()) {
+        BSONObjBuilder bob;
+        for (const auto& fieldName : topLevelSampleFieldNames) {
+            bob.append(fieldName, 1);
+        }
+        findCommand->setProjection(bob.obj());
     }
 
     auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build();
@@ -70,6 +83,51 @@ std::unique_ptr<CanonicalQuery> SamplingEstimatorImpl::makeCanonicalQuery(
 }
 
 namespace {
+
+/**
+ * Helper function to determine whether a given set of field names contains a
+ * dotted path.
+ */
+bool containsDottedPath(const std::vector<std::string>& topLevelSampleFieldNames) {
+    return std::any_of(
+        topLevelSampleFieldNames.begin(),
+        topLevelSampleFieldNames.end(),
+        [](const std::string& fieldName) { return fieldName.find('.') != std::string::npos; });
+}
+
+/**
+ * Helper function to determine if a given MatchExpression contains only fields present in the
+ * sample.
+ */
+void checkSampleContainsMatchExpressionFields(
+    const std::vector<std::string>& topLevelSampleFieldNames, const MatchExpression* expr) {
+    DepsTracker deps;
+    match_expression::addDependencies(expr, &deps);
+
+    const auto matchExpressionFields = stage_builder::getTopLevelFields(deps.fields);
+    stdx::unordered_set<StringData> topLevelSampleFieldNamesSet(topLevelSampleFieldNames.begin(),
+                                                                topLevelSampleFieldNames.end());
+    for (const auto& matchField : matchExpressionFields) {
+        tassert(10670301,
+                "MatchExpression contains fields not present in topLevelSampleFieldNames. "
+                "MatchExpression: " +
+                    expr->toString(),
+                topLevelSampleFieldNamesSet.contains(matchField));
+    }
+}
+
+/**
+ * Helper function to determine if a given set of MatchExpresions contains only fields present in
+ * the sample.
+ */
+void checkSampleContainsMatchExpressionFields(
+    const std::vector<std::string>& topLevelSampleFieldNames,
+    const std::vector<const MatchExpression*>& expressions) {
+    for (const auto& expr : expressions) {
+        checkSampleContainsMatchExpressionFields(topLevelSampleFieldNames, expr);
+    }
+}
+
 /**
  * Help function mapping confidence intervals to Z-scores.
  * A "95 confidence interval" means that 95% of the observations (in our case CEs computed from
@@ -129,6 +187,42 @@ std::unique_ptr<sbe::PlanStage> makeScanStage(const CollectionPtr& collection,
                                       0 /* nodeId */,
                                       callbacks,
                                       useRandomCursor);
+}
+
+/**
+ * This helper creates a sbe::ProjectStage which is used to apply an inclusion projection on the
+ * documents when generating the sample. 'stage' is the child SBE plan stage that we use as input to
+ * create the current stage. 'inputSlot' is the SBE slot where the document that we want to apply
+ * projection to is stored. 'outputSlot' is the SBE slot where the document with projections applied
+ * to it will be stored. 'topLevelSampleFieldNames' provide the SBE bindings of field names that
+ * should be in the output document and are used to apply the inclusion projection.
+ */
+std::unique_ptr<sbe::PlanStage> makeProjectStage(
+    std::unique_ptr<sbe::PlanStage> stage,
+    sbe::value::SlotId inputSlot,
+    sbe::value::SlotId outputSlot,
+    std::vector<std::string>& topLevelSampleFieldNames) {
+    // Populate the vector for field actions with Keep for all fields since we want inclusion
+    // projection.
+    std::vector<sbe::MakeObjSpec::FieldAction> fieldActions;
+    for (size_t i = 0; i < topLevelSampleFieldNames.size(); i++) {
+        fieldActions.emplace_back(sbe::MakeObjSpec::Keep{});
+    }
+
+    auto spec =
+        std::make_unique<sbe::MakeObjSpec>(FieldListScope::kClosed,
+                                           topLevelSampleFieldNames,
+                                           std::move(fieldActions),
+                                           sbe::MakeObjSpec::NonObjInputBehavior::kReturnNothing);
+    auto specExpr =
+        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::makeObjSpec,
+                                   sbe::value::bitcastFrom<sbe::MakeObjSpec*>(spec.release()));
+
+    // Create a built-in SBE makeBsonObj func and pass in the 2 args: MakeObjSpec and slot to read
+    // input doc from (inputSlot).
+    auto func = sbe::makeE<sbe::EFunction>(
+        "makeBsonObj"_sd, sbe::makeEs(std::move(specExpr), sbe::makeE<sbe::EVariable>(inputSlot)));
+    return sbe::makeProjectStage(std::move(stage), 0 /* nodeId */, outputSlot, std::move(func));
 }
 }  // namespace
 
@@ -272,6 +366,16 @@ SamplingEstimatorImpl::generateRandomSamplingPlan(PlanYieldPolicy* sbeYieldPolic
         nullptr /* skip */,
         0 /* nodeId */);
 
+    // Inject projection if topLevelSampleFieldNames is non-empty.
+    if (!_topLevelSampleFieldNames.empty()) {
+        auto projectResultSlot = ids.generate();
+        stage = makeProjectStage(std::move(stage),
+                                 staticData->resultSlot.get(),
+                                 projectResultSlot,
+                                 _topLevelSampleFieldNames);
+        staticData->resultSlot = projectResultSlot;
+    }
+
     stage_builder::PlanStageData data{
         stage_builder::Environment{std::make_unique<sbe::RuntimeEnvironment>()},
         std::move(staticData)};
@@ -317,24 +421,38 @@ SamplingEstimatorImpl::generateChunkSamplingPlan(PlanYieldPolicy* sbeYieldPolicy
 
     sbe::value::SlotVector outerProjectsSlots;
     sbe::value::SlotVector outerCorrelatedSlots{*outerRid};
-    auto loopJoinStage = sbe::makeS<sbe::LoopJoinStage>(std::move(outerStage),
-                                                        std::move(innerStage),
-                                                        outerProjectsSlots,
-                                                        outerCorrelatedSlots,
-                                                        nullptr /* predicate */,
-                                                        0 /* _nodeId */);
+    auto stage = sbe::makeS<sbe::LoopJoinStage>(std::move(outerStage),
+                                                std::move(innerStage),
+                                                outerProjectsSlots,
+                                                outerCorrelatedSlots,
+                                                nullptr /* predicate */,
+                                                0 /* _nodeId */);
+
+    // Inject projection if topLevelSampleFieldNames is non-empty.
+    if (!_topLevelSampleFieldNames.empty()) {
+        auto projectResultSlot = ids.generate();
+        stage = makeProjectStage(std::move(stage),
+                                 staticData->resultSlot.get(),
+                                 projectResultSlot,
+                                 _topLevelSampleFieldNames);
+        staticData->resultSlot = projectResultSlot;
+    }
 
     stage_builder::PlanStageData data{
         stage_builder::Environment{std::make_unique<sbe::RuntimeEnvironment>()},
         std::move(staticData)};
 
-    return {std::move(loopJoinStage), std::move(data)};
+    return {std::move(stage), std::move(data)};
 }
 
 void SamplingEstimatorImpl::executeSamplingQueryAndSample(
     std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>& plan,
     std::unique_ptr<CanonicalQuery> cq,
     std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy) {
+    LOGV2_DEBUG(10670302,
+                5,
+                "SamplingCE Sampling SBE plan",
+                "SBE Plan"_attr = sbe::DebugPrinter{}.print(plan.first.get()->debugPrint()));
     // Prepare the SBE plan for execution.
     prepareSlotBasedExecutableTree(_opCtx,
                                    plan.first.get(),
@@ -370,7 +488,8 @@ void SamplingEstimatorImpl::executeSamplingQueryAndSample(
 
 void SamplingEstimatorImpl::generateFullCollScanSample() {
     // Create a CanonicalQuery for the CollScan plan.
-    auto cq = makeCanonicalQuery(_collections.getMainCollection()->ns(), _opCtx, boost::none);
+    auto cq = makeEmptyCanonicalQuery(
+        _collections.getMainCollection()->ns(), _opCtx, boost::none, _topLevelSampleFieldNames);
     auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, cq->nss());
 
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
@@ -380,6 +499,17 @@ void SamplingEstimatorImpl::generateFullCollScanSample() {
 
     auto stage = makeScanStage(
         collection, staticData->resultSlot, boost::none, boost::none, false, sbeYieldPolicy.get());
+
+    // Inject projection if topLevelSampleFieldNames is non-empty.
+    if (!_topLevelSampleFieldNames.empty()) {
+        auto projectResultSlot = ids.generate();
+        stage = makeProjectStage(std::move(stage),
+                                 staticData->resultSlot.get(),
+                                 projectResultSlot,
+                                 _topLevelSampleFieldNames);
+        staticData->resultSlot = projectResultSlot;
+    }
+
     stage_builder::PlanStageData data{
         stage_builder::Environment{std::make_unique<sbe::RuntimeEnvironment>()},
         std::move(staticData)};
@@ -394,7 +524,8 @@ void SamplingEstimatorImpl::generateFullCollScanSample() {
 
 void SamplingEstimatorImpl::generateRandomSample(size_t sampleSize) {
     // Create a CanonicalQuery for the sampling plan.
-    auto cq = makeCanonicalQuery(_collections.getMainCollection()->ns(), _opCtx, sampleSize);
+    auto cq = makeEmptyCanonicalQuery(
+        _collections.getMainCollection()->ns(), _opCtx, sampleSize, _topLevelSampleFieldNames);
     _sampleSize = sampleSize;
     auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, cq->nss());
 
@@ -411,7 +542,8 @@ void SamplingEstimatorImpl::generateRandomSample() {
 
 void SamplingEstimatorImpl::generateChunkSample(size_t sampleSize) {
     // Create a CanonicalQuery for the sampling plan.
-    auto cq = makeCanonicalQuery(_collections.getMainCollection()->ns(), _opCtx, sampleSize);
+    auto cq = makeEmptyCanonicalQuery(
+        _collections.getMainCollection()->ns(), _opCtx, sampleSize, _topLevelSampleFieldNames);
     _sampleSize = sampleSize;
     auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, cq->nss());
 
@@ -428,7 +560,8 @@ void SamplingEstimatorImpl::generateChunkSample() {
 
 void SamplingEstimatorImpl::generateSampleBySeqScanningForTesting() {
     // Create a CanonicalQuery for the sampling plan.
-    auto cq = makeCanonicalQuery(_collections.getMainCollection()->ns(), _opCtx, _sampleSize);
+    auto cq = makeEmptyCanonicalQuery(
+        _collections.getMainCollection()->ns(), _opCtx, _sampleSize, _topLevelSampleFieldNames);
     auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, cq->nss());
 
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
@@ -446,6 +579,16 @@ void SamplingEstimatorImpl::generateSampleBySeqScanningForTesting() {
         nullptr /* skip */,
         0 /* nodeId */);
 
+    // Inject projection if topLevelSampleFieldNames is non-empty.
+    if (!_topLevelSampleFieldNames.empty()) {
+        auto projectResultSlot = ids.generate();
+        stage = makeProjectStage(std::move(stage),
+                                 staticData->resultSlot.get(),
+                                 projectResultSlot,
+                                 _topLevelSampleFieldNames);
+        staticData->resultSlot = projectResultSlot;
+    }
+
     stage_builder::PlanStageData data{
         stage_builder::Environment{std::make_unique<sbe::RuntimeEnvironment>()},
         std::move(staticData)};
@@ -461,6 +604,11 @@ CardinalityEstimate SamplingEstimatorImpl::estimateCardinality(const MatchExpres
     if (_sampleSize == 0) {
         return cost_based_ranker::zeroCE;
     }
+
+    if (!_topLevelSampleFieldNames.empty()) {
+        checkSampleContainsMatchExpressionFields(_topLevelSampleFieldNames, expr);
+    }
+
     size_t cnt = 0;
     try {
         for (const auto& doc : _sample) {
@@ -488,6 +636,9 @@ CardinalityEstimate SamplingEstimatorImpl::estimateCardinality(const MatchExpres
 
 std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateCardinality(
     const std::vector<const MatchExpression*>& expressions) const {
+    if (!_topLevelSampleFieldNames.empty()) {
+        checkSampleContainsMatchExpressionFields(_topLevelSampleFieldNames, expressions);
+    }
     // The bool value indicates whether the estimation of the corresponding expression was aborted
     // or not. The estimation would be stopped if any error occurred during the estimation.
     std::vector<std::pair<double, bool>> estimates(expressions.size(), {0, true});
@@ -562,6 +713,9 @@ std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateRIDs(
 
 CardinalityEstimate SamplingEstimatorImpl::estimateRIDs(const IndexBounds& bounds,
                                                         const MatchExpression* expr) const {
+    if (!_topLevelSampleFieldNames.empty()) {
+        checkSampleContainsMatchExpressionFields(_topLevelSampleFieldNames, expr);
+    }
     size_t count = 0;
     for (auto&& doc : _sample) {
         if (doesDocumentMatchBounds(bounds, doc)) {
@@ -588,13 +742,18 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                                              size_t sampleSize,
                                              SamplingStyle samplingStyle,
                                              boost::optional<int> numChunks,
-                                             CardinalityEstimate collectionCard)
+                                             CardinalityEstimate collectionCard,
+                                             std::vector<std::string> topLevelSampleFieldNames)
     : _opCtx(opCtx),
       _collections(collections),
       _yieldPolicy(yieldPolicy),
       _sampleSize(sampleSize),
       _numChunks(numChunks),
       _collectionCard(collectionCard) {
+    tassert(10670300,
+            "topLevelSampleFieldNames should not contain a dotted field path",
+            !containsDottedPath(topLevelSampleFieldNames));
+    _topLevelSampleFieldNames = std::move(topLevelSampleFieldNames);
     if (internalQuerySamplingBySequentialScan.load()) {
         // This is only used for testing purposes when a repeatable sample is needed.
         generateSampleBySeqScanningForTesting();
@@ -620,14 +779,16 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                                              CardinalityEstimate collectionCard,
                                              SamplingConfidenceIntervalEnum ci,
                                              double marginOfError,
-                                             boost::optional<int> numChunks)
+                                             boost::optional<int> numChunks,
+                                             std::vector<std::string> topLevelSampleFieldNames)
     : SamplingEstimatorImpl(opCtx,
                             collections,
                             yieldPolicy,
                             calculateSampleSize(ci, marginOfError),
                             samplingStyle,
                             numChunks,
-                            collectionCard) {}
+                            collectionCard,
+                            std::move(topLevelSampleFieldNames)) {}
 
 SamplingEstimatorImpl::~SamplingEstimatorImpl() {}
 

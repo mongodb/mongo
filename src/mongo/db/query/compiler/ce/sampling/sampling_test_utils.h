@@ -51,10 +51,19 @@ public:
         return _sample;
     }
 
-    static std::unique_ptr<CanonicalQuery> makeCanonicalQuery(const NamespaceString& nss,
-                                                              OperationContext* opCtx,
-                                                              size_t sampleSize) {
-        return SamplingEstimatorImpl::makeCanonicalQuery(nss, opCtx, sampleSize);
+    static std::unique_ptr<CanonicalQuery> makeEmptyCanonicalQuery(const NamespaceString& nss,
+                                                                   OperationContext* opCtx,
+                                                                   size_t sampleSize) {
+        return SamplingEstimatorImpl::makeEmptyCanonicalQuery(nss, opCtx, sampleSize);
+    }
+
+    static std::unique_ptr<CanonicalQuery> makeEmptyCanonicalQuery(
+        const NamespaceString& nss,
+        OperationContext* opCtx,
+        size_t sampleSize,
+        const std::vector<std::string>& sampleFieldNames) {
+        return SamplingEstimatorImpl::makeEmptyCanonicalQuery(
+            nss, opCtx, sampleSize, sampleFieldNames);
     }
 
     static size_t calculateSampleSize(SamplingConfidenceIntervalEnum ci, double marginOfError) {

@@ -51,7 +51,9 @@ public:
     /**
      * 'opCtx' is used to create a new CanonicalQuery for the sampling SBE plan.
      * 'collections' is needed to create a sampling SBE plan. 'samplingStyle' can specify the
-     * sampling method.
+     * sampling method. 'topLevelSampleFieldNames' is the set of top level field names that we want
+     * to include in the sampled documents. We assume that topLevelSampleFieldNames are all the top
+     * level predicate fields of a given query.
      */
     SamplingEstimatorImpl(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
@@ -60,7 +62,8 @@ public:
                           CardinalityEstimate collectionCard,
                           SamplingConfidenceIntervalEnum ci,
                           double marginOfError,
-                          boost::optional<int> numChunks);
+                          boost::optional<int> numChunks,
+                          std::vector<std::string> topLevelSampleFieldNames = {});
 
     /*
      * This constructor allows the caller to specify the sample size if necessary. This constructor
@@ -74,7 +77,8 @@ public:
                           size_t sampleSize,
                           SamplingStyle samplingStyle,
                           boost::optional<int> numChunks,
-                          CardinalityEstimate collectionCard);
+                          CardinalityEstimate collectionCard,
+                          std::vector<std::string> topLevelSampleFieldNames = {});
     ~SamplingEstimatorImpl() override;
 
     /**
@@ -139,11 +143,16 @@ public:
 
 protected:
     /*
-     * This helper creates a CanonicalQuery for the sampling plan.
+     * This helper creates a CanonicalQuery for the sampling plan. This CanonicalQuery is “empty”
+     * because its sole purpose is to be passed to ‘prepareSlotBasedExecutableTree()’ as part of
+     * preparing the sampling plan for execution in SBE. That function uses the CanonicalQuery to
+     * bind input parameters, but this is a no-op for sampling CE.
      */
-    static std::unique_ptr<CanonicalQuery> makeCanonicalQuery(const NamespaceString& nss,
-                                                              OperationContext* opCtx,
-                                                              boost::optional<size_t> sampleSize);
+    static std::unique_ptr<CanonicalQuery> makeEmptyCanonicalQuery(
+        const NamespaceString& nss,
+        OperationContext* opCtx,
+        boost::optional<size_t> sampleSize,
+        const std::vector<std::string>& topLevelSampleFieldNames = {});
 
     double getCollCard() const {
         return _collectionCard.cardinality().v();
@@ -247,6 +256,9 @@ private:
     const MultipleCollectionAccessor& _collections;
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
     size_t _sampleSize;
+    // The set of top level fields that we want to include in the sampled documents.
+    std::vector<std::string> _topLevelSampleFieldNames;
+
     boost::optional<int> _numChunks;
 
     CardinalityEstimate _collectionCard;
