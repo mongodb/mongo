@@ -34,6 +34,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
+#include "mongo/db/s/user_writes_block_reason_gen.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {
@@ -97,8 +98,10 @@ public:
      * Acquires the user writes critical section blocking user writes. This should be used only on
      * replica sets.
      */
-    void acquireRecoverableCriticalSectionBlockingUserWrites(OperationContext* opCtx,
-                                                             const NamespaceString& nss);
+    void acquireRecoverableCriticalSectionBlockingUserWrites(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<UserWritesBlockReasonEnum> reason = boost::none);
 
     /**
      * Acquires the user writes critical section blocking only new sharded DDL operations, but not
@@ -132,7 +135,10 @@ public:
      * before this method is called all shards must have first demoted their critical sections to no
      * longer block user writes.
      */
-    void releaseRecoverableCriticalSection(OperationContext* opCtx, const NamespaceString& nss);
+    void releaseRecoverableCriticalSection(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<UserWritesBlockReasonEnum> reason = boost::none);
 
     /**
      * This method is called when we have to mirror the state on disk of the recoverable critical

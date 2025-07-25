@@ -67,14 +67,17 @@ void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
                 IDLParserContext("UserWriteBlockOpObserver"), insertedDoc);
             shard_role_details::getRecoveryUnit(opCtx)->onCommit(
                 [blockShardedDDL = collCSDoc.getBlockNewUserShardedDDL(),
-                 blockWrites = collCSDoc.getBlockUserWrites()](OperationContext* opCtx,
+                 blockWrites = collCSDoc.getBlockUserWrites(),
+                 blockUserWritesReason = collCSDoc.getBlockUserWritesReason().value_or(
+                     UserWritesBlockReasonEnum::kUnspecified)](OperationContext* opCtx,
                                                                boost::optional<Timestamp>) {
                     if (blockShardedDDL) {
                         GlobalUserWriteBlockState::get(opCtx)->enableUserShardedDDLBlocking(opCtx);
                     }
 
                     if (blockWrites) {
-                        GlobalUserWriteBlockState::get(opCtx)->enableUserWriteBlocking(opCtx);
+                        GlobalUserWriteBlockState::get(opCtx)->enableUserWriteBlocking(
+                            opCtx, blockUserWritesReason);
                     }
                 });
         }
@@ -97,7 +100,9 @@ void UserWriteBlockModeOpObserver::onUpdate(OperationContext* opCtx,
 
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [blockShardedDDL = collCSDoc.getBlockNewUserShardedDDL(),
-             blockWrites = collCSDoc.getBlockUserWrites()](OperationContext* opCtx,
+             blockWrites = collCSDoc.getBlockUserWrites(),
+             blockUserWritesReason = collCSDoc.getBlockUserWritesReason().value_or(
+                 UserWritesBlockReasonEnum::kUnspecified)](OperationContext* opCtx,
                                                            boost::optional<Timestamp>) {
                 if (blockShardedDDL) {
                     GlobalUserWriteBlockState::get(opCtx)->enableUserShardedDDLBlocking(opCtx);
@@ -106,7 +111,8 @@ void UserWriteBlockModeOpObserver::onUpdate(OperationContext* opCtx,
                 }
 
                 if (blockWrites) {
-                    GlobalUserWriteBlockState::get(opCtx)->enableUserWriteBlocking(opCtx);
+                    GlobalUserWriteBlockState::get(opCtx)->enableUserWriteBlocking(
+                        opCtx, blockUserWritesReason);
                 } else {
                     GlobalUserWriteBlockState::get(opCtx)->disableUserWriteBlocking(opCtx);
                 }

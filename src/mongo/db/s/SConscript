@@ -249,10 +249,24 @@ env.Library(
 )
 
 env.Library(
+    target='user_writes_block_reason_idl',
+    source=[
+        'user_writes_block_reason.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
     target='user_writes_recoverable_critical_section',
     source=[
         'user_writes_critical_section_document.idl',
         'user_writes_recoverable_critical_section_service.cpp',
+    ],
+    LIBDEPS=[
+        'user_writes_block_reason_idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/dbdirectclient',

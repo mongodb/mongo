@@ -77,6 +77,11 @@ MONGO_FAIL_POINT_DEFINE(skipRecoverUserWriteCriticalSections);
 const auto serviceDecorator =
     ServiceContext::declareDecoration<UserWritesRecoverableCriticalSectionService>();
 
+inline StringData reasonText(const boost::optional<UserWritesBlockReasonEnum>& reason) {
+    return UserWritesBlockReason_serializer(
+        reason.value_or(UserWritesBlockReasonEnum::kUnspecified));
+}
+
 BSONObj findRecoverableCriticalSectionDoc(OperationContext* opCtx, const NamespaceString& nss) {
     DBDirectClient dbClient(opCtx);
 
@@ -102,16 +107,19 @@ void setBlockUserWritesDocumentField(OperationContext* opCtx,
         ShardingCatalogClient::kLocalWriteConcern);
 }
 
-void acquireRecoverableCriticalSection(OperationContext* opCtx,
-                                       const NamespaceString& nss,
-                                       bool blockShardedDDL,
-                                       bool blockUserWrites) {
+void acquireRecoverableCriticalSection(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    bool blockShardedDDL,
+    bool blockUserWrites,
+    boost::optional<UserWritesBlockReasonEnum> reason = boost::none) {
     LOGV2_DEBUG(6351900,
                 3,
                 "Acquiring user writes recoverable critical section",
                 logAttrs(nss),
                 "blockShardedDDL"_attr = blockShardedDDL,
-                "blockUserWrites"_attr = blockUserWrites);
+                "blockUserWrites"_attr = blockUserWrites,
+                "reason"_attr = reasonText(reason));
 
     invariant(nss == UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace);
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
@@ -140,6 +148,13 @@ void acquireRecoverableCriticalSection(OperationContext* opCtx,
                                   << ", current: " << collCSDoc.getBlockNewUserShardedDDL(),
                     !blockUserWrites || collCSDoc.getBlockUserWrites() == blockUserWrites);
 
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "Cannot acquire user writes critical section with different "
+                                     "options than the already existing one. reason: "
+                                  << reasonText(reason) << ", current: "
+                                  << reasonText(collCSDoc.getBlockUserWritesReason()),
+                    collCSDoc.getBlockUserWritesReason() == reason);
+
             LOGV2_DEBUG(6351914,
                         3,
                         "The user writes recoverable critical section was already acquired",
@@ -155,6 +170,7 @@ void acquireRecoverableCriticalSection(OperationContext* opCtx,
         UserWriteBlockingCriticalSectionDocument newDoc(nss);
         newDoc.setBlockNewUserShardedDDL(blockShardedDDL);
         newDoc.setBlockUserWrites(blockUserWrites);
+        newDoc.setBlockUserWritesReason(reason);
 
         PersistentTaskStore<UserWriteBlockingCriticalSectionDocument> store(
             NamespaceString::kUserWritesCriticalSectionsNamespace);
@@ -193,14 +209,16 @@ bool UserWritesRecoverableCriticalSectionService::shouldRegisterReplicaSetAwareS
 }
 
 void UserWritesRecoverableCriticalSectionService::
-    acquireRecoverableCriticalSectionBlockingUserWrites(OperationContext* opCtx,
-                                                        const NamespaceString& nss) {
+    acquireRecoverableCriticalSectionBlockingUserWrites(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<UserWritesBlockReasonEnum> reason) {
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::None),
               "Acquiring the user writes recoverable critical section directly to start blocking "
               "writes is only allowed on non-sharded cluster.");
 
     acquireRecoverableCriticalSection(
-        opCtx, nss, false /* blockShardedDDL */, true /* blockUserWrites */);
+        opCtx, nss, false /* blockShardedDDL */, true /* blockUserWrites */, reason);
 }
 
 void UserWritesRecoverableCriticalSectionService::
@@ -335,8 +353,14 @@ void UserWritesRecoverableCriticalSectionService::
 
 
 void UserWritesRecoverableCriticalSectionService::releaseRecoverableCriticalSection(
-    OperationContext* opCtx, const NamespaceString& nss) {
-    LOGV2_DEBUG(6351909, 3, "Releasing user writes recoverable critical section", logAttrs(nss));
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    boost::optional<UserWritesBlockReasonEnum> reason) {
+    LOGV2_DEBUG(6351909,
+                3,
+                "Releasing user writes recoverable critical section",
+                logAttrs(nss),
+                "reason"_attr = reasonText(reason));
 
     invariant(nss == UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace);
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
@@ -361,6 +385,13 @@ void UserWritesRecoverableCriticalSectionService::releaseRecoverableCriticalSect
 
         const auto collCSDoc = UserWriteBlockingCriticalSectionDocument::parse(
             IDLParserContext("ReleaseUserWritesCS"), bsonObj);
+
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "Cannot release user writes critical section with different "
+                                 "reason than the already existing one. reason: "
+                              << reasonText(reason)
+                              << ", current: " << reasonText(collCSDoc.getBlockUserWritesReason()),
+                collCSDoc.getBlockUserWritesReason() == reason);
 
         // Release the critical section by deleting the critical section document. The OpObserver
         // will release the in-memory CS when reacting to the delete event.
@@ -411,7 +442,9 @@ void UserWritesRecoverableCriticalSectionService::recoverRecoverableCriticalSect
         }
 
         if (doc.getBlockUserWrites()) {
-            GlobalUserWriteBlockState::get(opCtx)->enableUserWriteBlocking(opCtx);
+            GlobalUserWriteBlockState::get(opCtx)->enableUserWriteBlocking(
+                opCtx,
+                doc.getBlockUserWritesReason().value_or(UserWritesBlockReasonEnum::kUnspecified));
         }
 
         return true;

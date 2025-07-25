@@ -67,7 +67,7 @@ function runTest(conn, testCase) {
                 "error": {
                     "code": ErrorCodes.UserWritesBlocked,
                     "codeName": "UserWritesBlocked",
-                    "errmsg": "User writes blocked"
+                    "errmsg": "User writes blocked, reason: Unspecified"
                 }
             });
         }

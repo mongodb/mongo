@@ -31,6 +31,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/db/s/user_writes_block_reason.idl"
 
 structs:
     SetUserWriteBlockModeRequest:
@@ -40,6 +41,14 @@ structs:
             global:
                 description: "If true, enables write blocking. If false, disables."
                 type: bool
+            reason:
+                description:
+                    "The reason for which the writes are being blocked on the cluster. Once writes
+                    are blocked with a specific reason, subsequent attempts to block or unblock
+                    writes with a different reason will fail. To unblock writes, the same reason
+                    that was used to enable blocking must be specified."
+                type: UserWritesBlockReason
+                optional: true
 
 commands:
     set_user_write_block_mode:

@@ -4,6 +4,11 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 export const UserWriteBlockHelpers = (function() {
     const WriteBlockState = {UNKNOWN: 0, DISABLED: 1, ENABLED: 2};
+    const WriteBlockReason = {
+        Unspecified: {name: "Unspecified", enum: 0},
+        ClusterToClusterMigrationInProgress: {name: "ClusterToClusterMigrationInProgress", enum: 1},
+        DiskUseThresholdExceeded: {name: "DiskUseThresholdExceeded", enum: 2},
+    };
 
     const bypassUser = "adminUser";
     const noBypassUser = "user";
@@ -81,14 +86,20 @@ export const UserWriteBlockHelpers = (function() {
             }`, this.conn.port);
         }
 
-        enableWriteBlockMode() {
-            assert.commandWorked(
-                this.adminConn.getDB("admin").runCommand({setUserWriteBlockMode: 1, global: true}));
+        enableWriteBlockMode(reason) {
+            assert.commandWorked(this.setWriteBlockMode(true, reason));
         }
 
-        disableWriteBlockMode() {
-            assert.commandWorked(this.adminConn.getDB("admin").runCommand(
-                {setUserWriteBlockMode: 1, global: false}));
+        disableWriteBlockMode(reason) {
+            assert.commandWorked(this.setWriteBlockMode(false, reason));
+        }
+
+        setWriteBlockMode(enabled, reason) {
+            let command = {setUserWriteBlockMode: 1, global: enabled};
+            if (reason !== undefined) {
+                command.reason = reason.name;
+            }
+            return this.adminConn.getDB("admin").runCommand(command);
         }
 
         getStatus() {
@@ -98,6 +109,11 @@ export const UserWriteBlockHelpers = (function() {
         assertWriteBlockMode(expectedUserWriteBlockMode) {
             const status = this.getStatus();
             assert.eq(expectedUserWriteBlockMode, status.repl.userWriteBlockMode);
+        }
+
+        assertWriteBlockReason(expectedUserWriteBlockReason) {
+            const status = this.getStatus();
+            assert.eq(expectedUserWriteBlockReason.enum, status.repl.userWriteBlockReason);
         }
 
         _hangTransition(targetConn, failpoint) {
@@ -348,6 +364,7 @@ export const UserWriteBlockHelpers = (function() {
 
     return {
         WriteBlockState: WriteBlockState,
+        WriteBlockReason: WriteBlockReason,
         ShardingFixture: ShardingFixture,
         ReplicaFixture: ReplicaFixture,
         bypassUser: bypassUser,

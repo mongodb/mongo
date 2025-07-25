@@ -13,6 +13,7 @@ import {UserWriteBlockHelpers} from "jstests/noPassthrough/libs/user_write_block
 
 const {
     WriteBlockState,
+    WriteBlockReason,
     ShardingFixture,
     ReplicaFixture,
     bypassUser,
@@ -183,8 +184,7 @@ function runTest(fixture) {
     fixture.asAdmin(({conn}) => testCheckedOps(conn, true));
     fixture.asUser(({conn}) => testCheckedOps(conn, false, ErrorCodes.UserWritesBlocked));
 
-    // Ensure that attempting to enabling write blocking again is a no-op under various
-    // circumstances
+    // Ensure that attempting to enable write blocking again is a no-op under various circumstances
     fixture.enableWriteBlockMode();
     fixture.assertWriteBlockMode(WriteBlockState.ENABLED);
     fixture.stepDown();
@@ -350,6 +350,89 @@ function runTest(fixture) {
     }
 }
 
+// Test blocking reason, which is currently supported only on replsets. If we add support for the
+// sharded clusters, we will need to modify the fixture.
+function testReasons(fixture) {
+    function getCounters() {
+        return fixture.getStatus().repl.userWriteBlockModeCounters;
+    }
+    fixture.asAdmin(({conn}) => {
+        assert.commandWorked(conn.adminCommand({clearLog: 'global'}));
+    });
+
+    fixture.assertWriteBlockMode(WriteBlockState.DISABLED);
+    let expectedCounters = getCounters();
+
+    // Ensure that write blocking cannot be enabled with an invalid reason
+    assert.commandFailedWithCode(fixture.setWriteBlockMode(false, {name: "ArglebargleGlopGlyf"}),
+                                 ErrorCodes.BadValue);
+    fixture.assertWriteBlockMode(WriteBlockState.DISABLED);
+    assert.eq(getCounters(), expectedCounters);
+
+    // Ensure that the reason is correctly reported in logs and serverStatus
+    fixture.enableWriteBlockMode(WriteBlockReason.DiskUseThresholdExceeded);
+    fixture.assertWriteBlockMode(WriteBlockState.ENABLED);
+    fixture.assertWriteBlockReason(WriteBlockReason.DiskUseThresholdExceeded);
+    fixture.asAdmin(({conn}) => {
+        checkLog.checkContainsOnceJson(
+            conn, 10296100, {reason: WriteBlockReason.DiskUseThresholdExceeded.name});
+    });
+    expectedCounters.DiskUseThresholdExceeded += 1;
+    assert.eq(getCounters().DiskUseThresholdExceeded, expectedCounters.DiskUseThresholdExceeded);
+
+    // Ensure that attempting to enable write blocking again with a different reason is an error
+    {
+        const res =
+            fixture.setWriteBlockMode(true, WriteBlockReason.ClusterToClusterMigrationInProgress);
+        assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
+        assert(res.errmsg.includes("reason: " +
+                                   WriteBlockReason.ClusterToClusterMigrationInProgress.name));
+        assert(res.errmsg.includes("current: " + WriteBlockReason.DiskUseThresholdExceeded.name));
+        fixture.assertWriteBlockMode(WriteBlockState.ENABLED);
+    }
+
+    // Ensure that the reason is propagated to secondaries
+    {
+        fixture.rst.awaitReplication();
+        let sec = fixture.rst.getSecondary();
+        let admin = sec.getDB("admin");
+        assert(admin.auth(bypassUser, password));
+        assert.eq(WriteBlockReason.DiskUseThresholdExceeded.enum,
+                  admin.serverStatus().repl.userWriteBlockReason);
+    }
+
+    // Ensure that the reason and counters persist across step-down and step-up
+    fixture.stepDown();
+    fixture.assertWriteBlockReason(WriteBlockReason.DiskUseThresholdExceeded);
+    assert.eq(getCounters().DiskUseThresholdExceeded, expectedCounters.DiskUseThresholdExceeded);
+
+    // Ensure that the reason persists across restart
+    fixture.restart();
+    fixture.assertWriteBlockReason(WriteBlockReason.DiskUseThresholdExceeded);
+
+    // Write blocking counters are reset on restart
+    assert.eq(getCounters().DiskUseThresholdExceeded, 1);
+
+    // Ensure that attempting to disable write blocking with an incorrect reason is an error
+    {
+        const res =
+            fixture.setWriteBlockMode(false, WriteBlockReason.ClusterToClusterMigrationInProgress);
+        assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
+        assert(res.errmsg.includes("reason: " +
+                                   WriteBlockReason.ClusterToClusterMigrationInProgress.name));
+        assert(res.errmsg.includes("current: " + WriteBlockReason.DiskUseThresholdExceeded.name));
+        fixture.assertWriteBlockMode(WriteBlockState.ENABLED);
+    }
+
+    // Ensure that the reason is correctly logged when disabling write blocking
+    fixture.disableWriteBlockMode(WriteBlockReason.DiskUseThresholdExceeded);
+    fixture.assertWriteBlockMode(WriteBlockState.DISABLED);
+    fixture.asAdmin(({conn}) => {
+        checkLog.checkContainsOnceJson(
+            conn, 10296101, {reason: WriteBlockReason.DiskUseThresholdExceeded.name});
+    });
+}
+
 {
     // Validate that setting user write blocking fails on standalones
     const conn = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
@@ -366,6 +449,7 @@ function runTest(fixture) {
 // Test on a replset
 const rst = new ReplicaFixture();
 runTest(rst);
+testReasons(rst);
 rst.stop();
 
 // Test on a sharded cluster
