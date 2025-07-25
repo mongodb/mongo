@@ -175,11 +175,13 @@ def is_layered(uri):
 
 # If the uri has been marked as layered, then transform to a layered uri
 def replace_uri(uri):
+    testcase = WiredTigerTestCase.currentTestCase()
+    disagg_parameters = testcase.platform_api.getDisaggParameters()
     # Handle statistics: or statistics:<uri>
     stat_prefix = 'statistics:'
     if uri.startswith(stat_prefix):
         return 'statistics:' + replace_uri(uri[len(stat_prefix):])
-    if is_layered(uri):
+    if is_layered(uri) and disagg_parameters.table_prefix == "layered":
         return uri.replace("table:", "layered:")
     else:
         return uri
@@ -208,7 +210,8 @@ def session_compact_replace(orig_session_compact, session_self, uri, config):
 
 # Called to replace Session.create
 def session_create_replace(orig_session_create, session_self, uri, config):
-    new_uri = uri
+    testcase = WiredTigerTestCase.currentTestCase()
+    disagg_parameters = testcase.platform_api.getDisaggParameters()
 
     # If the test isn't creating a table (i.e., it's a column store or lsm) create it as a
     # regular (not layered) object.  Otherwise we get disagg storage from the connection defaults.
@@ -219,9 +222,14 @@ def session_create_replace(orig_session_create, session_self, uri, config):
        and not 'type=lsm' in config \
        and not marked_as_non_layered(uri):
         mark_as_layered(uri)
-        WiredTigerTestCase.verbose(None, 1, f'    Replacing, old uri = "{uri}"')
-        uri = replace_uri(uri)
-        WiredTigerTestCase.verbose(None, 1, f'    Replacing, new uri = "{uri}"')
+        if (disagg_parameters.table_prefix == "layered"):
+            WiredTigerTestCase.verbose(None, 1, f'    Replacing, old uri = "{uri}"')
+            uri = replace_uri(uri)
+            WiredTigerTestCase.verbose(None, 1, f'    Replacing, new uri = "{uri}"')
+        else:
+            WiredTigerTestCase.verbose(None, 1, f'    Replacing, old config = "\{config}"')
+            config += ',block_manager=disagg,type=layered'
+            WiredTigerTestCase.verbose(None, 1, f'    Replacing, new config = "\{config}"')
 
     # If this is an index create and the main table was already tagged to be layered,
     # there's nothing we can do to "fix" it.  Currently "index:foo" is hardwired to
@@ -392,6 +400,7 @@ class DisaggPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
         self.disagg_config = ''
         self.disagg_page_log = 'palm'
         self.disagg_role = 'leader'
+        self.table_prefix = 'layered'
 
         for param_key, param_value in params:
             if param_key == 'config':
@@ -400,6 +409,8 @@ class DisaggPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
                 self.disagg_page_log = param_value
             elif param_key == 'role':
                 self.disagg_role = param_value
+            elif param_key == 'table_prefix':
+                self.table_prefix = param_value
             else:
                 raise Exception('hook_disagg: unknown parameter {}'.format(param_key))
 
@@ -438,6 +449,7 @@ class DisaggPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
         result.config = self.disagg_config
         result.role = self.disagg_role
         result.page_log = self.disagg_page_log
+        result.table_prefix = self.table_prefix
         return result
 
 # Every hook file must have a top level initialize function,

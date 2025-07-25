@@ -2136,8 +2136,8 @@ int
 __wti_rec_build_delta_init(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
 {
     WT_RET(__wt_buf_init(session, &r->delta, r->disk_img_buf_size));
-    memset(r->delta.mem, 0, WT_DELTA_HEADER_SIZE);
-    r->delta.size = WT_DELTA_HEADER_BYTE_SIZE(S2BT(session));
+    memset(r->delta.mem, 0, WT_PAGE_HEADER_SIZE);
+    r->delta.size = WT_PAGE_HEADER_BYTE_SIZE(S2BT(session));
 
     return (0);
 }
@@ -2185,14 +2185,14 @@ int
 __wti_rec_pack_delta_internal(
   WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_KV *key, WTI_REC_KV *value)
 {
-    WT_DELTA_HEADER *header;
+    WT_PAGE_HEADER *header;
     size_t packed_size;
     uint8_t flags;
     uint8_t *p, *head_byte;
 
     flags = 0;
 
-    header = (WT_DELTA_HEADER *)r->delta.data;
+    header = (WT_PAGE_HEADER *)r->delta.data;
 
     packed_size = 1 + key->len;
     if (value != NULL)
@@ -2356,8 +2356,8 @@ err:
 static int
 __rec_build_delta_leaf(WT_SESSION_IMPL *session, WT_PAGE_HEADER *full_image, WTI_RECONCILE *r)
 {
-    WT_DELTA_HEADER *header;
     WT_MULTI *multi;
+    WT_PAGE_HEADER *header;
     WT_SAVE_UPD *supd;
     uint64_t start, stop;
     uint32_t count, i;
@@ -2410,7 +2410,7 @@ __rec_build_delta_leaf(WT_SESSION_IMPL *session, WT_PAGE_HEADER *full_image, WTI
         ++count;
     }
 
-    header = (WT_DELTA_HEADER *)r->delta.data;
+    header = (WT_PAGE_HEADER *)r->delta.data;
     header->mem_size = (uint32_t)r->delta.size;
     header->type = r->ref->page->type;
     header->u.entries = count;
@@ -2434,7 +2434,7 @@ static int
 __rec_build_delta(
   WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE_HEADER *full_image, bool *build_deltap)
 {
-    WT_DELTA_HEADER *header;
+    WT_PAGE_HEADER *header;
 
     *build_deltap = false;
     if (F_ISSET(r->ref, WT_REF_FLAG_LEAF)) {
@@ -2446,7 +2446,7 @@ __rec_build_delta(
         /* The internal page delta would have already been built at this point if one exists. */
         if (r->delta.size > 0) {
             *build_deltap = true;
-            header = (WT_DELTA_HEADER *)r->delta.data;
+            header = (WT_PAGE_HEADER *)r->delta.data;
             header->write_gen = full_image->write_gen;
         }
     }
@@ -2742,10 +2742,10 @@ static int
 __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chunk, bool last_block)
 {
     WT_BTREE *btree;
-    WT_DELTA_HEADER *header;
     WT_MULTI *multi;
     WT_PAGE *page;
     WT_PAGE_BLOCK_META *block_meta;
+    WT_PAGE_HEADER *header;
     size_t addr_size, compressed_size;
     uint8_t addr[WT_ADDR_MAX_COOKIE];
     bool build_delta;
@@ -2897,7 +2897,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
 
     /* Write the disk image and get an address. */
     if (build_delta) {
-        header = (WT_DELTA_HEADER *)r->delta.data;
+        header = (WT_PAGE_HEADER *)r->delta.data;
         /* Avoid writing an empty delta. */
         if (header->u.entries == 0) {
             /* Copy the previous written page's address if we skip writing. */

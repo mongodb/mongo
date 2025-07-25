@@ -279,7 +279,7 @@ __page_reconstruct_internal_deltas(
 {
     WT_CELL_UNPACK_DELTA_INT **unpacked_deltas, **unpacked_deltas_merged;
     WT_DECL_RET;
-    WT_DELTA_HEADER *header;
+    WT_PAGE_HEADER *header;
     WT_PAGE_INDEX *pindex;
     WT_REF **refs;
     size_t *delta_size_each, incr, pindex_size, refs_entries, unpacked_deltas_merged_size;
@@ -302,7 +302,7 @@ __page_reconstruct_internal_deltas(
     WT_RET(__wt_calloc_def(session, delta_size, &delta_size_each));
     WT_ERR(__wt_calloc_def(session, delta_size, &unpacked_deltas));
     for (i = 0, j = 0; i < (uint32_t)delta_size; ++i, j = 0) {
-        header = (WT_DELTA_HEADER *)deltas[i].data;
+        header = (WT_PAGE_HEADER *)deltas[i].data;
         WT_ASSERT(session, header->u.entries != 0);
         delta_size_each[i] = (size_t)header->u.entries;
 
@@ -366,14 +366,14 @@ __page_reconstruct_leaf_delta(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *de
     WT_CELL_UNPACK_DELTA_LEAF unpack;
     WT_CURSOR_BTREE cbt;
     WT_DECL_RET;
-    WT_DELTA_HEADER *header;
     WT_ITEM key, value;
     WT_PAGE *page;
+    WT_PAGE_HEADER *header;
     WT_ROW *rip;
     WT_UPDATE *first_upd, *standard_value, *tombstone, *upd;
     size_t size, tmp_size, total_size;
 
-    header = (WT_DELTA_HEADER *)delta->data;
+    header = (WT_PAGE_HEADER *)delta->data;
     tmp_size = total_size = 0;
     page = ref->page;
 

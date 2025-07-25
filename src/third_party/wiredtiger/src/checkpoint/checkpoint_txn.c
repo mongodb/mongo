@@ -1494,8 +1494,19 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
      * view of the data, make sure that all the logs are flushed to disk before the checkpoint is
      * complete.
      */
-    if (F_ISSET(&conn->log_mgr, WT_LOG_ENABLED))
+    if (logging) {
+        /* FIXME-WT-15069: Remove this if condition as part of this FIXME. This is a temporary
+         * workaround to allow ckpt_crash_before_metadata_sync crash point with logging enabled.
+         * test/model currently expects crash points to result in only non-recoverable checkpoints.
+         * However, from WT perspective, a crash after flushing the logs here is still considered
+         * a valid recoverable checkpoint.
+         */
+        /* Crash before metadata sync if checkpoint crash point is configured. */
+        if (ckpt_crash_before_metadata_sync)
+            __wt_debug_crash(session);
+
         WT_ERR(__wt_log_flush(session, WT_LOG_FSYNC));
+    }
 
     /* Crash before metadata sync if checkpoint crash point is configured. */
     if (ckpt_crash_before_metadata_sync)

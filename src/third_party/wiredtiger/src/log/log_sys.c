@@ -178,7 +178,8 @@ __wt_verbose_dump_log(WT_SESSION_IMPL *session)
       session, "Running downgraded: %s", F_ISSET(log_mgr, WT_LOG_DOWNGRADED) ? "yes" : "no"));
     WT_RET(
       __wt_msg(session, "Zero fill files: %s", F_ISSET(log_mgr, WT_LOG_ZERO_FILL) ? "yes" : "no"));
-    WT_RET(__wt_msg(session, "Pre-allocate files: %s", log_mgr->prealloc > 0 ? "yes" : "no"));
+    WT_RET(__wt_msg(
+      session, "Pre-allocate files: %s", __wti_log_is_prealloc_enabled(session) ? "yes" : "no"));
     WT_RET(__wt_msg(
       session, "Initial number of pre-allocated files: %" PRIu32, log_mgr->prealloc_init_count));
     WT_RET(__wt_msg(session, "Logging directory: %s", log_mgr->log_path));

@@ -310,7 +310,7 @@ __rec_row_merge(
 static int
 __rec_build_delta_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, bool build_delta)
 {
-    WT_DELTA_HEADER *header;
+    WT_PAGE_HEADER *header;
 
     if (!build_delta) {
         r->delta.size = 0;
@@ -318,7 +318,7 @@ __rec_build_delta_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, bool build_del
     }
 
     WT_RET(__wti_rec_build_delta_init(session, r));
-    header = (WT_DELTA_HEADER *)r->delta.data;
+    header = (WT_PAGE_HEADER *)r->delta.data;
     header->type = r->ref->page->type;
     return (0);
 }

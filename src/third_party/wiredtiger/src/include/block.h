@@ -213,7 +213,7 @@ struct __wt_bm {
     void (*compact_progress)(WT_BM *, WT_SESSION_IMPL *);
     int (*compact_start)(WT_BM *, WT_SESSION_IMPL *);
     int (*corrupt)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
-    size_t (*encrypt_skip)(WT_BM *, WT_SESSION_IMPL *, bool);
+    size_t (*encrypt_skip)(WT_BM *, WT_SESSION_IMPL *);
     int (*free)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
     bool (*is_mapped)(WT_BM *, WT_SESSION_IMPL *);
     int (*map_discard)(WT_BM *, WT_SESSION_IMPL *, void *, size_t);
@@ -532,11 +532,9 @@ struct __wt_block_disagg_header {
 };
 
 /*
- * WT_BLOCK_DISAGG_BASE_HEADER_SIZE is the number of bytes we allocate for a base page structure,
- * and WT_BLOCK_DISAGG_DELTA_HEADER_SIZE is the number of bytes we allocated for a delta: if the
- * compiler inserts padding it will break the world.
+ * WT_BLOCK_DISAGG_HEADER_SIZE is the number of bytes we allocate for a base page and delta
+ * structures: if the compiler inserts padding it will break the world.
  */
 #define WT_BLOCK_DISAGG_HEADER_SIZE 16
-#define WT_BLOCK_DISAGG_BASE_HEADER_BYTE_SIZE (WT_PAGE_HEADER_SIZE + WT_BLOCK_DISAGG_HEADER_SIZE)
-#define WT_BLOCK_DISAGG_DELTA_HEADER_BYTE_SIZE (WT_DELTA_HEADER_SIZE + WT_BLOCK_DISAGG_HEADER_SIZE)
+#define WT_BLOCK_DISAGG_HEADER_BYTE_SIZE (WT_PAGE_HEADER_SIZE + WT_BLOCK_DISAGG_HEADER_SIZE)
 #define WT_BLOCK_DISAGG_CHECKPOINT_BUFFER (1024)

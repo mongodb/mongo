@@ -69,6 +69,9 @@ struct kv_workload_generator_spec {
     /* The probability of allowing the use of "set commit timestamp" in a transaction. */
     float use_set_commit_timestamp;
 
+    /* The probability of running with connection level logging */
+    float conn_logging;
+
     /* Probabilities of operations within a transaction. */
     float finish_transaction; /* Commit, prepare, or rollback. */
     float get;
@@ -447,10 +450,17 @@ public:
     }
 
     static std::string
-    generate_configurations(uint64_t seed = 0)
+    generate_stress_configurations(uint64_t seed = 0)
     {
         kv_workload_generator generator(_default_spec, seed);
-        return generator.generate_connection_config();
+        return generator.generate_connection_stress_config();
+    }
+
+    static std::string
+    generate_log_configurations(uint64_t seed = 0)
+    {
+        kv_workload_generator generator(_default_spec, seed);
+        return generator.generate_connection_log_config();
     }
 
 protected:
@@ -496,10 +506,16 @@ protected:
     void create_table();
 
     /*
-     * kv_workload_generator::generate_connection_config --
-     *     Generate random WiredTiger timing stress configurations.
+     * kv_workload_generator::generate_connection_stress_config --
+     *     Generate random time stress configurations.
      */
-    std::string generate_connection_config();
+    std::string generate_connection_stress_config();
+
+    /*
+     * kv_workload_generator::generate_connection_log_config --
+     *     Generate random WiredTiger log configurations.
+     */
+    std::string generate_connection_log_config();
 
     /*
      * kv_workload_generator::generate_key --

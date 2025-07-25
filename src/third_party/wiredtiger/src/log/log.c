@@ -1128,7 +1128,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    WT_FH *log_fh;
+    WT_FH *log_fh, *close_fh;
     WTI_LOG *log;
     WT_LOG_MANAGER *log_mgr;
     WT_LSN end_lsn, logrec_lsn;
@@ -1145,7 +1145,8 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
      * one is closed. Wait for that to close.
      */
     WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SLOT));
-    for (yield_cnt = 0; log->log_close_fh != NULL;) {
+    WT_ACQUIRE_READ(close_fh, log->log_close_fh);
+    for (yield_cnt = 0; close_fh != NULL;) {
         WT_STAT_CONN_INCR(session, log_close_yields);
         /*
          * Processing slots will conditionally signal the file close server thread. But if we've
@@ -1160,6 +1161,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
         if (++yield_cnt > WT_THOUSAND * 10)
             return (__wt_set_return(session, EBUSY));
         __wt_yield();
+        WT_ACQUIRE_READ(close_fh, log->log_close_fh);
     }
     /*
      * Note, the file server worker thread requires the LSN be set once the close file handle is
@@ -1180,7 +1182,8 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
      * can copy the files in any way they choose, and a log file rename might confuse things.
      */
     create_log = true;
-    if (log_mgr->prealloc > 0 && __wt_atomic_load64(&conn->hot_backup_start) == 0) {
+    if (__wti_log_is_prealloc_enabled(session) &&
+      __wt_atomic_load64(&conn->hot_backup_start) == 0) {
         WT_WITH_HOTBACKUP_READ_LOCK(
           session, ret = __log_alloc_prealloc(session, log->fileid), &skipp);
 

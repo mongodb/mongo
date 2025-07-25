@@ -156,10 +156,7 @@ reread:
         /*
          * Do little- to big-endian handling early on.
          */
-        if (is_delta)
-            blk = WT_BLOCK_HEADER_REF_FOR_DELTAS(current->data);
-        else
-            blk = WT_BLOCK_HEADER_REF(current->data);
+        blk = WT_BLOCK_HEADER_REF(current->data);
         __wti_block_disagg_header_byteswap_copy(blk, &swap);
 
         /*
@@ -228,10 +225,7 @@ reread:
                  * Swap the page-header as needed; this doesn't belong here, but it's the best place
                  * to catch all callers.
                  */
-                if (is_delta)
-                    __wt_delta_header_byteswap((void *)current->data);
-                else
-                    __wt_page_header_byteswap((void *)current->data);
+                __wt_page_header_byteswap((void *)current->data);
                 checksum = swap.previous_checksum;
                 continue;
             }

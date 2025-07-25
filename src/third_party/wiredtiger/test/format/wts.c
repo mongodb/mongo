@@ -687,12 +687,12 @@ static void
 disagg_conn_init(WT_CONNECTION *conn)
 {
     /*
-     * We do a separate wiredtiger_open call to create a the database and tables, and when we close
+     * We do a separate wiredtiger_open call to create the database and tables, and when we close
      * that connection, a checkpoint is done. Disaggregated storage uses precise checkpoints, which
      * require the stable timestamp to be set. Set it to the minimum value, which should not
      * interfere with any later operations.
      */
-    testutil_check(conn->set_timestamp(conn, "stable_timestamp=1"));
+    testutil_check(conn->set_timestamp(conn, "stable_timestamp=0x1"));
 }
 
 /*
@@ -715,7 +715,7 @@ wts_create_database(void)
     WT_CONNECTION *conn;
 
     create_database(g.home, &conn);
-    if (GVS(DISAGG_PAGE_LOG) != NULL)
+    if (g.disagg_storage_config)
         disagg_conn_init(conn);
 
     g.wts_conn = conn;

@@ -163,27 +163,6 @@ def palm_dump_key(opts, kstr):
         print('  WARNING: is_delta is not boolean')
     return [ is_delta, table_id, page_id ]
 
-# e.g. 0089834f4b20393939343800476f00
-def palm_dump_delta_header(vstr):
-    #print(f'key: {vstr}')
-    keypat = '^' + u32 + u32 + u8 + u8 + u8 + u8 + '$'
-    columns = [ None,
-                { 'name' : 'mem_size' },
-                { 'name' : 'entries' },
-                { 'name' : 'version' },
-                { 'name' : 'type' },
-                { 'name' : 'flags' },
-                { 'name' : 'PADDING' },
-               ]
-    m = re.search(keypat, vstr)
-    cp = ColumnParser(columns, m)
-    if not m:
-        raise Exception('bad key: ' + vstr)
-
-    print(f'PALM KEY: {cp.get(1)}{cp.get(2)}{cp.get(3)}{cp.get(4)}{cp.get(5)}')
-    if m.group(6) != '00':
-        print('  WARNING: padding byte is not zero')
-
 # e.g. 0000000000000000f80c000000000000ee080000de00000007040001
 def palm_dump_page_header(vstr):
     keypat = '^' + u64 + u64 + u32 + u32 + u8 + u8 + u8 + u8 + '$'
@@ -279,7 +258,7 @@ def palm_dump_value(opts, vstr, is_delta):
     dh = 12*2
     bh = 16*2
     if is_delta:
-        palm_dump_delta_header(vstr[0:dh])
+        palm_dump_page_header(vstr[0:dh])
         palm_dump_block_header(vstr[dh:dh+bh])
         palm_dump_payload(opts, vstr[dh+bh:])
     else:

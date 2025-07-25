@@ -46,7 +46,7 @@ class kv_workload_runner_wt {
 
 public:
     /* Base connection configuration applied to every connection. */
-    constexpr static const char *k_config_base = "create=true,log=(enabled=false)";
+    constexpr static const char *k_config_base = "create=true";
 
 protected:
     /*

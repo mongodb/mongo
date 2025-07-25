@@ -343,18 +343,13 @@ def block_decode(p, b, nbytes, opts):
     # the file itself. We need to do this to support compressed blocks. As a consequence, offsets
     # printed in the split mode are relative to a (potentially uncompressed) page, rather than
     # the file.
-    #
-    # The size of the page data for disagg is dependent on whether the page is a delta.
     if opts.disagg:
         # Size of WT_PAGE_HEADER
         page_data = bytearray(b.read(28))
-        if page_data[0] == 0xdd:   # if it's a delta, then it's a different layout
-            # 16 for block header + 20 bytes for page delta, total of 36
-            page_data += bytearray(b.read(8))
+        if page_data[0] == 0xdd:
             disagg_delta = True
-        else:
-            # Add 16 for block header + 28 bytes for page header, total of 44
-            page_data += bytearray(b.read(16))
+         # Add 16 for block header + 28 bytes for page header, total of 44
+        page_data += bytearray(b.read(16))
     else:
         # Size of WT_PAGE_HEADER + size of WT_BLOCK_HEADER
         page_data = bytearray(b.read(40))
@@ -365,8 +360,8 @@ def block_decode(p, b, nbytes, opts):
     if disagg_delta:
         # WT_BLOCK_HEADER in block.h (44 bytes)
         blockhead = btree_format.BlockHeader.parse(b_page, disagg=opts.disagg)
-        # WT_DELTA_HEADER in btmem.h (20 bytes)
-        deltahead = btree_format.DeltaHeader.parse(b_page)
+        # WT_PAGE_HEADER in btmem.h (28 bytes)
+        pagehead = btree_format.PageHeader.parse(b_page)
     else:
         # WT_PAGE_HEADER in btmem.h (28 bytes)
         pagehead = btree_format.PageHeader.parse(b_page)
@@ -410,13 +405,13 @@ def block_decode(p, b, nbytes, opts):
     p.rint('  block flags: ' + hex(blockhead.flags))
 
     if disagg_delta:
-        p.rint('Delta Header:')
-        p.rint('  writegen: ' + str(deltahead.write_gen))
-        p.rint('  memsize: ' + str(deltahead.mem_size))
-        p.rint('  ncells (oflow len): ' + str(deltahead.entries))
-        p.rint('  page type: ' + str(deltahead.type.value) + ' (' + deltahead.type.name + ')')
-        p.rint('  page flags: ' + hex(deltahead.flags))
-        p.rint('  version: ' + str(deltahead.version))
+        p.rint('Delta Page Header:')
+        p.rint('  writegen: ' + str(pagehead.write_gen))
+        p.rint('  memsize: ' + str(pagehead.mem_size))
+        p.rint('  ncells (oflow len): ' + str(pagehead.entries))
+        p.rint('  page type: ' + str(pagehead.type.value) + ' (' + pagehead.type.name + ')')
+        p.rint('  page flags: ' + hex(pagehead.flags))
+        p.rint('  version: ' + str(pagehead.version))
 
     pagestats = PageStats()
 
