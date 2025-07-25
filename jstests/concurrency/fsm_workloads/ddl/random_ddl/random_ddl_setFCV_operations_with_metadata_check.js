@@ -93,8 +93,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.kMovePrimaryAllowedErrorCodes.push(ErrorCodes.LockBusy);
     // Additionally, you might end up hitting a shard where the db have already moved.
     $config.data.kMovePrimaryAllowedErrorCodes.push(ErrorCodes.NamespaceNotFound);
-    // TODO SERVER-105556: shardNotFound errors will be permitted in the base fsm eventually.
-    $config.data.kMovePrimaryAllowedErrorCodes.push(ErrorCodes.ShardNotFound);
 
     // Auxiliary function to catch and handle the move collection errors.
     $config.data.moveCollectionHelper = function(db, nss, destinationShard) {
