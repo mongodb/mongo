@@ -866,7 +866,7 @@ auto buildProjectionForPushdown(const DepsTracker& deps,
     };
     const auto parseProjection = [&](const BSONObj& projObj) {
         return projection_ast::parseAndAnalyze(
-            projStage->getContext(), projObj, ProjectionPolicies::aggregateProjectionPolicies());
+            projStage->getExpCtx(), projObj, ProjectionPolicies::aggregateProjectionPolicies());
     };
 
     // If there is an inclusion projection at the front of the pipeline, we have case 1.

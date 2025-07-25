@@ -66,6 +66,12 @@ protected:
             DocumentSourceReplaceRoot::createFromBson(specElement, getExpCtx()));
     }
 
+    intrusive_ptr<DocumentSource> createReplaceRootDS(const BSONObj& replaceRoot) {
+        BSONObj spec = BSON(DocumentSourceReplaceRoot::kStageName << replaceRoot);
+        BSONElement specElement = spec.firstElement();
+        return DocumentSourceReplaceRoot::createFromBson(specElement, getExpCtx());
+    }
+
     /**
      * Assert 'source' consistently reports it is exhausted.
      */
@@ -264,11 +270,10 @@ TEST_F(ReplaceRootBasics, ErrorsIfNewRootFieldPathDoesNotExist) {
 
 // Verify that the only dependent field is the root we are replacing with.
 TEST_F(ReplaceRootBasics, OnlyDependentFieldIsNewRoot) {
-    auto replaceRoot = createReplaceRoot(BSON("newRoot" << "$a.b"));
-    auto replaceRootSource = boost::dynamic_pointer_cast<DocumentSource>(replaceRoot);
+    auto replaceRootDS = createReplaceRootDS(BSON("newRoot" << "$a.b"));
     DepsTracker dependencies;
     ASSERT_EQUALS(DepsTracker::State::EXHAUSTIVE_FIELDS,
-                  replaceRootSource->getDependencies(&dependencies));
+                  replaceRootDS->getDependencies(&dependencies));
 
     // Should only depend on field a.b
     ASSERT_EQUALS(1U, dependencies.fields.size());
@@ -282,9 +287,8 @@ TEST_F(ReplaceRootBasics, OnlyDependentFieldIsNewRoot) {
 }
 
 TEST_F(ReplaceRootBasics, ReplaceRootModifiesAllFields) {
-    auto replaceRoot = createReplaceRoot(BSON("newRoot" << "$a"));
-    auto replaceRootSource = boost::dynamic_pointer_cast<DocumentSource>(replaceRoot);
-    auto modifiedPaths = replaceRootSource->getModifiedPaths();
+    auto replaceRootDS = createReplaceRootDS(BSON("newRoot" << "$a"));
+    auto modifiedPaths = replaceRootDS->getModifiedPaths();
     ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kAllPaths);
     ASSERT_EQUALS(0U, modifiedPaths.paths.size());
 }
@@ -301,14 +305,14 @@ TEST_F(ReplaceRootBasics, ReplaceRootWithRemoveSystemVariableThrows) {
 TEST_F(ReplaceRootBasics, ReplaceRootSwapsWithMatchStage) {
     DocumentSourceContainer container;
 
-    auto replaceRoot = createReplaceRoot(BSON("newRoot" << "$subDocument"));
+    auto replaceRootDS = createReplaceRootDS(BSON("newRoot" << "$subDocument"));
     auto match = DocumentSourceMatch::create(BSON("x" << 2), getExpCtx());
 
-    container.push_back(boost::dynamic_pointer_cast<DocumentSource>(replaceRoot));
+    container.push_back(replaceRootDS);
     container.push_back(match);
 
     auto singleDocTransform =
-        dynamic_cast<DocumentSourceSingleDocumentTransformation*>(replaceRoot.get());
+        dynamic_cast<DocumentSourceSingleDocumentTransformation*>(replaceRootDS.get());
     dynamic_cast<ReplaceRootTransformation*>(&singleDocTransform->getTransformer())
         ->pushDotRenamedMatchBefore(container.begin(), &container);
 

@@ -79,7 +79,7 @@ boost::intrusive_ptr<DocumentSource> sbeCompatibleProjectionFromSingleDocumentTr
             return nullptr;
     }
 
-    const boost::intrusive_ptr<ExpressionContext>& expCtx = transformStage.getContext();
+    const boost::intrusive_ptr<ExpressionContext>& expCtx = transformStage.getExpCtx();
     SbeCompatibility originalSbeCompatibility =
         expCtx->sbeCompatibilityExchange(SbeCompatibility::noRequirements);
     ON_BLOCK_EXIT([&] { expCtx->setSbeCompatibility(originalSbeCompatibility); });
@@ -119,7 +119,7 @@ boost::intrusive_ptr<DocumentSource> sbeCompatibleReplaceRootStage(
     }
 
     return make_intrusive<DocumentSourceInternalReplaceRoot>(
-        replaceRootStage->getContext(), replaceRootTransformation.getExpression());
+        replaceRootStage->getExpCtx(), replaceRootTransformation.getExpression());
 }
 
 // A bit field with a bool flag for each aggregation pipeline stage that can be translated to SBE.

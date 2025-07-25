@@ -67,8 +67,7 @@ namespace mongo {
  * a ParsedSingleDocumentTransformation. It is not a registered DocumentSource, and it cannot be
  * created from BSON.
  */
-class DocumentSourceSingleDocumentTransformation final : public DocumentSource,
-                                                         public exec::agg::Stage {
+class DocumentSourceSingleDocumentTransformation final : public DocumentSource {
 public:
     DocumentSourceSingleDocumentTransformation(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
@@ -108,7 +107,7 @@ public:
     }
 
     SingleDocumentTransformationProcessor* getTransformationProcessor() {
-        return _transformationProcessor.get_ptr();
+        return _transformationProcessor.get();
     }
 
     /**
@@ -148,19 +147,21 @@ public:
     }
 
 protected:
-    GetNextResult doGetNext() final;
-    void doDispose() final;
-
     DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
                                                    DocumentSourceContainer* container) final;
 
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage>
+    documentSourceSingleDocumentTransformationToStageFn(
+        const boost::intrusive_ptr<DocumentSource>&);
+
     DocumentSourceContainer::iterator maybeCoalesce(
         DocumentSourceContainer::iterator itr,
         DocumentSourceContainer* container,
         DocumentSourceSingleDocumentTransformation* nextSingleDocTransform);
 
-    boost::optional<SingleDocumentTransformationProcessor> _transformationProcessor;
+    // TODO SERVER-105521: Check if we can change from 'std::shared_ptr' to 'std::unique_ptr'.
+    std::shared_ptr<SingleDocumentTransformationProcessor> _transformationProcessor;
 
     projection_executor::ExclusionNode& getExclusionNode();
 
@@ -170,6 +171,7 @@ private:
     // Set to true if this transformation stage can be run on the collectionless namespace.
     bool _isIndependentOfAnyCollection;
 
+    // TODO SERVER-105521: Check if we can remove this and use just the '_transformationProcessor'.
     // Cached stage options in case this DocumentSource is disposed before serialized (e.g. explain
     // with a sort which will auto-dispose of the pipeline).
     Document _cachedStageOptions;

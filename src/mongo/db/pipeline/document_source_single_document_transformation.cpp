@@ -54,12 +54,11 @@ DocumentSourceSingleDocumentTransformation::DocumentSourceSingleDocumentTransfor
     const StringData name,
     bool isIndependentOfAnyCollection)
     : DocumentSource(name, pExpCtx),
-      exec::agg::Stage(name, pExpCtx),
       _name(std::string{name}),
       _isIndependentOfAnyCollection(isIndependentOfAnyCollection) {
     if (parsedTransform) {
-        _transformationProcessor.emplace(
-            SingleDocumentTransformationProcessor(std::move(parsedTransform)));
+        _transformationProcessor =
+            std::make_shared<SingleDocumentTransformationProcessor>(std::move(parsedTransform));
     }
 }
 
@@ -88,22 +87,6 @@ StageConstraints DocumentSourceSingleDocumentTransformation::constraints(
     return constraints;
 }
 
-DocumentSource::GetNextResult DocumentSourceSingleDocumentTransformation::doGetNext() {
-    if (!_transformationProcessor) {
-        return DocumentSource::GetNextResult::makeEOF();
-    }
-
-    // Get the next input document.
-    auto input = pSource->getNext();
-
-    if (!input.isAdvanced()) {
-        return input;
-    }
-
-    // Apply and return the document with added fields.
-    return _transformationProcessor->process(input.releaseDocument());
-}
-
 intrusive_ptr<DocumentSource> DocumentSourceSingleDocumentTransformation::optimize() {
     if (_transformationProcessor) {
         _transformationProcessor->getTransformer().optimize();
@@ -115,15 +98,6 @@ intrusive_ptr<DocumentSource> DocumentSourceSingleDocumentTransformation::optimi
         }
     }
     return this;
-}
-
-void DocumentSourceSingleDocumentTransformation::doDispose() {
-    if (_transformationProcessor) {
-        // Cache the stage options document in case this stage is serialized after disposing.
-        _cachedStageOptions = _transformationProcessor->getTransformer().serializeTransformation(
-            SerializationOptions{.verbosity = pExpCtx->getExplain()});
-        _transformationProcessor.reset();
-    }
 }
 
 Value DocumentSourceSingleDocumentTransformation::serialize(
