@@ -71,7 +71,8 @@ public:
         invariantWTOK(ret, nullptr);
 
         _fastClockSource = std::make_unique<SystemClockSource>();
-        _connection = std::make_unique<WiredTigerConnection>(_conn, _fastClockSource.get());
+        _connection = std::make_unique<WiredTigerConnection>(
+            _conn, _fastClockSource.get(), /*sessionCacheMax=*/33000);
     }
 
     ~WiredTigerIndexHarnessHelper() final {

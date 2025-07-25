@@ -59,9 +59,10 @@ class WiredTigerKVEngine;
  */
 class WiredTigerConnection {
 public:
-    WiredTigerConnection(WiredTigerKVEngine* engine);
+    WiredTigerConnection(WiredTigerKVEngine* engine, int32_t sessionCacheMax);
     WiredTigerConnection(WT_CONNECTION* conn,
                          ClockSource* cs,
+                         int32_t sessionCacheMax,
                          WiredTigerKVEngine* engine = nullptr);
     ~WiredTigerConnection();
 
@@ -95,6 +96,10 @@ public:
      */
     WiredTigerManagedSession getUninterruptibleSession();
 
+    /**
+     * Get the maximum number of sessions allowed in the cache.
+     */
+    int32_t getSessionCacheMax() const;
 
     /**
      * Get a count of idle sessions in the session cache.
@@ -209,7 +214,8 @@ private:
     friend class WiredTigerManagedSession;
     WT_CONNECTION* _conn;             // not owned
     ClockSource* const _clockSource;  // not owned
-    WiredTigerKVEngine* _engine;      // not owned, might be NULL
+    const int32_t _sessionCacheMax;
+    WiredTigerKVEngine* _engine;  // not owned, might be NULL
     WiredTigerSnapshotManager _snapshotManager;
     CompiledConfigurationsPerConnection _compiledConfigurations;
 

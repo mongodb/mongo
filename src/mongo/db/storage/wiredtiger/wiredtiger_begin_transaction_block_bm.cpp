@@ -88,7 +88,8 @@ private:
     unittest::TempDir _dbpath{"wt_test"};
     WiredTigerConnectionTest _connectionTest{_dbpath.path(), ""};
     ClockSourceMock _clockSource;
-    WiredTigerConnection _connection{_connectionTest.getConnection(), &_clockSource};
+    WiredTigerConnection _connection{
+        _connectionTest.getConnection(), &_clockSource, /*sessionCacheMax=*/33000};
     std::unique_ptr<WiredTigerRecoveryUnit> _ru;
 
     WiredTigerSession* _session;

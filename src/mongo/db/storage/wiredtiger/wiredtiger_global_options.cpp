@@ -43,6 +43,13 @@ WiredTigerGlobalOptions wiredTigerGlobalOptions;
 Status WiredTigerGlobalOptions::store(const moe::Environment& params) {
     // WiredTiger storage engine options
     if (!wiredTigerGlobalOptions.engineConfig.empty()) {
+        if (wiredTigerGlobalOptions.engineConfig.find("session_max=") != std::string::npos) {
+            LOGV2_WARNING(
+                9086701,
+                "The session cache max is derived from the session_max value "
+                "provided as a server parameter. Please use the wiredTigerSessionMax server "
+                "parameter to set this value.");
+        }
         LOGV2(22293, "Engine custom option", "option"_attr = wiredTigerGlobalOptions.engineConfig);
     }
 

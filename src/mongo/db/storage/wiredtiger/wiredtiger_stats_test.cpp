@@ -81,7 +81,8 @@ protected:
         WT_CONNECTION* wtConnection;
         ASSERT_WT_OK(wiredtiger_open(
             _path.path().c_str(), nullptr, "create,statistics=(fast),", &wtConnection));
-        _conn = std::make_unique<WiredTigerConnection>(wtConnection, &_clockSource);
+        _conn = std::make_unique<WiredTigerConnection>(
+            wtConnection, &_clockSource, /*sessionCacheMax=*/33000);
         _session = std::make_unique<WiredTigerSession>(_conn.get());
         ASSERT_WT_OK(_session->create(_uri.c_str(),
                                       "type=file,key_format=q,value_format=u,log=(enabled=false)"));

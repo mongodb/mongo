@@ -520,7 +520,15 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         }
     }
 
-    _connection.reset(new WiredTigerConnection(this));
+    int32_t sessionCacheMax =
+        ((gWiredTigerSessionCacheMaxPercentage * gWiredTigerSessionMax) / 100);
+
+    LOGV2(9086700,
+          "WiredTiger session cache max value has been set",
+          "sessionCacheMax"_attr = sessionCacheMax);
+
+    _connection =
+        std::make_unique<WiredTigerConnection>(_conn, _clockSource, sessionCacheMax, this);
 
     _sessionSweeper = std::make_unique<WiredTigerSessionSweeper>(_connection.get());
     _sessionSweeper->go();
