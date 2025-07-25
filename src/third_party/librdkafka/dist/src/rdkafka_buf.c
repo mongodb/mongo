@@ -1,7 +1,8 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2012-2015, Magnus Edenhill
+ * Copyright (c) 2012-2022, Magnus Edenhill
+ *               2023, Confluent Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,6 +38,8 @@ void rd_kafka_buf_destroy_final(rd_kafka_buf_t *rkbuf) {
         case RD_KAFKAP_Metadata:
                 if (rkbuf->rkbuf_u.Metadata.topics)
                         rd_list_destroy(rkbuf->rkbuf_u.Metadata.topics);
+                if (rkbuf->rkbuf_u.Metadata.topic_ids)
+                        rd_list_destroy(rkbuf->rkbuf_u.Metadata.topic_ids);
                 if (rkbuf->rkbuf_u.Metadata.reason)
                         rd_free(rkbuf->rkbuf_u.Metadata.reason);
                 if (rkbuf->rkbuf_u.Metadata.rko)
@@ -120,6 +123,18 @@ rd_kafka_buf_t *rd_kafka_buf_new0(int segcnt, size_t size, int flags) {
         return rkbuf;
 }
 
+/**
+ * @brief Upgrade request header to flexver by writing header tags.
+ */
+void rd_kafka_buf_upgrade_flexver_request(rd_kafka_buf_t *rkbuf) {
+        if (likely(!(rkbuf->rkbuf_flags & RD_KAFKA_OP_F_FLEXVER))) {
+                rkbuf->rkbuf_flags |= RD_KAFKA_OP_F_FLEXVER;
+
+                /* Empty request header tags */
+                rd_kafka_buf_write_i8(rkbuf, 0);
+        }
+}
+
 
 /**
  * @brief Create new request buffer with the request-header written (will
@@ -165,12 +180,7 @@ rd_kafka_buf_t *rd_kafka_buf_new_request0(rd_kafka_broker_t *rkb,
         rd_kafka_buf_write_kstr(rkbuf, rkb->rkb_rk->rk_client_id);
 
         if (is_flexver) {
-                /* Must set flexver after writing the client id since
-                 * it is still a standard non-compact string. */
-                rkbuf->rkbuf_flags |= RD_KAFKA_OP_F_FLEXVER;
-
-                /* Empty request header tags */
-                rd_kafka_buf_write_i8(rkbuf, 0);
+                rd_kafka_buf_upgrade_flexver_request(rkbuf);
         }
 
         return rkbuf;

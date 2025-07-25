@@ -1023,7 +1023,7 @@
         "name": "Organization: github"
       },
       "name": "librdkafka - the Apache Kafka C/C++ client library",
-      "version": "2.0.2",
+      "version": "2.6.0",
       "licenses": [
         {
           "license": {
@@ -1066,7 +1066,7 @@
           }
         }
       ],
-      "purl": "pkg:github/edenhill/librdkafka@v2.0.2",
+      "purl": "pkg:github/edenhill/librdkafka@v2.6.0",
       "properties": [
         {
           "name": "internal:team_responsible",

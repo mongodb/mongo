@@ -1,7 +1,9 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2012,2013 Magnus Edenhill
+ * Copyright (c) 2012-2022, Magnus Edenhill
+ *               2023, Confluent Inc.
+
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,8 +32,10 @@
 #define _RDKAFKA_PROTO_H_
 
 
+#include "rdstring.h"
 #include "rdendian.h"
 #include "rdvarint.h"
+#include "rdbase64.h"
 
 /* Protocol defines */
 #include "rdkafka_protocol.h"
@@ -152,13 +156,25 @@ static RD_UNUSED const char *rd_kafka_ApiKey2str(int16_t ApiKey) {
                 "DescribeUserScramCredentialsRequest",
             [RD_KAFKAP_AlterUserScramCredentials] =
                 "AlterUserScramCredentialsRequest",
-            [RD_KAFKAP_Vote]             = "VoteRequest",
-            [RD_KAFKAP_BeginQuorumEpoch] = "BeginQuorumEpochRequest",
-            [RD_KAFKAP_EndQuorumEpoch]   = "EndQuorumEpochRequest",
-            [RD_KAFKAP_DescribeQuorum]   = "DescribeQuorumRequest",
-            [RD_KAFKAP_AlterIsr]         = "AlterIsrRequest",
-            [RD_KAFKAP_UpdateFeatures]   = "UpdateFeaturesRequest",
-            [RD_KAFKAP_Envelope]         = "EnvelopeRequest",
+            [RD_KAFKAP_Vote]                      = "VoteRequest",
+            [RD_KAFKAP_BeginQuorumEpoch]          = "BeginQuorumEpochRequest",
+            [RD_KAFKAP_EndQuorumEpoch]            = "EndQuorumEpochRequest",
+            [RD_KAFKAP_DescribeQuorum]            = "DescribeQuorumRequest",
+            [RD_KAFKAP_AlterIsr]                  = "AlterIsrRequest",
+            [RD_KAFKAP_UpdateFeatures]            = "UpdateFeaturesRequest",
+            [RD_KAFKAP_Envelope]                  = "EnvelopeRequest",
+            [RD_KAFKAP_FetchSnapshot]             = "FetchSnapshot",
+            [RD_KAFKAP_DescribeCluster]           = "DescribeCluster",
+            [RD_KAFKAP_DescribeProducers]         = "DescribeProducers",
+            [RD_KAFKAP_BrokerHeartbeat]           = "BrokerHeartbeat",
+            [RD_KAFKAP_UnregisterBroker]          = "UnregisterBroker",
+            [RD_KAFKAP_DescribeTransactions]      = "DescribeTransactions",
+            [RD_KAFKAP_ListTransactions]          = "ListTransactions",
+            [RD_KAFKAP_AllocateProducerIds]       = "AllocateProducerIds",
+            [RD_KAFKAP_ConsumerGroupHeartbeat]    = "ConsumerGroupHeartbeat",
+            [RD_KAFKAP_GetTelemetrySubscriptions] = "GetTelemetrySubscriptions",
+            [RD_KAFKAP_PushTelemetry]             = "PushTelemetry",
+
         };
         static RD_TLS char ret[64];
 
@@ -370,7 +386,7 @@ typedef struct rd_kafkap_bytes_s {
         int32_t len;      /* Kafka bytes length (-1=NULL, 0=empty, >0=data) */
         const void *data; /* points just past the struct, or other memory,
                            * not NULL-terminated */
-        const char _data[1]; /* Bytes following struct when new()ed */
+        const unsigned char _data[1]; /* Bytes following struct when new()ed */
 } rd_kafkap_bytes_t;
 
 
@@ -415,7 +431,7 @@ static RD_UNUSED void rd_kafkap_bytes_destroy(rd_kafkap_bytes_t *kbytes) {
  *  - No-copy, just alloc (bytes==NULL,len>0)
  */
 static RD_INLINE RD_UNUSED rd_kafkap_bytes_t *
-rd_kafkap_bytes_new(const char *bytes, int32_t len) {
+rd_kafkap_bytes_new(const unsigned char *bytes, int32_t len) {
         rd_kafkap_bytes_t *kbytes;
         int32_t klen;
 
@@ -432,7 +448,7 @@ rd_kafkap_bytes_new(const char *bytes, int32_t len) {
         if (len == RD_KAFKAP_BYTES_LEN_NULL)
                 kbytes->data = NULL;
         else {
-                kbytes->data = ((const char *)(kbytes + 1)) + 4;
+                kbytes->data = ((const unsigned char *)(kbytes + 1)) + 4;
                 if (bytes)
                         memcpy((void *)kbytes->data, bytes, len);
         }
@@ -447,7 +463,7 @@ rd_kafkap_bytes_new(const char *bytes, int32_t len) {
  */
 static RD_INLINE RD_UNUSED rd_kafkap_bytes_t *
 rd_kafkap_bytes_copy(const rd_kafkap_bytes_t *src) {
-        return rd_kafkap_bytes_new((const char *)src->data, src->len);
+        return rd_kafkap_bytes_new((const unsigned char *)src->data, src->len);
 }
 
 
@@ -556,6 +572,76 @@ typedef struct rd_kafka_buf_s rd_kafka_buf_t;
 #define RD_KAFKAP_MSGSET_V2_OF_RecordCount                                     \
         (8 + 4 + 4 + 1 + 4 + 2 + 4 + 8 + 8 + 8 + 2 + 4)
 
+
+/**
+ * @struct Struct representing UUID protocol primitive type.
+ */
+typedef struct rd_kafka_Uuid_s {
+        int64_t
+            most_significant_bits; /**< Most significant 64 bits for the UUID */
+        int64_t least_significant_bits; /**< Least significant 64 bits for the
+                                           UUID */
+        char base64str[23]; /**< base64 encoding for the uuid. By default, it is
+                               lazy loaded. Use function
+                               `rd_kafka_Uuid_base64str()` as a getter for this
+                               field. */
+} rd_kafka_Uuid_t;
+
+#define RD_KAFKA_UUID_ZERO                                                     \
+        (rd_kafka_Uuid_t) {                                                    \
+                0, 0, ""                                                       \
+        }
+
+#define RD_KAFKA_UUID_IS_ZERO(uuid)                                            \
+        (!rd_kafka_Uuid_cmp(uuid, RD_KAFKA_UUID_ZERO))
+
+#define RD_KAFKA_UUID_METADATA_TOPIC_ID                                        \
+        (rd_kafka_Uuid_t) {                                                    \
+                0, 1, ""                                                       \
+        }
+
+static RD_INLINE RD_UNUSED int rd_kafka_Uuid_cmp(rd_kafka_Uuid_t a,
+                                                 rd_kafka_Uuid_t b) {
+        if (a.most_significant_bits < b.most_significant_bits)
+                return -1;
+        if (a.most_significant_bits > b.most_significant_bits)
+                return 1;
+        if (a.least_significant_bits < b.least_significant_bits)
+                return -1;
+        if (a.least_significant_bits > b.least_significant_bits)
+                return 1;
+        return 0;
+}
+
+static RD_INLINE RD_UNUSED int rd_kafka_Uuid_ptr_cmp(void *a, void *b) {
+        rd_kafka_Uuid_t *a_uuid = a, *b_uuid = b;
+        return rd_kafka_Uuid_cmp(*a_uuid, *b_uuid);
+}
+
+rd_kafka_Uuid_t rd_kafka_Uuid_random();
+
+const char *rd_kafka_Uuid_str(const rd_kafka_Uuid_t *uuid);
+
+unsigned int rd_kafka_Uuid_hash(const rd_kafka_Uuid_t *uuid);
+
+unsigned int rd_kafka_Uuid_map_hash(const void *key);
+
+/**
+ * @brief UUID copier for rd_list_copy()
+ */
+static RD_UNUSED void *rd_list_Uuid_copy(const void *elem, void *opaque) {
+        return (void *)rd_kafka_Uuid_copy((rd_kafka_Uuid_t *)elem);
+}
+
+static RD_INLINE RD_UNUSED void rd_list_Uuid_destroy(void *uuid) {
+        rd_kafka_Uuid_destroy((rd_kafka_Uuid_t *)uuid);
+}
+
+static RD_INLINE RD_UNUSED int rd_list_Uuid_cmp(const void *uuid1,
+                                                const void *uuid2) {
+        return rd_kafka_Uuid_cmp(*((rd_kafka_Uuid_t *)uuid1),
+                                 *((rd_kafka_Uuid_t *)uuid2));
+}
 
 
 /**

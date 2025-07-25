@@ -1,7 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2017 Magnus Edenhill
+ * Copyright (c) 2017-2022, Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -70,6 +70,8 @@ typedef struct rd_segment_s {
                                     *   beginning in the grand rd_buf_t */
         void (*seg_free)(void *p); /**< Optional free function for seg_p */
         int seg_flags;             /**< Segment flags */
+        size_t seg_erased;         /** Total number of bytes erased from
+                                    *   this segment. */
 #define RD_SEGMENT_F_RDONLY 0x1    /**< Read-only segment */
 #define RD_SEGMENT_F_FREE                                                      \
         0x2 /**< Free segment on destroy,                                      \

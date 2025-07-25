@@ -1,7 +1,8 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2012,2013 Magnus Edenhill
+ * Copyright (c) 2012-2022, Magnus Edenhill
+ *               2023, Confluent Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -98,6 +99,27 @@ typedef struct rd_kafka_partition_msgid_s {
 } rd_kafka_partition_msgid_t;
 
 
+/**
+ * @struct Aux struct that holds a partition id and a leader epoch.
+ *         Used as temporary holding space for per-partition leader epochs
+ *         while parsing MetadataResponse.
+ */
+typedef struct rd_kafka_partition_leader_epoch_s {
+        int32_t partition_id;
+        int32_t leader_epoch;
+} rd_kafka_partition_leader_epoch_t;
+
+/**
+ * Finds and returns a topic based on its topic_id, or NULL if not found.
+ * The 'rkt' refcount is increased by one and the caller must call
+ * rd_kafka_topic_destroy() when it is done with the topic to decrease
+ * the refcount.
+ *
+ * Locality: any thread
+ */
+rd_kafka_topic_t *rd_kafka_topic_find_by_topic_id(rd_kafka_t *rk,
+                                                  rd_kafka_Uuid_t topic_id);
+
 /*
  * @struct Internal representation of a topic.
  *
@@ -112,6 +134,7 @@ struct rd_kafka_topic_s {
 
         rwlock_t rkt_lock;
         rd_kafkap_str_t *rkt_topic;
+        rd_kafka_Uuid_t rkt_topic_id;
 
         rd_kafka_toppar_t *rkt_ua; /**< Unassigned partition (-1) */
         rd_kafka_toppar_t **rkt_p; /**< Partition array */
@@ -244,8 +267,10 @@ rd_kafka_topic_get_error(rd_kafka_topic_t *rkt) {
         return err;
 }
 
-int rd_kafka_topic_metadata_update2(rd_kafka_broker_t *rkb,
-                                    const struct rd_kafka_metadata_topic *mdt);
+int rd_kafka_topic_metadata_update2(
+    rd_kafka_broker_t *rkb,
+    const struct rd_kafka_metadata_topic *mdt,
+    const rd_kafka_metadata_topic_internal_t *mdit);
 
 void rd_kafka_topic_scan_all(rd_kafka_t *rk, rd_ts_t now);
 
@@ -253,12 +278,17 @@ void rd_kafka_topic_scan_all(rd_kafka_t *rk, rd_ts_t now);
 typedef struct rd_kafka_topic_info_s {
         const char *topic; /**< Allocated along with struct */
         int partition_cnt;
+        rd_kafka_metadata_partition_internal_t *partitions_internal;
 } rd_kafka_topic_info_t;
 
 int rd_kafka_topic_info_topic_cmp(const void *_a, const void *_b);
 int rd_kafka_topic_info_cmp(const void *_a, const void *_b);
 rd_kafka_topic_info_t *rd_kafka_topic_info_new(const char *topic,
                                                int partition_cnt);
+rd_kafka_topic_info_t *rd_kafka_topic_info_new_with_rack(
+    const char *topic,
+    int partition_cnt,
+    const rd_kafka_metadata_partition_internal_t *mdpi);
 void rd_kafka_topic_info_destroy(rd_kafka_topic_info_t *ti);
 
 int rd_kafka_topic_match(rd_kafka_t *rk,
@@ -278,9 +308,11 @@ rd_kafka_resp_err_t rd_kafka_topics_leader_query_sync(rd_kafka_t *rk,
                                                       int timeout_ms);
 void rd_kafka_topic_leader_query0(rd_kafka_t *rk,
                                   rd_kafka_topic_t *rkt,
-                                  int do_rk_lock);
+                                  int do_rk_lock,
+                                  rd_bool_t force);
 #define rd_kafka_topic_leader_query(rk, rkt)                                   \
-        rd_kafka_topic_leader_query0(rk, rkt, 1 /*lock*/)
+        rd_kafka_topic_leader_query0(rk, rkt, 1 /*lock*/,                      \
+                                     rd_false /*dont force*/)
 
 #define rd_kafka_topic_fast_leader_query(rk)                                   \
         rd_kafka_metadata_fast_leader_query(rk)
