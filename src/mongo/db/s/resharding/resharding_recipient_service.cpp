@@ -424,27 +424,7 @@ ReshardingRecipientService::RecipientStateMachine::_notifyCoordinatorAndAwaitDec
     return _retryingCancelableOpCtxFactory
         ->withAutomaticRetry([this, executor](const auto& factory) {
             auto opCtx = factory.makeOperationContext(&cc());
-            if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                {
-                    AutoGetCollection coll(opCtx.get(), _metadata.getTempReshardingNss(), MODE_IS);
-                    if (coll) {
-                        _recipientCtx.setTotalNumDocuments(coll->numRecords(opCtx.get()));
-                        _recipientCtx.setTotalDocumentSize(coll->dataSize(opCtx.get()));
-                        if (coll->isClustered()) {
-                            // There is an implicit 'clustered' index on a clustered collection.
-                            // Increment the total index count similar to storage stats:
-                            // https://github.com/10gen/mongo/blob/29d8030f8aa7f3bc119081007fb09777daffc591/src/mongo/db/stats/storage_stats.cpp#L249C1-L251C22
-                            _recipientCtx.setNumOfIndexes(
-                                coll->getIndexCatalog()->numIndexesTotal() + 1);
-                        } else {
-                            _recipientCtx.setNumOfIndexes(
-                                coll->getIndexCatalog()->numIndexesTotal());
-                        }
-                    }
-                }
-                _metrics->fillRecipientCtxOnCompletion(_recipientCtx);
-            }
+            _updateContextMetrics(opCtx.get());
             return _updateCoordinator(opCtx.get(), executor, factory);
         })
         .onTransientError([](const Status& status) {
@@ -484,6 +464,10 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                         _renameTemporaryReshardingCollection(factory);
                         return ExecutorFuture<void>(**executor, Status::OK());
                     }
+                })
+                .then([this, &factory] {
+                    auto opCtx = factory.makeOperationContext(&cc());
+                    _updateContextMetrics(opCtx.get());
                 })
                 .then([this, aborted, &factory] {
                     // It is safe to drop the oplog collections once either (1) the
@@ -1566,6 +1550,30 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
 
     _metrics->restoreExternallyTrackedRecipientFields(externalMetrics);
 }
+
+void ReshardingRecipientService::RecipientStateMachine::_updateContextMetrics(
+    OperationContext* opCtx) {
+    if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        {
+            AutoGetCollection coll(opCtx, _metadata.getTempReshardingNss(), MODE_IS);
+            if (coll) {
+                _recipientCtx.setTotalNumDocuments(coll->numRecords(opCtx));
+                _recipientCtx.setTotalDocumentSize(coll->dataSize(opCtx));
+                if (coll->isClustered()) {
+                    // There is an implicit 'clustered' index on a clustered collection.
+                    // Increment the total index count similar to storage stats:
+                    // https://github.com/10gen/mongo/blob/29d8030f8aa7f3bc119081007fb09777daffc591/src/mongo/db/stats/storage_stats.cpp#L249C1-L251C22
+                    _recipientCtx.setNumOfIndexes(coll->getIndexCatalog()->numIndexesTotal() + 1);
+                } else {
+                    _recipientCtx.setNumOfIndexes(coll->getIndexCatalog()->numIndexesTotal());
+                }
+            }
+        }
+        _metrics->fillRecipientCtxOnCompletion(_recipientCtx);
+    }
+}
+
 
 CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortSource(
     const CancellationToken& stepdownToken) {

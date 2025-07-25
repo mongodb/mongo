@@ -839,6 +839,8 @@ last-continuous:
     ticket: SERVER-102084
   - test_file: jstests/replsets/write_concern_stored_procedure.js
     ticket: SERVER-87126
+  - test_file: jstests/core_sharding/resharding/reshard_collection_atlas_log_ingestion.js
+    ticket: SERVER-100421
   suites: null
 last-lts:
   all:
@@ -1740,4 +1742,6 @@ last-lts:
     ticket: SERVER-102084
   - test_file: jstests/replsets/write_concern_stored_procedure.js
     ticket: SERVER-87126
+  - test_file: jstests/core_sharding/resharding/reshard_collection_atlas_log_ingestion.js
+    ticket: SERVER-100421
   suites: null

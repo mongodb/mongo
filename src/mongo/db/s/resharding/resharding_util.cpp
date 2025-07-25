@@ -47,6 +47,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
@@ -523,6 +524,28 @@ std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::strin
 boost::optional<Status> coordinatorAbortedError() {
     return Status{ErrorCodes::ReshardCollectionAborted,
                   "Recieved abort from the resharding coordinator"};
+}
+
+boost::optional<ReshardingCoordinatorDocument> tryGetCoordinatorDoc(OperationContext* opCtx,
+                                                                    const UUID& reshardingUUID) {
+    DBDirectClient client(opCtx);
+    auto doc = client.findOne(
+        NamespaceString::kConfigReshardingOperationsNamespace,
+        BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName << reshardingUUID));
+    if (doc.isEmpty()) {
+        return boost::none;
+    }
+    return ReshardingCoordinatorDocument::parse(IDLParserContext("getCoordinatorDoc"), doc);
+}
+
+ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx,
+                                                const UUID& reshardingUUID) {
+    auto maybeDoc = tryGetCoordinatorDoc(opCtx, reshardingUUID);
+    uassert(9858105,
+            str::stream() << "Could not find the coordinator document for the resharding operation "
+                          << reshardingUUID.toString(),
+            maybeDoc.has_value());
+    return *maybeDoc;
 }
 
 }  // namespace resharding

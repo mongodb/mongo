@@ -317,6 +317,8 @@ private:
         const CancellationToken& abortToken);
     void _restoreMetrics(const CancelableOperationContextFactory& factory);
 
+    void _updateContextMetrics(OperationContext* opCtx);
+
     // Initializes the _abortSource and generates a token from it to return back the caller.
     //
     // Should only be called once per lifetime.

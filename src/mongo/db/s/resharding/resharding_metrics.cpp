@@ -346,29 +346,39 @@ void ReshardingMetrics::restoreIndexBuildDurationFields(const ReshardingRecipien
     }
 }
 
-void ReshardingMetrics::reportOnCompletion(BSONObjBuilder* builder) {
+void ReshardingMetrics::reportPhaseDurationsOnCompletion(BSONObjBuilder* builder) {
     invariant(builder);
     if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        reportDurationsForAllPhases<Seconds>(
-            kTimedPhaseNamesMap, getClockSource(), builder, Seconds{0});
+        const auto fieldNames = ReshardingMetrics::TimedPhaseNameMap{
+            {TimedPhase::kCloning, "copyDurationMs"},
+            {TimedPhase::kBuildingIndex, "buildingIndexDurationMs"},
+            {TimedPhase::kApplying, "applyDurationMs"},
+            {TimedPhase::kCriticalSection, "criticalSectionDurationMs"},
+        };
+        reportDurationsForAllPhases<Milliseconds>(fieldNames, getClockSource(), builder);
     } else {
         reportDurationsForAllPhases<Seconds>(kTimedPhaseNamesMapWithoutReshardingImprovements,
                                              getClockSource(),
                                              builder,
                                              Seconds{0});
     }
-    builder->appendElements(BSON("provenance" << Provenance_serializer(_provenance)));
 }
 
 void ReshardingMetrics::fillDonorCtxOnCompletion(DonorShardContext& donorCtx) {
     donorCtx.setWritesDuringCriticalSection(getWritesDuringCriticalSection());
+    BSONObjBuilder bob;
+    reportPhaseDurationsOnCompletion(&bob);
+    donorCtx.setPhaseDurations(bob.obj());
 }
 
 void ReshardingMetrics::fillRecipientCtxOnCompletion(RecipientShardContext& recipientCtx) {
     recipientCtx.setBytesCopied(getBytesWrittenCount());
     recipientCtx.setOplogFetched(getOplogEntriesFetched());
     recipientCtx.setOplogApplied(getOplogEntriesApplied());
+    BSONObjBuilder bob;
+    reportPhaseDurationsOnCompletion(&bob);
+    recipientCtx.setPhaseDurations(bob.obj());
 }
 
 void ReshardingMetrics::onStarted() {
