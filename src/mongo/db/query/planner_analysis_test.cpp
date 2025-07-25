@@ -42,6 +42,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/interval.h"
@@ -366,4 +367,41 @@ TEST_F(QueryPlannerTest, ExprOnFetchDoesNotIncludeImpreciseFilter) {
         "      bounds: {a: [[1,1,true,true]]}}}}}");
 }
 
+TEST(QueryPlannerAnalysis, CanUseIndexForRightSideLookupInSBE) {
+    std::string foreignField = "a";
+    std::vector<IndexEntry> fullIndexList;
+    const CollatorInterface* defaultCollator = nullptr;  // simple collator
+
+    // If there are no indexes, the method should return true.
+    ASSERT_TRUE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupInSBE(
+        foreignField, fullIndexList, defaultCollator));
+
+    // Add an index on a field different to the foreign field
+    fullIndexList.push_back(buildSimpleIndexEntry(BSON("b" << 1)));
+
+    // If there are no indexes on the foreign field, the method should return true.
+    ASSERT_TRUE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupInSBE(
+        foreignField, fullIndexList, defaultCollator));
+
+    // Add a multikey index on the foreign field.
+    fullIndexList.push_back(buildSimpleIndexEntry(fromjson("{a: 1, b: 1}")));
+    // There is an index that SBE can use, the method should return true.
+    ASSERT_TRUE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupInSBE(
+        foreignField, fullIndexList, defaultCollator));
+
+    // Change the collation of the multikey index to be incompatible to the query collation.
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    fullIndexList.back().collator = &collator;
+
+    // There is an index that classic can potentially use but SBE cannot, the method should return
+    // false.
+    ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupInSBE(
+        foreignField, fullIndexList, defaultCollator));
+
+    // Create an index on the foreign field with compatible collation
+    fullIndexList.push_back(buildSimpleIndexEntry(BSON("a" << 1)));
+    // There is an index that SBE can use, the method should return true.
+    ASSERT_TRUE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupInSBE(
+        foreignField, fullIndexList, defaultCollator));
+}
 }  // namespace
