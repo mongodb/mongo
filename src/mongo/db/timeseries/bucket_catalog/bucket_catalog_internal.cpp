@@ -150,6 +150,16 @@ tracking::shared_ptr<ExecutionStats> getEmptyStats() {
     static const auto kEmptyStats{std::make_shared<ExecutionStats>()};
     return kEmptyStats;
 }
+
+/**
+ * Quick and incomplete check of bucket fill by size, when timeseriesBucketMaxSize size is in
+ * effect. It safely excludes checking any further optimizations like dynamic bucketing and large
+ * measurements which can change the effective max size.
+ */
+bool isBucketDefinitelyFullDueToSize(const Bucket& bucket) {
+    return (bucket.size >= gTimeseriesBucketMaxSize &&
+            bucket.numMeasurements >= static_cast<std::uint64_t>(gTimeseriesBucketMinCount));
+}
 }  // namespace
 
 StripeNumber getStripeNumber(const BucketCatalog& catalog, const BucketKey& key) {
@@ -727,6 +737,19 @@ void archiveBucket(BucketCatalog& catalog,
                    WithLock stripeLock,
                    Bucket& bucket,
                    ExecutionStatsController& stats) {
+    if (bucket.numMeasurements >= static_cast<std::uint32_t>(gTimeseriesBucketMaxCount) ||
+        isBucketDefinitelyFullDueToSize(bucket)) {
+        // Do not archive a bucket that is known to be full.
+        // It is impractical to conclusively determine all closure reasons at this point.
+        if (bucket.numMeasurements >= static_cast<std::uint32_t>(gTimeseriesBucketMaxCount)) {
+            stats.incNumBucketsClosedDueToCount();
+        } else {
+            stats.incNumBucketsClosedDueToSize();
+        }
+        closeOpenBucket(catalog, stripe, stripeLock, bucket, stats);
+        return;
+    }
+
     bool archived =
         stripe.archivedBuckets
             .emplace(

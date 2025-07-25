@@ -63,7 +63,7 @@ const clearCollection = function() {
 };
 clearCollection();
 
-const checkCollStats = function(empty = false) {
+const checkCollStats = function(empty = false, disableSizeClosureCheck = false) {
     const stats = assert.commandWorked(coll.stats());
 
     assert.eq(coll.getFullName(), stats.ns);
@@ -88,10 +88,17 @@ const checkCollStats = function(empty = false) {
                                "' value in collStats: " + tojson(stats.timeseries));
             }
         } else {
-            assert.eq(TimeseriesTest.getStat(stats.timeseries, stat),
-                      value,
-                      "Invalid 'timeseries." + stat +
-                          "' value in collStats: " + tojson(stats.timeseries));
+            if (disableSizeClosureCheck && stat == 'numBucketsClosedDueToSize') {
+                // With SERVER-107584 it is not possible to deterministically know when an archived
+                // bucket will in fact be archived or closed. The current archival policy is set to
+                // random, and a test cannot check size on random buckets.
+                continue;
+            } else {
+                assert.eq(TimeseriesTest.getStat(stats.timeseries, stat),
+                          value,
+                          "Invalid 'timeseries." + stat +
+                              "' value in collStats: " + tojson(stats.timeseries));
+            }
         }
     }
 
@@ -264,7 +271,7 @@ const testIdleBucketExpiry = function(docFn) {
         expectedStats.avgNumMeasurementsPerCommit =
             Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
         expectedStats.numBucketQueriesFailed++;
-        checkCollStats();
+        checkCollStats(/*empty=*/ false, /*disableSizeClosureCheck=*/ true);
 
         shouldExpire = memoryUsage > kIdleBucketExpiryMemoryUsageThreshold;
     }
