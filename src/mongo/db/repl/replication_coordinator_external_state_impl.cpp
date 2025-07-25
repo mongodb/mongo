@@ -156,7 +156,6 @@ namespace mongo {
 namespace repl {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(dropPendingCollectionReaperHang);
 MONGO_FAIL_POINT_DEFINE(skipDurableTimestampUpdates);
 
 // The maximum size of the oplog write buffer is set to 256MB.
@@ -501,10 +500,9 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
     LOGV2_DEBUG(21308, 1, "Stopping noop writer");
     _noopWriter->stopWritingPeriodicNoops();
 
-    // We must wait for _taskExecutor outside of _threadMutex, since _taskExecutor is used to
-    // run the dropPendingCollectionReaper, which takes database locks. It is safe to access
-    // _taskExecutor outside of _threadMutex because once _startedThreads is set to true, the
-    // _taskExecutor pointer never changes.
+    // We should wait for _taskExecutor outside of _threadMutex, in case some of its task would take
+    // data base locks. It is safe to access _taskExecutor outside of _threadMutex because once
+    // _startedThreads is set to true, the _taskExecutor pointer never changes.
     _taskExecutor->join();
 
     // The oplog truncate after point must be cleared, if we are still primary for shutdown, so

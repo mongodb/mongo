@@ -1672,11 +1672,8 @@ than or equal to the `stableTimestamp`, we create a `SessionTxnRecord` and perfo
 write to the `config.transactions` table. We must do an untimestamped write so that it will not be
 rolled back on recovering to the `stableTimestamp` if we were to crash. Finally, we take a stable checkpoint so that these restoration writes are persisted to disk before truncating the oplog.
 
-During the last few steps of the data modification section, we clear the state of the
-`DropPendingCollectionReaper`, which manages collections that are marked as drop-pending by the Two
-Phase Drop algorithm, and make sure it aligns with what is currently on disk. After doing so, we can
-run through the oplog recovery process, which truncates the oplog after the `common point` and
-applies all oplog entries through the end of the sync source's oplog. See the
+During the last few steps of the data modification section we run through the oplog recovery process,
+which truncates the oplog after the `common point` and applies all oplog entries through the end of the sync source's oplog. See the
 [Startup Recovery](#startup-recovery) section for more information on truncating the oplog and
 applying oplog entries.
 
