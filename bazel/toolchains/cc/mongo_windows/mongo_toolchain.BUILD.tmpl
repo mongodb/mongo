@@ -1,5 +1,29 @@
 load("@//bazel/toolchains/cc/mongo_windows:mongo_windows_cc_toolchain_config.bzl", "mongo_windows_cc_toolchain_config")
 
+DEFAULT_LINK_FLAGS = [
+    "/MACHINE:X64",
+    "/NODEFAULTLIB:library",
+    "/LIBPATH:external/windows_sasl/lib",
+
+    # This gives 32-bit programs 4 GB of user address space in WOW64, ignored in
+    # 64-bit builds.
+    "/LARGEADDRESSAWARE",
+    
+    "bcrypt.lib",
+    "Dnsapi.lib",
+    "Crypt32.lib",
+    "Version.lib",
+    "Winmm.lib",
+    "Iphlpapi.lib",
+    "Pdh.lib",
+    "kernel32.lib",
+    "shell32.lib",
+    "ws2_32.lib",
+    "DbgHelp.lib",
+    "Psapi.lib",
+    "Secur32.lib",
+]
+
 mongo_windows_cc_toolchain_config(
     name = "cc_msvc_toolchain_config",
     abi_libc_version = "local",
@@ -9,7 +33,7 @@ mongo_windows_cc_toolchain_config(
     cxx_builtin_include_directories = "{include_dirs}".split(";"),
     dbg_mode_debug_flag = "/DEBUG:FULL",
     default_compile_flags = ["/nologo"],
-    default_link_flags = ["/MACHINE:X64", "/NODEFAULTLIB:library"],
+    default_link_flags = DEFAULT_LINK_FLAGS,
     archiver_flags = ["/MACHINE:X64"],
     fastbuild_mode_debug_flag = "/DEBUG:FASTLINK",
     host_system_name = "local",

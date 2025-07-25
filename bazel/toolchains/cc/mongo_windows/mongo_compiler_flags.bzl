@@ -69,101 +69,6 @@ WINDOWS_DEBUG_COPTS = select({
     "//conditions:default": [],
 })
 
-# Suppress some warnings we don't like, or find necessary to
-# suppress. Please keep this list alphabetized and commented.
-WINDOWS_SUPRESSED_WARNINGS_COPTS = select({
-    "@platforms//os:windows": [
-        # C4068: unknown pragma. added so that we can specify unknown
-        # pragmas for other compilers.
-        "/wd4068",
-
-        # C4244: 'conversion' conversion from 'type1' to 'type2', possible loss
-        # of data. An integer type is converted to a smaller integer type.
-        "/wd4244",
-
-        # C4267: 'var' : conversion from 'size_t' to 'type', possible loss of
-        # data. When compiling with /Wp64, or when compiling on a 64-bit
-        # operating system, type is 32 bits but size_t is 64 bits when compiling
-        # for 64-bit targets. To fix this warning, use size_t instead of a type.
-        "/wd4267",
-
-        # C4290: C++ exception specification ignored except to indicate a
-        # function is not __declspec(nothrow). A function is declared using
-        # exception specification, which Visual C++ accepts but does not
-        # implement.
-        "/wd4290",
-
-        # C4351: On extremely old versions of MSVC (pre 2k5), default
-        # constructing an array member in a constructor's initialization list
-        # would not zero the array members "in some cases". Since we don't
-        # target MSVC versions that old, this warning is safe to ignore.
-        "/wd4351",
-
-        # C4355: 'this' : used in base member initializer list. The this pointer
-        # is valid only within nonstatic member functions. It cannot be used in
-        # the initializer list for a base class.
-        "/wd4355",
-
-        # C4373: Older versions of MSVC would fail to make a function in a
-        # derived class override a virtual function in the parent, when defined
-        # inline and at least one of the parameters is made const. The behavior
-        # is incorrect under the standard. MSVC is fixed now, and the warning
-        # exists merely to alert users who may have relied upon the older,
-        # non-compliant behavior. Our code should not have any problems with the
-        # older behavior, so we can just disable this warning.
-        "/wd4373",
-
-        # C4800: 'type' : forcing value to bool 'true' or 'false' (performance
-        # warning). This warning is generated when a value that is not bool is
-        # assigned or coerced into type bool.
-        "/wd4800",
-
-        # C4251: This warning attempts to prevent usage of CRT (C++ standard
-        # library) types in DLL interfaces. That is a good idea for DLLs you
-        # ship to others, but in our case, we know that all DLLs are built
-        # consistently. Suppress the warning.
-        "/wd4251",
-
-        # mozjs requires the following
-        #  'declaration' : no matching operator delete found; memory will not be
-        #                  freed if initialization throws an exception
-        "/wd4291",
-    ],
-    "//conditions:default": [],
-})
-
-WINDOWS_WARNINGS_AS_ERRORS_COPTS = select({
-    "@platforms//os:windows": [
-        # some warnings we should treat as errors:
-        # c4013
-        #  'function' undefined; assuming extern returning int
-        #
-        # This warning occurs when files compiled for the C language use
-        # functions not defined in a header file.
-        "/we4013",
-
-        # c4099
-        #  'identifier' : type name first seen using 'objecttype1' now seen
-        #                 using 'objecttype2'
-        #
-        # This warning occurs when classes and structs are declared with a mix
-        # of struct and classwhich can cause linker failures
-        "/we4099",
-
-        # c4930
-        #  'identifier': prototyped function not called (was a variable
-        #                definition intended?)
-        #
-        # This warning indicates a most-vexing parse error, where a user
-        # declared a function that was probably intended as a variable
-        # definition. A common example is accidentally declaring a function
-        # called lock that takes a mutex when one meant to create a guard object
-        # called lock on the stack.
-        "/we4930",
-    ],
-    "//conditions:default": [],
-})
-
 MSVC_OPT_COPTS = select({
     "//bazel/config:msvc_opt": [
         # https://devblogs.microsoft.com/cppblog/introducing-gw-compiler-switch/
@@ -215,15 +120,6 @@ WINDOWS_INCREMENTAL_LINKOPT = select({
     "//conditions:default": [],
 })
 
-# This gives 32-bit programs 4 GB of user address space in WOW64, ignored in
-# 64-bit builds.
-WINDOWS_LARGE_ADDRESS_AWARE_LINKFLAG = select({
-    "@platforms//os:windows": [
-        "/LARGEADDRESSAWARE",
-    ],
-    "//conditions:default": [],
-})
-
 MSVC_OPT_LINKFLAGS = select({
     "//bazel/config:msvc_opt": [
         # https://devblogs.microsoft.com/cppblog/introducing-gw-compiler-switch/
@@ -237,37 +133,11 @@ SASL_WINDOWS_COPTS = select({
     "//conditions:default": [],
 })
 
-SASL_WINDOWS_LINKFLAGS = select({
-    "@platforms//os:windows": ["/LIBPATH:external/windows_sasl/lib"],
-    "//conditions:default": [],
-})
-
-GLOBAL_WINDOWS_LIBRAY_LINKFLAGS = select({
-    "@platforms//os:windows": [
-        "bcrypt.lib",
-        "Dnsapi.lib",
-        "Crypt32.lib",
-        "Version.lib",
-        "Winmm.lib",
-        "Iphlpapi.lib",
-        "Pdh.lib",
-        "kernel32.lib",
-        "shell32.lib",
-        "ws2_32.lib",
-        "DbgHelp.lib",
-        "Psapi.lib",
-        "Secur32.lib",
-    ],
-    "//conditions:default": [],
-})
-
 MONGO_WIN_CC_COPTS = (
     WINDOWS_GENERAL_COPTS +
     WINDOWS_DEBUG_COPTS +
     WINDOWS_OPT_COPTS +
     WINDOWS_RUNTIME_ERROR_CHECK_COPTS +
-    WINDOWS_SUPRESSED_WARNINGS_COPTS +
-    WINDOWS_WARNINGS_AS_ERRORS_COPTS +
     MSVC_OPT_COPTS +
     SASL_WINDOWS_COPTS
 )
@@ -276,8 +146,5 @@ MONGO_WIN_CC_LINKFLAGS = (
     WINDOWS_DEFAULT_LINKFLAGS +
     WINDOWS_PDB_PAGE_SIZE_LINKOPT +
     WINDOWS_INCREMENTAL_LINKOPT +
-    WINDOWS_LARGE_ADDRESS_AWARE_LINKFLAG +
-    MSVC_OPT_LINKFLAGS +
-    SASL_WINDOWS_LINKFLAGS +
-    GLOBAL_WINDOWS_LIBRAY_LINKFLAGS
+    MSVC_OPT_LINKFLAGS
 )
