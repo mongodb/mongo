@@ -88,7 +88,7 @@ struct ServerGlobalParams {
     bool enableIPv6 = false;
     bool rest = false;  // --rest
 
-    int listenBacklog = SOMAXCONN;  // --listenBacklog
+    boost::optional<int> listenBacklog;  // --listenBacklog
 
     AtomicWord<bool> quiet{false};  // --quiet
 

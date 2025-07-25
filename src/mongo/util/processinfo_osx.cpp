@@ -40,6 +40,7 @@
 #include <mach/task.h>
 #include <mach/task_info.h>
 
+#include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/types.h>
 
@@ -189,6 +190,15 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     pageSize = static_cast<unsigned long long>(sysconf(_SC_PAGESIZE));
     cpuArch = getSysctlByName<std::string>("hw.machine");
     hasNuma = false;
+
+    // Darwin doesn't have a sysctl field for maximum listen() backlog size.
+    // `man listen` also notes:
+    //
+    // > BUGS
+    // >      The backlog is currently limited (silently) to 128.
+    //
+    // `SOMAXCONN` is 128.
+    defaultListenBacklog = SOMAXCONN;
 
     BSONObjBuilder bExtra;
     bExtra.append("versionString", getSysctlByName<std::string>("kern.version"));

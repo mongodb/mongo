@@ -36,6 +36,7 @@
 #include <sys/file.h>
 #include <sys/mman.h>
 #include <sys/param.h>
+#include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/types.h>
 #include <sys/user.h>
@@ -184,6 +185,10 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     pageSize = static_cast<unsigned long long>(sysconf(_SC_PAGESIZE));
 
     hasNuma = false;
+
+    // The appropriate system parameter is `{CTL_KERN, KERN_SOMAXCONN}`, but to
+    // simplify testing we hardcode to `SOMAXCONN`.
+    defaultListenBacklog = SOMAXCONN;
 }
 
 void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}
