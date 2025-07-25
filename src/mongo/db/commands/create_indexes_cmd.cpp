@@ -91,7 +91,7 @@ MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildAbort);
 // through the IndexBuildsCoordinator.
 MONGO_FAIL_POINT_DEFINE(hangCreateIndexesBeforeStartingIndexBuild);
 
-
+MONGO_FAIL_POINT_DEFINE(ignoreTTLIndexCappedCollectionCheck);
 MONGO_FAIL_POINT_DEFINE(skipTTLIndexValidationOnCreateIndex);
 
 constexpr auto kCommandName = "createIndexes"_sd;
@@ -504,6 +504,15 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
             }
 
             validateTTLOptions(opCtx, collection.getCollection(), cmd);
+
+            if (collection && collection->isCapped() &&
+                MONGO_likely(!ignoreTTLIndexCappedCollectionCheck.shouldFail())) {
+                for (const auto& spec : specs) {
+                    uassert(ErrorCodes::CannotCreateIndex,
+                            "Cannot create a TTL index on a capped collection",
+                            !spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName));
+                }
+            }
 
             if (collection &&
                 !UncommittedCatalogUpdates::get(opCtx).isCreatedCollection(opCtx, ns)) {

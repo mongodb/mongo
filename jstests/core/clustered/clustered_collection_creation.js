@@ -179,8 +179,7 @@ const validateClusteredCappedCollections = function(db, coll, clusterKey) {
     assert.commandWorked(db.createCollection(
         coll.getName(),
         {clusteredIndex: {key: clusterKey, unique: true}, capped: true, expireAfterSeconds: 10}));
-    assert.commandFailedWithCode(coll.createIndex({a: 1}, {expireAfterSeconds: 10}),
-                                 ErrorCodes.CannotCreateIndex);
+    assert.commandFailedWithCode(coll.createIndex({a: 1}, {expireAfterSeconds: 10}), 6049202);
     coll.drop();
 };
 
