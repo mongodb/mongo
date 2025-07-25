@@ -211,7 +211,7 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: gRemainingReshardingOperationTimeThresholdMillis
         default:
-            expr: 2 * 1000
+            expr: 500
         validator:
             gte: 0
         redact: false
