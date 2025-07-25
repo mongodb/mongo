@@ -1,7 +1,7 @@
 /**
  * Stress tests the cases where a sort order is interesting, and so the rank computation needs to be
  * careful. For example, when a sub-pipeline specifies a $sort.
- * @tags: [ featureFlagRankFusionBasic, featureFlagRankFusionFull, requires_fcv_81 ]
+ * @tags: [ featureFlagRankFusionBasic, featureFlagRankFusionFull, requires_fcv_82 ]
  */
 import {orderedArrayEq} from "jstests/aggregation/extras/utils.js";
 
@@ -337,7 +337,7 @@ function withAndWithoutIndex({index, assertFn}) {
                     description: scoreDetailsDescription,
                     details: [
                         {inputPipelineName: "everything", rank: 1, weight: 1, details: []},
-                        {inputPipelineName: "has_a_but", rank: 0, weight: 1},
+                        {inputPipelineName: "has_a_but", rank: "NA"},
                         {inputPipelineName: "tasty", rank: 2, weight: 1, details: []}
                     ]
                 }

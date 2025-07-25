@@ -1089,6 +1089,42 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocsAndNoDi
                     }
                 },
                 {
+                    "$addFields": {
+                        "agatha_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$agatha_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$agatha_rank"
+                            ]
+                        },
+                        "geo_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$geo_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$geo_rank"
+                            ]
+                        }
+                    }
+                },
+                {
                     "$setMetadata": {
                         "score": {
                             "$add": [
@@ -1617,13 +1653,16 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsApplied) {
                         "coll": "pipeline_test",
                         "pipeline": [
                             {
-                                "$search": { 
-                                    "mongotQuery": { 
-                                        "index": "search_index", 
-                                        "text": { "query": "mystery", "path": "genres" } 
-                                    }, 
-                                    "requiresSearchSequenceToken": false, 
-                                    "requiresSearchMetaCursor": true 
+                                "$search": {
+                                    "mongotQuery": {
+                                        "index": "search_index",
+                                        "text": {
+                                            "query": "mystery",
+                                            "path": "genres"
+                                        }
+                                    },
+                                    "requiresSearchSequenceToken": false,
+                                    "requiresSearchMetaCursor": true
                                 }
                             },
                             {
@@ -1709,6 +1748,42 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsApplied) {
                             "$add": [
                                 "$matchAuthor_score",
                                 "$matchGenres_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "matchAuthor_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$matchAuthor_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$matchAuthor_rank"
+                            ]
+                        },
+                        "matchGenres_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$matchGenres_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$matchGenres_rank"
                             ]
                         }
                     }
@@ -1843,13 +1918,16 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedToCorrectPipeline) {
                         "coll": "pipeline_test",
                         "pipeline": [
                             {
-                                "$search": { 
-                                    "mongotQuery": { 
-                                        "index": "search_index", 
-                                        "text": { "query": "mystery", "path": "genres" } 
-                                    }, 
-                                    "requiresSearchSequenceToken": false, 
-                                    "requiresSearchMetaCursor": true 
+                                "$search": {
+                                    "mongotQuery": {
+                                        "index": "search_index",
+                                        "text": {
+                                            "query": "mystery",
+                                            "path": "genres"
+                                        }
+                                    },
+                                    "requiresSearchSequenceToken": false,
+                                    "requiresSearchMetaCursor": true
                                 }
                             },
                             {
@@ -1935,6 +2013,42 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedToCorrectPipeline) {
                             "$add": [
                                 "$matchAuthor_score",
                                 "$matchGenres_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "matchAuthor_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$matchAuthor_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$matchAuthor_rank"
+                            ]
+                        },
+                        "matchGenres_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$matchGenres_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$matchGenres_rank"
                             ]
                         }
                     }
@@ -2026,9 +2140,10 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
         DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
     const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
     BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "expectedStages": [
+    // The expected desugar is too large for the compiler so we need to split it up.
+    const std::string expectedStages = std::string(R"({
+            "expectedStages": [)") +
+        std::string(R"(
                 {
                     "$match": {
                         "author": "Agatha Christie"
@@ -2160,19 +2275,23 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                             }
                         ]
                     }
-                },
+                },)") +
+        std::string(R"(
                 {
                     "$unionWith": {
                         "coll": "pipeline_test",
                         "pipeline": [
                             {
-                                "$search": { 
-                                    "mongotQuery": { 
-                                        "index": "search_index", 
-                                        "text": { "query": "mystery", "path": "genres" } 
-                                    }, 
-                                    "requiresSearchSequenceToken": false, 
-                                    "requiresSearchMetaCursor": true 
+                                "$search": {
+                                    "mongotQuery": {
+                                        "index": "search_index",
+                                        "text": {
+                                            "query": "mystery",
+                                            "path": "genres"
+                                        }
+                                    },
+                                    "requiresSearchSequenceToken": false,
+                                    "requiresSearchMetaCursor": true
                                 }
                             },
                             {
@@ -2222,7 +2341,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                             }
                         ]
                     }
-                },
+                },)") +
+        std::string(R"(
                 {
                     "$unionWith": {
                         "coll": "pipeline_test",
@@ -2336,7 +2456,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                         },
                         "$willBeMerged": false
                     }
-                },
+                },)") +
+        std::string(R"(
                 {
                     "$addFields": {
                         "score": {
@@ -2345,6 +2466,74 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                                 "$matchDistance_score",
                                 "$matchGenres_score",
                                 "$matchPlot_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "matchAuthor_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$matchAuthor_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$matchAuthor_rank"
+                            ]
+                        },
+                        "matchDistance_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$matchDistance_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$matchDistance_rank"
+                            ]
+                        },
+                        "matchGenres_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$matchGenres_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$matchGenres_rank"
+                            ]
+                        },
+                        "matchPlot_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$matchPlot_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$matchPlot_rank"
                             ]
                         }
                     }
@@ -2373,8 +2562,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                     }
                 }
             ]
-        })",
-        asOneObj);
+        })");
+    ASSERT_BSONOBJ_EQ_AUTO(expectedStages, asOneObj);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ScoreDetailsIsRejectedWithoutRankFusionFullFF) {
@@ -2536,6 +2725,26 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
                 },
                 {
                     "$addFields": {
+                        "agatha_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$agatha_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$agatha_rank"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
                         "calculatedScoreDetails": [
                             {
                                 "$mergeObjects": [
@@ -2545,7 +2754,20 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
                                         },
                                         "rank": "$agatha_rank",
                                         "weight": {
-                                            "$const": 5
+                                            "$cond": [
+                                                {
+                                                    "$eq": [
+                                                        "$agatha_rank",
+                                                        {
+                                                            "$const": "NA"
+                                                        }
+                                                    ]
+                                                },
+                                                "$$REMOVE",
+                                                {
+                                                    "$const": 5
+                                                }
+                                            ]
                                         }
                                     },
                                     "$agatha_scoreDetails"
@@ -2617,13 +2839,16 @@ TEST_F(DocumentSourceRankFusionTest, CheckOneScorePipelineScoreDetailsDesugaring
         R"({
             "expectedStages": [
                 {
-                    "$search": { 
-                        "mongotQuery": { 
-                            "index": "search_index", 
-                            "text": { "query": "mystery", "path": "genres" } 
-                        }, 
-                        "requiresSearchSequenceToken": false, 
-                        "requiresSearchMetaCursor": true 
+                    "$search": {
+                        "mongotQuery": {
+                            "index": "search_index",
+                            "text": {
+                                "query": "mystery",
+                                "path": "genres"
+                            }
+                        },
+                        "requiresSearchSequenceToken": false,
+                        "requiresSearchMetaCursor": true
                     }
                 },
                 {
@@ -2724,6 +2949,26 @@ TEST_F(DocumentSourceRankFusionTest, CheckOneScorePipelineScoreDetailsDesugaring
                 },
                 {
                     "$addFields": {
+                        "agatha_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$agatha_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$agatha_rank"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
                         "calculatedScoreDetails": [
                             {
                                 "$mergeObjects": [
@@ -2733,7 +2978,20 @@ TEST_F(DocumentSourceRankFusionTest, CheckOneScorePipelineScoreDetailsDesugaring
                                         },
                                         "rank": "$agatha_rank",
                                         "weight": {
-                                            "$const": 5
+                                            "$cond": [
+                                                {
+                                                    "$eq": [
+                                                        "$agatha_rank",
+                                                        {
+                                                            "$const": "NA"
+                                                        }
+                                                    ]
+                                                },
+                                                "$$REMOVE",
+                                                {
+                                                    "$const": 5
+                                                }
+                                            ]
                                         }
                                     },
                                     "$agatha_scoreDetails"
@@ -2880,14 +3138,17 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                         "coll": "pipeline_test",
                         "pipeline": [
                             {
-                                "$search": { 
-                                    "mongotQuery": { 
-                                        "index": "search_index", 
-                                        "text": { "query": "mystery", "path": "genres" },
+                                "$search": {
+                                    "mongotQuery": {
+                                        "index": "search_index",
+                                        "text": {
+                                            "query": "mystery",
+                                            "path": "genres"
+                                        },
                                         "scoreDetails": true
-                                    }, 
-                                    "requiresSearchSequenceToken": false, 
-                                    "requiresSearchMetaCursor": true 
+                                    },
+                                    "requiresSearchSequenceToken": false,
+                                    "requiresSearchMetaCursor": true
                                 }
                             },
                             {
@@ -3012,6 +3273,42 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                 },
                 {
                     "$addFields": {
+                        "agatha_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$agatha_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$agatha_rank"
+                            ]
+                        },
+                        "searchPipe_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$searchPipe_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$searchPipe_rank"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
                         "calculatedScoreDetails": [
                             {
                                 "$mergeObjects": [
@@ -3021,7 +3318,20 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                                         },
                                         "rank": "$agatha_rank",
                                         "weight": {
-                                            "$const": 1
+                                            "$cond": [
+                                                {
+                                                    "$eq": [
+                                                        "$agatha_rank",
+                                                        {
+                                                            "$const": "NA"
+                                                        }
+                                                    ]
+                                                },
+                                                "$$REMOVE",
+                                                {
+                                                    "$const": 1
+                                                }
+                                            ]
                                         }
                                     },
                                     "$agatha_scoreDetails"
@@ -3035,7 +3345,20 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                                         },
                                         "rank": "$searchPipe_rank",
                                         "weight": {
-                                            "$const": 2
+                                            "$cond": [
+                                                {
+                                                    "$eq": [
+                                                        "$searchPipe_rank",
+                                                        {
+                                                            "$const": "NA"
+                                                        }
+                                                    ]
+                                                },
+                                                "$$REMOVE",
+                                                {
+                                                    "$const": 2
+                                                }
+                                            ]
                                         }
                                     },
                                     "$searchPipe_scoreDetails"
@@ -3381,6 +3704,34 @@ TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
                     }
                 },
                 {
+                    "$addFields": {
+                        "HASH<matchAuthor_rank>": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$HASH<matchAuthor_rank>",
+                                        "?number"
+                                    ]
+                                },
+                                "?string",
+                                "$HASH<matchAuthor_rank>"
+                            ]
+                        },
+                        "HASH<matchDistance_rank>": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$HASH<matchDistance_rank>",
+                                        "?number"
+                                    ]
+                                },
+                                "?string",
+                                "$HASH<matchDistance_rank>"
+                            ]
+                        }
+                    }
+                },
+                {
                     "$setMetadata": {
                         "score": {
                             "$add": [
@@ -3597,6 +3948,34 @@ TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
                     }
                 },
                 {
+                    "$addFields": {
+                        "matchAuthor_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$matchAuthor_rank",
+                                        1
+                                    ]
+                                },
+                                "?",
+                                "$matchAuthor_rank"
+                            ]
+                        },
+                        "matchDistance_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$matchDistance_rank",
+                                        1
+                                    ]
+                                },
+                                "?",
+                                "$matchDistance_rank"
+                            ]
+                        }
+                    }
+                },
+                {
                     "$setMetadata": {
                         "score": {
                             "$add": [
@@ -3738,6 +4117,26 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineRankFusionFullDesugaring) {
                     }
                 },
                 {
+                    "$addFields": {
+                        "agatha_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$agatha_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$agatha_rank"
+                            ]
+                        }
+                    }
+                },
+                {
                     "$setMetadata": {
                         "score": {
                             "$add": [
@@ -3864,13 +4263,16 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineRankFusionFullDesugaring) {
                         "coll": "pipeline_test",
                         "pipeline": [
                             {
-                                "$search": { 
-                                    "mongotQuery": { 
-                                        "index": "search_index", 
-                                        "text": { "query": "mystery", "path": "genres" } 
-                                    }, 
-                                    "requiresSearchSequenceToken": false, 
-                                    "requiresSearchMetaCursor": true 
+                                "$search": {
+                                    "mongotQuery": {
+                                        "index": "search_index",
+                                        "text": {
+                                            "query": "mystery",
+                                            "path": "genres"
+                                        }
+                                    },
+                                    "requiresSearchSequenceToken": false,
+                                    "requiresSearchMetaCursor": true
                                 }
                             },
                             {
@@ -3947,7 +4349,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineRankFusionFullDesugaring) {
                                 ]
                             }
                         },
-                        $willBeMerged: false
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -3956,6 +4358,42 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineRankFusionFullDesugaring) {
                             "$add": [
                                 "$agatha_score",
                                 "$searchPipe_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "agatha_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$agatha_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$agatha_rank"
+                            ]
+                        },
+                        "searchPipe_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$searchPipe_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$searchPipe_rank"
                             ]
                         }
                     }

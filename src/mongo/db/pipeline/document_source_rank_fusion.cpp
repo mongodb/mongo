@@ -192,6 +192,52 @@ boost::intrusive_ptr<DocumentSource> addScoreField(
 }
 
 /**
+ * Builds and returns an $addFields stage that sets the rank to "NA" if its value is 0, like the
+ * following:
+ * {$addFields:
+ *     {<prefix_rank>:
+ *         {$cond: [
+ *              {
+ *                  $eq : [
+ *                      "$<prefix>_rank",
+ *                      {
+ *                          $const: 0
+ *                      }
+ *                  ]
+ *              },
+ *              {
+ *                  $const: "NA"
+ *              },
+ *              "$<prefix>_rank"
+ *          ]},
+ *     }
+ * }
+ * This is done, because, conceptually, if a rank has a value of 0, then that means the document was
+ * not output from that input pipeline. So leaving its value as 0 would confuse the user in the
+ * scoreDetails output since the lower the rank, the higher the relevance of the document. Thus,
+ * this stage changes the value of the rank field to "NA" when applicable.
+ */
+boost::intrusive_ptr<DocumentSource> addRankField(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const std::vector<std::string>& pipelineNames) {
+    BSONObjBuilder bob;
+    {
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        for (const auto& pipelineName : pipelineNames) {
+            const std::string rank = fmt::format("{}_rank", pipelineName);
+            const std::string rankPath = fmt::format("${}_rank", pipelineName);
+            addFieldsBob.append(rank,
+                                BSON("$cond" << BSON_ARRAY(BSON("$eq" << BSON_ARRAY(rankPath << 0))
+                                                           << BSON("$const" << "NA") << rankPath)));
+        }
+        addFieldsBob.done();
+    }
+
+    const auto spec = bob.obj();
+    return DocumentSourceAddFields::createFromBson(spec.firstElement(), expCtx);
+}
+
+/**
  * Builds and returns a $replaceRoot stage: {$replaceWith: {docs: "$$ROOT"}}.
  * This has the effect of storing the unmodified user's document in the path '$docs'.
  */
@@ -408,7 +454,15 @@ boost::intrusive_ptr<DocumentSource> constructCalculatedFinalScoreDetails(
         BSONObjBuilder mergeObjectsArrSubObj;
         mergeObjectsArrSubObj.append("inputPipelineName"_sd, pipelineName);
         mergeObjectsArrSubObj.append("rank"_sd, fmt::format("${}_rank", pipelineName));
-        mergeObjectsArrSubObj.append("weight"_sd, weight);
+        // In the scoreDetails output, for any input pipeline that didn't output a document in the
+        // result, the default "rank" will be "NA" and the weight will be omitted to make it clear
+        // to the user that the final score for that document result did not take into account its
+        // input pipeline's rank/weight.
+        mergeObjectsArrSubObj.append(
+            "weight",
+            BSON("$cond" << BSON_ARRAY(
+                     BSON("$eq" << BSON_ARRAY(fmt::format("${}_rank", pipelineName) << "NA"))
+                     << "$$REMOVE" << weight)));
         mergeObjectsArrSubObj.done();
         BSONArrayBuilder mergeObjectsArr;
         mergeObjectsArr.append(mergeObjectsArrSubObj.obj());
@@ -439,9 +493,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
         groupEachScore(pipelineNames, includeScoreDetails).firstElement(), expCtx);
     auto addFields = DocumentSourceAddFields::createFromBson(
         calculateFinalScore(pipelineNames).firstElement(), expCtx);
+    auto overrideRanksOfZero = addRankField(expCtx, pipelineNames);
 
-    // Note that the scoreDetails fields go here in the pipeline. We create them below to be able
-    // to return them immediately once all stages are generated.
+    // Note that the scoreDetails fields go here in the pipeline. We create them below to be
+    // able to return them immediately once all stages are generated.
     const SortPattern sortingPattern{BSON("score" << -1 << "_id" << 1), expCtx};
     auto sort = DocumentSourceSort::create(expCtx, sortingPattern);
 
@@ -457,13 +512,19 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
             constructCalculatedFinalScoreDetails(pipelineNames, weights, expCtx);
         auto setScoreDetails =
             constructScoreDetailsMetadata(rankFusionScoreDetailsDescription, expCtx);
-        return {group, addFields, addFieldsDetails, setScoreDetails, sort, restoreUserDocs};
+        return {group,
+                addFields,
+                overrideRanksOfZero,
+                addFieldsDetails,
+                setScoreDetails,
+                sort,
+                restoreUserDocs};
     }
     // TODO SERVER-85426: Remove this check once all feature flags have been removed.
     if (feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         auto setScore = calculateFinalScoreMetadata(expCtx, pipelineNames);
-        return {group, addFields, setScore, sort, restoreUserDocs};
+        return {group, addFields, overrideRanksOfZero, setScore, sort, restoreUserDocs};
     }
     return {group, addFields, sort, restoreUserDocs};
 }
