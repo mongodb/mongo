@@ -76,7 +76,7 @@ DocumentSourceGeoNearCursor::DocumentSourceGeoNearCursor(
       _distanceField(std::move(distanceField)),
       _locationField(std::move(locationField)),
       _distanceMultiplier(distanceMultiplier) {
-    invariant(_distanceMultiplier >= 0);
+    tassert(9911901, "", _distanceMultiplier >= 0);
 }
 
 const char* DocumentSourceGeoNearCursor::getSourceName() const {
@@ -87,19 +87,20 @@ Document DocumentSourceGeoNearCursor::transformDoc(Document&& objInput) const {
     MutableDocument output(std::move(objInput));
 
     // Scale the distance by the requested factor.
-    invariant(output.peek().metadata().hasGeoNearDistance(),
-              str::stream()
-                  << "Query returned a document that is unexpectedly missing the geoNear distance: "
-                  << output.peek().toString());
+    tassert(9911902,
+            str::stream()
+                << "Query returned a document that is unexpectedly missing the geoNear distance: "
+                << output.peek().toString(),
+            output.peek().metadata().hasGeoNearDistance());
     const auto distance = output.peek().metadata().getGeoNearDistance() * _distanceMultiplier;
 
     output.setNestedField(_distanceField, Value(distance));
     if (_locationField) {
-        invariant(
-            output.peek().metadata().hasGeoNearPoint(),
-            str::stream()
-                << "Query returned a document that is unexpectedly missing the geoNear point: "
-                << output.peek().toString());
+        tassert(9911903,
+                str::stream()
+                    << "Query returned a document that is unexpectedly missing the geoNear point: "
+                    << output.peek().toString(),
+                output.peek().metadata().hasGeoNearPoint());
         output.setNestedField(*_locationField, output.peek().metadata().getGeoNearPoint());
     }
 

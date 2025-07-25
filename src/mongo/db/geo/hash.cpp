@@ -559,7 +559,7 @@ GeoHash GeoHash::parent() const {
 
 
 void GeoHash::appendVertexNeighbors(unsigned level, vector<GeoHash>* output) const {
-    invariant(level >= 0 && level < _bits);
+    tassert(9911940, "", level >= 0 && level < _bits);
 
     // Parent at the given level.
     GeoHash parentHash = parent(level);
@@ -859,8 +859,8 @@ double GeoHashConverter::sizeOfDiag(const GeoHash& a) const {
 // Relative error = epsilon_(max-min). ldexp() is just a direct translation to
 // floating point exponent, and should be exact.
 double GeoHashConverter::sizeEdge(unsigned level) const {
-    invariant(level >= 0);
-    invariant((int)level <= _params.bits);
+    tassert(9911941, "", level >= 0);
+    tassert(9911942, "", (int)level <= _params.bits);
 #pragma warning(push)
 // C4146: unary minus operator applied to unsigned type, result still unsigned
 #pragma warning(disable : 4146)

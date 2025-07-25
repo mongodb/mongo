@@ -220,7 +220,7 @@ void R2RegionCoverer::addCandidate(Candidate* candidate) {
 // Dones't take ownership of "candidate"
 int R2RegionCoverer::expandChildren(Candidate* candidate) {
     GeoHash childCells[4];
-    invariant(candidate->cell.subdivide(childCells));
+    tassert(9911943, "", candidate->cell.subdivide(childCells));
 
     int numTerminals = 0;
     for (int i = 0; i < 4; ++i) {

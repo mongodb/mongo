@@ -78,7 +78,7 @@ bool GeometryContainer::isPoint() const {
 }
 
 PointWithCRS GeometryContainer::getPoint() const {
-    invariant(isPoint());
+    tassert(9911939, "", isPoint());
     return *_point;
 }
 
@@ -113,7 +113,7 @@ const S2Region& GeometryContainer::getS2Region() const {
     } else if (nullptr != _multiPolygon) {
         return *_s2Region;
     } else {
-        invariant(nullptr != _geometryCollection);
+        tassert(9911928, "", nullptr != _geometryCollection);
         return *_s2Region;
     }
 }
@@ -1010,8 +1010,7 @@ Status GeometryContainer::parseFromGeoJSON(bool skipValidation) {
             }
         }
     } else {
-        // Should not reach here.
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(9911954);
     }
 
     // Check parsing result.
@@ -1143,7 +1142,7 @@ string GeometryContainer::getDebugType() const {
     } else if (nullptr != _geometryCollection) {
         return "gc";
     } else {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(9911955);
         return "";
     }
 }
@@ -1170,7 +1169,7 @@ CRS GeometryContainer::getNativeCRS() const {
     } else if (nullptr != _geometryCollection) {
         return SPHERE;
     } else {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(9911956);
         return FLAT;
     }
 }
@@ -1195,7 +1194,7 @@ bool GeometryContainer::supportsProject(CRS otherCRS) const {
     } else if (nullptr != _multiPolygon) {
         return _multiPolygon->crs == otherCRS;
     } else {
-        invariant(nullptr != _geometryCollection);
+        tassert(9911929, "", nullptr != _geometryCollection);
         return SPHERE == otherCRS;
     }
 }
@@ -1209,7 +1208,7 @@ void GeometryContainer::projectInto(CRS otherCRS) {
         return;
     }
 
-    invariant(nullptr != _point);
+    tassert(9911930, "", nullptr != _point);
     ShapeProjection::projectInto(_point.get(), otherCRS);
 }
 
@@ -1257,7 +1256,7 @@ static double s2MinDistanceRad(const S2Point& s2Point,
     for (vector<PointWithCRS>::const_iterator it = geometryCollection.points.begin();
          it != geometryCollection.points.end();
          ++it) {
-        invariant(SPHERE == it->crs);
+        tassert(9911931, "", SPHERE == it->crs);
         double nextDistance = S2Distance::distanceRad(s2Point, it->point);
         if (minDistance < 0 || nextDistance < minDistance) {
             minDistance = nextDistance;
@@ -1265,7 +1264,7 @@ static double s2MinDistanceRad(const S2Point& s2Point,
     }
 
     for (const auto& line : geometryCollection.lines) {
-        invariant(SPHERE == line->crs);
+        tassert(9911932, "", SPHERE == line->crs);
         double nextDistance = S2Distance::minDistanceRad(s2Point, line->line);
         if (minDistance < 0 || nextDistance < minDistance) {
             minDistance = nextDistance;
@@ -1273,9 +1272,9 @@ static double s2MinDistanceRad(const S2Point& s2Point,
     }
 
     for (const auto& polygon : geometryCollection.polygons) {
-        invariant(SPHERE == polygon->crs);
+        tassert(9911933, "", SPHERE == polygon->crs);
         // We don't support distances for big polygons yet.
-        invariant(polygon->s2Polygon);
+        tassert(9911934, "", polygon->s2Polygon);
         double nextDistance = S2Distance::minDistanceRad(s2Point, *(polygon->s2Polygon));
         if (minDistance < 0 || nextDistance < minDistance) {
             minDistance = nextDistance;
@@ -1310,7 +1309,7 @@ double GeometryContainer::minDistance(const PointWithCRS& otherPoint) const {
     const CRS crs = getNativeCRS();
 
     if (FLAT == crs) {
-        invariant(nullptr != _point);
+        tassert(9911935, "", nullptr != _point);
 
         if (FLAT == otherPoint.crs) {
             return distance(_point->oldPoint, otherPoint.oldPoint);
@@ -1320,7 +1319,7 @@ double GeometryContainer::minDistance(const PointWithCRS& otherPoint) const {
                             Point(latLng.lng().degrees(), latLng.lat().degrees()));
         }
     } else {
-        invariant(SPHERE == crs);
+        tassert(9911936, "", SPHERE == crs);
 
         double minDistance = -1;
 
@@ -1338,7 +1337,7 @@ double GeometryContainer::minDistance(const PointWithCRS& otherPoint) const {
             minDistance = S2Distance::minDistanceRad(otherPoint.point, _line->line);
         } else if (nullptr != _polygon) {
             // We don't support distances for big polygons yet.
-            invariant(nullptr != _polygon->s2Polygon);
+            tassert(9911937, "", nullptr != _polygon->s2Polygon);
             minDistance = S2Distance::minDistanceRad(otherPoint.point, *_polygon->s2Polygon);
         } else if (nullptr != _cap) {
             minDistance = S2Distance::minDistanceRad(otherPoint.point, _cap->cap);
@@ -1352,7 +1351,7 @@ double GeometryContainer::minDistance(const PointWithCRS& otherPoint) const {
             minDistance = s2MinDistanceRad(otherPoint.point, *_geometryCollection);
         }
 
-        invariant(minDistance != -1);
+        tassert(9911938, "", minDistance != -1);
         return minDistance * kRadiusOfEarthInMeters;
     }
 }

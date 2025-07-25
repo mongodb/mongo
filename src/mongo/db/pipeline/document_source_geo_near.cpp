@@ -149,7 +149,7 @@ Pipeline::SourceContainer::iterator DocumentSourceGeoNear::doOptimizeAt(
 
 Pipeline::SourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
-    invariant(*itr == this);
+    tassert(9911904, "", *itr == this);
 
     // Only do this rewrite if we are immediately following an $_internalUnpackBucket stage.
     if (container->begin() == itr ||
