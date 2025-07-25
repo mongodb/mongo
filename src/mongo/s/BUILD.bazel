@@ -76,6 +76,14 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "balancer_configuration_gen",
+    src = "balancer_configuration.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "sharding_helpers",
     srcs = [
@@ -468,6 +476,7 @@ mongo_cc_library(
         "transaction_participant_failed_unyield_exception.cpp",
         "type_collection_common_types_gen",
         "would_change_owning_shard_exception.cpp",
+        ":balancer_configuration_gen",
 
         # TODO(SERVER-9414): Clean this up.
         "//src/mongo/db/repl:primary_only_service.h",
