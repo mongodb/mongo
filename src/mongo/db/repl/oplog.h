@@ -335,7 +335,8 @@ auto writeConflictRetryWithLimit(OperationContext* opCtx,
                                  StringData opStr,
                                  const NamespaceStringOrUUID& nssOrUUID,
                                  F&& f) {
-    return writeConflictRetry(opCtx, opStr, nssOrUUID, f, repl::writeConflictRetryLimit);
+    return writeConflictRetry(
+        opCtx, opStr, nssOrUUID, f, repl::writeConflictRetryLimit.loadRelaxed());
 }
 
 }  // namespace repl
