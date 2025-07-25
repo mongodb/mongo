@@ -17,6 +17,7 @@ describe("promote and demote replicaset to sharded cluster", function() {
         this.keyFile = "jstests/libs/key1";
 
         this.doRollingRestart = (rs, startupFlags) => {
+            rs.awaitReplication();
             for (const node of rs.getSecondaries()) {
                 const id = rs.getNodeId(node);
                 rs.stop(id, null, {}, {

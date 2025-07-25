@@ -175,6 +175,7 @@ describe("restarting a configserver as a replicaset", function() {
 describe("transitions", function() {
     before(() => {
         this.doRollingRestart = (rs, startupFlags) => {
+            rs.awaitReplication();
             for (const node of rs.getSecondaries()) {
                 const id = rs.getNodeId(node);
                 rs.stop(id, null, {}, {
