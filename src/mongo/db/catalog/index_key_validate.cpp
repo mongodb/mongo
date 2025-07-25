@@ -984,12 +984,15 @@ Status validateExpireAfterSeconds(std::int64_t expireAfterSeconds,
         // Clustered collections with TTL.
         // Note that 'expireAfterSeconds' is defined as safeInt64 in the IDL for the create and
         // collMod commands. See create.idl and coll_mod.idl.
+        //
         // There are two cases where we can encounter an issue here.
-        // The first case is when we try to cast to millseconds from seconds, which could cause an
+        // The first case is when we try to cast to milliseconds from seconds, which could cause an
         // overflow. The second case is where 'expireAfterSeconds' is larger than the current epoch
         // time. This isn't necessarily problematic for the general case, but for the specific case
         // of time series collections, we cluster the collection by an OID value, where the
         // timestamp portion is only a 32-bit unsigned integer offset of seconds since the epoch.
+        // Rather than special case for timeseries, we apply the same constraints for all clustered
+        // TTL indexes to maintain legacy behavior.
         if (expireAfterSeconds > std::numeric_limits<std::int64_t>::max() / 1000) {
             return {ErrorCodes::InvalidOptions,
                     str::stream() << "TTL index '" << IndexDescriptor::kExpireAfterSecondsFieldName
@@ -1003,7 +1006,7 @@ Status validateExpireAfterSeconds(std::int64_t expireAfterSeconds,
                                   << "' option cannot exceed time since last epoch ("
                                   << duration_cast<Seconds>(
                                          Milliseconds(Date_t::now().toDurationSinceEpoch()))
-                                  << ") for time-series collections, found " << expireAfterSeconds};
+                                  << ") found " << expireAfterSeconds};
         }
     }
     return Status::OK();
