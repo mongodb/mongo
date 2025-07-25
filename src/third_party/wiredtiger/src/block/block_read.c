@@ -169,11 +169,8 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
 {
     WT_BLOCK_HEADER *blk, swap;
     size_t bufsize, check_size;
-    uint64_t time_start, time_stop;
     int failures, max_failures;
     bool chunkcache_hit, full_checksum_mismatch;
-
-    time_start = __wt_clock(session);
 
     chunkcache_hit = full_checksum_mismatch = false;
     check_size = 0;
@@ -236,9 +233,6 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
              */
             blk->checksum = 0;
             if (__wt_checksum_match(buf->mem, check_size, checksum)) {
-                time_stop = __wt_clock(session);
-                __wt_stat_msecs_hist_incr_bmread(session, WT_CLOCKDIFF_MS(time_stop, time_start));
-
                 /*
                  * Swap the page-header as needed; this doesn't belong here, but it's the best place
                  * to catch all callers.

@@ -76,7 +76,6 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         else:
             self.assertTrue(False)
 
-    @wttest.skip_for_hook("disagg", "layered trees do not support opening checkpoint cursors")
     def test_checkpoint(self):
         uri = 'table:checkpoint12'
         nrows = 1000

@@ -145,7 +145,7 @@
         }                                                                                          \
     } while (0)
 #else
-#define WT_ACQUIRE_READ(v, val) (v) = __atomic_load_n(&(val), __ATOMIC_ACQUIRE)
+#define WT_ACQUIRE_READ(v, val) (v) = __atomic_load_n(&(val), __ATOMIC_ACQUIRE);
 #endif
 #else
 #define WT_ACQUIRE_READ(v, val) WT_ACQUIRE_READ_WITH_BARRIER(v, val)

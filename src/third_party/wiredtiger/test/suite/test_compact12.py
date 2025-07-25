@@ -73,9 +73,6 @@ class test_compact12(compact_util, test_cc_base):
         if self.runningHook('tiered'):
             self.skipTest("Tiered tables do not support compaction")
 
-        # FIXME-SLS-1890
-        self.skipTest("This test is not robust to changes in eviction behavior")
-
         self.conn.set_timestamp(f'oldest_timestamp={self.timestamp_str(1)}')
 
         # Create and populate a table.

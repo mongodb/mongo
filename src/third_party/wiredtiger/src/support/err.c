@@ -783,8 +783,7 @@ __wt_bad_object_type(WT_SESSION_IMPL *session, const char *uri) WT_GCC_FUNC_ATTR
       WT_PREFIX_MATCH(uri, "config:") || WT_PREFIX_MATCH(uri, "file:") ||
       WT_PREFIX_MATCH(uri, "index:") || WT_PREFIX_MATCH(uri, "log:") ||
       WT_PREFIX_MATCH(uri, "object:") || WT_PREFIX_MATCH(uri, "statistics:") ||
-      WT_PREFIX_MATCH(uri, "table:") || WT_PREFIX_MATCH(uri, "tiered:") ||
-      WT_PREFIX_MATCH(uri, "layered:"))
+      WT_PREFIX_MATCH(uri, "table:") || WT_PREFIX_MATCH(uri, "tiered:"))
         return (__wt_object_unsupported(session, uri));
 
     if (WT_PREFIX_MATCH(uri, "lsm:"))

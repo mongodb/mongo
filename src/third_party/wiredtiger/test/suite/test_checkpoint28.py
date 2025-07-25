@@ -46,9 +46,9 @@ from wtscenario import make_scenarios
 # an interesting scenario. The concern is getting the matching version
 # of WiredTigerCheckpoint and hanging onto it.
 
-@wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
+    conn_config = 'statistics=(all),timing_stress_for_test=[checkpoint_handle]'
     session_config = 'isolation=snapshot'
 
     format_values = [
@@ -57,14 +57,8 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         ('column', dict(key_format='r', value_format='S', extraconfig='')),
         ('string_row', dict(key_format='S', value_format='S', extraconfig='')),
     ]
-    ckpt_precision = [
-        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
-        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
-    ]
-    scenarios = make_scenarios(format_values, ckpt_precision)
+    scenarios = make_scenarios(format_values)
 
-    def conn_config(self):
-        return 'statistics=(all),timing_stress_for_test=[checkpoint_handle],' + self.ckpt_config
     def large_updates(self, ds, nrows, value):
         cursor = self.session.open_cursor(ds.uri)
         self.session.begin_transaction()

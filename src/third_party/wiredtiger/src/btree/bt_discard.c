@@ -62,25 +62,6 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
     *pagep = NULL;
 
     /*
-     * Ensure that we are not evicting a page ahead of the materialization frontier, unless we are
-     * simply discarding the page due to the dhandle being dead or the connection close.
-     *
-     * Here we are using the old_rec_lsn_max. This is because if we have done a dirty eviction, the
-     * new value holds the max lsn that is reloaded to memory. If we have done a clean eviction of
-     * the page that is read from the disk, the old value is the same as the new value. The only
-     * exception is the clean eviction for a page that has been reconciled before. We should use the
-     * new value but we cannot detect this case here.
-     *
-     * FIXME-WT-14720: this check needs a bit more thought. There isn't really an LSN that makes
-     * sense as a comparison point. Scrub eviction leaves the content in the cache, so we won't
-     * issue a read for the page we're evicting. That means we're free to write the page even if
-     * it's ahead of the materialization frontier.
-     */
-    if (!(F_ISSET(session->dhandle, WT_DHANDLE_DEAD) || F_ISSET(S2C(session), WT_CONN_CLOSING)))
-        if (!__wt_page_materialization_check(session, page->old_rec_lsn_max))
-            WT_STAT_CONN_DSRC_INCR(session, cache_eviction_ahead_of_last_materialized_lsn);
-
-    /*
      * Unless we have a dead handle or we're closing the database, we should never discard a dirty
      * page. We do ordinary eviction from dead trees until sweep gets to them, so we may not in the
      * WT_SYNC_DISCARD loop.
@@ -106,9 +87,6 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
             __wt_page_out(session, &mod->mod_root_split);
         break;
     }
-
-    /* Update the page history information for debugging. */
-    WT_IGNORE_RET(__wt_conn_page_history_track_evict(session, page));
 
     /* Update the cache's information. */
     __wt_evict_page_cache_bytes_decr(session, page);
@@ -193,7 +171,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
              * of the pages not in memory. We will redo reconciliation next time we visit this page.
              */
             __wt_free(session, multi->disk_image);
-            __wt_free(session, multi->addr.block_cookie);
+            __wt_free(session, multi->addr.addr);
         }
         __wt_free(session, mod->mod_multi);
         break;
@@ -209,7 +187,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
          * page, it would write the new disk image even it hasn't been instantiated into memory.
          * Therefore, no need to reconcile the page again if it remains clean.
          */
-        __wt_free(session, mod->mod_replace.block_cookie);
+        __wt_free(session, mod->mod_replace.addr);
         __wt_free(session, mod->mod_disk_image);
         break;
     }
@@ -322,8 +300,7 @@ __wt_ref_addr_free(WT_SESSION_IMPL *session, WT_REF *ref)
     }
 
     if (home == NULL || __wt_off_page(home, ref_addr)) {
-        __wti_ref_addr_safe_free(
-          session, ((WT_ADDR *)ref_addr)->block_cookie, ((WT_ADDR *)ref_addr)->block_cookie_size);
+        __wti_ref_addr_safe_free(session, ((WT_ADDR *)ref_addr)->addr, ((WT_ADDR *)ref_addr)->size);
         __wti_ref_addr_safe_free(session, ref_addr, sizeof(WT_ADDR));
     }
 }

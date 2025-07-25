@@ -109,37 +109,6 @@ source_meta = [
 ]
 
 connection_disaggregated_config_common = [
-    Config('checkpoint_id', '-1', r'''
-        the checkpoint ID from which to start (or restart) the node''',
-        min='-1', type='int', undoc=True),
-    Config('checkpoint_meta', '', r'''
-        the checkpoint metadata from which to start (or restart) the node''',
-        undoc=True),
-    Config('flatten_leaf_page_delta', 'false', r'''
-        When enabled, page read rewrites the leaf pages with deltas to a new
-        disk image if successful''',
-        type='boolean', undoc=True),
-    Config('internal_page_delta', 'true', r'''
-        When enabled, reconciliation may write deltas for internal pages
-        instead of writing entire pages every time''',
-        type='boolean', undoc=True),
-    Config('last_materialized_lsn', '', r'''
-        the page LSN indicating that all pages up until this LSN are available for reading''',
-        type='int', undoc=True),
-    Config('leaf_page_delta', 'true', r'''
-        When enabled, reconciliation may write deltas for leaf pages
-        instead of writing entire pages every time''',
-        type='boolean', undoc=True),
-    Config('lose_all_my_data', 'false', r'''
-        This setting skips file system syncs, and will cause data loss outside of a
-        disaggregated storage context.''',
-        type='boolean', undoc=True),
-    Config('next_checkpoint_id', '-1', r'''
-        the next checkpoint ID to open when starting (or restarting) the node''',
-        min='-1', type='int', undoc=True),
-    Config('role', '', r'''
-        whether the stable table in a layered data store should lead or follow''',
-        choices=['leader', 'follower'], undoc=True),
 ]
 disaggregated_config_common = [
     Config('page_log', '', r'''
@@ -152,25 +121,6 @@ connection_disaggregated_config = [
         configure disaggregated storage for this connection''',
         type='category', subconfig=connection_disaggregated_config_common +\
               disaggregated_config_common),
-]
-file_disaggregated_config = [
-    Config('disaggregated', '', r'''
-        configure disaggregated storage for this file''',
-        type='category', subconfig=disaggregated_config_common + [
-            Config('delta_pct', '20', r'''
-                the size threshold (as a percentage) at which a delta will cease to be emitted
-                when reconciling a page. For example, if this is set to 20, the size of a delta
-                is 20 bytes, and the size of the full page image is 100 bytes, reconciliation
-                can emit a delta for the page (if various other preconditions are met).
-                Conversely, if the delta came to 21 bytes, reconciliation would not emit a
-                delta. Deltas larger than full pages are permitted for measurement and testing
-                reasons, and may be disallowed in future.''', min='1', max='1000'),
-            Config('max_consecutive_delta', '32', r'''
-                the max consecutive deltas allowed for a single page. The maximum value is set
-                at 32 (WT_DELTA_LIMIT). If we need to change that, please change WT_DELTA_LIMIT
-                as well.''', min='1', max='32')
-        ]
-    ),
 ]
 wiredtiger_open_disaggregated_storage_configuration = connection_disaggregated_config
 connection_reconfigure_disaggregated_configuration = [
@@ -237,18 +187,7 @@ tiered_tree_config = [
         is relative to the home directory'''),
 ]
 
-log_runtime_config = [
-    Config('log', '', r'''
-        the transaction log configuration for this object. Only valid if \c log is enabled in
-        ::wiredtiger_open''',
-        type='category', subconfig=[
-        Config('enabled', 'true', r'''
-            if false, this object has checkpoint-level durability''',
-            type='boolean'),
-        ]),
-]
-
-file_runtime_config = common_runtime_config + log_runtime_config + [
+file_runtime_config = common_runtime_config + [
     Config('access_pattern_hint', 'none', r'''
         It is recommended that workloads that consist primarily of updates and/or point queries
         specify \c random. Workloads that do many cursor scans through large ranges of data
@@ -259,6 +198,14 @@ file_runtime_config = common_runtime_config + log_runtime_config + [
         do not ever evict the object's pages from cache, see @ref tuning_cache_resident for more
         information''',
         type='boolean'),
+    Config('log', '', r'''
+        the transaction log configuration for this object. Only valid if \c log is enabled in
+        ::wiredtiger_open''',
+        type='category', subconfig=[
+        Config('enabled', 'true', r'''
+            if false, this object has checkpoint-level durability''',
+            type='boolean'),
+        ]),
     Config('os_cache_max', '0', r'''
         maximum system buffer cache usage, in bytes. If non-zero, evict object blocks from
         the system buffer cache after that many bytes from this object are read or written into
@@ -272,7 +219,7 @@ file_runtime_config = common_runtime_config + log_runtime_config + [
 ]
 
 # Per-file configuration
-file_config = format_meta + file_runtime_config + tiered_config + file_disaggregated_config + [
+file_config = format_meta + file_runtime_config + tiered_config + [
     Config('block_allocation', 'best', r'''
         configure block allocation. Permitted values are \c "best" or \c "first"; the \c "best"
         configuration uses a best-fit algorithm, the \c "first" configuration uses a
@@ -288,10 +235,6 @@ file_config = format_meta + file_runtime_config + tiered_config + file_disaggreg
         compression engine name created with WT_CONNECTION::add_compressor. If WiredTiger
         has builtin support for \c "lz4", \c "snappy", \c "zlib" or \c "zstd" compression,
         these names are also available. See @ref compression for more information'''),
-    Config('block_manager', 'default', r'''
-        configure a manager for file blocks. Permitted values are \c "default" or the
-        disaggregated storage block manager backed by \c PALI.''',
-        choices=['default', 'disagg']),
     Config('checksum', 'on', r'''
         configure block checksums; the permitted values are \c on, \c off, \c uncompressed and
         \c unencrypted. The default is \c on, in which case all block writes include a checksum
@@ -345,9 +288,6 @@ file_config = format_meta + file_runtime_config + tiered_config + file_disaggreg
     Config('internal_key_max', '0', r'''
         This option is no longer supported, retained for backward compatibility''',
         min='0'),
-    Config('in_memory', 'false', r'''
-        keep the tree data in memory. Used experimentally by layered tables''',
-        type='boolean', undoc=True),
     Config('key_gap', '10', r'''
         This option is no longer supported, retained for backward compatibility''',
         min='0'),
@@ -482,17 +422,6 @@ index_meta = format_meta + source_meta + index_only_config
 
 table_meta = format_meta + table_only_config
 
-layered_config = [
-    Config('ingest', '', r'''
-        URI for layered ingest table''',
-        type='string', undoc=True),
-    Config('stable', '', r'''
-        URI for layered stable table''',
-        type='string', undoc=True),
-]
-
-layered_meta = format_meta + layered_config + log_runtime_config + connection_disaggregated_config
-
 # Connection runtime config, shared by conn.reconfigure and wiredtiger_open
 connection_runtime_config = [
     Config('block_cache', '', r'''
@@ -567,12 +496,6 @@ connection_runtime_config = [
             A database can configure both log_size and wait to set an upper bound for checkpoints;
             setting this value above 0 configures periodic checkpoints''',
             min='0', max='2GB'),
-        Config('precise', 'false', r'''
-            Only write data with timestamps that are smaller or equal to the stable timestamp to the
-            checkpoint. Rollback to stable after restart is a no-op if enabled. However, it leads to
-            extra cache pressure. The user must have set the stable timestamp. It is not compatible
-            with use_timestamp=false config.''',
-            type='boolean'),
         Config('wait', '0', r'''
             seconds to wait between each checkpoint; setting this value above 0 configures
             periodic checkpoints''',
@@ -635,10 +558,6 @@ connection_runtime_config = [
             and one that will never checkpoint, it might discard log files before any checkpoint is
             done.) Ignored if set to 0''',
             min='0', max='1024'),
-        Config('page_history', 'false', r'''
-            if true, keep track of per-page usage statistics for all pages and periodically print a
-            report. Currently this works only for disaggregated storage.''',
-            type='boolean', undoc=True),
         Config('realloc_exact', 'false', r'''
             if true, reallocation of memory will only provide the exact amount requested. This
             will help with spotting memory allocation issues more easily.''',
@@ -926,7 +845,6 @@ connection_runtime_config = [
             'compact',
             'compact_progress',
             'configuration',
-            'disaggregated_storage',
             'error_returns',
             'eviction',
             'fileops',
@@ -934,7 +852,6 @@ connection_runtime_config = [
             'handleops',
             'history_store',
             'history_store_activity',
-            'layered',
             'live_restore',
             'live_restore_progress',
             'log',
@@ -942,7 +859,6 @@ connection_runtime_config = [
             'mutex',
             'out_of_order',
             'overflow',
-            'page_delta',
             'prefetch',
             'read',
             'reconcile',
@@ -1464,8 +1380,6 @@ methods = {
 
 'object.meta' : Method(object_meta),
 
-'layered.meta' : Method(layered_meta),
-
 'table.meta' : Method(table_meta),
 
 'tier.meta' : Method(tier_meta),
@@ -1516,8 +1430,8 @@ methods = {
         type='int'),
 ]),
 
-'WT_SESSION.create' : Method(file_config + tiered_config + file_disaggregated_config +\
-        source_meta + index_only_config + table_only_config + layered_config + [
+'WT_SESSION.create' : Method(file_config + tiered_config +
+        source_meta + index_only_config + table_only_config + [
     Config('exclusive', 'false', r'''
         explicitly fail with EEXIST if the object exists. When false (the default), if the object
         exists, silently fail without creating a new object.''',
@@ -1620,29 +1534,8 @@ methods = {
             undoc=True),
         Config('dump_version', 'false', r'''
             open a version cursor, which is a debug cursor on a table that enables iteration
-            through the history of values for all the keys.''',
-            type='category', subconfig=[
-                Config('enabled', 'false', r'''
-                    enable version cursor''',
-                    type='boolean', undoc=True),
-                Config('visible_only', 'false', r'''
-                    only dump updates that are visible to the session''',
-                    type='boolean', undoc=True),
-                Config('start_timestamp', '', r'''
-                    Only return updates with durable timestamps larger than the start timestamp. If
-                    a tombstone has a timestamp larger than the start timestamp but the associated
-                    full value has a timestamp smaller than the start timestamp, it returns the
-                    tombstone and the full value.''', undoc=True),
-                Config('timestamp_order', 'false', r'''
-                    Return the updates in timestamp order from newest to oldest and ignore duplicate
-                    updates and updates that are from the same transaction with the same timestamp.
-                    ''',
-                    type='boolean', undoc=True),
-                Config('raw_key_value', 'false', r'''
-                    Return the key, value as raw data.
-                    ''',
-                    type='boolean', undoc=True),
-        ]),
+            through the history of values for a given key.''',
+            type='boolean'),
         Config('release_evict', 'false', r'''
             Configure the cursor to evict the page positioned on when the reset API call is used''',
             type='boolean'),
@@ -1945,11 +1838,6 @@ methods = {
     Config('read_timestamp', '', r'''
         read using the specified timestamp. The value must not be older than the current oldest
         timestamp. This can only be set once for a transaction. See @ref timestamp_txn_api'''),
-    Config('rollback_timestamp', '', r'''
-        set the rollback timestamp for the current transaction. This is valid only for prepared
-        transactions under the preserve_prepared config. For prepared transactions, a rollback
-        timestamp is required, must not be older than the prepare timestamp, and can be set only
-        once. See @ref timestamp_txn_api and @ref timestamp_prepare'''),
 ]),
 
 'WT_SESSION.rollback_transaction' : Method([
@@ -1960,11 +1848,6 @@ methods = {
         If WiredTiger notices the limit has been exceeded, an operation may return a WT_ROLLBACK
         error. Default is to have no limit''',
         min=0),
-    Config('rollback_timestamp', '', r'''
-        set the rollback timestamp for the current transaction. This is valid only for prepared
-        transactions under the preserve_prepared config. For prepared transactions, a rollback
-        timestamp is required, must not be older than the prepare timestamp, and can be set only
-        once. See @ref timestamp_txn_api and @ref timestamp_prepare'''),
 ]),
 
 'WT_SESSION.checkpoint' : Method([
@@ -2059,8 +1942,6 @@ methods = {
         print open handles information''', type='boolean'),
     Config('log', 'false', r'''
         print log information''', type='boolean'),
-    Config('metadata', 'false', r'''
-        print metadata information''', type='boolean'),
     Config('sessions', 'false', r'''
         print open session information''', type='boolean'),
     Config('txn', 'false', r'''

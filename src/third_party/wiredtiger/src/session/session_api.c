@@ -268,7 +268,7 @@ __session_close_cursors(WT_SESSION_IMPL *session, WT_CURSOR_LIST *cursors)
              */
             WT_TRET_NOTFOUND_OK(cursor->reopen(cursor, false));
         else if (session->event_handler->handle_close != NULL &&
-          !WT_IS_URI_HS(cursor->internal_uri))
+          strcmp(cursor->internal_uri, WT_HS_URI) != 0)
             /*
              * Notify the user that we are closing the cursor handle via the registered close
              * callback.
@@ -674,8 +674,6 @@ __session_open_cursor_int(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *
     case 'l':
         if (WT_PREFIX_MATCH(uri, "log:"))
             WT_RET(__wt_curlog_open(session, uri, cfg, cursorp));
-        else if (WT_PREFIX_MATCH(uri, "layered:"))
-            WT_RET(__wt_clayered_open(session, uri, owner, cfg, cursorp));
         break;
 
     /*
@@ -687,10 +685,9 @@ __session_open_cursor_int(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *
              * Open a version cursor instead of a table cursor if we are using the special debug
              * configuration.
              */
-            if ((ret = __wt_config_gets_def(
-                   session, cfg, "debug.dump_version.enabled", 0, &cval)) == 0 &&
+            if ((ret = __wt_config_gets_def(session, cfg, "debug.dump_version", 0, &cval)) == 0 &&
               cval.val) {
-                if (WT_IS_URI_HS(uri))
+                if (WT_STREQ(uri, WT_HS_URI))
                     WT_RET_MSG(session, EINVAL, "cannot open version cursor on the history store");
                 WT_RET(__wt_curversion_open(session, uri, owner, cfg, cursorp));
             } else
@@ -776,11 +773,12 @@ __wt_open_cursor(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, co
      * There are some exceptions to this rule:
      *  - Verifying the metadata through an internal session.
      *  - The btree is being verified.
-     *  - Opening the meta files while performing a checkpoint.
+     *  - Opening the meta file itself while performing a checkpoint.
      */
     WT_ASSERT(session,
-      WT_IS_URI_HS(uri) ||
-        (WT_IS_URI_METADATA(uri) && __wt_atomic_loadvbool(&txn_global->checkpoint_running)) ||
+      strcmp(uri, WT_HS_URI) == 0 ||
+        (strcmp(uri, WT_METAFILE_URI) == 0 &&
+          __wt_atomic_loadvbool(&txn_global->checkpoint_running)) ||
         session->hs_cursor_counter == 0 || F_ISSET(session, WT_SESSION_INTERNAL) ||
         (S2BT_SAFE(session) != NULL && F_ISSET(S2BT(session), WT_BTREE_VERIFY)));
 
@@ -1751,17 +1749,6 @@ err:
         WT_STAT_CONN_INCR(session, session_table_verify_fail);
     else
         WT_STAT_CONN_INCR(session, session_table_verify_success);
-
-    /*
-     * FIXME-WT-14553: Implement verify for disagg. For now we are skipping the expected ENOTSUP
-     * error.
-     */
-    if (__wt_conn_is_disagg(session) && ret == ENOTSUP) {
-        __wt_verbose_info(
-          session, WT_VERB_VERIFY, "%s", "silenced ENOTSUP from verify due to disagg");
-        ret = 0;
-    }
-
     API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
@@ -1876,7 +1863,7 @@ err:
 
         WT_TRET(__wt_session_reset_cursors(session, false));
         F_SET(session, WT_SESSION_RESOLVING_TXN);
-        WT_TRET(__wt_txn_rollback(session, cfg, false));
+        WT_TRET(__wt_txn_rollback(session, cfg));
         F_CLR(session, WT_SESSION_RESOLVING_TXN);
     }
 #ifdef HAVE_CALL_LOG
@@ -1978,7 +1965,7 @@ __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
     WT_TRET(__wt_session_reset_cursors(session, false));
 
     F_SET(session, WT_SESSION_RESOLVING_TXN);
-    WT_TRET(__wt_txn_rollback(session, cfg, true));
+    WT_TRET(__wt_txn_rollback(session, cfg));
     F_CLR(session, WT_SESSION_RESOLVING_TXN);
 
 err:

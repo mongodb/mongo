@@ -174,12 +174,6 @@ class test_import12(test_import_base):
                     err = WT_ERROR
                 else:
                     raise e
-
-            # The last import, if it failed, may have produced a message, ignore it.
-            # Note that this only appears to happen in the disaggregated branch.
-            # It's unknown yet why it doesn't ever happen in develop.  FIXME-WT-14713.
-            self.ignoreStderrPatternIfExists(r'failed to read .* bytes at offset')
-
             # If the second create attempt failed, try again with repair=true.
             # We expect success.
             if err == WT_ERROR:

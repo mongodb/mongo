@@ -222,16 +222,17 @@ err:
 }
 
 /*
- * __open_fs --
- *     Open a file handle with a known file system
+ * __wt_open --
+ *     Open a file handle.
  */
-static int
-__open_fs(WT_SESSION_IMPL *session, const char *name, WT_FS_OPEN_FILE_TYPE file_type, u_int flags,
-  WT_FILE_SYSTEM *file_system, WT_FH **fhp)
+int
+__wt_open(WT_SESSION_IMPL *session, const char *name, WT_FS_OPEN_FILE_TYPE file_type, u_int flags,
+  WT_FH **fhp)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_FH *fh;
+    WT_FILE_SYSTEM *file_system;
     char *path;
     bool lock_file, open_called;
 
@@ -240,6 +241,7 @@ __open_fs(WT_SESSION_IMPL *session, const char *name, WT_FS_OPEN_FILE_TYPE file_
     *fhp = NULL;
 
     conn = S2C(session);
+    file_system = __wt_fs_file_system(session);
     fh = NULL;
     open_called = false;
     path = NULL;
@@ -297,20 +299,6 @@ err:
 
     __wt_free(session, path);
     return (ret);
-}
-
-/*
- * __wt_open --
- *     Open a file handle.
- */
-int
-__wt_open(WT_SESSION_IMPL *session, const char *name, WT_FS_OPEN_FILE_TYPE file_type, u_int flags,
-  WT_FH **fhp)
-{
-    WT_FILE_SYSTEM *file_system;
-
-    file_system = __wt_fs_file_system(session);
-    return (__open_fs(session, name, file_type, flags, file_system, fhp));
 }
 
 /*

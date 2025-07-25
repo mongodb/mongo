@@ -112,174 +112,6 @@ struct __wt_background_compact {
 };
 
 /*
- * WT_LAYERED_TABLE_MANAGER_ENTRY --
- *      Structure containing information about a tracked layered table
- */
-struct __wt_layered_table_manager_entry {
-    uint32_t ingest_id;
-    uint32_t stable_id;
-    const char *ingest_uri;
-    const char *stable_uri;
-    WT_LAYERED_TABLE *layered_table;
-
-    uint64_t checkpoint_txn_id;
-    uint64_t read_checkpoint;
-};
-
-/*
- * WT_LAYERED_TABLE_MANAGER --
- *      Structure containing information related to running the layered table manager.
- */
-struct __wt_layered_table_manager {
-
-#define WT_LAYERED_TABLE_MANAGER_OFF 0     /* The layered table manager is not running */
-#define WT_LAYERED_TABLE_MANAGER_RUNNING 1 /* The layered table manager is running */
-    uint32_t state;                        /* Indicating the manager is already running */
-
-    WT_SPINLOCK
-    layered_table_lock; /* Lock used for managing changes to global layered table state */
-
-    uint32_t open_layered_table_count;
-    /*
-     * This is a sparsely populated array of layered tables - each fileid in the system gets an
-     * entry in this table. A lookups checks for a valid manager entry at the file ID offset for the
-     * ingest constituent in a layered table. It's done that way so that we can cheaply check
-     * whether a log record belongs to a layered table and should be applied.
-     */
-    WT_LAYERED_TABLE_MANAGER_ENTRY **entries;
-    size_t entries_allocated_bytes;
-
-#define WT_LAYERED_TABLE_THREAD_COUNT 1
-    WT_THREAD_GROUP threads;
-
-    bool leader;
-};
-
-struct __wt_disagg_copy_metadata {
-    char *stable_uri;                         /* The full URI of the stable component. */
-    char *table_name;                         /* The table name without prefix or suffix. */
-    TAILQ_ENTRY(__wt_disagg_copy_metadata) q; /* Linked list of entries. */
-};
-
-#define WT_DISAGG_LSN_NONE 0 /* The LSN is not set. */
-
-/*
- * WT_DISAGGREGATED_CHECKPOINT_TRACK --
- *      A relationship between the checkpoint order number and the history timestamp.
- */
-struct __wt_disaggregated_checkpoint_track {
-    int64_t ckpt_order;
-    wt_timestamp_t timestamp;
-};
-
-/*
- * WT_DISAGGREGATED_STORAGE --
- *      Configuration and the current state for disaggregated storage, which tells the Block Manager
- *      how to find remote object storage. This is a separate configuration from layered tables.
- */
-struct __wt_disaggregated_storage {
-    char *page_log;
-
-    wt_shared uint64_t global_checkpoint_id;     /* The ID of the currently opened checkpoint. */
-                                                 /* Updates are protected by the checkpoint lock. */
-    wt_shared uint64_t last_checkpoint_meta_lsn; /* The LSN of the last checkpoint metadata. */
-    wt_shared uint64_t last_materialized_lsn;    /* The LSN of the last materialized page. */
-
-    wt_timestamp_t cur_checkpoint_timestamp; /* The timestamp of the in-progress checkpoint. */
-    wt_shared wt_timestamp_t last_checkpoint_timestamp; /* The timestamp of the last checkpoint. */
-
-    wt_shared uint64_t max_internal_delta_count; /* The maximum number of internal deltas. */
-    wt_shared uint64_t max_leaf_delta_count;     /* The maximum number of leaf deltas. */
-
-    WT_NAMED_PAGE_LOG *npage_log;
-    WT_PAGE_LOG_HANDLE *page_log_meta;
-
-    wt_shared uint64_t num_meta_put;     /* The number metadata puts since connection open. */
-    uint64_t num_meta_put_at_ckpt_begin; /* The number metadata puts at checkpoint begin. */
-                                         /* Updates are protected by the checkpoint lock. */
-
-    /* To copy at the next checkpoint. */
-    TAILQ_HEAD(__wt_disagg_copy_metadata_qh, __wt_disagg_copy_metadata) copy_metadata_qh;
-    WT_SPINLOCK copy_metadata_lock;
-
-    WT_DISAGGREGATED_CHECKPOINT_TRACK *ckpt_track; /* Checkpoint info retained for GC. */
-    size_t ckpt_track_alloc;                       /* Allocated bytes for checkpoint track. */
-    uint32_t ckpt_track_cnt; /* Number of entries in use for checkpoint track. */
-    int64_t ckpt_min_inuse;  /* The minimum checkpoint order in use. */
-
-    /*
-     * Ideally we'd have flags passed to the IO system, which could make it all the way to the
-     * callers of posix_sync. But that's not possible because (1) posix_directory_sync also has no
-     * way to change behavior because it doesn't have a file handle, and (2) the flags for a file
-     * handle are all set up when we open the file, which can happen before disagg is set up and the
-     * relevant option is parsed. The other unfortunate part is that the flags are all per-file
-     * (really, per block-manager) so it's easy to accidentally miss a file when doing it that way,
-     * e.g. if the config parsing does anything even slightly off the beaten track.
-     */
-/* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_DISAGG_FLATTEN_LEAF_PAGE_DELTA 0x1u
-#define WT_DISAGG_INTERNAL_PAGE_DELTA 0x2u
-#define WT_DISAGG_LEAF_PAGE_DELTA 0x4u
-#define WT_DISAGG_NO_SYNC 0x8u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
-    uint8_t flags;
-};
-
-/*
- * WT_PAGE_HISTORY_KEY --
- *      A key in the page history.
- */
-struct __wt_page_history_key {
-    uint64_t page_id;
-    uint32_t table_id;
-};
-
-/*
- * WT_PAGE_HISTORY_ITEM --
- *      An entry in the page history.
- */
-struct __wt_page_history_item {
-    WT_PAGE_HISTORY_KEY key;
-
-    uint64_t first_global_read_count;
-    uint64_t first_read_timestamp;
-
-    uint64_t last_global_read_count;
-    uint64_t last_read_timestamp;
-
-    uint32_t num_evicts;
-    uint32_t num_reads;
-
-    uint8_t page_type;
-};
-
-/*
- * WT_PAGE_HISTORY --
- *      A page history for debugging issues with page lifetime and eviction. It currently requires
- *      page IDs, which are available if used in disaggregated storage.
- */
-struct __wt_page_history {
-    bool enabled;
-
-    wt_shared uint64_t global_evict_count;
-    wt_shared uint64_t global_read_count;
-    wt_shared uint64_t global_reread_count;
-
-    wt_shared uint64_t global_evict_count_local;
-    wt_shared uint64_t global_evict_count_no_page_id;
-    wt_shared uint64_t global_read_count_local;
-
-    WT_HASH_MAP *pages;
-
-    /* The reporting thread. */
-    wt_thread_t report_tid;
-    bool report_tid_set;
-    WT_SESSION_IMPL *report_session;
-    WT_CONDVAR *report_cond;
-    wt_shared bool report_shutdown;
-};
-
-/*
  * WT_BUCKET_STORAGE --
  *	A list entry for a storage source with a unique name (bucket, prefix).
  */
@@ -548,6 +380,7 @@ struct __wt_connection_impl {
     WT_SPINLOCK api_lock;                 /* Connection API spinlock */
     WT_SPINLOCK checkpoint_lock;          /* Checkpoint spinlock */
     WT_SPINLOCK chunkcache_metadata_lock; /* Chunk cache metadata spinlock */
+    WT_RWLOCK debug_log_retention_lock;   /* Log retention reconfiguration lock */
     WT_SPINLOCK fh_lock;                  /* File handle queue spinlock */
     WT_SPINLOCK flush_tier_lock;          /* Flush tier spinlock */
     WT_SPINLOCK metadata_lock;            /* Metadata update spinlock */
@@ -751,12 +584,6 @@ struct __wt_connection_impl {
     TAILQ_HEAD(__wt_pf_qh, __wt_prefetch_queue_entry) pfqh; /* Locked: prefetch_lock */
     bool prefetch_auto_on;
     bool prefetch_available;
-
-    WT_DISAGGREGATED_STORAGE disaggregated_storage;
-    WT_LAYERED_TABLE_MANAGER layered_table_manager;
-    WT_PAGE_HISTORY page_history;
-
-    bool preserve_prepared; /* Preserve prepared updates */
 
 #define WT_STATLOG_FILENAME "WiredTigerStat.%d.%H"
     WT_SESSION_IMPL *stat_session; /* Statistics log session */
@@ -962,19 +789,18 @@ struct __wt_connection_impl {
  * Server subsystem flags.
  */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_CONN_SERVER_CAPACITY 0x0001u
-#define WT_CONN_SERVER_CHECKPOINT 0x0002u
-#define WT_CONN_SERVER_CHECKPOINT_CLEANUP 0x0004u
-#define WT_CONN_SERVER_CHUNKCACHE_METADATA 0x0008u
-#define WT_CONN_SERVER_COMPACT 0x0010u
-#define WT_CONN_SERVER_EVICTION 0x0020u
-#define WT_CONN_SERVER_LAYERED 0x0040u
-#define WT_CONN_SERVER_LOG 0x0080u
-#define WT_CONN_SERVER_PREFETCH 0x0100u
-#define WT_CONN_SERVER_RTS 0x0200u
-#define WT_CONN_SERVER_STATISTICS 0x0400u
-#define WT_CONN_SERVER_SWEEP 0x0800u
-#define WT_CONN_SERVER_TIERED 0x1000u
+#define WT_CONN_SERVER_CAPACITY 0x001u
+#define WT_CONN_SERVER_CHECKPOINT 0x002u
+#define WT_CONN_SERVER_CHECKPOINT_CLEANUP 0x004u
+#define WT_CONN_SERVER_CHUNKCACHE_METADATA 0x008u
+#define WT_CONN_SERVER_COMPACT 0x010u
+#define WT_CONN_SERVER_EVICTION 0x020u
+#define WT_CONN_SERVER_LOG 0x040u
+#define WT_CONN_SERVER_PREFETCH 0x080u
+#define WT_CONN_SERVER_RTS 0x100u
+#define WT_CONN_SERVER_STATISTICS 0x200u
+#define WT_CONN_SERVER_SWEEP 0x400u
+#define WT_CONN_SERVER_TIERED 0x800u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t server_flags;
 
@@ -999,17 +825,16 @@ struct __wt_connection_impl {
 #define WT_CONN_MINIMAL 0x00020000u
 #define WT_CONN_OPTRACK 0x00040000u
 #define WT_CONN_PANIC 0x00080000u
-#define WT_CONN_PRECISE_CHECKPOINT 0x00100000u
-#define WT_CONN_PRESERVE_PREPARED 0x00200000u
-#define WT_CONN_READONLY 0x00400000u
-#define WT_CONN_READY 0x00800000u
-#define WT_CONN_RECONFIGURING 0x01000000u
-#define WT_CONN_RECOVERING 0x02000000u
-#define WT_CONN_RECOVERING_METADATA 0x04000000u
-#define WT_CONN_RECOVERY_COMPLETE 0x08000000u
-#define WT_CONN_SALVAGE 0x10000000u
-#define WT_CONN_TIERED_FIRST_FLUSH 0x20000000u
-#define WT_CONN_WAS_BACKUP 0x40000000u
+#define WT_CONN_PRESERVE_PREPARED 0x00100000u
+#define WT_CONN_READONLY 0x00200000u
+#define WT_CONN_READY 0x00400000u
+#define WT_CONN_RECONFIGURING 0x00800000u
+#define WT_CONN_RECOVERING 0x01000000u
+#define WT_CONN_RECOVERING_METADATA 0x02000000u
+#define WT_CONN_RECOVERY_COMPLETE 0x04000000u
+#define WT_CONN_SALVAGE 0x08000000u
+#define WT_CONN_TIERED_FIRST_FLUSH 0x10000000u
+#define WT_CONN_WAS_BACKUP 0x20000000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     wt_shared uint32_t flags;
 };

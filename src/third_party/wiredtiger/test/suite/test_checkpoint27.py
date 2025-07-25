@@ -38,7 +38,6 @@ from wtscenario import make_scenarios
 # middle of reading a checkpoint.
 
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
-@wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
 class test_checkpoint(wttest.WiredTigerTestCase):
 
     format_values = [
@@ -51,14 +50,8 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         ('named', dict(first_checkpoint='first_checkpoint')),
         ('unnamed', dict(first_checkpoint=None)),
     ]
-    ckpt_precision = [
-        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
-        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
-    ]
-    scenarios = make_scenarios(format_values, name_values, ckpt_precision)
+    scenarios = make_scenarios(format_values, name_values)
 
-    def conn_config(self):
-        return self.ckpt_config
 
     def large_updates(self, uri, ds, nrows, value, ts):
         cursor = self.session.open_cursor(uri)

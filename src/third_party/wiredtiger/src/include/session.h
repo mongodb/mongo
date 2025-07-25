@@ -157,8 +157,7 @@ struct __wt_session_impl {
 
     WT_IMPORT_LIST *import_list; /* List of metadata entries to import from file. */
 
-    u_int hs_cursor_counter;   /* Number of open history store cursors */
-    uint64_t hs_checkpoint_id; /* The checkpoint ID of the last opened HS cursor */
+    u_int hs_cursor_counter; /* Number of open history store cursors */
 
     WT_CURSOR *meta_cursor;  /* Metadata file */
     void *meta_track;        /* Metadata operation tracking */
@@ -320,12 +319,11 @@ struct __wt_session_impl {
 #define WT_SESSION_PREFETCH_ENABLED 0x0020000u
 #define WT_SESSION_PREFETCH_THREAD 0x0040000u
 #define WT_SESSION_QUIET_CORRUPT_FILE 0x0080000u
-#define WT_SESSION_QUIET_OPEN_FILE 0x0100000u
-#define WT_SESSION_READ_WONT_NEED 0x0200000u
-#define WT_SESSION_RESOLVING_TXN 0x0400000u
-#define WT_SESSION_ROLLBACK_TO_STABLE 0x0800000u
-#define WT_SESSION_SAVE_ERRORS 0x1000000u
-#define WT_SESSION_SCHEMA_TXN 0x2000000u
+#define WT_SESSION_READ_WONT_NEED 0x0100000u
+#define WT_SESSION_RESOLVING_TXN 0x0200000u
+#define WT_SESSION_ROLLBACK_TO_STABLE 0x0400000u
+#define WT_SESSION_SAVE_ERRORS 0x0800000u
+#define WT_SESSION_SCHEMA_TXN 0x1000000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 

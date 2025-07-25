@@ -206,7 +206,7 @@ __sync_obsolete_deleted_cleanup(WT_SESSION_IMPL *session, WT_REF *ref)
 
     page_del = ref->page_del;
     if (page_del == NULL ||
-      __wt_txn_visible_all(session, page_del->txnid, page_del->pg_del_durable_ts)) {
+      __wt_txn_visible_all(session, page_del->txnid, page_del->durable_timestamp)) {
         WT_RET(__wt_page_parent_modify_set(session, ref, false));
         __wt_verbose_debug2(session, WT_VERB_CHECKPOINT_CLEANUP,
           "%p: marking obsolete deleted page parent dirty", (void *)ref);
@@ -326,12 +326,6 @@ __sync_obsolete_cleanup_one(WT_SESSION_IMPL *session, WT_REF *ref)
             if (ref_deleted)
                 new_state = WT_REF_DELETED;
         }
-        /*
-         * For deleted and on-disk pages, increment ref_changes if there has been a change in the
-         * ref's state. There's nothing to do for in-memory pages as we don't change those.
-         */
-        if (previous_state != new_state)
-            __wt_atomic_addv16(&ref->ref_changes, 1);
         WT_REF_UNLOCK(ref, new_state);
         WT_RET(ret);
     } else

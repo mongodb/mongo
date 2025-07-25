@@ -388,7 +388,7 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
 
     // Open a version cursor. This is a debug cursor that enables iteration through the history of
     // values for a given index entry.
-    WT_CURSOR* cursor = session.getNewCursor(_uri, "debug=(dump_version=(enabled=true))");
+    WT_CURSOR* cursor = session.getNewCursor(_uri, "debug=(dump_version=true)");
 
     setKey(cursor, keyString.getKeyAndRecordIdView());
 

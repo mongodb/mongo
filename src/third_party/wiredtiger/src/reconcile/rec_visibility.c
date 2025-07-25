@@ -16,12 +16,11 @@
  */
 static WT_INLINE int
 __rec_update_save(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins, WT_ROW *rip,
-  WT_UPDATE *onpage_upd, WT_UPDATE *tombstone, WT_TIME_WINDOW *tw, bool supd_restore,
-  size_t upd_memsize)
+  WT_UPDATE *onpage_upd, WT_UPDATE *tombstone, bool supd_restore, size_t upd_memsize)
 {
     WT_SAVE_UPD *supd;
 
-    WT_ASSERT_ALWAYS(session, onpage_upd != NULL || tombstone != NULL || supd_restore,
+    WT_ASSERT_ALWAYS(session, onpage_upd != NULL || supd_restore,
       "If nothing is committed, the update chain must be restored");
     WT_ASSERT_ALWAYS(session,
       onpage_upd == NULL || onpage_upd->type == WT_UPDATE_STANDARD ||
@@ -36,7 +35,6 @@ __rec_update_save(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins, WT
     supd->rip = rip;
     supd->onpage_upd = onpage_upd;
     supd->onpage_tombstone = tombstone;
-    supd->tw = *tw;
     supd->restore = supd_restore;
     ++r->supd_next;
     r->supd_memsize += upd_memsize;
@@ -74,7 +72,6 @@ static int
 __rec_append_orig_value(
   WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd, WT_CELL_UNPACK_KV *unpack)
 {
-    WT_BTREE *btree;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
@@ -82,7 +79,6 @@ __rec_append_orig_value(
     size_t size, total_size;
     bool tombstone_globally_visible;
 
-    btree = S2BT(session);
     conn = S2C(session);
 
     WT_ASSERT_ALWAYS(session,
@@ -102,12 +98,8 @@ __rec_append_orig_value(
                 continue;
         }
 
-        /* Done if the update was restored from the history store or delta. */
-        if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_HS | WT_UPDATE_RESTORED_FROM_DELTA))
-            return (0);
-
-        /* Done if the update is a full update restored from the data store. */
-        if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DS) && upd->type == WT_UPDATE_STANDARD)
+        /* Done if the update was restored from the data store or the history store. */
+        if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_HS))
             return (0);
 
         /*
@@ -118,9 +110,8 @@ __rec_append_orig_value(
          * its transaction id to WT_TXN_NONE and its timestamps to WT_TS_NONE when we write the
          * update to the time window.
          */
-        if ((F_ISSET(conn, WT_CONN_IN_MEMORY) || F_ISSET(btree, WT_BTREE_IN_MEMORY)) &&
-          unpack->tw.start_ts == upd->upd_start_ts && unpack->tw.start_txn == upd->txnid &&
-          upd->type != WT_UPDATE_TOMBSTONE)
+        if (F_ISSET(conn, WT_CONN_IN_MEMORY) && unpack->tw.start_ts == upd->start_ts &&
+          unpack->tw.start_txn == upd->txnid && upd->type != WT_UPDATE_TOMBSTONE)
             return (0);
 
         /*
@@ -183,24 +174,17 @@ __rec_append_orig_value(
                 tombstone->txnid = WT_TXN_NONE;
             else
                 tombstone->txnid = unpack->tw.stop_txn;
-            tombstone->upd_start_ts = unpack->tw.stop_ts;
-            tombstone->upd_durable_ts = unpack->tw.durable_stop_ts;
+            tombstone->start_ts = unpack->tw.stop_ts;
+            tombstone->durable_ts = unpack->tw.durable_stop_ts;
             F_SET(tombstone, WT_UPDATE_RESTORED_FROM_DS);
-            if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
-                F_SET(tombstone, WT_UPDATE_DURABLE);
         } else {
             /*
              * We may have overwritten its transaction id to WT_TXN_NONE and its timestamps to
-             * WT_TS_NONE in the time window. In RTS in recovery, we may have cleared the
-             * transaction id of the tombstone but we haven't cleared the transaction ids on the
-             * disk-image if we are still in recovery.
+             * WT_TS_NONE in the time window.
              */
             WT_ASSERT(session,
-              (unpack->tw.stop_ts == oldest_upd->upd_start_ts ||
-                unpack->tw.stop_ts == WT_TS_NONE) &&
-                (unpack->tw.stop_txn == oldest_upd->txnid || unpack->tw.stop_txn == WT_TXN_NONE ||
-                  (oldest_upd->txnid == WT_TXN_NONE && F_ISSET(conn, WT_CONN_RECOVERING) &&
-                    F_ISSET(oldest_upd, WT_UPDATE_RESTORED_FROM_DS))));
+              (unpack->tw.stop_ts == oldest_upd->start_ts || unpack->tw.stop_ts == WT_TS_NONE) &&
+                (unpack->tw.stop_txn == oldest_upd->txnid || unpack->tw.stop_txn == WT_TXN_NONE));
 
             if (tombstone_globally_visible)
                 return (0);
@@ -228,11 +212,9 @@ __rec_append_orig_value(
             append->txnid = WT_TXN_NONE;
         else
             append->txnid = unpack->tw.start_txn;
-        append->upd_start_ts = unpack->tw.start_ts;
-        append->upd_durable_ts = unpack->tw.durable_start_ts;
+        append->start_ts = unpack->tw.start_ts;
+        append->durable_ts = unpack->tw.durable_start_ts;
         F_SET(append, WT_UPDATE_RESTORED_FROM_DS);
-        if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
-            F_SET(append, WT_UPDATE_DURABLE);
     }
 
     if (tombstone != NULL) {
@@ -303,55 +285,11 @@ __rec_need_save_upd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_UPDATE_SELEC
     WT_UPDATE *upd;
     bool supd_restore, visible_all;
 
-    if (F_ISSET(r, WT_REC_REWRITE_DELTA))
-        return (false);
-
     if (upd_select->tw.prepare)
         return (true);
 
     if (F_ISSET(r, WT_REC_EVICT) && has_newer_updates)
         return (true);
-
-    /*
-     * We need to save the update chain to build the delta. Don't save the update chain if the
-     * selected update is already durable.
-     */
-    if (upd_select->upd != NULL && F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) &&
-      F_ISSET(&S2C(session)->disaggregated_storage, WT_DISAGG_LEAF_PAGE_DELTA)) {
-        if (upd_select->tombstone != NULL) {
-            if (!F_ISSET(upd_select->tombstone, WT_UPDATE_DURABLE | WT_UPDATE_PREPARE_DURABLE))
-                return (true);
-
-            /* Save the update if we overwrite the previous prepared update. */
-            if (F_ISSET(upd_select->tombstone, WT_UPDATE_PREPARE_DURABLE) &&
-              !WT_TIME_WINDOW_HAS_STOP_PREPARE(&upd_select->tw))
-                return (true);
-        }
-
-        if (upd_select->upd->type == WT_UPDATE_TOMBSTONE) {
-            /*
-             * Save the update if we haven't deleted the key from the disk image. We may have
-             * written the tombstone to disk already but we still need to do another delta to remove
-             * it from disk.
-             *
-             * Deleting the key with a stop timestamp in the delta is not saving disk space but
-             * actually increases our disk usage. We need to write a full image to really delete
-             * these keys. But if we don't do that, we will have a lot of deleted keys in memory and
-             * search will be less efficient. Particularly it will be a problem for the history
-             * store.
-             */
-            if (!F_ISSET(upd_select->upd, WT_UPDATE_DELETE_DURABLE))
-                return (true);
-        } else {
-            if (!F_ISSET(upd_select->upd, WT_UPDATE_DURABLE | WT_UPDATE_PREPARE_DURABLE))
-                return (true);
-
-            /* Save the update if we overwrite the previous prepared update. */
-            if (F_ISSET(upd_select->upd, WT_UPDATE_PREPARE_DURABLE) &&
-              !WT_TIME_WINDOW_HAS_START_PREPARE(&upd_select->tw))
-                return (true);
-        }
-    }
 
     /* No need to save the update chain if we want to delete the key from the disk image. */
     if (upd_select->upd != NULL && upd_select->upd->type == WT_UPDATE_TOMBSTONE)
@@ -383,9 +321,8 @@ __rec_need_save_upd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_UPDATE_SELEC
      * 2. On-disk entry exists.
      * 3. Valid updates exist in the update chain to be written to the history store.
      */
-    supd_restore = F_ISSET(r, WT_REC_EVICT) &&
-      (has_newer_updates || F_ISSET(S2C(session), WT_CONN_IN_MEMORY) ||
-        F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY));
+    supd_restore =
+      F_ISSET(r, WT_REC_EVICT) && (has_newer_updates || F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
     if (!supd_restore && vpack == NULL && upd_select->upd != NULL) {
         upd = upd_select->upd;
@@ -508,20 +445,18 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *
         char ts_string[3][WT_TS_INT_STRING_SIZE];
         WT_ASSERT_ALWAYS(session,
           prev_upd->prepare_state == WT_PREPARE_INPROGRESS ||
-            prev_upd->upd_start_ts == prev_upd->upd_durable_ts ||
-            prev_upd->upd_durable_ts >= upd->upd_durable_ts,
-          "Durable timestamps cannot be out of order for prepared updates: "
-          "prev_upd->upd_start_ts=%s, "
-          "prev_upd->upd_durable_ts=%s, prev_upd->flags=%" PRIu16
-          ", upd->upd_durable_ts=%s, upd->flags=%" PRIu16,
-          __wt_timestamp_to_string(prev_upd->upd_start_ts, ts_string[0]),
-          __wt_timestamp_to_string(prev_upd->upd_durable_ts, ts_string[1]), prev_upd->flags,
-          __wt_timestamp_to_string(upd->upd_durable_ts, ts_string[2]), upd->flags);
+            prev_upd->start_ts == prev_upd->durable_ts || prev_upd->durable_ts >= upd->durable_ts,
+          "Durable timestamps cannot be out of order for prepared updates: prev_upd->start_ts=%s, "
+          "prev_upd->durable_ts=%s, prev_upd->flags=%" PRIu16
+          ", upd->durable_ts=%s, upd->flags=%" PRIu16,
+          __wt_timestamp_to_string(prev_upd->start_ts, ts_string[0]),
+          __wt_timestamp_to_string(prev_upd->durable_ts, ts_string[1]), prev_upd->flags,
+          __wt_timestamp_to_string(upd->durable_ts, ts_string[2]), upd->flags);
 
         /* Validate that the updates older than us have older timestamps. */
-        if (prev_upd->upd_start_ts < upd->upd_start_ts) {
-            WT_ASSERT_ALWAYS(session, prev_upd->upd_start_ts == WT_TS_NONE,
-              "Previous update missing start timestamp");
+        if (prev_upd->start_ts < upd->start_ts) {
+            WT_ASSERT_ALWAYS(
+              session, prev_upd->start_ts == WT_TS_NONE, "Previous update missing start timestamp");
             WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_no_ts_checkpoint_race_4);
             return (EBUSY);
         }
@@ -557,27 +492,27 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *
         if (WT_TIME_WINDOW_HAS_STOP(&vpack->tw))
             WT_ASSERT_ALWAYS(session,
               prev_upd->prepare_state == WT_PREPARE_INPROGRESS ||
-                prev_upd->upd_start_ts == prev_upd->upd_durable_ts ||
-                prev_upd->upd_durable_ts >= vpack->tw.durable_stop_ts,
+                prev_upd->start_ts == prev_upd->durable_ts ||
+                prev_upd->durable_ts >= vpack->tw.durable_stop_ts,
               "Stop: Durable timestamps cannot be out of order for prepared updates: "
-              "prev_upd->upd_start_ts=%s, prev_upd->upd_durable_ts=%s, prev_upd->flags=%" PRIu16
+              "prev_upd->start_ts=%s, prev_upd->durable_ts=%s, prev_upd->flags=%" PRIu16
               ", vpack->tw.durable_stop_ts=%s",
-              __wt_timestamp_to_string(prev_upd->upd_start_ts, ts_string[0]),
-              __wt_timestamp_to_string(prev_upd->upd_durable_ts, ts_string[1]), prev_upd->flags,
+              __wt_timestamp_to_string(prev_upd->start_ts, ts_string[0]),
+              __wt_timestamp_to_string(prev_upd->durable_ts, ts_string[1]), prev_upd->flags,
               __wt_timestamp_to_string(vpack->tw.durable_stop_ts, ts_string[2]));
         else
             WT_ASSERT_ALWAYS(session,
               prev_upd->prepare_state == WT_PREPARE_INPROGRESS ||
-                prev_upd->upd_start_ts == prev_upd->upd_durable_ts ||
-                prev_upd->upd_durable_ts >= vpack->tw.durable_start_ts,
+                prev_upd->start_ts == prev_upd->durable_ts ||
+                prev_upd->durable_ts >= vpack->tw.durable_start_ts,
               "Start: Durable timestamps cannot be out of order for prepared updates: "
-              "prev_upd->upd_start_ts=%s, prev_upd->upd_durable_ts=%s, prev_upd->flags=%" PRIu16
+              "prev_upd->start_ts=%s, prev_upd->durable_ts=%s, prev_upd->flags=%" PRIu16
               ", vpack->tw.durable_start_ts=%s",
-              __wt_timestamp_to_string(prev_upd->upd_start_ts, ts_string[0]),
-              __wt_timestamp_to_string(prev_upd->upd_durable_ts, ts_string[1]), prev_upd->flags,
+              __wt_timestamp_to_string(prev_upd->start_ts, ts_string[0]),
+              __wt_timestamp_to_string(prev_upd->durable_ts, ts_string[1]), prev_upd->flags,
               __wt_timestamp_to_string(vpack->tw.durable_start_ts, ts_string[2]));
 
-        if (prev_upd->upd_start_ts == WT_TS_NONE) {
+        if (prev_upd->start_ts == WT_TS_NONE) {
             if (vpack->tw.start_ts != WT_TS_NONE ||
               (WT_TIME_WINDOW_HAS_STOP(&vpack->tw) && vpack->tw.stop_ts != WT_TS_NONE)) {
                 WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_no_ts_checkpoint_race_1);
@@ -594,9 +529,9 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *
              */
             WT_ASSERT(session,
               __wt_txn_upd_visible_all(session, prev_upd) ||
-                (prev_upd->upd_start_ts >= vpack->tw.start_ts &&
+                (prev_upd->start_ts >= vpack->tw.start_ts &&
                   (!WT_TIME_WINDOW_HAS_STOP(&vpack->tw) ||
-                    prev_upd->upd_start_ts >= vpack->tw.stop_ts)));
+                    prev_upd->start_ts >= vpack->tw.stop_ts)));
     }
 
     return (0);
@@ -635,14 +570,12 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *first_up
   WTI_UPDATE_SELECT *upd_select, WT_UPDATE **first_txn_updp, bool *has_newer_updatesp,
   size_t *upd_memsizep)
 {
-    WT_CONNECTION_IMPL *conn;
     WT_UPDATE *upd;
     wt_timestamp_t max_ts;
     uint64_t max_txn, session_txnid, txnid;
     uint8_t prepare_state;
     bool is_hs_page, seen_prepare;
 
-    conn = S2C(session);
     max_ts = WT_TS_NONE;
     max_txn = WT_TXN_NONE;
     is_hs_page = F_ISSET(session->dhandle, WT_DHANDLE_HS);
@@ -653,12 +586,8 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *first_up
         if ((txnid = upd->txnid) == WT_TXN_ABORTED)
             continue;
 
-        /*
-         * Give up if the update is from this transaction and on the metadata file or disaggregated
-         * shared metadata file.
-         */
-        if ((WT_IS_METADATA(session->dhandle) || WT_IS_DISAGG_META(session->dhandle)) &&
-          txnid != WT_TXN_NONE && txnid == session_txnid)
+        /* Give up if the update is from this transaction and on the metadata file.*/
+        if (WT_IS_METADATA(session->dhandle) && txnid == session_txnid)
             return (__wt_set_return(session, EBUSY));
 
         /*
@@ -744,8 +673,8 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *first_up
              * when preserve prepared is enabled.
              */
             if (F_ISSET(r, WT_REC_CHECKPOINT) &&
-              (!F_ISSET(conn, WT_CONN_PRESERVE_PREPARED) ||
-                upd->upd_start_ts > conn->txn_global.checkpoint_timestamp)) {
+              (!F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) ||
+                upd->start_ts > S2C(session)->txn_global.checkpoint_timestamp)) {
                 *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
                 *has_newer_updatesp = true;
                 seen_prepare = true;
@@ -770,30 +699,7 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *first_up
             }
         }
 
-        /*
-         * Don't write any update that is not stable if precise checkpoint is enabled.
-         *
-         * If we are rewriting the page restored from deltas on the standby, we may see the pinned
-         * stable timestamp behind the shared checkpoint timestamp. Check the update flag to write
-         * it anyway.
-         *
-         * FIXME-WT-14902: currently we only support this mode from startup. If we want to enable
-         * this through reconfiguration, we need to ensure we have run a rollback to stable before
-         * we run the first checkpoint with the precise mode.
-         */
-        if (F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT) &&
-          !F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DELTA) &&
-          upd->upd_durable_ts > r->rec_start_pinned_stable_ts) {
-            WT_ASSERT(session, !is_hs_page);
-            *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
-            *has_newer_updatesp = true;
-            continue;
-        }
-
-        /*
-         * Always select the newest visible update if precise checkpoint is not enabled. Otherwise,
-         * select the first update that is smaller or equal to the pinned timestamp.
-         */
+        /* Always select the newest committed update to write to disk */
         if (upd_select->upd == NULL)
             upd_select->upd = upd;
 
@@ -801,8 +707,8 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *first_up
         if (max_txn < txnid)
             max_txn = txnid;
 
-        if (upd->upd_start_ts > max_ts)
-            max_ts = upd->upd_start_ts;
+        if (upd->start_ts > max_ts)
+            max_ts = upd->start_ts;
 
         /*
          * We only need to walk the whole update chain if we are evicting metadata as it is written
@@ -876,7 +782,7 @@ __rec_fill_tw_from_upd_select(
      * that the value is visible to any timestamp/transaction id ahead of it.
      */
     if (upd->type == WT_UPDATE_TOMBSTONE) {
-        WT_TIME_WINDOW_SET_STOP(session, select_tw, upd);
+        WT_TIME_WINDOW_SET_STOP(select_tw, upd);
         tombstone = upd_select->tombstone = upd;
 
         /* Find the update this tombstone applies to. */
@@ -894,7 +800,7 @@ __rec_fill_tw_from_upd_select(
 
     if (upd != NULL)
         /* The beginning of the validity window is the selected update's time point. */
-        WT_TIME_WINDOW_SET_START(session, select_tw, upd);
+        WT_TIME_WINDOW_SET_START(select_tw, upd);
     else if (select_tw->stop_ts != WT_TS_NONE || select_tw->stop_txn != WT_TXN_NONE) {
         WT_ASSERT_ALWAYS(
           session, tombstone != NULL, "The only contents of the update list is a single tombstone");
@@ -929,16 +835,14 @@ __rec_fill_tw_from_upd_select(
          * currently we either append the onpage value and return that, or return the tombstone
          * itself; there is no case that returns no update but sets the time window.)
          *
-         * If the tombstone is restored from the disk except for disaggregated storage or the
-         * history store, the onpage value and the history store value should have been restored
-         * together. Therefore, we should not end up here.
+         * If the tombstone is restored from the disk or the history store, the onpage value and the
+         * history store value should have been restored together. Therefore, we should not end up
+         * here.
          */
         WT_ASSERT_ALWAYS(session,
-          (F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) &&
-            !F_ISSET(tombstone, WT_UPDATE_RESTORED_FROM_HS)) ||
-            (!F_ISSET(tombstone, WT_UPDATE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_HS)),
-          "A tombstone written to the disk image except for disaggregated storage or history store "
-          "should be accompanied by the full value.");
+          !F_ISSET(tombstone, WT_UPDATE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_HS),
+          "A tombstone written to the disk image or history store should be accompanied by "
+          "the full value.");
         WT_RET(__rec_append_orig_value(session, page, tombstone, vpack));
 
         /*
@@ -949,12 +853,12 @@ __rec_fill_tw_from_upd_select(
             WT_ASSERT_ALWAYS(session,
               last_upd->next->txnid ==
                   (F_ISSET(S2C(session), WT_CONN_RECOVERING) ? WT_TXN_NONE : vpack->tw.start_txn) &&
-                last_upd->next->upd_start_ts == vpack->tw.start_ts &&
+                last_upd->next->start_ts == vpack->tw.start_ts &&
                 last_upd->next->type == WT_UPDATE_STANDARD && last_upd->next->next == NULL,
               "Tombstone is globally visible, but the tombstoned update is on the update "
               "chain");
             upd_select->upd = last_upd->next;
-            WT_TIME_WINDOW_SET_START(session, select_tw, last_upd->next);
+            WT_TIME_WINDOW_SET_START(select_tw, last_upd->next);
         } else {
             /*
              * It's possible that onpage value is not appended if the tombstone becomes globally
@@ -1099,8 +1003,8 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
                 upd = upd->next;
         }
 
-        if ((upd != NULL && upd->upd_start_ts > upd_select->tombstone->upd_start_ts) ||
-          (vpack != NULL && vpack->tw.start_ts > upd_select->tombstone->upd_start_ts))
+        if ((upd != NULL && upd->start_ts > upd_select->tombstone->start_ts) ||
+          (vpack != NULL && vpack->tw.start_ts > upd_select->tombstone->start_ts))
             upd_select->no_ts_tombstone = true;
     }
 
@@ -1132,12 +1036,11 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
          * eviction, or for cases that don't support history store, such as an in-memory database.
          */
         supd_restore = F_ISSET(r, WT_REC_EVICT) &&
-          (has_newer_updates || F_ISSET(S2C(session), WT_CONN_IN_MEMORY) ||
-            F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY));
+          (has_newer_updates || F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
         upd_memsize = __rec_calc_upd_memsize(onpage_upd, upd_select->tombstone, upd_memsize);
-        WT_RET(__rec_update_save(session, r, ins, rip, onpage_upd, upd_select->tombstone,
-          &upd_select->tw, supd_restore, upd_memsize));
+        WT_RET(__rec_update_save(
+          session, r, ins, rip, onpage_upd, upd_select->tombstone, supd_restore, upd_memsize));
         upd_saved = upd_select->upd_saved = true;
     }
 
@@ -1186,16 +1089,4 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
       session, upd_select->tw.stop_txn != WT_TXN_MAX || upd_select->tw.stop_ts == WT_TS_MAX);
 
     return (0);
-}
-
-/*
- * __wt_rec_in_progress --
- *     Whether we're currently reconciling.
- */
-bool
-__wt_rec_in_progress(WT_SESSION_IMPL *session)
-{
-    WTI_RECONCILE *rec = session->reconcile;
-
-    return (!(rec == NULL && rec->ref == NULL));
 }

@@ -33,17 +33,17 @@ __hs_cleanup_las(WT_SESSION_IMPL *session)
 }
 
 /*
- * __hs_get_btree --
+ * __wt_hs_get_btree --
  *     Get the history store btree by opening a history store cursor.
  */
-static int
-__hs_get_btree(WT_SESSION_IMPL *session, uint32_t hs_id, WT_BTREE **hs_btreep)
+int
+__wt_hs_get_btree(WT_SESSION_IMPL *session, WT_BTREE **hs_btreep)
 {
     WT_CURSOR *hs_cursor;
 
     *hs_btreep = NULL;
 
-    WT_RET(__wt_curhs_open_ext(session, hs_id, 0, NULL, &hs_cursor));
+    WT_RET(__wt_curhs_open(session, NULL, &hs_cursor));
     *hs_btreep = __wt_curhs_get_btree(hs_cursor);
     WT_ASSERT(session, *hs_btreep != NULL);
 
@@ -53,11 +53,11 @@ __hs_get_btree(WT_SESSION_IMPL *session, uint32_t hs_id, WT_BTREE **hs_btreep)
 }
 
 /*
- * __hs_config --
- *     Configure one history store table.
+ * __wt_hs_config --
+ *     Configure the history store table.
  */
-static int
-__hs_config(WT_SESSION_IMPL *session, uint32_t hs_id, const char **cfg)
+int
+__wt_hs_config(WT_SESSION_IMPL *session, const char **cfg)
 {
     WT_BTREE *btree;
     WT_CONFIG_ITEM cval;
@@ -80,7 +80,7 @@ __hs_config(WT_SESSION_IMPL *session, uint32_t hs_id, const char **cfg)
     WT_ERR(__wt_open_internal_session(conn, "hs_access", true, 0, 0, &tmp_setup_session));
 
     /* Retrieve the btree from the history store cursor. */
-    WT_ERR(__hs_get_btree(tmp_setup_session, hs_id, &btree));
+    WT_ERR(__wt_hs_get_btree(tmp_setup_session, &btree));
 
     /* Track the history store file ID. */
     if (conn->cache->hs_fileid == 0)
@@ -100,25 +100,6 @@ err:
     if (tmp_setup_session != NULL)
         WT_TRET(__wt_session_close_internal(tmp_setup_session));
     return (ret);
-}
-
-/*
- * __wt_hs_config --
- *     Configure the all history store tables.
- */
-int
-__wt_hs_config(WT_SESSION_IMPL *session, const char **cfg)
-{
-    WT_DECL_RET;
-    uint32_t hs_id;
-
-    hs_id = 0;
-    for (;;) {
-        WT_RET_NOTFOUND_OK(ret = __wt_curhs_next_hs_id(session, hs_id, &hs_id));
-        if (ret == WT_NOTFOUND)
-            return (0);
-        WT_RET(__hs_config(session, hs_id, cfg));
-    }
 }
 
 /*
@@ -148,14 +129,9 @@ __wt_hs_open(WT_SESSION_IMPL *session, const char **cfg)
     /* Drop the lookaside file if it still exists. */
     WT_ERR(__hs_cleanup_las(hs_session));
 
-    /* Create the local table. */
-    WT_ERR(__wt_session_create(hs_session, WT_HS_URI, WT_HS_CONFIG_LOCAL));
+    /* Create the table. */
+    WT_ERR(__wt_session_create(hs_session, WT_HS_URI, WT_HS_CONFIG));
 
-    /* Create the shared table. */
-    if (__wt_conn_is_disagg(session))
-        WT_ERR(__wt_session_create(hs_session, WT_HS_URI_SHARED, WT_HS_CONFIG_SHARED));
-
-    /* Configure all history stores. */
     WT_ERR(__wt_hs_config(hs_session, cfg));
 
 err:

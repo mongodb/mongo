@@ -31,7 +31,6 @@ from suite_subprocess import suite_subprocess
 from wiredtiger import stat
 import os
 import time
-import wttest
 
 # test_checkpoint33.py
 #
@@ -80,8 +79,6 @@ class test_checkpoint33(test_cc_base, suite_subprocess):
         self.session.rollback_transaction()
         evict_cursor.close()
 
-    # FIXME-WT-14982
-    @wttest.skip_for_hook("disagg", "PALM environment mapsize limitation")
     def test_checkpoint33(self):
 
         if os.environ.get("TSAN_OPTIONS"):

@@ -131,10 +131,7 @@ __curbackup_incr_next(WT_CURSOR *cursor)
     cb = (WT_CURSOR_BACKUP *)cursor;
     btree = cb->incr_cursor == NULL ? NULL : CUR2BT(cb->incr_cursor);
     raw = F_MASK(cursor, WT_CURSTD_RAW);
-
-    /* FIXME-WT-14789: we can probably replace the NULL check with something tidier. */
-    CURSOR_API_CALL(cursor, session, ret, next,
-      btree == NULL ? NULL : ((WT_CURSOR_BTREE *)cb->incr_cursor)->dhandle);
+    CURSOR_API_CALL(cursor, session, ret, next, btree);
     F_CLR(cursor, WT_CURSTD_RAW);
 
     if (!F_ISSET(cb, WT_CURBACKUP_INCR_INIT) &&

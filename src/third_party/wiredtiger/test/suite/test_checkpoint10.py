@@ -38,7 +38,6 @@ from wtscenario import make_scenarios
 # Test what happens if we create an inconsistent checkpoint and then try to
 # open it for read. No timestamps in this version.
 
-@wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
@@ -64,14 +63,10 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         ('nonlogged', dict(do_log=False)),
         ('logged', dict(do_log=True)),
     ]
-    ckpt_precision = [
-        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
-        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
-    ]
-    scenarios = make_scenarios(format_values, overlap_values, name_values, log_values, ckpt_precision)
+    scenarios = make_scenarios(format_values, overlap_values, name_values, log_values)
 
     def conn_config(self):
-        cfg = 'statistics=(all),timing_stress_for_test=[checkpoint_slow],' + self.ckpt_config
+        cfg = 'statistics=(all),timing_stress_for_test=[checkpoint_slow]'
         if self.do_log:
             cfg += ',log=(enabled=true)'
         return cfg
@@ -106,10 +101,6 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         cursor.close()
 
     def test_checkpoint(self):
-        # Avoid checkpoint error with precise checkpoint
-        if self.ckpt_config == 'checkpoint=(precise=true)':
-            self.conn.set_timestamp('stable_timestamp=1')
-
         uri = 'table:checkpoint10'
         nrows = 10000
         overlap = 5000 if self.do_overlap else 0

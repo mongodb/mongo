@@ -38,9 +38,10 @@ from wtscenario import make_scenarios
 # Test reading a checkpoint that contains fast-delete pages.
 # This version uses timestamps.
 
-@wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
+    conn_config = 'statistics=(all)'
+
     format_values = [
         ('string_row', dict(key_format='S', value_format='S', extraconfig='')),
         ('column-fix', dict(key_format='r', value_format='8t',
@@ -62,15 +63,9 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         ('no_advance_stable', dict(advance_stable=False)),
         ('advance_stable', dict(advance_stable=True)),
     ]
-    ckpt_precision = [
-        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
-        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
-    ]
     scenarios = make_scenarios(
-        format_values, name_values, advance_oldest_values, advance_stable_values, ckpt_precision)
+        format_values, name_values, advance_oldest_values, advance_stable_values)
 
-    def conn_config(self):
-        return 'statistics=(all),' + self.ckpt_config
 
     def large_updates(self, uri, ds, nrows, value, ts):
         cursor = self.session.open_cursor(uri)

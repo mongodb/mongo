@@ -213,7 +213,7 @@ __txn_logrec_init(WT_SESSION_IMPL *session)
     rectype = WT_LOGREC_COMMIT;
     fmt = WT_UNCHECKED_STRING(Iq);
 
-    if (txn->txn_log.logrec != NULL) {
+    if (txn->logrec != NULL) {
         WT_ASSERT(session, F_ISSET(txn, WT_TXN_HAS_ID));
         return (0);
     }
@@ -233,7 +233,7 @@ __txn_logrec_init(WT_SESSION_IMPL *session)
     WT_ERR(__wt_struct_pack(
       session, (uint8_t *)logrec->data + logrec->size, header_size, fmt, rectype, txn->id));
     logrec->size += (uint32_t)header_size;
-    txn->txn_log.logrec = logrec;
+    txn->logrec = logrec;
 
     if (0) {
 err:
@@ -275,7 +275,7 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
         FLD_SET(fileid, WT_LOGOP_IGNORE);
 
     WT_RET(__txn_logrec_init(session));
-    logrec = txn->txn_log.logrec;
+    logrec = txn->logrec;
 
     switch (op->type) {
     case WT_TXN_OP_NONE:
@@ -313,11 +313,11 @@ __wti_txn_log_commit(WT_SESSION_IMPL *session)
     /*
      * If there are no log records there is nothing to do.
      */
-    if (txn->txn_log.logrec == NULL)
+    if (txn->logrec == NULL)
         return (0);
 
     /* Write updates to the log. */
-    return (__wt_log_write(session, txn->txn_log.logrec, NULL, txn->txn_log.txn_logsync));
+    return (__wt_log_write(session, txn->logrec, NULL, txn->txn_logsync));
 }
 
 /*
@@ -406,7 +406,7 @@ __wti_txn_ts_log(WT_SESSION_IMPL *session)
         return (0);
 
     WT_RET(__txn_logrec_init(session));
-    logrec = txn->txn_log.logrec;
+    logrec = txn->logrec;
     commit = durable = first_commit = prepare = read = WT_TS_NONE;
     if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT)) {
         commit = txn->commit_timestamp;

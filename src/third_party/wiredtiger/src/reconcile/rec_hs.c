@@ -168,7 +168,7 @@ __rec_hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor
              * case, we'll never get here.
              */
             if (hs_insert_cursor == NULL)
-                WT_ERR(__wt_curhs_open(session, btree_id, NULL, &hs_insert_cursor));
+                WT_ERR(__wt_curhs_open(session, NULL, &hs_insert_cursor));
 
             /*
              * If these history store records are resolved prepared updates, their durable
@@ -677,7 +677,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
       FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_EVICTION_CKPT_TS_ORDERING);
     cache_hs_insert_full_update = cache_hs_insert_reverse_modify = cache_hs_write_squash = 0;
 
-    WT_RET(__wt_curhs_open(session, btree->id, NULL, &hs_cursor));
+    WT_RET(__wt_curhs_open(session, NULL, &hs_cursor));
     F_SET(hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
 
     __wt_update_vector_init(session, &updates);
@@ -730,7 +730,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
          * update to clear the timestamps of all the updates that are inserted into the history
          * store.
          */
-        if (list->onpage_tombstone != NULL && list->onpage_tombstone->upd_start_ts == WT_TS_NONE)
+        if (list->onpage_tombstone != NULL && list->onpage_tombstone->start_ts == WT_TS_NONE)
             no_ts_upd = list->onpage_tombstone;
 
         /*
@@ -770,8 +770,8 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
             WT_ASSERT(session, !F_ISSET(upd, WT_UPDATE_TO_DELETE_FROM_HS));
 
             /* Detect any update without a timestamp. */
-            if (prev_upd != NULL && prev_upd->upd_start_ts < upd->upd_start_ts) {
-                WT_ASSERT_ALWAYS(session, prev_upd->upd_start_ts == WT_TS_NONE,
+            if (prev_upd != NULL && prev_upd->start_ts < upd->start_ts) {
+                WT_ASSERT_ALWAYS(session, prev_upd->start_ts == WT_TS_NONE,
                   "out-of-order timestamp update detected");
                 /*
                  * Fail the eviction if we detect any timestamp ordering issue and the error flag is
@@ -804,7 +804,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
 
             /* Always insert full update to the history store if we need to squash the updates. */
             if (prev_upd != NULL && prev_upd->txnid == upd->txnid &&
-              prev_upd->upd_start_ts == upd->upd_start_ts)
+              prev_upd->start_ts == upd->start_ts)
                 enable_reverse_modify = false;
 
             /*
@@ -812,7 +812,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
              * than the on-page value)
              */
             if (newest_hs == NULL) {
-                if (upd->txnid != ref_upd->txnid || upd->upd_start_ts != ref_upd->upd_start_ts) {
+                if (upd->txnid != ref_upd->txnid || upd->start_ts != ref_upd->start_ts) {
                     if (upd->type == WT_UPDATE_TOMBSTONE)
                         ref_upd = upd;
                     else
@@ -837,11 +837,8 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
             /*
              * If we've reached a full update and it's in the history store we don't need to
              * continue as anything beyond this point won't help with calculating deltas.
-             *
-             * No need to insert any data that is older than the update restored from delta. They
-             * are already in the history store.
              */
-            if (F_ISSET(upd, WT_UPDATE_HS | WT_UPDATE_RESTORED_FROM_DELTA)) {
+            if (F_ISSET(upd, WT_UPDATE_HS)) {
                 if (upd->type == WT_UPDATE_STANDARD)
                     break;
 
@@ -850,16 +847,15 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
                  * flag state to deal with this later. We cannot break here as there are scenarios
                  * we need to finish the loop to construct the full update.
                  */
-                if (F_ISSET(upd, WT_UPDATE_HS))
-                    hs_flag_set = true;
+                hs_flag_set = true;
             }
 
             /*
              * Save the first update without a timestamp in the update chain. This is used to remove
              * all the following updates' timestamps in the chain.
              */
-            if (no_ts_upd == NULL && upd->upd_start_ts == WT_TS_NONE) {
-                WT_ASSERT(session, upd->upd_durable_ts == WT_TS_NONE);
+            if (no_ts_upd == NULL && upd->start_ts == WT_TS_NONE) {
+                WT_ASSERT(session, upd->durable_ts == WT_TS_NONE);
                 no_ts_upd = upd;
             }
         }
@@ -880,7 +876,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
          * deal with it here and skip the deletion as there is nothing to do
          */
         if (!hs_flag_set && oldest_upd->type == WT_UPDATE_TOMBSTONE &&
-          oldest_upd->upd_start_ts == WT_TS_NONE) {
+          oldest_upd->start_ts == WT_TS_NONE) {
             WT_ERR(__wti_rec_hs_delete_key(
               session, hs_cursor, btree->id, key, false, error_on_ts_ordering));
 
@@ -930,8 +926,8 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
                 tw.durable_start_ts = WT_TS_NONE;
                 tw.start_ts = WT_TS_NONE;
             } else {
-                tw.durable_start_ts = upd->upd_durable_ts;
-                tw.start_ts = upd->upd_start_ts;
+                tw.durable_start_ts = upd->durable_ts;
+                tw.start_ts = upd->start_ts;
             }
             tw.start_txn = upd->txnid;
 
@@ -943,7 +939,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
             if (prev_upd->prepare_state == WT_PREPARE_INPROGRESS) {
                 WT_ASSERT(session,
                   list->onpage_upd->txnid == prev_upd->txnid &&
-                    list->onpage_upd->upd_start_ts == prev_upd->upd_start_ts);
+                    list->onpage_upd->start_ts == prev_upd->start_ts);
                 tw.durable_stop_ts = tw.stop_ts = WT_TS_MAX;
                 tw.stop_txn = WT_TXN_MAX;
             } else {
@@ -952,14 +948,14 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
                  * garbage collection of history store removes the history values once the stop
                  * timestamp is globally visible. i.e. durable timestamp of data store version.
                  */
-                WT_ASSERT(session, prev_upd->upd_start_ts <= prev_upd->upd_durable_ts);
+                WT_ASSERT(session, prev_upd->start_ts <= prev_upd->durable_ts);
 
                 if (no_ts_upd != NULL) {
                     tw.durable_stop_ts = WT_TS_NONE;
                     tw.stop_ts = WT_TS_NONE;
                 } else {
-                    tw.durable_stop_ts = prev_upd->upd_durable_ts;
-                    tw.stop_ts = prev_upd->upd_start_ts;
+                    tw.durable_stop_ts = prev_upd->durable_ts;
+                    tw.stop_ts = prev_upd->start_ts;
                 }
                 tw.stop_txn = prev_upd->txnid;
 
@@ -978,7 +974,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
               session, &updates, full_value, prev_full_value, &prev_upd));
 
             /* Squash the updates from the same transaction. */
-            if (upd->upd_start_ts == prev_upd->upd_start_ts && upd->txnid == prev_upd->txnid) {
+            if (upd->start_ts == prev_upd->start_ts && upd->txnid == prev_upd->txnid) {
                 squashed = true;
                 continue;
             }
@@ -1165,29 +1161,13 @@ static int
 __rec_hs_delete_record(
   WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_ITEM *key, WT_UPDATE *upd, WT_UPDATE *tombstone)
 {
-    WT_BTREE *btree;
     WT_DECL_RET;
     bool hs_read_committed;
 
     WT_TIME_WINDOW *hs_tw;
 
-    btree = S2BT(session);
-
-    /*
-     * Open a history store cursor if we don't yet have one. If we already have it, check if it
-     * matches the current btree and attempt to reuse it if it does not.
-     */
     if (r->hs_cursor == NULL)
-        WT_RET(__wt_curhs_open(session, btree->id, NULL, &r->hs_cursor));
-    else if (__wt_curhs_get_btree_id(session, r->hs_cursor) != btree->id) {
-        WT_RET_ERROR_OK(ret = __wt_curhs_set_btree_id(session, r->hs_cursor, btree->id), EINVAL);
-        if (ret == EINVAL) {
-            WT_RET(r->hs_cursor->close(r->hs_cursor));
-            r->hs_cursor = NULL;
-            WT_RET(__wt_curhs_open(session, btree->id, NULL, &r->hs_cursor));
-        }
-    }
-
+        WT_RET(__wt_curhs_open(session, NULL, &r->hs_cursor));
     hs_read_committed = F_ISSET(r->hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
     /* Ensure we can see all the content in the history store. */
     F_SET(r->hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
@@ -1196,7 +1176,7 @@ __rec_hs_delete_record(
     if (tombstone != NULL && __wt_txn_upd_visible_all(session, tombstone))
         goto done;
 
-    r->hs_cursor->set_key(r->hs_cursor, 4, btree->id, key, WT_TS_MAX, UINT64_MAX);
+    r->hs_cursor->set_key(r->hs_cursor, 4, S2BT(session)->id, key, WT_TS_MAX, UINT64_MAX);
     WT_ERR_NOTFOUND_OK(__wt_curhs_search_near_before(session, r->hs_cursor), true);
     /* It's possible the value in the history store becomes obsolete concurrently. */
     if (ret == WT_NOTFOUND) {
@@ -1212,7 +1192,7 @@ __rec_hs_delete_record(
          * it has a stop timestamp greater than the start timestamp of the update.
          */
         __wt_hs_upd_time_window(r->hs_cursor, &hs_tw);
-        if (hs_tw->stop_ts <= upd->upd_start_ts)
+        if (hs_tw->stop_ts <= upd->start_ts)
             goto done;
 
         /*
@@ -1226,18 +1206,17 @@ __rec_hs_delete_record(
               hs_tw->start_txn == WT_TXN_NONE || hs_tw->start_txn == upd->txnid,
               "Retrieved wrong update from history store: start txn id mismatch");
             WT_ASSERT_ALWAYS(session,
-              hs_tw->start_ts == WT_TS_NONE || hs_tw->start_ts == upd->upd_start_ts,
+              hs_tw->start_ts == WT_TS_NONE || hs_tw->start_ts == upd->start_ts,
               "Retrieved wrong update from history store: start timestamp mismatch");
             WT_ASSERT_ALWAYS(session,
-              hs_tw->durable_start_ts == WT_TS_NONE ||
-                hs_tw->durable_start_ts == upd->upd_durable_ts,
+              hs_tw->durable_start_ts == WT_TS_NONE || hs_tw->durable_start_ts == upd->durable_ts,
               "Retrieved wrong update from history store: durable start timestamp mismatch");
             if (tombstone != NULL) {
                 WT_ASSERT_ALWAYS(session, hs_tw->stop_txn == tombstone->txnid,
                   "Retrieved wrong update from history store: stop txn id mismatch");
-                WT_ASSERT_ALWAYS(session, hs_tw->stop_ts == tombstone->upd_start_ts,
+                WT_ASSERT_ALWAYS(session, hs_tw->stop_ts == tombstone->start_ts,
                   "Retrieved wrong update from history store: stop timestamp mismatch");
-                WT_ASSERT_ALWAYS(session, hs_tw->durable_stop_ts == tombstone->upd_durable_ts,
+                WT_ASSERT_ALWAYS(session, hs_tw->durable_stop_ts == tombstone->durable_ts,
                   "Retrieved wrong update from history store: durable stop timestamp mismatch");
             } else
                 WT_ASSERT_ALWAYS(session, !WT_TIME_WINDOW_HAS_STOP(hs_tw),

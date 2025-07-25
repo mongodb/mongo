@@ -38,7 +38,7 @@ from wtscenario import make_scenarios
 class test_prepare_discover01(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_prepare_discover01'
     uri = 'table:' + tablename
-    conn_config = 'checkpoint=(precise=true),preserve_prepared=true'
+    conn_config = 'preserve_prepared=true'
 
     types = [
         ('row', dict(s_config='key_format=i,value_format=S')),
@@ -52,13 +52,8 @@ class test_prepare_discover01(wttest.WiredTigerTestCase, suite_subprocess):
     scenarios = make_scenarios(types, txn_end)
 
     def test_prepare_discover01(self):
-        # Currently this test will fail because we haven't added support for
-        # packing/unpacking prepare_ts and prepared_id on checkpoint yet, so it
-        # will fail cell validation when trying to read prepared_id from disk. Re-enable this test
-        # when the feature is supported.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(50))
-        self.skipTest('FIXME-WT-14941 Enable when packing/unpacking prepare_ts and prepared_id on checkpoint is supported')
         self.session.create(self.uri, self.s_config)
         c = self.session.open_cursor(self.uri)
 
@@ -73,7 +68,8 @@ class test_prepare_discover01(wttest.WiredTigerTestCase, suite_subprocess):
         c[4] = "prepare ts=100"
         c[5] = "prepare ts=100"
         # Prepare with a timestamp greater than current stable
-        self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(100) +',prepared_id=123')
+        self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(100))
+
         # Move the stable timestamp to include the prepared transaction
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(150))
         # Create a checkpoint
@@ -100,7 +96,7 @@ class test_prepare_discover01(wttest.WiredTigerTestCase, suite_subprocess):
             prepared_id = prepared_discover_cursor.get_key()
             self.assertEqual(prepared_id, 100)
             c2s2.begin_transaction("claim_prepared=" + self.timestamp_str(prepared_id))
-            c2s2.rollback_transaction("rollback_timestamp=" + self.timestamp_str(200))
+            c2s2.rollback_transaction()
         self.assertEqual(count, 1)
 
         prepared_discover_cursor.close()

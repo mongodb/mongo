@@ -9,28 +9,24 @@
 #include "wt_internal.h"
 
 static int __curhs_file_cursor_next(WT_SESSION_IMPL *, WT_CURSOR *);
-static int __curhs_file_cursor_open(WT_SESSION_IMPL *, const char *, WT_CURSOR *, WT_CURSOR **);
+static int __curhs_file_cursor_open(WT_SESSION_IMPL *, WT_CURSOR *, WT_CURSOR **);
 static int __curhs_file_cursor_prev(WT_SESSION_IMPL *, WT_CURSOR *);
 static int __curhs_file_cursor_search_near(WT_SESSION_IMPL *, WT_CURSOR *, int *);
 static int __curhs_prev_visible(WT_SESSION_IMPL *, WT_CURSOR_HS *);
 static int __curhs_next_visible(WT_SESSION_IMPL *, WT_CURSOR_HS *);
 static int __curhs_search_near_helper(WT_SESSION_IMPL *, WT_CURSOR *, bool);
-
 /*
  * __curhs_file_cursor_open --
  *     Open a new history store table cursor, internal function.
  */
 static int
-__curhs_file_cursor_open(
-  WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, WT_CURSOR **cursorp)
+__curhs_file_cursor_open(WT_SESSION_IMPL *session, WT_CURSOR *owner, WT_CURSOR **cursorp)
 {
     WT_CURSOR *cursor;
     WT_DECL_RET;
     size_t len;
     char *tmp;
-
-    const char *open_cursor_cfg[] = {
-      WT_CONFIG_BASE(session, WT_SESSION_open_cursor), "", NULL, NULL};
+    const char *open_cursor_cfg[] = {WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL, NULL};
 
     if (WT_READING_CHECKPOINT(session)) {
         /*
@@ -42,12 +38,12 @@ __curhs_file_cursor_open(
         len = strlen("checkpoint=") + strlen(session->hs_checkpoint) + 1;
         WT_RET(__wt_malloc(session, len, &tmp));
         WT_ERR(__wt_snprintf(tmp, len, "checkpoint=%s", session->hs_checkpoint));
-        open_cursor_cfg[2] = tmp;
+        open_cursor_cfg[1] = tmp;
     } else
         tmp = NULL;
 
     WT_WITHOUT_DHANDLE(
-      session, ret = __wt_open_cursor(session, uri, owner, open_cursor_cfg, &cursor));
+      session, ret = __wt_open_cursor(session, WT_HS_URI, owner, open_cursor_cfg, &cursor));
     WT_ERR(ret);
 
     /* History store cursors should always ignore tombstones. */
@@ -57,37 +53,6 @@ __curhs_file_cursor_open(
 
 err:
     __wt_free(session, tmp);
-    return (ret);
-}
-
-/*
- * __wt_curhs_get_cached --
- *     Retrieve the history store btree from the cursors dhandle cache.
- */
-int
-__wt_curhs_get_cached(WT_SESSION_IMPL *session, uint32_t hs_id, WT_BTREE **hs_btreep)
-{
-    WT_CURSOR *cursor;
-    WT_DECL_RET;
-    uint64_t hash_value;
-    const char *uri;
-
-    uri = NULL;
-    WT_HS_ID_TO_URI(session, hs_id, uri);
-
-    __wt_cursor_get_hash(session, uri, NULL, &hash_value);
-    if ((ret = __wt_cursor_cache_get(session, uri, hash_value, NULL, NULL, &cursor)) == 0) {
-        *hs_btreep = CUR2BT(cursor);
-        /*
-         * The pattern of acquiring a cursor, obtaining its dhandle, and then closing the cursor is
-         * generally unsafe and can lead to undefined behavior. This is because the sweep server
-         * checks for references to dhandles, and closing the cursor may result in the dhandle being
-         * swept while still in use. However, history store dhandles are an exception as they are
-         * not subject to sweeping.
-         */
-        WT_RET(cursor->close(cursor));
-    }
-
     return (ret);
 }
 
@@ -130,21 +95,8 @@ __wt_curhs_cache(WT_SESSION_IMPL *session)
       (session->dhandle != NULL && WT_IS_METADATA(S2BT(session)->dhandle)) ||
       session == conn->default_session)
         return (0);
-
-    /*
-     * The pattern of acquiring a cursor, obtaining its dhandle, and then closing the cursor is
-     * generally unsafe and can lead to undefined behavior. This is because the sweep server checks
-     * for references to dhandles, and closing the cursor may result in the dhandle being swept
-     * while still in use. However, history store dhandles are an exception as they are not subject
-     * to sweeping.
-     */
-    WT_RET(__curhs_file_cursor_open(session, WT_HS_URI, NULL, &cursor));
+    WT_RET(__curhs_file_cursor_open(session, NULL, &cursor));
     WT_RET(cursor->close(cursor));
-
-    if (__wt_conn_is_disagg(session)) {
-        WT_RET(__curhs_file_cursor_open(session, WT_HS_URI_SHARED, NULL, &cursor));
-        WT_RET(cursor->close(cursor));
-    }
     return (0);
 }
 
@@ -290,8 +242,7 @@ __curhs_next(WT_CURSOR *cursor)
 
     hs_cursor = (WT_CURSOR_HS *)cursor;
     file_cursor = hs_cursor->file_cursor;
-    CURSOR_API_CALL_PREPARE_ALLOWED(
-      cursor, session, next, ((WT_CURSOR_BTREE *)file_cursor)->dhandle);
+    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, next, CUR2BT(file_cursor));
 
     WT_ERR(__curhs_file_cursor_next(session, file_cursor));
     /*
@@ -326,8 +277,7 @@ __curhs_prev(WT_CURSOR *cursor)
 
     hs_cursor = (WT_CURSOR_HS *)cursor;
     file_cursor = hs_cursor->file_cursor;
-    CURSOR_API_CALL_PREPARE_ALLOWED(
-      cursor, session, prev, ((WT_CURSOR_BTREE *)file_cursor)->dhandle);
+    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, prev, CUR2BT(file_cursor));
 
     WT_ERR(__curhs_file_cursor_prev(session, file_cursor));
     /*
@@ -362,8 +312,8 @@ __curhs_close(WT_CURSOR *cursor)
 
     hs_cursor = (WT_CURSOR_HS *)cursor;
     file_cursor = hs_cursor->file_cursor;
-    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close,
-      file_cursor == NULL ? NULL : ((WT_CURSOR_BTREE *)file_cursor)->dhandle);
+    CURSOR_API_CALL_PREPARE_ALLOWED(
+      cursor, session, close, file_cursor == NULL ? NULL : CUR2BT(file_cursor));
 err:
     __wt_scr_free(session, &hs_cursor->datastore_key);
     if (file_cursor != NULL)
@@ -388,17 +338,11 @@ __curhs_reset(WT_CURSOR *cursor)
 
     hs_cursor = (WT_CURSOR_HS *)cursor;
     file_cursor = hs_cursor->file_cursor;
-    CURSOR_API_CALL_PREPARE_ALLOWED(
-      cursor, session, reset, ((WT_CURSOR_BTREE *)file_cursor)->dhandle);
-
-    /*
-     * Now that we can have more than one history store table, don't reset the btree ID. This cursor
-     * was opened on a specific btree, and there is no guarantee that it could be safely reused for
-     * a different btree.
-     */
+    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, reset, CUR2BT(file_cursor));
 
     ret = file_cursor->reset(file_cursor);
     WT_TIME_WINDOW_INIT(&hs_cursor->time_window);
+    hs_cursor->btree_id = 0;
     hs_cursor->datastore_key->data = NULL;
     hs_cursor->datastore_key->size = 0;
     hs_cursor->flags = 0;
@@ -427,7 +371,7 @@ __curhs_set_key(WT_CURSOR *cursor, ...)
     WT_SESSION_IMPL *session;
     wt_timestamp_t start_ts;
     uint64_t counter;
-    uint32_t arg_count, btree_id;
+    uint32_t arg_count;
     va_list ap;
 
     hs_cursor = (WT_CURSOR_HS *)cursor;
@@ -442,17 +386,8 @@ __curhs_set_key(WT_CURSOR *cursor, ...)
 
     WT_ASSERT(session, arg_count >= 1 && arg_count <= 4);
 
-    /*
-     * Verify that the btree ID matches the history store cursor's btree ID. We also need to allow
-     * btree ID + 1, which is used by RTS to mark the end of a truncation range: When truncating all
-     * entries belonging to a given btree, it sets the start key to btree ID and the end key to
-     * btree ID + 1.
-     */
-    btree_id = va_arg(ap, uint32_t);
-    WT_ASSERT(session, hs_cursor->btree_id == btree_id || hs_cursor->btree_id + 1 == btree_id);
-    hs_cursor->btree_id = btree_id;
+    hs_cursor->btree_id = va_arg(ap, uint32_t);
     F_SET(hs_cursor, WT_HS_CUR_BTREE_ID_SET);
-
     if (arg_count > 1) {
         datastore_key = va_arg(ap, WT_ITEM *);
         if ((ret = __wt_buf_set(
@@ -785,8 +720,7 @@ __curhs_search_near(WT_CURSOR *cursor, int *exactp)
     file_cursor = hs_cursor->file_cursor;
     *exactp = 0;
 
-    CURSOR_API_CALL_PREPARE_ALLOWED(
-      cursor, session, search_near, ((WT_CURSOR_BTREE *)file_cursor)->dhandle);
+    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, search_near, CUR2BT(file_cursor));
 
     WT_ERR(__wt_scr_alloc(session, 0, &datastore_key));
     WT_ERR(__wt_scr_alloc(session, 0, &srch_key));
@@ -1017,8 +951,7 @@ __curhs_insert(WT_CURSOR *cursor)
     cbt = (WT_CURSOR_BTREE *)file_cursor;
     hs_tombstone = hs_upd = NULL;
 
-    CURSOR_API_CALL_PREPARE_ALLOWED(
-      cursor, session, insert, ((WT_CURSOR_BTREE *)file_cursor)->dhandle);
+    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, insert, CUR2BT(file_cursor));
 
     /*
      * Disable bulk loads into history store. This would normally occur when updating a record with
@@ -1031,8 +964,8 @@ __curhs_insert(WT_CURSOR *cursor)
      * point as the commit time point to the history store record.
      */
     WT_ERR(__wt_upd_alloc(session, &file_cursor->value, WT_UPDATE_STANDARD, &hs_upd, NULL));
-    hs_upd->upd_start_ts = hs_cursor->time_window.start_ts;
-    hs_upd->upd_durable_ts = hs_cursor->time_window.durable_start_ts;
+    hs_upd->start_ts = hs_cursor->time_window.start_ts;
+    hs_upd->durable_ts = hs_cursor->time_window.durable_start_ts;
     hs_upd->txnid = hs_cursor->time_window.start_txn;
 
     /*
@@ -1047,13 +980,13 @@ __curhs_insert(WT_CURSOR *cursor)
          * Set the stop time point as the commit time point of the history store delete record.
          */
         WT_ERR(__wt_upd_alloc_tombstone(session, &hs_tombstone, NULL));
-        hs_tombstone->upd_start_ts = hs_cursor->time_window.stop_ts;
-        hs_tombstone->upd_durable_ts = hs_cursor->time_window.durable_stop_ts;
+        hs_tombstone->start_ts = hs_cursor->time_window.stop_ts;
+        hs_tombstone->durable_ts = hs_cursor->time_window.durable_stop_ts;
         hs_tombstone->txnid = hs_cursor->time_window.stop_txn;
 
         WT_ASSERT(session,
-          hs_tombstone->upd_start_ts >= hs_upd->upd_start_ts &&
-            hs_tombstone->upd_durable_ts >= hs_upd->upd_durable_ts);
+          hs_tombstone->start_ts >= hs_upd->start_ts &&
+            hs_tombstone->durable_ts >= hs_upd->durable_ts);
 
         hs_tombstone->next = hs_upd;
         hs_upd = hs_tombstone;
@@ -1117,7 +1050,7 @@ __curhs_remove_int(WT_CURSOR_BTREE *cbt, const WT_ITEM *value, u_int modify_type
     /* Add a tombstone with WT_TXN_NONE transaction id and WT_TS_NONE timestamps. */
     WT_ERR(__wt_upd_alloc_tombstone(session, &hs_tombstone, NULL));
     hs_tombstone->txnid = WT_TXN_NONE;
-    hs_tombstone->upd_start_ts = hs_tombstone->upd_durable_ts = WT_TS_NONE;
+    hs_tombstone->start_ts = hs_tombstone->durable_ts = WT_TS_NONE;
     while ((ret = __wt_hs_modify(cbt, hs_tombstone)) == WT_RESTART) {
         WT_WITH_PAGE_INDEX(session, ret = __curhs_search(cbt, false));
         WT_ERR(ret);
@@ -1148,8 +1081,7 @@ __curhs_remove(WT_CURSOR *cursor)
     file_cursor = hs_cursor->file_cursor;
     cbt = (WT_CURSOR_BTREE *)file_cursor;
 
-    CURSOR_API_CALL_PREPARE_ALLOWED(
-      cursor, session, remove, ((WT_CURSOR_BTREE *)file_cursor)->dhandle);
+    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, remove, CUR2BT(file_cursor));
 
     /* Remove must be called with cursor positioned. */
     WT_ASSERT(session, F_ISSET(file_cursor, WT_CURSTD_KEY_INT));
@@ -1190,8 +1122,7 @@ __curhs_update(WT_CURSOR *cursor)
     cbt = (WT_CURSOR_BTREE *)file_cursor;
     hs_tombstone = hs_upd = NULL;
 
-    CURSOR_API_CALL_PREPARE_ALLOWED(
-      cursor, session, update, ((WT_CURSOR_BTREE *)file_cursor)->dhandle);
+    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, update, CUR2BT(file_cursor));
 
     /* Update must be called with cursor positioned. */
     WT_ASSERT(session, F_ISSET(file_cursor, WT_CURSTD_KEY_INT));
@@ -1206,18 +1137,17 @@ __curhs_update(WT_CURSOR *cursor)
 
     /* The tombstone to represent the stop time window. */
     WT_ERR(__wt_upd_alloc_tombstone(session, &hs_tombstone, NULL));
-    hs_tombstone->upd_start_ts = hs_cursor->time_window.stop_ts;
-    hs_tombstone->upd_durable_ts = hs_cursor->time_window.durable_stop_ts;
+    hs_tombstone->start_ts = hs_cursor->time_window.stop_ts;
+    hs_tombstone->durable_ts = hs_cursor->time_window.durable_stop_ts;
     hs_tombstone->txnid = hs_cursor->time_window.stop_txn;
 
     WT_ERR(__wt_upd_alloc(session, &file_cursor->value, WT_UPDATE_STANDARD, &hs_upd, NULL));
-    hs_upd->upd_start_ts = hs_cursor->time_window.start_ts;
-    hs_upd->upd_durable_ts = hs_cursor->time_window.durable_start_ts;
+    hs_upd->start_ts = hs_cursor->time_window.start_ts;
+    hs_upd->durable_ts = hs_cursor->time_window.durable_start_ts;
     hs_upd->txnid = hs_cursor->time_window.start_txn;
 
     WT_ASSERT(session,
-      hs_tombstone->upd_start_ts >= hs_upd->upd_start_ts &&
-        hs_tombstone->upd_durable_ts >= hs_upd->upd_durable_ts);
+      hs_tombstone->start_ts >= hs_upd->start_ts && hs_tombstone->durable_ts >= hs_upd->durable_ts);
 
     /* Connect the tombstone to the update. */
     hs_tombstone->next = hs_upd;
@@ -1294,110 +1224,11 @@ __wt_curhs_range_truncate(WT_TRUNCATE_INFO *trunc_info)
 }
 
 /*
- * __wt_curhs_next_hs_id --
- *     Get the History Store ID that follows the current ID (kind of like a cursor, but simpler at
- *     least for now). Starting with ID 0 returns the actual first ID.
- */
-int
-__wt_curhs_next_hs_id(WT_SESSION_IMPL *session, uint32_t hs_id, uint32_t *next_hs_idp)
-{
-    WT_UNUSED(session);
-
-    if (hs_id == 0) {
-        *next_hs_idp = WT_HS_ID;
-        return (0);
-    }
-
-    if (hs_id == WT_HS_ID) {
-        if (!__wt_conn_is_disagg(session))
-            return (WT_NOTFOUND);
-        *next_hs_idp = WT_HS_ID_SHARED;
-        return (0);
-    }
-
-    return (WT_NOTFOUND);
-}
-
-/*
- * __curhs_btree_id_to_hs_id --
- *     Get the HS ID that corresponds to the given btree ID.
- */
-static uint32_t
-__curhs_btree_id_to_hs_id(WT_SESSION_IMPL *session, uint32_t btree_id)
-{
-    WT_ASSERT(session, btree_id != 0);
-
-    /* No table ID namespaces. */
-    if (!__wt_conn_is_disagg(session))
-        return (1);
-
-    /*
-     * Map the history store ID into the URI. The current implementation does this simply using
-     * table ID namespaces, but keep the notion of HS ID and namespace ID separate to ensure that we
-     * can make more flexible choices in the future.
-     */
-    return (WT_BTREE_ID_SHARED(btree_id) ? 2 : 1);
-}
-
-/*
- * __wt_curhs_get_btree_id --
- *     Get the HS cursor's btree ID.
- */
-uint32_t
-__wt_curhs_get_btree_id(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
-{
-    WT_CURSOR_HS *hs_cursor;
-
-    WT_UNUSED(session);
-
-    hs_cursor = (WT_CURSOR_HS *)cursor;
-    return (hs_cursor->btree_id);
-}
-
-/*
- * __wt_curhs_set_btree_id --
- *     Change the HS cursor's btree ID, after first checking that the change is compatible.
- */
-int
-__wt_curhs_set_btree_id(WT_SESSION_IMPL *session, WT_CURSOR *cursor, uint32_t btree_id)
-{
-    WT_CURSOR_HS *hs_cursor;
-    uint32_t hs_id;
-
-    WT_UNUSED(session);
-
-    hs_cursor = (WT_CURSOR_HS *)cursor;
-    hs_id = __curhs_btree_id_to_hs_id(session, btree_id);
-
-    if (hs_id != hs_cursor->hs_id)
-        return (EINVAL);
-
-    hs_cursor->btree_id = btree_id;
-    return (0);
-}
-
-/*
  * __wt_curhs_open --
  *     Initialize a history store cursor.
  */
 int
-__wt_curhs_open(WT_SESSION_IMPL *session, uint32_t btree_id, WT_CURSOR *owner, WT_CURSOR **cursorp)
-{
-    uint32_t hs_id;
-
-    hs_id = __curhs_btree_id_to_hs_id(session, btree_id);
-    return (__wt_curhs_open_ext(session, hs_id, btree_id, owner, cursorp));
-}
-
-/*
- * __wt_curhs_open_ext --
- *     Initialize a history store cursor using a logical history store ID. This does not check
- *     whether the btree ID actually belongs to the selected history store; use 0 to simply ignore
- *     the it.
- */
-int
-__wt_curhs_open_ext(WT_SESSION_IMPL *session, uint32_t hs_id, uint32_t btree_id, WT_CURSOR *owner,
-  WT_CURSOR **cursorp)
+__wt_curhs_open(WT_SESSION_IMPL *session, WT_CURSOR *owner, WT_CURSOR **cursorp)
 {
     WT_CURSOR_STATIC_INIT(iface, __wt_cursor_get_key, /* get-key */
       __wt_cursor_get_value,                          /* get-value */
@@ -1426,32 +1257,25 @@ __wt_curhs_open_ext(WT_SESSION_IMPL *session, uint32_t hs_id, uint32_t btree_id,
     WT_CURSOR *cursor;
     WT_CURSOR_HS *hs_cursor;
     WT_DECL_RET;
-    const char *uri;
 
-    cursor = NULL;
     *cursorp = NULL;
-    uri = NULL;
-
-    WT_HS_ID_TO_URI(session, hs_id, uri);
-
-    WT_ERR(__wt_calloc_one(session, &hs_cursor));
+    WT_RET(__wt_calloc_one(session, &hs_cursor));
     ++session->hs_cursor_counter;
     cursor = (WT_CURSOR *)hs_cursor;
     *cursor = iface;
     cursor->session = (WT_SESSION *)session;
     cursor->key_format = WT_HS_KEY_FORMAT;
     cursor->value_format = WT_HS_VALUE_FORMAT;
-    WT_ERR(__wt_strdup(session, uri, &cursor->uri));
+    WT_ERR(__wt_strdup(session, WT_HS_URI, &cursor->uri));
 
     /* Open the file cursor for operations on the regular history store .*/
-    WT_ERR(__curhs_file_cursor_open(session, uri, owner, &hs_cursor->file_cursor));
+    WT_ERR(__curhs_file_cursor_open(session, owner, &hs_cursor->file_cursor));
 
     WT_WITH_BTREE(session, CUR2BT(hs_cursor->file_cursor),
-      ret = __wt_cursor_init(cursor, uri, owner, NULL, cursorp));
+      ret = __wt_cursor_init(cursor, WT_HS_URI, owner, NULL, cursorp));
     WT_ERR(ret);
     WT_TIME_WINDOW_INIT(&hs_cursor->time_window);
-    hs_cursor->btree_id = btree_id;
-    hs_cursor->hs_id = hs_id;
+    hs_cursor->btree_id = 0;
     WT_ERR(__wt_scr_alloc(session, 0, &hs_cursor->datastore_key));
     hs_cursor->flags = 0;
 
@@ -1459,8 +1283,7 @@ __wt_curhs_open_ext(WT_SESSION_IMPL *session, uint32_t hs_id, uint32_t btree_id,
 
     if (0) {
 err:
-        if (cursor != NULL)
-            WT_TRET(cursor->close(cursor));
+        WT_TRET(cursor->close(cursor));
         *cursorp = NULL;
     }
     return (ret);

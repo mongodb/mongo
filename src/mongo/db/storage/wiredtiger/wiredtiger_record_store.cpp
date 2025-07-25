@@ -926,7 +926,7 @@ void WiredTigerRecordStore::printRecordMetadata(const RecordId& recordId,
 
     // Open a version cursor. This is a debug cursor that enables iteration through the history of
     // values for a given record.
-    WT_CURSOR* cursor = session.getNewCursor(_uri, "debug=(dump_version=(enabled=true))");
+    WT_CURSOR* cursor = session.getNewCursor(_uri, "debug=(dump_version=true)");
 
     CursorKey key = makeCursorKey(recordId, _keyFormat);
     setKey(cursor, &key);

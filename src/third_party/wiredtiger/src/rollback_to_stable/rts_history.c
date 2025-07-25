@@ -30,7 +30,7 @@ __wti_rts_history_delete_hs(WT_SESSION_IMPL *session, WT_ITEM *key, wt_timestamp
     btree_id = S2BT(session)->id;
 
     /* Open a history store table cursor. */
-    WT_RET(__wt_curhs_open(session, btree_id, NULL, &hs_cursor));
+    WT_RET(__wt_curhs_open(session, NULL, &hs_cursor));
     /*
      * Rollback-to-stable operates exclusively (i.e., it is the only active operation in the system)
      * outside the constraints of transactions. Therefore, there is no need for snapshot based

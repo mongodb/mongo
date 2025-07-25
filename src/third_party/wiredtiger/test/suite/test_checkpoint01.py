@@ -36,19 +36,11 @@ from wtscenario import make_scenarios
 # with a set of checkpoints, then confirm the checkpoint's values are correct,
 # including after other checkpoints are dropped.
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
-@wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
 class test_checkpoint(wttest.WiredTigerTestCase):
-    uris = [
+    scenarios = make_scenarios([
         ('file', dict(uri='file:checkpoint',fmt='S')),
         ('table', dict(uri='table:checkpoint',fmt='S'))
-    ]
-
-    ckpt_precision = [
-        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
-        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
-    ]
-
-    scenarios = make_scenarios(uris, ckpt_precision)
+    ])
 
     # Each checkpoint has a key range and a "is dropped" flag.
     checkpoints = {
@@ -62,9 +54,6 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         "checkpoint-8": ((300, 820), 0),
         "checkpoint-9": ((400, 920), 0)
         }
-
-    def conn_config(self):
-        return self.ckpt_config
 
     # Add a set of records for a checkpoint.
     def add_records(self, name):
@@ -121,11 +110,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
                 self.assertEqual(list_expected, list_checkpoint)
 
     # Main checkpoint test driver.
-    @wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
     def test_checkpoint(self):
-        # Avoid checkpoint error with precise checkpoint
-        self.conn.set_timestamp('stable_timestamp=1')
-
         # Build a file with a set of checkpoints, and confirm they all have
         # the correct key/value pairs.
         self.session.create(self.uri,
@@ -153,7 +138,6 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         self.check()
 
 # Check some specific cursor checkpoint combinations.
-@wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
 class test_checkpoint_cursor(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([
         ('file', dict(uri='file:checkpoint',fmt='S')),
@@ -236,7 +220,6 @@ class test_checkpoint_target(wttest.WiredTigerTestCase):
         cursor.close()
 
 # Check that you can't write checkpoint cursors.
-@wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
 class test_checkpoint_cursor_update(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([
         ('file-r', dict(uri='file:checkpoint',fmt='r')),
@@ -262,7 +245,6 @@ class test_checkpoint_cursor_update(wttest.WiredTigerTestCase):
         cursor.close()
 
 # Check that WiredTigerCheckpoint works as a checkpoint specifier.
-@wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
 class test_checkpoint_last(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([
         ('file', dict(uri='file:checkpoint',fmt='S')),
@@ -329,7 +311,6 @@ class test_checkpoint_illegal_name(wttest.WiredTigerTestCase):
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                     lambda: self.session.open_cursor("file:WiredTigerHS.wt", None, conf), msg)
 
-@wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
 class test_checkpoint_empty(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([
         ('file', dict(uri='file:checkpoint')),

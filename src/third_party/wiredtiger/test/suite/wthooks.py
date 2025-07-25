@@ -289,19 +289,12 @@ class WiredTigerHookCreator(ABC):
     def uses(self, use_list):
         return False
 
-# Used by hooks to encapsulate all disagg parameters
-class DisaggParameters(object):
-    def __init__(self):
-        self.config = None
-        self.role = 'leader'
-        self.page_log = 'palm'
-
 class WiredTigerHookPlatformAPI(object):
-    def setUp(self, testcase):
+    def setUp(self):
         """Called at the beginning of a test case"""
         pass
 
-    def tearDown(self, testcase):
+    def tearDown(self):
         """Called at the termination of a test case"""
         pass
 
@@ -312,10 +305,6 @@ class WiredTigerHookPlatformAPI(object):
     def initialFileName(self, uri):
         """The first local backing file name created for this URI."""
         raise NotImplementedError('initialFileName method not implemented')
-
-    def getDisaggParameters(self):
-        """The disaggregated parameters for this test case."""
-        raise NotImplementedError('getDisaggParameters method not implemented')
 
     def getTimestamp(self):
         """The timestamp generator for this test case."""
@@ -350,9 +339,6 @@ class DefaultPlatformAPI(WiredTigerHookPlatformAPI):
         else:
             raise Exception('bad uri')
 
-    def getDisaggParameters(self):
-        return DisaggParameters()
-
     # By default, there is no automatic timestamping by test infrastructure classes.
     def getTimestamp(self):
         return None
@@ -377,15 +363,15 @@ class MultiPlatformAPI(WiredTigerHookPlatformAPI):
     def __init__(self, platform_apis):
         self.apis = platform_apis
 
-    def setUp(self, testcase):
+    def setUp(self):
         """Called at the beginning of a test case"""
         for api in self.apis:
-            api.setUp(testcase)
+            api.setUp()
 
-    def tearDown(self, testcase):
+    def tearDown(self):
         """Called at the termination of a test case"""
         for api in self.apis:
-            api.tearDown(testcase)
+            api.tearDown()
 
     def tableExists(self, name):
         """Return boolean if local files exist for the table with the given base name"""
@@ -404,15 +390,6 @@ class MultiPlatformAPI(WiredTigerHookPlatformAPI):
             except NotImplementedError:
                 pass
         raise Exception('initialFileName: no implementation')  # should never happen
-
-    def getDisaggParameters(self):
-        """The disaggregated parameters for this test case."""
-        for api in self.apis:
-            try:
-                return api.getDisaggParameters()
-            except NotImplementedError:
-                pass
-        raise Exception('getDisaggParameters: no implementation')  # should never happen
 
     def getTimestamp(self):
         """The timestamp generator for this test case."""

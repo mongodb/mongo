@@ -63,14 +63,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         #            second_checkpoint='second_checkpoint',
         #            third_checkpoint='third_checkpoint')),
     ]
-    ckpt_precision = [
-        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
-        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
-    ]
-    scenarios = make_scenarios(format_values, name_values, ckpt_precision)
-
-    def conn_config(self):
-        return self.ckpt_config
+    scenarios = make_scenarios(format_values, name_values)
 
     def large_updates(self, uri, ds, nrows, value, ts):
         cursor = self.session.open_cursor(uri)

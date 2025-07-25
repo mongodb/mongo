@@ -401,7 +401,7 @@ __compute_min_lognum(WT_SESSION_IMPL *session, WTI_LOG *log, uint32_t backup_fil
     min_lognum = backup_file == 0 ? WT_MIN(log->ckpt_lsn.l.file, log->sync_lsn.l.file) :
                                     WT_MIN(log->ckpt_lsn.l.file, backup_file);
 
-    __wt_readlock(session, &conn->log_mgr.debug_log_retention_lock);
+    __wt_readlock(session, &conn->debug_log_retention_lock);
 
     /* Adjust the number of log files to retain based on debugging options. */
 
@@ -426,7 +426,7 @@ __compute_min_lognum(WT_SESSION_IMPL *session, WTI_LOG *log, uint32_t backup_fil
             min_lognum = WT_MIN(log->fileid - (conn->debug_log_cnt + 1), min_lognum);
     }
 
-    __wt_readunlock(session, &conn->log_mgr.debug_log_retention_lock);
+    __wt_readunlock(session, &conn->debug_log_retention_lock);
 #ifdef HAVE_DIAGNOSTIC
     __wt_epoch(session, &ts);
     if (min_lognum > WT_INIT_LSN_FILE && min_lognum != log->min_fileid) {

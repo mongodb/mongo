@@ -85,7 +85,7 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
     WT_CONNECTION_STATS **stats;
-    uint64_t avg_internal_chain, avg_leaf_chain, intl, inuse, leaf;
+    uint64_t intl, inuse, leaf;
 
     conn = S2C(session);
     cache = conn->cache;
@@ -103,8 +103,6 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
     WT_STATP_CONN_SET(session, stats, cache_bytes_inuse, inuse);
     WT_STATP_CONN_SET(session, stats, cache_overhead, cache->overhead_pct);
 
-    WT_STATP_CONN_SET(
-      session, stats, cache_bytes_delta_updates, __wt_cache_bytes_delta_updates(cache));
     WT_STATP_CONN_SET(session, stats, cache_bytes_dirty, __wt_cache_dirty_inuse(cache));
     WT_STATP_CONN_SET(session, stats, cache_bytes_dirty_leaf, __wt_cache_dirty_leaf_inuse(cache));
     WT_STATP_CONN_SET(
@@ -132,23 +130,6 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
     WT_STATP_CONN_SET(session, stats, rec_maximum_image_build_milliseconds,
       conn->rec_maximum_image_build_milliseconds);
     WT_STATP_CONN_SET(session, stats, rec_maximum_milliseconds, conn->rec_maximum_milliseconds);
-
-    avg_internal_chain = (uint64_t)WT_STAT_CONN_READ(stats, rec_pages_with_internal_deltas) == 0 ?
-      0 :
-      (uint64_t)WT_STAT_CONN_READ(stats, rec_page_delta_internal) /
-        (uint64_t)WT_STAT_CONN_READ(stats, rec_pages_with_internal_deltas);
-    avg_leaf_chain = (uint64_t)WT_STAT_CONN_READ(stats, rec_pages_with_leaf_deltas) == 0 ?
-      0 :
-      (uint64_t)WT_STAT_CONN_READ(stats, rec_page_delta_leaf) /
-        (uint64_t)WT_STAT_CONN_READ(stats, rec_pages_with_leaf_deltas);
-    WT_STATP_CONN_SET(
-      session, stats, rec_average_internal_page_delta_chain_length, avg_internal_chain);
-    WT_STATP_CONN_SET(session, stats, rec_average_leaf_page_delta_chain_length, avg_leaf_chain);
-
-    WT_STATP_CONN_SET(session, stats, rec_max_internal_page_deltas,
-      conn->disaggregated_storage.max_internal_delta_count);
-    WT_STATP_CONN_SET(
-      session, stats, rec_max_leaf_page_deltas, conn->disaggregated_storage.max_leaf_delta_count);
 }
 
 /*

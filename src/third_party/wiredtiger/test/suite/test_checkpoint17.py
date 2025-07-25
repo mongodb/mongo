@@ -37,7 +37,6 @@ from wtscenario import make_scenarios
 # Make sure that if the history store is clean when a checkpoint is taken
 # that we can still access it via the checkpoint.
 
-@wttest.skip_for_hook("disagg", "layered trees do not support named checkpoints")
 @wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
@@ -52,14 +51,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         ('named', dict(second_checkpoint='second_checkpoint')),
         ('unnamed', dict(second_checkpoint=None)),
     ]
-    ckpt_precision = [
-        ('fuzzy', dict(ckpt_config='checkpoint=(precise=false)')),
-        ('precise', dict(ckpt_config='checkpoint=(precise=true)')),
-    ]
-    scenarios = make_scenarios(format_values, name_values, ckpt_precision)
-
-    def conn_config(self):
-        return self.ckpt_config
+    scenarios = make_scenarios(format_values, name_values)
 
     def large_updates(self, ds, lo, hi, value, ts):
         cursor = self.session.open_cursor(ds.uri)
