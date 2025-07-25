@@ -40,6 +40,7 @@
 
 namespace mongo::query_settings {
 
+MONGO_FAIL_POINT_DEFINE(alwaysFailBackfillInsertCommands);
 MONGO_FAIL_POINT_DEFINE(throwBeforeSchedulingBackfillTask);
 MONGO_FAIL_POINT_DEFINE(hangBeforeExecutingBackfillTask);
 MONGO_FAIL_POINT_DEFINE(hangAfterExecutingBackfillInserts);
@@ -118,11 +119,24 @@ ExecutorFuture<std::vector<QueryShapeHash>> dispatchBatchedInsert(
     auto request = makeInsertCommandRequest(std::move(documents));
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<write_ops::InsertCommandRequest>>(
         executor, CancellationToken::uncancelable(), std::move(request));
-    return async_rpc::sendCommand<write_ops::InsertCommandRequest>(opts, opCtx, std::move(targeter))
-        .onCompletion([hashes = std::move(hashes)](auto reply) {
-            // Map the insert reply to a list of inserted hashes.
-            return handleInsertReply(std::move(hashes), std::move(reply));
-        });
+    auto future = [&]() {
+        if (MONGO_unlikely(alwaysFailBackfillInsertCommands.shouldFail())) {
+            // Fake a "HostUnreachable" response if the failpoint is active.
+            return ExecutorFuture<void>{executor}.then(
+                []() -> async_rpc::AsyncRPCResponse<write_ops::InsertCommandReply> {
+                    uassertStatusOK(Status{
+                        AsyncRPCErrorInfo(Status(ErrorCodes::HostUnreachable, "host is down")),
+                        "Remote command execution failed"});
+                    MONGO_UNREACHABLE;
+                });
+        }
+        return async_rpc::sendCommand<write_ops::InsertCommandRequest>(
+            opts, opCtx, std::move(targeter));
+    }();
+    return std::move(future).onCompletion([hashes = std::move(hashes)](auto reply) {
+        // Map the insert reply to a list of inserted hashes.
+        return handleInsertReply(std::move(hashes), std::move(reply));
+    });
 }
 
 std::vector<QueryShapeHash> flattenVector(std::vector<std::vector<QueryShapeHash>> vecOfVecs) {
