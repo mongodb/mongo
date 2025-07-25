@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor.h"
@@ -399,6 +400,8 @@ private:
     size_t _batchSizeCount = 0;
     // The size limit in bytes of each batch.
     size_t _batchSizeBytes = 0;
+
+    boost::optional<Explain::PlannerContext> _plannerContext;
 };
 
 class DSCursorCatalogResourceHandle : public DocumentSourceCursor::CatalogResourceHandle {

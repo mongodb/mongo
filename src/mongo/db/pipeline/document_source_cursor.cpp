@@ -313,39 +313,19 @@ Value DocumentSourceCursor::serialize(const SerializationOptions& opts) const {
     MutableDocument out;
 
     BSONObjBuilder explainStatsBuilder;
+    tassert(
+        10769400, "Expected the plannerContext to be set for explain", _plannerContext.has_value());
+    Explain::explainStages(
+        _exec.get(),
+        *_plannerContext,
+        opts.verbosity.value(),
+        _execStatus,
+        _winningPlanTrialStats,
+        BSONObj(),
+        SerializationContext::stateCommandReply(pExpCtx->getSerializationContext()),
+        BSONObj(),
+        &explainStatsBuilder);
 
-    {
-        auto opCtx = pExpCtx->getOperationContext();
-        auto secondaryNssList = _exec->getSecondaryNamespaces();
-        boost::optional<AutoGetCollectionForReadMaybeLockFree> readLock = boost::none;
-        auto initAutoGetFn = [&]() {
-            readLock.emplace(pExpCtx->getOperationContext(),
-                             _exec->nss(),
-                             AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                                 secondaryNssList.cbegin(), secondaryNssList.cend()));
-        };
-        bool isAnySecondaryCollectionNotLocal =
-            initializeAutoGet(opCtx, _exec->nss(), secondaryNssList, initAutoGetFn);
-        tassert(8322003,
-                "Should have initialized AutoGet* after calling 'initializeAutoGet'",
-                readLock.has_value());
-        MultipleCollectionAccessor collections(opCtx,
-                                               &readLock->getCollection(),
-                                               readLock->getNss(),
-                                               readLock->isAnySecondaryNamespaceAView() ||
-                                                   isAnySecondaryCollectionNotLocal,
-                                               secondaryNssList);
-        Explain::explainStages(
-            _exec.get(),
-            collections,
-            opts.verbosity.value(),
-            _execStatus,
-            _winningPlanTrialStats,
-            BSONObj(),
-            SerializationContext::stateCommandReply(pExpCtx->getSerializationContext()),
-            BSONObj(),
-            &explainStatsBuilder);
-    }
 
     BSONObj explainStats = explainStatsBuilder.obj();
     invariant(explainStats["queryPlanner"]);
@@ -458,6 +438,7 @@ DocumentSourceCursor::DocumentSourceCursor(
         // It's safe to access the executor even if we don't have the collection lock since we're
         // just going to call getStats() on it.
         _winningPlanTrialStats = explainer.getWinningPlanTrialStats();
+        _plannerContext = Explain::makePlannerContext(*_exec, collections);
     }
 
     if (collections.hasMainCollection()) {

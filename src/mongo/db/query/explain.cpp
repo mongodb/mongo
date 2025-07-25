@@ -87,7 +87,7 @@ namespace {
  */
 void generatePlannerInfo(PlanExecutor* exec,
                          const BSONObj& cmd,
-                         const MultipleCollectionAccessor& collections,
+                         const Explain::PlannerContext& plannerContext,
                          BSONObj extraInfo,
                          const SerializationContext& serializationContext,
                          BSONObjBuilder* out) {
@@ -95,24 +95,6 @@ void generatePlannerInfo(PlanExecutor* exec,
 
     plannerBob.append("namespace",
                       NamespaceStringUtil::serialize(exec->nss(), serializationContext));
-
-    boost::optional<uint32_t> planCacheShapeHash;
-    boost::optional<uint32_t> planCacheKeyHash;
-    const auto& mainCollection = collections.getMainCollection();
-    if (auto* cq = exec->getCanonicalQuery(); mainCollection && cq) {
-        if (cq->isSbeCompatible() && cq->isUsingSbePlanCache() &&
-            feature_flags::gFeatureFlagSbeFull.isEnabled()) {
-            const auto planCacheKeyInfo =
-                plan_cache_key_factory::make(*exec->getCanonicalQuery(), collections);
-            planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
-            planCacheShapeHash = planCacheKeyInfo.planCacheShapeHash();
-        } else {
-            const auto planCacheKeyInfo = plan_cache_key_factory::make<PlanCacheKey>(
-                *exec->getCanonicalQuery(), mainCollection);
-            planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
-            planCacheShapeHash = planCacheKeyInfo.planCacheShapeHash();
-        }
-    }
 
     // In general we should have a canonical query, but sometimes we may avoid creating a canonical
     // query as an optimization (specifically, the update system does not canonicalize for idhack
@@ -135,27 +117,19 @@ void generatePlannerInfo(PlanExecutor* exec,
             plannerBob.append("querySettings", querySettingsBSON);
             plannerBob.append("indexFilterSet", false);
         } else {
-            const bool existsMatchingIndexFilter = [&]() {
-                if (!mainCollection) {
-                    return false;
-                }
-                const auto* indexFilters =
-                    QuerySettingsDecoration::get(mainCollection->getSharedDecorations());
-                return indexFilters->getAllowedIndicesFilter(*query).has_value();
-            }();
-            plannerBob.append("indexFilterSet", existsMatchingIndexFilter);
+            plannerBob.append("indexFilterSet", plannerContext.indexFilterSet);
         }
     }
 
-    if (planCacheShapeHash) {
+    if (plannerContext.planCacheShapeHash) {
         // TODO SERVER-93305: Remove deprecated 'queryHash' usages.
-        std::string planCacheShapeHashStr = zeroPaddedHex(*planCacheShapeHash);
+        std::string planCacheShapeHashStr = zeroPaddedHex(*plannerContext.planCacheShapeHash);
         plannerBob.append("queryHash", planCacheShapeHashStr);
         plannerBob.append("planCacheShapeHash", planCacheShapeHashStr);
     }
 
-    if (planCacheKeyHash) {
-        plannerBob.append("planCacheKey", zeroPaddedHex(*planCacheKeyHash));
+    if (plannerContext.planCacheKeyHash) {
+        plannerBob.append("planCacheKey", zeroPaddedHex(*plannerContext.planCacheKeyHash));
     }
 
     if (exec->getOpCtx() != nullptr) {
@@ -368,6 +342,27 @@ void Explain::explainStages(PlanExecutor* exec,
                             const SerializationContext& serializationContext,
                             const BSONObj& command,
                             BSONObjBuilder* out) {
+    auto collInfo = Explain::makePlannerContext(*exec, collections);
+    Explain::explainStages(exec,
+                           collInfo,
+                           verbosity,
+                           executePlanStatus,
+                           winningPlanTrialStats,
+                           extraInfo,
+                           serializationContext,
+                           command,
+                           out);
+}
+
+void Explain::explainStages(PlanExecutor* exec,
+                            const Explain::PlannerContext& plannerContext,
+                            ExplainOptions::Verbosity verbosity,
+                            Status executePlanStatus,
+                            boost::optional<PlanExplainer::PlanStatsDetails> winningPlanTrialStats,
+                            BSONObj extraInfo,
+                            const SerializationContext& serializationContext,
+                            const BSONObj& command,
+                            BSONObjBuilder* out) {
     //
     // Use the stats trees to produce explain BSON.
     //
@@ -376,7 +371,7 @@ void Explain::explainStages(PlanExecutor* exec,
     out->appendElements(explainVersionToBson(explainer.getVersion()));
 
     if (verbosity >= ExplainOptions::Verbosity::kQueryPlanner) {
-        generatePlannerInfo(exec, command, collections, extraInfo, serializationContext, out);
+        generatePlannerInfo(exec, command, plannerContext, extraInfo, serializationContext, out);
     }
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
@@ -388,13 +383,16 @@ void Explain::explainStages(PlanExecutor* exec,
     explain_common::appendIfRoom(command, "command", out);
 }
 
-void Explain::explainPipeline(PlanExecutorPipeline* pipelineExec,
+void Explain::explainPipeline(PlanExecutor* exec,
                               bool executePipeline,
                               ExplainOptions::Verbosity verbosity,
                               const BSONObj& command,
                               BSONObjBuilder* out) {
-    invariant(pipelineExec);
+    invariant(exec);
     invariant(out);
+
+    auto pipelineExec = dynamic_cast<PlanExecutorPipeline*>(exec);
+    invariant(pipelineExec);
 
     // If we need execution stats, this runs the plan in order to gather the stats.
     if (verbosity >= ExplainOptions::Verbosity::kExecStats && executePipeline) {
@@ -407,14 +405,14 @@ void Explain::explainPipeline(PlanExecutorPipeline* pipelineExec,
     out->appendElements(explainVersionToBson(explainer.getVersion()));
     *out << "stages" << Value(pipelineExec->writeExplainOps(verbosity));
 
-    explain_common::generateQueryShapeHash(pipelineExec->getOpCtx(), out);
-    explain_common::generateMaxUsedMemBytes(pipelineExec->getOpCtx(), out);
+    explain_common::generateQueryShapeHash(exec->getOpCtx(), out);
+    explain_common::generateMaxUsedMemBytes(exec->getOpCtx(), out);
     explain_common::generateServerInfo(out);
 
-    auto* cq = pipelineExec->getCanonicalQuery();
-    const auto& expCtx = cq ? cq->getExpCtx()
-                            : ExpressionContext::makeBlankExpressionContext(
-                                  pipelineExec->getOpCtx(), pipelineExec->nss());
+    auto* cq = exec->getCanonicalQuery();
+    const auto& expCtx = cq
+        ? cq->getExpCtx()
+        : ExpressionContext::makeBlankExpressionContext(exec->getOpCtx(), exec->nss());
     explain_common::generateServerParameters(expCtx, out);
     explain_common::appendIfRoom(command, "command", out);
 }
@@ -464,22 +462,6 @@ void Explain::explainStages(PlanExecutor* exec,
         ? cq->getExpCtx()
         : ExpressionContext::makeBlankExpressionContext(exec->getOpCtx(), exec->nss());
     explain_common::generateServerParameters(expCtx, out);
-}
-
-void Explain::explainStages(PlanExecutor* exec,
-                            const CollectionPtr& collection,
-                            ExplainOptions::Verbosity verbosity,
-                            BSONObj extraInfo,
-                            const SerializationContext& serializationContext,
-                            const BSONObj& command,
-                            BSONObjBuilder* out) {
-    explainStages(exec,
-                  MultipleCollectionAccessor(collection),
-                  verbosity,
-                  extraInfo,
-                  serializationContext,
-                  command,
-                  out);
 }
 
 void Explain::explainStages(PlanExecutor* exec,
@@ -568,4 +550,48 @@ void Explain::planCacheEntryToBSON(const sbe::PlanCacheEntry& entry, BSONObjBuil
     out->append("estimatedSizeBytes", static_cast<long long>(entry.estimatedEntrySizeBytes));
     out->append("solutionHash", static_cast<long long>(entry.cachedPlan->solutionHash));
 }
+
+Explain::PlannerContext Explain::makePlannerContext(const PlanExecutor& exec,
+                                                    const MultipleCollectionAccessor& collections) {
+    const bool mainCollExists = collections.hasMainCollection();
+
+    boost::optional<uint32_t> planCacheKeyHash;
+    boost::optional<uint32_t> planCacheShapeHash;
+
+    if (auto* cq = exec.getCanonicalQuery(); mainCollExists && cq) {
+        if (cq->isSbeCompatible() && cq->isUsingSbePlanCache() &&
+            feature_flags::gFeatureFlagSbeFull.isEnabled()) {
+            const auto planCacheKeyInfo =
+                plan_cache_key_factory::make(*exec.getCanonicalQuery(), collections);
+            planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
+            planCacheShapeHash = planCacheKeyInfo.planCacheShapeHash();
+        } else {
+            const auto planCacheKeyInfo = plan_cache_key_factory::make<PlanCacheKey>(
+                *exec.getCanonicalQuery(), collections.getMainCollection());
+            planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
+            planCacheShapeHash = planCacheKeyInfo.planCacheShapeHash();
+        }
+    }
+
+    // If there exists a matching index filter, set 'indexFilterSet' to false if query settings
+    // set, as they have higher priority.
+    bool indexFilterSet = false;
+    if (auto query = exec.getCanonicalQuery()) {
+        auto& querySettings = query->getExpCtx()->getQuerySettings();
+        if (auto querySettingsBSON = querySettings.toBSON(); !querySettingsBSON.isEmpty()) {
+            indexFilterSet = false;
+        } else {
+            indexFilterSet = [&]() {
+                if (!mainCollExists) {
+                    return false;
+                }
+                const auto* indexFilters = QuerySettingsDecoration::get(
+                    collections.getMainCollection()->getSharedDecorations());
+                return indexFilters->getAllowedIndicesFilter(*query).has_value();
+            }();
+        }
+    }
+    return {mainCollExists, planCacheShapeHash, planCacheKeyHash, indexFilterSet};
+}
+
 }  // namespace mongo

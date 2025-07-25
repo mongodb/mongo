@@ -435,7 +435,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(
             exec.get(),
-            collection.getCollectionPtr(),
+            collection,
             verbosity,
             BSONObj(),
             SerializationContext::stateCommandReply(request.getSerializationContext()),
@@ -482,7 +482,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(
             exec.get(),
-            collection.getCollectionPtr(),
+            collection,
             verbosity,
             BSONObj(),
             SerializationContext::stateCommandReply(request.getSerializationContext()),

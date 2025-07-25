@@ -485,7 +485,7 @@ public:
         ScopedDebugInfo explainDiagnostics(
             "explainDiagnostics", diagnostic_printers::ExplainDiagnosticPrinter{executor.get()});
         Explain::explainStages(executor.get(),
-                               collectionOrView->getCollectionPtr(),
+                               collectionOrView->getCollection(),
                                verbosity,
                                BSONObj(),
                                SerializationContext::stateCommandReply(serializationCtx),
