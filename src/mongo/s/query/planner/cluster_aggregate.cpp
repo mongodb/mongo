@@ -567,6 +567,24 @@ Status _parseQueryStatsAndReturnEmptyResult(
     boost::optional<ExplainOptions::Verbosity> verbosity,
     BSONObjBuilder* result) {
 
+    // By forcing the validation checks to be done explicitly, instead of indirectly via a callback
+    // function (runAggregateImpl) in runAggregate(...) that gets passed to
+    // router.routeWithRoutingContext(...), this code ensures that the router always performs
+    // lite parsed pipeline validation. This is critical for $rankFusion and $scoreFusion because
+    // both stages are fully desugared by the time they are sent to the shards (meaning they don't
+    // contain $rankFusion/$scoreFusion DocumentSources) so the lite parsed pipeline validation
+    // performed on the shards will NOT catch any validation errors. Without this explicit check,
+    // it's possible for the router.routeWithRoutingContext(...) to error early before the callback
+    // function, runAggregateImpl(...), is executed. The catch clause catches the error and
+    // execution continues to pipeline parsing and so on. Thus, lite parsed pipeline validation
+    // never happens on the sharding node for single shard/sharded cluster with unsharded collection
+    // topologies.
+    try {
+        performValidationChecks(opCtx, request, liteParsedPipeline);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+
     const auto hasChangeStream = liteParsedPipeline.hasChangeStream();
     const auto shouldDoFLERewrite = request.getEncryptionInformation().has_value();
     const auto requiresCollationForParsingUnshardedAggregate =
