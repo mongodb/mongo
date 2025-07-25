@@ -892,6 +892,8 @@ flags in common: {common_set}
             _config.EVERGREEN_PROJECT_NAME, base_task, _config.EVERGREEN_VARIANT_NAME
         )
         _config.SHUFFLE_STRATEGY = TestRunner.LongestFirstPartialShuffle(historic_task_data)
+    elif shuffle == "auto":
+        _config.SHUFFLE_STRATEGY = TestRunner.RandomShuffle() if _config.JOBS > 1 else None
     elif shuffle != "off":
         _config.SHUFFLE_STRATEGY = TestRunner.RandomShuffle()
 

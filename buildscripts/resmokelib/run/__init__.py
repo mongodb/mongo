@@ -1648,12 +1648,14 @@ class RunPlugin(PluginInterface):
             "--shuffleMode",
             action="store",
             dest="shuffle",
-            choices=("random", "longest-first", "off"),
-            metavar="random|longest-first|off",
+            choices=("random", "longest-first", "off", "auto"),
+            metavar="random|longest-first|off|auto",
             help=(
                 "Controls whether to randomize the order in which tests are executed."
                 " The longest-first option requires historic runtime information via the evergreen"
                 " project/variant/task name, otherwise fallsback to completely random."
+                " Defaults to auto when not supplied. auto enables randomization in"
+                " all cases except when the number of jobs requested is 1."
             ),
         )
 
