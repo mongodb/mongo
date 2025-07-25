@@ -1523,122 +1523,7 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
         return HistoricalPlacement{{}, HistoricalPlacementStatus::FutureClusterTime};
     }
 
-    /*
-    The aggregation pipeline is split in 2 sub pipelines:
-    - one pipeline "exactPlacementData" describing the list of shards currently active in the
-    cluster in which the data belonging to the input nss were placed at the given clusterTime. The
-    primary shard is always included in the list. In case the input nss is empty, the list of shards
-    includes all the shards in the cluster containing data at the given clusterTime. Stages can be
-    described as follow:
-        Stage 1. Select only the entry with timestamp <= clusterTime and filter out
-    all nss that are not the collection or the database using a regex. We also esclude all the
-    entries related to the fcv marker. In case the whole cluster info is searched, we filter any nss
-    with at least 1 caracter
-        Stage 2. sort by timestamp
-        Stage 3. Extract the first document for each database and collection matching the received
-    namespace
-        Stage 4. Discard the entries with empty shards (i.e. the collection was dropped or
-    renamed)
-        Stage 5. Group all documents and concat shards (this will generate an array of arrays)
-        Stage 6. Flatten the array of arrays into a set
-    (this will also remove duplicates)
-        Stage 7. Access to the list of shards currently active in the cluster
-    - one pipeline "approximatePlacementData" retreiving the last "marker" which is a special entry
-    where the nss is empty and the list of shard can be either empty or not.
-        - In case the list is not empty: it means the clusterTime requested was during an fcv
-    upgrade/downgrade. Thus we cannot guarantee the result of 'exactPlacementData' to
-    be correct. We therefore report the list of shards present in the "marker" entry, which
-    correspond to the list of shards in the cluster at the time the fcv upgrade/downgrade started.
-        - The pipeline selects only the fcv markers, sorts by decreasing timestamp and gets the
-    first element.
-
-    regex=^db(\.collection)?$ // matches db or db.collection
-    db.placementHistory.aggregate([
-      {
-        "$facet": {
-          "exactPlacementData": [
-            {
-              "$match": {
-                "timestamp": {
-                  "$lte":<clusterTime>
-                },
-                "nss": {
-                  $regex: regex
-                }
-              }
-            },
-            {
-              "$sort": {
-                "timestamp": -1
-              }
-            },
-            {
-              "$group": {
-                _id: "$nss",
-                shards: {
-                  $first: "$shards"
-                }
-              }
-            },
-            {
-              "$match": {
-                shards: {
-                  $not: {
-                    $size: 0
-                  }
-                }
-              }
-            },
-            {
-              "$group": {
-                _id: "",
-                shards: {
-                  $push: "$shards"
-                }
-              }
-            },
-            {
-              $project: {
-                "shards": {
-                  $reduce: {
-                    input: "$shards",
-                    initialValue: [],
-                    in: {
-                      "$setUnion": [
-                        "$$this",
-                        "$$value"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "approximatePlacementData": [
-            {
-              "$match": {
-                "timestamp": {
-                  "$lte": <clusterTime>
-                },
-                "nss": kConfigPlacementHistoryInitializationMarker
-              }
-            },
-            {
-              "$sort": {
-                "timestamp": -1
-              }
-            },
-            {
-              "$limit": 1
-            }
-          ]
-        }
-      }
-    ])
-        */
     ResolvedNamespaceMap resolvedNamespaces;
-    resolvedNamespaces[NamespaceString::kConfigsvrShardsNamespace] = {
-        NamespaceString::kConfigsvrShardsNamespace, std::vector<BSONObj>() /* pipeline */};
     resolvedNamespaces[NamespaceString::kConfigsvrPlacementHistoryNamespace] = {
         NamespaceString::kConfigsvrPlacementHistoryNamespace,
         std::vector<BSONObj>() /* pipeline */};
@@ -1648,96 +1533,360 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
                       .resolvedNamespace(std::move(resolvedNamespaces))
                       .build();
 
-    // Build the pipeline for the exact placement data.
-    // 1. Get all the history entries prior to the requested time concerning either the collection
-    // or the parent database.
-    const auto& kMarkerNss = NamespaceStringUtil::serialize(
+    const auto kInitDocumentLabel = NamespaceStringUtil::serialize(
         ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,
         SerializationContext::stateDefault());
-    auto matchStage = [&]() {
-        bool isClusterSearch = !nss.has_value();
-        if (isClusterSearch)
-            return DocumentSourceMatch::create(BSON("nss" << BSON("$ne" << kMarkerNss)
-                                                          << "timestamp"
-                                                          << BSON("$lte" << atClusterTime)),
-                                               expCtx);
+    constexpr auto kConsistentMetadataAvailable = "consistentMetadataAvailable"_sd;
 
-        bool isCollectionSearch = !nss->db_forSharding().empty() && !nss->coll().empty();
-        auto collMatchExpression = isCollectionSearch ? pcre_util::quoteMeta(nss->coll()) : ".*";
-        auto regexString = "^" + pcre_util::quoteMeta(nss->db_forSharding()) + "(\\." +
-            collMatchExpression + ")?$";
-        return DocumentSourceMatch::create(BSON("nss" << BSON("$regex" << regexString)
-                                                      << "timestamp"
-                                                      << BSON("$lte" << atClusterTime)),
-                                           expCtx);
+    // The aggregation is composed by 2 sub pipelines:
+    // 1. The first sub pipeline pulls the 'config.placementHistory' initialization document related
+    //    to the requested 'atClusterTime', whose content will be later processed to determine
+    //    if the query may be served (and if so, through which data).
+    auto initializationDocumentSubPipeline = [&] {
+        DocumentSourceContainer initDocSubPipelineStages;
+        // a. Get the most recent initialization doc that satisfies <= 'atClusterTime'.
+        auto matchStage = DocumentSourceMatch::create(
+            BSON("timestamp" << BSON("$lte" << atClusterTime) << "nss" << kInitDocumentLabel),
+            expCtx);
+        auto sortStage = DocumentSourceSort::create(expCtx, BSON("timestamp" << -1));
+        auto limitStage = DocumentSourceLimit::create(expCtx, 1);
+
+        // b. Reformat the content of the initialization document:
+        //  - the 'kConsistentMetadataAvailable' field gives an indication on whether the
+        //    initialization state 'atClusterTime' allows to retrieve accurate placement metadata
+        //    through computation (the 2nd subpipeline)
+        //  - the 'shards' field contains the full composition of cluster when the initialization
+        //    process was run for the last time (and it can be used as an approximated response to
+        //    this query when no computation is possible).
+        auto projectStage = DocumentSourceProject::create(
+            BSON("_id" << 0 << "shards" << 1 << kConsistentMetadataAvailable
+                       << BSON("$eq" << BSON_ARRAY(BSON("$size" << "$shards") << 0))),
+            expCtx,
+            DocumentSourceProject::kStageName);
+
+        initDocSubPipelineStages.emplace_back(std::move(matchStage));
+        initDocSubPipelineStages.emplace_back(std::move(sortStage));
+        initDocSubPipelineStages.emplace_back(std::move(limitStage));
+        initDocSubPipelineStages.emplace_back(std::move(projectStage));
+
+        return Pipeline::create(std::move(initDocSubPipelineStages), expCtx);
     }();
 
-    // 2 & 3. Sort by timestamp and extract the first document for collection and database
-    auto sortStage = DocumentSourceSort::create(expCtx, BSON("timestamp" << -1));
-    constexpr auto kShardsFieldName = "shards"_sd;
-    constexpr auto kDollarShardsFieldName = "$shards"_sd;
-    auto groupByExpressionBson =
-        BSON("_id" << "$nss" << kShardsFieldName << BSON("$first" << kDollarShardsFieldName));
-    auto groupStage = DocumentSourceGroup::createFromBson(
-        BSON(DocumentSourceGroup::kStageName << std::move(groupByExpressionBson)).firstElement(),
-        expCtx);
+    // 2. The second sub pipeline retrieves the set of data bearing shards for the nss/whole cluster
+    //    at the requested time, combining the placement metadata of each collection/database name
+    //    that matches the search criteria.
+    auto retrievePlacementSubPipeline = [&] {
+        // The shape of the pipeline varies depending on the search level.
+        const auto clusterLevelSearch = !nss.has_value();
+        const auto dbLevelSearch = !clusterLevelSearch && nss->isDbOnly();
+        const auto collectionLevelSearch = !clusterLevelSearch && !dbLevelSearch;
+        DocumentSourceContainer placementSearchSubPipelineStages;
 
-    // Stage 4. Discard the entries with empty shards (i.e. the collection was dropped or renamed)
-    auto noShardsFilter = DocumentSourceMatch::create(
-        BSON(kShardsFieldName << BSON("$not" << BSON("$size" << 0))), expCtx);
+        if (collectionLevelSearch) {
+            // a. Retrieve the most recent placement doc recorded for both the collection and its
+            //    parent database (note: docs may not be present when the collection was untracked
+            //    or the database/collection were not existing 'atClusterTime').
+            auto matchCollAndParentDbExpr = "^" + pcre_util::quoteMeta(nss->db_forSharding()) +
+                "(\\." + pcre_util::quoteMeta(nss->coll()) + ")?$";
 
-    // Stage 5. Group all documents and concat shards (this will generate an array of arrays)
-    auto groupByExpressionBson2 =
-        BSON("_id" << "" << kShardsFieldName << BSON("$push" << kDollarShardsFieldName));
-    auto groupStageConcat = DocumentSourceGroup::createFromBson(
-        BSON(DocumentSourceGroup::kStageName << std::move(groupByExpressionBson2)).firstElement(),
-        expCtx);
+            auto matchStage = DocumentSourceMatch::create(
+                BSON("nss" << BSON("$regex" << matchCollAndParentDbExpr) << "timestamp"
+                           << BSON("$lte" << atClusterTime)),
+                expCtx);
 
-    // Stage 6. Flatten the array of arrays into a set (this will also remove duplicates)
-    auto projectStageSpecBson =
-        BSON(kShardsFieldName << BSON(
-                 "$reduce" << BSON(
-                     "input" << kDollarShardsFieldName << "initialValue" << BSONArray() << "in"
-                             << BSON("$setUnion" << BSON_ARRAY("$$this" << "$$value")))));
-    auto projectStageFlatten = DocumentSourceProject::createFromBson(
-        BSON(DocumentSourceProject::kStageName << std::move(projectStageSpecBson)).firstElement(),
-        expCtx);
+            auto sortByTimestampStage = DocumentSourceSort::create(expCtx, BSON("timestamp" << -1));
 
-    DocumentSourceContainer stages;
-    stages.emplace_back(std::move(matchStage));
-    stages.emplace_back(std::move(sortStage));
-    stages.emplace_back(std::move(groupStage));
-    stages.emplace_back(std::move(noShardsFilter));
-    stages.emplace_back(std::move(groupStageConcat));
-    stages.emplace_back(std::move(projectStageFlatten));
-    auto exactDataPipeline = Pipeline::create(stages, expCtx);
+            auto groupByNamespaceAndTakeLatestPlacementSpec =
+                BSON("_id" << "$nss" << "shards" << BSON("$first" << "$shards"));
+            auto groupByNamespaceStage = DocumentSourceGroup::createFromBson(
+                BSON(DocumentSourceGroup::kStageName
+                     << std::move(groupByNamespaceAndTakeLatestPlacementSpec))
+                    .firstElement(),
+                expCtx);
 
-    // Build the pipeline for the approximate data.
-    auto matchFcvMarkerStage = DocumentSourceMatch::create(
-        BSON("timestamp" << BSON("$lte" << atClusterTime) << "nss" << kMarkerNss), expCtx);
-    auto sortFcvMarkerStage = DocumentSourceSort::create(expCtx, BSON("timestamp" << -1));
-    auto limitFcvMarkerStage = DocumentSourceLimit::create(expCtx, 1);
-    DocumentSourceContainer stages2;
-    stages2.emplace_back(std::move(matchFcvMarkerStage));
-    stages2.emplace_back(std::move(sortFcvMarkerStage));
-    stages2.emplace_back(std::move(limitFcvMarkerStage));
-    auto approximateDataPipeline = Pipeline::create(stages2, expCtx);
+            // b. Select the placement information about the collection or fallback to the parent
+            //    database; placement information containing an empty set of shards have to be
+            //    discarded (they describe a dropped namespace, which may be treated as a "non
+            //    existing one").
+            //    The sorting is done over the _id field, which contains nss value, as a consequence
+            //    of the projection performed by sortGroupsByNamespaceStage.
+            auto sortGroupsByNamespaceStage = DocumentSourceSort::create(expCtx, BSON("_id" << -1));
+            auto filterOutDroppedNamespacesStage =
+                DocumentSourceMatch::create(BSON("shards" << BSON("$ne" << BSONArray())), expCtx);
+            auto takeFirstNamespaceGroupStage = DocumentSourceLimit::create(expCtx, 1);
 
-    // Build the facet pipeline
-    constexpr auto kApproximatePlacementDataFieldName = "approximatePlacementData"_sd;
-    constexpr auto kExactPlacementDataFieldName = "exactPlacementData"_sd;
-    auto facetStageBson =
-        BSON(kApproximatePlacementDataFieldName << approximateDataPipeline->serializeToBson()
-                                                << kExactPlacementDataFieldName
-                                                << exactDataPipeline->serializeToBson());
-    auto facetStage = DocumentSourceFacet::createFromBson(
-        BSON(DocumentSourceFacet::kStageName << std::move(facetStageBson)).firstElement(), expCtx);
+            placementSearchSubPipelineStages.emplace_back(std::move(matchStage));
+            placementSearchSubPipelineStages.emplace_back(std::move(sortByTimestampStage));
+            placementSearchSubPipelineStages.emplace_back(std::move(groupByNamespaceStage));
+            placementSearchSubPipelineStages.emplace_back(std::move(sortGroupsByNamespaceStage));
+            placementSearchSubPipelineStages.emplace_back(
+                std::move(filterOutDroppedNamespacesStage));
+            placementSearchSubPipelineStages.emplace_back(std::move(takeFirstNamespaceGroupStage));
+            return Pipeline::create(std::move(placementSearchSubPipelineStages), expCtx);
+        }
 
-    const auto pipeline = Pipeline::create({facetStage}, expCtx);
+        tassert(
+            10719400, "Unexpected kind of search detected", dbLevelSearch || clusterLevelSearch);
+        // a. Retrieve the latest placement information for each collection and database that falls
+        // within
+        //    the search criteria.
+        auto matchNssExpression = [&] {
+            if (clusterLevelSearch) {
+                // Only discard documents containing 'config.placementHistory' initialization
+                // metadata.
+                return BSON("$ne" << kInitDocumentLabel);
+            }
+
+            // Capture documents about the database itself and any tracked collection under it.
+            auto matchDbAndCollectionsExpr =
+                "^" + pcre_util::quoteMeta(nss->db_forSharding()) + "(\\..*)?$";
+            return BSON("$regex" << matchDbAndCollectionsExpr);
+        }();
+
+        auto matchStage = DocumentSourceMatch::create(
+            BSON("nss" << matchNssExpression << "timestamp" << BSON("$lte" << atClusterTime)),
+            expCtx);
+
+        auto sortByTimestampStage = DocumentSourceSort::create(expCtx, BSON("timestamp" << -1));
+        auto groupByNamespaceAndTakeLatestPlacementSpec =
+            BSON("_id" << "$nss" << "shards" << BSON("$first" << "$shards"));
+        auto groupByNamespaceStage = DocumentSourceGroup::createFromBson(
+            BSON(DocumentSourceGroup::kStageName
+                 << std::move(groupByNamespaceAndTakeLatestPlacementSpec))
+                .firstElement(),
+            expCtx);
+
+        // b. Merge the placement of each matched namespace into a single set field.
+        auto unwindShardsStage =
+            DocumentSourceUnwind::create(expCtx,
+                                         std::string("shards"),
+                                         false /* preserveNullAndEmptyArrays */,
+                                         boost::none /* indexPath */);
+
+        auto mergeAllGroupsInASingleShardListSpec =
+            BSON("_id" << "" << "shards" << BSON("$addToSet" << "$shards"));
+
+        auto mergeAllGroupsStage = DocumentSourceGroup::createFromBson(
+            BSON(DocumentSourceGroup::kStageName << std::move(mergeAllGroupsInASingleShardListSpec))
+                .firstElement(),
+            expCtx);
+
+        auto projectStage = DocumentSourceProject::create(
+            BSON("_id" << 0 << "shards" << 1), expCtx, DocumentSourceProject::kStageName);
+
+        placementSearchSubPipelineStages.emplace_back(std::move(matchStage));
+        placementSearchSubPipelineStages.emplace_back(std::move(sortByTimestampStage));
+        placementSearchSubPipelineStages.emplace_back(std::move(groupByNamespaceStage));
+        placementSearchSubPipelineStages.emplace_back(std::move(unwindShardsStage));
+        placementSearchSubPipelineStages.emplace_back(std::move(mergeAllGroupsStage));
+        return Pipeline::create(std::move(placementSearchSubPipelineStages), expCtx);
+    }();
+
+    // Compose the main aggregation; first, combine the two sub pipelines within a $facets stage...
+    constexpr auto kInitMetadataRetrievalSubPipelineName = "metadataFromInitDoc"_sd;
+    constexpr auto kPlacementRetrievalSubPipelineName = "computedPlacement"_sd;
+    const auto mainPipeline = [&] {
+        auto facetStageBson = BSON(kInitMetadataRetrievalSubPipelineName
+                                   << initializationDocumentSubPipeline->serializeToBson()
+                                   << kPlacementRetrievalSubPipelineName
+                                   << retrievePlacementSubPipeline->serializeToBson());
+        auto facetStage = DocumentSourceFacet::createFromBson(
+            BSON(DocumentSourceFacet::kStageName << std::move(facetStageBson)).firstElement(),
+            expCtx);
+
+        // ... then merge the results into a single document.
+        // Each subpipeline is expected to produce an array containing at most one element:
+        // - If no initialization document may be retrieved, produce the proper fields to express
+        //   that the response cannot be neither computed nor approximated;
+        // - If the computation of the placement returns an empty result, this means that there was
+        //   no existing collection/database at the requested 'atClusterTime'; this state gets
+        //   remapped into an empty set of shards.
+        auto projectStageBson =
+            BSON("isComputedPlacementAccurate"
+                 << BSON("$ifNull" << BSON_ARRAY(
+                             BSON("$first" << "$metadataFromInitDoc.consistentMetadataAvailable")
+                             << false))
+                 << "placementAtInitTime"
+                 << BSON("$ifNull"
+                         << BSON_ARRAY(BSON("$first" << "$metadataFromInitDoc.shards") << BSONNULL))
+                 << "computedPlacement"
+                 << BSON("$ifNull" << BSON_ARRAY(BSON("$first" << "$computedPlacement.shards")
+                                                 << BSONArray())));
+        auto projectStage = DocumentSourceProject::create(
+            projectStageBson, expCtx, DocumentSourceProject::kStageName);
+
+        return Pipeline::create({std::move(facetStage), std::move(projectStage)}, expCtx);
+    }();
+
+    // 4. Run the aggregation.
+    // ************************************************************
+    // Full pipeline for collection level search:
+    // [
+    //   {
+    //     '$facet': {
+    //       'computedPlacement': [
+    //         {
+    //           '$match': {
+    //             'timestamp': {
+    //               '$lte': '<atClusterTime>'
+    //             },
+    //               'nss': {'$regex': '^dbName(\\.collName)?$'}
+    //           }
+    //         },
+    //         {
+    //           '$sort': {'timestamp': -1}
+    //         },
+    //         {
+    //           '$group': {
+    //             '_id': '$nss',
+    //             'shards': {
+    //               '$first': '$shards'
+    //             }
+    //           }
+    //         },
+    //         {
+    //           '$sort': {'_id': -1}
+    //         },
+    //         {
+    //           '$match': {'shards': {'$ne': []}}
+    //         },
+    //         {
+    //           '$limit': 1
+    //         },
+    //       ],
+    //       'metadataFromInitDoc': [
+    //         {
+    //           '$match': {
+    //             'timestamp': {
+    //               '$lte': '<atClusterTime>'
+    //               },
+    //             'nss': '.'
+    //           }
+    //         },
+    //         {
+    //           '$sort': {'timestamp': -1}
+    //         },
+    //         {
+    //           '$limit': 1
+    //         },
+    //         {
+    //           '$project': {
+    //             'consistentMetadataAvailable': {
+    //               '$eq': [
+    //                 {
+    //                   '$size': '$shards'
+    //                 },
+    //                 0
+    //               ]
+    //             },
+    //             'shards': 1,
+    //             '_id': 0
+    //           }
+    //         }
+    //       ]
+    //     }
+    //   },
+    //   {
+    //     '$project': {
+    //       'computedPlacement': {
+    //         '$ifNull': [{'$first': '$computedPlacement.shards'}, []]
+    //       },
+    //       'isComputedPlacementAccurate': {
+    //         '$ifNull': [{'$first': '$metadataFromInitDoc.consistentMetadataAvailable'}, false]
+    //       },
+    //       'placementAtInitTime': {
+    //         '$ifNull': [{'$first': '$metadataFromInitDoc.shards'}, null]
+    //       }
+    //     }
+    //   }
+    // ]
+    // ************************************************************
+    // Full pipeline for database & cluster level search:
+    // [
+    //   {
+    //     '$facet': {
+    //       'computedPlacement': [
+    //         {
+    //           '$match': {
+    //             'timestamp': {
+    //               '$lte': '<atClusterTime>'
+    //             },
+    //                      ||            DB Level             || Cluster Level
+    //               'nss': || {'$regex': '^dbName(\\..*)?$'}  || {'$ne': '.'}
+    //           }
+    //         },
+    //         {
+    //           '$sort': {'timestamp': -1}
+    //         },
+    //         {
+    //           '$group': {
+    //             '_id': '$nss',
+    //             'shards': {
+    //               '$first': '$shards'
+    //             }
+    //           }
+    //         },
+    //         {
+    //           '$unwind': '$shards'
+    //         },
+    //         {
+    //           '$group': {
+    //             '_id': '',
+    //             'shards': {
+    //               '$addToSet': '$shards'
+    //             }
+    //           }
+    //         },
+    //       ],
+    //       'metadataFromInitDoc': [
+    //         {
+    //           '$match': {
+    //             'timestamp': {
+    //               '$lte': '<atClusterTime>'
+    //               },
+    //             'nss': '.'
+    //           }
+    //         },
+    //         {
+    //           '$sort': {'timestamp': -1}
+    //         },
+    //         {
+    //           '$limit': 1
+    //         },
+    //         {
+    //           '$project': {
+    //             'consistentMetadataAvailable': {
+    //               '$eq': [
+    //                 {
+    //                   '$size': '$shards'
+    //                 },
+    //                 0
+    //               ]
+    //             },
+    //             'shards': 1,
+    //             '_id': 0
+    //           }
+    //         }
+    //       ]
+    //     }
+    //   },
+    //   {
+    //     '$project': {
+    //       'computedPlacement': {
+    //         '$ifNull': [{'$first': '$computedPlacement.shards'}, []]
+    //       },
+    //       'isComputedPlacementAccurate': {
+    //         '$ifNull': [{'$first': '$metadataFromInitDoc.consistentMetadataAvailable'}, false]
+    //       },
+    //       'placementAtInitTime': {
+    //         '$ifNull': [{'$first': '$metadataFromInitDoc.shards'}, null]
+    //       }
+    //     }
+    //   }
+    // ]
     auto aggRequest = AggregateCommandRequest(NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                                              pipeline->serializeToBson());
+                                              mainPipeline->serializeToBson());
 
-    // Run the aggregation
     const repl::ReadConcernArgs readConcern{vcTime.configTime(),
                                             repl::ReadConcernLevel::kSnapshotReadConcern};
     auto aggrResult = runCatalogAggregation(opCtx, aggRequest, readConcern);
@@ -1745,29 +1894,40 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
             "GetHistoricalPlacement command must return a single document",
             aggrResult.size() == 1);
 
-    auto extractShardIds = [&](const auto& fieldName) {
-        auto pipelineResult = aggrResult.front()[fieldName].Array();
-        if (pipelineResult.empty()) {
-            return std::vector<ShardId>{};
-        }
+    const auto& result = aggrResult.front();
+    LOGV2_DEBUG(10719401,
+                1,
+                "getHistoricalPlacement() query completed",
+                "nss"_attr = nss ? nss->toStringForErrorMsg() : "whole cluster",
+                "atClusterTime"_attr = atClusterTime,
+                "result"_attr = result);
 
-        // Every pipeline result is an array of one element, while containing a single element
-        // 'shards' field.
-        auto shards = pipelineResult[0][kShardsFieldName].Obj();
-        std::vector<ShardId> activeShards;
-        for (const auto& shard : shards) {
-            activeShards.push_back(shard.String());
+    // Finally, process the result of the aggregation.
+    // The expected schema of its only document is:
+    // {
+    //   computedPlacement: <arrayofShardIds>,
+    //   isComputedPlacementAccurate: <bool>,
+    //   placementAtInitTime: <arrayofShardIds or null>,
+    // }
+    const auto isComputedPlacementAccurate = result.getBoolField("isComputedPlacementAccurate");
+    // No placement data may be returned if no response may be computed 'atClusterTime'
+    // and no approximate data is available from the initialization doc.
+    if (!isComputedPlacementAccurate && result.getField("placementAtInitTime").isNull()) {
+        return HistoricalPlacement{{}, HistoricalPlacementStatus::NotAvailable};
+    }
+
+    auto extractShardIds = [&](const auto& fieldName) {
+        std::vector<ShardId> shards;
+        auto shardsArray = result.getField(fieldName).Obj();
+        for (const auto& shardObj : shardsArray) {
+            shards.push_back(shardObj.String());
         }
-        return activeShards;
+        return shards;
     };
 
-    // If there is an fcv marker and the shards array is not empty, return it (the retrieved data as
-    // not exact). If the fcv marker shards array is empty, return the shards array from the exact
-    // data.
-    auto fcvMarkerShards = extractShardIds(kApproximatePlacementDataFieldName);
-    auto&& shards = !fcvMarkerShards.empty() ? std::move(fcvMarkerShards)
-                                             : extractShardIds(kExactPlacementDataFieldName);
-    return HistoricalPlacement{std::move(shards), HistoricalPlacementStatus::OK};
+    const auto sourceField =
+        isComputedPlacementAccurate ? "computedPlacement" : "placementAtInitTime";
+    return HistoricalPlacement{extractShardIds(sourceField), HistoricalPlacementStatus::OK};
 }
 
 bool ShardingCatalogClientImpl::anyShardRemovedSince(OperationContext* opCtx,
