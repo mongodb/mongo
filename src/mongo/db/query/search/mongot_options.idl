@@ -72,10 +72,9 @@ server_parameters:
       redact: false
 
     searchTLSMode:
-      description: "Sets the TLS mode for mongod to mongot connection (globalTLS|disabled|allowTLS|preferTLS|requireTLS). globalTLS will use the setting provided in net.tls.mode, while the other settings will operate according to their usual behavior."
-      set_at: [ startup ]
-      cpp_vartype: std::string
-      cpp_varname: 'searchTLSMode'
-      # TODO SERVER-99787 Change default to "globalTLS"
-      default: 'disabled'
-      redact: false
+        description: "Sets the TLS mode for mongod to mongot connection (globalTLS|disabled|allowTLS|preferTLS|requireTLS). globalTLS will use the setting provided in net.tls.mode, while the other settings will operate according to their usual behavior."
+        set_at: [startup]
+        cpp_vartype: std::string
+        cpp_varname: "searchTLSMode"
+        default: "globalTLS"
+        redact: false

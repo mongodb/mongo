@@ -47,8 +47,7 @@ MongotParams globalMongotParams;
 
 MongotParams::MongotParams() {
     host = kMongotHostDefault;
-    // TODO SERVER-99787 Change default to kGlobalSSL.
-    sslMode = transport::ConnectSSLMode::kDisableSSL;
+    sslMode = transport::ConnectSSLMode::kGlobalSSLMode;
 }
 
 Status MongotParams::onSetHost(const std::string&) {
