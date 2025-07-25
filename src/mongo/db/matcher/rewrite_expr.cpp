@@ -30,17 +30,16 @@
 
 #include "mongo/db/matcher/rewrite_expr.h"
 
-#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
-#include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -49,6 +48,39 @@
 
 
 namespace mongo {
+
+namespace {
+bool validateFieldPathForExprInRewrite(const ExpressionFieldPath& fieldPathExpr) {
+    return !fieldPathExpr.isVariableReference() && !fieldPathExpr.isROOT();
+}
+
+template <bool wrapConstInArray>
+std::unique_ptr<InMatchExpression> rewriteExprInMatchExpression(
+    const ExpressionFieldPath& fieldPathExpr,
+    const ExpressionConstant& literalExpr,
+    std::vector<BSONObj>& cache) {
+    // Build expression BSON.
+    auto fieldPath = fieldPathExpr.getFieldPath().tail().fullPath();
+    auto bob = BSONObjBuilder{};
+    if constexpr (wrapConstInArray) {
+        bob << fieldPath << BSON_ARRAY(literalExpr.getValue());
+    } else {
+        bob << fieldPath << literalExpr.getValue();
+    }
+    auto inObj = bob.obj();
+
+    // Create $in MatchExpression.
+    auto fieldName = inObj.firstElementFieldNameStringData();
+    auto inMatch = std::make_unique<InMatchExpression>(fieldName);
+    uassertStatusOK(inMatch->setEqualitiesArray(inObj.getField(fieldName).Obj()));
+
+    // Cache the backing BSON for the MatchExpression so it doesn't get destroyed while we still
+    // need it.
+    cache.push_back(std::move(inObj));
+
+    return inMatch;
+};
+}  // namespace
 
 using CmpOp = ExpressionCompare::CmpOp;
 
@@ -287,6 +319,17 @@ bool RewriteExpr::_canRewriteComparison(
     return hasFieldPath;
 }
 
+/**
+ * Create the MatchExpression equivalent of the $expr $in.
+ * Cases:
+ *   - {$expr: {$in: ["$lhsFieldPath", rhsConstArray]}} --> {"lhsFieldPath": {$in:
+ * rhsConstArray}}
+ *   - {$expr: {$in:[lhsConst, "$rhsFieldPath"]}} --> {"rhsFieldPath": {$in: [lhsConst]}}
+ * This is the first level of filtering that can take advantage of indexes.
+ * It may return a superset of results because MatchExpressions have implicit array
+ * traversal semantics that are not present in agg. The original predicate is maintained in
+ * the second level of filtering for correctness.
+ */
 std::unique_ptr<MatchExpression> RewriteExpr::_rewriteInExpression(
     const boost::intrusive_ptr<ExpressionIn>& expr) {
 
@@ -299,8 +342,33 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteInExpression(
     // Validate lhs, which must be a field path.
     auto lhsFieldPath = dynamic_cast<ExpressionFieldPath*>(lhs);
     if (!lhsFieldPath) {
+        if (internalQueryExtraPredicateForReversedIn.load() ||
+            expr->getExpressionContext()->isFleQuery()) {
+            /**
+             * If we have a FLE query, we are guaranteed to have an expression that may generate a
+             * $in for its FLE tag disjunction. In this case we want the rewrite to take place even
+             * in the absence of the internalQueryExtraPredicateForReversedIn query knob. Not
+             * performing the rewrite for FLE queries will prevent them from being able to take
+             *advantage of the index on the '__safeContent__' array, and has signficant performance
+             * implications.
+             */
+            if (auto* lhsConst = dynamic_cast<ExpressionConstant*>(lhs); lhsConst) {
+                auto* rhsFieldPath = dynamic_cast<ExpressionFieldPath*>(rhs);
+                if (rhsFieldPath && validateFieldPathForExprInRewrite(*rhsFieldPath)) {
+                    if (lhsConst->getValue().getType() == BSONType::regEx) {
+                        // Would trigger BadValue: Cannot insert regex into InListData.
+                        return nullptr;
+                    }
+                    // We don't need to place additional restrictions on 'rhs' here, because $in
+                    // would error out for a non-array value of 'rhs'- similarly, 'lhs' will become
+                    // an array, so we don't need th same checks as in the case below.
+                    return rewriteExprInMatchExpression<true /* wrapConstInArray */>(
+                        *rhsFieldPath, *lhsConst, _matchExprElemStorage);
+                }
+            }
+        }
         return nullptr;
-    } else if (lhsFieldPath->isVariableReference() || lhsFieldPath->isROOT()) {
+    } else if (!validateFieldPathForExprInRewrite(*lhsFieldPath)) {
         // Rather than a local document field path, this field path refers to either a variable or
         // the full document itself. Neither of which can be expressed in the match language.
         return nullptr;
@@ -337,23 +405,7 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteInExpression(
         }
     }
 
-    // Store the BSONObj in _matchExprElemStorage to extend its lifetime.
-    auto fieldPath = lhsFieldPath->getFieldPath().tail().fullPath();
-    auto bob = BSONObjBuilder{};
-    bob << fieldPath << rhsConst->getValue();
-    auto inObj = bob.obj();
-    _matchExprElemStorage.push_back(inObj);
-
-    // Create the MatchExpression equivalent of the $expr $in.
-    // {$expr: {$in: ["$lhsFieldPath", rhsConstArray]}} --> {"lhsFieldPath": {$in: rhsConstArray}}
-    // This is the first level of filtering that can take advantage of indexes. It may return a
-    // superset of results because MatchExpressions have implicit array traversal semantics that are
-    // not present in agg. The original predicate is maintained in the second level of filtering for
-    // correctness.
-    auto fieldName = inObj.firstElementFieldNameStringData();
-    auto inMatch = std::make_unique<InMatchExpression>(fieldName);
-    uassertStatusOK(inMatch->setEqualitiesArray(inObj.getField(fieldName).Obj()));
-
-    return inMatch;
+    return rewriteExprInMatchExpression<false /* wrapConstInArray */>(
+        *lhsFieldPath, *rhsConst, _matchExprElemStorage);
 }
 }  // namespace mongo
