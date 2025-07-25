@@ -1,8 +1,7 @@
 /*
  * librdkafka - The Apache Kafka C/C++ library
  *
- * Copyright (c) 2017-2022, Magnus Edenhill
- *               2023, Confluent Inc.
+ * Copyright (c) 2017 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -80,10 +79,6 @@ char *rd_flags2str(char *dst, size_t size, const char **desc, int flags);
 unsigned int rd_string_hash(const char *str, ssize_t len);
 
 int rd_strcmp(const char *a, const char *b);
-
-int rd_strcmp2(const void *a, const void *b);
-
-int rd_strcmp3(const void *a, const void *b);
 
 char *_rd_strcasestr(const char *haystack, const char *needle);
 

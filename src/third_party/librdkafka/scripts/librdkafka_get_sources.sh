@@ -18,7 +18,7 @@ TEMP_DIR=$(mktemp -d /tmp/librdkafka.XXXXXX)
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/librdkafka
 DIST_DIR=$DEST_DIR/dist
 PLATFORM_DIR=$DIST_DIR/platform
-VERSION="2.6.0"
+VERSION="2.0.2"
 
 # Clean the output directories
 rm -rf $DIST_DIR
@@ -27,8 +27,8 @@ rm -rf $TEMP_DIR/*
 
 pushd $TEMP_DIR
 
-# Clone the v2.6.0 branch of librdkafka.
-git clone --depth 1 --branch v2.6.0 https://github.com/confluentinc/librdkafka.git
+# Clone the v2.0.2 branch of librdkafka.
+git clone --depth 1 --branch v2.0.2 https://github.com/confluentinc/librdkafka.git
 
 pushd librdkafka
 
@@ -53,9 +53,8 @@ pushd src
 # Replace all instances of the string "LZ4" and "XXH" with "KLZ4" and "KXXH" in the C source code.
 # This is to avoid symbol conflicts with the LZ4 and XXH source that is used by
 # third_party/mozjs.
-find . -type f -exec sed -i 's/LZ4/KLZ4/g' {} +
-find . -type f -exec sed -i 's/XXH/KXXH/g' {} +
-find . -type f -exec sed -i 's/read_long_length_no_check/kread_long_length_no_check/g' {} +
+sed -i 's/LZ4/KLZ4/g' *
+sed -i 's/XXH/KXXH/g' *
 popd
 
 mkdir -p $DIST_DIR

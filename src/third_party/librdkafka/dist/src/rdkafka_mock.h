@@ -1,8 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2019-2022, Magnus Edenhill
- *               2023, Confluent Inc.
+ * Copyright (c) 2019-2022 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -68,7 +67,6 @@ extern "C" {
  *  - Low-level consumer
  *  - High-level balanced consumer groups with offset commits
  *  - Topic Metadata and auto creation
- *  - Telemetry (KIP-714)
  *
  * @remark This is an experimental public API that is NOT covered by the
  *         librdkafka API or ABI stability guarantees.
@@ -166,15 +164,6 @@ rd_kafka_mock_push_request_errors_array(rd_kafka_mock_cluster_t *mcluster,
                                         int16_t ApiKey,
                                         size_t cnt,
                                         const rd_kafka_resp_err_t *errors);
-
-
-/**
- * @brief Apply broker configuration group.initial.rebalance.delay.ms
- *        to the whole \p mcluster.
- */
-RD_EXPORT void rd_kafka_mock_group_initial_rebalance_delay_ms(
-    rd_kafka_mock_cluster_t *mcluster,
-    int32_t delay_ms);
 
 
 /**
@@ -292,24 +281,6 @@ rd_kafka_mock_partition_set_follower_wmarks(rd_kafka_mock_cluster_t *mcluster,
                                             int64_t lo,
                                             int64_t hi);
 
-/**
- * @brief Push \p cnt Metadata leader response
- *        onto the cluster's stack for the given \p topic and \p partition.
- *
- * @param topic Topic to change
- * @param partition  Partition to change in \p topic
- * @param leader_id Broker id of the leader node
- * @param leader_epoch Leader epoch corresponding to the given \p leader_id
- *
- * @return Push operation error code
- */
-RD_EXPORT
-rd_kafka_resp_err_t
-rd_kafka_mock_partition_push_leader_response(rd_kafka_mock_cluster_t *mcluster,
-                                             const char *topic,
-                                             int partition,
-                                             int32_t leader_id,
-                                             int32_t leader_epoch);
 
 /**
  * @brief Disconnects the broker and disallows any new connections.
@@ -393,96 +364,7 @@ rd_kafka_mock_set_apiversion(rd_kafka_mock_cluster_t *mcluster,
                              int16_t MinVersion,
                              int16_t MaxVersion);
 
-/**
- * @brief Start tracking RPC requests for this mock cluster.
- * @sa rd_kafka_mock_get_requests to get the requests.
- */
-RD_EXPORT
-void rd_kafka_mock_start_request_tracking(rd_kafka_mock_cluster_t *mcluster);
 
-/**
- * @brief Stop tracking RPC requests for this mock cluster.
- *        Does not clear already tracked requests.
- */
-RD_EXPORT
-void rd_kafka_mock_stop_request_tracking(rd_kafka_mock_cluster_t *mcluster);
-
-/**
- * @name Represents a request to the mock cluster along with a timestamp.
- */
-typedef struct rd_kafka_mock_request_s rd_kafka_mock_request_t;
-
-/**
- * @brief Destroy a rd_kafka_mock_request_t * and deallocate memory.
- */
-RD_EXPORT void rd_kafka_mock_request_destroy(rd_kafka_mock_request_t *mreq);
-
-/**
- * @brief Destroy a rd_kafka_mock_request_t * array and deallocate it.
- */
-RD_EXPORT void
-rd_kafka_mock_request_destroy_array(rd_kafka_mock_request_t **mreqs,
-                                    size_t mreq_cnt);
-
-/**
- * @brief Get the broker id to which \p mreq was sent.
- */
-RD_EXPORT int32_t rd_kafka_mock_request_id(rd_kafka_mock_request_t *mreq);
-
-/**
- * @brief Get the ApiKey with which \p mreq was sent.
- */
-RD_EXPORT int16_t rd_kafka_mock_request_api_key(rd_kafka_mock_request_t *mreq);
-
-/**
- * @brief Get the timestamp in micros at which \p mreq was sent.
- */
-RD_EXPORT int64_t
-rd_kafka_mock_request_timestamp(rd_kafka_mock_request_t *mreq);
-
-/**
- * @brief Get the list of requests sent to this mock cluster.
- *
- * @param cntp is set to the count of requests.
- * @return List of rd_kafka_mock_request_t *.
- * @remark each element of the returned array must be freed with
- *         rd_kafka_mock_request_destroy, and the list itself must be freed too.
- */
-RD_EXPORT rd_kafka_mock_request_t **
-rd_kafka_mock_get_requests(rd_kafka_mock_cluster_t *mcluster, size_t *cntp);
-
-/**
- * @brief Clear the list of requests sent to this mock broker, in case request
- *        tracking is/was turned on.
- */
-RD_EXPORT void rd_kafka_mock_clear_requests(rd_kafka_mock_cluster_t *mcluster);
-
-/**
- * @brief Set the metrics that are expected by the broker for telemetry
- * collection.
- *
- * @param metrics List of prefixes of metric names or NULL.
- * @param metrics_cnt
- *
- * @note if \p metrics is NULL, no metrics will be expected by the broker. If
- * the first elements of \p metrics is an empty string, that indicates the
- * broker expects all metrics.
- */
-RD_EXPORT rd_kafka_resp_err_t
-rd_kafka_mock_telemetry_set_requested_metrics(rd_kafka_mock_cluster_t *mcluster,
-                                              char **metrics,
-                                              size_t metrics_cnt);
-
-
-/**
- * @brief Set push frequency to be sent to the client for telemetry collection.
- *        when the broker receives GetTelemetrySubscription requests.
- *
- * @param push_interval_ms time for push in milliseconds. Must be more than 0.
- */
-RD_EXPORT rd_kafka_resp_err_t
-rd_kafka_mock_telemetry_set_push_interval(rd_kafka_mock_cluster_t *mcluster,
-                                          int64_t push_interval_ms);
 /**@}*/
 
 #ifdef __cplusplus

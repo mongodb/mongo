@@ -1,8 +1,7 @@
 /*
  * librdkafka - The Apache Kafka C/C++ library
  *
- * Copyright (c) 2020-2022, Magnus Edenhill
- *               2023, Confluent Inc.
+ * Copyright (c) 2020 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -250,10 +249,6 @@ int rd_map_str_cmp(const void *a, const void *b);
  */
 unsigned int rd_map_str_hash(const void *a);
 
-/**
- * @brief Bytes hash function (djb2).
- */
-unsigned int rd_bytes_hash(unsigned char *bytes, size_t len);
 
 
 /**
