@@ -35,7 +35,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -43,7 +42,10 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/s/balancer_configuration.h"
+#include "mongo/s/balancer_feature_flag_gen.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
@@ -58,6 +60,7 @@
 #include <utility>
 #include <vector>
 
+#include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/date_time/posix_time/posix_time_duration.hpp>
 #include <boost/date_time/posix_time/posix_time_io.hpp>
 #include <boost/date_time/posix_time/ptime.hpp>
@@ -72,8 +75,10 @@
 
 namespace mongo {
 namespace {
+const std::array<std::string, 7> kDaysOfWeek = {
+    "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
-// parses time of day in "hh:mm" format assuming 'hh' is 00-23
+// Parses time of day in "hh:mm" format assuming 'hh' is 00-23.
 bool toPointInTime(const std::string& str, boost::posix_time::ptime* timeOfDay) {
     int hh = 0;
     int mm = 0;
@@ -81,7 +86,7 @@ bool toPointInTime(const std::string& str, boost::posix_time::ptime* timeOfDay) 
         return false;
     }
 
-    // verify that time is well formed
+    // Verify that time is well formed.
     if ((hh / 24) || (mm / 60)) {
         return false;
     }
@@ -99,6 +104,18 @@ const char kMode[] = "mode";
 const char kActiveWindow[] = "activeWindow";
 const char kWaitForDelete[] = "_waitForDelete";
 const char kAttemptToBalanceJumboChunks[] = "attemptToBalanceJumboChunks";
+const char kActiveWindowDOW[] = "activeWindowDOW";
+const char kDay[] = "day";
+const char kStart[] = "start";
+const char kStop[] = "stop";
+
+bool isValidDayOfWeek(const std::string& dayStr) {
+    return std::find(kDaysOfWeek.begin(), kDaysOfWeek.end(), dayStr) != kDaysOfWeek.end();
+}
+
+std::string getDayOfWeekString(const boost::gregorian::date& date) {
+    return kDaysOfWeek[date.day_of_week()];
+}
 
 }  // namespace
 
@@ -110,6 +127,7 @@ const BSONObj BalancerSettingsType::kSchema = BSON(
                                << BSON("bsonType" << "bool") << kActiveWindow
                                << BSON("bsonType" << "object"
                                                   << "required" << BSON_ARRAY("start" << "stop"))
+                               << kActiveWindowDOW << BSON("bsonType" << "array")
                                << "_secondaryThrottle"
                                << BSON("oneOf" << BSON_ARRAY(BSON("bsonType" << "bool")
                                                              << BSON("bsonType" << "object")))
@@ -186,22 +204,24 @@ Status BalancerConfiguration::changeAutoMergeSettings(OperationContext* opCtx, b
     return Status::OK();
 }
 
-bool BalancerConfiguration::shouldBalance() const {
+bool BalancerConfiguration::shouldBalance(OperationContext* opCtx) const {
     stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
     if (_balancerSettings.getMode() != BalancerSettingsType::kFull) {
         return false;
     }
 
-    return _balancerSettings.isTimeInBalancingWindow(boost::posix_time::second_clock::local_time());
+    return _balancerSettings.isTimeInBalancingWindow(opCtx,
+                                                     boost::posix_time::second_clock::local_time());
 }
 
-bool BalancerConfiguration::shouldBalanceForAutoMerge() const {
+bool BalancerConfiguration::shouldBalanceForAutoMerge(OperationContext* opCtx) const {
     stdx::lock_guard<stdx::mutex> lk(_balancerSettingsMutex);
     if (_balancerSettings.getMode() == BalancerSettingsType::kOff || !shouldAutoMerge()) {
         return false;
     }
 
-    return _balancerSettings.isTimeInBalancingWindow(boost::posix_time::second_clock::local_time());
+    return _balancerSettings.isTimeInBalancingWindow(opCtx,
+                                                     boost::posix_time::second_clock::local_time());
 }
 
 MigrationSecondaryThrottleOptions BalancerConfiguration::getSecondaryThrottle() const {
@@ -223,19 +243,19 @@ Status BalancerConfiguration::refreshAndCheck(OperationContext* opCtx) {
     try {
         Lock::ExclusiveLock settingsRefreshLock(opCtx, _settingsRefreshMutex);
 
-        // Balancer configuration
+        // Balancer configuration.
         Status balancerSettingsStatus = _refreshBalancerSettings(opCtx);
         if (!balancerSettingsStatus.isOK()) {
             return balancerSettingsStatus.withContext("Failed to refresh the balancer settings");
         }
 
-        // Chunk size settings
+        // Chunk size settings.
         Status chunkSizeStatus = _refreshChunkSizeSettings(opCtx);
         if (!chunkSizeStatus.isOK()) {
             return chunkSizeStatus.withContext("Failed to refresh the chunk sizes settings");
         }
 
-        // Global auto merge settings
+        // Global auto merge settings.
         Status autoMergeStatus = _refreshAutoMergeSettings(opCtx);
         if (!autoMergeStatus.isOK()) {
             return autoMergeStatus.withContext("Failed to refresh the autoMerge settings");
@@ -254,7 +274,7 @@ Status BalancerConfiguration::_refreshBalancerSettings(OperationContext* opCtx) 
     auto settingsObjStatus =
         Grid::get(opCtx)->catalogClient()->getGlobalSettings(opCtx, BalancerSettingsType::kKey);
     if (settingsObjStatus.isOK()) {
-        auto settingsStatus = BalancerSettingsType::fromBSON(settingsObjStatus.getValue());
+        auto settingsStatus = BalancerSettingsType::fromBSON(opCtx, settingsObjStatus.getValue());
         if (!settingsStatus.isOK()) {
             return settingsStatus.getStatus();
         }
@@ -331,7 +351,8 @@ BalancerSettingsType BalancerSettingsType::createDefault() {
     return BalancerSettingsType();
 }
 
-StatusWith<BalancerSettingsType> BalancerSettingsType::fromBSON(const BSONObj& obj) {
+StatusWith<BalancerSettingsType> BalancerSettingsType::fromBSON(OperationContext* opCtx,
+                                                                const BSONObj& obj) {
     BalancerSettingsType settings;
 
     {
@@ -361,45 +382,138 @@ StatusWith<BalancerSettingsType> BalancerSettingsType::fromBSON(const BSONObj& o
     }
 
     {
-        BSONElement activeWindowElem;
-        Status status =
-            bsonExtractTypedField(obj, kActiveWindow, BSONType::object, &activeWindowElem);
-        if (status.isOK()) {
-            const BSONObj balancingWindowObj = activeWindowElem.Obj();
-            if (balancingWindowObj.isEmpty()) {
-                return Status(ErrorCodes::BadValue, "activeWindow not specified");
+        bool shouldParseActiveWindow = true;
+        BSONElement activeWindowDOWElem;
+        Status activeWindowDOWStatus =
+            bsonExtractTypedField(obj, kActiveWindowDOW, BSONType::array, &activeWindowDOWElem);
+
+        if (activeWindowDOWStatus.isOK()) {
+            // DOW settings exist, check feature flag.
+            bool balancerDOWWindowEnabled = feature_flags::gFeatureFlagBalancerWindowDOW.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+            if (balancerDOWWindowEnabled) {
+                // Feature flag enabled, parse DOW settings.
+                std::vector<BSONElement> windowElements = activeWindowDOWElem.Array();
+
+                for (const auto& windowElem : windowElements) {
+                    if (windowElem.type() != BSONType::object) {
+                        return Status(ErrorCodes::BadValue,
+                                      str::stream()
+                                          << "expected object for activeWindowDOW entry but got "
+                                          << typeName(windowElem.type()));
+                    }
+
+                    BSONObj windowObj = windowElem.Obj();
+
+                    // Extract day of week.
+                    std::string dayOfWeek;
+                    Status dayStatus = bsonExtractStringField(windowObj, kDay, &dayOfWeek);
+                    if (!dayStatus.isOK()) {
+                        return dayStatus;
+                    }
+
+                    if (!isValidDayOfWeek(dayOfWeek)) {
+                        return Status(ErrorCodes::BadValue,
+                                      str::stream() << "invalid day of week: " << dayOfWeek);
+                    }
+
+                    std::string start = windowObj.getField(kStart).str();
+                    std::string stop = windowObj.getField(kStop).str();
+
+                    if (start.empty() || stop.empty()) {
+                        return Status(
+                            ErrorCodes::BadValue,
+                            str::stream()
+                                << "must specify both start and stop of balancing window: "
+                                << windowObj);
+                    }
+
+                    Status startStatus = bsonExtractStringField(windowObj, kStart, &start);
+                    if (!startStatus.isOK()) {
+                        return startStatus;
+                    }
+
+                    Status stopStatus = bsonExtractStringField(windowObj, kStop, &stop);
+                    if (!stopStatus.isOK()) {
+                        return stopStatus;
+                    }
+
+                    // Parse time points.
+                    boost::posix_time::ptime startTime, stopTime;
+                    if (!toPointInTime(start, &startTime) || !toPointInTime(stop, &stopTime)) {
+                        return Status(ErrorCodes::BadValue,
+                                      str::stream()
+                                          << "time format must be \"hh:mm\" in activeWindowDOW");
+                    }
+
+                    // Check that start and stop designate different time points.
+                    if (startTime == stopTime) {
+                        return Status(
+                            ErrorCodes::BadValue,
+                            str::stream()
+                                << "start and stop times must be different in activeWindowDOW");
+                    }
+
+                    // Add the day of week window to our settings.
+                    DayOfWeekWindow dowWindow;
+                    dowWindow.dayOfWeek = dayOfWeek;
+                    dowWindow.startTime = startTime;
+                    dowWindow.stopTime = stopTime;
+                    settings._activeWindowDOW.push_back(dowWindow);
+                }
+                shouldParseActiveWindow = false;
+            } else {
+                LOGV2_WARNING(8248700, "Ignoring activeWindowDOW settings for versions under 8.3");
             }
+        } else if (activeWindowDOWStatus != ErrorCodes::NoSuchKey) {
+            return activeWindowDOWStatus;
+        }
 
-            // Check if both 'start' and 'stop' are present
-            const std::string start = balancingWindowObj.getField("start").str();
-            const std::string stop = balancingWindowObj.getField("stop").str();
+        // Parse activeWindow settings if DOW wasn't successfully parsed
+        // (either DOW doesn't exist or feature flag is disabled).
+        if (shouldParseActiveWindow) {
+            BSONElement activeWindowElem;
+            Status status =
+                bsonExtractTypedField(obj, kActiveWindow, BSONType::object, &activeWindowElem);
+            if (status.isOK()) {
+                const BSONObj balancingWindowObj = activeWindowElem.Obj();
+                if (balancingWindowObj.isEmpty()) {
+                    return Status(ErrorCodes::BadValue, "activeWindow not specified");
+                }
 
-            if (start.empty() || stop.empty()) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream()
-                                  << "must specify both start and stop of balancing window: "
-                                  << balancingWindowObj);
+                // Check if both 'start' and 'stop' are present.
+                const std::string start = balancingWindowObj.getField(kStart).str();
+                const std::string stop = balancingWindowObj.getField(kStop).str();
+
+                if (start.empty() || stop.empty()) {
+                    return Status(ErrorCodes::BadValue,
+                                  str::stream()
+                                      << "must specify both start and stop of balancing window: "
+                                      << balancingWindowObj);
+                }
+
+                // Check that both 'start' and 'stop' are valid time-of-day.
+                boost::posix_time::ptime startTime;
+                boost::posix_time::ptime stopTime;
+                if (!toPointInTime(start, &startTime) || !toPointInTime(stop, &stopTime)) {
+                    return Status(ErrorCodes::BadValue,
+                                  str::stream() << kActiveWindow << " format is "
+                                                << " { start: \"hh:mm\" , stop: \"hh:mm\" }");
+                }
+
+                // Check that start and stop designate different time points.
+                if (startTime == stopTime) {
+                    return Status(ErrorCodes::BadValue,
+                                  str::stream() << "start and stop times must be different");
+                }
+
+                settings._activeWindowStart = startTime;
+                settings._activeWindowStop = stopTime;
+            } else if (status != ErrorCodes::NoSuchKey) {
+                return status;
             }
-
-            // Check that both 'start' and 'stop' are valid time-of-day
-            boost::posix_time::ptime startTime;
-            boost::posix_time::ptime stopTime;
-            if (!toPointInTime(start, &startTime) || !toPointInTime(stop, &stopTime)) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << kActiveWindow << " format is "
-                                            << " { start: \"hh:mm\" , stop: \"hh:mm\" }");
-            }
-
-            // Check that start and stop designate different time points
-            if (startTime == stopTime) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << "start and stop times must be different");
-            }
-
-            settings._activeWindowStart = startTime;
-            settings._activeWindowStop = stopTime;
-        } else if (status != ErrorCodes::NoSuchKey) {
-            return status;
         }
     }
 
@@ -436,7 +550,37 @@ StatusWith<BalancerSettingsType> BalancerSettingsType::fromBSON(const BSONObj& o
     return settings;
 }
 
-bool BalancerSettingsType::isTimeInBalancingWindow(const boost::posix_time::ptime& now) const {
+bool BalancerSettingsType::isTimeInBalancingWindow(OperationContext* opCtx,
+                                                   const boost::posix_time::ptime& now) const {
+    bool balancerDOWWindowEnabled = feature_flags::gFeatureFlagBalancerWindowDOW.isEnabled(
+        VersionContext::getDecoration(opCtx),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+    if (balancerDOWWindowEnabled && !_activeWindowDOW.empty()) {
+        std::string currentDayOfWeek = getDayOfWeekString(now.date());
+
+        // Check if the current time is in any of the day-specific windows.
+        for (const auto& window : _activeWindowDOW) {
+            if (window.dayOfWeek == currentDayOfWeek) {
+                boost::posix_time::ptime windowStartForToday(now.date(),
+                                                             window.startTime.time_of_day());
+                boost::posix_time::ptime windowStopForToday(now.date(),
+                                                            window.stopTime.time_of_day());
+
+                if (windowStopForToday > windowStartForToday) {
+                    if (now >= windowStartForToday && now <= windowStopForToday) {
+                        return true;
+                    }
+                } else {
+                    if (now >= windowStartForToday || now <= windowStopForToday) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     invariant(!_activeWindowStart == !_activeWindowStop);
 
     if (!_activeWindowStart) {

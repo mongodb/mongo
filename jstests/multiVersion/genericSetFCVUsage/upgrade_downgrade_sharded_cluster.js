@@ -6,8 +6,9 @@
  *   2. Setup some data on cluster
  *   3. Upgrade binaries and FCV of the cluster to the latest version
  *   4. Verify the data consistency after the upgrade procedure
- *   5. Downgrade binaries and FCV of the cluster to an old version
- *   6. Verify the data consistency after the downgrade procedure
+ *   5. Verify that config.settings collection upgrade behavior works correctly
+ *   6. Downgrade binaries and FCV of the cluster to an old version
+ *   7. Verify the data consistency after the downgrade procedure
  */
 
 import "jstests/multiVersion/libs/multi_cluster.js";
@@ -69,6 +70,36 @@ function checkConfigAndShardsFCV(expectedFCV) {
     }
 }
 
+function checkConfigSettingsValidatorUpgrade() {
+    jsTest.log("Verifying config.settings collection validator upgrade by checking for DOW field");
+
+    const configPrimary = st.configRS.getPrimary();
+    const configDB = configPrimary.getDB("config");
+
+    const collectionInfo = configDB.runCommand({listCollections: 1, filter: {name: "settings"}});
+    assert.commandWorked(collectionInfo, "Failed to get collection info for config.settings");
+
+    const settingsCollection =
+        collectionInfo.cursor.firstBatch.find(coll => coll.name === "settings");
+    assert(settingsCollection, "config.settings collection not found");
+
+    if (!settingsCollection.options || !settingsCollection.options.validator) {
+        jsTest.log("config.settings collection has no validator");
+        return;
+    }
+
+    const validator = settingsCollection.options.validator;
+
+    const validatorStr = JSON.stringify(validator);
+    const hasActiveWindowDOW = validatorStr.includes("activeWindowDOW");
+
+    assert(hasActiveWindowDOW,
+           "Validator does not contain activeWindowDOW field anywhere in the schema");
+
+    jsTest.log(
+        "Config.settings validator upgrade verified successfully - activeWindowDOW field found");
+}
+
 function checkRangeDeletionMetadataConsistency() {
     if (FeatureFlagUtil.isPresentAndEnabled(st.shard0,
                                             "CheckRangeDeletionsWithMissingShardKeyIndex")) {
@@ -96,6 +127,7 @@ function checkClusterBeforeUpgrade(fcv) {
 
 function checkClusterAfterFCVUpgrade(fcv) {
     checkConfigAndShardsFCV(fcv);
+    checkConfigSettingsValidatorUpgrade();
 }
 
 function checkClusterAfterBinaryDowngrade(fcv) {

@@ -888,10 +888,11 @@ void Balancer::_consumeActionStreamLoop() {
         auto activeStreams = [&]() -> std::vector<ActionsStreamPolicy*> {
             auto balancerConfig = Grid::get(opCtx.get())->getBalancerConfiguration();
             std::vector<ActionsStreamPolicy*> streams;
-            if (balancerConfig->shouldBalanceForAutoMerge() && _autoMergerPolicy->isEnabled()) {
+            if (balancerConfig->shouldBalanceForAutoMerge(opCtx.get()) &&
+                _autoMergerPolicy->isEnabled()) {
                 streams.push_back(_autoMergerPolicy.get());
             }
-            if (balancerConfig->shouldBalance()) {
+            if (balancerConfig->shouldBalance(opCtx.get())) {
                 streams.push_back(_defragmentationPolicy.get());
             }
             return streams;
@@ -1060,7 +1061,7 @@ void Balancer::_mainThread() {
             // Warn before we skip the iteration due to balancing being disabled.
             balancerWarning.warnIfRequired(opCtx.get(), balancerConfig->getBalancerMode());
 
-            if (!balancerConfig->shouldBalance() || _terminationRequested()) {
+            if (!balancerConfig->shouldBalance(opCtx.get()) || _terminationRequested()) {
                 _autoMergerPolicy->disable(opCtx.get());
 
                 LOGV2_DEBUG(21859, 1, "Skipping balancing round because balancing is disabled");
@@ -1068,7 +1069,7 @@ void Balancer::_mainThread() {
                 continue;
             }
 
-            if (balancerConfig->shouldBalanceForAutoMerge()) {
+            if (balancerConfig->shouldBalanceForAutoMerge(opCtx.get())) {
                 _autoMergerPolicy->enable(opCtx.get());
             }
 
@@ -1380,7 +1381,8 @@ Balancer::MigrationStats Balancer::_doMigrations(OperationContext* opCtx,
     auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
 
     // If the balancer was disabled since we started this round, don't start new chunk moves
-    if (const bool terminating = _terminationRequested(), enabled = balancerConfig->shouldBalance();
+    if (const bool terminating = _terminationRequested(),
+        enabled = balancerConfig->shouldBalance(opCtx);
         terminating || !enabled) {
         LOGV2_DEBUG(21870,
                     1,
@@ -1423,7 +1425,7 @@ void Balancer::_onActionsStreamPolicyStateUpdate() {
 }
 
 void Balancer::notifyPersistedBalancerSettingsChanged(OperationContext* opCtx) {
-    if (!Grid::get(opCtx)->getBalancerConfiguration()->shouldBalanceForAutoMerge()) {
+    if (!Grid::get(opCtx)->getBalancerConfiguration()->shouldBalanceForAutoMerge(opCtx)) {
         _autoMergerPolicy->disable(opCtx);
     }
 

@@ -60,10 +60,21 @@ class StatusWith;
  *  stopped: <true|false>,
  *  mode: <full|off>,  // Only consulted if "stopped" is missing or
  * false activeWindow: { start: "<HH:MM>", stop: "<HH:MM>" }
+ * activeWindowDOW: [
+ *   { day: "<day_name>", start: "<HH:MM>", stop: "<HH:MM>" },
+ *   ...
+ * ]
  * }
  */
 class BalancerSettingsType {
 public:
+    // Represents a balancing window for a specific day of the week
+    struct DayOfWeekWindow {
+        std::string dayOfWeek;
+        boost::posix_time::ptime startTime;
+        boost::posix_time::ptime stopTime;
+    };
+
     // Supported balancer modes
     enum BalancerMode {
         kFull,  // Balancer will always try to keep the cluster even
@@ -84,6 +95,7 @@ public:
      *                 mode: {bsonType: {enum: ["full", "off"]}},
      *                 stopped: {bsonType: bool},
      *                 activeWindow: {bsonType: object}
+     *                 activeWindowDOW: {bsonType: array}
      *                 _secondaryThrottle: {"oneOf": [{bsonType: bool}, {bsonType: object}]}
      *                 _waitForDelete: {bsonType: bool}
      *                 attemptToBalanceJumboChunks: {bsonType: bool}}
@@ -103,7 +115,7 @@ public:
     /**
      * Interprets the BSON content as balancer settings and extracts the respective values.
      */
-    static StatusWith<BalancerSettingsType> fromBSON(const BSONObj& obj);
+    static StatusWith<BalancerSettingsType> fromBSON(OperationContext* opCtx, const BSONObj& obj);
 
     /**
      * Returns whether the balancer is enabled.
@@ -115,7 +127,8 @@ public:
     /**
      * Returns true if either 'now' is in the balancing window or if no balancing window exists.
      */
-    bool isTimeInBalancingWindow(const boost::posix_time::ptime& now) const;
+    bool isTimeInBalancingWindow(OperationContext* opCtx,
+                                 const boost::posix_time::ptime& now) const;
 
     /**
      * Returns the secondary throttle options.
@@ -147,6 +160,7 @@ private:
 
     boost::optional<boost::posix_time::ptime> _activeWindowStart;
     boost::optional<boost::posix_time::ptime> _activeWindowStop;
+    std::vector<DayOfWeekWindow> _activeWindowDOW;
 
     MigrationSecondaryThrottleOptions _secondaryThrottle;
 
@@ -273,8 +287,8 @@ public:
      * Returns whether balancing is allowed based on both the enabled state of the balancer and the
      * balancing window.
      */
-    bool shouldBalance() const;
-    bool shouldBalanceForAutoMerge() const;
+    bool shouldBalance(OperationContext* opCtx) const;
+    bool shouldBalanceForAutoMerge(OperationContext* opCtx) const;
 
     /**
      * Returns the secondary throttle options for the balancer.
