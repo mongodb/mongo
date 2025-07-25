@@ -4,7 +4,7 @@
  * producing stage of each $scoreFusion input pipeline is the one that determines said input
  * pipeline's score and scoreDetails.
  *
- * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_81 ]
+ * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_82 ]
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";

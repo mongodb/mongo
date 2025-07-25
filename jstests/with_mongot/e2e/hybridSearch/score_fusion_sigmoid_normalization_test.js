@@ -1,6 +1,6 @@
 /**
  * Tests that the $sigmoid normalization option on $scoreFusion computes the correct values.
- * @tags: [ featureFlagRankFusionFull, featureFlagSearchHybridScoringFull, requires_fcv_81 ]
+ * @tags: [ featureFlagRankFusionFull, featureFlagSearchHybridScoringFull, requires_fcv_82 ]
  */
 
 /**

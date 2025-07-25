@@ -448,7 +448,7 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipelineStage(
 
     std::vector<BSONObj> bsonPipeline = oneInputPipeline->serializeToBson();
 
-    auto collName = expCtx->getNamespaceString().coll();
+    auto collName = expCtx->getUserNss().coll();
 
     BSONObj inputToUnionWith =
         BSON("$unionWith" << BSON("coll" << collName << "pipeline" << bsonPipeline));
@@ -1162,6 +1162,16 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScoreFusion::creat
     auto spec = ScoreFusionSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
 
     const auto& inputPipelines = parseAndValidateScoredSelectionPipelines(spec, pExpCtx);
+
+    // It is currently necessary to annotate on the ExpressionContext that this is a $scoreFusion
+    // query. Once desugaring happens, there's no way to identity from the (desugared) pipeline
+    // alone that it came from $scoreFusion. We need to know if it came from $scoreFusion so we can
+    // reject the query if it is run over a view.
+
+    // This flag's value is also used to gate an internal client error. See
+    // search_helper::validateViewNotSetByUser(...) for more details.
+    pExpCtx->setIsHybridSearch();
+
     return constructDesugaredOutput(spec, std::move(inputPipelines), pExpCtx);
 }
 }  // namespace mongo

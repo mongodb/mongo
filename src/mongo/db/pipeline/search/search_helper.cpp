@@ -651,10 +651,10 @@ void validateViewNotSetByUser(boost::intrusive_ptr<ExpressionContext> expCtx, co
     // Because the view key already exists in the pipeline and the internal client flag is not set,
     // this internal client error gets thrown.
 
-    // To avoid that, the isRankFusion flag is only set after the initial parsing of the
-    // user-provided $rankFusion pipeline and its value is checked here to avoid throwing an
-    // internal client error.
-    if (spec.hasField(kViewFieldName) && !expCtx->isRankFusion()) {
+    // To avoid that, the isHybridSearch flag is only set after the initial parsing of the
+    // user-provided $rankFusion/$scoreFusion pipeline and its value is checked here to avoid
+    // throwing an internal client error.
+    if (spec.hasField(kViewFieldName) && !expCtx->isHybridSearch()) {
         assertAllowedInternalIfRequired(
             expCtx->getOperationContext(), kViewFieldName, AllowedWithClientType::kInternal);
     }

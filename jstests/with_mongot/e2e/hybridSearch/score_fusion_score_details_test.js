@@ -2,7 +2,7 @@
  * Tests hybrid search $scoreFusion score details. This test focuses on ensuring that the structure
  * and contents of the produced scoreDetails field is correct.
  *
- * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_81 ]
+ * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_82 ]
  */
 
 import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";

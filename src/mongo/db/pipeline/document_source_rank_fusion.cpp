@@ -602,7 +602,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
 
     // This flag's value is also used to gate an internal client error. See
     // search_helper::validateViewNotSetByUser(...) for more details.
-    pExpCtx->setIsRankFusion();
+    pExpCtx->setIsHybridSearch();
 
     StringMap<double> weights;
     // If RankFusionCombinationSpec has no value (no weights specified), no work to do.

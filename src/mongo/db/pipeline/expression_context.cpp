@@ -373,8 +373,8 @@ ExpressionContextBuilder& ExpressionContextBuilder::originalNs(NamespaceString o
     return *this;
 }
 
-ExpressionContextBuilder& ExpressionContextBuilder::isRankFusion(bool isRankFusion) {
-    params.isRankFusion = isRankFusion;
+ExpressionContextBuilder& ExpressionContextBuilder::isHybridSearch(bool isHybridSearch) {
+    params.isHybridSearch = isHybridSearch;
     return *this;
 }
 
@@ -650,7 +650,7 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
             .initialPostBatchResumeToken(_params.initialPostBatchResumeToken.getOwned())
             .view(view)
             .requiresTimeseriesExtendedRangeSupport(_params.requiresTimeseriesExtendedRangeSupport)
-            .isRankFusion(_params.isRankFusion)
+            .isHybridSearch(_params.isHybridSearch)
             .build();
 
     if (_collator.getIgnore()) {

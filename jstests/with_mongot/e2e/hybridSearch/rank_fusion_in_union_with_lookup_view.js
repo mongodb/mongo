@@ -6,64 +6,15 @@
  *
  * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_82]
  */
-
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
-    assertDocArrExpectedFuzzy,
-} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
-
-const collName = jsTestName();
-const coll = db.getCollection(collName);
-coll.drop();
-assert.commandWorked(db.createCollection(coll.getName()));
-
-const nDocs = 50;
-let bulk = coll.initializeOrderedBulkOp();
-for (let i = 0; i < nDocs; i++) {
-    if (i % 2 === 0) {
-        bulk.insert({_id: i, a: "foo", b: "apple", x: i / 3, y: i / 2});
-    } else {
-        bulk.insert({_id: i, a: "bar", b: "orange", x: i / 2, y: i / 3});
-    }
-}
-assert.commandWorked(bulk.execute());
-
-const searchIndexName = "searchIndex";
-createSearchIndex(coll, {name: searchIndexName, definition: {"mappings": {"dynamic": true}}});
+    runHybridSearchInUnionWithLookupSubViewTest,
+    runHybridSearchInUnionWithLookupTopLevelViewTest,
+    runHybridSearchInUnionWithLookupViewTopAndSubTest,
+    searchIndexName
+} from "jstests/with_mongot/e2e_lib/hybrid_search_in_union_with_lookup_view.js";
 
 function buildRankFusionPipeline(inputPipelines) {
     return [{$rankFusion: {input: {pipelines: inputPipelines}}}];
-}
-
-// Builds a unionWith pipeline that runs the $rankFusion inside the $unionWith, where,
-// regardless of the passed in $rankFusion, returns the results results of that $rankFusion.
-// So the $unionWith acts only as a passthrough.
-// In doing so, we can ensure $rankFusion works inside a $unionWith,
-// in the same way as a top-level $rankFusion query.
-function buildUnionPassthroughWithPipeline(viewName, rankFusionPipeline) {
-    return [
-        {
-            // Intentionally matches nothing, so only output results are from the $unionWith.
-            $match: {a: "baz"},
-        },
-        {$unionWith: {coll: viewName, pipeline: rankFusionPipeline}}
-    ];
-}
-
-// Builds a lookup pipeline that runs the $rankFusion inside the $lookup, where,
-// regardless of the passed in $rankFusion, returns the results results of that $rankFusion.
-// So the $lookup acts only as a passthrough.
-// In doing so, we can ensure $rankFusion works inside a $lookup,
-// in the same way as a top-level $rankFusion query.
-function buildLookupPassthroughPipeline(ns, rankFusionPipeline) {
-    return [
-        {
-            $limit: 1,
-        },
-        {$lookup: {from: ns, as: "matched_docs", pipeline: rankFusionPipeline}},
-        {$unwind: "$matched_docs"},
-        {$replaceRoot: {newRoot: "$matched_docs"}}
-    ];
 }
 
 (function testRankFusionInUnionWithLookupSubViewTest() {
@@ -71,28 +22,8 @@ function buildLookupPassthroughPipeline(ns, rankFusionPipeline) {
     // and a view on the $unionWith/$lookup. Test queries like:
     // db.coll.aggregate([{$unionWith/$lookup: { from: "view", pipeline: [{$rankFusion}] }}])
     function runRankFusionInUnionWithLookupSubViewTest(testName, viewPipeline, inputPipelines) {
-        const viewName = jsTestName() + "sub_view_" + testName + "_view";
-        assert.commandWorked(db.createView(viewName, coll.getName(), viewPipeline));
-        const view = db[viewName];
-
-        const rankFusionPipeline = buildRankFusionPipeline(inputPipelines);
-        const unionWithPipeline = buildUnionPassthroughWithPipeline(viewName, rankFusionPipeline);
-        const lookupPipeline = buildLookupPassthroughPipeline(viewName, rankFusionPipeline);
-
-        // Results of running the $rankFusion directly
-        const expectedResults = view.aggregate(rankFusionPipeline);
-        // Results of $rankFusion running through $unionWith passthrough.
-        const unionWithResults = coll.aggregate(unionWithPipeline);
-        // Results of $rankFusion running through $lookup passthrough.
-        const lookupResults = coll.aggregate(lookupPipeline);
-
-        // Direct $rankFusion results should be the same as results through the passthroughs.
-        assertDocArrExpectedFuzzy(expectedResults.toArray(), lookupResults.toArray());
-        assertDocArrExpectedFuzzy(expectedResults.toArray(), unionWithResults.toArray());
-
-        // Explains for both passthroughs should work too.
-        assert.commandWorked(coll.explain().aggregate(unionWithPipeline));
-        assert.commandWorked(coll.explain().aggregate(lookupPipeline));
+        runHybridSearchInUnionWithLookupSubViewTest(
+            testName, viewPipeline, inputPipelines, buildRankFusionPipeline);
     }
 
     (function testMatchView() {
@@ -151,27 +82,8 @@ function buildLookupPassthroughPipeline(ns, rankFusionPipeline) {
     // db.view.aggregate([{$unionWith/$lookup: { from: "coll", pipeline: [{$rankFusion}] }}])
     function runRankFusionInUnionWithLookupTopLevelViewTest(
         testName, viewPipeline, inputPipelines) {
-        const viewName = jsTestName() + "top_level_view_" + testName + "_view";
-        assert.commandWorked(db.createView(viewName, coll.getName(), viewPipeline));
-        const view = db[viewName];
-
-        const rankFusionPipeline = buildRankFusionPipeline(inputPipelines);
-        const unionWithPipeline = buildUnionPassthroughWithPipeline(collName, rankFusionPipeline);
-        const lookupPipeline = buildLookupPassthroughPipeline(collName, rankFusionPipeline);
-
-        // Test $unionWith
-        const expectedUnionWithResults = coll.aggregate([...viewPipeline, ...unionWithPipeline]);
-        const unionWithResults = view.aggregate(unionWithPipeline);
-        assertDocArrExpectedFuzzy(expectedUnionWithResults.toArray(), unionWithResults.toArray());
-
-        // Test $lookup
-        const expectedLookupResults = coll.aggregate([...viewPipeline, ...lookupPipeline]);
-        const lookupResults = view.aggregate(lookupPipeline);
-        assertDocArrExpectedFuzzy(expectedLookupResults.toArray(), lookupResults.toArray());
-
-        // Explains for both passthroughs should work too.
-        assert.commandWorked(view.explain().aggregate(unionWithPipeline));
-        assert.commandWorked(view.explain().aggregate(lookupPipeline));
+        runHybridSearchInUnionWithLookupTopLevelViewTest(
+            testName, viewPipeline, inputPipelines, buildRankFusionPipeline);
     }
 
     (function testMatchView() {
@@ -241,33 +153,11 @@ function buildLookupPassthroughPipeline(ns, rankFusionPipeline) {
     // from: "subView", pipeline: [{$rankFusion}] }}]) Tests all combinations of of view1 and view2
     function runRankFusionInUnionWithLookupViewTopAndSubTest(
         testName, topLevelViewPipeline, subViewPipeline, inputPipelines) {
-        const topLevelViewName = jsTestName() + "both_views_" + testName + "_view_top_level";
-        assert.commandWorked(db.createView(topLevelViewName, coll.getName(), topLevelViewPipeline));
-        const topLevelView = db[topLevelViewName];
-
-        const subViewName = jsTestName() + "both_views_" + testName + "_view_sub";
-        assert.commandWorked(db.createView(subViewName, coll.getName(), subViewPipeline));
-        const subView = db[subViewName];
-
-        const rankFusionPipeline = buildRankFusionPipeline(inputPipelines);
-        const unionWithPipeline =
-            buildUnionPassthroughWithPipeline(subViewName, rankFusionPipeline);
-        const lookupPipeline = buildLookupPassthroughPipeline(subViewName, rankFusionPipeline);
-
-        // Test $unionWith
-        const expectedUnionWithResults =
-            coll.aggregate([...topLevelViewPipeline, ...unionWithPipeline]);
-        const unionWithResults = topLevelView.aggregate(unionWithPipeline);
-        assertDocArrExpectedFuzzy(expectedUnionWithResults.toArray(), unionWithResults.toArray());
-
-        // Test $lookup
-        const expectedLookupResults = coll.aggregate([...topLevelViewPipeline, ...lookupPipeline]);
-        const lookupResults = topLevelView.aggregate(lookupPipeline);
-        assertDocArrExpectedFuzzy(expectedLookupResults.toArray(), lookupResults.toArray());
-
-        // Explains for both passthroughs should work too.
-        assert.commandWorked(topLevelView.explain().aggregate(unionWithPipeline));
-        assert.commandWorked(topLevelView.explain().aggregate(lookupPipeline));
+        runHybridSearchInUnionWithLookupViewTopAndSubTest(testName,
+                                                          topLevelViewPipeline,
+                                                          subViewPipeline,
+                                                          inputPipelines,
+                                                          buildRankFusionPipeline);
     }
 
     (function testBothMatchViews() {
@@ -393,5 +283,3 @@ function buildLookupPassthroughPipeline(ns, rankFusionPipeline) {
         // returning no results, like in a top-level query.
     })();
 })();
-
-dropSearchIndex(coll, {name: searchIndexName});

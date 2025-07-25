@@ -1005,16 +1005,12 @@ public:
         return _params.isMapReduceCommand;
     }
 
-    // TODO SERVER-104725 Generalize this to hybrid search. Optionally figure out if it can be
-    // deleted.
-    void setIsRankFusion() {
-        _params.isRankFusion = true;
+    void setIsHybridSearch() {
+        _params.isHybridSearch = true;
     }
 
-    // TODO SERVER-104725 Generalize this to hybrid search. Optionally figure out if it can be
-    // deleted.
-    bool isRankFusion() const {
-        return _params.isRankFusion;
+    bool isHybridSearch() const {
+        return _params.isHybridSearch;
     }
 
     // Sets or clears a flag which tells DocumentSource parsers whether any involved Collection
@@ -1160,9 +1156,9 @@ protected:
         // collection in the local database.
         bool allowGenericForeignDbLookup = false;
 
-        // Indicates that the pipeline is a desugared representation of a user's $rankFusion
-        // pipeline.
-        bool isRankFusion = false;
+        // Indicates that the pipeline is a desugared representation of a user's $rankFusion or
+        // $scoreFusion pipeline.
+        bool isHybridSearch = false;
 
         bool requiresTimeseriesExtendedRangeSupport = false;
 
@@ -1390,7 +1386,7 @@ public:
     ExpressionContextBuilder& view(
         boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>>);
     ExpressionContextBuilder& originalNs(NamespaceString);
-    ExpressionContextBuilder& isRankFusion(bool);
+    ExpressionContextBuilder& isHybridSearch(bool);
 
     /**
      * Add kSessionTransactionsTableNamespace, and kRsOplogNamespace

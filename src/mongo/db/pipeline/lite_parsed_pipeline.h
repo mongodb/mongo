@@ -65,15 +65,15 @@ public:
      * validation happens later, during Pipeline construction.
      */
     LiteParsedPipeline(const AggregateCommandRequest& request,
-                       const bool isRunningAgainstViewForRankFusion = false)
+                       const bool isRunningAgainstViewForHybridSearch = false)
         : LiteParsedPipeline(
-              request.getNamespace(), request.getPipeline(), isRunningAgainstViewForRankFusion) {}
+              request.getNamespace(), request.getPipeline(), isRunningAgainstViewForHybridSearch) {}
 
     LiteParsedPipeline(const NamespaceString& nss,
                        const std::vector<BSONObj>& pipelineStages,
-                       const bool isRunningAgainstViewForRankFusion = false,
+                       const bool isRunningAgainstViewForHybridSearch = false,
                        const LiteParserOptions& options = LiteParserOptions{})
-        : _isRunningAgainstViewForRankFusion(isRunningAgainstViewForRankFusion) {
+        : _isRunningAgainstViewForHybridSearch(isRunningAgainstViewForHybridSearch) {
         _stageSpecs.reserve(pipelineStages.size());
         for (auto&& rawStage : pipelineStages) {
             _stageSpecs.push_back(LiteParsedDocumentSource::parse(nss, rawStage, options));
@@ -165,11 +165,11 @@ public:
     }
 
     /**
-     * Returns true iff the pipeline has a $rankFusion stage.
+     * Returns true iff the pipeline has a $rankFusion or $scoreFusion stage.
      */
-    bool hasRankFusionStage() const {
+    bool hasHybridSearchStage() const {
         return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
-            return spec->isRankFusionStage();
+            return spec->isHybridSearchStage();
         });
     }
 
@@ -284,8 +284,8 @@ public:
     void checkStagesAllowedInViewDefinition() const;
 
     // TODO SERVER-101722: Remove this once the validation is changed.
-    bool isRunningAgainstViewForRankFusion() const {
-        return _isRunningAgainstViewForRankFusion;
+    bool isRunningAgainstViewForHybridSearch() const {
+        return _isRunningAgainstViewForHybridSearch;
     }
 
 private:
@@ -294,9 +294,9 @@ private:
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> _stageSpecs;
 
     // This variable specifies whether the pipeline is running on a view's namespace. This is
-    // currently needed for $rankFusion positional validation.
+    // currently needed for $rankFusion/$scoreFusion positional validation.
     // TODO SERVER-101722: Remove this once the validation is changed.
-    bool _isRunningAgainstViewForRankFusion = false;
+    bool _isRunningAgainstViewForHybridSearch = false;
 
     Deferred<bool (*)(const decltype(_stageSpecs)&)> _hasChangeStream{[](const auto& stageSpecs) {
         return std::any_of(stageSpecs.begin(), stageSpecs.end(), [](auto&& spec) {

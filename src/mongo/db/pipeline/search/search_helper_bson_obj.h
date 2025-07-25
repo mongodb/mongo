@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/document_source_rank_fusion.h"
+#include "mongo/db/pipeline/document_source_score_fusion.h"
 #include "mongo/db/pipeline/search/document_source_list_search_indexes.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_search_meta.h"
@@ -43,11 +44,11 @@ namespace search_helper_bson_obj {
 
 /**
  * Checks that the pipeline isn't empty and if the first stage in the pipeline is a mongot stage
- * (either $search, $vectorSearch, $searchMeta, $listSearchIndexes, or $rankFusion).
+ * (either $search, $vectorSearch, $searchMeta, $listSearchIndexes, $rankFusion, or $scoreFusion).
  */
 inline bool isMongotPipeline(const std::vector<BSONObj> pipeline) {
-    // Note that the $rankFusion stage is syntactic sugar. When desugared, the first stage in its
-    // first pipeline in the $rankFusion query (ex: $rankFusion: {
+    // Note that the $rankFusion/$scoreFusion stages are syntactic sugar. When desugared, the first
+    // stage in its first pipeline in the $rankFusion/$scoreFusion query (ex: $rankFusion: {
     //    input: {
     //        pipelines: {
     //            searchPipeline: [
@@ -67,6 +68,14 @@ inline bool isMongotPipeline(const std::vector<BSONObj> pipeline) {
           isMongotPipeline(std::vector<BSONObj>{
               pipeline[0][DocumentSourceRankFusion::kStageName][RankFusionSpec::kInputFieldName]
                       [RankFusionInputSpec::kPipelinesFieldName]
+                          .Obj()
+                          .firstElement()
+                          .Array()[0]
+                          .Obj()})) ||
+         (pipeline[0][DocumentSourceScoreFusion::kStageName] &&
+          isMongotPipeline(std::vector<BSONObj>{
+              pipeline[0][DocumentSourceScoreFusion::kStageName][ScoreFusionSpec::kInputFieldName]
+                      [ScoreFusionInputsSpec::kPipelinesFieldName]
                           .Obj()
                           .firstElement()
                           .Array()[0]

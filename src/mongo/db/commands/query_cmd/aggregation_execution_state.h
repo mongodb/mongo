@@ -193,17 +193,17 @@ public:
     }
 
     /**
-     * True iff aggregation represents a $rankFusion pipeline.
+     * True iff aggregation represents a hybrid search pipeline ($rankFusion or $scoreFusion).
      *
-     * If the $rankFusion request came from the router, that will get annotated on the request from
-     * the router (which is necessary to distinguish it as $rankFusion since the pipeline dispatched
-     * will be the desugared representation). If the $rankFusion request came straight from the
-     * user, we'll identify via the lite-parsed pipeline.
+     * If the hybrid search request came from the router, that will get annotated on the request
+     * from the router (which is necessary to distinguish it as $rankFusion or $scoreFusion since
+     * the pipeline dispatched will be the desugared representation). If the hybrid search request
+     * came straight from the user, we'll identify via the lite-parsed pipeline.
      */
-    virtual bool isRankFusionPipeline() const {
+    virtual bool isHybridSearchPipeline() const {
         // Use the original request as we want this assert to work during/after view resolution.
-        return _aggReqDerivatives->request.getIsRankFusion() ||
-            _aggReqDerivatives->liteParsedPipeline.hasRankFusionStage();
+        return _aggReqDerivatives->request.getIsHybridSearch() ||
+            _aggReqDerivatives->liteParsedPipeline.hasHybridSearchStage();
     }
 
     /**
@@ -414,20 +414,18 @@ public:
     }
 
     /**
-     * True if aggregation represents a $rankFusion pipeline.
+     * True if aggregation represents a $rankFusion/$scoreFusion pipeline.
      *
-     * If the $rankFusion request came from the router, that will get annotated on the request from
-     * the router (which is necessary to distinguish it as $rankFusion since the pipeline dispatched
-     * will be the desugared representation). If the $rankFusion request came straight from the
-     * user, we'll identify via the lite-parsed pipeline.
-     *
-     * TODO SERVER-104725 Generalize this to hybrid search. Optionally figure out if there's a way
-     * to get rid of this check.
+     * If the $rankFusion/$scoreFusion request came from the router, that will get annotated on the
+     * request from the router (which is necessary to distinguish it as $rankFusion/$scoreFusion
+     * since the pipeline dispatched will be the desugared representation). If the
+     * $rankFusion/$scoreFusion request came straight from the user, we'll identify via the
+     * lite-parsed pipeline.
      */
-    bool isRankFusionPipeline() const override {
+    bool isHybridSearchPipeline() const override {
         // Use the original request as we want this assert to work during/after view resolution.
-        return _originalAggReqDerivatives->request.getIsRankFusion() ||
-            _originalAggReqDerivatives->liteParsedPipeline.hasRankFusionStage();
+        return _originalAggReqDerivatives->request.getIsHybridSearch() ||
+            _originalAggReqDerivatives->liteParsedPipeline.hasHybridSearchStage();
     }
 
 private:
