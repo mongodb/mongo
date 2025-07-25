@@ -32,6 +32,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
+#include "mongo/db/query/query_settings/query_settings_usage_tracker.h"
 
 #include <algorithm>
 
@@ -59,6 +60,12 @@ auto computeTenantConfiguration(std::vector<QueryShapeConfiguration>&& settingsA
              }});
     }
     return queryShapeConfigurationMap;
+}
+
+int countMissingRepresentativeQueries(const QueryShapeConfigurationsMap& config) {
+    return std::count_if(config.begin(), config.end(), [](auto&& elem) {
+        return !elem.second.hasRepresentativeQuery;
+    });
 }
 }  // namespace
 
@@ -106,6 +113,9 @@ template <bool enforceClusterParameterTimeMatch>
 void QuerySettingsManager::setVersionedQueryShapeConfigurations(
     VersionedQueryShapeConfigurations&& newQueryShapeConfigurations,
     const boost::optional<TenantId>& tenantId) {
+    auto&& tracker = QuerySettingsUsageTracker::get(getGlobalServiceContext());
+    const auto missingRepresentativeQueries = countMissingRepresentativeQueries(
+        newQueryShapeConfigurations.queryShapeHashToQueryShapeConfigurationsMap);
     auto writeLock = _mutex.writeLock();
     const auto versionedQueryShapeConfigurationsIt =
         _tenantIdToVersionedQueryShapeConfigurationsMap.find(tenantId);
@@ -115,6 +125,7 @@ void QuerySettingsManager::setVersionedQueryShapeConfigurations(
         versionedQueryShapeConfigurationsIt) {
         _tenantIdToVersionedQueryShapeConfigurationsMap.emplace(
             tenantId, std::move(newQueryShapeConfigurations));
+        tracker.setMissingRepresentativeQueries(missingRepresentativeQueries);
         return;
     }
 
@@ -132,6 +143,7 @@ void QuerySettingsManager::setVersionedQueryShapeConfigurations(
     // deferring the destruction of the previous version of the query shape configurations
     // to the time when the lock is not held.
     std::swap(currQueryShapeConfigurations, newQueryShapeConfigurations);
+    tracker.setMissingRepresentativeQueries(missingRepresentativeQueries);
 }
 
 void QuerySettingsManager::removeAllQueryShapeConfigurations(

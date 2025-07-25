@@ -54,6 +54,15 @@ function mapOnEachNode(func) {
     return fromMongos.concat(fromShards);
 }
 
+// Get the 'querySettings' server status section for the given 'db'. Ignore the 'backfill'
+// subsection for the purpose of this test, as it's not identical across all nodes and it's not
+// restored accross restarts.
+function getQuerySettingsServerStatus(db) {
+    const qsutil = new QuerySettingsUtils(db, collName);
+    const {backfill, ...rest} = qsutil.getQuerySettingsServerStatus();
+    return rest;
+}
+
 function runTest({expectedQueryShapeConfiguration, assertionFunc}) {
     // Call `assertQueryShapeConfiguration()` on each mongos instance to ensure that the changes
     // introduced by the `setQuerySettings` command have been correctly propagated throughout the
@@ -67,8 +76,7 @@ function runTest({expectedQueryShapeConfiguration, assertionFunc}) {
     // 'assert.soon()' construct.
     let dataPoints;
     assert.soon(() => {
-        dataPoints = mapOnEachNode(
-            (nodeDB) => new QuerySettingsUtils(nodeDB, collName).getQuerySettingsServerStatus());
+        dataPoints = mapOnEachNode(getQuerySettingsServerStatus);
         if (!dataPoints || dataPoints.length === 0) {
             return false;
         }

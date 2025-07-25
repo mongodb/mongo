@@ -6,6 +6,9 @@
 //   # TODO SERVER-98659 Investigate why this test is failing on
 //   # 'sharding_kill_stepdown_terminate_jscore_passthrough'.
 //   does_not_support_stepdowns,
+//   # This test asserts on the backfill server status section, which needs to be ran against the
+//   # same host that executed the queries.
+//   assumes_read_preference_unchanged,
 //   not_allowed_with_signed_security_token,
 //   simulate_mongoq_incompatible,
 //   directly_against_shardsvrs_incompatible,
@@ -19,40 +22,164 @@ import {
     assertDropAndRecreateCollection,
     assertDropCollection
 } from "jstests/libs/collection_drop_recreate.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
+class QuerySettingsBackfillMetricsTests {
+    constructor(qsutils) {
+        this.qsutils = qsutils;
+        this.capturedMetrics = this.getBackfillMetrics();
+    }
+
+    getBackfillMetrics() {
+        return this.qsutils.getQuerySettingsServerStatus().backfill;
+    }
+
+    verify(...fns) {
+        const currentMetrics = this.getBackfillMetrics();
+        fns.forEach(fn => assert.doesNotThrow(() => fn(currentMetrics)),
+                    "Backfill metrics validation failed");
+    }
+
+    captureCurrentMetrics() {
+        this.capturedMetrics = this.getBackfillMetrics();
+    }
+
+    missingRepresentativeQueriesIs(expected) {
+        return ({missingRepresentativeQueries}) =>
+                   assert.eq(missingRepresentativeQueries,
+                             expected,
+                             "Expected 'missingRepresentativeQueries' to be " + expected +
+                                 " but found " + missingRepresentativeQueries);
+    }
+
+    bufferedRepresentativeQueriesIs(expected) {
+        return ({bufferedRepresentativeQueries}) =>
+                   assert.eq(bufferedRepresentativeQueries,
+                             expected,
+                             "Expected 'bufferedRepresentativeQueries' to be " + expected +
+                                 " but found " + bufferedRepresentativeQueries);
+    }
+
+    memoryUsedBytesIs(expected) {
+        return ({memoryUsedBytes}) => assert.eq(memoryUsedBytes,
+                                                expected,
+                                                "Expected memory used bytes to be " + expected +
+                                                    " but found " + memoryUsedBytes);
+    }
+
+    memoryUsedBytesIncreased() {
+        return ({memoryUsedBytes}) => assert.gt(memoryUsedBytes,
+                                                this.capturedMetrics.memoryUsedBytes,
+                                                "Expected memory used to increase");
+    }
+
+    memoryUsedBytesDidNotIncrease() {
+        return this.memoryUsedBytesIs(this.capturedMetrics.memoryUsedBytes);
+    }
+
+    insertedRepresentativeQueriesIncreasedBy(increment) {
+        return ({insertedRepresentativeQueries}) =>
+                   assert.eq(insertedRepresentativeQueries,
+                             this.capturedMetrics.insertedRepresentativeQueries + increment,
+                             "Expected the 'insertedRepresentativeQueries' count to increase by " +
+                                 increment);
+    }
+
+    succeededBackfillsIncreasedBy(increment) {
+        return ({succeededBackfills}) => assert.eq(
+                   succeededBackfills,
+                   this.capturedMetrics.succeededBackfills + increment,
+                   "Expected the 'succeededBackfills ' count to increase by " + increment);
+    }
+
+    failedBackfillsIncreasedBy(increment) {
+        return ({failedBackfills}) =>
+                   assert.eq(failedBackfills,
+                             this.capturedMetrics.failedBackfills + increment,
+                             "Expected the 'failedBackfills' count to increase by " + increment);
+    }
+}
+
 describe("QuerySettingsBackfill", function() {
     let qsutils = null;
+    let metrics = null;
     let coll = null;
     let view = null;
 
     function runQueryAndExpectBackfill({query, settings}) {
-        // Set the query settings by hash for the given 'query'.
         const queryShapeHash = qsutils.getQueryShapeHashFromExplain(query);
         const cmdObj = qsutils.withoutDollarDB(query);
-        function assertQueryWasBackfilled() {
-            // Execute the query so it has a chance to be backfilled.
-            assert.commandWorked(db.runCommand(cmdObj));
 
-            // Assert that the representative query will soon be present in $querySettings.
-            const expectedConfiguration = [qsutils.makeQueryShapeConfiguration(settings, query)];
-            qsutils.assertQueryShapeConfiguration(
-                expectedConfiguration,
-                /* shouldRunExplain */ true,
-                /* ignoreRepresentativeQueryFields */ kGenericArgFieldNames);
+        // There might be pending backfills from previous tests. Assert that they'll eventually
+        // finish, so we can start the backfill assertions from a clean state.
+        assert.soonNoExcept(() => {
+            metrics.verify(metrics.missingRepresentativeQueriesIs(0), metrics.memoryUsedBytesIs(0));
             return true;
-        };
-        qsutils.withBackfillDelaySeconds(1, () => {
+        });
+
+        function runTest() {
+            // Capture the current metrics and set query settings before starting the test.
+            metrics.captureCurrentMetrics();
+            // Set the query settings by hash for the given 'query'.
             qsutils.withQuerySettings(queryShapeHash, settings, () => {
                 // Assert that the representative query is not present in $querySettings yet.
                 qsutils.assertQueryShapeConfiguration([{settings}], /* shouldRunExplain */ false);
-                // Representative queries are not guaranteed to be backfilled immediately and might
-                // require additional executions, so wrap the test in assert.soonNoExcept() to
-                // ensure it eventually passes.
-                assert.soonNoExcept(assertQueryWasBackfilled);
+
+                // Assert that there is now one missing representative queries.
+                metrics.verify(metrics.missingRepresentativeQueriesIs(1),
+                               metrics.bufferedRepresentativeQueriesIs(0),
+                               metrics.memoryUsedBytesIs(0));
+
+                // Assert that no backfill specific metric was increased yet.
+                metrics.verify(metrics.succeededBackfillsIncreasedBy(0),
+                               metrics.failedBackfillsIncreasedBy(0),
+                               metrics.insertedRepresentativeQueriesIncreasedBy(0));
+
+                // Configure a failpoint to block the backfill task execution.
+                const fp = configureFailPoint(db, "hangBeforeExecutingBackfillTask");
+
+                // Execute the query and ensure that it is buffered. Expect the memory used to
+                // increase.
+                metrics.captureCurrentMetrics();
+                assert.commandWorked(db.runCommand(cmdObj));
+                metrics.verify(metrics.bufferedRepresentativeQueriesIs(1),
+                               metrics.memoryUsedBytesIncreased());
+
+                // Execute the same query again and ensure that it isn't buffered again and no
+                // additional memory is used.
+                metrics.captureCurrentMetrics();
+                assert.commandWorked(db.runCommand(cmdObj));
+                metrics.verify(metrics.bufferedRepresentativeQueriesIs(1),
+                               metrics.memoryUsedBytesDidNotIncrease());
+
+                // Unblock the execution of the task.
+                fp.off();
+
+                // Assert that the representative query will soon be present in $querySettings.
+                const expectedConfiguration =
+                    [qsutils.makeQueryShapeConfiguration(settings, query)];
+                qsutils.assertQueryShapeConfiguration(
+                    expectedConfiguration,
+                    /* shouldRunExplain */ true,
+                    /* ignoreRepresentativeQueryFields */ kGenericArgFieldNames);
+
+                // Expect the task to have finished succesfully. Both the success metrics and the
+                // number of inserted representative queries should have increased, while the fail
+                // count should remain constant.
+                metrics.verify(metrics.succeededBackfillsIncreasedBy(1),
+                               metrics.failedBackfillsIncreasedBy(0),
+                               metrics.insertedRepresentativeQueriesIncreasedBy(1));
+
+                // Assert that there is now no missing representative queries and no memory used.
+                metrics.verify(metrics.missingRepresentativeQueriesIs(0),
+                               metrics.bufferedRepresentativeQueriesIs(0),
+                               metrics.memoryUsedBytesIs(0));
             });
-        });
+            return true;
+        }
+        qsutils.withBackfillDelaySeconds(1, () => assert.soonNoExcept(runTest));
     }
 
     // Create a collection and a view before the tests run.
@@ -73,6 +200,7 @@ describe("QuerySettingsBackfill", function() {
     describe("Against Regular Collections", function() {
         before(function() {
             qsutils = new QuerySettingsUtils(db, coll.getName());
+            metrics = new QuerySettingsBackfillMetricsTests(qsutils);
             qsutils.removeAllQuerySettings();
         });
 
@@ -153,6 +281,7 @@ describe("QuerySettingsBackfill", function() {
     describe("Against Views", function() {
         before(function() {
             qsutils = new QuerySettingsUtils(db, coll.getName());
+            metrics = new QuerySettingsBackfillMetricsTests(qsutils);
             qsutils.removeAllQuerySettings();
         });
 
@@ -184,6 +313,7 @@ describe("QuerySettingsBackfill", function() {
     describe("Against non-existent collections", function() {
         before(function() {
             qsutils = new QuerySettingsUtils(db, "nonExistentCollection");
+            metrics = new QuerySettingsBackfillMetricsTests(qsutils);
             qsutils.removeAllQuerySettings();
         });
 

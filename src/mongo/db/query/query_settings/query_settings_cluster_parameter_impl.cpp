@@ -34,56 +34,18 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/server_status.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
+#include "mongo/db/query/query_settings/query_settings_usage_tracker.h"
 #include "mongo/db/service_context.h"
 #include "mongo/idl/idl_parser.h"
-
-#include <algorithm>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
 
 namespace mongo::query_settings {
-
-class QuerySettingsServerStatusSection final : public ServerStatusSection {
-public:
-    using ServerStatusSection::ServerStatusSection;
-
-    bool includeByDefault() const override {
-        // Only include if Query Settings are enabled.
-        // We need to use isEnabledUseLatestFCVWhenUninitialized() instead of isEnabled() because
-        // this could run during startup while the FCV is still uninitialized.
-        return feature_flags::gFeatureFlagQuerySettings.isEnabledUseLatestFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    }
-
-    BSONObj generateSection(OperationContext* opCtx,
-                            const BSONElement& configElement) const override {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        return BSON("count" << _count << "size" << _size << "rejectCount"
-                            << _numSettingsWithReject);
-    }
-
-    void record(int count, int size, int numSettingsWithReject) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _count = count;
-        _size = size;
-        _numSettingsWithReject = numSettingsWithReject;
-    }
-
-private:
-    int _count = 0;
-    int _size = 0;
-    int _numSettingsWithReject = 0;
-    mutable stdx::mutex _mutex;
-};
-
-auto& querySettingsServerStatusSection =
-    *ServerStatusSectionBuilder<QuerySettingsServerStatusSection>("querySettings");
 
 void QuerySettingsClusterParameter::append(OperationContext* opCtx,
                                            BSONObjBuilder* bob,
@@ -107,7 +69,8 @@ void QuerySettingsClusterParameter::append(OperationContext* opCtx,
 
 Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
                                           const boost::optional<TenantId>& tenantId) {
-    auto& querySettingsService = QuerySettingsService::get(getGlobalServiceContext());
+    auto* serviceContext = getGlobalServiceContext();
+    auto& querySettingsService = QuerySettingsService::get(serviceContext);
     auto newSettings = QuerySettingsClusterParameterValue::parse(
         IDLParserContext("querySettingsParameterValue",
                          boost::none /* vts */,
@@ -134,10 +97,10 @@ Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
             ++rejectCount;
         }
     }
-    querySettingsServerStatusSection.record(
-        /* count */ static_cast<int>(settingsArray.size()),
-        /* size */ static_cast<int>(newValueElement.valuesize()),
-        /* numSettingsWithReject */ static_cast<int>(rejectCount));
+    QuerySettingsUsageTracker::get(serviceContext)
+        .setQuerySettingsUsageMetrics(/* count */ static_cast<int>(settingsArray.size()),
+                                      /* size */ static_cast<int>(newValueElement.valuesize()),
+                                      /* rejectCount */ static_cast<int>(rejectCount));
     querySettingsService.setAllQueryShapeConfigurations(
         {std::move(settingsArray), newSettings.getClusterParameterTime()}, tenantId);
     return Status::OK();

@@ -30,6 +30,7 @@
 #include "mongo/db/query/query_settings/query_settings_backfill.h"
 
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/query/query_settings/query_settings_usage_tracker.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_error_info.h"
 #include "mongo/util/assert_util.h"
@@ -40,6 +41,8 @@
 namespace mongo::query_settings {
 
 MONGO_FAIL_POINT_DEFINE(throwBeforeSchedulingBackfillTask);
+MONGO_FAIL_POINT_DEFINE(hangBeforeExecutingBackfillTask);
+MONGO_FAIL_POINT_DEFINE(hangAfterExecutingBackfillInserts);
 
 using query_shape::QueryShapeHash;
 
@@ -258,6 +261,7 @@ void BackfillCoordinator::markForBackfillAndScheduleIfNeeded(
     query_shape::QueryShapeHash queryShapeHash,
     QueryInstance queryInstance) try {
     stdx::lock_guard lock{_mutex};
+    auto&& tracker = QuerySettingsUsageTracker::get(opCtx);
     constexpr auto onTaskCompletion = [](Status status) {
         LOGV2_DEBUG(10493705,
                     2,
@@ -276,7 +280,7 @@ void BackfillCoordinator::markForBackfillAndScheduleIfNeeded(
     auto memoryLimitBytes = internalQuerySettingsBackfillMemoryLimitBytes.load();
     const std::size_t itemSize = sizeof(queryShapeHash) + queryInstance.objsize();
     if (itemSize >= memoryLimitBytes - _state->memoryUsedBytes) {
-        auto prevState = std::exchange(_state, std::make_unique<State>());
+        auto prevState = consume_inlock();
         _state->taskScheduled = true;  // The original task is still scheduled.
         auto executor = makeExecutor(opCtx);
         ExecutorFuture<void>{executor}
@@ -297,6 +301,8 @@ void BackfillCoordinator::markForBackfillAndScheduleIfNeeded(
                 "representativeQuery"_attr = queryInstance);
     _state->buffer.emplace_hint(it, queryShapeHash, std::move(queryInstance));
     _state->memoryUsedBytes += itemSize;
+    tracker.setBackfillMemoryUsedBytes(_state->memoryUsedBytes);
+    tracker.setBufferedRepresentativeQueries(_state->buffer.size());
 
     if (MONGO_unlikely(throwBeforeSchedulingBackfillTask.shouldFail())) {
         uasserted(ErrorCodes::UnknownError, "test exception while recording");
@@ -330,6 +336,9 @@ void BackfillCoordinator::markForBackfillAndScheduleIfNeeded(
             uassertStatusOK(status);
         })
         .then([this, executor] {
+            if (MONGO_unlikely(hangBeforeExecutingBackfillTask.shouldFail())) {
+                hangBeforeExecutingBackfillTask.pauseWhileSet();
+            }
             auto state = consume();
             return execute(std::move(state->buffer),
                            std::move(state->cancellationSource),
@@ -376,7 +385,8 @@ ExecutorFuture<void> BackfillCoordinator::execute(
     }
 
     // Early exit if there are no representative queries left to insert after the cleanup step.
-    if (representativeQueries.size() == 0) {
+    auto nRepresentativeQueries = representativeQueries.size();
+    if (nRepresentativeQueries == 0) {
         return ExecutorFuture<void>(std::move(executor));
     }
 
@@ -389,11 +399,32 @@ ExecutorFuture<void> BackfillCoordinator::execute(
                clusterParameterTime,
                tenantId,
                client = std::move(client),
-               opCtxHolder = std::move(opCtxHolder)](std::vector<QueryShapeHash> hashes) {
-            LOGV2_WARNING(10493707,
-                          "Succesfully inserted the backfilled representative queries",
-                          "hashes"_attr = hashes);
+               opCtxHolder = std::move(opCtxHolder),
+               nRepresentativeQueries](std::vector<QueryShapeHash> hashes) {
+            auto&& tracker = QuerySettingsUsageTracker::get(opCtxHolder.get());
+            if (MONGO_unlikely(hangAfterExecutingBackfillInserts.shouldFail())) {
+                hangAfterExecutingBackfillInserts.pauseWhileSet();
+            }
+            const auto nInsertedRepresentativeQueries = hashes.size();
+            tracker.incrementInsertedRepresentativeQueries(nInsertedRepresentativeQueries);
+            LOGV2_DEBUG(10493707,
+                        2,
+                        "Succesfully inserted the backfilled representative queries",
+                        "hashes"_attr = hashes,
+                        "representativeQueriesInserted"_attr = nInsertedRepresentativeQueries);
             _onCompletionHook(std::move(hashes), clusterParameterTime, tenantId);
+            tracker.incrementSucceededBackfills(nInsertedRepresentativeQueries);
+            tracker.incrementFailedBackfills(nRepresentativeQueries -
+                                             nInsertedRepresentativeQueries);
+        })
+        .onError([nRepresentativeQueries](Status status) {
+            LOGV2_DEBUG(10710600,
+                        2,
+                        "Encountered error while backfilling query settings representative queries",
+                        "error"_attr = status);
+            QuerySettingsUsageTracker::get(getGlobalServiceContext())
+                .incrementFailedBackfills(nRepresentativeQueries);
+            uassertStatusOK(status);
         });
 }
 
@@ -414,9 +445,15 @@ void BackfillCoordinator::cancel() {
 }
 
 std::unique_ptr<BackfillCoordinator::State> BackfillCoordinator::consume() {
-    auto newState = std::make_unique<BackfillCoordinator::State>();
     stdx::lock_guard lk{_mutex};
-    return std::exchange(_state, std::move(newState));
+    return consume_inlock();
+}
+
+std::unique_ptr<BackfillCoordinator::State> BackfillCoordinator::consume_inlock() {
+    auto&& tracker = QuerySettingsUsageTracker::get(getGlobalServiceContext());
+    tracker.setBackfillMemoryUsedBytes(0);
+    tracker.setBufferedRepresentativeQueries(0);
+    return std::exchange(_state, std::make_unique<BackfillCoordinator::State>());
 }
 
 std::shared_ptr<executor::TaskExecutor> BackfillCoordinator::makeExecutor(OperationContext* opCtx) {

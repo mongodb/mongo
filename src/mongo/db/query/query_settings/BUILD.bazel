@@ -79,6 +79,8 @@ mongo_cc_library(
         "query_settings_manager.cpp",
         "query_settings_manager.h",
         "query_settings_service.cpp",
+        "query_settings_usage_tracker.cpp",
+        "query_settings_usage_tracker.h",
         ":query_settings_cluster_parameter_gen",
     ],
     hdrs = [

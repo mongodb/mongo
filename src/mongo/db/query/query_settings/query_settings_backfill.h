@@ -132,6 +132,7 @@ private:
      * Thread safe utillity to return the inner state and replace it with a new one.
      */
     std::unique_ptr<State> consume();
+    std::unique_ptr<State> consume_inlock();
 
     virtual std::shared_ptr<executor::TaskExecutor> makeExecutor(OperationContext* opCtx);
     virtual std::unique_ptr<async_rpc::Targeter> makeTargeter(OperationContext* opCtx) = 0;
