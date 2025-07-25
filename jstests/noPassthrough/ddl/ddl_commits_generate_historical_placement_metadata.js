@@ -182,7 +182,7 @@ function makeCreateIndexesEntryTemplate(dbName, collName, indexSpec) {
     return {
         op: 'c',
         ns: `${dbName}.$cmd`,
-        o: {createIndexes: collName, spec: {v: 2, key: indexSpec, name: indexName}},
+        o: {createIndexes: collName, v: 2, key: indexSpec, name: indexName},
 
     };
 }

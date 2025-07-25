@@ -49,7 +49,8 @@ public:
     /**
      * Parses an oplog entry for "startIndexBuild", "commitIndexBuild", or "abortIndexBuild".
      */
-    static StatusWith<IndexBuildOplogEntry> parse(const repl::OplogEntry& entry);
+    static StatusWith<IndexBuildOplogEntry> parse(const repl::OplogEntry& entry,
+                                                  bool parseO2 = true);
 
     UUID collUUID;
     repl::OplogEntry::CommandType commandType;
@@ -57,6 +58,7 @@ public:
     UUID buildUUID;
     std::vector<std::string> indexNames;
     std::vector<BSONObj> indexSpecs;
+    std::vector<std::string> indexIdents;
     boost::optional<Status> cause;
     repl::OpTime opTime;
 };

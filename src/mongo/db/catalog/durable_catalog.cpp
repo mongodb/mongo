@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/collection_record_store_options.h"
 #include "mongo/db/catalog/durable_catalog_entry_metadata.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/feature_document_util.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -327,21 +328,45 @@ Status createIndex(OperationContext* opCtx,
                    const CollectionOptions& collectionOptions,
                    const IndexConfig& indexConfig,
                    StringData ident) {
-    auto engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto kvEngine = storageEngine->getEngine();
     invariant(collectionOptions.uuid);
-    Status status =
-        engine->createSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx),
-                                          nss,
-                                          *collectionOptions.uuid,
-                                          ident,
-                                          indexConfig,
-                                          collectionOptions.indexOptionDefaults.getStorageEngine());
+
+    bool replicateLocalCatalogIdentifiers = shouldReplicateLocalCatalogIdentifers(opCtx);
+    if (replicateLocalCatalogIdentifiers) {
+        // If a previous attempt at creating this index was rolled back, the ident may still be drop
+        // pending. Complete that drop before creating the index if so.
+        if (Status status = storageEngine->immediatelyCompletePendingDrop(opCtx, ident);
+            !status.isOK()) {
+            LOGV2(10526400,
+                  "Index ident was drop pending and required completing the drop",
+                  "ident"_attr = ident,
+                  "error"_attr = status);
+            return status;
+        }
+    }
+
+    Status status = kvEngine->createSortedDataInterface(
+        ru,
+        nss,
+        *collectionOptions.uuid,
+        ident,
+        indexConfig,
+        collectionOptions.indexOptionDefaults.getStorageEngine());
+
     if (status.isOK()) {
-        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-        ru.onRollback([engine, ident = std::string(ident), &ru](OperationContext*) {
-            // Intentionally ignoring failure.
-            engine->dropIdent(ru, ident, /*identHasSizeInfo=*/false).ignore();
-        });
+        if (replicateLocalCatalogIdentifiers) {
+            ru.onRollback([storageEngine, ident = std::string(ident), &ru](OperationContext*) {
+                storageEngine->addDropPendingIdent(Timestamp::min(),
+                                                   std::make_shared<Ident>(ident));
+            });
+        } else {
+            ru.onRollback([kvEngine, ident = std::string(ident), &ru](OperationContext*) {
+                // Intentionally ignoring failure.
+                kvEngine->dropIdent(ru, ident, false).ignore();
+            });
+        }
     }
     return status;
 }

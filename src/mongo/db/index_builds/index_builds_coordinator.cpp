@@ -1096,8 +1096,6 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
             wuow.commit();
         });
     }
-    auto indexIdents = opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdents(
-        nss.dbName(), oplogEntry.indexSpecs.size());
 
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     uassertStatusOK(
@@ -1106,7 +1104,7 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
                               nss.dbName(),
                               collUUID,
                               oplogEntry.indexSpecs,
-                              indexIdents,
+                              oplogEntry.indexIdents,
                               oplogEntry.buildUUID,
                               /* This oplog entry is only replicated for two-phase index builds */
                               IndexBuildProtocol::kTwoPhase,
@@ -2103,15 +2101,34 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
                                          IndexBuildsManager::IndexConstraints indexConstraints,
                                          bool fromMigrate) {
     CollectionWriter collection(opCtx, collectionUUID);
-
     invariant(collection,
               str::stream() << "IndexBuildsCoordinator::createIndexes: " << collectionUUID);
+    auto ident = opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdent(
+        collection->ns().dbName());
+    _createIndex(opCtx, collection, spec, ident, indexConstraints, fromMigrate);
+}
+
+void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
+                                         UUID collectionUUID,
+                                         const BSONObj& spec,
+                                         StringData ident,
+                                         IndexBuildsManager::IndexConstraints indexConstraints) {
+    CollectionWriter collection(opCtx, collectionUUID);
+    invariant(collection,
+              str::stream() << "IndexBuildsCoordinator::createIndexes: " << collectionUUID);
+    _createIndex(opCtx, collection, spec, ident, indexConstraints, false);
+}
+
+void IndexBuildsCoordinator::_createIndex(OperationContext* opCtx,
+                                          CollectionWriter& collection,
+                                          const BSONObj& spec,
+                                          StringData ident,
+                                          IndexBuildsManager::IndexConstraints indexConstraints,
+                                          bool fromMigrate) {
     auto nss = collection->ns();
     CollectionCatalog::get(opCtx)->invariantHasExclusiveAccessToCollection(opCtx, nss);
 
     auto buildUUID = UUID::gen();
-    auto ident = opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdent(
-        collection->ns().dbName());
 
     // Rest of this function can throw, so ensure the build cleanup occurs.
     ON_BLOCK_EXIT([&] { _indexBuildsManager.tearDownAndUnregisterIndexBuild(buildUUID); });
@@ -2124,7 +2141,7 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
         // build the index in the foreground instead of yielding during element insertion.
         options.method = IndexBuildMethod::kForeground;
         uassertStatusOK(_indexBuildsManager.setUpIndexBuild(
-            opCtx, collection, {spec}, {ident}, buildUUID, onInitFn, options));
+            opCtx, collection, {spec}, {std::string{ident}}, buildUUID, onInitFn, options));
     } catch (DBException& ex) {
         const auto& status = ex.toStatus();
         if (IndexBuildsCoordinator::isCreateIndexesErrorSafeToIgnore(status, indexConstraints)) {
@@ -2133,7 +2150,7 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
                         "Ignoring indexing error",
                         "error"_attr = redact(status),
                         logAttrs(nss),
-                        "collectionUUID"_attr = collectionUUID,
+                        "collectionUUID"_attr = collection->uuid(),
                         "spec"_attr = spec);
             return;
         }
@@ -2149,7 +2166,7 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     auto onCreateEachFn = [&](const BSONObj& spec, StringData ident) {
         opObserver->onCreateIndex(
-            opCtx, collection->ns(), collectionUUID, spec, ident, fromMigrate);
+            opCtx, collection->ns(), collection->uuid(), spec, ident, fromMigrate);
     };
     uassertStatusOK(_indexBuildsManager.commitIndexBuild(
         opCtx, collection, nss, buildUUID, onCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));

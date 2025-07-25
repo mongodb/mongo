@@ -189,6 +189,9 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
     if (retCode == EEXIST) {
         return Status(ErrorCodes::ObjectAlreadyExists, s);
     }
+    if (retCode == ENOENT) {
+        return Status(ErrorCodes::NoSuchKey, s);
+    }
 
     uassert(ErrorCodes::ExceededMemoryLimit, s, retCode != WT_CACHE_FULL);
 

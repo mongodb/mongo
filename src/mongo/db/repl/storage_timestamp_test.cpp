@@ -2764,6 +2764,9 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
  * index build through applying the oplog entry, rather than creating an oplog entry.
  */
 TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
+    RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
+        "featureFlagReplicateLocalCatalogIdentifiers", true);
+
     // Index builds expect a non-empty oplog and a valid committed snapshot.
     {
         Lock::GlobalLock lk(_opCtx, MODE_IX);
@@ -2821,18 +2824,10 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
         const auto beforeBuildTime = _clock->tickClusterTime(2);
         const auto startBuildTs = beforeBuildTime.addTicks(1).asTimestamp();
 
-        // Grab the existing idents to identify the ident created by the index build.
-        auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
-        auto mdbCatalog = storageEngine->getMDBCatalog();
-        std::vector<std::string> origIdents;
-        {
-            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
-            origIdents = mdbCatalog->getAllIdents(_opCtx);
-        }
-
         auto keyPattern = BSON("field" << 1);
         auto startBuildOpTime = repl::OpTime(startBuildTs, _presentTerm);
         UUID indexBuildUUID = UUID::gen();
+        const auto indexIdent = "index-ident"_sd;
 
         // Wait for the index build thread to start the collection scan before proceeding with
         // checking the catalog and applying the commitIndexBuild oplog entry.
@@ -2845,7 +2840,7 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
             FailPointEnableBlock fpb("hangAfterStartingIndexBuild");
 
             auto start = repl::makeStartIndexBuildOplogEntry(
-                startBuildOpTime, nss, "field_1", keyPattern, collUUID, indexBuildUUID);
+                startBuildOpTime, nss, "field_1", keyPattern, collUUID, indexBuildUUID, indexIdent);
             const bool dataIsConsistent = true;
             ASSERT_OK(
                 repl::applyOplogEntryOrGroupedInserts(_opCtx,
@@ -2859,10 +2854,10 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
                                      fpb.initialTimesEntered() + 1);
         }
 
+        auto mdbCatalog = _opCtx->getServiceContext()->getStorageEngine()->getMDBCatalog();
+
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
-            const std::string indexIdent =
-                getNewIndexIdentAtTime(mdbCatalog, origIdents, Timestamp::min());
             assertIdentsMissingAtTimestamp(
                 mdbCatalog, "", indexIdent, beforeBuildTime.asTimestamp());
             assertIdentsExistAtTimestamp(mdbCatalog, "", indexIdent, startBuildTs);

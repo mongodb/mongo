@@ -39,6 +39,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/index_builds/index_build_oplog_entry.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
@@ -49,6 +50,7 @@
 #include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
@@ -59,8 +61,6 @@
 #include <vector>
 
 #include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
@@ -684,6 +684,157 @@ TEST(OplogEntryParserTest, ParseObjectFailure) {
                                     8881101,
                                     "Invalid 'o' field type (expected Object)");
     }
+}
+
+#define ASSERT_BSONOBJ_VECTOR_EQ(a, b)            \
+    do {                                          \
+        ASSERT_EQ((a).size(), (b).size());        \
+        for (size_t i = 0; i < (a).size(); ++i) { \
+            ASSERT_BSONOBJ_EQ((a)[i], (b)[i]);    \
+        }                                         \
+    } while (0)
+
+TEST(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
+    const std::string ns = "test.coll";
+    const auto nss = NamespaceString::createNamespaceString_forTest(ns);
+    const UUID indexBuildUUID = UUID::gen();
+    const std::vector<BSONObj> indexSpecs = {
+        BSON("v" << 2 << "key" << BSON("x" << 1) << "name" << "x_1"),
+        BSON("v" << 2 << "key" << BSON("y" << 1) << "name" << "y_1"),
+    };
+    const std::vector<std::string> indexNames = {"x_1", "y_1"};
+    const std::vector<std::string> indexIdents = {"index-0", "index-1"};
+
+    auto uuid = UUID::gen();
+
+    {
+        const auto o = BSON("startIndexBuild" << ns << "indexBuildUUID" << indexBuildUUID
+                                              << "indexes" << indexSpecs);
+        const auto o2 = BSON("idents" << indexIdents);
+
+        const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
+        auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(entry));
+        ASSERT_EQ(parsed.collUUID, uuid);
+        ASSERT_EQ(parsed.commandType, OplogEntry::CommandType::kStartIndexBuild);
+        ASSERT_EQ(parsed.commandName, "startIndexBuild");
+        ASSERT_EQ(parsed.indexNames, indexNames);
+        ASSERT_BSONOBJ_VECTOR_EQ(parsed.indexSpecs, indexSpecs);
+        ASSERT_EQ(parsed.indexIdents, indexIdents);
+        ASSERT_FALSE(parsed.cause);
+    }
+
+    {
+        const auto o = BSON("startIndexBuild" << ns << "indexBuildUUID" << indexBuildUUID
+                                              << "indexes" << indexSpecs);
+        const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, boost::none, uuid);
+        auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(entry));
+        ASSERT(parsed.indexIdents.empty());
+    }
+
+    {
+        const auto o = BSON("commitIndexBuild" << ns << "indexBuildUUID" << indexBuildUUID
+                                               << "indexes" << indexSpecs);
+        const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, boost::none, uuid);
+        auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(entry));
+        ASSERT_EQ(parsed.collUUID, uuid);
+        ASSERT_EQ(parsed.commandType, OplogEntry::CommandType::kCommitIndexBuild);
+        ASSERT_EQ(parsed.commandName, "commitIndexBuild");
+        ASSERT_EQ(parsed.indexNames, indexNames);
+        ASSERT_BSONOBJ_VECTOR_EQ(parsed.indexSpecs, indexSpecs);
+        ASSERT(parsed.indexIdents.empty());
+        ASSERT_FALSE(parsed.cause);
+    }
+
+    {
+        BSONObjBuilder builder;
+        builder.append("ok", false);
+        const auto cause = Status(ErrorCodes::IndexBuildAborted, "aborted");
+        cause.serializeErrorToBSON(&builder);
+        const auto o =
+            BSON("abortIndexBuild" << ns << "indexBuildUUID" << indexBuildUUID << "indexes"
+                                   << indexSpecs << "cause" << builder.obj());
+        const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, boost::none, uuid);
+        auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(entry));
+        ASSERT_EQ(parsed.collUUID, uuid);
+        ASSERT_EQ(parsed.commandType, OplogEntry::CommandType::kAbortIndexBuild);
+        ASSERT_EQ(parsed.commandName, "abortIndexBuild");
+        ASSERT_EQ(parsed.indexNames, indexNames);
+        ASSERT_BSONOBJ_VECTOR_EQ(parsed.indexSpecs, indexSpecs);
+        ASSERT(parsed.indexIdents.empty());
+        ASSERT_EQ(parsed.cause, cause);
+    }
+}
+
+TEST(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
+    auto parse = [&](BSONObj o, boost::optional<BSONObj> o2 = boost::none) {
+        auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, UUID::gen());
+        auto parsed = IndexBuildOplogEntry::parse(entry);
+        ASSERT_NOT_OK(parsed);
+        return parsed.getStatus();
+    };
+
+    BSONObj baseObj =
+        BSON("startIndexBuild" << "test.coll" << "indexBuildUUID" << UUID::gen() << "indexes"
+                               << BSON_ARRAY(BSON("v" << 2 << "key" << BSON("x" << 1) << "name"
+                                                      << "x_1")));
+    auto setField = [&](StringData name, auto value) {
+        return baseObj.addFields(BSON(name << value));
+    };
+
+    ASSERT_EQ(parse(baseObj.removeField("indexBuildUUID")), ErrorCodes::BadValue);
+    ASSERT_EQ(parse(baseObj.removeField("indexes")), ErrorCodes::BadValue);
+
+    ASSERT_EQ(parse(setField("startIndexBuild", 1)), ErrorCodes::InvalidNamespace);
+    ASSERT_EQ(parse(setField("indexBuildUUID", "")), ErrorCodes::InvalidUUID);
+    ASSERT_EQ(parse(setField("indexes", "")), ErrorCodes::BadValue);
+    ASSERT_EQ(parse(setField("indexes", BSON_ARRAY(""))), ErrorCodes::BadValue);
+    ASSERT_EQ(parse(setField("indexes", BSON_ARRAY(BSON("nameless" << "")))),
+              ErrorCodes::NoSuchKey);
+    // parse does not verify that the specs are valid beyond having names, so no further tests for
+    // them here
+
+    ASSERT_EQ(parse(baseObj, BSONObj()), ErrorCodes::BadValue);
+    ASSERT_EQ(parse(baseObj, BSON("idents" << 1)), ErrorCodes::BadValue);
+    ASSERT_EQ(parse(baseObj, BSON("idents" << BSON_ARRAY(1))), ErrorCodes::BadValue);
+
+    baseObj =
+        BSON("abortIndexBuild" << "test.coll" << "indexBuildUUID" << UUID::gen() << "indexes"
+                               << BSON_ARRAY(BSON("v" << 2 << "key" << BSON("x" << 1) << "name"
+                                                      << "x_1")));
+    ASSERT_EQ(parse(baseObj), ErrorCodes::BadValue);
+    ASSERT_EQ(parse(setField("cause", 1)), ErrorCodes::BadValue);
+
+    // The cause field being an object which can't be interpreted as a Status results in the
+    // top-level parse succeeding and the "cause" field reporting a parse error
+    {
+        auto entry = makeCommandOplogEntry(
+            entryOpTime, nss, setField("cause", BSONObj()), boost::none, UUID::gen());
+        auto parsed = IndexBuildOplogEntry::parse(entry);
+        ASSERT_OK(parsed);
+        ASSERT_NOT_OK(parsed.getValue().cause);
+    }
+}
+
+// The caller is expected to only call parse on command entries with a command type of
+// startIndexBuild, commitIndexBuild, or abortIndexBuild.
+DEATH_TEST(OplogEntryTest, ParseNonCommandOperation, "kCommand") {
+    auto entry = makeOplogEntry(entryOpTime,
+                                OpTypeEnum::kInsert,  // should be kCommand
+                                nss.getCommandNS(),
+                                BSONObj(),
+                                boost::none,
+                                {} /* sessionInfo */,
+                                Date_t() /* wallClockTime*/,
+                                {} /* stmtIds */,
+                                UUID::gen());
+    IndexBuildOplogEntry::parse(entry).getValue();
+}
+
+DEATH_TEST(OplogEntryTest, ParseWrongCommandOperation, "CommandType") {
+    // A valid command type, but not one supported by this function
+    auto entry = makeCommandOplogEntry(
+        entryOpTime, nss, BSON("applyOps" << "test.coll"), boost::none, UUID::gen());
+    IndexBuildOplogEntry::parse(entry).getValue();
 }
 
 }  // namespace

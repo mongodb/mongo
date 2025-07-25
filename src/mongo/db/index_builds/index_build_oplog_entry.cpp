@@ -46,7 +46,8 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEntry& entry) {
+StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEntry& entry,
+                                                             bool parseO2) {
     // Example 'o' field which takes the same form for all three oplog entries.
     // {
     //     < "startIndexBuild" | "commitIndexBuild" | "abortIndexBuild" > : "coll",
@@ -82,13 +83,14 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
     BSONObj obj = entry.getObject();
     BSONElement first = obj.firstElement();
     auto commandName = first.fieldNameStringData();
-    uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << commandName << " value must be a string",
-            first.type() == BSONType::string);
+    if (first.type() != BSONType::string) {
+        return {ErrorCodes::InvalidNamespace,
+                str::stream() << commandName << " value must be a string"};
+    }
 
     auto buildUUIDElem = obj.getField("indexBuildUUID");
     if (buildUUIDElem.eoo()) {
-        return {ErrorCodes::BadValue, str::stream() << "Missing required field 'indexBuildUUID'"};
+        return {ErrorCodes::BadValue, "Missing required field 'indexBuildUUID'"};
     }
 
     auto swBuildUUID = UUID::parse(buildUUIDElem);
@@ -98,20 +100,18 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
 
     auto indexesElem = obj.getField("indexes");
     if (indexesElem.eoo()) {
-        return {ErrorCodes::BadValue, str::stream() << "Missing required field 'indexes'"};
+        return {ErrorCodes::BadValue, "Missing required field 'indexes'"};
     }
 
     if (indexesElem.type() != BSONType::array) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "Field 'indexes' must be an array of index spec objects"};
+        return {ErrorCodes::BadValue, "Field 'indexes' must be an array of index spec objects"};
     }
 
     std::vector<std::string> indexNames;
     std::vector<BSONObj> indexSpecs;
     for (auto& indexElem : indexesElem.Array()) {
         if (!indexElem.isABSONObj()) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << "Element of 'indexes' must be an object"};
+            return {ErrorCodes::BadValue, "Element of 'indexes' must be an object"};
         }
         std::string indexName;
         auto status = bsonExtractStringField(indexElem.Obj(), "name", &indexName);
@@ -139,12 +139,34 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
     auto collUUID = entry.getUuid();
     invariant(collUUID, str::stream() << redact(entry.toBSONForLogging()));
 
+    std::vector<std::string> indexIdents;
+    if (auto o2 = entry.getObject2(); o2 && parseO2) {
+        auto identsElem = o2->getField("idents");
+        if (identsElem.eoo()) {
+            return {ErrorCodes::BadValue, "Missing required field 'idents'"};
+        }
+        if (identsElem.type() != BSONType::array) {
+            return {ErrorCodes::BadValue,
+                    fmt::format("Field 'idents' must be an array of index idents, got '{}'",
+                                identsElem.toString())};
+        }
+        for (auto& identElem : identsElem.Array()) {
+            if (identElem.type() != BSONType::string) {
+                return {ErrorCodes::BadValue,
+                        fmt::format("Element of 'idents' must be a string, got '{}'",
+                                    identElem.toString())};
+            }
+            indexIdents.push_back(identElem.str());
+        }
+    }
+
     return IndexBuildOplogEntry{*collUUID,
                                 commandType,
                                 std::string{commandName},
                                 swBuildUUID.getValue(),
                                 std::move(indexNames),
                                 std::move(indexSpecs),
+                                std::move(indexIdents),
                                 cause,
                                 entry.getOpTime()};
 }

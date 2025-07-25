@@ -279,6 +279,7 @@ void registerApplyImportCollectionFn(ApplyImportCollectionFn func) {
 
 void createIndexForApplyOps(OperationContext* opCtx,
                             const BSONObj& indexSpec,
+                            const boost::optional<BSONObj>& indexMetadata,
                             const NamespaceString& indexNss,
                             OplogApplication::Mode mode) {
     // Uncommitted collections support creating indexes using relaxed locking if they are part of a
@@ -329,7 +330,6 @@ void createIndexForApplyOps(OperationContext* opCtx,
               str::stream() << "Unexpected result from shouldRelaxIndexConstraints - ns: "
                             << indexNss.toStringForErrorMsg() << "; uuid: "
                             << indexCollection->uuid() << "; original index spec: " << indexSpec);
-    const auto constraints = IndexBuildsManager::IndexConstraints::kRelax;
 
     // Run single-phase builds synchronously with oplog batch application.
     //
@@ -337,9 +337,27 @@ void createIndexForApplyOps(OperationContext* opCtx,
     // collections. See SERVER-47439.
     IndexBuildsCoordinator::updateCurOpOpDescription(opCtx, indexNss, {indexSpec});
     auto collUUID = indexCollection->uuid();
-    auto fromMigrate = false;
+    std::string indexIdent = [&] {
+        if (!indexMetadata || !shouldReplicateLocalCatalogIdentifers(opCtx)) {
+            return opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdent(
+                indexCollection->ns().dbName());
+        }
+
+        auto identField = indexMetadata->getField("ident");
+        uassert(ErrorCodes::BadValue,
+                "Failed to create index because metadata o2 was present but missing ident: " +
+                    indexMetadata->toString(),
+                !identField.eoo());
+        uassert(ErrorCodes::BadValue,
+                "Failed to create index because ident field in metadata o2 was invalid: " +
+                    indexMetadata->toString(),
+                identField.type() == BSONType::string && !identField.valueStringData().empty());
+        return identField.String();
+    }();
+
     auto indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
-    indexBuildsCoordinator->createIndex(opCtx, collUUID, indexSpec, constraints, fromMigrate);
+    indexBuildsCoordinator->createIndex(
+        opCtx, collUUID, indexSpec, indexIdent, IndexBuildsManager::IndexConstraints::kRelax);
 }
 
 /**
@@ -898,7 +916,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           } else {
               collLock.emplace(opCtx, nss, MODE_X);
           }
-          createIndexForApplyOps(opCtx, indexSpec, nss, mode);
+          createIndexForApplyOps(opCtx, indexSpec, entry.getObject2(), nss, mode);
           return Status::OK();
       },
       {ErrorCodes::IndexAlreadyExists,
@@ -913,16 +931,24 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           }
 
           const auto& entry = *op;
-          auto swOplogEntry = IndexBuildOplogEntry::parse(entry);
+          auto swOplogEntry =
+              IndexBuildOplogEntry::parse(entry, shouldReplicateLocalCatalogIdentifers(opCtx));
           if (!swOplogEntry.isOK()) {
               return swOplogEntry.getStatus().withContext(
                   "Error parsing 'startIndexBuild' oplog entry");
           }
+          auto oplogEntry = std::move(swOplogEntry.getValue());
 
           // Sanitize storage engine options to remove options which might not apply to this node.
           // See SERVER-68122.
-          for (auto& spec : swOplogEntry.getValue().indexSpecs) {
+          for (auto& spec : oplogEntry.indexSpecs) {
               spec = getObjWithSanitizedStorageEngineOptions(opCtx, spec);
+          }
+
+          if (oplogEntry.indexIdents.empty()) {
+              oplogEntry.indexIdents =
+                  opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdents(
+                      entry.getNss().dbName(), oplogEntry.indexSpecs.size());
           }
 
           IndexBuildsCoordinator::ApplicationMode applicationMode =
@@ -931,7 +957,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
               applicationMode = IndexBuildsCoordinator::ApplicationMode::kInitialSync;
           }
           IndexBuildsCoordinator::get(opCtx)->applyStartIndexBuild(
-              opCtx, applicationMode, swOplogEntry.getValue());
+              opCtx, applicationMode, oplogEntry);
           return Status::OK();
       },
       // These index related error codes needs to be ignored during initial sync because these

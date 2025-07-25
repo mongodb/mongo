@@ -28,10 +28,8 @@
  */
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/op_observer/op_observer_impl.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -55,7 +53,6 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/batched_write_context.h"
-#include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults.h"
@@ -94,8 +91,9 @@
 #include <cstddef>
 #include <iterator>
 #include <limits>
-#include <mutex>
 #include <utility>
+
+#include <boost/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
@@ -362,14 +360,16 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                   "Added oplog entry for createIndexes to transaction",
                   logAttrs(oplogEntry.getNss()),
                   "uuid"_attr = oplogEntry.getUuid(),
-                  "object"_attr = oplogEntry.getObject());
+                  "object"_attr = oplogEntry.getObject(),
+                  "object2"_attr = oplogEntry.getObject2());
         } else {
             LOGV2(7360101,
                   "Wrote oplog entry for createIndexes",
                   logAttrs(oplogEntry.getNss()),
                   "uuid"_attr = oplogEntry.getUuid(),
                   "opTime"_attr = opTime,
-                  "object"_attr = oplogEntry.getObject());
+                  "object"_attr = oplogEntry.getObject(),
+                  "object2"_attr = oplogEntry.getObject2());
         }
     }
 }

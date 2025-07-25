@@ -30,3 +30,4 @@
 - featureFlagSessionsCollectionCoordinatorOnConfigServer
 # TODO (SERVER-101672) : Delete featureFlagOplogSamplingAsyncEnabled.
 - featureFlagOplogSamplingAsyncEnabled
+- featureFlagReplicateLocalCatalogIdentifiers
