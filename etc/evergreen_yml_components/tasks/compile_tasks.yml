@@ -336,7 +336,7 @@ tasks:
       - func: "bazel compile"
         vars:
           targets: compiledb
-      - func: bazel run
+      - func: "bazel run"
         vars:
           target: //evergreen:validate_compile_commands
 
