@@ -40,8 +40,11 @@
 namespace mongo {
 namespace unified_write_executor {
 
-WriteBatchResponse WriteBatchExecutor::execute(OperationContext* opCtx, const WriteBatch& batch) {
-    return std::visit([&](const auto& batchData) { return _execute(opCtx, batchData); }, batch);
+WriteBatchResponse WriteBatchExecutor::execute(OperationContext* opCtx,
+                                               RoutingContext& routingCtx,
+                                               const WriteBatch& batch) {
+    return std::visit([&](const auto& batchData) { return _execute(opCtx, routingCtx, batchData); },
+                      batch.data);
 }
 
 std::vector<AsyncRequestsSender::Request> WriteBatchExecutor::buildBulkWriteRequests(
@@ -103,6 +106,7 @@ std::vector<AsyncRequestsSender::Request> WriteBatchExecutor::buildBulkWriteRequ
 }
 
 WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
+                                                RoutingContext& routingCtx,
                                                 const SimpleWriteBatch& batch) {
     std::vector<AsyncRequestsSender::Request> requestsToSend = buildBulkWriteRequests(opCtx, batch);
 
@@ -113,6 +117,11 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         std::move(requestsToSend),
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         Shard::RetryPolicy::kNoRetry);
+
+    // Note that we sent a request for the involved namespaces after the requests get scheduled.
+    for (const auto& nss : batch.getInvolvedNamespaces()) {
+        routingCtx.onRequestSentForNss(nss);
+    }
 
     SimpleWriteBatchResponse shardResponses;
     while (!sender.done()) {
@@ -128,8 +137,12 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
 }
 
 WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
+                                                RoutingContext& routingCtx,
                                                 const NonTargetedWriteBatch& batch) {
     const WriteOp& writeOp = batch.op;
+    // TODO SERVER-108144 maybe we shouldn't call release here or maybe we should acknowledge a
+    // write based on the swRes.
+    routingCtx.release(writeOp.getNss());
     auto bulkOp = writeOp.getBulkWriteOp();
     const auto& nss = writeOp.getNss();
 

@@ -72,7 +72,7 @@ public:
      * Process a response from each shard, handle errors, and collect statistics. Returns an
      * array containing ops that did not complete successfully that need to be resent.
      */
-    Result onWriteBatchResponse(const WriteBatchResponse& response);
+    Result onWriteBatchResponse(RoutingContext& routingCtx, const WriteBatchResponse& response);
 
     /**
      * Turns gathered statistics into a command reply for the client. Consumes any pending reply
@@ -82,19 +82,24 @@ public:
     CmdResponse generateClientResponse();
 
 private:
-    Result _onWriteBatchResponse(const SimpleWriteBatchResponse& response);
-    Result _onWriteBatchResponse(const NonTargetedWriteBatchResponse& response);
+    Result _onWriteBatchResponse(RoutingContext& routingCtx,
+                                 const SimpleWriteBatchResponse& response);
+    Result _onWriteBatchResponse(RoutingContext& routingCtx,
+                                 const NonTargetedWriteBatchResponse& response);
 
     /**
      * Process a response from a shard, handle errors, and collect statistics. Returns an array
      * containing ops that did not complete successfully that need to be resent.
      */
-    Result onShardResponse(const ShardId& shardId, const ShardResponse& response);
+    Result onShardResponse(RoutingContext& routingCtx,
+                           const ShardId& shardId,
+                           const ShardResponse& response);
 
     /**
      * Process ReplyItems and pick out any ops that need to be retried.
      */
-    Result processOpsInReplyItems(const std::vector<WriteOp>& ops,
+    Result processOpsInReplyItems(RoutingContext& routingCtx,
+                                  const std::vector<WriteOp>& ops,
                                   const std::vector<BulkWriteReplyItem>&);
     /**
      * If an op was not in the ReplyItems, this function processes it and decides if a retry is

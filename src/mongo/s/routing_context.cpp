@@ -111,6 +111,9 @@ RoutingContext::RoutingContext(stdx::unordered_map<NamespaceString, CollectionRo
 
 const CollectionRoutingInfo& RoutingContext::getCollectionRoutingInfo(
     const NamespaceString& nss) const {
+    tassert(10411401,
+            "should not have acquired routing info for namespace released from routing context",
+            !_releasedNssList.contains(nss));
     auto it = _nssRoutingInfoMap.find(nss);
     uassert(10292301,
             str::stream() << "Attempted to access RoutingContext for undeclared namespace "
@@ -133,6 +136,9 @@ StatusWith<CollectionRoutingInfo> RoutingContext::_getCollectionRoutingInfo(
 }
 
 void RoutingContext::onRequestSentForNss(const NamespaceString& nss) {
+    tassert(10411400,
+            "should not have sent request for namespace released from routing context",
+            !_releasedNssList.contains(nss));
     if (auto& validated = _nssRoutingInfoMap.at(nss).validated; !validated) {
         validated = true;
     }
@@ -160,6 +166,10 @@ void RoutingContext::skipValidation() {
     _skipValidation = true;
 }
 
+void RoutingContext::release(const NamespaceString& nss) {
+    _releasedNssList.insert(nss);
+}
+
 void RoutingContext::validateOnContextEnd() const {
     if (_skipValidation) {
         return;
@@ -167,6 +177,10 @@ void RoutingContext::validateOnContextEnd() const {
 
     for (const auto& [nss, routingInfoEntry] : _nssRoutingInfoMap) {
         if (auto validated = routingInfoEntry.validated; !validated) {
+            if (_releasedNssList.contains(nss)) {
+                // If the namespace was released, we don't expect it to be validated.
+                continue;
+            }
             if (TestingProctor::instance().isEnabled()) {
                 tasserted(10446900,
                           str::stream()

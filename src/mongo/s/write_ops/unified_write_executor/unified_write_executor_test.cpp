@@ -163,7 +163,7 @@ TEST_F(UnifiedWriteExecutorTest, BulkWriteBasic) {
     expectCollectionRoutingRequest(nss1, shardId1);
     expectCollectionRoutingRequest(nss2, shardId2);
 
-    // First batch
+    // First batch of ops for shard1
     expectBulkWriteShardRequest({BSON("insert" << 0 << "document" << BSON("x" << 1))} /* opList */,
                                 {nss1} /* nssList */,
                                 shardId1 /* shardId */,
@@ -176,7 +176,7 @@ TEST_F(UnifiedWriteExecutorTest, BulkWriteBasic) {
                                 0 /* nDelete */
     );
 
-    // Second batch
+    // Second batch of ops for shard 2
     expectBulkWriteShardRequest({BSON("insert" << 0 << "document" << BSON("x" << 2))} /* opList */,
                                 {nss2} /* nssList */,
                                 shardId2 /* shardId */,
@@ -425,7 +425,8 @@ TEST_F(UnifiedWriteExecutorTest, OrderedBulkWriteErrorsAndStops) {
         {BSON("insert" << 0 << "document" << BSON("x" << 1))} /* opList */,
         {nss1} /* nssList */,
         shardId1 /* shardId */,
-        {BSON("ok" << 0.0 << "idx" << 0 << "code" << ErrorCodes::BadValue << "errmsg" << "failed"
+        {BSON("ok" << 0.0 << "idx" << 0 << "code" << ErrorCodes::BadValue << "errmsg"
+                   << "failed"
                    << "n" << 0)} /* replyItems */,
         1 /* nErrors */,
         0 /* nInserted */,

@@ -169,6 +169,14 @@ public:
         return getRef().isMulti();
     }
 
+    WriteOpContext getWriteOpContext() const {
+        if (_bulkWriteRequest) {
+            return WriteOpContext(*_bulkWriteRequest);
+        } else {
+            return WriteOpContext(*_batchedRequest);
+        }
+    }
+
 private:
     // TODO SERVER-104262 refactor the WriteOp implementation to not use raw pointers
     const BulkWriteCommandRequest* _bulkWriteRequest{nullptr};

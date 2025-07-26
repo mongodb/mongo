@@ -11,9 +11,11 @@ selector:
     # - jstests/sharding/analyze_shard_key/list_sampled_queries.js
     # - jstests/sharding/analyze_shard_key/sample_rates_bulk_write_multi_namespaces.js
     # - jstests/sharding/applyOps_multiple_namespaces.js
-    # - jstests/sharding/chunk_migration_with_bulk_write.js
+    - jstests/sharding/chunk_migration_with_bulk_write.js
     # - jstests/sharding/database_versioning_all_commands.js
     - jstests/sharding/mongos_writes_wait_for_write_concern_sharded.js
+    # TODO SERVER-104134 add support for max replies size
+    # - jstests/sharding/bulk_write_max_replies_size.js
     # TODO SERVER-104120: Write without shard key support
     # - jstests/sharding/mongos_writes_wait_for_write_concern_sharded_addl_crud_ops.js
     # TODO SERVER-104139: Timeseries collection support
@@ -52,5 +54,6 @@ executor:
     shell_options:
       global_vars:
         TestData:
-          internalQueryUnifiedWriteExecutor: true
+          setParametersMongos:
+            internalQueryUnifiedWriteExecutor: true
       nodb: ""

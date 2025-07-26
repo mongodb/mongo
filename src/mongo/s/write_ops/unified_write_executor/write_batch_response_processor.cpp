@@ -38,17 +38,20 @@
 namespace mongo::unified_write_executor {
 using Result = WriteBatchResponseProcessor::Result;
 
-Result WriteBatchResponseProcessor::onWriteBatchResponse(const WriteBatchResponse& response) {
+Result WriteBatchResponseProcessor::onWriteBatchResponse(RoutingContext& routingCtx,
+                                                         const WriteBatchResponse& response) {
     return std::visit(
-        [&](const auto& responseData) -> Result { return _onWriteBatchResponse(responseData); },
+        [&](const auto& responseData) -> Result {
+            return _onWriteBatchResponse(routingCtx, responseData);
+        },
         response);
 }
 
 Result WriteBatchResponseProcessor::_onWriteBatchResponse(
-    const SimpleWriteBatchResponse& response) {
+    RoutingContext& routingCtx, const SimpleWriteBatchResponse& response) {
     Result result;
     for (const auto& [shardId, shardResponse] : response) {
-        auto shardResult = onShardResponse(shardId, shardResponse);
+        auto shardResult = onShardResponse(routingCtx, shardId, shardResponse);
         result.unrecoverableError |= shardResult.unrecoverableError;
         result.opsToRetry.insert(result.opsToRetry.end(),
                                  std::make_move_iterator(shardResult.opsToRetry.begin()),
@@ -63,7 +66,7 @@ Result WriteBatchResponseProcessor::_onWriteBatchResponse(
 }
 
 Result WriteBatchResponseProcessor::_onWriteBatchResponse(
-    const NonTargetedWriteBatchResponse& response) {
+    RoutingContext& routingCtx, const NonTargetedWriteBatchResponse& response) {
     // TODO SERVER-104115 retried stmts.
     // TODO SERVER-104535 cursor support for UnifiedWriteExec.
     // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
@@ -130,7 +133,9 @@ Result WriteBatchResponseProcessor::_onWriteBatchResponse(
     return {};
 }
 
-Result WriteBatchResponseProcessor::onShardResponse(const ShardId& shardId,
+Result WriteBatchResponseProcessor::onShardResponse(RoutingContext& routingCtx,
+                                                    const ShardId& shardId,
+
                                                     const ShardResponse& response) {
     // Handle local errors, not from a shardResponse.
     if (!response.swResponse.isOK()) {
@@ -184,7 +189,7 @@ Result WriteBatchResponseProcessor::onShardResponse(const ShardId& shardId,
     // TODO SERVER-104115 retried stmts.
     // TODO SERVER-104535 cursor support for UnifiedWriteExec.
     const auto& replyItems = parsedReply.getCursor().getFirstBatch();
-    auto result = processOpsInReplyItems(ops, replyItems);
+    auto result = processOpsInReplyItems(routingCtx, ops, replyItems);
     if (!result.unrecoverableError) {
         result.opsToRetry =
             processOpsNotInReplyItems(ops, replyItems, std::move(result.opsToRetry));
@@ -193,12 +198,13 @@ Result WriteBatchResponseProcessor::onShardResponse(const ShardId& shardId,
 }
 
 Result WriteBatchResponseProcessor::processOpsInReplyItems(
-    const std::vector<WriteOp>& ops, const std::vector<BulkWriteReplyItem>& replyItems) {
+    RoutingContext& routingCtx,
+    const std::vector<WriteOp>& ops,
+    const std::vector<BulkWriteReplyItem>& replyItems) {
     std::vector<WriteOp> toRetry;
     CollectionsToCreate collectionsToCreate;
     bool unrecoverableError = false;
     for (const auto& item : replyItems) {
-        // TODO SERVER-104114 support retrying staleness errors.
         // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
         tassert(10347004,
                 fmt::format("shard replied with invalid opId {} when it was only sent {} ops",
@@ -207,11 +213,8 @@ Result WriteBatchResponseProcessor::processOpsInReplyItems(
                 static_cast<WriteOpId>(item.getIdx()) < ops.size());
         const auto& op = ops[item.getIdx()];
 
-        if (item.getStatus().code() == ErrorCodes::StaleConfig) {
-            LOGV2_DEBUG(
-                10346900, 4, "Noting stale config response", "status"_attr = item.getStatus());
-            toRetry.push_back(op);
-        } else if (item.getStatus().code() == ErrorCodes::CannotImplicitlyCreateCollection) {
+        const auto itemCode = item.getStatus().code();
+        if (itemCode == ErrorCodes::CannotImplicitlyCreateCollection) {
             // Stage the collection to be created if it was found to not exist.
             auto info = item.getStatus().extraInfo<CannotImplicitlyCreateCollectionInfo>();
             if (auto it = collectionsToCreate.find(info->getNss());
@@ -219,10 +222,25 @@ Result WriteBatchResponseProcessor::processOpsInReplyItems(
                 collectionsToCreate.emplace(info->getNss(), std::move(info));
             }
             toRetry.push_back(op);
+        } else if (itemCode == ErrorCodes::StaleDbVersion ||
+                   ErrorCodes::isStaleShardVersionError(itemCode)) {
+            if (itemCode == ErrorCodes::StaleDbVersion) {
+                LOGV2_DEBUG(10411403,
+                            4,
+                            "Noting stale database response",
+                            "status"_attr = item.getStatus());
+            } else {
+                LOGV2_DEBUG(
+                    10346900, 4, "Noting stale config response", "status"_attr = item.getStatus());
+            }
+            routingCtx.onStaleError(op.getNss(), item.getStatus());
+            toRetry.push_back(op);
         } else {
             if (!item.getStatus().isOK()) {
                 _nErrors++;
-                unrecoverableError = true;
+                if (op.getWriteOpContext().getOrdered()) {
+                    unrecoverableError = true;
+                }
             }
             auto [it, _] = _results.emplace(op.getId(), item);
             it->second.setIdx(op.getId());
@@ -240,6 +258,10 @@ std::vector<WriteOp> WriteBatchResponseProcessor::processOpsNotInReplyItems(
         // If we are here it means we got a response from an ordered: true command and it stopped on
         // the first error.
         for (size_t i = replyItems.size(); i < requestedOps.size(); i++) {
+            LOGV2_DEBUG(10411404,
+                        4,
+                        "renenqueuing op not completed by shard",
+                        "op"_attr = requestedOps[i].getId());
             toRetry.push_back(requestedOps[i]);
         }
     }

@@ -46,13 +46,28 @@ struct SimpleWriteBatch {
         std::vector<WriteOp> ops;
     };
     std::map<ShardId, ShardRequest> requestByShardId;
+    std::set<NamespaceString> getInvolvedNamespaces() const {
+        std::set<NamespaceString> result;
+        for (const auto& [_, req] : requestByShardId) {
+            for (const auto& [nss, _] : req.versionByNss) {
+                result.insert(nss);
+            }
+        }
+        return result;
+    }
 };
-
 struct NonTargetedWriteBatch {
     WriteOp op;
+    std::set<NamespaceString> getInvolvedNamespaces() const {
+        return {op.getNss()};
+    }
 };
-
-using WriteBatch = std::variant<SimpleWriteBatch, NonTargetedWriteBatch>;
+struct WriteBatch {
+    std::variant<SimpleWriteBatch, NonTargetedWriteBatch> data;
+    std::set<NamespaceString> getInvolvedNamespaces() {
+        return std::visit([](const auto& inner) { return inner.getInvolvedNamespaces(); }, data);
+    }
+};
 
 /**
  * Based on the analysis of the write ops, this class bundles multiple write ops into batches to be
@@ -83,6 +98,13 @@ public:
     }
 
     /**
+     * Returns true if there are no more ops left to batch.
+     */
+    virtual bool isDone() {
+        return _producer.peekNext() == boost::none;
+    }
+
+    /**
      * Mark an unrecoverable error has occurred, for ordered batcher this means no further batches
      * should be produced.
      */
@@ -102,6 +124,9 @@ public:
                                              const RoutingContext& routingCtx) override;
 
     void markUnrecoverableError() override;
+    bool isDone() override {
+        return WriteOpBatcher::isDone() || unrecoverableError;
+    }
 
 private:
     bool unrecoverableError{false};

@@ -61,12 +61,18 @@ class WriteBatchExecutor {
 public:
     WriteBatchExecutor(const WriteOpContext& context) : _context(context) {}
 
-    WriteBatchResponse execute(OperationContext* opCtx, const WriteBatch& batch);
+    WriteBatchResponse execute(OperationContext* opCtx,
+                               RoutingContext& routingCtx,
+                               const WriteBatch& batch);
 
 private:
-    WriteBatchResponse _execute(OperationContext* opCtx, const SimpleWriteBatch& batch);
+    WriteBatchResponse _execute(OperationContext* opCtx,
+                                RoutingContext& routingCtx,
+                                const SimpleWriteBatch& batch);
 
-    WriteBatchResponse _execute(OperationContext* opCtx, const NonTargetedWriteBatch& batch);
+    WriteBatchResponse _execute(OperationContext* opCtx,
+                                RoutingContext& routingCtx,
+                                const NonTargetedWriteBatch& batch);
 
     std::vector<AsyncRequestsSender::Request> buildBulkWriteRequests(
         OperationContext* opCtx, const SimpleWriteBatch& batch) const;

@@ -81,8 +81,8 @@ public:
     void assertMultiShardSimpleWriteBatch(const WriteBatch& batch,
                                           WriteOpId expectedOpId,
                                           std::vector<ShardEndpoint> expectedShards) {
-        ASSERT_TRUE(std::holds_alternative<SimpleWriteBatch>(batch));
-        auto& simpleBatch = std::get<SimpleWriteBatch>(batch);
+        ASSERT_TRUE(std::holds_alternative<SimpleWriteBatch>(batch.data));
+        auto& simpleBatch = std::get<SimpleWriteBatch>(batch.data);
 
         ASSERT_EQ(expectedShards.size(), simpleBatch.requestByShardId.size());
         for (auto& expectedShard : expectedShards) {
@@ -99,8 +99,8 @@ public:
     void reprocessWriteOp(WriteOpBatcher& batcher,
                           WriteBatch& batch,
                           std::set<WriteOpId> reprocessOpIds) {
-        ASSERT_TRUE(std::holds_alternative<SimpleWriteBatch>(batch));
-        auto& simpleBatch = std::get<SimpleWriteBatch>(batch);
+        ASSERT_TRUE(std::holds_alternative<SimpleWriteBatch>(batch.data));
+        auto& simpleBatch = std::get<SimpleWriteBatch>(batch.data);
         for (auto& [shardId, request] : simpleBatch.requestByShardId) {
             for (auto& op : request.ops) {
                 if (reprocessOpIds.contains(op.getId())) {
@@ -111,8 +111,8 @@ public:
     }
 
     void assertNonTargetedWriteBatch(const WriteBatch& batch, WriteOpId expectedOpId) {
-        ASSERT_TRUE(std::holds_alternative<NonTargetedWriteBatch>(batch));
-        auto& nonTargetedWriteBatch = std::get<NonTargetedWriteBatch>(batch);
+        ASSERT_TRUE(std::holds_alternative<NonTargetedWriteBatch>(batch.data));
+        auto& nonTargetedWriteBatch = std::get<NonTargetedWriteBatch>(batch.data);
         const auto& op = nonTargetedWriteBatch.op;
         ASSERT_EQ(op.getId(), expectedOpId);
     }
@@ -123,8 +123,8 @@ public:
     void assertSingleShardSimpleWriteBatch(const WriteBatch& batch,
                                            std::vector<WriteOpId> expectedOpIds,
                                            std::vector<ShardEndpoint> expectedShards) {
-        ASSERT_TRUE(std::holds_alternative<SimpleWriteBatch>(batch));
-        auto& simpleBatch = std::get<SimpleWriteBatch>(batch);
+        ASSERT_TRUE(std::holds_alternative<SimpleWriteBatch>(batch.data));
+        auto& simpleBatch = std::get<SimpleWriteBatch>(batch.data);
         ASSERT_EQ(1, simpleBatch.requestByShardId.size());
         const auto& shardRequest = simpleBatch.requestByShardId.begin()->second;
         ASSERT_EQ(shardRequest.ops.size(), expectedOpIds.size());
@@ -147,8 +147,8 @@ public:
 
     void assertUnorderedSingleShardSimpleWriteBatch(const WriteBatch& batch,
                                                     const SimpleWriteBatch& expectedBatch) {
-        ASSERT_TRUE(std::holds_alternative<SimpleWriteBatch>(batch));
-        auto& simpleBatch = std::get<SimpleWriteBatch>(batch);
+        ASSERT_TRUE(std::holds_alternative<SimpleWriteBatch>(batch.data));
+        auto& simpleBatch = std::get<SimpleWriteBatch>(batch.data);
         ASSERT_EQ(expectedBatch.requestByShardId.size(), simpleBatch.requestByShardId.size());
 
         for (const auto& [shardId, expectedShardRequest] : expectedBatch.requestByShardId) {

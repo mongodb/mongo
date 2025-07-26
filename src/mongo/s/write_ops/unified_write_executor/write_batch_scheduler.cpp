@@ -35,29 +35,44 @@ namespace mongo {
 namespace unified_write_executor {
 
 void WriteBatchScheduler::run(OperationContext* opCtx, const std::set<NamespaceString>& nssSet) {
-    while (true) {
-        auto batch = [&]() {
-            // Destroy the routing context after retrieving the next batch, as later processing may
-            // generate separate routing operations (e.g. implicitly creating collections) but at
-            // most one routing context should exist in one thread at any given time.
-            RoutingContext routingCtx(opCtx,
-                                      std::vector<NamespaceString>{nssSet.begin(), nssSet.end()});
-            return _batcher.getNextBatch(opCtx, routingCtx);
-        }();
-        if (!batch) {
-            break;
-        }
+    while (!_batcher.isDone()) {
 
-        auto response = _executor.execute(opCtx, *batch);
-        auto result = _processor.onWriteBatchResponse(response);
-        if (result.unrecoverableError) {
-            _batcher.markUnrecoverableError();
-        }
-        if (!result.opsToRetry.empty()) {
-            _batcher.markOpReprocess(result.opsToRetry);
-        }
-        if (!result.collsToCreate.empty()) {
-            for (auto& [nss, _] : result.collsToCreate) {
+        // Destroy the routing context after retrieving the next batch, as later processing
+        // may generate separate routing operations (e.g. implicitly creating collections)
+        // but at most one routing context should exist in one thread at any given time.
+        auto collsToCreate = routing_context_utils::withValidatedRoutingContextForTxnCmd(
+            opCtx,
+            std::vector<NamespaceString>{nssSet.begin(), nssSet.end()},
+            [&,
+             this](RoutingContext& routingCtx) -> WriteBatchResponseProcessor::CollectionsToCreate {
+                auto batchOfRequests = _batcher.getNextBatch(opCtx, routingCtx);
+                tassert(10411402,
+                        "batcher has no batches left but 'isDone()' returned false",
+                        batchOfRequests.has_value());
+
+
+                // Dismiss validation for any namespaces that don't have write ops in this
+                // round.
+                auto involvedNamespaces = batchOfRequests->getInvolvedNamespaces();
+                for (const auto& nss : nssSet) {
+                    if (!involvedNamespaces.contains(nss)) {
+                        routingCtx.release(nss);
+                    }
+                }
+
+
+                auto batchOfResponses = _executor.execute(opCtx, routingCtx, *batchOfRequests);
+                auto result = _processor.onWriteBatchResponse(routingCtx, batchOfResponses);
+                if (result.unrecoverableError) {
+                    _batcher.markUnrecoverableError();
+                }
+                if (!result.opsToRetry.empty()) {
+                    _batcher.markOpReprocess(result.opsToRetry);
+                }
+                return result.collsToCreate;
+            });
+        if (!collsToCreate.empty()) {
+            for (auto& [nss, _] : collsToCreate) {
                 cluster::createCollectionWithRouterLoop(opCtx, nss);
             }
         }

@@ -94,13 +94,13 @@ public:
      * Record that a versioned request for a namespace was sent to a shard. The namespace is
      * considered validated.
      */
-    void onRequestSentForNss(const NamespaceString& nss);
+    virtual void onRequestSentForNss(const NamespaceString& nss);
 
     /**
      * Utility to trigger CatalogCache refreshes for staleness errors directly from the
      * RoutingContext.
      */
-    void onStaleError(const NamespaceString& nss, const Status& status);
+    virtual void onStaleError(const NamespaceString& nss, const Status& status);
 
     /**
      * By default, the RoutingContext should be validated by running validateOnContextEnd() at the
@@ -108,6 +108,13 @@ public:
      * for the RoutingContext to terminate without sending a request to a shard.
      */
     void skipValidation();
+
+    /**
+     * Sometimes a RoutingContext is needed to determine if a request to a shard will actually need
+     * metadata for a request. If the routing operation decides it no longer needs that metadata
+     * then this method releases it so it can't be used.
+     */
+    void release(const NamespaceString& nss);
 
     /**
      * Validate the RoutingContext prior to destruction to ensure that either:
@@ -121,9 +128,12 @@ public:
      */
     void validateOnContextEnd() const;
 
-private:
+    virtual ~RoutingContext() = default;
+
+protected:
     RoutingContext(stdx::unordered_map<NamespaceString, CollectionRoutingInfo> nssMap);
 
+private:
     /**
      * Obtain the routing table associated with a namespace from the CatalogCache. This returns the
      * latest routing table unless the read concern is snapshot with "atClusterTime" set. If an
@@ -137,10 +147,39 @@ private:
 
     using NssRoutingInfoMap = stdx::unordered_map<NamespaceString, RoutingInfoEntry>;
     NssRoutingInfoMap _nssRoutingInfoMap;
+    stdx::unordered_set<NamespaceString> _releasedNssList;
 
     // If set, skip validation prior to destruction that the RoutingContext has had its routing
     // tables validated by sending a versioned request to a shard
     bool _skipValidation = false;
+};
+
+class MockRoutingContext : public RoutingContext {
+public:
+    MockRoutingContext(stdx::unordered_map<NamespaceString, CollectionRoutingInfo> map = {})
+        : RoutingContext(map) {}
+    // TODO SERVER-102931: Integrate the RouterAcquisitionSnapshot
+    MockRoutingContext(OperationContext* opCtx,
+                       const std::vector<NamespaceString>&
+                           nssList,  // list of required namespaces for the routing operation
+                       bool allowLocks = false)
+        : RoutingContext(opCtx, nssList, allowLocks) {}
+
+    // TODO SERVER-102931: Integrate the RouterAcquisitionSnapshot
+    MockRoutingContext(
+        OperationContext* opCtx,
+        const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& nssToCriMap)
+        : RoutingContext(opCtx, nssToCriMap) {}
+
+    // Non-copyable, non-movable
+    MockRoutingContext(const RoutingContext&) = delete;
+    MockRoutingContext& operator=(const RoutingContext&) = delete;
+
+    void onRequestSentForNss(const NamespaceString& nss) override {}
+    void onStaleError(const NamespaceString& nss, const Status& status) override {
+        errors.emplace(nss, status);
+    };
+    stdx::unordered_map<NamespaceString, Status> errors;
 };
 
 namespace routing_context_utils {

@@ -203,11 +203,11 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
     operationContext()->setTxnNumber(txnNumber);
 
     auto future = launchAsync([&]() {
+        MockRoutingContext rtx;
         WriteBatchExecutor executor(context);
-        auto resps = executor.execute(operationContext(), {batch});
+        auto resps = executor.execute(operationContext(), rtx, {batch});
 
         ASSERT_TRUE(holds_alternative<SimpleWriteBatchResponse>(resps));
-
         auto& responses = get<SimpleWriteBatchResponse>(resps);
 
         std::set<ShardId> expectedShardIds{shardId1, shardId2};
@@ -292,8 +292,9 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSpecifiedWriteOptions) {
     WriteOpContext context(bulkRequest);
 
     auto future = launchAsync([&]() {
+        MockRoutingContext rtx;
         WriteBatchExecutor executor(context);
-        auto resps = executor.execute(operationContext(), {batch});
+        auto resps = executor.execute(operationContext(), rtx, {batch});
 
         ASSERT_TRUE(holds_alternative<SimpleWriteBatchResponse>(resps));
 
@@ -359,8 +360,9 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchBulkOpOptions) {
     operationContext()->setTxnNumber(txnNumber);
 
     auto future = launchAsync([&]() {
+        MockRoutingContext rtx;
         WriteBatchExecutor executor(context);
-        auto resps = executor.execute(operationContext(), {batch});
+        auto resps = executor.execute(operationContext(), rtx, {batch});
 
         ASSERT_TRUE(holds_alternative<SimpleWriteBatchResponse>(resps));
 

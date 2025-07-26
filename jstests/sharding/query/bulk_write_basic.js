@@ -38,7 +38,7 @@ function bulkWriteBasicTest(ordered) {
 
     const staleConfigBananaLog = /(7279201|10346900).*Noting stale config response.*banana/;
     const staleConfigOrangeLog = /(7279201|10346900).*Noting stale config response.*orange/;
-    const staleDbTest2Log = /7279202.*Noting stale database response.*test2/;
+    const staleDbTest2Log = /(7279202|10411403).*Noting stale database response.*test2/;
 
     jsTestLog("Case 1: Collection does't exist yet.");
     // Case 1: The collection doesn't exist yet. This results in a CannotImplicitlyCreateCollection
@@ -59,17 +59,11 @@ function bulkWriteBasicTest(ordered) {
     assert.eq(2, insertedDocs.length, `Inserted docs: '${tojson(insertedDocs)}'`);
     assert(checkLog.checkContainsOnce(st.s0, staleConfigBananaLog));
     if (!ordered && !isUnifiedWriteExecutor) {
-        // Check that the error for the 0th op was duplicated and used for the 1st op as well. This
-        // logic is currently not ported to the UWE project so skip the assertion.
+        // Check that the error for the 0th op was duplicated and used for the 1st op as well.
+        // TODO SERVER-106418 This logic is currently not ported to the UWE project so skip the
+        // assertion.
         assert(
             checkLog.checkContainsOnce(st.s0, /7695304.*Duplicating the error.*opIdx":1.*banana/));
-    }
-
-    // TODO SERVER-104114: Skip the following test cases until stale config errors are handled
-    // properly by the response processor.
-    if (isUnifiedWriteExecutor) {
-        st.stop();
-        return;
     }
 
     jsTestLog("Case 2: The collection exists for some of writes, but not for others.");
@@ -179,20 +173,24 @@ function bulkWriteBasicTest(ordered) {
         insertedDocs = getCollection(strawberry).find({}).toArray();
         assert.eq(2, insertedDocs.length, `Inserted docs: '${tojson(insertedDocs)}'`);
 
-        // The CannotImplicitlyCreateCollection error on op 0 should have been duplicated to all
-        // operations.
-        for (let i = 1; i < 5; i++) {
-            assert(checkLog.checkContainsOnce(
-                st.s0, new RegExp(`7695304.*Duplicating the error.*opIdx":${i}.*mango`)));
-        }
+        if (!isUnifiedWriteExecutor) {
+            // The CannotImplicitlyCreateCollection error on op 0 should have been duplicated to all
+            // operations.
+            for (let i = 1; i < 5; i++) {
+                assert(checkLog.checkContainsOnce(
+                    st.s0, new RegExp(`7695304.*Duplicating the error.*opIdx":${i}.*mango`)));
+            }
 
-        // The CannotImplicitlyCreateCollection error on op 3 should have been duplicated to op 4.
-        assert(
-            checkLog.checkContainsOnce(
-                st.s0, /8037206.*Noting cannotImplicitlyCreateCollection response.*strawberry/) ||
-            checkLog.checkContainsOnce(st.s0, /7279201.*Noting stale config response.*strawberry/));
-        assert(checkLog.checkContainsOnce(st.s0,
-                                          /7695304.*Duplicating the error.*opIdx":4.*strawberry/));
+            // The CannotImplicitlyCreateCollection error on op 3 should have been duplicated to
+            // op 4.
+            assert(checkLog.checkContainsOnce(
+                       st.s0,
+                       /8037206.*Noting cannotImplicitlyCreateCollection response.*strawberry/) ||
+                   checkLog.checkContainsOnce(st.s0,
+                                              /7279201.*Noting stale config response.*strawberry/));
+            assert(checkLog.checkContainsOnce(
+                st.s0, /7695304.*Duplicating the error.*opIdx":4.*strawberry/));
+        }
     }
 
     st.stop();

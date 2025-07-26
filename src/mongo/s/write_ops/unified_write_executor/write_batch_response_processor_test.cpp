@@ -30,7 +30,6 @@
 #include "mongo/s/write_ops/unified_write_executor/write_batch_response_processor.h"
 
 #include "mongo/s/cannot_implicitly_create_collection_info.h"
-#include "mongo/s/catalog_cache_mock.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/unittest/unittest.h"
 
@@ -55,7 +54,9 @@ public:
         shard1Name, ShardVersionFactory::make(ChunkVersion(gen, {100, 200})), boost::none);
     const ShardEndpoint shard2Endpoint = ShardEndpoint(
         shard2Name, ShardVersionFactory::make(ChunkVersion(gen, {100, 200})), boost::none);
+    const ShardVersion newShardVersion = ShardVersionFactory::make(ChunkVersion(gen, {100, 300}));
 
+    MockRoutingContext routingCtx;
 
     BulkWriteCommandReply makeReply() {
         return BulkWriteCommandReply(BulkWriteCommandResponseCursor(0, {}, nss1), 0, 0, 0, 0, 0, 0);
@@ -80,9 +81,11 @@ TEST_F(WriteBatchResponseProcessorTest, OKReplies) {
     WriteOpContext ctx(request);
     WriteBatchResponseProcessor processor(ctx);
 
-    processor.onWriteBatchResponse(SimpleWriteBatchResponse{
-        {shard1Name, Response{rcr1, {}}},
-        {shard2Name, Response{rcr2, {WriteOp(request, 0), WriteOp(request, 1)}}}});
+    processor.onWriteBatchResponse(
+        routingCtx,
+        SimpleWriteBatchResponse{
+            {shard1Name, Response{rcr1, {}}},
+            {shard2Name, Response{rcr2, {WriteOp(request, 0), WriteOp(request, 1)}}}});
 
     auto clientReply = processor.generateClientResponse<BulkWriteCommandReply>();
     ASSERT_EQ(clientReply.getNInserted(), 2);
@@ -113,8 +116,9 @@ TEST_F(WriteBatchResponseProcessorTest, AllStatisticsCopied) {
     WriteOpContext ctx(request);
     WriteBatchResponseProcessor processor(ctx);
 
+
     processor.onWriteBatchResponse(
-        SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {WriteOp(request, 0)}}}});
+        routingCtx, SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {WriteOp(request, 0)}}}});
     auto clientReply = processor.generateClientResponse<BulkWriteCommandReply>();
     ASSERT_EQ(clientReply.getNInserted(), 1);
     ASSERT_EQ(clientReply.getNMatched(), 1);
@@ -175,7 +179,9 @@ TEST_F(WriteBatchResponseProcessorTest, MixedErrorsAndOk) {
     WriteOpContext ctx(request);
     WriteBatchResponseProcessor processor(ctx);
 
+
     processor.onWriteBatchResponse(
+        routingCtx,
         SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {op1}}},
                                  {shard2Name, Response{rcr2, {op2, op3}}},
                                  {shard3Name, Response{rcr3, {op4}}}});
@@ -218,7 +224,8 @@ TEST_F(WriteBatchResponseProcessorTest, CreateCollection) {
 
     WriteOpContext ctx(request);
     WriteBatchResponseProcessor processor(ctx);
-    auto result = processor.onWriteBatchResponse(SimpleWriteBatchResponse{{shard1Name,
+    auto result = processor.onWriteBatchResponse(routingCtx,
+                                                 SimpleWriteBatchResponse{{shard1Name,
                                                                            Response{
                                                                                rcr1,
                                                                                {op1, op2},
@@ -259,7 +266,7 @@ TEST_F(WriteBatchResponseProcessorTest, CreateCollection) {
     RemoteCommandResponse rcr2(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
 
     result = processor.onWriteBatchResponse(
-        SimpleWriteBatchResponse{{shard1Name, Response{rcr2, {op2}}}});
+        routingCtx, SimpleWriteBatchResponse{{shard1Name, Response{rcr2, {op2}}}});
     ASSERT_FALSE(result.unrecoverableError);
     ASSERT(result.opsToRetry.empty());
     ASSERT(result.collsToCreate.empty());
@@ -294,7 +301,8 @@ TEST_F(WriteBatchResponseProcessorTest, SingleReplyItemForBatchOfThree) {
 
     WriteOpContext ctx(request);
     WriteBatchResponseProcessor processor(ctx);
-    auto result = processor.onWriteBatchResponse(SimpleWriteBatchResponse{{shard1Name,
+    auto result = processor.onWriteBatchResponse(routingCtx,
+                                                 SimpleWriteBatchResponse{{shard1Name,
                                                                            Response{
                                                                                rcr1,
                                                                                {op1, op2, op3},
@@ -364,7 +372,8 @@ TEST_F(WriteBatchResponseProcessorTest, TwoShardMixedNamespaceExistence) {
 
     WriteOpContext ctx(request);
     WriteBatchResponseProcessor processor(ctx);
-    auto result = processor.onWriteBatchResponse(SimpleWriteBatchResponse{{shard1Name,
+    auto result = processor.onWriteBatchResponse(routingCtx,
+                                                 SimpleWriteBatchResponse{{shard1Name,
                                                                            Response{
                                                                                rcr1,
                                                                                {op1, op2, op3},
@@ -376,6 +385,7 @@ TEST_F(WriteBatchResponseProcessorTest, TwoShardMixedNamespaceExistence) {
                                                                            }}});
     // No unrecoverable error.
     ASSERT_FALSE(result.unrecoverableError);
+
     // Assert all the errors were returned for retry.
     ASSERT_EQ(result.opsToRetry.size(), 4);
     ASSERT_EQ(result.opsToRetry[0].getId(), 1);
@@ -439,20 +449,22 @@ TEST_F(WriteBatchResponseProcessorTest, IdxsCorrectlyRewrittenInReplyItems) {
 
     WriteOpContext ctx(request);
     WriteBatchResponseProcessor processor(ctx);
-    auto result = processor.onWriteBatchResponse(SimpleWriteBatchResponse{
-        {shard2Name,
-         Response{
-             rcr2,
-             {op5, op3, op4},
-         }},
-        {shard1Name,
-         Response{
-             rcr1,
-             {op6, op1, op2},
-         }},
-    });
+    auto result = processor.onWriteBatchResponse(routingCtx,
+                                                 SimpleWriteBatchResponse{
+                                                     {shard2Name,
+                                                      Response{
+                                                          rcr2,
+                                                          {op5, op3, op4},
+                                                      }},
+                                                     {shard1Name,
+                                                      Response{
+                                                          rcr1,
+                                                          {op6, op1, op2},
+                                                      }},
+                                                 });
     // Recoverable error.
     ASSERT_TRUE(result.unrecoverableError);
+
     // Assert all the errors were returned for retry.
     ASSERT_EQ(result.opsToRetry.size(), 1);
     ASSERT_EQ(result.opsToRetry[0].getId(), 0);
@@ -478,6 +490,117 @@ TEST_F(WriteBatchResponseProcessorTest, IdxsCorrectlyRewrittenInReplyItems) {
     ASSERT_EQ(batch[2].getStatus().code(), ErrorCodes::BadValue);
     ASSERT_EQ(batch[3].getStatus().code(), ErrorCodes::BadValue);
     ASSERT_EQ(batch[4].getStatus().code(), ErrorCodes::BadValue);
+}
+
+TEST_F(WriteBatchResponseProcessorTest, RetryStalenessErrors) {
+    // shard1: {code: ok, firstBatch: [{code: StaleShardVersion}, {code: StaleDbVersion}]}
+    auto request = BulkWriteCommandRequest(
+        {BulkWriteInsertOp(0, BSON("_id" << 1)), BulkWriteInsertOp(1, BSON("_id" << 2))},
+        {NamespaceInfoEntry(nss1), NamespaceInfoEntry(nss2)});
+    WriteOp op1(request, 0);
+    WriteOp op2(request, 1);
+
+    Status staleCollStatus(
+        StaleConfigInfo(nss1, *shard1Endpoint.shardVersion, newShardVersion, shard1Name), "");
+    const ShardEndpoint shard1EndpointUnsharded =
+        ShardEndpoint(shard1Name,
+                      ShardVersionFactory::make(ChunkVersion::UNSHARDED()),
+                      DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseVersion newDbVersion(UUID::gen(), Timestamp(1, 100));
+    Status staleDbStatus(StaleDbRoutingVersion(
+                             nss2.dbName(), *shard1EndpointUnsharded.databaseVersion, newDbVersion),
+                         "");
+
+    auto reply = makeReply();
+    reply.setNErrors(1);
+    reply.setCursor(BulkWriteCommandResponseCursor(0,
+                                                   {
+                                                       BulkWriteReplyItem{0, staleCollStatus},
+                                                       BulkWriteReplyItem{1, staleDbStatus},
+                                                   },
+                                                   nss1));
+    RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
+
+    WriteOpContext ctx(request);
+    WriteBatchResponseProcessor processor(ctx);
+    auto result = processor.onWriteBatchResponse(routingCtx,
+                                                 SimpleWriteBatchResponse{{shard1Name,
+                                                                           Response{
+                                                                               rcr1,
+                                                                               {op1, op2},
+                                                                           }}});
+
+    ASSERT_EQ(routingCtx.errors.at(nss1).code(), ErrorCodes::StaleConfig);
+    ASSERT_EQ(routingCtx.errors.at(nss2).code(), ErrorCodes::StaleDbVersion);
+
+    // Assert all the op was returned for retry.
+    ASSERT_EQ(result.opsToRetry.size(), 2);
+    ASSERT_EQ(result.opsToRetry[0].getId(), 0);
+    ASSERT_EQ(result.opsToRetry[0].getNss(), nss1);
+    ASSERT_EQ(result.opsToRetry[1].getId(), 1);
+    ASSERT_EQ(result.opsToRetry[1].getNss(), nss2);
+    ASSERT(result.collsToCreate.empty());
+
+    // Assert errors was not incremented since we can retry Staleness errors.
+    auto response = processor.generateClientResponse<BulkWriteCommandReply>();
+    ASSERT_EQ(response.getNErrors(), 0);
+    ASSERT_EQ(response.getNInserted(), 0);
+}
+
+TEST_F(WriteBatchResponseProcessorTest, MixedStalenessErrorsAndOk) {
+    // shard1: {code: ok, firstBatch: [{code: StaleShardVersion}, {code: ok}]}
+    // shard2: {code: ok, firstBatch: [{code: StaleShardVersion}, {code: ok}]}
+    auto request = BulkWriteCommandRequest({BulkWriteInsertOp(0, BSON("_id" << 1)),
+                                            BulkWriteInsertOp(0, BSON("_id" << -1)),
+                                            BulkWriteInsertOp(1, BSON("_id" << 1)),
+                                            BulkWriteInsertOp(1, BSON("_id" << -1))},
+                                           {NamespaceInfoEntry(nss1), NamespaceInfoEntry(nss2)});
+    WriteOp op1(request, 0);
+    WriteOp op2(request, 1);
+    WriteOp op3(request, 2);
+    WriteOp op4(request, 3);
+    Status staleCollStatus1(
+        StaleConfigInfo(nss1, *shard1Endpoint.shardVersion, newShardVersion, shard1Name), "");
+    Status staleCollStatus2(
+        StaleConfigInfo(nss1, *shard2Endpoint.shardVersion, newShardVersion, shard2Name), "");
+
+    auto reply = makeReply();
+    reply.setNErrors(1);
+    reply.setCursor(BulkWriteCommandResponseCursor(0,
+                                                   {
+                                                       BulkWriteReplyItem{0, staleCollStatus1},
+                                                       BulkWriteReplyItem{1, Status::OK()},
+                                                   },
+                                                   nss1));
+    RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
+
+    auto reply2 = makeReply();
+    reply2.setNErrors(1);
+    reply2.setCursor(BulkWriteCommandResponseCursor(0,
+                                                    {
+                                                        BulkWriteReplyItem{0, staleCollStatus2},
+                                                        BulkWriteReplyItem{1, Status::OK()},
+                                                    },
+                                                    nss2));
+    RemoteCommandResponse rcr2(host2, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
+
+    WriteOpContext ctx(request);
+    WriteBatchResponseProcessor processor(ctx);
+    auto result = processor.onWriteBatchResponse(
+        routingCtx,
+        SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {op1, op3}}},
+                                 {shard2Name, Response{rcr2, {op2, op4}}}});
+
+    ASSERT_EQ(routingCtx.errors.size(), 1);
+    ASSERT_EQ(routingCtx.errors.at(nss1).code(), ErrorCodes::StaleConfig);
+    ASSERT_EQ(result.collsToCreate.size(), 0);
+
+    // Assert failed ops were returned for retry.
+    ASSERT_EQ(result.opsToRetry.size(), 2);
+    ASSERT_EQ(result.opsToRetry[0].getId(), op1.getId());
+    ASSERT_EQ(result.opsToRetry[0].getNss(), nss1);
+    ASSERT_EQ(result.opsToRetry[1].getId(), op2.getId());
+    ASSERT_EQ(result.opsToRetry[1].getNss(), nss1);
 }
 
 TEST_F(WriteBatchResponseProcessorTest, ProcessesSingleWriteConcernError) {
@@ -510,7 +633,8 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesSingleWriteConcernError) {
 
     WriteOpContext ctx(request);
     WriteBatchResponseProcessor processor(ctx);
-    auto result = processor.onWriteBatchResponse(SimpleWriteBatchResponse{{shard1Name,
+    auto result = processor.onWriteBatchResponse(routingCtx,
+                                                 SimpleWriteBatchResponse{{shard1Name,
                                                                            Response{
                                                                                rcr1,
                                                                                {op2},
@@ -574,18 +698,19 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesMultipleWriteConcernErrors) {
 
     WriteOpContext ctx(request);
     WriteBatchResponseProcessor processor(ctx);
-    auto result = processor.onWriteBatchResponse(SimpleWriteBatchResponse{
-        {shard1Name,
-         Response{
-             rcr1,
-             {op2},
-         }},
-        {shard2Name,
-         Response{
-             rcr2,
-             {op1},
-         }},
-    });
+    auto result = processor.onWriteBatchResponse(routingCtx,
+                                                 SimpleWriteBatchResponse{
+                                                     {shard1Name,
+                                                      Response{
+                                                          rcr1,
+                                                          {op2},
+                                                      }},
+                                                     {shard2Name,
+                                                      Response{
+                                                          rcr2,
+                                                          {op1},
+                                                      }},
+                                                 });
     ASSERT_FALSE(result.unrecoverableError);
     ASSERT_EQ(result.opsToRetry.size(), 0);
     ASSERT_EQ(result.collsToCreate.size(), 0);
@@ -607,5 +732,6 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesMultipleWriteConcernErrors) {
     ASSERT_TRUE(wcError->getErrmsg().find(reply1WcErrorMsg) != std::string::npos);
     ASSERT_TRUE(wcError->getErrmsg().find(reply2WcErrorMsg) != std::string::npos);
 }
+
 }  // namespace
 }  // namespace mongo::unified_write_executor
