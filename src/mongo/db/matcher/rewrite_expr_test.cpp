@@ -46,11 +46,8 @@ namespace {
  *   - A partial rewrite matching on a superset of documents
  *   - No MatchExpression (when full or superset rewrite is not possible)
  */
-void testExprRewrite(BSONObj expr, BSONObj expectedMatch, bool reversedInRewrite = false) {
+void testExprRewrite(BSONObj expr, BSONObj expectedMatch) {
     auto expCtx = ExpressionContextForTest{};
-    expCtx.variablesParseState.defineVariable("var");
-    expCtx.variablesParseState.defineVariable("abc");
-    internalQueryExtraPredicateForReversedIn.store(reversedInRewrite);
 
     auto expression =
         Expression::parseOperand(&expCtx, expr.firstElement(), expCtx.variablesParseState);
@@ -78,11 +75,9 @@ TEST(RewriteExpr, EqWithOneFieldPathRewritesToMatch) {
     BSONObj expr = fromjson("{$expr: {$eq: ['$x', 3]}}");
     const BSONObj expectedMatch = fromjson("{x: {$_internalExprEq: 3}}");
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 
     expr = fromjson("{$expr: {$eq: [3, '$x']}}");
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, AndRewritesToMatch) {
@@ -91,7 +86,6 @@ TEST(RewriteExpr, AndRewritesToMatch) {
         fromjson("{$and: [{x: {$_internalExprEq: 3}}, {y: {$_internalExprEq: 4}}]}");
 
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, OrRewritesToMatch) {
@@ -100,7 +94,6 @@ TEST(RewriteExpr, OrRewritesToMatch) {
         fromjson("{$or: [{x: {$_internalExprEq: 3}}, {y: {$_internalExprEq: 4}}]}");
 
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, AndNestedWithinOrRewritesToMatch) {
@@ -111,7 +104,6 @@ TEST(RewriteExpr, AndNestedWithinOrRewritesToMatch) {
         "{y: {$_internalExprEq: 4}}]}");
 
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, OrNestedWithinAndRewritesToMatch) {
@@ -122,7 +114,6 @@ TEST(RewriteExpr, OrNestedWithinAndRewritesToMatch) {
         "{y: {$_internalExprEq: 4}}]}");
 
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, EqWithDottedFieldPathRewritesToMatch) {
@@ -130,7 +121,6 @@ TEST(RewriteExpr, EqWithDottedFieldPathRewritesToMatch) {
     const BSONObj expectedMatch = fromjson("{'x.y': {$_internalExprEq: 3}}");
 
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 //
@@ -142,7 +132,6 @@ TEST(RewriteExpr, CmpDoesNotRewriteToMatch) {
     const BSONObj expectedMatch;
 
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, ConstantExpressionDoesNotRewriteToMatch) {
@@ -150,7 +139,6 @@ TEST(RewriteExpr, ConstantExpressionDoesNotRewriteToMatch) {
     const BSONObj expectedMatch;
 
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, EqWithTwoFieldPathsDoesNotRewriteToMatch) {
@@ -158,7 +146,6 @@ TEST(RewriteExpr, EqWithTwoFieldPathsDoesNotRewriteToMatch) {
     const BSONObj expectedMatch;
 
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, EqWithTwoConstantsDoesNotRewriteToMatch) {
@@ -166,53 +153,45 @@ TEST(RewriteExpr, EqWithTwoConstantsDoesNotRewriteToMatch) {
     const BSONObj expectedMatch;
 
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, EqWithComparisonToUndefinedDoesNotRewriteToMatch) {
     BSONObj expr = fromjson("{$expr: {$eq: ['$x', undefined]}}");
     const BSONObj expectedMatch;
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, EqWithComparisonToMissingDoesNotRewriteToMatch) {
     BSONObj expr = fromjson("{$expr: {$eq: ['$x', '$$REMOVE']}}");
     const BSONObj expectedMatch;
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, EqWithComparisonToRootDoesNotRewriteToMatch) {
     BSONObj expr = fromjson("{$expr: {$eq: ['$$ROOT', {a: 1}]}}");
     const BSONObj expectedMatch;
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, EqWithComparisonToCurrentDoesNotRewriteToMatch) {
     BSONObj expr = fromjson("{$expr: {$eq: ['$$CURRENT', 2]}}");
     const BSONObj expectedMatch;
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, EqWithComparisonToArrayDoesNotRewriteToMatch) {
     BSONObj expr = fromjson("{$expr: {$eq: ['$x', [1, 2, 3]]}}");
     const BSONObj expectedMatch;
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, NeWithOneFieldPathDoesNotRewriteToMatch) {
     BSONObj expr = fromjson("{$expr: {$ne: ['$x', 3]}}");
     BSONObj expectedMatch;
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 
     expr = fromjson("{$expr: {$ne: [3, '$x']}}");
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, AndWithoutMatchSubtreeDoesNotRewriteToMatch) {
@@ -220,7 +199,6 @@ TEST(RewriteExpr, AndWithoutMatchSubtreeDoesNotRewriteToMatch) {
     const BSONObj expectedMatch;
 
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, OrWithDistinctMatchAndNonMatchSubTreeDoesNotRewriteToMatch) {
@@ -228,7 +206,6 @@ TEST(RewriteExpr, OrWithDistinctMatchAndNonMatchSubTreeDoesNotRewriteToMatch) {
     const BSONObj expectedMatch;
 
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 //
@@ -243,7 +220,6 @@ TEST(RewriteExpr, NestedAndWithTwoFieldPathsWithinOrPartiallyRewriteToMatch) {
         fromjson("{$or: [{z: {$_internalExprEq: 5}}, {y: {$_internalExprEq: 4}}]}");
 
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, AndWithDistinctMatchAndNonMatchSubTreeSplitsOnRewrite) {
@@ -251,7 +227,6 @@ TEST(RewriteExpr, AndWithDistinctMatchAndNonMatchSubTreeSplitsOnRewrite) {
     const BSONObj expectedMatch = fromjson("{x: {$_internalExprEq: 1}}");
 
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 // Rewrites an Expression that contains a mix of rewritable and non-rewritable statements to a
@@ -294,7 +269,6 @@ TEST(RewriteExpr, ComplexSupersetMatchRewritesToMatchSuperset) {
         "}");
 
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, OrWithAndContainingMatchAndNonMatchChildPartiallyRewritesToMatch) {
@@ -304,28 +278,24 @@ TEST(RewriteExpr, OrWithAndContainingMatchAndNonMatchChildPartiallyRewritesToMat
         fromjson("{$or: [{x: {$_internalExprEq: 3}}, {y: {$_internalExprEq: 4}}]}");
 
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, InWithScalarInListRewritesToMatch) {
     const BSONObj expr = fromjson("{$expr: {$in: ['$category', ['clothing', 'materials']]}}");
     const BSONObj expectedMatch = fromjson("{category: {$in: ['clothing', 'materials']}}");
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, InWithDottedFieldPathRewritesToMatch) {
     const BSONObj expr = fromjson("{$expr: {$in: ['$category.a', ['clothing', 'materials']]}}");
     const BSONObj expectedMatch = fromjson("{'category.a': {$in: ['clothing', 'materials']}}");
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, InWithObjectInListRewritesToMatch) {
     const BSONObj expr = fromjson("{$expr: {$in: ['$category', [{}, {a: 'clothing'}]]}}");
     const BSONObj expectedMatch = fromjson("{category: {$in: [{}, {a: 'clothing'}]}}");
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, InWithArrayInListDoesNotRewriteToMatch) {
@@ -335,7 +305,6 @@ TEST(RewriteExpr, InWithArrayInListDoesNotRewriteToMatch) {
         "{$expr: {$in: ['$category', ['clothing', 'materials', ['clothing', 'electronics']]]}}");
     const BSONObj expectedMatch;
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, InWithRegexInListDoesNotRewriteToMatch) {
@@ -346,7 +315,6 @@ TEST(RewriteExpr, InWithRegexInListDoesNotRewriteToMatch) {
     const BSONObj expr = fromjson("{$expr: {$in: ['$category', [/clothing/]]}}");
     const BSONObj expectedMatch;
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, InWithNullInListDoesNotRewriteToMatch) {
@@ -356,7 +324,6 @@ TEST(RewriteExpr, InWithNullInListDoesNotRewriteToMatch) {
     const BSONObj expr = fromjson("{$expr: {$in: ['$category', [null]]}}");
     const BSONObj expectedMatch;
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
 
 TEST(RewriteExpr, InWithGetFieldFieldPathDoesNotRewriteToMatch) {
@@ -366,107 +333,6 @@ TEST(RewriteExpr, InWithGetFieldFieldPathDoesNotRewriteToMatch) {
         fromjson("{$expr: {$in: [{$getField: 'category.a'}, ['clothing', 'electronics']]}}");
     const BSONObj expectedMatch;
     testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
 }
-
-TEST(RewriteExpr, InWithFieldPathOnRHSGetsRewrittenToMatch) {
-    const BSONObj expr = fromjson("{$expr: {$in: ['abc', '$foo']}}");
-    // Note: it gets rewritten to {$in: ['abc']}, and then to {$eq: ['abc']}. This is correct
-    // because of array traversal semantics in $match!
-    BSONObj expectedMatch;
-    testExprRewrite(expr, expectedMatch);
-    expectedMatch = fromjson("{'foo': {'$eq': 'abc'}}");
-    testExprRewrite(expr, expectedMatch, true);
-}
-
-TEST(RewriteExpr, InWithFieldPathOnRHSInOrGetsRewrittenToMatch) {
-    const BSONObj expr = fromjson(
-        "{$expr: {$or: [{$in: ['abc', '$foo']}, {$in: ['def', '$foo']}, {$in: ['ghi', '$foo']}]}}");
-    BSONObj expectedMatch;
-    testExprRewrite(expr, expectedMatch);
-    expectedMatch =
-        fromjson("{'foo': {'$in': ['abc', 'def', 'ghi']}}");  // Note: multiple $ins coalesced by
-                                                              // optimization.
-    testExprRewrite(expr, expectedMatch, true);
-}
-
-TEST(RewriteExpr, InWithFieldPathOnRHSInAndGetsRewrittenToMatch) {
-    const BSONObj expr = fromjson(
-        "{$expr: {$and: [{$in: ['abc', '$foo']}, {$in: ['def', '$foo']}, {$in: ['ghi', "
-        "'$foo']}]}}");
-    BSONObj expectedMatch;
-    testExprRewrite(expr, expectedMatch);
-    expectedMatch = fromjson(
-        "{$and: [{'foo': {'$eq': 'abc'}}, {'foo': {'$eq': 'def'}}, {'foo': {'$eq': "
-        "'ghi'}}]}");
-    testExprRewrite(expr, expectedMatch, true);
-}
-
-TEST(RewriteExpr, InWithMultipleRHSFieldPathsInOrGetsRewrittenToMatch) {
-    const BSONObj expr = fromjson(
-        "{$expr: {$or: [{$in: ['abc', '$foo']}, {$in: ['def', '$foo']}, {$in: ['ghi', "
-        "'$foo2']}]}}");
-    BSONObj expectedMatch;
-    testExprRewrite(expr, expectedMatch);
-    expectedMatch = fromjson("{$or: [{'foo': {'$in': ['abc', 'def']}}, {'foo2': {$eq: 'ghi'}}]}");
-    testExprRewrite(expr, expectedMatch, true);
-}
-
-TEST(RewriteExpr, InWithBothSidesAsFieldPathDoesNotGetRewrittenToMatch) {
-    const BSONObj expr = fromjson("{$expr: {$in: ['$abc', '$foo']}}");
-    const BSONObj expectedMatch;
-    testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
-}
-
-TEST(RewriteExpr, InWithBothSidesAsVariableDoesNotGetRewrittenToMatch) {
-    const BSONObj expr = fromjson("{$expr: {$in: ['$$abc', '$$var']}}");
-    const BSONObj expectedMatch;
-    testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
-}
-
-TEST(RewriteExpr, InWithBothSidesAsRootDoesNotGetRewrittenToMatch) {
-    const BSONObj expr = fromjson("{$expr: {$in: ['$$ROOT', '$$ROOT']}}");
-    const BSONObj expectedMatch;
-    testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
-}
-
-TEST(RewriteExpr, InWithRootAsRHSFieldPathDoesNotGetRewrittenToMatch) {
-    const BSONObj expr = fromjson("{$expr: {$in: ['abc', '$$ROOT']}}");
-    const BSONObj expectedMatch;
-    testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
-}
-
-TEST(RewriteExpr, InWithVariableAsRHSFieldPathDoesNotGetRewrittenToMatch) {
-    const BSONObj expr = fromjson("{$expr: {$in: ['abc', '$$var']}}");
-    const BSONObj expectedMatch;
-    testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
-}
-
-TEST(RewriteExpr, InWithVariableAsLHSFieldPathDoesNotGetRewrittenToMatch) {
-    const BSONObj expr = fromjson("{$expr: {$in: ['$$var', ['abc']]}}");
-    const BSONObj expectedMatch;
-    testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
-}
-
-TEST(RewriteExpr, InWithRootAsLHSFieldPathDoesNotGetRewrittenToMatch) {
-    const BSONObj expr = fromjson("{$expr: {$in: ['$$ROOT', ['abc']]}}");
-    const BSONObj expectedMatch;
-    testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
-}
-
-TEST(RewriteExpr, InWithRegexAsLHSConstDoesNotGetRewrittenToMatch) {
-    const BSONObj expr = fromjson("{$expr: {$in: [/myRegex/, '$foo']}}");
-    const BSONObj expectedMatch;
-    testExprRewrite(expr, expectedMatch);
-    testExprRewrite(expr, expectedMatch, true);
-}
-
 }  // namespace
 }  // namespace mongo

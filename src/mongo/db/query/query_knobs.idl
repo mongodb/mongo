@@ -1730,18 +1730,6 @@ server_parameters:
         validator:
             gte: 16777248 # 'BSONObjMaxUserSize' + sizeof(QueryShapeHash)
         redact: false
-
-    internalQueryExtraPredicateForReversedIn:
-        description: >-
-            Enable an optimization for queries like {$expr: {$in: [<const>, "$fieldpath"]}} that generates
-            an extra predicate in order to allow indexes on $fieldpath to be used. This optimization
-            is applied irrespective of this query knob if we are dealing with a FLE query.
-        set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
-        cpp_varname: internalQueryExtraPredicateForReversedIn
-        default: false
-        redact: false
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'
