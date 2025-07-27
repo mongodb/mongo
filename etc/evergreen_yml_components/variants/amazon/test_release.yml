@@ -396,7 +396,7 @@ buildvariants:
     tasks:
       - name: compile_test_and_package_serial_TG
         distros:
-          - amazon2023.3-arm64-large
+          - amazon2023.3-arm64-xlarge
       - name: run_unit_tests_TG
         distros:
           - amazon2023.3-arm64-large
