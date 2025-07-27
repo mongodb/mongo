@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#pragma once
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/slotted_timestamp_list.h"
 #include "mongo/stdx/mutex.h"
@@ -45,18 +43,24 @@ public:
     using iterator = SlottedTimestampList::iterator;
     using const_iterator = SlottedTimestampList::const_iterator;
 
+    static OplogVisibilityManager* get(ServiceContext& service);
+    static OplogVisibilityManager* get(ServiceContext* service);
+    static OplogVisibilityManager* get(OperationContext* opCtx);
+
     RecordStore* getRecordStore() const;
+    void setRecordStore(RecordStore* rs);
+    void resetRecordStore();
 
-    OplogVisibilityManager(const Timestamp& initialTs, RecordStore* rs)
-        : _latestTimeSeen(initialTs), _rs(rs) {
-        _oplogVisibilityTimestamp.store(initialTs);
-    }
-
-    OplogVisibilityManager() = delete;
+    OplogVisibilityManager() = default;
     OplogVisibilityManager(const OplogVisibilityManager& rhs) = delete;
     OplogVisibilityManager& operator=(const OplogVisibilityManager& rhs) = delete;
     OplogVisibilityManager(const OplogVisibilityManager&& rhs) = delete;
     OplogVisibilityManager& operator=(const OplogVisibilityManager&& rhs) = delete;
+
+    /**
+     * Initializes oplog visibility using the given initialTs.
+     */
+    void init(const Timestamp& initialTs);
 
     /**
      * Start tracking the timestamps given the first and last timestamp.
@@ -67,11 +71,6 @@ public:
      * Stop tracking the timestamp that pos points to.
      */
     void untrackTimestamps(OplogVisibilityManager::const_iterator pos);
-
-    /**
-     * Returns true if there are timestamps currently being tracked.
-     */
-    bool trackingActiveTimestamps();
 
     /**
      * Returns the current visibility timestamp.

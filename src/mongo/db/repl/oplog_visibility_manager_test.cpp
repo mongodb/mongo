@@ -57,7 +57,7 @@ public:
                            std::size_t expectedVisibility);
 
 protected:
-    std::unique_ptr<OplogVisibilityManager> _manager;
+    OplogVisibilityManager _manager;
     std::unique_ptr<RecordStore> _rs;
     std::shared_ptr<CappedInsertNotifier> _notifier;
 };
@@ -74,9 +74,9 @@ void OplogVisibilityManagerTest::setUp() {
                                 boost::none /* uuid */);
 
     _notifier = _rs->capped()->getInsertNotifier();
-    _manager =
-        std::make_unique<repl::OplogVisibilityManager>(Timestamp(1) /* initialTs */, _rs.get());
-    ASSERT_EQ(_manager->getOplogVisibilityTimestamp(), Timestamp(1));
+    _manager.setRecordStore(_rs.get());
+    _manager.init(Timestamp(1) /* initialTs */);
+    ASSERT_EQ(_manager.getOplogVisibilityTimestamp(), Timestamp(1));
 }
 
 void OplogVisibilityManagerTest::tearDown() {
@@ -89,22 +89,20 @@ OplogVisibilityManager::const_iterator OplogVisibilityManagerTest::trackTimestam
     const std::pair<std::size_t, std::size_t>& timestampRange, bool managerIsEmpty) {
     const auto first = Timestamp(timestampRange.first);
     const auto last = Timestamp(timestampRange.second);
-    auto expectedVisibility =
-        managerIsEmpty ? (first - 1) : _manager->getOplogVisibilityTimestamp();
-    auto res = _manager->trackTimestamps(first, last);
-    ASSERT_EQ(_manager->getOplogVisibilityTimestamp(), expectedVisibility);
+    auto expectedVisibility = managerIsEmpty ? (first - 1) : _manager.getOplogVisibilityTimestamp();
+    auto res = _manager.trackTimestamps(first, last);
+    ASSERT_EQ(_manager.getOplogVisibilityTimestamp(), expectedVisibility);
     return res;
 }
 
 void OplogVisibilityManagerTest::untrackTimestamps(OplogVisibilityManager::const_iterator pos,
                                                    std::size_t expectedVisibility) {
-    const auto prevVisibilityTs = _manager->getOplogVisibilityTimestamp();
-    const auto prevVersion =
-        _manager->getRecordStore()->capped()->getInsertNotifier()->getVersion();
-    _manager->untrackTimestamps(pos);
-    ASSERT_EQ(_manager->getOplogVisibilityTimestamp(), Timestamp(expectedVisibility));
-    if (_manager->getOplogVisibilityTimestamp() > prevVisibilityTs) {
-        ASSERT_GT(_manager->getRecordStore()->capped()->getInsertNotifier()->getVersion(),
+    const auto prevVisibilityTs = _manager.getOplogVisibilityTimestamp();
+    const auto prevVersion = _manager.getRecordStore()->capped()->getInsertNotifier()->getVersion();
+    _manager.untrackTimestamps(pos);
+    ASSERT_EQ(_manager.getOplogVisibilityTimestamp(), Timestamp(expectedVisibility));
+    if (_manager.getOplogVisibilityTimestamp() > prevVisibilityTs) {
+        ASSERT_GT(_manager.getRecordStore()->capped()->getInsertNotifier()->getVersion(),
                   prevVersion);
     }
 }
@@ -161,19 +159,19 @@ DEATH_TEST_F(OplogVisibilityManagerTest,
              "invariant") {
     trackTimestamps({3, 5} /* timestampRange */, true /* managerIsEmpty */);
 
-    ASSERT_EQ(_manager->getOplogVisibilityTimestamp().asULL(), 2);
+    ASSERT_EQ(_manager.getOplogVisibilityTimestamp().asULL(), 2);
 
-    _manager->setOplogVisibilityTimestamp(Timestamp(6));
+    _manager.setOplogVisibilityTimestamp(Timestamp(6));
 }
 
 TEST_F(OplogVisibilityManagerTest, SetVisibilityTimestampBackward) {
     trackTimestamps({4, 5} /* timestampRange */, true /* managerIsEmpty */);
 
-    ASSERT_EQ(_manager->getOplogVisibilityTimestamp().asULL(), 3);
+    ASSERT_EQ(_manager.getOplogVisibilityTimestamp().asULL(), 3);
 
-    _manager->setOplogVisibilityTimestamp(Timestamp(2));
+    _manager.setOplogVisibilityTimestamp(Timestamp(2));
 
-    ASSERT_EQ(_manager->getOplogVisibilityTimestamp().asULL(), 2);
+    ASSERT_EQ(_manager.getOplogVisibilityTimestamp().asULL(), 2);
 }
 
 TEST_F(OplogVisibilityManagerTest, SetVisibilityTimestampForward) {
@@ -181,25 +179,9 @@ TEST_F(OplogVisibilityManagerTest, SetVisibilityTimestampForward) {
 
     untrackTimestamps(it1, 5 /* expectedVisibility */);
 
-    _manager->setOplogVisibilityTimestamp(Timestamp(10));
+    _manager.setOplogVisibilityTimestamp(Timestamp(10));
 
-    ASSERT_EQ(_manager->getOplogVisibilityTimestamp().asULL(), 10);
-}
-
-TEST_F(OplogVisibilityManagerTest, TrackingActiveTimestamps) {
-    ASSERT(!_manager->trackingActiveTimestamps());
-
-    auto it1 = trackTimestamps({3, 4} /* timestampRange */, true /* managerIsEmpty */);
-    ASSERT(_manager->trackingActiveTimestamps());
-
-    auto it2 = trackTimestamps({5, 6} /* timestampRange */, false /* managerIsEmpty */);
-    ASSERT(_manager->trackingActiveTimestamps());
-
-    untrackTimestamps(it1, 4 /* expectedVisibility */);
-    ASSERT(_manager->trackingActiveTimestamps());
-
-    untrackTimestamps(it2, 6 /* expectedVisibility */);
-    ASSERT(!_manager->trackingActiveTimestamps());
+    ASSERT_EQ(_manager.getOplogVisibilityTimestamp().asULL(), 10);
 }
 
 TEST_F(OplogVisibilityManagerTest, WaitForTimestampToBecomeVisibile) {
@@ -211,7 +193,7 @@ TEST_F(OplogVisibilityManagerTest, WaitForTimestampToBecomeVisibile) {
     bool doneWait = false;
 
     stdx::thread pushThread([&] {
-        _manager->waitForTimestampToBeVisible(opCtxHolder.get(), Timestamp(4));
+        _manager.waitForTimestampToBeVisible(opCtxHolder.get(), Timestamp(4));
         doneWait = true;
     });
 
@@ -229,10 +211,10 @@ TEST_F(OplogVisibilityManagerTest, WaitForTimestampToBecomeVisibile) {
 
     pushThread.join();
     ASSERT(doneWait);
-    ASSERT_EQ(_manager->getOplogVisibilityTimestamp().asULL(), 4);
+    ASSERT_EQ(_manager.getOplogVisibilityTimestamp().asULL(), 4);
 
     untrackTimestamps(it3, 5 /* expectedVisibility */);
-    ASSERT_EQ(_manager->getOplogVisibilityTimestamp().asULL(), 5);
+    ASSERT_EQ(_manager.getOplogVisibilityTimestamp().asULL(), 5);
 }
 
 

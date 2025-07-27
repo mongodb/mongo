@@ -40,6 +40,8 @@ namespace repl {
 
 namespace {
 
+const auto oplogVisibilityManager = ServiceContext::declareDecoration<OplogVisibilityManager>();
+
 /**
  * Returns a lambda expression that notifies capped waiters if visibility is changed.
  */
@@ -54,8 +56,36 @@ auto notifyCappedWaitersIfVisibilityChanged(const bool& visibilityChanged, Recor
 
 }  // namespace
 
+// static
+OplogVisibilityManager* OplogVisibilityManager::get(ServiceContext& service) {
+    return get(&service);
+}
+
+// static
+OplogVisibilityManager* OplogVisibilityManager::get(ServiceContext* service) {
+    return &oplogVisibilityManager(service);
+}
+
+// static
+OplogVisibilityManager* OplogVisibilityManager::get(OperationContext* opCtx) {
+    return get(opCtx->getServiceContext());
+}
+
 RecordStore* OplogVisibilityManager::getRecordStore() const {
     return _rs;
+}
+
+void OplogVisibilityManager::setRecordStore(RecordStore* rs) {
+    _rs = rs;
+}
+
+void OplogVisibilityManager::resetRecordStore() {
+    _rs = nullptr;
+}
+
+void OplogVisibilityManager::init(const Timestamp& initialTs) {
+    _oplogVisibilityTimestamp.store(initialTs);
+    _latestTimeSeen = initialTs;
 }
 
 OplogVisibilityManager::const_iterator OplogVisibilityManager::trackTimestamps(
@@ -95,11 +125,6 @@ void OplogVisibilityManager::untrackTimestamps(OplogVisibilityManager::const_ite
 
     // Visibility is updated to the oldest timestamp in the list minus 1.
     visibilityChanged = _setOplogVisibilityTimestamp(lock, _oplogTimestampList.front() - 1);
-}
-
-bool OplogVisibilityManager::trackingActiveTimestamps() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return !_oplogTimestampList.empty();
 }
 
 Timestamp OplogVisibilityManager::getOplogVisibilityTimestamp() const {
