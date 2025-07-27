@@ -307,6 +307,8 @@ struct __wt_prefetch_queue_entry;
 typedef struct __wt_prefetch_queue_entry WT_PREFETCH_QUEUE_ENTRY;
 struct __wt_process;
 typedef struct __wt_process WT_PROCESS;
+struct __wt_reconcile_stats;
+typedef struct __wt_reconcile_stats WT_RECONCILE_STATS;
 struct __wt_reconcile_timeline;
 typedef struct __wt_reconcile_timeline WT_RECONCILE_TIMELINE;
 struct __wt_recovery_timeline;
