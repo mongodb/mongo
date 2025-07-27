@@ -175,6 +175,21 @@ protected:
     }
 
     /*
+     * kv_workload_runner_wt::config --
+     *     Execute the given workload operation in WiredTiger.
+     */
+    int
+    do_operation(const operation::config &op)
+    {
+        if (op.type == "database") {
+            _database.set_config(std::move(kv_database_config::from_string(op.value)));
+            return 0;
+        }
+
+        throw model_exception("Unknown config type");
+    }
+
+    /*
      * kv_workload_runner::do_operation --
      *     Execute the given workload operation in the model.
      */

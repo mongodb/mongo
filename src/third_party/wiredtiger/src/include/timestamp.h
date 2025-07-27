@@ -19,11 +19,12 @@
 
 /*
  * We need an appropriately sized buffer for formatted time points, aggregates and windows. This is
- * for time windows with 4 timestamps, 2 transaction IDs, prepare state and formatting. The
- * formatting is currently about 32 characters - enough space that we don't need to think about it.
- * Time points have less information that time aggregate windows - cater for the larger here.
+ * for time windows with 6 timestamps, 2 transaction IDs, 2 prepared IDs, prepare state and
+ * formatting. The formatting is currently about 64 characters - enough space that we don't need to
+ * think about it. Time points have less information that time aggregate windows - cater for the
+ * larger here.
  */
-#define WT_TIME_STRING_SIZE (WT_TS_INT_STRING_SIZE * 4 + 20 * 2 + 64)
+#define WT_TIME_STRING_SIZE (WT_TS_INT_STRING_SIZE * 6 + 20 * 4 + 64)
 
 /* The time points that define a value's time window and associated prepare information. */
 struct __wt_time_window {
@@ -38,11 +39,6 @@ struct __wt_time_window {
     wt_timestamp_t stop_prepare_ts; /* default value: WT_TS_NONE */
     uint64_t stop_txn;              /* default value: WT_TXN_MAX */
     uint64_t stop_prepared_id;      /* default value: WT_PREPARED_ID_NONE */
-    /*
-     * Prepare information isn't really part of a time window, but we need to aggregate it to the
-     * internal page information in reconciliation, and this is the simplest place to put it.
-     */
-    uint8_t prepare;
 };
 
 /*

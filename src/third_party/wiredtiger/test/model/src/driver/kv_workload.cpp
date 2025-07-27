@@ -154,6 +154,10 @@ parse(const char *str)
           args.size() <= 1 ? k_timestamp_none : parse_uint64(args[1]),
           args.size() <= 2 ? k_timestamp_none : parse_uint64(args[2]));
     }
+    if (name == "config") {
+        CHECK_NUM_ARGS(2);
+        return config(args[0].c_str(), args[1].c_str());
+    }
     if (name == "crash") {
         CHECK_NUM_ARGS(0);
         return crash();
@@ -237,7 +241,8 @@ parse(const char *str)
  *     Assert that the timestamps are assigned correctly. Call this function one sequence at a time.
  */
 void
-kv_workload::assert_timestamps(const operation::any &op, timestamp_t &oldest, timestamp_t &stable)
+kv_workload::assert_timestamps(const kv_database_config &database_config, const operation::any &op,
+  timestamp_t &oldest, timestamp_t &stable)
 {
     if (std::holds_alternative<operation::set_stable_timestamp>(op)) {
         timestamp_t t = std::get<operation::set_stable_timestamp>(op).stable_timestamp;
@@ -303,16 +308,38 @@ kv_workload::assert_timestamps(const operation::any &op, timestamp_t &oldest, ti
             throw model_exception(err.str());
         }
     }
+
+    if (database_config.disaggregated) {
+        if (std::holds_alternative<operation::checkpoint>(op) ||
+          std::holds_alternative<operation::checkpoint_crash>(op)) {
+            if (stable == k_timestamp_none) {
+                std::ostringstream err;
+                err << "Checkpoint operation without a stable timestamp";
+                throw model_exception(err.str());
+            }
+        }
+
+        if (std::holds_alternative<operation::restart>(op)) {
+            if (stable == k_timestamp_none) {
+                std::ostringstream err;
+                err << "Closing a connection without a stable timestamp";
+                throw model_exception(err.str());
+            }
+        }
+    }
 }
 
 /*
- * kv_workload::assert_timestamps --
- *     Assert that all timestamps in the entire workload are assigned correctly. Throw an exception
- *     on error.
+ * kv_workload::verify --
+ *     Verify that the workload is valid. Throw an exception on error.
  */
 void
-kv_workload::assert_timestamps()
+kv_workload::verify()
 {
+    kv_database_config database_config{};
+    std::map<model::table_id_t, std::string> tables;
+    std::map<model::table_id_t, std::string> tables_as_of_last_checkpoint;
+
     timestamp_t ckpt_oldest = k_timestamp_none;
     timestamp_t ckpt_stable = k_timestamp_none;
     timestamp_t oldest = k_timestamp_none;
@@ -320,7 +347,43 @@ kv_workload::assert_timestamps()
 
     for (size_t i = 0; i < _operations.size(); i++) {
         const operation::any &op = _operations[i].operation;
-        assert_timestamps(op, oldest, stable);
+        if (std::holds_alternative<operation::config>(op)) {
+            const operation::config &c = std::get<operation::config>(op);
+            database_config = kv_database_config::from_string(c.value);
+        }
+
+        /*
+         * Verify that the table operations reference existing tables.
+         */
+        if (std::holds_alternative<operation::create_table>(op)) {
+            const operation::create_table &c = std::get<operation::create_table>(op);
+            if (tables.find(c.table_id) != tables.end())
+                throw model_exception(
+                  std::string("Table ") + std::to_string(c.table_id) + " already exists");
+            tables[c.table_id] = c.name;
+        }
+
+        if (std::holds_alternative<operation::checkpoint>(op) ||
+          std::holds_alternative<operation::restart>(op))
+            tables_as_of_last_checkpoint = tables;
+
+        if (database_config.disaggregated) {
+            if (std::holds_alternative<operation::crash>(op) ||
+              std::holds_alternative<operation::checkpoint_crash>(op))
+                tables = tables_as_of_last_checkpoint;
+        }
+
+        if (operation::table_op(op)) {
+            model::table_id_t table_id = operation::table_id(op);
+            if (tables.find(table_id) == tables.end())
+                throw model_exception(
+                  std::string("Table ") + std::to_string(table_id) + " does not exist");
+        }
+
+        /*
+         * Verify that the timestamps are correct.
+         */
+        assert_timestamps(database_config, op, oldest, stable);
 
         if (std::holds_alternative<operation::checkpoint>(op) ||
           std::holds_alternative<operation::restart>(op) ||
@@ -335,6 +398,18 @@ kv_workload::assert_timestamps()
           std::holds_alternative<operation::restart>(op)) {
             oldest = ckpt_oldest;
             stable = ckpt_stable;
+        }
+    }
+
+    if (database_config.disaggregated) {
+        /*
+         * Disaggregated storage with precise checkpoints requires a stable timestamp to be set
+         * before the connection closes, as it includes creating a checkpoint.
+         */
+        if (stable == k_timestamp_none) {
+            std::ostringstream err;
+            err << "Closing a connection without a stable timestamp";
+            throw model_exception(err.str());
         }
     }
 }

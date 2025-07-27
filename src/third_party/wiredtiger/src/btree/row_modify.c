@@ -72,7 +72,6 @@ int
 __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
   WT_UPDATE **updp_arg, u_int modify_type, bool exclusive, bool restore)
 {
-    WT_BTREE *btree;
     WT_DECL_RET;
     WT_INSERT *ins;
     WT_INSERT_HEAD *ins_head, **ins_headp;
@@ -89,7 +88,6 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
     ins = NULL;
     page = cbt->ref->page;
     session = CUR2S(cbt);
-    btree = S2BT(session);
     last_upd = NULL;
     upd_arg = updp_arg == NULL ? NULL : *updp_arg;
     upd = upd_arg;
@@ -157,7 +155,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
              *  3) Reinsert an update that has been deleted by a prepared rollback.
              */
             WT_ASSERT(session,
-              !WT_IS_HS(btree->dhandle) ||
+              !WT_IS_HS(S2BT(session)->dhandle) ||
                 (*upd_entry == NULL ||
                   ((*upd_entry)->type == WT_UPDATE_TOMBSTONE &&
                     (((*upd_entry)->txnid == WT_TXN_NONE &&
@@ -178,13 +176,13 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
 
             /*
              * If we restore an update chain in update restore eviction, there should be no update
-             * or a restored tombstone on the existing update chain except for disaggregated btrees.
+             * or a restored tombstone on the existing update chain except for btrees with leaf
+             * delta enabled.
              */
             WT_ASSERT_ALWAYS(session,
               !restore ||
                 (*upd_entry == NULL ||
-                  (F_ISSET(btree, WT_BTREE_DISAGGREGATED) &&
-                    (*upd_entry)->type == WT_UPDATE_TOMBSTONE &&
+                  (WT_DELTA_LEAF_ENABLED(session) && (*upd_entry)->type == WT_UPDATE_TOMBSTONE &&
                     F_ISSET(*upd_entry, WT_UPDATE_RESTORED_FROM_DS))),
               "Illegal update on chain during update restore eviction");
 
@@ -249,7 +247,7 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
              * history store if we write a prepared update to the data store.
              */
             WT_ASSERT(session,
-              !WT_IS_HS(btree->dhandle) ||
+              !WT_IS_HS(S2BT(session)->dhandle) ||
                 (upd_arg->type == WT_UPDATE_TOMBSTONE && upd_arg->next != NULL &&
                   upd_arg->next->type == WT_UPDATE_STANDARD && upd_arg->next->next == NULL) ||
                 (upd_arg->type == WT_UPDATE_STANDARD && upd_arg->next == NULL));

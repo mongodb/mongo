@@ -29,9 +29,6 @@ create_test_time_window(wt_timestamp_t start_ts, uint64_t start_txn, wt_timestam
     tw.stop_ts = stop_ts;
     tw.stop_txn = stop_txn;
 
-    if (has_start_prepare || has_stop_prepare) {
-        tw.prepare = 1;
-    }
     if (tw.start_ts != WT_TS_NONE)
         tw.durable_start_ts = tw.start_ts;
 
@@ -139,7 +136,6 @@ compare_time_windows(const WT_TIME_WINDOW &expected, const WT_TIME_WINDOW &actua
     CHECK(expected.start_txn == actual.start_txn);
     CHECK(expected.stop_ts == actual.stop_ts);
     CHECK(expected.stop_txn == actual.stop_txn);
-    CHECK(expected.prepare == actual.prepare);
     CHECK(expected.start_prepare_ts == actual.start_prepare_ts);
     CHECK(expected.start_prepared_id == actual.start_prepared_id);
     CHECK(expected.stop_prepare_ts == actual.stop_prepare_ts);

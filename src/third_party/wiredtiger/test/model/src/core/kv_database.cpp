@@ -35,8 +35,48 @@ extern "C" {
 
 #include "model/kv_database.h"
 #include "model/kv_transaction.h"
+#include "model/util.h"
 
 namespace model {
+
+/*
+ * kv_database::_default_config --
+ *     The default database configuration.
+ */
+const kv_database_config kv_database::_default_config;
+
+/*
+ * kv_database_config::kv_database_config --
+ *     Create the default database configuration.
+ */
+kv_database_config::kv_database_config()
+{
+    disaggregated = false;
+    leader = true;
+}
+
+/*
+ * kv_database_config::from_string --
+ *     Create the configuration from a string. Throw an exception on error.
+ */
+kv_database_config
+kv_database_config::from_string(const std::string &config)
+{
+    kv_database_config r;
+
+    config_map m = config_map::from_string(config);
+    std::vector<std::string> keys = m.keys();
+    for (std::string &k : keys) {
+        if (k == "disaggregated")
+            r.disaggregated = m.get_bool(k.c_str());
+        else if (k == "leader")
+            r.leader = m.get_bool(k.c_str());
+        else
+            throw std::runtime_error("Invalid database configuration key: " + k);
+    }
+
+    return r;
+}
 
 /*
  * kv_database::create_table --
@@ -345,6 +385,7 @@ kv_database::start_nolock()
     for (auto &p : ckpt->highest_recnos())
         table_nolock(p.first)->truncate_recnos_after(p.second);
 
+    /* Run RTS, even for disaggregated storage, which is a way to simulate precise checkpoints. */
     rollback_to_stable_nolock(t, ckpt->snapshot());
 }
 

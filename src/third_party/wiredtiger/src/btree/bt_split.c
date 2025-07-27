@@ -710,7 +710,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
              * which seems like asking for trouble.) Don't discard any ref has the prefetch flag,
              * the prefetch thread would crash if it sees a freed ref.
              */
-            if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+            if (WT_DELTA_INT_ENABLED(session))
                 WT_ACQUIRE_READ(ref_changes, next_ref->ref_changes);
             else
                 ref_changes = 0;
@@ -1613,11 +1613,10 @@ __split_multi_inmem_final(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *mul
 
     /*
      * If we have saved updates, we must have decided to restore them to the new page except for
-     * disaggregated storage.
+     * btrees with delta enabled.
      */
-    WT_ASSERT(session,
-      F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) || multi->supd_entries == 0 ||
-        multi->supd_restore);
+    WT_ASSERT(
+      session, WT_DELTA_LEAF_ENABLED(session) || multi->supd_entries == 0 || multi->supd_restore);
 
     if (!multi->supd_restore)
         return;
@@ -1717,7 +1716,6 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_REF *old_ref, WT_PAGE *page, WT_M
   size_t multi_entries, WT_REF **refp, size_t *incrp, bool first, bool closing)
 {
     WT_ADDR *addr, *old_addr;
-    WT_BTREE *btree;
     WT_IKEY *ikey;
     WT_REF *ref;
     size_t key_size;
@@ -1742,8 +1740,6 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_REF *old_ref, WT_PAGE *page, WT_M
           WT_VRFY_DISK_EMPTY_PAGE_OK) == 0,
       "Failed to verify a disk image");
 
-    btree = S2BT(session);
-
     /* Allocate an underlying WT_REF. */
     WT_RET(__wt_calloc_one(session, refp));
     ref = *refp;
@@ -1754,10 +1750,12 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_REF *old_ref, WT_PAGE *page, WT_M
      * Set the WT_REF key before (optionally) building the page, underlying column-store functions
      * need the page's key space to search it.
      */
+    bool delta_enabled = false;
     switch (page->type) {
     case WT_PAGE_ROW_INT:
     case WT_PAGE_ROW_LEAF:
-        if (F_ISSET(btree, WT_BTREE_DISAGGREGATED) && first) {
+        delta_enabled = WT_DELTA_ENABLED_FOR_PAGE(session, page->type);
+        if (delta_enabled && first) {
             __wt_ref_key(old_ref->home, old_ref, &key, &key_size);
             WT_RET(__wti_row_ikey(session, 0, key, key_size, ref));
             if (incrp)
@@ -1806,8 +1804,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_REF *old_ref, WT_PAGE *page, WT_M
         addr->type = multi->addr.type;
 
         WT_REF_SET_STATE(ref, WT_REF_DISK);
-    } else if (F_ISSET(btree, WT_BTREE_DISAGGREGATED) && multi_entries == 1 &&
-      old_ref->addr != NULL) {
+    } else if (delta_enabled && multi_entries == 1 && old_ref->addr != NULL) {
         old_addr = (WT_ADDR *)old_ref->addr;
         if (!__wt_off_page(old_ref->home, old_addr))
             ref->addr = old_addr;
@@ -2382,7 +2379,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi, bool 
 
     /* If there's an address, copy it. */
     if (multi->addr.block_cookie != NULL) {
-        WT_ASSERT(session, F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED));
+        WT_ASSERT(session, WT_DELTA_LEAF_ENABLED(session));
         WT_ERR(__wt_calloc_one(session, &addr));
         WT_TIME_AGGREGATE_COPY(&addr->ta, &multi->addr.ta);
         WT_ERR(__wt_memdup(

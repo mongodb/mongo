@@ -82,7 +82,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         version_cursor.set_key(1)
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
-        self.verify_value(version_cursor, 5, 5, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 0, 1)
+        self.verify_value(version_cursor, 5, 5, WT_TS_MAX, 0, 3, 0, 0, 0, 1)
         self.assertEqual(version_cursor.next(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 1, 1, 5, 5, 3, 0, 0, 0, 0)
@@ -109,7 +109,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         version_cursor.set_key(1)
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
-        self.verify_value(version_cursor, 1, 1, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 1, 0)
+        self.verify_value(version_cursor, 1, 1, WT_TS_MAX, 0, 3, 0, 0, 1, 0)
         self.assertEqual(version_cursor.next(), wiredtiger.WT_NOTFOUND)
 
     def test_ondisk_only_with_deletion(self):
@@ -202,7 +202,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         version_cursor.set_key(1)
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
-        self.verify_value(version_cursor, 5, 5, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 1, 1)
+        self.verify_value(version_cursor, 5, 5, WT_TS_MAX, 0, 3, 0, 0, 1, 1)
         self.assertEqual(version_cursor.next(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 1, 1, 5, 5, 3, 0, 0, 2, 0)
@@ -239,7 +239,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         version_cursor.set_key(1)
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
-        self.verify_value(version_cursor, 10, 10, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 0, 2)
+        self.verify_value(version_cursor, 10, 10, WT_TS_MAX, 0, 3, 0, 0, 0, 2)
         self.assertEqual(version_cursor.next(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 5, 5, 10, 10, 3, 0, 0, 1, 1)
@@ -273,7 +273,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         version_cursor.set_key(2)
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 2)
-        self.verify_value(version_cursor, 20, 20, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 0, 3)
+        self.verify_value(version_cursor, 20, 20, WT_TS_MAX, 0, 3, 0, 0, 0, 3)
         self.assertEqual(version_cursor.next(), 0)
         self.assertEqual(version_cursor.get_key(), 2)
         self.verify_value(version_cursor, 15, 15, 20, 20, 3, 0, 0, 1, 2)
@@ -310,7 +310,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
 
-        self.verify_value(version_cursor, 1, 0, WT_TS_MAX, WT_TS_MAX, 3, 1, 32, 0, 0)
+        self.verify_value(version_cursor, 1, 0, WT_TS_MAX, 0, 3, 1, 32, 0, 0)
         self.assertEqual(version_cursor.next(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 1, 1, 1, 0, 3, 1, 0, 1, 0)
@@ -337,7 +337,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         version_cursor.set_key(1)
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
-        self.verify_value(version_cursor, 1, 1, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 1, 0)
+        self.verify_value(version_cursor, 1, 1, WT_TS_MAX, 0, 3, 0, 0, 1, 0)
         self.assertEqual(version_cursor.next(), wiredtiger.WT_NOTFOUND)
 
         # Repeat after reset
@@ -345,7 +345,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         version_cursor.set_key(1)
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
-        self.verify_value(version_cursor, 1, 1, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 1, 0)
+        self.verify_value(version_cursor, 1, 1, WT_TS_MAX, 0, 3, 0, 0, 1, 0)
         self.assertEqual(version_cursor.next(), wiredtiger.WT_NOTFOUND)
 
     def test_prepare_tombstone(self):
@@ -422,7 +422,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         version_cursor.set_key(1)
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
-        self.verify_value(version_cursor, 5, 5, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 0, 1)
+        self.verify_value(version_cursor, 5, 5, WT_TS_MAX, 0, 3, 0, 0, 0, 1)
 
         # Update the value
         session2 = self.conn.open_session()
@@ -556,9 +556,9 @@ class test_cursor18(wttest.WiredTigerTestCase):
         version_cursor.set_key(1)
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
-        self.verify_value(version_cursor, 1, 1, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 0, 0)
+        self.verify_value(version_cursor, 1, 1, WT_TS_MAX, 0, 3, 0, 0, 0, 0)
         self.assertEqual(version_cursor.next(), 0)
-        self.verify_value(version_cursor, 1, 1, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 1, 0)
+        self.verify_value(version_cursor, 1, 1, WT_TS_MAX, 0, 3, 0, 0, 1, 0)
         self.assertEqual(version_cursor.next(), wiredtiger.WT_NOTFOUND)
 
     def test_multiple_keys_with_search(self):
@@ -581,10 +581,10 @@ class test_cursor18(wttest.WiredTigerTestCase):
         version_cursor.set_key(1)
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
-        self.verify_value(version_cursor, 1, 1, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 0, 0)
+        self.verify_value(version_cursor, 1, 1, WT_TS_MAX, 0, 3, 0, 0, 0, 0)
         self.assertEqual(version_cursor.next(), 0)
         self.assertEqual(version_cursor.get_key(), 2)
-        self.verify_value(version_cursor, 5, 5, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 0, 1)
+        self.verify_value(version_cursor, 5, 5, WT_TS_MAX, 0, 3, 0, 0, 0, 1)
         self.assertEqual(version_cursor.next(), wiredtiger.WT_NOTFOUND)
 
     def test_multiple_keys_with_next(self):
@@ -606,10 +606,10 @@ class test_cursor18(wttest.WiredTigerTestCase):
         version_cursor = self.session.open_cursor(self.uri, None, "debug=(dump_version=(enabled=true))")
         self.assertEqual(version_cursor.next(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
-        self.verify_value(version_cursor, 1, 1, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 0, 0)
+        self.verify_value(version_cursor, 1, 1, WT_TS_MAX, 0, 3, 0, 0, 0, 0)
         self.assertEqual(version_cursor.next(), 0)
         self.assertEqual(version_cursor.get_key(), 2)
-        self.verify_value(version_cursor, 5, 5, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 0, 1)
+        self.verify_value(version_cursor, 5, 5, WT_TS_MAX, 0, 3, 0, 0, 0, 1)
         self.assertEqual(version_cursor.next(), wiredtiger.WT_NOTFOUND)
 
     def test_update_chain_start_timestamp(self):
@@ -632,7 +632,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         version_cursor.set_key(1)
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
-        self.verify_value(version_cursor, 5, 5, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 0, 1)
+        self.verify_value(version_cursor, 5, 5, WT_TS_MAX, 0, 3, 0, 0, 0, 1)
         self.assertEqual(version_cursor.next(), wiredtiger.WT_NOTFOUND)
 
     def test_update_chain_start_timestamp_with_remove(self):
@@ -662,7 +662,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         version_cursor.set_key(1)
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
-        self.verify_value(version_cursor, 5, 5, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 0, 1)
+        self.verify_value(version_cursor, 5, 5, WT_TS_MAX, 0, 3, 0, 0, 0, 1)
         self.assertEqual(version_cursor.next(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 1, 1, 2, 2, 3, 0, 0, 0, 0)
@@ -695,7 +695,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         version_cursor.set_key(1)
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
-        self.verify_value(version_cursor, 5, 5, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 0, 1)
+        self.verify_value(version_cursor, 5, 5, WT_TS_MAX, 0, 3, 0, 0, 0, 1)
         self.assertEqual(version_cursor.next(), wiredtiger.WT_NOTFOUND)
 
     def test_ondisk_start_timestamp(self):
@@ -873,7 +873,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         version_cursor.set_key(1)
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
-        self.verify_value(version_cursor, 5, 5, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 1, 1)
+        self.verify_value(version_cursor, 5, 5, WT_TS_MAX, 0, 3, 0, 0, 1, 1)
         self.assertEqual(version_cursor.next(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 1, 1, 5, 5, 3, 0, 0, 2, 0)
@@ -911,7 +911,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         version_cursor.set_key(1)
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
-        self.verify_value(version_cursor, 8, 8, WT_TS_MAX, WT_TS_MAX, 3, 0, 0, 1, 2)
+        self.verify_value(version_cursor, 8, 8, WT_TS_MAX, 0, 3, 0, 0, 1, 2)
         self.assertEqual(version_cursor.next(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 5, 5, 8, 8, 3, 0, 0, 2, 1)

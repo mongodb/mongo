@@ -37,6 +37,11 @@
 #include <sstream>
 #include <vector>
 
+#ifdef __linux__
+#include <dlfcn.h>
+#include <libgen.h>
+#endif
+
 #include "wiredtiger.h"
 extern "C" {
 #include "wt_internal.h"
@@ -353,6 +358,63 @@ decode_utf8(const std::string &str)
 }
 
 /*
+ * directory_path --
+ *     Get path to the parent directory. Throw an exception on error.
+ */
+std::string
+directory_path(const std::string &path)
+{
+#ifdef __linux__
+    char *buf;
+
+    buf = strdup(path.c_str());
+    if (buf == nullptr)
+        throw std::runtime_error("Out of memory");
+
+    std::string s{dirname(buf)};
+    free(buf);
+    return std::move(s);
+#else
+    throw std::runtime_error("Not implemented for this platform");
+#endif
+}
+
+/*
+ * executable_path --
+ *     Path to the current executable. Throw an exception on error.
+ */
+std::string
+executable_path()
+{
+#ifdef __linux__
+    char buf[PATH_MAX];
+    int ret = readlink("/proc/self/exe", buf, sizeof(buf));
+    if (ret != 0)
+        throw std::runtime_error("Cannot read /proc/self/exe");
+    return std::string(buf);
+#else
+    throw std::runtime_error("Not implemented for this platform");
+#endif
+}
+
+/*
+ * model_library_path --
+ *     Path to this library. Throw an exception on error.
+ */
+std::string
+model_library_path()
+{
+#ifdef __linux__
+    Dl_info info;
+    if (dladdr((const void *)model_library_path, &info) == 0)
+        throw std::runtime_error("Cannot find the location of the model library");
+    return std::string(info.dli_fname);
+#else
+    throw std::runtime_error("Not implemented for this platform");
+#endif
+}
+
+/*
  * parse_uint64 --
  *     Parse the string into a number. Throw an exception on error.
  */
@@ -395,6 +457,87 @@ quote(const std::string &str)
 }
 
 /*
+ * wt_build_dir_path --
+ *     Path to the WiredTiger build directory, assuming that this library is used from the build
+ *     directory. Throw an exception on error.
+ */
+std::string
+wt_build_dir_path()
+{
+    std::string path = model_library_path();
+    for (path = directory_path(path); path != "." && path != "/"; path = directory_path(path)) {
+        std::string s = join(path, "libwiredtiger.so", "/");
+        if (access(s.c_str(), 0) == 0)
+            return path;
+    }
+
+    throw std::runtime_error("Could not find WiredTiger's build directory");
+}
+
+/*
+ * wt_disagg_config_string --
+ *     Get the config string for disaggregated storage.
+ */
+std::string
+wt_disagg_config_string()
+{
+    std::string extension = wt_extension_path("page_log/palm/libwiredtiger_palm.so");
+
+    std::ostringstream config;
+    config << "checkpoint=(precise=true),";
+    config << "extensions=[" << extension << "],";
+    /* config << "extensions=[" << extension << "=(config=\"(verbose=1)\")" << "],"; */
+    config << "disaggregated=(page_log=palm,role=follower)";
+
+    return config.str();
+}
+
+/*
+ * wt_disagg_pick_up_latest_checkpoint --
+ *     Pick up the latest WiredTiger checkpoint.
+ */
+bool
+wt_disagg_pick_up_latest_checkpoint(WT_CONNECTION *conn, model::timestamp_t &checkpoint_timestamp)
+{
+    int ret;
+    checkpoint_timestamp = model::k_timestamp_none;
+
+    WT_PAGE_LOG *page_log;
+    ret = conn->get_page_log(conn, "palm", &page_log);
+    if (ret != 0)
+        throw wiredtiger_exception("Cannot get page log \"palm\"", ret);
+
+    WT_SESSION *session;
+    ret = conn->open_session(conn, nullptr, nullptr, &session);
+    if (ret != 0)
+        throw wiredtiger_exception("Failed to open a session", ret);
+    wiredtiger_session_guard wiredtiger_session_guard(session);
+
+    WT_ITEM metadata{};
+    uint64_t timestamp;
+    ret = page_log->pl_get_complete_checkpoint_ext(
+      page_log, session, nullptr, nullptr, &timestamp, &metadata);
+    if (ret == WT_NOTFOUND)
+        return false;
+    if (ret != 0)
+        throw wiredtiger_exception("Cannot get checkpoint metadata", ret);
+    char *checkpoint_meta = strndup((const char *)metadata.data, metadata.size);
+    free(metadata.mem);
+
+    std::ostringstream config;
+    config << "disaggregated=(checkpoint_meta=\"" << checkpoint_meta << "\")";
+    free(checkpoint_meta);
+
+    std::string config_str = config.str();
+    ret = conn->reconfigure(conn, config_str.c_str());
+    if (ret != 0)
+        throw wiredtiger_exception("Cannot reconfigure WiredTiger", ret);
+
+    checkpoint_timestamp = model::timestamp_t(timestamp);
+    return true;
+}
+
+/*
  * wt_evict --
  *     Evict a WiredTiger page with the given key.
  */
@@ -425,6 +568,16 @@ wt_evict(WT_CONNECTION *conn, const char *uri, const data_value &key)
     ret = cursor->reset(cursor);
     if (ret != 0)
         throw wiredtiger_exception("Cursor reset failed: ", ret);
+}
+
+/*
+ * wt_extension_path --
+ *     Path to the given WiredTiger extension given its relative path. Throw an exception on error.
+ */
+std::string
+wt_extension_path(const std::string &path)
+{
+    return join(join(wt_build_dir_path(), "ext", "/"), path, "/");
 }
 
 /*

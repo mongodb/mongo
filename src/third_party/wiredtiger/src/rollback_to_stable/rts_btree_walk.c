@@ -69,8 +69,8 @@ __rts_btree_walk_page_skip(
                 __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
                   WT_RTS_VERB_TAG_SKIP_DEL "ref=%p: deleted page walk skipped page_del %s",
                   (void *)ref,
-                  __wt_time_point_to_string(page_del->pg_del_start_ts, page_del->pg_del_durable_ts,
-                    page_del->txnid, time_string[0]));
+                  __wt_time_point_to_string(page_del->pg_del_durable_ts, page_del->pg_del_start_ts,
+                    page_del->prepare_ts, page_del->prepared_id, page_del->txnid, time_string[0]));
             }
             WT_STAT_CONN_INCR(session, txn_rts_tree_walk_skip_pages);
             *skipp = true;

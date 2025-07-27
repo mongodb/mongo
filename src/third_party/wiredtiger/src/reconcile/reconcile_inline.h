@@ -50,7 +50,7 @@ __rec_cell_tw_stats(WTI_RECONCILE *r, WT_TIME_WINDOW *tw)
         ++r->count_stop_ts;
     if (tw->stop_txn != WT_TXN_MAX)
         ++r->count_stop_txn;
-    if (tw->prepare)
+    if (WT_TIME_WINDOW_HAS_PREPARE(tw))
         ++r->count_prepare;
 }
 
@@ -491,7 +491,7 @@ __wti_rec_time_window_clear_obsolete(WT_SESSION_IMPL *session, WTI_UPDATE_SELECT
      * create an extra update on the end of the chain later in reconciliation as we'll re-append the
      * disk image value to the update chain.
      */
-    if (!tw->prepare && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY) &&
+    if (!WT_TIME_WINDOW_HAS_PREPARE(tw) && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY) &&
       !F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY)) {
         /*
          * Check if the start of the time window is globally visible, and if so remove unnecessary

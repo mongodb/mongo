@@ -47,6 +47,9 @@ namespace model {
  */
 struct kv_workload_generator_spec {
 
+    /* Top-level database configuration. */
+    float disaggregated;
+
     /* The minimum and maximum number of tables. */
     size_t min_tables;
     size_t max_tables;
@@ -552,6 +555,7 @@ private:
     kv_workload &_workload;
 
     kv_workload_generator_spec _spec;
+    kv_database_config _database_config;
     random _random;
 
     table_id_t _last_table_id;

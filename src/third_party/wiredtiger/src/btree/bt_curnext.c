@@ -379,8 +379,7 @@ restart_read:
          * we can't cache it; but in that case the on-disk value cannot be globally visible.)
          */
         cbt->cip_saved = cip;
-        if (rle > 1 &&
-          __wt_txn_visible_all(session, unpack.tw.start_txn, unpack.tw.durable_start_ts)) {
+        if (rle > 1 && __wt_txn_tw_start_visible_all(session, &unpack.tw)) {
             /*
              * Copy the value into cbt->tmp to cache it. This is perhaps unfortunate, because
              * copying isn't free, but it's currently necessary. The memory we're copying might be

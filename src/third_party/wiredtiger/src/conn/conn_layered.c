@@ -1407,6 +1407,8 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
             upd->txnid = tw.start_txn;
             upd->upd_start_ts = tw.start_ts;
             upd->upd_durable_ts = tw.durable_start_ts;
+            upd->prepare_ts = tw.start_prepare_ts;
+            upd->prepared_id = tw.start_prepared_id;
         } else
             WT_ASSERT(session, tombstone != NULL);
 
@@ -1414,8 +1416,10 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
          * ingest table. */
         if (tombstone != NULL) {
             tombstone->txnid = tw.stop_txn;
-            tombstone->upd_start_ts = tw.start_ts;
-            tombstone->upd_durable_ts = tw.durable_start_ts;
+            tombstone->upd_start_ts = tw.stop_ts != WT_TS_MAX ? tw.stop_ts : tw.stop_prepare_ts;
+            tombstone->upd_durable_ts = tw.durable_stop_ts;
+            tombstone->prepare_ts = tw.stop_prepare_ts;
+            tombstone->prepared_id = tw.stop_prepared_id;
             tombstone->next = upd;
 
             WT_ASSERT(session, tombstone->upd_durable_ts > last_checkpoint_timestamp);

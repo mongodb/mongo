@@ -427,7 +427,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_
     mod = ref->page->modify;
     closing = FLD_ISSET(evict_flags, WT_EVICT_CALL_CLOSING);
 
-    WT_ASSERT(session, ref->addr == NULL || F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED));
+    WT_ASSERT(session, ref->addr == NULL || WT_DELTA_ENABLED_FOR_PAGE(session, ref->page->type));
 
     switch (mod->rec_result) {
     case WT_PM_REC_EMPTY:
@@ -476,7 +476,8 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_
             mod->mod_replace.block_cookie_size = 0;
             ref->addr = addr;
         } else
-            WT_ASSERT(session, F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) && ref->addr != NULL);
+            WT_ASSERT(
+              session, WT_DELTA_ENABLED_FOR_PAGE(session, ref->page->type) && ref->addr != NULL);
 
         /*
          * Eviction wants to keep this page if we have a disk image, re-instantiate the page in

@@ -27,6 +27,7 @@
  */
 
 #include <sys/time.h>
+#include <sys/types.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
 
@@ -118,8 +119,14 @@ run_and_verify(std::shared_ptr<model::kv_workload> workload, const std::string &
           "Failed to run the workload in the model: " + std::string(e.what()));
     }
 
-    /* Create the database directory and save the workload. */
+    /* Create the database directory. */
     testutil_recreate_dir(home.c_str());
+    if (database.config().disaggregated) {
+        std::string kv_home = home + "/kv_home";
+        testutil_recreate_dir(kv_home.c_str());
+    }
+
+    /* Save the workload. */
     std::string workload_file = home + DIR_DELIM_STR + MAIN_WORKLOAD_FILE;
     std::ofstream workload_out;
     workload_out.open(workload_file);
@@ -153,12 +160,12 @@ run_and_verify(std::shared_ptr<model::kv_workload> workload, const std::string &
         throw std::runtime_error("WiredTiger executed " + std::to_string(ret_wt.size()) +
           " operations, but " + std::to_string(ret_model.size()) + " was expected.");
 
-    /*
-     * Verify the database in a separate process to protect against any crashes during verification,
-     * which would allow the counter-example reduction to run in this case.
-     */
+    /* Verify the database in a separate process. */
 
-    /* Initialize the shared memory to pass state from the verification process to the parent. */
+    /*
+     * Initialize the shared memory state, that we will share between the controller (parent)
+     * process, and the process that will actually run the workload.
+     */
     model::shared_memory shm_state(sizeof(shared_verify_state));
     shared_verify_state *verify_state = (shared_verify_state *)shm_state.data();
 
@@ -175,6 +182,9 @@ run_and_verify(std::shared_ptr<model::kv_workload> workload, const std::string &
             /* Open the WiredTiger database to verify. */
             WT_CONNECTION *conn;
             std::string conn_config_verify = model::kv_workload_runner_wt::k_config_base;
+            if (database.config().disaggregated)
+                conn_config_verify =
+                  model::join(conn_config_verify, model::wt_disagg_config_string(), ",");
             if (conn_config_override != "")
                 conn_config_verify += "," + conn_config_override;
             int ret = wiredtiger_open(
@@ -182,7 +192,15 @@ run_and_verify(std::shared_ptr<model::kv_workload> workload, const std::string &
             if (ret != 0)
                 throw std::runtime_error("Cannot open the database: " +
                   std::string(wiredtiger_strerror(ret)) + " (" + std::to_string(ret) + ")");
-            model::wiredtiger_connection_guard conn_guard(conn); /* Close automatically. */
+            model::wiredtiger_connection_guard conn_guard(
+              conn); /* Automatically close at the end. */
+
+            /* If this is disaggregated storage, pick up the latest checkpoint. */
+            if (database.config().disaggregated) {
+                model::timestamp_t checkpoint_timestamp;
+                model::wt_disagg_pick_up_latest_checkpoint(
+                  conn, checkpoint_timestamp /* not used */);
+            }
 
             /* Get the list of tables. */
             std::vector<std::string> tables;
@@ -260,6 +278,8 @@ update_spec(model::kv_workload_generator_spec &spec, std::string &conn_config,
     for (std::string &k : keys) {
         UPDATE_SPEC_START;
 
+        UPDATE_SPEC(disaggregated, float);
+
         UPDATE_SPEC(min_tables, uint64);
         UPDATE_SPEC(max_tables, uint64);
         UPDATE_SPEC(min_sequences, uint64);
@@ -299,6 +319,17 @@ update_spec(model::kv_workload_generator_spec &spec, std::string &conn_config,
         UPDATE_SPEC(nonprepared_transaction_rollback, float);
         UPDATE_SPEC(prepared_transaction_rollback_after_prepare, float);
         UPDATE_SPEC(prepared_transaction_rollback_before_prepare, float);
+
+        UPDATE_SPEC(timing_stress_ckpt_slow, float);
+        UPDATE_SPEC(timing_stress_ckpt_evict_page, float);
+        UPDATE_SPEC(timing_stress_ckpt_handle, float);
+        UPDATE_SPEC(timing_stress_ckpt_stop, float);
+        UPDATE_SPEC(timing_stress_compact_slow, float);
+        UPDATE_SPEC(timing_stress_hs_ckpt_delay, float);
+        UPDATE_SPEC(timing_stress_hs_search, float);
+        UPDATE_SPEC(timing_stress_hs_sweep_race, float);
+        UPDATE_SPEC(timing_stress_prepare_ckpt_delay, float);
+        UPDATE_SPEC(timing_stress_commit_txn_slow, float);
 
         else if (k == "connection_config") conn_config += "," + m.get_string("connection_config");
 
@@ -476,12 +507,11 @@ reduce_counterexample_by_aspect(reduce_counterexample_context_t &context,
         /*
          * Validate that we didn't just produce a malformed workload.
          *
-         * The workload construction algorithm above already guarantees that the transactions are
-         * included or removed in their entirety and that the workload creates all of its tables, so
-         * we don't need to check for undefined transaction or table IDs.
+         * Note that the workload construction algorithm above already guarantees that the
+         * transactions are included or removed in their entirety.
          */
         bool skip = false;
-        if (!w->verify_timestamps())
+        if (!w->verify_noexcept())
             skip = true;
 
         /* Clean up the previous database directory, if it exists. */
@@ -625,6 +655,9 @@ reduce_counterexample(std::shared_ptr<model::kv_workload> workload, const std::s
         const model::kv_workload_operation &op, size_t) { return op.seq_no != model::k_no_seq_no; },
       [](const model::kv_workload_operation &op, size_t) { return op.seq_no; },
       [](const model::kv_workload_operation &op, size_t) {
+          /* Always include model-level configuration in the workload. */
+          if (std::holds_alternative<model::operation::config>(op.operation))
+              return true;
           /*
            * Always include metadata operations in the workload, so that we don't produce a
            * malformed workload at this stage due to a missing table.

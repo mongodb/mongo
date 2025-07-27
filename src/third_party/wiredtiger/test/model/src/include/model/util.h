@@ -507,6 +507,35 @@ private:
 std::string decode_utf8(const std::string &str);
 
 /*
+ * directory_path --
+ *     Get path to the parent directory. Throw an exception on error.
+ */
+std::string directory_path(const std::string &path);
+
+/*
+ * executable_path --
+ *     Path to the current executable. Throw an exception on error.
+ */
+std::string executable_path();
+
+/*
+ * model_library_path --
+ *     Path to this library. Throw an exception on error.
+ */
+std::string model_library_path();
+
+/*
+ * ends_with --
+ *     Check whether the string ends with the given suffix.
+ */
+inline bool
+ends_with(std::string_view str, std::string_view suffix)
+{
+    return str.size() >= suffix.size() &&
+      str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+/*
  * parse_uint64 --
  *     Parse the string into a number. Throw an exception on error.
  */
@@ -621,10 +650,36 @@ wt_cursor_update(WT_CURSOR *cursor, const data_value &key, const data_value &val
 }
 
 /*
+ * wt_build_dir_path --
+ *     Path to the WiredTiger build directory, assuming that this library is used from the build
+ *     directory. Throw an exception on error.
+ */
+std::string wt_build_dir_path();
+
+/*
+ * wt_disagg_config_string --
+ *     Get the config string for disaggregated storage.
+ */
+std::string wt_disagg_config_string();
+
+/*
+ * wt_disagg_pick_up_latest_checkpoint --
+ *     Pick up the latest disaggregated storage checkpoint.
+ */
+bool wt_disagg_pick_up_latest_checkpoint(
+  WT_CONNECTION *conn, model::timestamp_t &checkpoint_timestamp);
+
+/*
  * wt_evict --
  *     Evict a WiredTiger page with the given key.
  */
 void wt_evict(WT_CONNECTION *conn, const char *uri, const data_value &key);
+
+/*
+ * wt_extension_path --
+ *     Path to the given WiredTiger extension given its relative path. Throw an exception on error.
+ */
+std::string wt_extension_path(const std::string &path);
 
 /*
  * wt_list_tables --

@@ -399,6 +399,58 @@ operator<<(std::ostream &out, const commit_transaction &op)
 }
 
 /*
+ * config --
+ *     A representation of this workload operation.
+ */
+struct config : public without_txn_id, public without_table_id {
+    std::string type;
+    std::string value;
+
+    /*
+     * config::config --
+     *     Create the operation.
+     */
+    inline config(const char *type, const char *value) : type(type), value(value) {}
+
+    /*
+     * config::config --
+     *     Create the operation.
+     */
+    inline config(const char *type, const std::string &value) : type(type), value(value) {}
+
+    /*
+     * config::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const config &other) const noexcept
+    {
+        return type == other.type && value == other.value;
+    }
+
+    /*
+     * config::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const config &other) const noexcept
+    {
+        return !(*this == other);
+    }
+};
+
+/*
+ * operator<< --
+ *     Human-readable output.
+ */
+inline std::ostream &
+operator<<(std::ostream &out, const config &op)
+{
+    out << "config(" << quote(op.type) << ", " << quote(op.value) << ")";
+    return out;
+}
+
+/*
  * crash --
  *     A representation of this workload operation.
  */
@@ -1163,9 +1215,9 @@ operator<<(std::ostream &out, const wt_config &op)
  *     Any workload operation.
  */
 using any = std::variant<begin_transaction, breakpoint, checkpoint, checkpoint_crash,
-  commit_transaction, crash, create_table, evict, get, insert, nop, prepare_transaction, remove,
-  restart, rollback_to_stable, rollback_transaction, set_commit_timestamp, set_oldest_timestamp,
-  set_stable_timestamp, truncate, wt_config>;
+  commit_transaction, config, crash, create_table, evict, get, insert, nop, prepare_transaction,
+  remove, restart, rollback_to_stable, rollback_transaction, set_commit_timestamp,
+  set_oldest_timestamp, set_stable_timestamp, truncate, wt_config>;
 
 /*
  * operator<< --
@@ -1392,22 +1444,21 @@ public:
     }
 
     /*
-     * kv_workload::assert_timestamps --
-     *     Assert that all timestamps in the entire workload are assigned correctly. Throw an
-     *     exception on error.
+     * kv_workload::verify --
+     *     Verify that the workload is valid. Throw an exception on error.
      */
-    void assert_timestamps();
+    void verify();
 
     /*
-     * kv_workload::verify_timestamps --
-     *     Verify that all timestamps in the entire workload are assigned correctly; just return
-     *     true or false instead of throwing an exception.
+     * kv_workload::verify_noexcept --
+     *     Verify that the workload is valid; just return true or false instead of throwing an
+     *     exception.
      */
     bool
-    verify_timestamps()
+    verify_noexcept()
     {
         try {
-            assert_timestamps();
+            verify();
             return true;
         } catch (...) {
             return false;
@@ -1433,7 +1484,8 @@ protected:
      *     Assert that the timestamps are assigned correctly. Call this function one sequence at a
      *     time.
      */
-    void assert_timestamps(const operation::any &op, timestamp_t &oldest, timestamp_t &stable);
+    void assert_timestamps(const kv_database_config &database_config, const operation::any &op,
+      timestamp_t &oldest, timestamp_t &stable);
 
 private:
     std::deque<kv_workload_operation> _operations;

@@ -264,14 +264,18 @@ class Operation:
         self.type = OpType.ONDISK_ABORT_TW
         self.file = self.__extract_file(line)
 
-        matches = re.search('time_window=\((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+)', line)
-        start_start = int(matches.group(1))
-        start_end = int(matches.group(2))
-        self.start = Timestamp(start_start, start_end)
-        durable_start_start = int(matches.group(3))
-        durable_start_end = int(matches.group(4))
+        matches = re.search('time_window=\((\d+), (\d+)\)/\((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+)/(\d+)', line)
+        durable_start_start = int(matches.group(1))
+        durable_start_end = int(matches.group(2))
         self.durable_start = Timestamp(durable_start_start, durable_start_end)
-        self.start_txn = int(matches.group(5))
+        start_start = int(matches.group(3))
+        start_end = int(matches.group(4))
+        self.start = Timestamp(start_start, start_end)
+        start_prepare_start = int(matches.group(5))
+        start_prepare_end = int(matches.group(6))
+        self.start_prepare = Timestamp(start_prepare_start, start_prepare_end)
+        self.start_prepared_id = int(matches.group(7))
+        self.start_txn = int(matches.group(8))
 
         matches = re.search('durable_timestamp > stable_timestamp: (\w+)', line)
         self.durable_gt_stable = matches.group(1).lower() == "true"
@@ -293,7 +297,7 @@ class Operation:
         self.type = OpType.HS_UPDATE_ABORT
         self.file = self.__extract_file(line)
 
-        matches = re.search('start: \((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+) \| stop: \((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+)', line)
+        matches = re.search('start: \((\d+), (\d+)\)/\((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+)/(\d+) \| stop: \((\d+), (\d+)\)/\((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+)/(\d+)', line)
 
         durable_start_start = int(matches.group(1))
         durable_start_end = int(matches.group(2))
@@ -301,15 +305,23 @@ class Operation:
         start_start = int(matches.group(3))
         start_end = int(matches.group(4))
         self.start = Timestamp(start_start, start_end)
-        self.start_txn = int(matches.group(5))
+        start_prepare_start = int(matches.group(5))
+        start_prepare_end = int(matches.group(6))
+        self.start_prepare = Timestamp(start_prepare_start, start_prepare_end)
+        self.start_prepared_id = int(matches.group(7))
+        self.start_txn = int(matches.group(8))
 
-        durable_stop_start = int(matches.group(6))
-        durable_stop_end = int(matches.group(7))
+        durable_stop_start = int(matches.group(9))
+        durable_stop_end = int(matches.group(10))
         self.durable_stop = Timestamp(durable_start_start, durable_start_end)
-        stop_start = int(matches.group(8))
-        stop_end = int(matches.group(9))
+        stop_start = int(matches.group(11))
+        stop_end = int(matches.group(12))
         self.stop = Timestamp(start_start, start_end)
-        self.stop_txn = int(matches.group(10))
+        stop_prepare_start = int(matches.group(13))
+        stop_prepare_end = int(matches.group(14))
+        self.stop_prepare = Timestamp(stop_prepare_start, stop_prepare_end)
+        self.stop_prepared_id = int(matches.group(15))
+        self.stop_txn = int(matches.group(16))
 
         matches = re.search('type=(\w+)', line)
         self.update_type = UpdateType[matches.group(1)]
@@ -320,7 +332,7 @@ class Operation:
         self.type = OpType.HS_UPDATE_VALID
         self.file = self.__extract_file(line)
 
-        matches = re.search('start: \((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+) \| stop: \((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+)', line)
+        matches = re.search('start: \((\d+), (\d+)\)/\((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+)/(\d+) \| stop: \((\d+), (\d+)\)/\((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+)/(\d+)', line)
 
         durable_start_start = int(matches.group(1))
         durable_start_end = int(matches.group(2))
@@ -328,15 +340,23 @@ class Operation:
         start_start = int(matches.group(3))
         start_end = int(matches.group(4))
         self.start = Timestamp(start_start, start_end)
-        self.start_txn = int(matches.group(5))
+        start_prepare_start = int(matches.group(5))
+        start_prepare_end = int(matches.group(6))
+        self.start_prepare = Timestamp(start_prepare_start, start_prepare_end)
+        self.start_prepared_id = int(matches.group(7))
+        self.start_txn = int(matches.group(8))
 
-        durable_stop_start = int(matches.group(6))
-        durable_stop_end = int(matches.group(7))
+        durable_stop_start = int(matches.group(9))
+        durable_stop_end = int(matches.group(10))
         self.durable_stop = Timestamp(durable_start_start, durable_start_end)
-        stop_start = int(matches.group(8))
-        stop_end = int(matches.group(9))
+        stop_start = int(matches.group(11))
+        stop_end = int(matches.group(12))
         self.stop = Timestamp(start_start, start_end)
-        self.stop_txn = int(matches.group(10))
+        stop_prepare_start = int(matches.group(13))
+        stop_prepare_end = int(matches.group(14))
+        self.stop_prepare = Timestamp(stop_prepare_start, stop_prepare_end)
+        self.stop_prepared_id = int(matches.group(15))
+        self.stop_txn = int(matches.group(16))
 
         matches = re.search('type=(\w+)', line)
         self.update_type = UpdateType[matches.group(1)]
@@ -371,7 +391,7 @@ class Operation:
         self.type = OpType.HS_GT_ONDISK
         self.file = self.__extract_file(line)
 
-        matches = re.search('start: \((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+) \| stop: \((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+)', line)
+        matches = re.search('start: \((\d+), (\d+)\)/\((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+)/(\d+) \| stop: \((\d+), (\d+)\)/\((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+)/(\d+)', line)
 
         durable_start_start = int(matches.group(1))
         durable_start_end = int(matches.group(2))
@@ -379,15 +399,23 @@ class Operation:
         start_start = int(matches.group(3))
         start_end = int(matches.group(4))
         self.start = Timestamp(start_start, start_end)
-        self.start_txn = int(matches.group(5))
+        start_prepare_start = int(matches.group(5))
+        start_prepare_end = int(matches.group(6))
+        self.start_prepare = Timestamp(start_prepare_start, start_prepare_end)
+        self.start_prepared_id = int(matches.group(7))
+        self.start_txn = int(matches.group(8))
 
-        durable_stop_start = int(matches.group(6))
-        durable_stop_end = int(matches.group(7))
+        durable_stop_start = int(matches.group(9))
+        durable_stop_end = int(matches.group(10))
         self.durable_stop = Timestamp(durable_start_start, durable_start_end)
-        stop_start = int(matches.group(8))
-        stop_end = int(matches.group(9))
+        stop_start = int(matches.group(11))
+        stop_end = int(matches.group(12))
         self.stop = Timestamp(start_start, start_end)
-        self.stop_txn = int(matches.group(10))
+        stop_prepare_start = int(matches.group(13))
+        stop_prepare_end = int(matches.group(14))
+        self.stop_prepare = Timestamp(stop_prepare_start, stop_prepare_end)
+        self.stop_prepared_id = int(matches.group(15))
+        self.stop_txn = int(matches.group(16))
 
         matches = re.search('type=(\w+)', line)
         self.update_type = UpdateType[matches.group(1)]
@@ -402,22 +430,30 @@ class Operation:
         self.type = OpType.HS_STOP_OBSOLETE
         self.file = self.__extract_file(line)
 
-        matches = re.search('start: \((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+) \| stop: \((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+)', line)
+        matches = re.search('start: \((\d+), (\d+)\)/\((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+)/(\d+) \| stop: \((\d+), (\d+)\)/\((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+)/(\d+)', line)
         durable_start_start = int(matches.group(1))
         durable_start_end = int(matches.group(2))
         self.durable_start = Timestamp(durable_start_start, durable_start_end)
         start_start = int(matches.group(3))
         start_end = int(matches.group(4))
         self.start = Timestamp(start_start, start_end)
-        self.start_txn = int(matches.group(5))
+        start_prepare_start = int(matches.group(5))
+        start_prepare_end = int(matches.group(6))
+        self.start_prepare = Timestamp(start_prepare_start, start_prepare_end)
+        self.start_prepared_id = int(matches.group(7))
+        self.start_txn = int(matches.group(8))
 
-        durable_stop_start = int(matches.group(6))
-        durable_stop_end = int(matches.group(7))
+        durable_stop_start = int(matches.group(9))
+        durable_stop_end = int(matches.group(10))
         self.durable_stop = Timestamp(durable_start_start, durable_start_end)
-        stop_start = int(matches.group(8))
-        stop_end = int(matches.group(9))
+        stop_start = int(matches.group(11))
+        stop_end = int(matches.group(12))
         self.stop = Timestamp(start_start, start_end)
-        self.stop_txn = int(matches.group(10))
+        stop_prepare_start = int(matches.group(13))
+        stop_prepare_end = int(matches.group(14))
+        self.stop_prepare = Timestamp(stop_prepare_start, stop_prepare_end)
+        self.stop_prepared_id = int(matches.group(15))
+        self.stop_txn = int(matches.group(16))
 
         self.pinned = self.__extract_simple_timestamp('pinned_timestamp', line)
 
@@ -482,15 +518,19 @@ class Operation:
         self.stop = self.__extract_simple_timestamp('stop_timestamp', line)
         self.stable = self.__extract_simple_timestamp('stable_timestamp', line)
 
-        matches = re.search('start: \((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+) \| stop: \((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+)', line)
+        matches = re.search('start: \((\d+), (\d+)\)/\((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+)/(\d+) \| stop: \((\d+), (\d+)\)/\((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+)/(\d+)', line)
 
-        start_start = int(matches.group(1))
-        start_end = int(matches.group(2))
-        self.start = Timestamp(start_start, start_end)
-        durable_start_start = int(matches.group(3))
-        durable_start_end = int(matches.group(4))
+        durable_start_start = int(matches.group(1))
+        durable_start_end = int(matches.group(2))
         self.durable_start = Timestamp(durable_start_start, durable_start_end)
-        self.start_txn = int(matches.group(5))
+        start_start = int(matches.group(3))
+        start_end = int(matches.group(4))
+        self.start = Timestamp(start_start, start_end)
+        start_prepare_start = int(matches.group(5))
+        start_prepare_end = int(matches.group(6))
+        self.start_prepare = Timestamp(start_prepare_start, start_prepare_end)
+        self.start_prepared_id = int(matches.group(7))
+        self.start_txn = int(matches.group(8))
 
     def __init_insert_list_check(self, line):
         self.type = OpType.INSERT_LIST_CHECK

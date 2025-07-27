@@ -103,7 +103,7 @@ __prepared_discover_check_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_RO
     __wt_cell_get_tw(vpack, &tw);
 
     /* Done if the record wasn't prepared. */
-    if (!tw->prepare)
+    if (!WT_TIME_WINDOW_HAS_PREPARE(tw))
         return (0);
 
     WT_RET(__prepared_discover_process_ondisk_kv(session, ref, rip, recno, row_key, vpack));

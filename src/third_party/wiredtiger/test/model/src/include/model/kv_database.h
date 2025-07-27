@@ -40,6 +40,30 @@
 namespace model {
 
 /*
+ * kv_database_config --
+ *     A high-level database specification. This struct contains only configuration that affects the
+ *     contents of the database.
+ */
+struct kv_database_config {
+
+    /* Disaggregated storage. */
+    bool disaggregated;
+    bool leader;
+
+    /*
+     * kv_database_config::kv_database_config --
+     *     Create the default database configuration.
+     */
+    kv_database_config();
+
+    /*
+     * kv_database_config::from_string --
+     *     Create the configuration from a string. Throw an exception on error.
+     */
+    static kv_database_config from_string(const std::string &config);
+};
+
+/*
  * kv_database --
  *     A database with key-value tables.
  */
@@ -50,8 +74,8 @@ public:
      * kv_database::kv_database --
      *     Create a new instance.
      */
-    inline kv_database()
-        : _last_transaction_id(k_txn_none), _oldest_timestamp(k_timestamp_none),
+    inline kv_database(const kv_database_config &config = _default_config)
+        : _config(config), _last_transaction_id(k_txn_none), _oldest_timestamp(k_timestamp_none),
           _stable_timestamp(k_timestamp_none)
     {
     }
@@ -119,6 +143,27 @@ public:
      *     Get the checkpoint. Throw an exception if it does not exist.
      */
     kv_checkpoint_ptr checkpoint(const char *name = nullptr);
+
+    /*
+     * kv_database::set_config --
+     *     Change the database's configuration.
+     */
+    inline void
+    set_config(const kv_database_config &config)
+    {
+        _config = config;
+    }
+
+    /*
+     * kv_database::config --
+     *     Get the database configuration. The lifetime of the returned pointer follows the lifetime
+     *     of this object.
+     */
+    inline const kv_database_config &
+    config() const noexcept
+    {
+        return _config;
+    }
 
     /*
      * kv_transaction::set_oldest_timestamp --
@@ -343,6 +388,9 @@ protected:
     void start_nolock();
 
 private:
+    static const kv_database_config _default_config;
+    kv_database_config _config;
+
     /*
      * Locking order: If you need to acquire more than one lock at a time, acquire locks in the
      * order in which they are declared in this file to avoid deadlocks. For example, the tables

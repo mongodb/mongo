@@ -483,6 +483,10 @@ struct __wt_cursor_version {
     wt_timestamp_t upd_durable_stop_ts;
     /* The previous traversed update's start_ts will become the stop_ts. */
     wt_timestamp_t upd_stop_ts;
+    /* The previous traversed update's prepare_ts will become the stop_prepare_ts. */
+    wt_timestamp_t upd_stop_prepare_ts;
+    /* Whether The previous traversed update is prepared. */
+    uint8_t upd_stop_prepared;
 
     /* Don't show the user any keys from before this time. */
     wt_timestamp_t start_timestamp;
