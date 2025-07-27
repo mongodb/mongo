@@ -73,7 +73,7 @@ __wt_bulk_insert_fix(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool delet
      * Also, it should reflect the fact that we've just loaded a batch of stable values.
      */
     WT_TIME_WINDOW_INIT(&tw);
-    WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, &tw);
+    WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
     return (0);
 }
 
@@ -111,7 +111,7 @@ __wt_bulk_insert_fix_bitmap(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 
     /* Initialize the time aggregate that's going into the parent page. See note above. */
     WT_TIME_WINDOW_INIT(&tw);
-    WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, &tw);
+    WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
     return (0);
 }
 
@@ -155,7 +155,7 @@ __wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool delet
     __wt_rec_image_copy(session, r, val);
 
     /* Initialize the time aggregate that's going into the parent page. See note above. */
-    WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, &tw);
+    WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
 
     /* Update the starting record number in case we split. */
     r->recno += cbulk->rle;
@@ -195,7 +195,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
         /* Copy the value onto the page. */
         __wt_rec_image_copy(session, r, val);
-        WT_TIME_AGGREGATE_MERGE(session, &r->cur_ptr->ta, &addr->ta);
+        WT_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &addr->ta);
     }
     return (0);
 }
@@ -319,8 +319,8 @@ __wti_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
         /* Copy the value (which is in val, val == r->v) onto the page. */
         __wt_rec_image_copy(session, r, val);
         if (page_del != NULL)
-            WT_TIME_AGGREGATE_MERGE(session, &r->cur_ptr->ta, &ft_ta);
-        WT_TIME_AGGREGATE_MERGE(session, &r->cur_ptr->ta, &ta);
+            WT_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ft_ta);
+        WT_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ta);
     }
     WT_INTL_FOREACH_END;
 
@@ -446,7 +446,7 @@ __rec_col_fix_addtw(
     __wt_rec_auximage_copy(session, r, 0, key);
     __wt_rec_auximage_copy(session, r, 1, val);
 
-    WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, tw);
+    WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, tw);
 
     /* If we're on key 3 we should have just written at most the 4th time window. */
     WT_ASSERT(session, r->aux_entries <= recno_offset + 1);
@@ -948,7 +948,7 @@ __wti_rec_col_fix(
             /* If there are entries we didn't write timestamps for, aggregate a stable timestamp. */
             if (r->aux_entries < r->entries) {
                 WT_TIME_WINDOW_INIT(&unpack.tw);
-                WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, &unpack.tw);
+                WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &unpack.tw);
             }
 
             /* Make sure the trailing bits in the bitmap get cleared. */
@@ -982,7 +982,7 @@ __wti_rec_col_fix(
      */
     if (r->aux_entries < r->entries || r->entries == 0) {
         WT_TIME_WINDOW_INIT(&unpack.tw);
-        WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, &unpack.tw);
+        WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &unpack.tw);
     }
 
     /* Make sure the trailing bits in the bitmap get cleared. */
@@ -1171,7 +1171,7 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_SALVAGE_COOKI
     if (dictionary && !deleted && ovfl_usedp == NULL)
         WT_RET(__wt_rec_dict_replace(session, r, tw, rle, val));
     __wt_rec_image_copy(session, r, val);
-    WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, tw);
+    WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, tw);
 
     /* Update the starting record number in case we split. */
     r->recno += rle;

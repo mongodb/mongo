@@ -607,7 +607,7 @@ __evict_update_work(WT_SESSION_IMPL *session)
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
     double dirty_target, dirty_trigger, target, trigger, updates_target, updates_trigger;
-    uint64_t bytes_dirty, bytes_inuse, bytes_max, bytes_updates;
+    uint64_t bytes_dirty, bytes_inuse, bytes_max, bytes_updates, cache_fill_ratio;
     uint32_t flags;
 
     conn = S2C(session);
@@ -648,22 +648,41 @@ __evict_update_work(WT_SESSION_IMPL *session)
      */
     bytes_max = conn->cache_size + 1;
     bytes_inuse = __wt_cache_bytes_inuse(cache);
-    if (__wt_eviction_clean_needed(session, NULL))
+    if (__wt_eviction_clean_needed(session, NULL)) {
         LF_SET(WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_CLEAN_HARD);
-    else if (bytes_inuse > (target * bytes_max) / 100)
+        WT_STAT_CONN_INCR(session, cache_eviction_trigger_reached);
+    } else if (bytes_inuse > (target * bytes_max) / 100) {
         LF_SET(WT_CACHE_EVICT_CLEAN);
+    }
 
     bytes_dirty = __wt_cache_dirty_leaf_inuse(cache);
-    if (__wt_eviction_dirty_needed(session, NULL))
+    if (__wt_eviction_dirty_needed(session, NULL)) {
         LF_SET(WT_CACHE_EVICT_DIRTY | WT_CACHE_EVICT_DIRTY_HARD);
-    else if (bytes_dirty > (uint64_t)(dirty_target * bytes_max) / 100)
+        WT_STAT_CONN_INCR(session, cache_eviction_trigger_dirty_reached);
+    } else if (bytes_dirty > (uint64_t)(dirty_target * bytes_max) / 100) {
         LF_SET(WT_CACHE_EVICT_DIRTY);
+    }
 
     bytes_updates = __wt_cache_bytes_updates(cache);
-    if (__wt_eviction_updates_needed(session, NULL))
+    if (__wt_eviction_updates_needed(session, NULL)) {
         LF_SET(WT_CACHE_EVICT_UPDATES | WT_CACHE_EVICT_UPDATES_HARD);
-    else if (bytes_updates > (uint64_t)(updates_target * bytes_max) / 100)
+        WT_STAT_CONN_INCR(session, cache_eviction_trigger_updates_reached);
+    } else if (bytes_updates > (uint64_t)(updates_target * bytes_max) / 100) {
         LF_SET(WT_CACHE_EVICT_UPDATES);
+    }
+
+    /* If application threads are blocked by data in cache, track the fill ratio. */
+    cache_fill_ratio = bytes_inuse / bytes_max;
+    if (LF_ISSET(WT_CACHE_EVICT_HARD)) {
+        if (cache_fill_ratio < 0.25)
+            WT_STAT_CONN_INCR(session, cache_eviction_app_threads_fill_ratio_lt_25);
+        else if (cache_fill_ratio < 0.50)
+            WT_STAT_CONN_INCR(session, cache_eviction_app_threads_fill_ratio_25_50);
+        else if (cache_fill_ratio < 0.75)
+            WT_STAT_CONN_INCR(session, cache_eviction_app_threads_fill_ratio_50_75);
+        else
+            WT_STAT_CONN_INCR(session, cache_eviction_app_threads_fill_ratio_gt_75);
+    }
 
     /*
      * If application threads are blocked by the total volume of data in cache, try dirty pages as
@@ -1873,16 +1892,17 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
 
     /*
      * Examine at least a reasonable number of pages before deciding whether to give up. When we are
-     * only looking for dirty pages, search the tree for longer.
+     * not looking for clean pages, search the tree for longer.
      */
     min_pages = 10 * (uint64_t)target_pages;
-    if (!F_ISSET(cache, WT_CACHE_EVICT_DIRTY | WT_CACHE_EVICT_UPDATES))
+    if (F_ISSET(cache, WT_CACHE_EVICT_CLEAN))
         WT_STAT_CONN_INCR(session, cache_eviction_target_strategy_clean);
-    else if (!F_ISSET(cache, WT_CACHE_EVICT_CLEAN)) {
+    else
         min_pages *= 10;
+    if (F_ISSET(cache, WT_CACHE_EVICT_UPDATES))
+        WT_STAT_CONN_INCR(session, cache_eviction_target_strategy_updates);
+    if (F_ISSET(cache, WT_CACHE_EVICT_DIRTY))
         WT_STAT_CONN_INCR(session, cache_eviction_target_strategy_dirty);
-    } else
-        WT_STAT_CONN_INCR(session, cache_eviction_target_strategy_both_clean_and_dirty);
 
     if (btree->evict_ref == NULL) {
         WT_STAT_CONN_INCR(session, cache_eviction_walk_from_root);
@@ -2523,7 +2543,6 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly)
             if (ret == WT_ROLLBACK) {
                 __wt_atomic_decrement_if_positive(&cache->evict_aggressive_score);
 
-                WT_STAT_CONN_INCR(session, txn_rollback_oldest_pinned);
                 __wt_verbose_debug1(session, WT_VERB_TRANSACTION, "rollback reason: %s",
                   session->txn->rollback_reason);
             }

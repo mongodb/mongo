@@ -821,10 +821,10 @@ __rec_destroy(WT_SESSION_IMPL *session, void *reconcilep)
     *(WT_RECONCILE **)reconcilep = NULL;
 
     __wt_buf_free(session, &r->chunk_A.key);
-    __wt_buf_free(session, &r->chunk_A.min_key);
+    __wt_buf_free(session, &r->chunk_A.key_at_split_boundary);
     __wt_buf_free(session, &r->chunk_A.image);
     __wt_buf_free(session, &r->chunk_B.key);
-    __wt_buf_free(session, &r->chunk_B.min_key);
+    __wt_buf_free(session, &r->chunk_B.key_at_split_boundary);
     __wt_buf_free(session, &r->chunk_B.image);
 
     __wt_free(session, r->supd);
@@ -1033,12 +1033,14 @@ __rec_split_chunk_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *
     chunk->entries = 0;
     WT_TIME_AGGREGATE_INIT_MERGE(&chunk->ta);
 
-    chunk->min_recno = WT_RECNO_OOB;
+    chunk->recno_at_split_boundary = WT_RECNO_OOB;
     /* Don't touch the key item memory, that memory is reused. */
-    chunk->min_key.size = 0;
-    chunk->min_entries = 0;
-    WT_TIME_AGGREGATE_INIT_MERGE(&chunk->ta_min);
+    chunk->key_at_split_boundary.size = 0;
+    chunk->entries_before_split_boundary = 0;
     chunk->min_offset = 0;
+    /* Initialize our two special split time aggregates. */
+    WT_TIME_AGGREGATE_INIT_MERGE(&chunk->ta_before_split_boundary);
+    WT_TIME_AGGREGATE_INIT_MERGE(&chunk->ta_after_split_boundary);
 
     /*
      * Allocate and clear the disk image buffer.
@@ -1600,12 +1602,14 @@ __wti_rec_split_crossing_bnd(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t n
         if (r->entries == 0)
             return (0);
 
-        r->cur_ptr->min_entries = r->entries;
-        r->cur_ptr->min_recno = r->recno;
+        r->cur_ptr->entries_before_split_boundary = r->entries;
+        r->cur_ptr->recno_at_split_boundary = r->recno;
         if (S2BT(session)->type == BTREE_ROW)
-            WT_RET(__rec_split_row_promote(session, r, &r->cur_ptr->min_key, r->page->type));
-        WT_TIME_AGGREGATE_COPY(&r->cur_ptr->ta_min, &r->cur_ptr->ta);
-
+            WT_RET(__rec_split_row_promote(
+              session, r, &r->cur_ptr->key_at_split_boundary, r->page->type));
+        WT_TIME_AGGREGATE_COPY(&r->cur_ptr->ta_before_split_boundary, &r->cur_ptr->ta);
+        /* Reset the "next" time aggregate which may be used in certain split scenarios. */
+        WT_TIME_AGGREGATE_INIT_MERGE(&r->cur_ptr->ta_after_split_boundary);
         WT_ASSERT_ALWAYS(
           session, r->cur_ptr->min_offset == 0, "Trying to re-enter __wti_rec_split_crossing_bnd");
         r->cur_ptr->min_offset = WT_PTRDIFF(r->first_free, r->cur_ptr->image.mem);
@@ -1699,16 +1703,30 @@ __rec_split_finish_process_prev(WT_SESSION_IMPL *session, WT_RECONCILE *r)
         memcpy(
           cur_dsk_start, (uint8_t *)r->prev_ptr->image.mem + prev_ptr->min_offset, len_to_move);
 
+#ifdef HAVE_DIAGNOSTIC
+        /* This indentation lets us define temp_ta here. */
+        {
+            WT_TIME_AGGREGATE temp_ta;
+            WT_TIME_AGGREGATE_COPY(&temp_ta, &prev_ptr->ta_before_split_boundary);
+            WT_TIME_AGGREGATE_MERGE(session, &temp_ta, &prev_ptr->ta_after_split_boundary);
+            /*
+             * We track a bit more information than we need to because ta should always be a
+             * combination of the before split ta and after split ta. We can assert that here.
+             */
+            WT_ASSERT(session, memcmp(&prev_ptr->ta, &temp_ta, sizeof(WT_TIME_AGGREGATE)) == 0);
+        }
+#endif
+
         /* Update boundary information */
-        cur_ptr->entries += prev_ptr->entries - prev_ptr->min_entries;
-        cur_ptr->recno = prev_ptr->min_recno;
-        WT_RET(
-          __wt_buf_set(session, &cur_ptr->key, prev_ptr->min_key.data, prev_ptr->min_key.size));
-        WT_TIME_AGGREGATE_MERGE(session, &cur_ptr->ta, &prev_ptr->ta);
+        cur_ptr->entries += prev_ptr->entries - prev_ptr->entries_before_split_boundary;
+        cur_ptr->recno = prev_ptr->recno_at_split_boundary;
+        WT_RET(__wt_buf_set(session, &cur_ptr->key, prev_ptr->key_at_split_boundary.data,
+          prev_ptr->key_at_split_boundary.size));
+        WT_TIME_AGGREGATE_MERGE(session, &cur_ptr->ta, &prev_ptr->ta_after_split_boundary);
         cur_ptr->image.size += len_to_move;
 
-        prev_ptr->entries = prev_ptr->min_entries;
-        WT_TIME_AGGREGATE_COPY(&prev_ptr->ta, &prev_ptr->ta_min);
+        prev_ptr->entries = prev_ptr->entries_before_split_boundary;
+        WT_TIME_AGGREGATE_COPY(&prev_ptr->ta, &prev_ptr->ta_before_split_boundary);
         prev_ptr->image.size -= len_to_move;
     }
 

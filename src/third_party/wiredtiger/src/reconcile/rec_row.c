@@ -222,7 +222,7 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
             WT_RET(__wt_rec_dict_replace(session, r, &tw, 0, val));
         __wt_rec_image_copy(session, r, val);
     }
-    WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, &tw);
+    WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
 
     /* Update compression state. */
     __rec_key_state_update(r, ovfl_key);
@@ -265,7 +265,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         /* Copy the key and value onto the page. */
         __wt_rec_image_copy(session, r, key);
         __wt_rec_image_copy(session, r, val);
-        WT_TIME_AGGREGATE_MERGE(session, &r->cur_ptr->ta, &addr->ta);
+        WT_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &addr->ta);
 
         /* Update compression state. */
         __rec_key_state_update(r, false);
@@ -455,8 +455,8 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         __wt_rec_image_copy(session, r, key);
         __wt_rec_image_copy(session, r, val);
         if (page_del != NULL)
-            WT_TIME_AGGREGATE_MERGE(session, &r->cur_ptr->ta, &ft_ta);
-        WT_TIME_AGGREGATE_MERGE(session, &r->cur_ptr->ta, &ta);
+            WT_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ft_ta);
+        WT_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ta);
 
         /* Update compression state. */
         __rec_key_state_update(r, false);
@@ -625,7 +625,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
                 WT_ERR(__wt_rec_dict_replace(session, r, &tw, 0, val));
             __wt_rec_image_copy(session, r, val);
         }
-        WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, &tw);
+        WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
 
         /* Update compression state. */
         __rec_key_state_update(r, ovfl_key);
@@ -994,7 +994,7 @@ slow:
                 WT_ERR(__wt_rec_dict_replace(session, r, twp, 0, val));
             __wt_rec_image_copy(session, r, val);
         }
-        WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, twp);
+        WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, twp);
 
         /* Update compression state. */
         __rec_key_state_update(r, ovfl_key);
