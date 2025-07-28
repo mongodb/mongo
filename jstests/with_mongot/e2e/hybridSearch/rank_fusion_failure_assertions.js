@@ -75,6 +75,12 @@ assert.commandFailedWithCode(
     }]),
     10170100);
 
+// Check that LPP validation catches that $rankFusion is not the first stage. This test may help
+// expose discrepancies across sharding topologies.
+assert.commandFailedWithCode(
+    runPipeline([{$limit: 10}, {$rankFusion: {input: {pipelines: {nested: [{$sort: {_id: 1}}]}}}}]),
+    10170100);
+
 // Check that $score is not an allowed stage in $rankFusion.
 assert.commandFailedWithCode(
     runPipeline([{
