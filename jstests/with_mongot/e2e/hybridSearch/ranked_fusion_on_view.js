@@ -76,7 +76,6 @@ const runRankFusionViewTest =
                           /*CheckCorrectness=**/ true);
 })();
 
-// TODO SERVER-105677: Add tests for $skip.
 // Excluded tests:
 // - $geoNear can't run against views.
 (function testRankFusionViewSimpleViews() {
