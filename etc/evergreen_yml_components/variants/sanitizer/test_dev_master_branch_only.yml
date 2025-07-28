@@ -167,10 +167,7 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_streams !.no_debug_mode
   - name: .change_stream_fuzzer
-  - name: .misc_js !.no_debug_mode !.requires_large_host
-  - name: .misc_js !.no_debug_mode .requires_large_host
-    distros:
-    - rhel8.8-large
+  - name: .misc_js !.no_debug_mode
   - name: .concurrency !.large !.no_txns !.no_debug_mode !.feature_flag_guarded
   - name: .concurrency .large !.no_txns !.no_debug_mode !.feature_flag_guarded
     distros:
@@ -240,10 +237,7 @@ buildvariants:
   - name: session_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.no_debug_mode !.feature_flag_guarded
   - name: sharding_api_version_jscore_passthrough_gen
-  - name: .stitch !.requires_large_host
-  - name: .stitch .requires_large_host
-    distros:
-    - rhel8.8-large
+  - name: .stitch
   - name: .crypt
     distros:
     - rhel8.8-xlarge

@@ -80,10 +80,7 @@ buildvariants:
   - name: .causally_consistent !.wo_snapshot !.durable_history
   - name: .change_streams
   - name: .change_stream_fuzzer
-  - name: .misc_js !.requires_large_host
-  - name: .misc_js .requires_large_host
-    distros:
-    - rhel8.8-large
+  - name: .misc_js
   - name: .concurrency !.no_txns !.kill_terminate !.requires_wt !.feature_flag_guarded
     distros:
     - rhel8.8-medium  # Some workloads require a lot of memory, use a bigger machine for this suite.

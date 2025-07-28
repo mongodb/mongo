@@ -138,10 +138,7 @@ buildvariants:
       --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_ldap_pool
   tasks:
   - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
-  - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.requires_large_host
-  - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags .requires_large_host
-    distros:
-    - amazon2-arm64-latest-large
+  - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
   - name: .default !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
 
 - name: &commit-queue commit-queue
