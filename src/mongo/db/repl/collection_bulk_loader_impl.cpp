@@ -60,12 +60,36 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/shared_buffer_fragment.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 namespace mongo {
 namespace repl {
+
+namespace {
+size_t getIndexBuildMemoryLimit() {
+    const double memPct = initialSyncIndexBuildMemoryPercentage.load();
+    const size_t memMinBytes =
+        static_cast<size_t>(initialSyncIndexBuildMemoryMinMB.load()) * 1024 * 1024;
+    const size_t memMaxBytes =
+        static_cast<size_t>(initialSyncIndexBuildMemoryMaxMB.load()) * 1024 * 1024;
+
+    ProcessInfo pi;
+    size_t memSizeMB = pi.getMemSizeMB();
+    size_t memLimitBytes = (memPct / 100.0) * memSizeMB * 1024 * 1024;
+
+    // The min and max are not validated relative to each other, so if the min is greater than the
+    // max, just bound to the maximum.
+    if (memMinBytes > memMaxBytes) {
+        return std::min(memLimitBytes, memMaxBytes);
+    }
+
+    return std::clamp(memLimitBytes, memMinBytes, memMaxBytes);
+}
+
+}  // namespace
 
 CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(ServiceContext::UniqueClient client,
                                                    ServiceContext::UniqueOperationContext opCtx,
@@ -111,14 +135,27 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
                     collWriter.getWritableCollection(_opCtx.get())->getIndexCatalog();
                 auto specs = indexCatalog->removeExistingIndexesNoChecks(
                     _opCtx.get(), collWriter.get(), secondaryIndexSpecs);
+                auto totalIndexBuildsIncludingIdIndex =
+                    specs.size() + (_idIndexSpec.isEmpty() ? 0 : 1);
+                auto maxInitialSyncIndexBuildMemoryUsageBytes = getIndexBuildMemoryLimit();
+                LOGV2(10658900,
+                      "Collection cloner index build memory usage",
+                      "totalLimitMB"_attr =
+                          maxInitialSyncIndexBuildMemoryUsageBytes / (1024 * 1024),
+                      "numIndexes"_attr = totalIndexBuildsIncludingIdIndex);
                 if (specs.size()) {
                     _secondaryIndexesBlock->ignoreUniqueConstraint();
+                    auto maxSecondaryIndexMemoryUsageBytes =
+                        maxInitialSyncIndexBuildMemoryUsageBytes /
+                        totalIndexBuildsIncludingIdIndex * specs.size();
                     auto status = _secondaryIndexesBlock
                                       ->init(_opCtx.get(),
                                              collWriter,
                                              specs,
                                              MultiIndexBlock::kNoopOnInitFn,
-                                             MultiIndexBlock::InitMode::InitialSync)
+                                             MultiIndexBlock::InitMode::InitialSync,
+                                             {} /* resumeInfo */,
+                                             maxSecondaryIndexMemoryUsageBytes)
                                       .getStatus();
                     if (!status.isOK()) {
                         return status;
@@ -127,11 +164,14 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
                     _secondaryIndexesBlock.reset();
                 }
                 if (!_idIndexSpec.isEmpty()) {
+                    auto maxIdIndexMemoryUsageBytes =
+                        maxInitialSyncIndexBuildMemoryUsageBytes / totalIndexBuildsIncludingIdIndex;
                     auto status = _idIndexBlock
                                       ->init(_opCtx.get(),
                                              collWriter,
                                              _idIndexSpec,
-                                             MultiIndexBlock::kNoopOnInitFn)
+                                             MultiIndexBlock::kNoopOnInitFn,
+                                             maxIdIndexMemoryUsageBytes)
                                       .getStatus();
                     if (!status.isOK()) {
                         return status;
@@ -339,7 +379,7 @@ Status CollectionBulkLoaderImpl::commit() {
                                     options,
                                     nullptr /* numDeleted */,
                                     // Initial sync can build an index over a collection with
-                                    // duplicates, so we need to check the RecordId of the docuemnt
+                                    // duplicates, so we need to check the RecordId of the document
                                     // we are unindexing. See SERVER-17487 for more details.
                                     CheckRecordId::On);
                             }

@@ -140,8 +140,13 @@ assert.eq(indexBulkBuilderSection.memUsage, 0, tojson(indexBulkBuilderSection));
 
 (function initialSyncNewNode() {
     jsTestLog("Adding new node and initial syncing");
-    const newNode =
-        replSet.add({setParameter: {maxIndexBuildMemoryUsageMegabytes: maxMemUsageMegabytes}});
+    const newNode = replSet.add({
+        setParameter: {
+            initialSyncIndexBuildMemoryPercentage:
+                80,  // Set high enough to reliably hit the maximum.
+            initialSyncIndexBuildMemoryMaxMB: maxMemUsageMegabytes
+        }
+    });
     replSet.reInitiate();
     replSet.waitForState(newNode, ReplSetTest.State.SECONDARY);
     replSet.awaitReplication();
@@ -158,11 +163,13 @@ assert.eq(indexBulkBuilderSection.memUsage, 0, tojson(indexBulkBuilderSection));
 assert.gte(indexBulkBuilderSection.count, 3, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 1, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 1, tojson(indexBulkBuilderSection));
-// We try building two indexes for the test collection so the memory usage limit for each index
-// build during initial sync is the maxIndexBuildMemoryUsageMegabytes divided by the number of index
-// builds. We end up with half of the in-memory memory so we double the amount of the memory
+// We try building three indexes for the test collection so the memory usage limit for each index
+// build during initial sync is the initialSyncIndexBuildMemoryMaxMB divided by the number of index
+// builds. We end up with a third of the in-memory memory so we triple the amount of the memory
 // reserved for the file iterators in sort.
-let maxMemUsagePerIndexBytes = maxMemUsageMegabytes * 1024 * 1024 / 2;
+let maxMemUsagePerIndexBytes = maxMemUsageMegabytes * 1024 * 1024 / 3;
+// There is enough memory to reserve 1MB for the file iterators needed for each index.
+// See fileIteratorsMaxBytesSize in db/sorter/sorter.h
 let maxDataMemUsagePerIndexBytes = maxMemUsagePerIndexBytes - 1024 * 1024;
 memAllocNum =
     Math.trunc((maxDataMemUsagePerIndexBytes + memPoolMemoryUsage - 1) / memPoolMemoryUsage);
@@ -214,17 +221,6 @@ assert.eq(indexBulkBuilderSection.count, 4, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.resumed, 1, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 2, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 2, tojson(indexBulkBuilderSection));
-expectedSpilledRanges += 1;
-
-// The memory is shared among 3 indexes but only the compound index will spill.
-maxMemUsagePerIndexBytes = maxMemUsageMegabytes * 1024 * 1024 / 3;
-maxDataMemUsagePerIndexBytes =
-    maxMemUsagePerIndexBytes - 1024 * 1024;  // There is enough memory to reserve 1MB for the file
-                                             // iterators needed for each index.
-
-memAllocNum =
-    Math.trunc((maxDataMemUsagePerIndexBytes + memPoolMemoryUsage - 1) / memPoolMemoryUsage);
-expectedSpilledRanges = Math.trunc((numDocs + memAllocNum - 1) / memAllocNum);
 
 assert.between(expectedSpilledRanges,
                indexBulkBuilderSection.spilledRanges,
