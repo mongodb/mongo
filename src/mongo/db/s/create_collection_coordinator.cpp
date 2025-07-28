@@ -1554,6 +1554,10 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
+                uassert(ErrorCodes::InvalidOptions,
+                        "The creation of unsplittable collections is not supported.",
+                        !isUnsplittable(_request));
+
                 checkCommandArguments(opCtx, _request, originalNss());
                 // Perform a preliminary check on whether the request may resolve into a no-op
                 // before acquiring any critical section.

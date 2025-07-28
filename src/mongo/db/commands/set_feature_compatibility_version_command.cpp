@@ -975,9 +975,8 @@ private:
         auto role = ShardingState::get(opCtx)->pollClusterRole();
         invariant(role->has(ClusterRole::ConfigServer));
 
-        std::vector<NamespaceString> namespacesToUntrack;
-
-        {
+        auto getUnsplittableNamespaces = [&]() {
+            std::vector<NamespaceString> namespaces;
             DBDirectClient client(opCtx);
             FindCommandRequest findCmd{NamespaceString::kConfigsvrCollectionsNamespace};
             findCmd.setFilter(BSON(CollectionType::kUnsplittableFieldName << true));
@@ -985,57 +984,61 @@ private:
             while (cursor->more()) {
                 const auto doc = cursor->next();
                 auto nssString = doc.getField(CollectionType::kNssFieldName).String();
-                namespacesToUntrack.push_back(NamespaceStringUtil::deserialize(
+                namespaces.push_back(NamespaceStringUtil::deserialize(
                     boost::none, nssString, SerializationContext::stateDefault()));
             }
-        }
+            return namespaces;
+        };
+
+        auto namespacesToUntrack = getUnsplittableNamespaces();
 
         auto logUntrackUnsplittableCollectionsProgress = [&]() {
             LOGV2_INFO(
                 8630900,
-                "Unregistering unsharded collections from the sharding catalog because they are "
+                "Unregistering unsharded collections from the sharding catalog because they are"
                 "only tracked on the local catalog(s) in versions older than v8.0.",
                 "numRemainingCollectionsToUnregister"_attr = namespacesToUntrack.size());
         };
 
-        logUntrackUnsplittableCollectionsProgress();
+        while (!namespacesToUntrack.empty()) {
+            for (size_t idx = 0; idx < namespacesToUntrack.size(); idx++) {
+                if (idx % 10 == 0) {
+                    logUntrackUnsplittableCollectionsProgress();
+                }
+                const auto nss = namespacesToUntrack[idx];
+                ShardsvrUntrackUnsplittableCollection shardsvrRequest(nss);
+                shardsvrRequest.setDbName(NamespaceString::kAdminCommandNamespace.dbName());
+                try {
+                    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(),
+                                                             nss.dbName());
+                    router.route(
+                        opCtx,
+                        "untrackCollection",
+                        [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+                            auto cmdResponse = executeDDLCoordinatorCommandAgainstDatabasePrimary(
+                                opCtx,
+                                DatabaseName::kAdmin,
+                                dbInfo,
+                                CommandHelpers::appendMajorityWriteConcern(
+                                    shardsvrRequest.toBSON({}), opCtx->getWriteConcern()),
+                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                Shard::RetryPolicy::kIdempotent);
 
-        auto nss = namespacesToUntrack.begin();
-        while (nss != namespacesToUntrack.end()) {
-            ShardsvrUntrackUnsplittableCollection shardsvrRequest(*nss);
-            shardsvrRequest.setDbName(NamespaceString::kAdminCommandNamespace.dbName());
-
-            try {
-                sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss->dbName());
-                router.route(
-                    opCtx,
-                    "untrackCollection",
-                    [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
-                        auto cmdResponse = executeDDLCoordinatorCommandAgainstDatabasePrimary(
-                            opCtx,
-                            DatabaseName::kAdmin,
-                            dbInfo,
-                            CommandHelpers::appendMajorityWriteConcern(shardsvrRequest.toBSON({}),
-                                                                       opCtx->getWriteConcern()),
-                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                            Shard::RetryPolicy::kIdempotent);
-
-                        const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-                        uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
-                    });
-            } catch (const ExceptionFor<ErrorCodes::OperationFailed>& ex) {
-                // The untrack collection coordinator throws OperationFailed when it is not possible
-                // to untrack the collection. Wrapping the exception because users expect
-                // `CannotDowngrade` to be thrown when manual intervention is needed during
-                // downgrade.
-                uasserted(ErrorCodes::CannotDowngrade, ex.toString());
+                            const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+                            uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+                        });
+                } catch (const ExceptionFor<ErrorCodes::OperationFailed>& ex) {
+                    // The untrack collection coordinator throws OperationFailed when it is not
+                    // possible to untrack the collection. Wrapping the exception because users
+                    // expect `CannotDowngrade` to be thrown when manual intervention is needed
+                    // during downgrade.
+                    uasserted(ErrorCodes::CannotDowngrade, ex.toString());
+                }
             }
-
-            nss = namespacesToUntrack.erase(nss);
-
-            if (namespacesToUntrack.size() % 10 == 0 && namespacesToUntrack.size() > 0) {
-                logUntrackUnsplittableCollectionsProgress();
-            }
+            // Untracked collections may remain if there were concurrent rename operations (see
+            // SERVER-99144), so refetch the list of unsplittable namespaces and retry until we are
+            // sure that none remain.
+            namespacesToUntrack = getUnsplittableNamespaces();
         }
 
         LOGV2_INFO(8630901, "Unregistered all unsharded collections from the sharding catalog");
