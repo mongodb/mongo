@@ -90,6 +90,13 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
                     countTransitionToDedicatedConfigServerCompleted.loadRelaxed());
     builder->append("countTransitionFromDedicatedConfigServerCompleted",
                     countTransitionFromDedicatedConfigServerCompleted.loadRelaxed());
+    builder->append("countFlushReshardingStateChangeTotalShardingMetadataRefreshes",
+                    countFlushReshardingStateChangeTotalShardingMetadataRefreshes.loadRelaxed());
+    builder->append(
+        "countFlushReshardingStateChangeSuccessfulShardingMetadataRefreshes",
+        countFlushReshardingStateChangeSuccessfulShardingMetadataRefreshes.loadRelaxed());
+    builder->append("countFlushReshardingStateChangeFailedShardingMetadataRefreshes",
+                    countFlushReshardingStateChangeFailedShardingMetadataRefreshes.loadRelaxed());
 }
 
 }  // namespace mongo

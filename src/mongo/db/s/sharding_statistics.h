@@ -144,6 +144,14 @@ struct ShardingStatistics {
     // completed.
     AtomicWord<long long> countTransitionFromDedicatedConfigServerCompleted{0};
 
+    // Cumulative, always-increasing total number of sharding metadata refreshes that have been
+    // kicked off by the _flushReshardingStateChange command.
+    AtomicWord<long long> countFlushReshardingStateChangeTotalShardingMetadataRefreshes{0};
+    // Cumulative, always-increasing number of successful and failed sharding metadata refreshes
+    // that have been kicked off by the _flushReshardingStateChange command.
+    AtomicWord<long long> countFlushReshardingStateChangeSuccessfulShardingMetadataRefreshes{0};
+    AtomicWord<long long> countFlushReshardingStateChangeFailedShardingMetadataRefreshes{0};
+
     /**
      * Obtains the per-process instance of the sharding statistics object.
      */

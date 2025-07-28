@@ -38,9 +38,12 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/primary_only_service_helpers/with_automatic_retry.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
@@ -51,6 +54,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/future_util.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -64,9 +68,31 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
-
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(failFlushReshardingStateChange);
+
+const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
+
+/**
+ * Returns true if _flushReshardingStateChange command should retry refreshing sharding metadata
+ * upon getting the given error.
+ */
+bool shouldRetryOnRefreshError(const Status& status) {
+    if (status == ErrorCodes::NamespaceNotFound) {
+        // The collection has been dropped.
+        return false;
+    }
+    // We need to retry on WriteConcernTimeout errors since doing a sharding metadata refresh
+    // involves performing a noop write with majority write concern with a timeout. We need to retry
+    // on snapshot errors since doing a sharding metadata refresh involves running an aggregation
+    // over the config.collections and config.chunks collections with snapshot read concern. The
+    // catalog cache does retry on snapshot errors but the number of retries is capped.
+    return primary_only_service_helpers::kDefaultRetryabilityPredicate(status) ||
+        status == ErrorCodes::WriteConcernTimeout || status.isA<ErrorCategory::SnapshotError>();
+}
+
 class FlushReshardingStateChangeCmd final : public TypedCommand<FlushReshardingStateChangeCmd> {
 public:
     using Request = _flushReshardingStateChange;
@@ -130,21 +156,71 @@ public:
             // cause potential liveness issues since the arbitrary executor is a NetworkInterfaceTL
             // executor in sharded clusters and that executor is one that executes networking
             // operations.
-            ExecutorFuture<void>(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
-                .then([svcCtx = opCtx->getServiceContext(), nss = ns()] {
-                    ThreadClient tc("FlushReshardingStateChange",
-                                    svcCtx->getService(ClusterRole::ShardServer));
-                    auto opCtx = tc->makeOperationContext();
-                    uassertStatusOK(
-                        FilteringMetadataCache::get(opCtx.get())
-                            ->onCollectionPlacementVersionMismatch(
-                                opCtx.get(), nss, boost::none /* chunkVersionReceived */));
+            AsyncTry([svcCtx = opCtx->getServiceContext(), nss = ns(), numTries = 0]() mutable {
+                ThreadClient tc("FlushReshardingStateChange",
+                                svcCtx->getService(ClusterRole::ShardServer));
+                auto opCtx = tc->makeOperationContext();
+
+                auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
+                if (!replCoord->getMemberState().primary()) {
+                    LOGV2(10795200,
+                          "Stop refreshing sharding metadata in _flushReshardingStateChange since "
+                          "this node is no longer a primary",
+                          "numTries"_attr = numTries);
+                    return;
+                }
+
+                numTries++;
+                LOGV2_DEBUG(10795201,
+                            1,
+                            "Start refreshing sharding metadata in _flushReshardingStateChange",
+                            "numTries"_attr = numTries);
+
+                auto& shardingStatistics = ShardingStatistics::get(opCtx.get());
+                shardingStatistics.countFlushReshardingStateChangeTotalShardingMetadataRefreshes
+                    .addAndFetch(1);
+
+                boost::optional<Status> mockStatus;
+                failFlushReshardingStateChange.execute([&](const BSONObj& data) {
+                    const auto& errorCode = data.getIntField("errorCode");
+                    mockStatus =
+                        Status(ErrorCodes::Error(errorCode),
+                               "Failing refresh in _flushReshardingStateChange due to failpoint");
+                });
+
+                auto refreshStatus = mockStatus
+                    ? *mockStatus
+                    : FilteringMetadataCache::get(opCtx.get())
+                          ->onCollectionPlacementVersionMismatch(
+                              opCtx.get(), nss, boost::none /* chunkVersionReceived */);
+
+                if (refreshStatus.isOK()) {
+                    shardingStatistics
+                        .countFlushReshardingStateChangeSuccessfulShardingMetadataRefreshes
+                        .addAndFetch(1);
+                } else {
+                    shardingStatistics
+                        .countFlushReshardingStateChangeFailedShardingMetadataRefreshes.addAndFetch(
+                            1);
+                }
+
+                uassertStatusOK(refreshStatus);
+                LOGV2_DEBUG(10795202,
+                            1,
+                            "Finished refreshing sharding metadata in _flushReshardingStateChange",
+                            "numTries"_attr = numTries);
+            })
+                .until([](Status status) {
+                    if (!status.isOK()) {
+                        LOGV2_WARNING(5808100,
+                                      "Error on deferred _flushReshardingStateChange execution",
+                                      "error"_attr = redact(status));
+                    }
+                    return status.isOK() || !shouldRetryOnRefreshError(status);
                 })
-                .onError([](const Status& status) {
-                    LOGV2_WARNING(5808100,
-                                  "Error on deferred _flushReshardingStateChange execution",
-                                  "error"_attr = redact(status));
-                })
+                .withBackoffBetweenIterations(kExponentialBackoff)
+                .on(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+                    CancellationToken::uncancelable())
                 .getAsync([](auto) {});
 
             // Ensure the command isn't run on a stale primary.
