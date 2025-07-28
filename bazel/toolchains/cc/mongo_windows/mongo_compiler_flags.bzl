@@ -53,14 +53,6 @@ WINDOWS_RUNTIME_ERROR_CHECK_COPTS = select({
     "//conditions:default": [],
 })
 
-WINDOWS_GENERAL_COPTS = select({
-    "@platforms//os:windows": [
-        # /W3 warning level
-        "/W3",
-    ],
-    "//conditions:default": [],
-})
-
 WINDOWS_DEBUG_COPTS = select({
     "//bazel/config:windows_debug_symbols_enabled": [
         # Generate debug info into the object files
@@ -134,7 +126,6 @@ SASL_WINDOWS_COPTS = select({
 })
 
 MONGO_WIN_CC_COPTS = (
-    WINDOWS_GENERAL_COPTS +
     WINDOWS_DEBUG_COPTS +
     WINDOWS_OPT_COPTS +
     WINDOWS_RUNTIME_ERROR_CHECK_COPTS +

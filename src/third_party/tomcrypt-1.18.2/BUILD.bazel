@@ -22,6 +22,9 @@ mongo_cc_library(
         "src/headers/*.h",
     ]),
     copts = NO_WARN_COPTS,
+    features = [
+        "-win_level_3_warning",
+    ],
     includes = [
         "src/headers",
     ],
@@ -68,6 +71,9 @@ mongo_cc_library(
     defines = [
         "LTC_NO_PROTOTYPES",
     ],
+    features = [
+        "-win_level_3_warning",
+    ],
     includes = [
         "src/headers",
     ],
@@ -85,6 +91,9 @@ mongo_cc_library(
         "src/headers/*.h",
     ]),
     copts = NO_WARN_COPTS,
+    features = [
+        "-win_level_3_warning",
+    ],
     includes = [
         "src/headers",
     ],

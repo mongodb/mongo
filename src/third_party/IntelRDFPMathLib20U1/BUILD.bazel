@@ -137,6 +137,9 @@ mongo_cc_library(
         "LIBRARY/float128/dpml_log.c",
     ] + INTEL_RDFP_FLOAT128_INTERNAL_HEADERS,
     copts = IGNORE_WARNINGS_COPT,
+    features = [
+        "-win_level_3_warning",
+    ],
     linkopts = DYNAMIC_LOOKUP_LINKOPT,
     local_defines = INTEL_RDFP_MATHLIB_DEFINES + [
         "LOG1P=1",
@@ -420,6 +423,9 @@ mongo_cc_library(
         "//conditions:default": [],
     }),
     copts = IGNORE_WARNINGS_COPT,
+    features = [
+        "-win_level_3_warning",
+    ],
     includes = [
         "LIBRARY/src",
     ],

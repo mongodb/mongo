@@ -1350,6 +1350,34 @@ def _impl(ctx):
             ],
         )
 
+        win_level_3_warning_feature = feature(
+            name = "win_level_3_warning",
+            enabled = True,
+            flag_sets = [
+                flag_set(
+                    actions = [
+                        ACTION_NAMES.assemble,
+                        ACTION_NAMES.preprocess_assemble,
+                        ACTION_NAMES.linkstamp_compile,
+                        ACTION_NAMES.c_compile,
+                        ACTION_NAMES.cpp_compile,
+                        ACTION_NAMES.cpp_header_parsing,
+                        ACTION_NAMES.cpp_module_compile,
+                        ACTION_NAMES.cpp_module_codegen,
+                        ACTION_NAMES.lto_backend,
+                        ACTION_NAMES.clif_match,
+                    ],
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                "/W3",
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        )
+
         features = [
             no_legacy_features_feature,
             nologo_feature,
@@ -1403,6 +1431,7 @@ def _impl(ctx):
             supports_interface_shared_libraries_feature,
             symbol_check_feature,
             mongodb_boost_all_no_lib_link_feature,
+            win_level_3_warning_feature,
         ]
     else:
         targets_windows_feature = feature(
