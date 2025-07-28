@@ -32,11 +32,14 @@
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/util/assert_util.h"
 
+#include <algorithm>
+
 namespace mongo::exec::agg {
 
 Pipeline::Pipeline(StageContainer&& stages, boost::intrusive_ptr<ExpressionContext> pCtx)
     : _stages(std::move(stages)), expCtx(std::move(pCtx)) {
-    tassert(10537101, "Aggregation pipeline missing ExpressionContext", this->expCtx != nullptr);
+    tassert(10549300, "Cannot create an empty execution pipeline", !_stages.empty());
+    tassert(10537101, "Aggregation pipeline missing ExpressionContext", expCtx != nullptr);
     for (const auto& stage : _stages) {
         tassert(10617300, "stage must not be null", stage != nullptr);
     }
@@ -50,11 +53,6 @@ Pipeline::~Pipeline() {
 }
 
 boost::optional<Document> Pipeline::getNext() {
-    // TODO SERVER-105493: Remove the following early exit after we prohibit creating empty
-    // execution pipelines.
-    if (MONGO_unlikely(_stages.empty())) {
-        return boost::none;
-    }
     auto nextResult = _stages.back()->getNext();
     while (nextResult.isPaused()) {
         nextResult = _stages.back()->getNext();
@@ -65,13 +63,6 @@ boost::optional<Document> Pipeline::getNext() {
         return nextResult.releaseDocument();
     }
     return boost::none;
-}
-
-GetNextResult Pipeline::getNextResult() {
-    // TODO SERVER-105493: Remove the following assertion after we prohibit creating empty execution
-    // pipelines.
-    tassert(10394800, "cannon execute an empty aggregation pipeline", _stages.size());
-    return _stages.back()->getNext();
 }
 
 void Pipeline::accumulatePlanSummaryStats(PlanSummaryStats& planSummaryStats) const {
@@ -121,13 +112,10 @@ void Pipeline::checkValidOperationContext() const {
 }
 
 void Pipeline::forceSpill() {
-    if (!_stages.empty()) {
-        _stages.back()->forceSpill();
-    }
+    _stages.back()->forceSpill();
 }
 
 std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) const {
-
     if (*opts.verbosity < ExplainOptions::Verbosity::kExecStats) {
         auto emptyDoc = Value(Document());
         return std::vector<Value>(_stages.size(), emptyDoc);
@@ -173,9 +161,7 @@ void Pipeline::dispose(OperationContext* opCtx) {
     }
     try {
         expCtx->setOperationContext(opCtx);
-        if (!_stages.empty()) {
-            _stages.back()->dispose();
-        }
+        _stages.back()->dispose();
         _disposed = true;
     } catch (...) {
         std::terminate();

@@ -30,9 +30,14 @@
 #pragma once
 
 #include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/platform/compiler.h"
 
 #include <vector>
 
+#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::exec::agg {
@@ -40,8 +45,8 @@ class Pipeline {
 public:
     using StageContainer = std::vector<StagePtr>;
 
-    // Deleting implicit copy constructor, because it was not needed so far.
     Pipeline(const Pipeline&) = delete;
+    Pipeline& operator=(const Pipeline&) = delete;
 
     Pipeline(StageContainer&& stages, boost::intrusive_ptr<ExpressionContext> expCtx);
 
@@ -55,10 +60,13 @@ public:
      * Returns the next document from the pipeline, or boost::none if there are no more documents.
      */
     boost::optional<Document> getNext();
+
     /**
      * Returns the next result from the pipeline.
      */
-    GetNextResult getNextResult();
+    MONGO_COMPILER_ALWAYS_INLINE GetNextResult getNextResult() {
+        return _stages.back()->getNext();
+    }
 
     /**
      * Method to accumulate the plan summary stats from all stages of the pipeline into the given
@@ -132,7 +140,10 @@ public:
     }
 
 private:
+    // The '_stages' container is guaranteed to be non-empty after the constructor successfully
+    // executed.
     StageContainer _stages;
+
     boost::intrusive_ptr<ExpressionContext> expCtx;
     bool _disposed{false};
 

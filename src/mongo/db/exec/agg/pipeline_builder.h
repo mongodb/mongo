@@ -43,10 +43,11 @@ namespace exec::agg {
 /**
  * Builds and returns a query execution pipeline from the given document source pipeline.
  * Expects that the document source is 'frozen' for modifications.
+ * Raises a tassert when called with an empty 'pipeline' object, i.e. a pipeline that contains 0
+ * 'DocumentSource's, because empty pipelines cannot be executed.
  * TODO SERVER-105562: Return the resulting pipeline by value.
  */
 std::unique_ptr<exec::agg::Pipeline> buildPipeline(const mongo::Pipeline& pipeline);
-
 
 }  // namespace exec::agg
 }  // namespace mongo

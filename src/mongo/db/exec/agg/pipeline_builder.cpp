@@ -41,9 +41,9 @@ std::unique_ptr<exec::agg::Pipeline> buildPipeline(const mongo::Pipeline& pipeli
         10706500, "expecting pipeline frozen for modifications as an input", pipeline.isFrozen());
     Pipeline::StageContainer stages;
     const auto& documentSources = pipeline.getSources();
-    stages.reserve(documentSources.size());
 
     if (MONGO_likely(!documentSources.empty())) {
+        stages.reserve(documentSources.size());
         auto it = documentSources.cbegin();
         stages.push_back(buildStage(*it));
         for (++it; it != documentSources.cend(); ++it) {
@@ -53,7 +53,7 @@ std::unique_ptr<exec::agg::Pipeline> buildPipeline(const mongo::Pipeline& pipeli
         }
     }
 
-    return std::make_unique<Pipeline>(std::move(stages), pipeline.getContext());
+    return std::make_unique<exec::agg::Pipeline>(std::move(stages), pipeline.getContext());
 }
 
 }  // namespace mongo::exec::agg

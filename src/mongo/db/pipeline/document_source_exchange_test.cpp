@@ -652,101 +652,161 @@ TEST_F(DocumentSourceExchangeTest, RangeRandomHashExchangeNConsumer) {
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectNoConsumers) {
+    const size_t nDocs = 500;
+
+    auto source = getMockSource(nDocs);
+
     BSONObj spec = BSON("policy" << "broadcast"
                                  << "consumers" << 0);
-    ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50901);
+    ASSERT_THROWS_CODE(Exchange(parseSpec(spec), Pipeline::create({source}, getExpCtx())),
+                       AssertionException,
+                       50901);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidKey) {
+    const size_t nDocs = 500;
+
+    auto source = getMockSource(nDocs);
+
     BSONObj spec = BSON("policy" << "broadcast"
                                  << "consumers" << 1 << "key" << BSON("a" << 2));
-    ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50896);
+    ASSERT_THROWS_CODE(Exchange(parseSpec(spec), Pipeline::create({source}, getExpCtx())),
+                       AssertionException,
+                       50896);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidKeyHashExpected) {
+    const size_t nDocs = 500;
+
+    auto source = getMockSource(nDocs);
+
     BSONObj spec = BSON("policy" << "broadcast"
                                  << "consumers" << 1 << "key" << BSON("a" << "nothash"));
-    ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50895);
+    ASSERT_THROWS_CODE(Exchange(parseSpec(spec), Pipeline::create({source}, getExpCtx())),
+                       AssertionException,
+                       50895);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidKeyWrongType) {
+    const size_t nDocs = 500;
+
+    auto source = getMockSource(nDocs);
+
     BSONObj spec = BSON("policy" << "broadcast"
                                  << "consumers" << 1 << "key" << BSON("a" << true));
-    ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50897);
+    ASSERT_THROWS_CODE(Exchange(parseSpec(spec), Pipeline::create({source}, getExpCtx())),
+                       AssertionException,
+                       50897);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidKeyEmpty) {
+    const size_t nDocs = 500;
+
+    auto source = getMockSource(nDocs);
+
     BSONObj spec = BSON("policy" << "broadcast"
                                  << "consumers" << 1 << "key" << BSON("" << 1));
-    ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 40352);
+    ASSERT_THROWS_CODE(Exchange(parseSpec(spec), Pipeline::create({source}, getExpCtx())),
+                       AssertionException,
+                       40352);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundaries) {
+    const size_t nDocs = 500;
+
+    auto source = getMockSource(nDocs);
+
     BSONObj spec = BSON("policy" << "keyRange"
                                  << "consumers" << 1 << "key" << BSON("a" << 1) << "boundaries"
                                  << BSON_ARRAY(BSON("a" << MAXKEY) << BSON("a" << MINKEY))
                                  << "consumerIds" << BSON_ARRAY(0));
-    ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50893);
+    ASSERT_THROWS_CODE(Exchange(parseSpec(spec), Pipeline::create({source}, getExpCtx())),
+                       AssertionException,
+                       50893);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesMissingMin) {
+    const size_t nDocs = 500;
+
+    auto source = getMockSource(nDocs);
+
     BSONObj spec = BSON("policy" << "keyRange"
                                  << "consumers" << 1 << "key" << BSON("a" << 1) << "boundaries"
                                  << BSON_ARRAY(BSON("a" << 0) << BSON("a" << MAXKEY))
                                  << "consumerIds" << BSON_ARRAY(0));
-    ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50958);
+    ASSERT_THROWS_CODE(Exchange(parseSpec(spec), Pipeline::create({source}, getExpCtx())),
+                       AssertionException,
+                       50958);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesMissingMax) {
+    const size_t nDocs = 500;
+
+    auto source = getMockSource(nDocs);
+
     BSONObj spec = BSON("policy" << "keyRange"
                                  << "consumers" << 1 << "key" << BSON("a" << 1) << "boundaries"
                                  << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << 0))
                                  << "consumerIds" << BSON_ARRAY(0));
-    ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50959);
+    ASSERT_THROWS_CODE(Exchange(parseSpec(spec), Pipeline::create({source}, getExpCtx())),
+                       AssertionException,
+                       50959);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesAndConsumerIds) {
+    const size_t nDocs = 500;
+
+    auto source = getMockSource(nDocs);
+
     BSONObj spec = BSON("policy" << "keyRange"
                                  << "consumers" << 2 << "key" << BSON("a" << 1) << "boundaries"
                                  << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY))
                                  << "consumerIds" << BSON_ARRAY(0 << 1));
-    ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50900);
+    ASSERT_THROWS_CODE(Exchange(parseSpec(spec), Pipeline::create({source}, getExpCtx())),
+                       AssertionException,
+                       50900);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidPolicyBoundaries) {
+    const size_t nDocs = 500;
+
+    auto source = getMockSource(nDocs);
+
     BSONObj spec = BSON("policy" << "roundrobin"
                                  << "consumers" << 1 << "key" << BSON("a" << 1) << "boundaries"
                                  << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY))
                                  << "consumerIds" << BSON_ARRAY(0));
-    ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50899);
+    ASSERT_THROWS_CODE(Exchange(parseSpec(spec), Pipeline::create({source}, getExpCtx())),
+                       AssertionException,
+                       50899);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidConsumerIds) {
+    const size_t nDocs = 500;
+
+    auto source = getMockSource(nDocs);
+
     BSONObj spec = BSON("policy" << "keyRange"
                                  << "consumers" << 1 << "key" << BSON("a" << 1) << "boundaries"
                                  << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY))
                                  << "consumerIds" << BSON_ARRAY(1));
-    ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50894);
+    ASSERT_THROWS_CODE(Exchange(parseSpec(spec), Pipeline::create({source}, getExpCtx())),
+                       AssertionException,
+                       50894);
 }
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidMissingKeys) {
+    const size_t nDocs = 500;
+
+    auto source = getMockSource(nDocs);
+
     BSONObj spec = BSON("policy" << "keyRange"
                                  << "consumers" << 1 << "boundaries"
                                  << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY))
                                  << "consumerIds" << BSON_ARRAY(0));
-    ASSERT_THROWS_CODE(
-        Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50967);
+    ASSERT_THROWS_CODE(Exchange(parseSpec(spec), Pipeline::create({source}, getExpCtx())),
+                       AssertionException,
+                       50967);
 }
 
 TEST_F(DocumentSourceExchangeTest, QueryShape) {

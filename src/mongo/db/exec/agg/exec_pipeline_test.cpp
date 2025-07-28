@@ -81,10 +81,11 @@ TEST(PipelineTest, ThreeStagePipeline) {
     ASSERT_EQ(stage2.get(), pl.getStages()[2].get());
 }
 
-DEATH_TEST_REGEX(PipelineTest, GetNextResultOnEmptyPipelineThrows, "Tripwire assertion.*10394800") {
+DEATH_TEST_REGEX(PipelineTest, GetNextResultOnEmptyPipelineThrows, "Tripwire assertion.*10549300") {
     StageContainer stages;
-    Pipeline pl(std::move(stages), make_intrusive<ExpressionContextForTest>());
-    ASSERT_THROWS_CODE(pl.getNextResult(), AssertionException, 10395600);
+    ASSERT_THROWS_CODE(Pipeline(std::move(stages), make_intrusive<ExpressionContextForTest>()),
+                       AssertionException,
+                       10549300);
 }
 
 }  // namespace mongo::test
