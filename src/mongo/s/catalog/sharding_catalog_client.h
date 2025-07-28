@@ -49,20 +49,12 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
-
-#include <utility>
-#include <vector>
-
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -418,51 +410,6 @@ public:
                                          const BSONObj& query,
                                          const WriteConcernOptions& writeConcern,
                                          boost::optional<BSONObj> hint = boost::none) = 0;
-
-    /**
-     * Returns shard-placement information for collection named 'collName' at the requested point in
-     * time 'clusterTime'.
-     * - When an exact response may be computed, this will be composed by the shards hosting data of
-     *   collName + the primary shard of the parent db.
-     * - Otherwise, an approximated response is generated based on a past snapshot of config.shards.
-     * References to shards that aren't currently part of the cluster may be included in the
-     * response.
-     */
-    virtual HistoricalPlacement getShardsThatOwnDataForCollAtClusterTime(
-        OperationContext* opCtx, const NamespaceString& collName, const Timestamp& clusterTime) = 0;
-
-    /**
-     * Returns shard-placement information for database named 'dbName' at the requested point in
-     * time 'clusterTime'.
-     * When no exact response may be computed, an approximated one is generated based on a past
-     * snapshot of config.shards.
-     * References to shards that aren't currently part of the cluster may be included in the
-     * response.
-     */
-    virtual HistoricalPlacement getShardsThatOwnDataForDbAtClusterTime(
-        OperationContext* opCtx, const NamespaceString& dbName, const Timestamp& clusterTime) = 0;
-
-    /**
-     * Returns shard-placement information for the whole cluster at the requested point in time
-     * 'clusterTime'.
-     * When no exact response may be computed, an approximated one is generated based on a past
-     * snapshot of config.shards.
-     * References to shards that aren't currently part of the cluster may be included in the
-     * response.
-     */
-    virtual HistoricalPlacement getShardsThatOwnDataAtClusterTime(OperationContext* opCtx,
-                                                                  const Timestamp& clusterTime) = 0;
-
-    /**
-     * Queries config.placementHistory to retrieve placement metadata on the requested namespace at
-     * a specific point in time. When no namespace is specified, placement metadata on the whole
-     * cluster will be returned. This function is meant to be exclusively invoked by config server
-     * nodes.
-     */
-    virtual HistoricalPlacement getHistoricalPlacement(
-        OperationContext* opCtx,
-        const Timestamp& atClusterTime,
-        const boost::optional<NamespaceString>& nss) = 0;
 
     /**
      * Provided a cluster time, returns whether there was a topology change caused by a removeShard

@@ -513,7 +513,6 @@ ddl:
     - src/mongo/db/s/config/index_on_config*
     - src/mongo/db/s/config/sharding_catalog_manager*
     - src/mongo/db/s/migration_blocking_operation/*blocking*
-    - src/mongo/db/s/sharding_catalog_client_aggregations_test.cpp
     - src/mongo/s/request_types/migration_blocking_operation*
     - src/mongo/s/migration_blocking_operation*
     - src/mongo/db/metadata_consistency_types.idl

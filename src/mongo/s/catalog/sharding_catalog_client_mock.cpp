@@ -261,28 +261,6 @@ ShardingCatalogClientMock::_exhaustiveFindOnConfig(OperationContext* opCtx,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-HistoricalPlacement ShardingCatalogClientMock::getShardsThatOwnDataForCollAtClusterTime(
-    OperationContext* opCtx, const NamespaceString& collName, const Timestamp& clusterTime) {
-    uasserted(ErrorCodes::InternalError, "Method not implemented");
-}
-
-HistoricalPlacement ShardingCatalogClientMock::getShardsThatOwnDataForDbAtClusterTime(
-    OperationContext* opCtx, const NamespaceString& dbName, const Timestamp& clusterTime) {
-    uasserted(ErrorCodes::InternalError, "Method not implemented");
-}
-
-HistoricalPlacement ShardingCatalogClientMock::getShardsThatOwnDataAtClusterTime(
-    OperationContext* opCtx, const Timestamp& clusterTime) {
-    uasserted(ErrorCodes::InternalError, "Method not implemented");
-}
-
-HistoricalPlacement ShardingCatalogClientMock::getHistoricalPlacement(
-    OperationContext* opCtx,
-    const Timestamp& atClusterTime,
-    const boost::optional<NamespaceString>& nss) {
-    uasserted(ErrorCodes::InternalError, "Method not implemented");
-}
-
 bool ShardingCatalogClientMock::anyShardRemovedSince(OperationContext* opCtx,
                                                      const Timestamp& clusterTime) {
     return false;

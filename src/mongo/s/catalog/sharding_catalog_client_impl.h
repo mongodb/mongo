@@ -238,24 +238,6 @@ public:
         StringData purpose,
         repl::ReadConcernLevel readConcernLevel) override;
 
-    HistoricalPlacement getShardsThatOwnDataForCollAtClusterTime(
-        OperationContext* opCtx,
-        const NamespaceString& collName,
-        const Timestamp& clusterTime) override;
-
-    HistoricalPlacement getShardsThatOwnDataForDbAtClusterTime(
-        OperationContext* opCtx,
-        const NamespaceString& dbName,
-        const Timestamp& clusterTime) override;
-
-    HistoricalPlacement getShardsThatOwnDataAtClusterTime(OperationContext* opCtx,
-                                                          const Timestamp& clusterTime) override;
-
-    HistoricalPlacement getHistoricalPlacement(
-        OperationContext* opCtx,
-        const Timestamp& atClusterTime,
-        const boost::optional<NamespaceString>& nss) override;
-
     bool anyShardRemovedSince(OperationContext* opCtx, const Timestamp& clusterTime) override;
 
 private:

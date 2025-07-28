@@ -2577,7 +2577,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/**/clone_catalog_data_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*catalog_cache* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*catalog*idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/db/s/**/*catalog_client* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/README.md @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/README_balancer.md @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/README_startup_and_shutdown.md @10gen/server-catalog-and-routing @svc-auto-approve-bot

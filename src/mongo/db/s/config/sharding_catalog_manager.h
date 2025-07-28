@@ -64,6 +64,7 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database_gen.h"
+#include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
@@ -690,6 +691,17 @@ public:
      * related initialization metadata).
      **/
     void cleanUpPlacementHistory(OperationContext* opCtx, const Timestamp& earliestClusterTime);
+
+    /**
+     * Queries config.placementHistory to retrieve placement metadata on the requested namespace at
+     * a specific point in time. When no namespace is specified, placement metadata on the whole
+     * cluster will be returned. This function is meant to be exclusively invoked by config server
+     * nodes.
+     */
+    HistoricalPlacement getHistoricalPlacement(OperationContext* opCtx,
+                                               const boost::optional<NamespaceString>& nss,
+                                               const Timestamp& atClusterTime);
+
 
     /**
      * Schedules an asynchronous unset of the addOrRemoveShardInProgress cluster parameter, in case

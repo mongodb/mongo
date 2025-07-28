@@ -27,41 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/base/error_codes.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/database_name.h"
-#include "mongo/db/feature_flag.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/optime_with.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/shard_id.h"
-#include "mongo/rpc/op_msg.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
-#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/request_types/placement_history_commands_gen.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/util/assert_util.h"
-
-#include <algorithm>
-#include <iterator>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 
 namespace mongo {
@@ -88,13 +57,12 @@ public:
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
 
-            const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-
             boost::optional<NamespaceString> targetedNs = request().getTargetWholeCluster()
                 ? (boost::optional<NamespaceString>)boost::none
                 : nss;
-            return ConfigsvrGetHistoricalPlacementResponse(
-                catalogClient->getHistoricalPlacement(opCtx, request().getAt(), targetedNs));
+
+            return ShardingCatalogManager::get(opCtx)->getHistoricalPlacement(
+                opCtx, targetedNs, request().getAt());
         }
 
     private:
