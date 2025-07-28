@@ -87,7 +87,7 @@ buildvariants:
 
   - <<: *linux-arm64-dynamic-compile-params
     name: &amazon-linux2023-arm64-static-compile amazon-linux2023-arm64-static-compile
-    display_name: "! Amazon Linux 2023 arm64 Enterprise Shared Library Compile & Static Analysis"
+    display_name: "! Amazon Linux 2023 arm64 Enterprise Compile"
     tags: ["required", "bazel_check", "forbid_tasks_tagged_with_experimental"]
     expansions:
       <<: *linux-arm64-static-enterprise-compile-expansions

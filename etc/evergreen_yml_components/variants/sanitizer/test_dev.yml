@@ -80,21 +80,25 @@ variables:
     bazel_compile_flags: >-
       --dbg=True
       --opt=on
-      --linkstatic=False
       --build_otel=True
       --build_enterprise=False
+      --jobs=800
+    unittest_library_compile_flags: >-
+      --linkstatic=False
+    unittest_compile_flags: >-
+      --linkstatic=False
 
-  - &linux_x86_dynamic_debug_compile_variant_dependency
+  - &linux_x86_debug_compile_variant_dependency
     depends_on:
       - name: archive_dist_test
-        variant: &linux_x86_dynamic_debug_compile_variant_name linux-x86-dynamic-debug-compile-required
+        variant: &linux_x86_debug_compile_variant_name linux-x86-debug-compile-required
       - name: version_gen
         variant: generate-tasks-for-version
         # This is added because of EVG-18211.
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
     # - name: generate_buildid_to_debug_symbols_mapping
-    #   variant: linux-x86-dynamic-debug-compile-required
+    #   variant: linux-x86-debug-compile-required
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
@@ -193,6 +197,7 @@ variables:
       --config=dbg_tsan
       --opt=on
       --fission=no
+      --jobs=800
     # Avoid starting too many mongod's under TSAN build.
     resmoke_jobs_factor: 0.3
     large_distro_name: &enterprise-rhel8-debug-tsan-large-distro-name rhel8.8-xlarge
@@ -204,25 +209,23 @@ variables:
 
 buildvariants:
   - <<: *generic_linux_compile_params
-    name: &linux-x86-dynamic-debug-compile-required linux-x86-dynamic-debug-compile-required # TODO: replace with Sanitizer.
-    display_name: "! Linux x86 Shared Library DEBUG Compile"
+    name: &linux-x86-debug-compile-required linux-x86-debug-compile-required # TODO: replace with Sanitizer.
+    display_name: "! Linux x86 DEBUG Compile"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     stepback: false
     expansions:
       <<: *linux_debug_community_compile_expansions
-      compile_variant: *linux-x86-dynamic-debug-compile-required
+      compile_variant: *linux-x86-debug-compile-required
       build_mongot: true
       download_mongot_release: true
       evergreen_remote_exec: on
+      skip_debug_link: true
       test_flags: >-
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     tasks:
       - name: compile_test_parallel_core_stream_TG
       - name: run_unit_tests_TG
       - name: compile_test_parallel_dbtest_stream_TG
-      - name: .clang_tidy
-        distros:
-          - rhel8.8-xxlarge
       - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
       - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
         distros:
@@ -243,6 +246,7 @@ buildvariants:
         --config=dbg_aubsan
         --opt=on
         --fission=no
+        --jobs=800
       build_mongot: true
       download_mongot_release: true
       evergreen_remote_exec: on
@@ -269,9 +273,9 @@ buildvariants:
         distros:
           - rhel8.8-xlarge
 
-  - <<: *linux_x86_dynamic_debug_compile_variant_dependency
+  - <<: *linux_x86_debug_compile_variant_dependency
     name: linux-64-debug-required
-    display_name: "! Linux x86 Shared Library DEBUG"
+    display_name: "! Linux x86 Static Library DEBUG"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
@@ -286,7 +290,7 @@ buildvariants:
       max_sub_suites: 5
       large_distro_name: rhel8.8-medium
       core_analyzer_distro_name: rhel8.8-xlarge
-      compile_variant: *linux_x86_dynamic_debug_compile_variant_name
+      compile_variant: *linux_x86_debug_compile_variant_name
     tasks:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only

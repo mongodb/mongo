@@ -38,8 +38,12 @@ variables:
     bazel_compile_flags: >-
       --dbg=True
       --opt=on
-      --linkstatic=False
       --build_enterprise=False
+      --jobs=800
+    unittest_library_compile_flags: >-
+      --linkstatic=False
+    unittest_compile_flags: >-
+      --linkstatic=False
 
 buildvariants:
   - <<: *generic_linux_compile_params

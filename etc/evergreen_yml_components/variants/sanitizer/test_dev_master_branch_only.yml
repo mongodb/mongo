@@ -159,6 +159,7 @@ variables:
       --config=dbg_tsan
       --opt=on
       --fission=no
+      --jobs=800
     # Avoid starting too many mongod's under TSAN build.
     resmoke_jobs_factor: 0.3
     large_distro_name: &enterprise-rhel8-debug-tsan-large-distro-name rhel8.8-xlarge
