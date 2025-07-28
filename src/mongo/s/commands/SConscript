@@ -120,7 +120,6 @@ env.Library(
         'cluster_write_without_shard_key_cmd.cpp',
         'internal_transactions_test_command_s.cpp',
         'refine_collection_shard_key.idl',
-        's_read_write_concern_defaults_server_status.cpp',
         'shard_collection.idl',
     ],
     LIBDEPS_PRIVATE=[

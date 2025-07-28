@@ -449,12 +449,14 @@ env.Library(
         'cluster_cursor_stats.cpp',
         'router_transactions_server_status.cpp',
         's_sharding_server_status.cpp',
+        'commands/s_read_write_concern_defaults_server_status.cpp',
     ],
     LIBDEPS_PRIVATE=[
         # NOTE: If you need to add a static or mongo initializer to mongos startup,
         # please add that library here, as a private library dependency.
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/auth/authserver',
+        '$BUILD_DIR/mongo/db/commands/rwc_defaults_commands',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/commands/server_status_servers',
         '$BUILD_DIR/mongo/db/dbdirectclient',
