@@ -423,6 +423,16 @@ server_parameters:
             lte: 22
         redact: false
 
+    spillWiredTigerSessionMax:
+        description: "The WiredTiger session limit for the spill engine"
+        set_at: startup
+        cpp_vartype: int32_t
+        cpp_varname: gSpillWiredTigerSessionMax
+        default: 1024
+        validator:
+            gte: 1
+        redact: false
+
     spillWiredTigerEngineConfig:
         description: >-
             The config string of WiredTiger storage engine options used for the spill engine.
