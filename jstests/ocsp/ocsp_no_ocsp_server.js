@@ -25,6 +25,9 @@ var ocsp_options = {
     tlsCAFile: OCSP_CA_PEM,
 };
 
+// Clear the OCSP cache from any previous runs
+clearOCSPCache();
+
 // Start with the OCSP-enabled server certificate
 copyCertificateFile(OCSP_SERVER_CERT, serverCertificatePath);
 
