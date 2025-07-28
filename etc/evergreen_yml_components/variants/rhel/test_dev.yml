@@ -362,3 +362,36 @@ buildvariants:
       - name: sharding_pqs_fallback_gen
       - name: sharding_pqs_hints_gen
       - name: sharding_pqs_index_filters_gen
+
+  # TODO SERVER-106634 Delete this variant once the feature is compiled in by default
+  - <<: *linux_x86_dynamic_compile_variant_dependency
+    name: mutex-observation
+    display_name: "~ Build With Mutex Observation"
+    tags: ["mutex_observation"]
+    cron: "0 3 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel8.8-medium
+    expansions:
+      <<: *linux_x86_generic_expansions
+      bazel_compile_flags: >-
+        --mutex_observation=true
+        --define=MONGO_DISTMOD=rhel88
+        --linkstatic=False
+    depends_on:
+      - name: archive_dist_test
+        variant: *linux_x86_dynamic_compile_variant_name
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+    tasks:
+      - name: jsCore
+        distros:
+          - rhel8.8-xlarge
+      - name: sharding_gen
+      - name: replica_sets_gen
+      - name: noPassthrough_gen
+      - name: run_unit_tests_TG
+        distros:
+          - rhel8.8-xlarge
