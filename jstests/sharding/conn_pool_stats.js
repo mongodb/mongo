@@ -75,50 +75,60 @@ function neverUsedMetricTest(kDbName = 'test') {
     const primaryOnly = [primary.name];
 
     let currentCheckNum = 0;
-    let toRefreshTimeoutMS = 1000;
+    let toRefreshTimeoutMS = 5000;
     let threads = [];
 
     [1, 2, 3].forEach(v => assert.commandWorked(mongosDB.test.insert({x: v})));
     st.rs0.awaitReplication();
 
+    const numPools = assert.commandWorked(mongos.adminCommand(
+        {"getParameter": 1, "taskExecutorPoolSize": 1}))["taskExecutorPoolSize"];
+
     // Bump up number of pooled connections to 15
+    const poolMinSize = 15;
     assert.commandWorked(mongos.adminCommand({
         "setParameter": 1,
-        ShardingTaskExecutorPoolMinSize: 15,
+        ShardingTaskExecutorPoolMinSize: poolMinSize,
         ShardingTaskExecutorPoolRefreshRequirementMS: toRefreshTimeoutMS
     }));
+    const totalConns = numPools * poolMinSize;
 
-    // Launch 5 blocked finds and verify that 5 connections are in-use while the remaining 10
+    // Launch 5 blocked finds and verify that 5 connections are in-use while the remaining ones
     // are available
     const fpRs = configureFailPointForRS(st.rs0.nodes,
                                          "waitInFindBeforeMakingBatch",
                                          {shouldCheckForInterrupt: true, nss: kDbName + ".test"});
-    launchFinds(mongos, threads, {times: 5, readPref: "primary"}, currentCheckNum);
-    currentCheckNum = assertHasConnPoolStats(
-        mongos, allHosts, {active: 5, ready: 10, hosts: primaryOnly}, currentCheckNum);
+    const numFinds = 5;
+    launchFinds(mongos, threads, {times: numFinds, readPref: "primary"}, currentCheckNum);
+    currentCheckNum =
+        assertHasConnPoolStats(mongos,
+                               allHosts,
+                               {active: numFinds, ready: totalConns - numFinds, hosts: primaryOnly},
+                               currentCheckNum);
 
     // Reduce pool size to drop some available connections, verify that these were never used to
     // run an operation during their lifetime
+    const reducedSize = 7;
     assert.commandWorked(mongos.adminCommand({
         "setParameter": 1,
-        ShardingTaskExecutorPoolMinSize: 7,
-        ShardingTaskExecutorPoolMaxSize: 7
+        ShardingTaskExecutorPoolMinSize: reducedSize,
+        ShardingTaskExecutorPoolMaxSize: reducedSize,
     }));
+    const reducedTotalConns = numPools * reducedSize;
+    const neverUsedConns = totalConns - reducedTotalConns;
     currentCheckNum = assertHasConnPoolStats(
         mongos,
         allHosts,
         {
             hosts: primaryOnly,
             checkStatsFunc: function(stats) {
-                return stats.available == 2 && stats.inUse == 5 && stats.wasNeverUsed == 8;
+                return stats.available == reducedTotalConns - numFinds && stats.inUse == numFinds &&
+                    stats.wasNeverUsed == neverUsedConns;
             }
         },
         currentCheckNum);
     fpRs.off();
     threads.forEach(t => t.join());
-
-    // stats = st.s.getDB("admin").runCommand({connPoolStats: 1});
-    // assert.eq(stats["totalWasNeverUsed"], 8);
 }
 
 neverUsedMetricTest();
