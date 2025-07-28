@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import os
+import shutil
 import sys
 import tempfile
 import time
@@ -61,7 +62,6 @@ def _verify_s3_hash(s3_path: str, local_path: str, expected_hash: str) -> None:
         raise ValueError(
             f"Hash mismatch for {s3_path}, expected {expected_hash} but got {hash_string}"
         )
-    print(f"File is valid: {local_path} (sha256: {expected_hash})")
 
 def validate_file(s3_path, output_path, remote_sha_allowed):
     hexdigest = S3_SHA256_HASHES.get(s3_path)
@@ -100,6 +100,7 @@ def _download_and_verify(s3_path, output_path, remote_sha_allowed):
                 download_from_s3_with_requests(s3_path, output_path)
                 
             validate_file(s3_path, output_path, remote_sha_allowed)
+            break
 
         except Exception:
             print("Download failed:")
@@ -133,7 +134,15 @@ def download_s3_binary(
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             tempfile_name = temp_file.name
             _download_and_verify(s3_path, tempfile_name, remote_sha_allowed)
+
+        try:
             os.replace(tempfile_name, local_path)
+        except OSError as e:
+            if e.errno == 18:  # EXDEV cross filesystem error, need to use a mv
+                shutil.move(tempfile_name, local_path)
+            else:
+                raise
+
         print(f"Downloaded and verified {s3_path} -> {local_path}")
         return True
     except Exception as e:
