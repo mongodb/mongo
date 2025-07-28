@@ -1139,6 +1139,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "change_stream_pipeline",
     srcs = [
+        "all_databases_change_stream_shard_targeter_impl.cpp",
         "change_stream.cpp",
         "change_stream_document_diff_parser.cpp",
         "change_stream_event_transform.cpp",
@@ -1146,8 +1147,10 @@ mongo_cc_library(
         "change_stream_reader_builder.cpp",
         "change_stream_rewrite_helpers.cpp",
         "change_stream_split_event_helpers.cpp",
+        "collection_change_stream_shard_targeter_impl.cpp",
         "data_to_shards_allocation_query_service.cpp",
         "data_to_shards_allocation_query_service_impl.cpp",
+        "database_change_stream_shard_targeter_impl.cpp",
         "document_source_change_stream.cpp",
         "document_source_change_stream_add_post_image.cpp",
         "document_source_change_stream_add_pre_image.cpp",
@@ -1167,6 +1170,7 @@ mongo_cc_library(
         "//src/mongo/db/transaction:transaction_history_iterator.h",
     ],
     hdrs = [
+        "all_databases_change_stream_shard_targeter_impl.h",
         "change_stream.h",
         "change_stream_document_diff_parser.h",
         "change_stream_event_transform.h",
@@ -1176,8 +1180,10 @@ mongo_cc_library(
         "change_stream_rewrite_helpers.h",
         "change_stream_shard_targeter.h",
         "change_stream_split_event_helpers.h",
+        "collection_change_stream_shard_targeter_impl.h",
         "data_to_shards_allocation_query_service.h",
         "data_to_shards_allocation_query_service_impl.h",
+        "database_change_stream_shard_targeter_impl.h",
         "document_source_change_stream.h",
         "document_source_change_stream_add_post_image.h",
         "document_source_change_stream_add_pre_image.h",
