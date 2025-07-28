@@ -39,9 +39,8 @@
 #include <system_error>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/kill_sessions.h"
-#include "mongo/db/session/session_catalog.h"
+#include "mongo/db/session/session_catalog_test.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/barrier.h"
@@ -50,94 +49,63 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 
 namespace mongo {
-namespace {
 
-class SessionCatalogTest : public ServiceContextTest {
-protected:
-    SessionCatalog* catalog() {
-        return SessionCatalog::get(getServiceContext());
-    }
+SessionCatalog* SessionCatalogTest::catalog() {
+    return SessionCatalog::get(getServiceContext());
+}
 
-    void assertCanCheckoutSession(const LogicalSessionId& lsid) {
+void SessionCatalogTest::assertCanCheckoutSession(const LogicalSessionId& lsid) {
+    auto opCtx = makeOperationContext();
+    opCtx->setLogicalSessionId(lsid);
+    OperationContextSession ocs(opCtx.get());
+}
+
+void SessionCatalogTest::assertSessionCheckoutTimesOut(const LogicalSessionId& lsid) {
+    auto opCtx = makeOperationContext();
+    opCtx->setLogicalSessionId(lsid);
+    opCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
+    ASSERT_THROWS_CODE(
+        OperationContextSession(opCtx.get()), AssertionException, ErrorCodes::MaxTimeMSExpired);
+}
+
+void SessionCatalogTest::assertConcurrentCheckoutTimesOut(const LogicalSessionId& lsid) {
+    auto future = stdx::async(stdx::launch::async, [this, lsid] {
+        ThreadClient tc(getServiceContext()->getService());
+        auto sideOpCtx = Client::getCurrent()->makeOperationContext();
+        sideOpCtx->setLogicalSessionId(lsid);
+        sideOpCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
+        OperationContextSession ocs(sideOpCtx.get());
+    });
+    ASSERT_THROWS_CODE(future.get(), AssertionException, ErrorCodes::MaxTimeMSExpired);
+}
+
+void SessionCatalogTest::createSession(const LogicalSessionId& lsid) {
+    stdx::async(stdx::launch::async, [this, lsid] {
+        ThreadClient tc(getServiceContext()->getService());
         auto opCtx = makeOperationContext();
         opCtx->setLogicalSessionId(lsid);
         OperationContextSession ocs(opCtx.get());
-    }
+    }).get();
+}
 
-    void assertSessionCheckoutTimesOut(const LogicalSessionId& lsid) {
-        auto opCtx = makeOperationContext();
-        opCtx->setLogicalSessionId(lsid);
-        opCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
-        ASSERT_THROWS_CODE(
-            OperationContextSession(opCtx.get()), AssertionException, ErrorCodes::MaxTimeMSExpired);
-    }
-
-    void assertConcurrentCheckoutTimesOut(const LogicalSessionId& lsid) {
-        auto future = stdx::async(stdx::launch::async, [this, lsid] {
-            ThreadClient tc(getServiceContext()->getService());
-            auto sideOpCtx = Client::getCurrent()->makeOperationContext();
-            sideOpCtx->setLogicalSessionId(lsid);
-            sideOpCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
-            OperationContextSession ocs(sideOpCtx.get());
-        });
-        ASSERT_THROWS_CODE(future.get(), AssertionException, ErrorCodes::MaxTimeMSExpired);
-    }
-
-    /**
-     * Creates the session with the given 'lsid' by checking it out from the SessionCatalog and then
-     * checking it back in.
-     */
-    void createSession(const LogicalSessionId& lsid) {
-        stdx::async(stdx::launch::async, [this, lsid] {
-            ThreadClient tc(getServiceContext()->getService());
-            auto opCtx = makeOperationContext();
-            opCtx->setLogicalSessionId(lsid);
-            OperationContextSession ocs(opCtx.get());
-        }).get();
-    }
-
-    /**
-     * Returns the session ids for all sessions in the SessionCatalog.
-     */
-    std::vector<LogicalSessionId> getAllSessionIds(OperationContext* opCtx) {
-        std::vector<LogicalSessionId> lsidsFound;
-        SessionKiller::Matcher matcherAllSessions(
-            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-        const auto getAllSessionIdsWorkerFn = [&lsidsFound](const ObservableSession& session) {
-            lsidsFound.push_back(session.getSessionId());
-        };
-        catalog()->scanSessions(matcherAllSessions, getAllSessionIdsWorkerFn);
-        return lsidsFound;
+std::vector<LogicalSessionId> SessionCatalogTest::getAllSessionIds(OperationContext* opCtx) {
+    std::vector<LogicalSessionId> lsidsFound;
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+    const auto getAllSessionIdsWorkerFn = [&lsidsFound](const ObservableSession& session) {
+        lsidsFound.push_back(session.getSessionId());
     };
+    catalog()->scanSessions(matcherAllSessions, getAllSessionIdsWorkerFn);
+    return lsidsFound;
 };
 
-class SessionCatalogTestWithDefaultOpCtx : public SessionCatalogTest {
-protected:
-    const ServiceContext::UniqueOperationContext _uniqueOpCtx = makeOperationContext();
-    OperationContext* const _opCtx = _uniqueOpCtx.get();
-};
-
-// When this class is in scope, makes the system behave as if we're in a DBDirectClient
-class DirectClientSetter {
-public:
-    explicit DirectClientSetter(OperationContext* opCtx)
-        : _opCtx(opCtx), _wasInDirectClient(_opCtx->getClient()->isInDirectClient()) {
-        _opCtx->getClient()->setInDirectClient(true);
-    }
-
-    ~DirectClientSetter() {
-        _opCtx->getClient()->setInDirectClient(_wasInDirectClient);
-    }
-
-private:
-    const OperationContext* _opCtx;
-    const bool _wasInDirectClient;
-};
+namespace {
 
 TEST_F(SessionCatalogTest, GetParentSessionId) {
     auto parentLsid = makeLogicalSessionIdForTest();
@@ -1586,7 +1554,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsThroughScanSessions) {
     }
 }
 
-// Test that session kill will block normal sesion chechout and will be signaled correctly.
+// Test that session kill will block normal sesion checkout and will be signaled correctly.
 // Even if the implementaion has a bug, the test may not always fail depending on thread
 // scheduling, however, this test case still gives us a good coverage.
 TEST_F(SessionCatalogTestWithDefaultOpCtx, ConcurrentCheckOutAndKill) {
@@ -1649,6 +1617,43 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ConcurrentCheckOutAndKill) {
         killCheckOutFinish.get();
 
         ASSERT_EQ("session checkout", lastSessionCheckOut);
+    };
+
+    runTest(makeLogicalSessionIdForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
+    runTest(makeLogicalSessionIdWithTxnUUIDForTest());
+}
+
+TEST_F(SessionCatalogTest, CheckOutForKillTimeout) {
+    auto runTest = [&](const LogicalSessionId& lsid) {
+        auto client = getServiceContext()->getService()->makeClient("CheckOutForKillTimeout");
+        AlternativeClientRegion acr(client);
+        auto opCtx = cc().makeOperationContext();
+        opCtx->setLogicalSessionId(lsid);
+
+        // Check out the session to block checkOutForKill.
+        OperationContextSession firstCheckOut(opCtx.get());
+
+        stdx::future<void> killCheckOutTimeout = stdx::async(stdx::launch::async, [&] {
+            ThreadClient tc(getServiceContext()->getService());
+            auto sideOpCtx = Client::getCurrent()->makeOperationContext();
+            sideOpCtx->setLogicalSessionId(lsid);
+
+            // Create kill token.
+            std::vector<SessionCatalog::KillToken> killTokens;
+            catalog()->scanSession(lsid, [&killTokens](const ObservableSession& session) {
+                killTokens.emplace_back(session.kill(ErrorCodes::InternalError));
+            });
+            ASSERT_EQ(1U, killTokens.size());
+
+            // Checkout session for kill should time out.
+            auto timeout = Milliseconds(0);
+            ASSERT_THROWS_CODE(catalog()->checkOutSessionForKill(
+                                   sideOpCtx.get(), std::move(killTokens[0]), &timeout),
+                               DBException,
+                               ErrorCodes::ExceededTimeLimit);
+        });
+        killCheckOutTimeout.get();
     };
 
     runTest(makeLogicalSessionIdForTest());

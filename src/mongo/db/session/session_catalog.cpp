@@ -104,7 +104,10 @@ SessionCatalog* SessionCatalog::get(ServiceContext* service) {
 }
 
 SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSessionInner(
-    OperationContext* opCtx, const LogicalSessionId& lsid, boost::optional<KillToken> killToken) {
+    OperationContext* opCtx,
+    const LogicalSessionId& lsid,
+    boost::optional<KillToken> killToken,
+    Milliseconds* timeout) {
     if (killToken) {
         dassert(killToken->lsidToKill == lsid);
     } else {
@@ -132,11 +135,20 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSessionInner(
         ul.lock();
     }
 
-    opCtx->waitForConditionOrInterrupt(
-        sri->availableCondVar, ul, [&ul, &sri, &session, forKill = killToken.has_value()]() {
+    auto deadline = timeout ? Date_t::now() + *timeout : Date_t::max();
+    const auto ok = opCtx->waitForConditionOrInterruptUntil(
+        sri->availableCondVar,
+        ul,
+        deadline,
+        [&ul, &sri, &session, forKill = killToken.has_value()]() {
             ObservableSession osession(ul, sri, session);
             return osession._isAvailableForCheckOut(forKill);
         });
+
+    if (!ok && killToken) {
+        --sri->killsRequested;
+    }
+    iassert(opCtx->getTimeoutError(), "operation exceeded time limit", ok);
 
     sri->checkoutOpCtx = opCtx;
     sri->lastCheckout = Date_t::now();
@@ -157,14 +169,15 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSession(Operati
 }
 
 SessionCatalog::SessionToKill SessionCatalog::checkOutSessionForKill(OperationContext* opCtx,
-                                                                     KillToken killToken) {
+                                                                     KillToken killToken,
+                                                                     Milliseconds* timeout) {
     // This method is not supposed to be called with an already checked-out session due to risk of
     // deadlock
     invariant(!operationSessionDecoration(opCtx));
     invariant(!opCtx->getTxnNumber());
 
     auto lsid = killToken.lsidToKill;
-    return SessionToKill(_checkOutSessionInner(opCtx, lsid, std::move(killToken)));
+    return SessionToKill(_checkOutSessionInner(opCtx, lsid, std::move(killToken), timeout));
 }
 
 void SessionCatalog::scanSession(const LogicalSessionId& lsid,

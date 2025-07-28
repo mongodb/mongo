@@ -864,6 +864,26 @@ public:
             o(lk).txnState.transitionTo(TransactionState::kAbortedWithPrepare);
         }
 
+        void transitionToInProgressForTest() {
+            _tp->_o.txnState.transitionTo(TransactionState::kInProgress);
+        }
+
+        void setTransactionExpiredDate(Date_t expire) {
+            _tp->_o.transactionExpireDate = expire;
+        }
+
+        void startMetricsTimer(OperationContext* opCtx,
+                               TickSource* ticksource,
+                               Date_t curWallClockTime,
+                               Date_t expireDate) {
+            _tp->_o.transactionMetricsObserver.onStart(
+                ServerTransactionsMetrics::get(opCtx->getServiceContext()),
+                /* isAutoCommit */ false,
+                ticksource,
+                curWallClockTime,
+                expireDate);
+        }
+
         /**
          * Used by secondary oplog application for prepared transactions or unit tests to directly
          * add the statement ids that were written.

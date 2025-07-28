@@ -56,7 +56,10 @@ void killSessionsAbortUnpreparedTransactions(OperationContext* opCtx,
 /**
  * Aborts any expired transactions.
  */
-void killAllExpiredTransactions(OperationContext* opCtx);
+void killAllExpiredTransactions(OperationContext* opCtx,
+                                Milliseconds timeout,
+                                int64_t* numKills,
+                                int64_t* numTimeOuts);
 
 /**
  * Run during shutdown to kill all in-progress transactions, including those in prepare.

@@ -118,7 +118,9 @@ public:
      * See the description of 'ObservableSession::kill' for more information on the session kill
      * usage pattern.
      */
-    SessionToKill checkOutSessionForKill(OperationContext* opCtx, KillToken killToken);
+    SessionToKill checkOutSessionForKill(OperationContext* opCtx,
+                                         KillToken killToken,
+                                         Milliseconds* timeout = nullptr);
 
     /**
      * Iterates through the SessionCatalog under the SessionCatalog mutex and applies 'workerFn' to
@@ -237,7 +239,8 @@ private:
      */
     ScopedCheckedOutSession _checkOutSessionInner(OperationContext* opCtx,
                                                   const LogicalSessionId& lsid,
-                                                  boost::optional<KillToken> killToken);
+                                                  boost::optional<KillToken> killToken,
+                                                  Milliseconds* timeout = nullptr);
 
     /**
      * Blocking method, which checks-out the session set on 'opCtx'.
