@@ -27,15 +27,12 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/s/resharding/resharding_metrics.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/shard_id.h"
@@ -72,10 +69,6 @@ const auto kShardKey = BSON("newKey" << 1);
 class ReshardingMetricsTest : public ReshardingMetricsTestFixture {
 
 public:
-    std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics() override {
-        return std::make_unique<ReshardingCumulativeMetrics>();
-    }
-
     std::unique_ptr<ReshardingMetrics> createInstanceMetrics(ClockSource* clockSource,
                                                              UUID instanceId = UUID::gen(),
                                                              Role role = Role::kDonor) {
@@ -280,7 +273,7 @@ public:
     ReshardingMetricsWithObserverMock(Date_t startTime,
                                       int64_t timeRemaining,
                                       ClockSource* clockSource,
-                                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
+                                      ReshardingCumulativeMetrics* cumulativeMetrics)
         : _impl{UUID::gen(),
                 BSON("command" << "test"),
                 NamespaceString::createNamespaceString_forTest("test.source"),

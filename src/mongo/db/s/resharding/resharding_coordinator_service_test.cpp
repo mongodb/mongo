@@ -47,10 +47,10 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
-#include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_coordinator.h"
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_external_state.h"
+#include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_op_observer.h"
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
 #include "mongo/db/s/resharding/resharding_util.h"
@@ -826,8 +826,7 @@ public:
         coordinator->getCompletionFuture().get(opCtx);
 
         BSONObjBuilder bob;
-        ShardingDataTransformCumulativeMetrics::getForResharding(
-            operationContext()->getServiceContext())
+        ReshardingCumulativeMetrics::getForResharding(operationContext()->getServiceContext())
             ->reportForServerStatus(&bob);
         auto cumulativeMetricsBSON = bob.obj();
         ASSERT_EQ(cumulativeMetricsBSON["resharding"]["countStarted"].numberInt(), 1);
@@ -1387,8 +1386,7 @@ TEST_F(ReshardingCoordinatorServiceTest, AbortingReshardingOperationIncrementsMe
     coordinator->getCompletionFuture().wait();
 
     BSONObjBuilder bob;
-    ShardingDataTransformCumulativeMetrics::getForResharding(
-        operationContext()->getServiceContext())
+    ReshardingCumulativeMetrics::getForResharding(operationContext()->getServiceContext())
         ->reportForServerStatus(&bob);
     auto cumulativeMetricsBSON = bob.obj();
 
@@ -1429,8 +1427,7 @@ TEST_F(ReshardingCoordinatorServiceTest, CoordinatorReturnsErrorCode) {
                        DBException,
                        ErrorCodes::SnapshotUnavailable);
     BSONObjBuilder bob;
-    ShardingDataTransformCumulativeMetrics::getForResharding(
-        operationContext()->getServiceContext())
+    ReshardingCumulativeMetrics::getForResharding(operationContext()->getServiceContext())
         ->reportForServerStatus(&bob);
     auto cumulativeMetricsBSON = bob.obj();
 

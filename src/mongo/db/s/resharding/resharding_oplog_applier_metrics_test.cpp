@@ -32,7 +32,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
@@ -53,10 +52,6 @@ namespace {
 
 class ReshardingOplogApplierMetricsTest : public ReshardingMetricsTestFixture {
 public:
-    std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics() override {
-        return std::make_unique<ReshardingCumulativeMetrics>();
-    }
-
     std::unique_ptr<ReshardingMetrics> createInstanceMetrics() {
         return std::make_unique<ReshardingMetrics>(UUID::gen(),
                                                    kTestCommand,

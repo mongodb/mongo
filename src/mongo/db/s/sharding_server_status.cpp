@@ -42,8 +42,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/active_migrations_registry.h"
-#include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/range_deleter_service.h"
+#include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -183,7 +183,7 @@ public:
 
     void reportDataTransformMetrics(OperationContext* opCtx, BSONObjBuilder* bob) const {
         auto sCtx = opCtx->getServiceContext();
-        using Metrics = ShardingDataTransformCumulativeMetrics;
+        using Metrics = ReshardingCumulativeMetrics;
         Metrics::getForResharding(sCtx)->reportForServerStatus(bob);
         Metrics::getForMoveCollection(sCtx)->reportForServerStatus(bob);
         Metrics::getForBalancerMoveCollection(sCtx)->reportForServerStatus(bob);

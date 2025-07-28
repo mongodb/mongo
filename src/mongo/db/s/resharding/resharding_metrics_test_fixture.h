@@ -86,10 +86,10 @@ private:
     ReshardingMetricsCommon::Role _role;
 };
 
-class ShardingDataTransformCumulativeMetricsFieldNameProviderForTest
-    : public ShardingDataTransformCumulativeMetricsFieldNameProvider {
+class ReshardingCumulativeMetricsFieldNameProviderForTest
+    : public ReshardingCumulativeMetricsFieldNameProvider {
 public:
-    ~ShardingDataTransformCumulativeMetricsFieldNameProviderForTest() override = default;
+    ~ReshardingCumulativeMetricsFieldNameProviderForTest() override = default;
     StringData getForDocumentsProcessed() const override {
         return "documentsProcessed";
     }
@@ -242,10 +242,8 @@ protected:
         NamespaceString::createNamespaceString_forTest("test.source");
     const BSONObj kTestCommand = BSON("command" << "test");
 
-    virtual std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics() {
-        return std::make_unique<ShardingDataTransformCumulativeMetrics>(
-            kTestMetricsName,
-            std::make_unique<ShardingDataTransformCumulativeMetricsFieldNameProviderForTest>());
+    std::unique_ptr<ReshardingCumulativeMetrics> initializeCumulativeMetrics() {
+        return std::make_unique<ReshardingCumulativeMetrics>();
     }
 
     const ObserverMock* getYoungestObserver() {
@@ -263,7 +261,7 @@ protected:
         return &clock.value();
     }
 
-    ShardingDataTransformCumulativeMetrics* getCumulativeMetrics() {
+    ReshardingCumulativeMetrics* getCumulativeMetrics() {
         return _cumulativeMetrics.get();
     }
 
@@ -379,8 +377,8 @@ protected:
         }
     }
 
-    std::unique_ptr<ShardingDataTransformCumulativeMetrics> _cumulativeMetrics;
-    std::vector<ShardingDataTransformCumulativeMetrics::UniqueScopedObserver> _observers;
+    std::unique_ptr<ReshardingCumulativeMetrics> _cumulativeMetrics;
+    std::vector<ReshardingCumulativeMetrics::UniqueScopedObserver> _observers;
 };
 
 }  // namespace mongo

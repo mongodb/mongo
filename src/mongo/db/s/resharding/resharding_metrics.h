@@ -35,7 +35,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/metrics/metrics_state_holder.h"
 #include "mongo/db/s/metrics/phase_duration_tracker.h"
-#include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
@@ -121,12 +120,12 @@ public:
     ReshardingMetrics(const CommonReshardingMetadata& metadata,
                       Role role,
                       ClockSource* clockSource,
-                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
+                      ReshardingCumulativeMetrics* cumulativeMetrics);
 
     ReshardingMetrics(const CommonReshardingMetadata& metadata,
                       Role role,
                       ClockSource* clockSource,
-                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+                      ReshardingCumulativeMetrics* cumulativeMetrics,
                       State state);
 
     ReshardingMetrics(UUID instanceId,
@@ -135,7 +134,7 @@ public:
                       Role role,
                       Date_t startTime,
                       ClockSource* clockSource,
-                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+                      ReshardingCumulativeMetrics* cumulativeMetrics,
                       State state,
                       ReshardingProvenanceEnum provenance);
 
@@ -145,7 +144,7 @@ public:
                       Role role,
                       Date_t startTime,
                       ClockSource* clockSource,
-                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+                      ReshardingCumulativeMetrics* cumulativeMetrics,
                       State state,
                       ObserverPtr observer,
                       ReshardingProvenanceEnum provenance);
@@ -162,7 +161,7 @@ public:
     template <typename T>
     static auto initializeFrom(const T& document,
                                ClockSource* clockSource,
-                               ShardingDataTransformCumulativeMetrics* cumulativeMetrics) {
+                               ReshardingCumulativeMetrics* cumulativeMetrics) {
         static_assert(resharding_metrics::isStateDocument<T>);
         auto result =
             std::make_unique<ReshardingMetrics>(document.getCommonReshardingMetadata(),
@@ -181,16 +180,14 @@ public:
                 ReshardingProvenanceEnum::kReshardCollection);
             switch (provenance) {
                 case ReshardingProvenanceEnum::kMoveCollection:
-                    return ShardingDataTransformCumulativeMetrics::getForMoveCollection(
-                        serviceContext);
+                    return ReshardingCumulativeMetrics::getForMoveCollection(serviceContext);
                 case ReshardingProvenanceEnum::kBalancerMoveCollection:
-                    return ShardingDataTransformCumulativeMetrics::getForBalancerMoveCollection(
+                    return ReshardingCumulativeMetrics::getForBalancerMoveCollection(
                         serviceContext);
                 case ReshardingProvenanceEnum::kUnshardCollection:
-                    return ShardingDataTransformCumulativeMetrics::getForUnshardCollection(
-                        serviceContext);
+                    return ReshardingCumulativeMetrics::getForUnshardCollection(serviceContext);
                 case ReshardingProvenanceEnum::kReshardCollection:
-                    return ShardingDataTransformCumulativeMetrics::getForResharding(serviceContext);
+                    return ReshardingCumulativeMetrics::getForResharding(serviceContext);
             }
             MONGO_UNREACHABLE;
         }();
@@ -239,19 +236,19 @@ public:
 
     template <typename T>
     void onStateTransition(T before, boost::none_t after) {
-        getTypedCumulativeMetrics()->template onStateTransition<T>(before, boost::none);
+        getCumulativeMetrics()->template onStateTransition<T>(before, boost::none);
     }
 
     template <typename T>
     void onStateTransition(boost::none_t before, T after) {
         setState(after);
-        getTypedCumulativeMetrics()->template onStateTransition<T>(boost::none, after);
+        getCumulativeMetrics()->template onStateTransition<T>(boost::none, after);
     }
 
     template <typename T>
     void onStateTransition(T before, T after) {
         setState(after);
-        getTypedCumulativeMetrics()->template onStateTransition<T>(before, after);
+        getCumulativeMetrics()->template onStateTransition<T>(before, after);
     }
 
     void onInsertApplied();
@@ -352,7 +349,7 @@ public:
 
 private:
     static constexpr auto kNoDate = Date_t::min();
-    using UniqueScopedObserver = ShardingDataTransformCumulativeMetrics::UniqueScopedObserver;
+    using UniqueScopedObserver = ReshardingCumulativeMetrics::UniqueScopedObserver;
 
     template <typename T>
     T getElapsed(const AtomicWord<Date_t>& startTime,
@@ -378,8 +375,7 @@ private:
     void restoreDocumentsProcessed(int64_t documentCount, int64_t totalDocumentsSizeBytes);
     void restoreWritesToStashCollections(int64_t writesToStashCollections);
 
-    ShardingDataTransformCumulativeMetrics* getCumulativeMetrics();
-    ReshardingCumulativeMetrics* getTypedCumulativeMetrics();
+    ReshardingCumulativeMetrics* getCumulativeMetrics();
     ClockSource* getClockSource() const;
     UniqueScopedObserver registerInstanceMetrics();
 
@@ -494,7 +490,7 @@ private:
 
     ClockSource* _clockSource;
     ObserverPtr _observer;
-    ShardingDataTransformCumulativeMetrics* _cumulativeMetrics;
+    ReshardingCumulativeMetrics* _cumulativeMetrics;
 
     AtomicWord<int64_t> _approxDocumentsToProcess;
     AtomicWord<int64_t> _documentsProcessed;

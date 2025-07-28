@@ -137,13 +137,13 @@ void ReshardingMetrics::ExternallyTrackedRecipientFields::accumulateFrom(
 ReshardingMetrics::ReshardingMetrics(const CommonReshardingMetadata& metadata,
                                      Role role,
                                      ClockSource* clockSource,
-                                     ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
+                                     ReshardingCumulativeMetrics* cumulativeMetrics)
     : ReshardingMetrics{metadata, role, clockSource, cumulativeMetrics, getDefaultState(role)} {}
 
 ReshardingMetrics::ReshardingMetrics(const CommonReshardingMetadata& metadata,
                                      Role role,
                                      ClockSource* clockSource,
-                                     ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+                                     ReshardingCumulativeMetrics* cumulativeMetrics,
                                      State state)
     : ReshardingMetrics{metadata.getReshardingUUID(),
                         metadata.getReshardingKey().toBSON(),
@@ -161,7 +161,7 @@ ReshardingMetrics::ReshardingMetrics(UUID instanceId,
                                      Role role,
                                      Date_t startTime,
                                      ClockSource* clockSource,
-                                     ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+                                     ReshardingCumulativeMetrics* cumulativeMetrics,
                                      State state,
                                      ReshardingProvenanceEnum provenance)
     : ReshardingMetrics{std::move(instanceId),
@@ -181,7 +181,7 @@ ReshardingMetrics::ReshardingMetrics(UUID instanceId,
                                      Role role,
                                      Date_t startTime,
                                      ClockSource* clockSource,
-                                     ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+                                     ReshardingCumulativeMetrics* cumulativeMetrics,
                                      State state,
                                      ObserverPtr observer,
                                      ReshardingProvenanceEnum provenance)
@@ -345,12 +345,8 @@ void ReshardingMetrics::onCloningRemoteBatchRetrieval(Milliseconds elapsed) {
     _cumulativeMetrics->onCloningRemoteBatchRetrieval(elapsed);
 }
 
-ShardingDataTransformCumulativeMetrics* ReshardingMetrics::getCumulativeMetrics() {
+ReshardingCumulativeMetrics* ReshardingMetrics::getCumulativeMetrics() {
     return _cumulativeMetrics;
-}
-
-ReshardingCumulativeMetrics* ReshardingMetrics::getTypedCumulativeMetrics() {
-    return dynamic_cast<ReshardingCumulativeMetrics*>(getCumulativeMetrics());
 }
 
 ClockSource* ReshardingMetrics::getClockSource() const {
@@ -363,27 +359,27 @@ void ReshardingMetrics::setLastOpEndingChunkImbalance(int64_t imbalanceCount) {
 
 void ReshardingMetrics::onInsertApplied() {
     _insertsApplied.fetchAndAdd(1);
-    getTypedCumulativeMetrics()->onInsertApplied();
+    getCumulativeMetrics()->onInsertApplied();
 }
 
 void ReshardingMetrics::onUpdateApplied() {
     _updatesApplied.fetchAndAdd(1);
-    getTypedCumulativeMetrics()->onUpdateApplied();
+    getCumulativeMetrics()->onUpdateApplied();
 }
 
 void ReshardingMetrics::onDeleteApplied() {
     _deletesApplied.fetchAndAdd(1);
-    getTypedCumulativeMetrics()->onDeleteApplied();
+    getCumulativeMetrics()->onDeleteApplied();
 }
 
 void ReshardingMetrics::onOplogEntriesFetched(int64_t numEntries) {
     _oplogEntriesFetched.fetchAndAdd(numEntries);
-    getTypedCumulativeMetrics()->onOplogEntriesFetched(numEntries);
+    getCumulativeMetrics()->onOplogEntriesFetched(numEntries);
 }
 
 void ReshardingMetrics::onOplogEntriesApplied(int64_t numEntries) {
     _oplogEntriesApplied.fetchAndAdd(numEntries);
-    getTypedCumulativeMetrics()->onOplogEntriesApplied(numEntries);
+    getCumulativeMetrics()->onOplogEntriesApplied(numEntries);
 }
 
 void ReshardingMetrics::registerDonors(const std::vector<ShardId>& donorShardIds) {
@@ -506,19 +502,19 @@ boost::optional<Milliseconds> ReshardingMetrics::getMaxAverageTimeToFetchAndAppl
 }
 
 void ReshardingMetrics::onBatchRetrievedDuringOplogFetching(Milliseconds elapsed) {
-    getTypedCumulativeMetrics()->onBatchRetrievedDuringOplogFetching(elapsed);
+    getCumulativeMetrics()->onBatchRetrievedDuringOplogFetching(elapsed);
 }
 
 void ReshardingMetrics::onLocalInsertDuringOplogFetching(const Milliseconds& elapsed) {
-    getTypedCumulativeMetrics()->onLocalInsertDuringOplogFetching(elapsed);
+    getCumulativeMetrics()->onLocalInsertDuringOplogFetching(elapsed);
 }
 
 void ReshardingMetrics::onBatchRetrievedDuringOplogApplying(const Milliseconds& elapsed) {
-    getTypedCumulativeMetrics()->onBatchRetrievedDuringOplogApplying(elapsed);
+    getCumulativeMetrics()->onBatchRetrievedDuringOplogApplying(elapsed);
 }
 
 void ReshardingMetrics::onOplogLocalBatchApplied(Milliseconds elapsed) {
-    getTypedCumulativeMetrics()->onOplogLocalBatchApplied(elapsed);
+    getCumulativeMetrics()->onOplogLocalBatchApplied(elapsed);
 }
 
 boost::optional<ReshardingMetricsTimeInterval> ReshardingMetrics::getIntervalFor(
@@ -617,8 +613,7 @@ std::unique_ptr<ReshardingMetrics> ReshardingMetrics::makeInstance_forTest(
     Role role,
     Date_t startTime,
     ServiceContext* serviceContext) {
-    auto cumulativeMetrics =
-        ShardingDataTransformCumulativeMetrics::getForResharding(serviceContext);
+    auto cumulativeMetrics = ReshardingCumulativeMetrics::getForResharding(serviceContext);
     return std::make_unique<ReshardingMetrics>(instanceId,
                                                createOriginalCommand(nss, std::move(shardKey)),
                                                std::move(nss),
