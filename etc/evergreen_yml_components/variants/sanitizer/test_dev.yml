@@ -185,8 +185,7 @@ buildvariants:
     build_mongot: true
     download_mongot_release: true
   tasks:
-  - name: search_end_to_end_sharded_cluster
-  - name: search_end_to_end_single_node
+  - name: .search_e2e_tests
   - name: .development_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
   - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags
 
@@ -525,8 +524,7 @@ buildvariants:
       --excludeWithAnyTags=tsan_incompatible,requires_latch_analyzer
       --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
   tasks:
-  - name: search_end_to_end_sharded_cluster
-  - name: search_end_to_end_single_node
+  - name: .search_e2e_tests
   - name: compile_test_serial_TG
   - name: compile_test_parallel_unittest_stream_TG
   - name: compile_integration_and_test_parallel_stream_TG
