@@ -1694,6 +1694,20 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "sharding_test_helpers",
+    srcs = [
+        "sharding_ddl_coordinator_external_state_for_test.cpp",
+        "sharding_ddl_coordinator_external_state_for_test.h",
+        "sharding_test_helpers.h",
+        "//src/mongo/db/s/resharding:resharding_metrics_test_fixture.h",
+        "//src/mongo/db/s/resharding:resharding_service_test_helpers.h",
+        "//src/mongo/db/s/resharding:resharding_test_util.cpp",
+        "//src/mongo/db/s/resharding:resharding_test_util.h",
+    ],
+    deps = [":db_s_shard_server_test_deps"],
+)
+
 mongo_cc_unit_test(
     name = "db_s_shard_server_test",
     srcs = [
@@ -1748,16 +1762,14 @@ mongo_cc_unit_test(
         "split_chunk_request_test.cpp",
         "split_vector_test.cpp",
         "start_chunk_clone_request_test.cpp",
-
-        # helpers
-        "sharding_ddl_coordinator_external_state_for_test.cpp",
-        "sharding_ddl_coordinator_external_state_for_test.h",
-        "sharding_test_helpers.h",
     ],
     tags = [
         "mongo_unittest_first_group",
     ],
-    deps = [":db_s_shard_server_test_deps"],
+    deps = [
+        ":db_s_shard_server_test_deps",
+        ":sharding_test_helpers",
+    ],
 )
 
 mongo_cc_unit_test(
@@ -1778,17 +1790,14 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/migration_blocking_operation:migration_blocking_operation_coordinator_test.cpp",
         "//src/mongo/db/s/migration_blocking_operation:multi_update_coordinator_test.cpp",
         "//src/mongo/db/s/primary_only_service_helpers:cancel_state_test.cpp",
-
-        # helpers
-        "sharding_ddl_coordinator_external_state_for_test.cpp",
-        "sharding_ddl_coordinator_external_state_for_test.h",
-        "sharding_test_helpers.h",
-        "//src/mongo/db/s/resharding:resharding_metrics_test_fixture.h",
     ],
     tags = [
         "mongo_unittest_sixth_group",
     ],
-    deps = [":db_s_shard_server_test_deps"],
+    deps = [
+        ":db_s_shard_server_test_deps",
+        ":sharding_test_helpers",
+    ],
 )
 
 mongo_cc_unit_test(
@@ -1806,17 +1815,14 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/resharding:resharding_donor_service_test.cpp",
         "//src/mongo/db/s/resharding:resharding_future_util_test.cpp",
         "//src/mongo/db/s/resharding:resharding_metrics_test.cpp",
-
-        # helpers
-        "//src/mongo/db/s/resharding:resharding_metrics_test_fixture.h",
-        "//src/mongo/db/s/resharding:resharding_service_test_helpers.h",
-        "//src/mongo/db/s/resharding:resharding_test_util.cpp",
-        "//src/mongo/db/s/resharding:resharding_test_util.h",
     ],
     tags = [
         "mongo_unittest_fourth_group",
     ],
-    deps = [":db_s_shard_server_test_deps"],
+    deps = [
+        ":db_s_shard_server_test_deps",
+        ":sharding_test_helpers",
+    ],
 )
 
 mongo_cc_unit_test(
@@ -1832,12 +1838,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/resharding:resharding_recipient_service_external_state_test.cpp",
         "//src/mongo/db/s/resharding:resharding_recipient_service_test.cpp",
         "//src/mongo/db/s/resharding:resharding_txn_cloner_test.cpp",
-
-        # helpers
-        "//src/mongo/db/s/resharding:resharding_metrics_test_fixture.h",
-        "//src/mongo/db/s/resharding:resharding_service_test_helpers.h",
-        "//src/mongo/db/s/resharding:resharding_test_util.cpp",
-        "//src/mongo/db/s/resharding:resharding_test_util.h",
     ],
     tags = [
         # State mismatch in sandbox in resharding_recipient_service_test.cpp
@@ -1845,7 +1845,10 @@ mongo_cc_unit_test(
         "code_coverage_quarantine_SERVER-98847",
         "mongo_unittest_sixth_group",
     ],
-    deps = [":db_s_shard_server_test_deps"],
+    deps = [
+        ":db_s_shard_server_test_deps",
+        ":sharding_test_helpers",
+    ],
 )
 
 mongo_cc_unit_test(
