@@ -177,19 +177,6 @@ TEST(UnitTestSelfTest, TestAssertStringSearchRegex) {
     ASSERT_TEST_FAILS(ASSERT_STRING_SEARCH_REGEX("abcdef", "?.*"));
 }
 
-TEST(UnitTestSelfTest, TestAssertIdentity) {
-    auto intIdentity = [](int x) {
-        return x;
-    };
-    ASSERT_IDENTITY(123, intIdentity);
-    ASSERT_IDENTITY(123, [](int x) { return x; });
-    auto zero = [](auto) {
-        return 0;
-    };
-    ASSERT_TEST_FAILS(ASSERT_IDENTITY(1, zero));
-    ASSERT_TEST_FAILS_MATCH(ASSERT_IDENTITY(1, zero) << "XmsgX", "XmsgX");
-}
-
 TEST(UnitTestSelfTest, TestStreamingIntoFailures) {
     ASSERT_TEST_FAILS_MATCH(ASSERT_TRUE(false) << "Told you so", "Told you so");
     ASSERT_TEST_FAILS_MATCH(ASSERT(false) << "Told you so", "Told you so");

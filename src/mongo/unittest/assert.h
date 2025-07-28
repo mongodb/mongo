@@ -132,24 +132,6 @@
 #define ASSERT_APPROX_EQUAL(a, b, ABSOLUTE_ERR) ASSERT_LTE(std::abs((a) - (b)), ABSOLUTE_ERR)
 
 /**
- * Assert a function call returns its input unchanged.
- */
-#define ASSERT_IDENTITY(INPUT, FUNCTION)                                                  \
-    if (auto ca =                                                                         \
-            [&](const auto& v, const auto& fn) {                                          \
-                return ::mongo::unittest::ComparisonAssertion<                            \
-                    ::mongo::unittest::ComparisonOp::kEq>::make(__FILE__,                 \
-                                                                __LINE__,                 \
-                                                                #INPUT,                   \
-                                                                #FUNCTION "(" #INPUT ")", \
-                                                                v,                        \
-                                                                fn(v));                   \
-            }(INPUT, [&](auto&& x) { return FUNCTION(x); });                              \
-        !ca) {                                                                            \
-    } else                                                                                \
-        ca.failure().stream()
-
-/**
  * Verify that the evaluation of "EXPRESSION" throws an exception of type EXCEPTION_TYPE.
  *
  * If "EXPRESSION" throws no exception, or one that is neither of type "EXCEPTION_TYPE" nor
