@@ -127,6 +127,7 @@ public:
             _stage._memoryTracker.value().set(_sorter->stats().memUsage());
         }
 
+        _stage._specificStats.maxUsedMemBytes = _stage._memoryTracker.value().maxMemoryBytes();
         _stage._specificStats.totalDataSizeBytes += _sorter->stats().bytesSorted();
         _outputIt = _sorter->done();
         _stage._specificStats.keysSorted += _sorter->stats().numSorted();
