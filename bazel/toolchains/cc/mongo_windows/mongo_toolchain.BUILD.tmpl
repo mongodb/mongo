@@ -1,5 +1,10 @@
 load("@//bazel/toolchains/cc/mongo_windows:mongo_windows_cc_toolchain_config.bzl", "mongo_windows_cc_toolchain_config")
 
+SMALLER_BINARY = select({
+    "@//bazel/config:msvc_opt": True,
+    "//conditions:default": False,
+})
+
 DEFAULT_LINK_FLAGS = [
     "/MACHINE:X64",
     "/NODEFAULTLIB:library",
@@ -61,6 +66,7 @@ mongo_windows_cc_toolchain_config(
     },
     toolchain_identifier = "msvc_x64",
     supports_parse_showincludes = True,
+    smaller_binary = SMALLER_BINARY,
 )
 
 cc_toolchain(

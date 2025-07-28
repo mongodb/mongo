@@ -61,18 +61,6 @@ WINDOWS_DEBUG_COPTS = select({
     "//conditions:default": [],
 })
 
-MSVC_OPT_COPTS = select({
-    "//bazel/config:msvc_opt": [
-        # https://devblogs.microsoft.com/cppblog/introducing-gw-compiler-switch/
-        "/Gw",
-        "/Gy",
-
-        # https://devblogs.microsoft.com/cppblog/linker-enhancements-in-visual-studio-2013-update-2-ctp2/
-        "/Zc:inline",
-    ],
-    "//conditions:default": [],
-})
-
 WINDOWS_DEFAULT_LINKFLAGS = select({
     "//bazel/config:windows_debug_symbols_enabled": [
         # /DEBUG will tell the linker to create a .pdb file which WinDbg and
@@ -112,14 +100,6 @@ WINDOWS_INCREMENTAL_LINKOPT = select({
     "//conditions:default": [],
 })
 
-MSVC_OPT_LINKFLAGS = select({
-    "//bazel/config:msvc_opt": [
-        # https://devblogs.microsoft.com/cppblog/introducing-gw-compiler-switch/
-        "/OPT:REF",
-    ],
-    "//conditions:default": [],
-})
-
 SASL_WINDOWS_COPTS = select({
     "@platforms//os:windows": ["-Iexternal/windows_sasl/include"],
     "//conditions:default": [],
@@ -129,13 +109,11 @@ MONGO_WIN_CC_COPTS = (
     WINDOWS_DEBUG_COPTS +
     WINDOWS_OPT_COPTS +
     WINDOWS_RUNTIME_ERROR_CHECK_COPTS +
-    MSVC_OPT_COPTS +
     SASL_WINDOWS_COPTS
 )
 
 MONGO_WIN_CC_LINKFLAGS = (
     WINDOWS_DEFAULT_LINKFLAGS +
     WINDOWS_PDB_PAGE_SIZE_LINKOPT +
-    WINDOWS_INCREMENTAL_LINKOPT +
-    MSVC_OPT_LINKFLAGS
+    WINDOWS_INCREMENTAL_LINKOPT
 )

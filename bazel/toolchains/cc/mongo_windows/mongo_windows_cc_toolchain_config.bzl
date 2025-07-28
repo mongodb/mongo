@@ -1217,17 +1217,22 @@ def _impl(ctx):
 
         smaller_binary_feature = feature(
             name = "smaller_binary",
-            enabled = False,
+            enabled = ctx.attr.smaller_binary,
             flag_sets = [
                 flag_set(
                     actions = [ACTION_NAMES.c_compile, ACTION_NAMES.cpp_compile],
-                    flag_groups = [flag_group(flags = ["/Gy", "/Gw"])],
-                    with_features = [with_feature_set(features = ["opt"])],
+                    flag_groups = [flag_group(flags = [
+                        # https://devblogs.microsoft.com/cppblog/introducing-gw-compiler-switch/
+                        "/Gy",
+                        "/Gw",
+                    ])],
                 ),
                 flag_set(
                     actions = all_link_actions,
-                    flag_groups = [flag_group(flags = ["/OPT:ICF", "/OPT:REF"])],
-                    with_features = [with_feature_set(features = ["opt"])],
+                    flag_groups = [flag_group(flags = [
+                        # https://devblogs.microsoft.com/cppblog/introducing-gw-compiler-switch/
+                        "/OPT:REF",
+                    ])],
                 ),
             ],
         )
@@ -1238,7 +1243,10 @@ def _impl(ctx):
             flag_sets = [
                 flag_set(
                     actions = [ACTION_NAMES.c_compile, ACTION_NAMES.cpp_compile],
-                    flag_groups = [flag_group(flags = ["/Zc:inline"])],
+                    flag_groups = [flag_group(flags = [
+                        # https://devblogs.microsoft.com/cppblog/linker-enhancements-in-visual-studio-2013-update-2-ctp2/
+                        "/Zc:inline",
+                    ])],
                 ),
             ],
         )
@@ -1760,6 +1768,7 @@ mongo_windows_cc_toolchain_config = rule(
         "tool_paths": attr.string_dict(),
         "toolchain_identifier": attr.string(),
         "windows_version_minimal": attr.label(default = "//bazel/config:win_min_version"),
+        "smaller_binary": attr.bool(default = False),
     },
     provides = [CcToolchainConfigInfo],
 )
