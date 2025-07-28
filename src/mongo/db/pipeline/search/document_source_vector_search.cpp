@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/search/mongot_cursor.h"
+#include "mongo/db/query/search/search_index_view_validation.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/views/resolved_view.h"
@@ -244,6 +245,7 @@ intrusive_ptr<DocumentSource> DocumentSourceVectorSearch::createFromBson(
 
     if (view) {
         search_helpers::validateMongotIndexedViewsFF(expCtx, view->getEffectivePipeline());
+        search_index_view_validation::validate(*view);
     }
 
     auto serviceContext = expCtx->getOperationContext()->getServiceContext();

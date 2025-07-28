@@ -185,26 +185,49 @@ const [viewNames, views] = createViews();
 export function runHybridSearchOnSearchViewsTest(
     inputPipelines, checkCorrectness = true, createPipelineFn) {
     const hybridSearchPipeline = createPipelineFn(inputPipelines);
+
+    // Check if any of the input pipelines are mongot input pipelines.
+    let hasMongotPipeline = false;
+    for (const pipeline of Object.values(inputPipelines)) {
+        if (pipeline.length > 0 && mongotInputPipelines.has(pipeline[0])) {
+            hasMongotPipeline = true;
+            break;
+        }
+    }
+
     for (let i = 0; i < views.length; i++) {
         const searchView = views[i];
-        const hybridSearchPipelineWithViewPrepended =
-            createPipelineFn(inputPipelines, viewPipelines[i]);
 
-        const expectedResultsNoSearchIndexOnView =
-            coll.aggregate(hybridSearchPipelineWithViewPrepended);
+        // If any part of the input pipeline has a mongot stage, then the hybrid search should fail
+        // as mongot queries on mongot views are not allowed.
+        if (hasMongotPipeline) {
+            assert.commandFailedWithCode(
+                searchView.runCommand("aggregate", {pipeline: hybridSearchPipeline, cursor: {}}),
+                10623000);
+            assert.commandFailedWithCode(
+                searchView.runCommand("aggregate",
+                                      {pipeline: hybridSearchPipeline, explain: true, cursor: {}}),
+                10623000);
+        } else {
+            const hybridSearchPipelineWithViewPrepended =
+                createPipelineFn(inputPipelines, viewPipelines[i]);
 
-        assert.commandWorked(coll.runCommand(
-            "aggregate",
-            {pipeline: hybridSearchPipelineWithViewPrepended, explain: true, cursor: {}}));
+            const expectedResultsNoSearchIndexOnView =
+                coll.aggregate(hybridSearchPipelineWithViewPrepended);
 
-        const viewResultsNoSearchIndexOnColl = searchView.aggregate(hybridSearchPipeline);
+            assert.commandWorked(coll.runCommand(
+                "aggregate",
+                {pipeline: hybridSearchPipelineWithViewPrepended, explain: true, cursor: {}}));
 
-        assert.commandWorked(searchView.runCommand(
-            "aggregate", {pipeline: hybridSearchPipeline, explain: true, cursor: {}}));
+            const viewResultsNoSearchIndexOnColl = searchView.aggregate(hybridSearchPipeline);
 
-        if (checkCorrectness) {
-            assertDocArrExpectedFuzzy(expectedResultsNoSearchIndexOnView.toArray(),
-                                      viewResultsNoSearchIndexOnColl.toArray());
+            assert.commandWorked(searchView.runCommand(
+                "aggregate", {pipeline: hybridSearchPipeline, explain: true, cursor: {}}));
+
+            if (checkCorrectness) {
+                assertDocArrExpectedFuzzy(expectedResultsNoSearchIndexOnView.toArray(),
+                                          viewResultsNoSearchIndexOnColl.toArray());
+            }
         }
     }
 }
@@ -221,21 +244,17 @@ export function runHybridSearchWithAllMongotInputPipelinesOnSearchViewsTest(inpu
             searchView.runCommand({createSearchIndexes: viewNames[i], indexes: [searchIndexDef]}),
             10623000);
 
-        // Running a hybrid search query with mongot input pipelines aggregation query should work
+        // Running a hybrid search query with mongot input pipelines aggregation query should fail
         // on views defined with search.
-        assert.commandWorked(
-            searchView.runCommand("aggregate", {pipeline: hybridSearchPipeline, cursor: {}}));
+        assert.commandFailedWithCode(
+            searchView.runCommand("aggregate", {pipeline: hybridSearchPipeline, cursor: {}}),
+            10623000);
 
-        // Explain for this query should work.
-        assert.commandWorked(searchView.runCommand(
-            "aggregate", {pipeline: hybridSearchPipeline, explain: true, cursor: {}}));
-
-        // If all of the hybrid search query's input pipelines are mongot input pipelines, then
-        // the aggregation query should fail silently (not return any documents) because the search
-        // index(es) that hybrid search query's input pipelines specify will not be on the search
-        // view. Thus, mongot will look for the specified searchIndex names on the view, not find
-        // them, and return nothing.
-        assert.eq(searchView.aggregate(hybridSearchPipeline)["_batch"], []);
+        // Explain for this query should fail.
+        assert.commandFailedWithCode(
+            searchView.runCommand("aggregate",
+                                  {pipeline: hybridSearchPipeline, explain: true, cursor: {}}),
+            10623000);
     }
 }
 

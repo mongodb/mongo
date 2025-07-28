@@ -42,7 +42,7 @@ namespace mongo {
 namespace search_index_view_validation {
 
 static constexpr StringData errorPrefix =
-    "Cannot create or update index as the view definition is incompatible with Atlas Search: "_sd;
+    "Cannot perform a search operation as the view definition is incompatible with Atlas Search: "_sd;
 
 namespace {
 

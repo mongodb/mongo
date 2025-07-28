@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
+#include "mongo/db/query/search/search_index_view_validation.h"
 #include "mongo/db/query/search/search_task_executors.h"
 
 #include <boost/optional/optional.hpp>
@@ -175,6 +176,7 @@ InternalSearchMongotRemoteSpec prepareInternalSearchMetaMongotSpec(
 
         if (auto view = params.getView()) {
             search_helpers::validateMongotIndexedViewsFF(expCtx, view->getEffectivePipeline());
+            search_index_view_validation::validate(*view);
         }
 
         return params;
