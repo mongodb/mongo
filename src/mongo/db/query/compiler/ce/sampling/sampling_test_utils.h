@@ -176,6 +176,12 @@ public:
         return operationContext();
     }
 
+    /**
+     * Helper to create sampling estimator for unit tests.
+     */
+    SamplingEstimatorForTesting createSamplingEstimatorForTesting(size_t collCard,
+                                                                  size_t sampleSize);
+
     NamespaceString _kTestNss;
 };
 
