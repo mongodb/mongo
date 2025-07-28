@@ -4,6 +4,10 @@
 //
 
 class DBExplainQuery {
+    /**
+     * @param {DBQuery} query
+     * @param {*} verbosity
+     */
     constructor(query, verbosity) {
         //
         // Private vars.

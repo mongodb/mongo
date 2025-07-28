@@ -1,4 +1,4 @@
-// type declarations for db.js
+// type declarations for db.js, which extends objects/methods implemented in cpp.
 
 declare class DB {
 

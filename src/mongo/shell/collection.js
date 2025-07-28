@@ -3,7 +3,14 @@
 // or db["colName"]
 
 if ((typeof DBCollection) == "undefined") {
-    DBCollection = function(mongo, db, shortName, fullName) {
+    /**
+     *
+     * @param {Mongo} mongo
+     * @param {DB} db
+     * @param {string} shortName
+     * @param {string} fullName
+     */
+    function DBCollection(mongo, db, shortName, fullName) {
         this._mongo = mongo;
         this._db = db;
         this._shortName = shortName;

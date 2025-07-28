@@ -132,7 +132,7 @@ MongoDB commands:
 - `assert.writeErrorWithCode()`
 - `assert.noAPIParams()`
 
-See more details on specific assert functions and their signatures in [assert.d.ts](assert.d.ts).
+See more details on specific assert functions and their signatures in [assert.js](assert.js).
 
 ## Types Library
 
@@ -181,7 +181,7 @@ instance:
 - replica set control functions
 - logging functions
 
-See more details on specific functions and their signatures in [utils.d.ts](utils.d.ts).
+See more details on specific functions and their signatures in [utils.js](utils.js).
 
 ### Logging
 

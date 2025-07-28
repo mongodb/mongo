@@ -34,28 +34,28 @@ export default [
                 // jstests/libs/parallelTester.d.ts
                 CountDownLatch: true,
 
-                // src/mongo/shell/assert.js
+                // src/mongo/shell/assert_global.js
                 assert: true,
                 doassert: true,
                 sortDoc: true,
                 formatErrorMsg: true,
 
-                // src/mongo/shell/bridge.d.ts
+                // src/mongo/shell/bridge_global.js
                 MongoBridge: true,
 
-                // src/mongo/shell/bulk_api.d.ts
+                // src/mongo/shell/bulk_api_global.js
                 BulkWriteError: true,
                 WriteCommandError: true,
                 WriteConcern: true,
                 WriteError: true,
 
-                // src/mongo/shell/check_log.d.ts
+                // src/mongo/shell/check_log_global.js
                 checkLog: true,
 
-                // src/mongo/shell/collection.d.ts
+                // src/mongo/shell/collection.js
                 DBCollection: true,
 
-                // src/mongo/shell/data_consistency_checker.d.ts
+                // src/mongo/shell/data_consistency_checker_global.js
                 CollInfos: true,
                 DataConsistencyChecker: true,
 
@@ -66,10 +66,10 @@ export default [
                 ErrorCodeStrings: true,
                 ErrorCodes: true,
 
-                // src/mongo/shell/explain_query.d.ts
+                // src/mongo/shell/explain_query_global.js
                 DBExplainQuery: true,
 
-                // src/mongo/shell/explainable.d.ts
+                // src/mongo/shell/explainable_global.js
                 Explainable: true,
 
                 // src/mongo/shell/feature_compatibility_version_global.js
@@ -83,7 +83,7 @@ export default [
                 removeFCVDocument: true,
                 runFeatureFlagMultiversionTest: true,
 
-                // src/mongo/shell/query.d.ts
+                // src/mongo/shell/query_global.js
                 DBQuery: true,
                 DBCommandCursor: true,
                 QueryHelpers: true,

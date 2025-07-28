@@ -2,7 +2,7 @@
  * Helper functions which connect to a server or reads a log file, and check its logs for particular
  * strings.
  */
-let getGlobalLog = function(connOrFile) {
+function getGlobalLog(connOrFile) {
     assert(typeof connOrFile !== 'undefined', "Connection is undefined");
     let cmdRes;
     if (typeof connOrFile === 'object') {
@@ -31,7 +31,7 @@ let getGlobalLog = function(connOrFile) {
  * is found in the logs. Note: this function does not throw an exception, so the return
  * value should not be ignored.
  */
-const getLogMessage = function(connOrFile, msg) {
+function getLogMessage(connOrFile, msg) {
     const logMessages = getGlobalLog(connOrFile);
     if (logMessages === null) {
         return null;
@@ -57,7 +57,7 @@ const getLogMessage = function(connOrFile, msg) {
  * provided msg is found in the logs. Note: this function does not throw an exception, so the
  * return value should not be ignored.
  */
-const checkContainsOnce = function(connOrFile, msg) {
+function checkContainsOnce(connOrFile, msg) {
     const logMessages = getGlobalLog(connOrFile);
     if (logMessages === null) {
         return false;
@@ -78,7 +78,7 @@ const checkContainsOnce = function(connOrFile, msg) {
     return false;
 };
 
-const checkContainsOnceJson = function(connOrFile, id, attrsDict, severity = null) {
+function checkContainsOnceJson(connOrFile, id, attrsDict, severity = null) {
     const logMessages = getGlobalLog(connOrFile);
     if (logMessages === null) {
         return false;
@@ -112,17 +112,17 @@ const checkContainsOnceJson = function(connOrFile, id, attrsDict, severity = nul
  * applied to appropriately compare the count with `expectedCount`. `context` allows to check
  * the `ctx` field of the logs.
  */
-const checkContainsWithCountJson = function(connOrFile,
-                                            id,
-                                            attrsDict,
-                                            expectedCount,
-                                            severity = null,
-                                            isRelaxed = false,
-                                            comparator =
-                                                (actual, expected) => {
-                                                    return actual === expected;
-                                                },
-                                            context = null) {
+function checkContainsWithCountJson(connOrFile,
+                                    id,
+                                    attrsDict,
+                                    expectedCount,
+                                    severity = null,
+                                    isRelaxed = false,
+                                    comparator =
+                                        (actual, expected) => {
+                                            return actual === expected;
+                                        },
+                                    context = null) {
     const messages =
         getFilteredLogMessages(connOrFile, id, attrsDict, severity, isRelaxed, context);
 
@@ -135,7 +135,7 @@ const checkContainsWithCountJson = function(connOrFile,
  * Similar to checkContainsWithCountJson, but checks whether there are at least 'expectedCount'
  * instances of 'id' in the logs.
  */
-const checkContainsWithAtLeastCountJson = function(
+function checkContainsWithAtLeastCountJson(
     connOrFile, id, attrsDict, expectedCount, severity = null, isRelaxed = false, context = null) {
     return checkContainsWithCountJson(
         connOrFile, id, attrsDict, expectedCount, severity, isRelaxed, (actual, expected) => {
@@ -149,7 +149,7 @@ const checkContainsWithAtLeastCountJson = function(
  * attribute by attrName and checks if the msg is found in its value. Note: this function does
  * not throw an exception, so the return value should not be ignored.
  */
-const checkContainsOnceJsonStringMatch = function(connOrFile, id, attrName, msg) {
+function checkContainsOnceJsonStringMatch(connOrFile, id, attrName, msg) {
     const logMessages = getGlobalLog(connOrFile);
     if (logMessages === null) {
         return false;
@@ -169,7 +169,7 @@ const checkContainsOnceJsonStringMatch = function(connOrFile, id, attrName, msg)
 /*
  * See checkContainsWithCountJson comment.
  */
-const getFilteredLogMessages = function(
+function getFilteredLogMessages(
     connOrFile, id, attrsDict, severity = null, isRelaxed = false, context = null) {
     const logMessages = getGlobalLog(connOrFile);
     if (logMessages === null) {
@@ -201,7 +201,7 @@ const getFilteredLogMessages = function(
  * 'connOrFile' until the provided 'msg' is found in the logs, or it times out. Throws an
  * exception on timeout.
  */
-let contains = function(connOrFile, msg, timeoutMillis = 5 * 60 * 1000, retryIntervalMS = 300) {
+function contains(connOrFile, msg, timeoutMillis = 5 * 60 * 1000, retryIntervalMS = 300) {
     // Don't run the hang analyzer because we don't expect contains() to always succeed.
     assert.soon(
         function() {
@@ -218,7 +218,7 @@ let contains = function(connOrFile, msg, timeoutMillis = 5 * 60 * 1000, retryInt
  * file'connOrFile' until the provided 'msg' is found in the logs and returned, or it times out.
  * Throws an exception on timeout.
  */
-let containsLog = function(connOrFile, msg, timeoutMillis = 5 * 60 * 1000, retryIntervalMS = 300) {
+function containsLog(connOrFile, msg, timeoutMillis = 5 * 60 * 1000, retryIntervalMS = 300) {
     // Don't run the hang analyzer because we don't expect contains() to always succeed.
     let logMsg = null;
     assert.soon(
@@ -236,7 +236,7 @@ let containsLog = function(connOrFile, msg, timeoutMillis = 5 * 60 * 1000, retry
     return logMsg;
 };
 
-let containsJson = function(connOrFile, id, attrsDict, timeoutMillis = 5 * 60 * 1000) {
+function containsJson(connOrFile, id, attrsDict, timeoutMillis = 5 * 60 * 1000) {
     // Don't run the hang analyzer because we don't expect contains() to always succeed.
     assert.soon(
         function() {
@@ -256,16 +256,16 @@ let containsJson = function(connOrFile, id, attrsDict, timeoutMillis = 5 * 60 * 
  * or exactly `expectedCount` times based on the `comparator` function passed in or the timeout
  * (in ms) is reached.
  */
-let containsRelaxedJson = function(connOrFile,
-                                   id,
-                                   attrsDict,
-                                   expectedCount = 1,
-                                   timeoutMillis = 5 * 60 * 1000,
-                                   comparator =
-                                       (actual, expected) => {
-                                           return actual === expected;
-                                       },
-                                   context = null) {
+function containsRelaxedJson(connOrFile,
+                             id,
+                             attrsDict,
+                             expectedCount = 1,
+                             timeoutMillis = 5 * 60 * 1000,
+                             comparator =
+                                 (actual, expected) => {
+                                     return actual === expected;
+                                 },
+                             context = null) {
     // Don't run the hang analyzer because we don't expect contains() to always succeed.
     assert.soon(
         function() {
@@ -286,7 +286,7 @@ let containsRelaxedJson = function(connOrFile,
  * equal to 'expectedCount'. Otherwise, checks whether the count is at least equal to
  * 'expectedCount'. Early returns when at least 'expectedCount' entries are found.
  */
-let containsWithCount = function(
+function containsWithCount(
     connOrFile, msg, expectedCount, timeoutMillis = 5 * 60 * 1000, exact = true) {
     let expectedStr = exact ? 'exactly ' : 'at least ';
     assert.soon(
@@ -325,8 +325,7 @@ let containsWithCount = function(
  * Similar to containsWithCount, but checks whether there are at least 'expectedCount'
  * instances of 'msg' in the logs.
  */
-let containsWithAtLeastCount = function(
-    connOrFile, msg, expectedCount, timeoutMillis = 5 * 60 * 1000) {
+function containsWithAtLeastCount(connOrFile, msg, expectedCount, timeoutMillis = 5 * 60 * 1000) {
     containsWithCount(connOrFile, msg, expectedCount, timeoutMillis, /*exact*/ false);
 };
 
@@ -337,7 +336,7 @@ let containsWithAtLeastCount = function(
  * serialized as integers, while those within an object are serialized as floats to one
  * decimal point. NumberLongs are unwrapped prior to serialization.
  */
-const formatAsLogLine = function(value, escapeStrings, toDecimal) {
+function formatAsLogLine(value, escapeStrings, toDecimal) {
     if (typeof value === "string") {
         return (escapeStrings ? `"${value}"` : value);
     } else if (typeof value === "number") {
@@ -361,7 +360,7 @@ const formatAsLogLine = function(value, escapeStrings, toDecimal) {
 /**
  * Format at the json for the log file which has no extra spaces.
  */
-const formatAsJsonLogLine = function(value, escapeStrings, toDecimal) {
+function formatAsJsonLogLine(value, escapeStrings, toDecimal) {
     if (typeof value === "string") {
         return (escapeStrings ? `"${value}"` : value);
     } else if (typeof value === "number") {
@@ -432,7 +431,7 @@ const _isObject = function(object) {
  * fields specified in the attrsDict attribute are equal to those in the corresponding attribute
  * of obj. Otherwise, `_deepEqual()` checks that both subobjects are identical.
  */
-const compareLogs = function(obj, id, severity, context, attrsDict, isRelaxed = false) {
+function compareLogs(obj, id, severity, context, attrsDict, isRelaxed = false) {
     if (obj.id !== id) {
         return false;
     }

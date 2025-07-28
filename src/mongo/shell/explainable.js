@@ -37,6 +37,11 @@ let buildExplainCmd = function(innerCmd, verbosity) {
     return explainCmd;
 };
 
+/**
+ *
+ * @param {*} collection
+ * @param {*} verbosity
+ */
 function Explainable(collection, verbosity) {
     //
     // Private vars.
