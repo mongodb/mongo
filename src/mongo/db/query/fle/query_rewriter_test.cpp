@@ -46,6 +46,7 @@
 #include "mongo/db/query/fle/encrypted_predicate_test_fixtures.h"
 #include "mongo/db/query/fle/query_rewriter_interface.h"
 #include "mongo/db/query/fle/server_rewrite_helper.h"
+#include "mongo/db/query/fle/text_search_predicate.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -245,10 +246,12 @@ private:
 
 // A mock rewriter for text search predicates which will rewrite the string 'original' to
 // 'rewritten' as an arbitrary choice to show rewrites work properly.
-class EncTextSearchPredicateRewriter : public fle::EncryptedPredicate {
+class EncTextSearchPredicateRewriter : public fle::TextSearchPredicate {
 public:
-    EncTextSearchPredicateRewriter(const fle::QueryRewriterInterface* rewriter)
-        : EncryptedPredicate(rewriter) {}
+    EncTextSearchPredicateRewriter(const fle::QueryRewriterInterface* rewriter,
+                                   bool forceCollectionScanOnAggAsMatchRewrite = false)
+        : TextSearchPredicate(rewriter),
+          _forceCollScanOnAggAsMatchRewrite(forceCollectionScanOnAggAsMatchRewrite) {}
 
     static inline const std::string kPayloadText{"original"};
     static inline const std::string kRewrittenText{"rewritten"};
@@ -266,6 +269,15 @@ protected:
     }
 
     std::vector<PrfBlock> generateTags(fle::BSONValue payload) const override {
+        /**
+         * If we are in _forceCollScanOnAggAsMatchRewrite, we want text predicates to artifically
+         * trigger a failure to generate tags for our testing. Note, this only happens when
+         * rewriting FLE as an match tag disjunction.
+         */
+        if (_forceCollScanOnAggAsMatchRewrite) {
+            uasserted(ErrorCodes::FLEMaxTagLimitExceeded,
+                      "Forced test mode encrypted rewrite too many tags");
+        }
         return {};
     };
 
@@ -347,6 +359,13 @@ private:
     EncryptedBinDataType encryptedBinDataType() const override {
         return EncryptedBinDataType::kPlaceholder;
     }
+
+    /**
+     * When _forceCollScanOnAggAsMatchRewrite is set to true, this generateTags() will throw an
+     * exception indicating the tag limit was exceeded. Note, in these unit tests, the code path for
+     * calling generateTags() is only called when calling rewriteToTagDisjunctionAsMatch.
+     */
+    const bool _forceCollScanOnAggAsMatchRewrite{false};
 };
 
 // Define the mock match and agg rewrite maps to be used by the unit tests.
@@ -376,13 +395,14 @@ static const fle::ExpressionToRewriteMap aggRewriteMap{
          return EncTextSearchPredicateRewriter{rewriter}.rewrite(expr);
      }}}};
 
-
 class MockQueryRewriter : public fle::QueryRewriter {
 public:
     MockQueryRewriter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                       const NamespaceString& mockNss,
-                      const std::map<NamespaceString, NamespaceString>& escMap)
-        : fle::QueryRewriter(expCtx, mockNss, aggRewriteMap, matchRewriteMap, escMap) {}
+                      const std::map<NamespaceString, NamespaceString>& escMap,
+                      const bool forceCollectionScanOnAggAsMatchRewrite)
+        : fle::QueryRewriter(expCtx, mockNss, aggRewriteMap, matchRewriteMap, escMap),
+          _forceCollectionScanOnAggAsMatchRewrite(forceCollectionScanOnAggAsMatchRewrite) {}
 
     BSONObj rewriteMatchExpressionForTest(const BSONObj& obj) {
         auto res = rewriteMatchExpression(obj);
@@ -401,15 +421,27 @@ public:
     static fle::QueryRewriter getQueryRewriterWithMockedMaps(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
-        const std::map<NamespaceString, NamespaceString>& escMap) {
+        const std::map<NamespaceString, NamespaceString>& escMap,
+        bool forceCollectionScanOnAggAsMatchRewrite) {
         // Workaround for protected fle::QueryRewriter constructor. Slices the mocked object,
         // leaving us with the copied base class with mocked maps.
-        return MockQueryRewriter(expCtx, nss, escMap);
+        return MockQueryRewriter(expCtx, nss, escMap, forceCollectionScanOnAggAsMatchRewrite);
     }
 
 private:
+    // This method is only called from _initializeTextSearchPredicate, which guarantees that we
+    // never re-initialize our predicate.
+    std::unique_ptr<fle::TextSearchPredicate> _initializeTextSearchPredicateInternal()
+        const override {
+        return std::make_unique<EncTextSearchPredicateRewriter>(
+            this, _forceCollectionScanOnAggAsMatchRewrite);
+    }
+
     fle::TagMap _tags;
     std::set<StringData> _encryptedFields;
+    // _forceCollectionScanOnAggAsMatchRewrite indicates that the _textSearchPredicate we initialize
+    // for this QueryRewriter will throw an exception for tag limit exceeded when generating tags.
+    const bool _forceCollectionScanOnAggAsMatchRewrite;
 };
 
 class FLEServerRewriteTest : public unittest::Test {
@@ -417,7 +449,8 @@ public:
     FLEServerRewriteTest() : _mock(nullptr) {}
 
     void setUp() override {
-        _mock = std::make_unique<MockQueryRewriter>(_expCtx, _mockNss, _mockEscMap);
+        _mock = std::make_unique<MockQueryRewriter>(
+            _expCtx, _mockNss, _mockEscMap, false /*forceCollectionScanOnAggAsMatchRewrite*/);
     }
 
     void tearDown() override {}
@@ -429,6 +462,30 @@ protected:
     std::map<NamespaceString, NamespaceString> _mockEscMap{{_mockNss, _mockNss}};
 };
 
+class FLEServerRewriteTestForceCollScanOnTextSearchPredicates : public FLEServerRewriteTest {
+public:
+    FLEServerRewriteTestForceCollScanOnTextSearchPredicates() : FLEServerRewriteTest() {}
+
+    void setUp() override {
+        _mock = std::make_unique<MockQueryRewriter>(
+            _expCtx, _mockNss, _mockEscMap, true /*forceCollectionScanOnAggAsMatchRewrite*/);
+    }
+
+    void tearDown() override {}
+};
+
+class FLEServerRewriteTestForceCollScan : public FLEServerRewriteTest {
+public:
+    FLEServerRewriteTestForceCollScan() : FLEServerRewriteTest() {}
+
+    void setUp() override {
+        _mock = std::make_unique<MockQueryRewriter>(_expCtx, _mockNss, _mockEscMap, false);
+        _mock->setForceEncryptedCollScanForTest();
+    }
+
+    void tearDown() override {}
+};
+
 #define ASSERT_MATCH_EXPRESSION_REWRITE(input, expected)                 \
     auto actual = _mock->rewriteMatchExpressionForTest(fromjson(input)); \
     ASSERT_BSONOBJ_EQ(actual, fromjson(expected));
@@ -436,6 +493,18 @@ protected:
 #define TEST_FLE_REWRITE_MATCH(name, input, expected)      \
     TEST_F(FLEServerRewriteTest, name##_MatchExpression) { \
         ASSERT_MATCH_EXPRESSION_REWRITE(input, expected);  \
+    }
+
+#define TEST_FLE_REWRITE_MATCH_FORCE_COLLSCAN(name, input, expected)                  \
+    TEST_F(FLEServerRewriteTestForceCollScan, name##_MatchExpression_ForceCollScan) { \
+        ASSERT_MATCH_EXPRESSION_REWRITE(input, expected);                             \
+    }
+
+#define TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION( \
+    name, input, expected)                                                            \
+    TEST_F(FLEServerRewriteTestForceCollScanOnTextSearchPredicates,                   \
+           name##_MatchExpression_ForceTextSearchGenerateTagsAsMatchException) {      \
+        ASSERT_MATCH_EXPRESSION_REWRITE(input, expected);                             \
     }
 
 #define ASSERT_AGG_EXPRESSION_REWRITE(input, expected)                 \
@@ -541,18 +610,128 @@ TEST_FLE_REWRITE_AGG(
     "{$and: [{$encStrStartsWith: {input: '$ssn', prefix: {$const: 'rewritten'}}}, "
     "{$encStrStartsWith: {input: '$otherSsn', prefix: {$const: 'other'}}}]}")
 
-TEST_FLE_REWRITE_MATCH(
+// Text search predicates generate match style $elemMatch
+TEST_FLE_REWRITE_MATCH(Match_FleEncStrStartsWith_Expr,
+                       "{$expr: {$encStrStartsWith: {input: '$ssn', prefix: 'original'}}}",
+                       "{ __safeContent__: { $elemMatch: { $in: [] } } }")
+
+// When we force a collection scan, no rewrites expected for encStrStartsWith.
+TEST_FLE_REWRITE_MATCH_FORCE_COLLSCAN(
     Match_FleEncStrStartsWith_Expr,
     "{$expr: {$encStrStartsWith: {input: '$ssn', prefix: 'original'}}}",
-    "{$expr: {$encStrStartsWith: {input: '$ssn', prefix: {$const: 'rewritten'}}}}");
+    "{$expr: {$encStrStartsWith: {input: '$ssn', prefix: 'original'}}}")
 
+//  $expr with encrypted text seach expressions within match $and are replaced with $elemMatch
 TEST_FLE_REWRITE_MATCH(
     Match_Nested_FleEncStrStartsWith_Expr,
     "{$and: [{$expr: {$encStrStartsWith: {input: '$ssn', prefix: 'original'}}}, {$expr: "
     "{$encStrStartsWith: {input: "
     "'$otherSsn', prefix: 'other'}}}]}",
-    "{$and: [{$expr: {$encStrStartsWith: {input: '$ssn', prefix: {$const: 'rewritten'}}}}, "
-    "{$expr: {$encStrStartsWith: {input: '$otherSsn', prefix: {$const: 'other'}}}}]}")
+    R"({$and: [
+        { __safeContent__: { $elemMatch: { $in: [] } } },
+        {$expr: {$encStrStartsWith: {input: '$otherSsn', prefix: {$const: 'other'}}}}
+        ]})")
+
+// $expr with $and with $encStrStartsWith which generates tags results in pushdown of $expr and elem
+// match for tag disjunction
+TEST_FLE_REWRITE_MATCH(
+    Match_Nested_FleEncStrStartsWith_Expr_TopLevelExpr,
+    "{$expr: {$and: [{$encStrStartsWith: {input: '$ssn', prefix: 'original'}}, "
+    "{$encStrStartsWith: {input: '$otherSsn', prefix: 'other'}}]}}",
+    "{$and: [{ __safeContent__: { $elemMatch: { $in: [] } } }, {$expr:{$encStrStartsWith: {input: "
+    "'$otherSsn', prefix: {$const: 'other'}}}}]}")
+
+/**
+ * $expr with $and with $encStrStartsWith which fails to generate tags results in no rewrite of the
+ * top level $and. Note, that we expect that no rewrite takes place for the encrypted predicate
+ * because we purposely prevent trying to regenerate the tags as an aggregate disjunction if we
+ * failed to generate the match version.
+ */
+TEST_FLE_REWRITE_MATCH_FORCE_COLLSCAN(
+    Match_Nested_FleEncStrStartsWith_Expr_TopLevelExpr,
+    "{$expr: {$and: [{$encStrStartsWith: {input: '$ssn', prefix: 'original'}}, "
+    "{$encStrStartsWith: {input: '$otherSsn', prefix: 'other'}}]}}",
+    R"({$expr: {
+        $and: [
+            {$encStrStartsWith: {input: '$ssn', prefix: 'original'}},
+            {$encStrStartsWith: {input: '$otherSsn',  prefix: 'other'}}]}})")
+
+// $expr with doubly nested $and with $encStrStartsWith which generates tags results in pushdown of
+// $expr and elem match for tag disjunction
+TEST_FLE_REWRITE_MATCH(Match_Nested_FleEncStrStartsWith_Expr_TopLevelExpr_DoublyNestedAnd,
+                       R"(
+    {$expr: {
+        $and: [
+            {$and:[
+                    {$encStrStartsWith: {input: '$ssn', prefix: 'original'}},
+                    {$encStrStartsWith: {input: '$otherSsn', prefix: 'other'}}]}]}})",
+                       R"(
+    {$and: [
+        {$and: [
+            { __safeContent__: { $elemMatch: { $in: [] } } },
+            {$expr: {$encStrStartsWith: {input: '$otherSsn', prefix: {$const: 'other'}}}}
+            ]
+        }
+        ]
+    })")
+
+/**
+ * $expr with nested $and with $encStrStartsWith which fails to generate tags results in no
+ * rewrite of the top level $and. Note, that we expect that no rewrite takes place for the encrypted
+ * predicate because we purposely prevent trying to regenerate the tags as an aggregate disjunction
+ * if we failed to generate the match version.
+ */
+TEST_FLE_REWRITE_MATCH_FORCE_COLLSCAN(
+    Match_Nested_FleEncStrStartsWith_Expr_TopLevelExpr_DoublyNestedAnd,
+    R"({$expr: {
+        $and: [
+            {$and:[
+                    {$encStrStartsWith: {input: '$ssn', prefix: 'original'}},
+                    {$encStrStartsWith: {input: '$otherSsn', prefix: 'other'}}]}]}})",
+    R"({$expr: {
+        $and: [
+            {$and:[
+                    {$encStrStartsWith: {input: '$ssn', prefix: 'original'}},
+                    {$encStrStartsWith: {input: '$otherSsn', prefix: 'other'}}]}]}})")
+
+// $expr with nested $or with $encStrStartsWith which generates tags results in pushdown of
+// $expr and elem match for tag disjunction
+TEST_FLE_REWRITE_MATCH(Match_Nested_FleEncStrStartsWith_Expr_TopLevelExpr_DoublyNestedOr,
+                       R"(
+    {$expr: {
+        $or: [
+            {$or:[
+                    {$encStrStartsWith: {input: '$ssn', prefix: 'original'}},
+                    {$encStrStartsWith: {input: '$otherSsn', prefix: 'other'}}]}]}})",
+                       R"(
+    {$or: [
+        {$or: [
+            { __safeContent__: { $elemMatch: { $in: [] } } },
+            {$expr: {$encStrStartsWith: {input: '$otherSsn', prefix: {$const: 'other'}}}}
+            ]
+        }
+        ]
+    })")
+
+/**
+ * $expr with nested $or with $encStrStartsWith which fails to generate tags results in no rewrite
+ * of the top level $or. Note, that we expect that no rewrite takes place for the encrypted
+ * predicate because we purposely prevent trying to regenerate the tags as an aggregate disjunction
+ * if we failed to generate the match version.
+ */
+TEST_FLE_REWRITE_MATCH_FORCE_COLLSCAN(
+    Match_Nested_FleEncStrStartsWith_Expr_TopLevelExpr_DoublyNestedOr,
+    R"({$expr: {
+        $or: [
+            {$or:[
+                    {$encStrStartsWith: {input: '$ssn', prefix: 'original'}},
+                    {$encStrStartsWith: {input: '$otherSsn', prefix: 'other'}}]}]}})",
+    R"({$expr: {
+        $or: [
+            {$or:[
+                    {$encStrStartsWith: {input: '$ssn', prefix: 'original'}},
+                    {$encStrStartsWith: {input: '$otherSsn', prefix: 'other'}}]}]}})")
+
 
 TEST_FLE_REWRITE_AGG(Basic_FleEncStrEndsWith,
                      "{$encStrEndsWith: {input: '$ssn', suffix: 'original'}}",
@@ -572,18 +751,24 @@ TEST_FLE_REWRITE_AGG(
     "{$and: [{$encStrEndsWith: {input: '$ssn', suffix: {$const: 'rewritten'}}}, "
     "{$encStrEndsWith: {input: '$otherSsn', suffix: {$const: 'other'}}}]}")
 
-TEST_FLE_REWRITE_MATCH(
-    Match_FleEncStrEndsWith_Expr,
-    "{$expr: {$encStrEndsWith: {input: '$ssn', suffix: 'original'}}}",
-    "{$expr: {$encStrEndsWith: {input: '$ssn', suffix: {$const: 'rewritten'}}}}");
+TEST_FLE_REWRITE_MATCH(Match_FleEncStrEndsWith_Expr,
+                       "{$expr: {$encStrEndsWith: {input: '$ssn', suffix: 'original'}}}",
+                       "{ __safeContent__: { $elemMatch: { $in: [] } } }");
 
-TEST_FLE_REWRITE_MATCH(
-    Match_Nested_FleEncStrEndsWith_Expr,
-    "{$and: [{$expr: {$encStrEndsWith: {input: '$ssn', suffix: 'original'}}}, {$expr: "
-    "{$encStrEndsWith: {input: "
-    "'$otherSsn', suffix: 'other'}}}]}",
-    "{$and: [{$expr: {$encStrEndsWith: {input: '$ssn', suffix: {$const: 'rewritten'}}}}, "
-    "{$expr: {$encStrEndsWith: {input: '$otherSsn', suffix: {$const: 'other'}}}}]}")
+TEST_FLE_REWRITE_MATCH(Match_Nested_FleEncStrEndsWith_Expr,
+                       R"(
+    {$and: [
+        {$expr: {
+            $encStrEndsWith: {input: '$ssn', suffix: 'original'}}},
+        {$expr: {
+            $encStrEndsWith: {input: '$otherSsn', suffix: 'other'}}}]})",
+                       R"(
+    {$and: [
+        { __safeContent__: { $elemMatch: { $in: [] } } },
+        {$expr: {
+            $encStrEndsWith: {input: '$otherSsn', suffix: {$const: 'other'}}}}
+        ]
+    })")
 
 TEST_FLE_REWRITE_AGG(Basic_FleEncStrContains,
                      "{$encStrContains: {input: '$ssn', substring: 'original'}}",
@@ -603,17 +788,16 @@ TEST_FLE_REWRITE_AGG(
     "{$and: [{$encStrContains: {input: '$ssn', substring: {$const: 'rewritten'}}}, "
     "{$encStrContains: {input: '$otherSsn', substring: {$const: 'other'}}}]}")
 
-TEST_FLE_REWRITE_MATCH(
-    Match_FleEncStrContains_Expr,
-    "{$expr: {$encStrContains: {input: '$ssn', substring: 'original'}}}",
-    "{$expr: {$encStrContains: {input: '$ssn', substring: {$const: 'rewritten'}}}}");
+TEST_FLE_REWRITE_MATCH(Match_FleEncStrContains_Expr,
+                       "{$expr: {$encStrContains: {input: '$ssn', substring: 'original'}}}",
+                       "{ __safeContent__: { $elemMatch: { $in: [] } } }");
 
 TEST_FLE_REWRITE_MATCH(
     Match_Nested_FleEncStrContains_Expr,
     "{$and: [{$expr: {$encStrContains: {input: '$ssn', substring: 'original'}}}, {$expr: "
     "{$encStrContains: {input: "
     "'$otherSsn', substring: 'other'}}}]}",
-    "{$and: [{$expr: {$encStrContains: {input: '$ssn', substring: {$const: 'rewritten'}}}}, "
+    "{$and: [{ __safeContent__: { $elemMatch: { $in: [] } } }, "
     "{$expr: {$encStrContains: {input: '$otherSsn', substring: {$const: 'other'}}}}]}")
 
 TEST_FLE_REWRITE_AGG(Basic_FleEncStrNormalizedEq,
@@ -636,17 +820,16 @@ TEST_FLE_REWRITE_AGG(
     "{$and: [{$encStrNormalizedEq: {input: '$ssn', string: {$const: 'rewritten'}}}, "
     "{$encStrNormalizedEq: {input: '$otherSsn', string: {$const: 'other'}}}]}")
 
-TEST_FLE_REWRITE_MATCH(
-    Match_FleEncStrNormalizedEq_Expr,
-    "{$expr: {$encStrNormalizedEq: {input: '$ssn', string: 'original'}}}",
-    "{$expr: {$encStrNormalizedEq: {input: '$ssn', string: {$const: 'rewritten'}}}}");
+TEST_FLE_REWRITE_MATCH(Match_FleEncStrNormalizedEq_Expr,
+                       "{$expr: {$encStrNormalizedEq: {input: '$ssn', string: 'original'}}}",
+                       "{ __safeContent__: { $elemMatch: { $in: [] } } }");
 
 TEST_FLE_REWRITE_MATCH(
     Match_Nested_FleEncStrNormalizedEq_Expr,
     "{$and: [{$expr: {$encStrNormalizedEq: {input: '$ssn', string: 'original'}}}, {$expr: "
     "{$encStrNormalizedEq: {input: "
     "'$otherSsn', string: 'other'}}}]}",
-    "{$and: [{$expr: {$encStrNormalizedEq: {input: '$ssn', string: {$const: 'rewritten'}}}}, "
+    "{$and: [{ __safeContent__: { $elemMatch: { $in: [] } } }, "
     "{$expr: {$encStrNormalizedEq: {input: '$otherSsn', string: {$const: 'other'}}}}]}")
 
 TEST_FLE_REWRITE_MATCH(
@@ -655,10 +838,11 @@ TEST_FLE_REWRITE_MATCH(
     "{$encStrEndsWith: {input: "
     "'$otherSsn', suffix: 'original'}}}, {$expr: {$encStrContains: {input: '$ssn', substring: "
     "'original'}}}, {$expr: {$encStrNormalizedEq: {input: '$ssn', string: 'original'}}}]}",
-    "{$or: [{$expr: {$encStrStartsWith: {input: '$ssn', prefix: {$const: 'rewritten'}}}}, "
-    "{$expr: {$encStrEndsWith: {input: '$otherSsn', suffix: {$const: 'rewritten'}}}}, {$expr: "
-    "{$encStrContains: {input: '$ssn', substring: {$const: 'rewritten'}}}}, {$expr: "
-    "{$encStrNormalizedEq: {input: '$ssn', string: {$const: 'rewritten'}}}}]}")
+    R"({$or: [
+        { __safeContent__: { $elemMatch: { $in: [] } } },
+        { __safeContent__: { $elemMatch: { $in: [] } } }, 
+        { __safeContent__: { $elemMatch: { $in: [] } } },
+        { __safeContent__: { $elemMatch: { $in: [] } } }]})")
 
 TEST_FLE_REWRITE_MATCH(
     Match_FleEncStrCombined_Exprs_PartiallyRewrite,
@@ -667,10 +851,11 @@ TEST_FLE_REWRITE_MATCH(
     "'$otherSsn', suffix: 'other'}}}, {$expr: {$encStrContains: {input: '$ssn', substring: "
     "'original'}}}, {$expr: {$encStrNormalizedEq: {input: '$ssn', string: "
     "'other'}}}]}",
-    "{$and: [{$expr: {$encStrStartsWith: {input: '$ssn', prefix: {$const: 'rewritten'}}}}, "
-    "{$expr: {$encStrEndsWith: {input: '$otherSsn', suffix: {$const: 'other'}}}}, {$expr: "
-    "{$encStrContains: {input: '$ssn', substring: {$const: 'rewritten'}}}}, {$expr: "
-    "{$encStrNormalizedEq: {input: '$ssn', string: {$const: 'other'}}}}]}")
+    R"({$and: [
+        { __safeContent__: { $elemMatch: { $in: [] } } },
+        {$expr: {$encStrEndsWith: {input: '$otherSsn', suffix: {$const: 'other'}}}}, 
+        { __safeContent__: { $elemMatch: { $in: [] } } },
+        {$expr: {$encStrNormalizedEq: {input: '$ssn', string: {$const: 'other'}}}}]})")
 
 // Test that the rewriter will work from any rewrite registered to an expression. The test rewriter
 // has two rewrites registered on $eq.
@@ -702,7 +887,8 @@ public:
 
 protected:
     fle::QueryRewriter getQueryRewriterForEsc(FLETagQueryInterface* queryImpl) override {
-        return MockQueryRewriter::getQueryRewriterWithMockedMaps(expCtx, nssEsc, _escMap);
+        return MockQueryRewriter::getQueryRewriterWithMockedMaps(
+            expCtx, nssEsc, _escMap, /*forceTextSearchGenerateTagsAsMatchException*/ false);
     }
 };
 
@@ -1340,5 +1526,1563 @@ TEST_FLE_REWRITE_PIPELINE(LookupDoublyNestedMatchMissingUnencryptedPrimarySchema
                           FLEServerRewritePipelineTest::kSingleEncryptionSchemaEncryptionCollD,
                           true);
 
+// Begin encrypted text search FLE and/or rewrite optimization testing.
+/**
+ *
+ * 1) Base case: single $encStrContains with $expr:
+ *   $expr: {$encStrContains: {$encStrContains: {input: '$ssn', substring: 'original'}} }
+ */
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_EncStrContains,
+                       R"({$expr: {
+                            $encStrContains: {
+                                input: '$ssn',
+                                substring: 'original'}}})",
+                       R"({ __safeContent__: 
+                            { $elemMatch: { $in: [] } } })")
+
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_EncStrContains,
+    R"(
+    {$expr: {
+        $encStrContains: {
+            input: '$ssn',
+            substring: 'original'}}})",
+    R"(
+    {$expr: {
+        $encStrContains: {
+            input: '$ssn',
+            substring: 'original'}}})")
+
+/**
+ *
+ * 2) Base case: $encStrContains within non covertible expr $not:
+ *   $expr: {$not: {$encStrContains: {} }}
+ */
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_Not_EncStrContains,
+                       R"({$expr: {
+                            $not: [
+                            { $encStrContains: {
+                                    input: '$ssn',
+                                    substring: 'original'}}]}})",
+                       R"({$expr: {
+                            $not: [
+                                {$encStrContains: {
+                                    input: '$ssn',
+                                    substring: {$const: 'rewritten'}}}
+]}})")
+
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_Not_EncStrContains,
+    R"({$expr: {
+                            $not: [
+                            { $encStrContains: {
+                                    input: '$ssn',
+                                    substring: 'original'}}]}})",
+    R"({$expr: {
+                            $not: [
+                            { $encStrContains: {
+                                    input: '$ssn',
+                                    substring: {$const: 'rewritten'}}}]}})")
+
+/**
+ *
+ * 2.a) $and with $eq -> No pushdown for $expr
+ *   $expr: {$and: [{$eq: [] }]}
+ */
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_And_WithEncryptedEq,
+                       R"({$expr: {
+                            $and: [
+                                {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+                                ]}})",
+                       R"({$expr: {
+                            $and: [
+                                {$gt: ['$ssn', {$const: 2}]}
+                                ]}})")
+
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_And_WithEncryptedEq,
+    R"(
+    {$expr: {
+        $and: [
+            {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+            ]}})",
+    R"(
+    {$expr: {
+        $and: [
+            {$gt: ['$ssn', {$const: 2}]}
+            ]}})")
+
+/**
+ *
+ * 3) $and with single $encStrContains.
+ *   $expr: {$and: [{$encStrContains: {} }]}
+ */
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_And_WithEncStrContains,
+                       R"({$expr: {
+                            $and: [
+                                { $encStrContains: {
+                                    input: '$ssn',
+                                    substring: 'original'}}
+                                ]}})",
+                       R"({$and: [
+                            { __safeContent__: { $elemMatch: { $in: [] } } }
+                       ]})")
+
+// $expr pushdown does not take place because we get no rewrites from the subexpressions due to
+// failure to generate tags.
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_And_WithEncStrContains,
+    R"({$expr: {
+            $and: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}}
+                ]}})",
+    R"({$expr: {
+            $and: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}}
+                ]}})")
+/**
+ *
+ * 4) $and with single $not $encStrContains.
+ *   $expr: {$and: [{$not: {$encStrContains: {} }}]}
+ */
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_And_WithNotEncStrContains,
+                       R"(
+    { $expr: {
+        $and: [
+            { $not:[
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}} 
+                    ]
+            }]}})",
+                       R"(
+    { $and: [
+        { $expr: { 
+            $not: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: {$const: 'rewritten'}}}
+                ]
+            }}
+        ]})")
+
+// $expr is pushed down because $not results in expression style rewrite.
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_And_WithNotEncStrContains,
+    R"(
+    { $expr: {
+        $and: [
+            { $not:[
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}} 
+                    ]
+            }]}})",
+    R"(
+    { $and: [
+        { $expr: { 
+            $not: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: {$const: 'rewritten'}}}
+                ]
+            }}
+        ]})")
+
+/**
+ *
+ * 5) $and with $encStrContains and $eq.
+ *   $expr: {$and: [{$encStrContains: {} }, {$eq:[]}]}
+ */
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_And_WithEncStrContains_EncryptedEq,
+                       R"(
+    { $expr: {
+        $and: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: 'original'}},
+             {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+            ]}})",
+                       R"(
+    { $and: [
+        { __safeContent__: { $elemMatch: { $in: [] } } },
+        {$expr: {
+            $gt: ['$ssn', {$const: 2}]
+        }}
+]})")
+
+// $expr is pushed down because $eq results in a rewrite
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_And_WithEncStrContains_EncryptedEq,
+    R"(
+    { $expr: {
+        $and: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: 'original'}},
+             {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+            ]}})",
+    R"(
+    { $and: [
+        {$expr: {
+            $encStrContains: {
+                input: '$ssn',
+                substring: {$const: 'original'}}}},
+        {$expr: {
+            $gt: ['$ssn', {$const: 2}]
+        }}
+]})")
+
+/**
+ *
+ * 6) $and with $encStrContains and $not:{$encStrContains}}.
+ *   $expr: {$and: [{$encStrContains: {} }, {$not:{$encStrContains:{}}}]}
+ */
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_And_WithEncStrContains_NotEncStrContains,
+                       R"(
+    { $expr: {
+        $and: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: 'original'}},
+             {$not: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}}]}
+            ]}})",
+                       R"(
+    { $and: [
+        { __safeContent__: { $elemMatch: { $in: [] } } },
+        { $expr: {
+            $not: [
+                { $encStrContains: { 
+                    input: '$ssn', substring: {$const: 'rewritten'}}}
+                ]
+         }}
+    ]})")
+
+// $expr is pushed down because the substring in $not is rewritten in a code path that doesn't call
+// generateTags() which results in a rewrite.
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_And_WithEncStrContains_NotEncStrContains,
+    R"(
+    { $expr: {
+        $and: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: 'original'}},
+             {$not: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}}]}
+            ]}})",
+    R"(
+    { $and: [
+        {$expr: { $encStrContains: {
+            input: '$ssn',
+            substring: {$const: 'original'}}}},
+        { $expr: {
+            $not: [
+                { $encStrContains: { 
+                    input: '$ssn', substring: {$const: 'rewritten'}}}
+                ]
+         }}
+    ]})")
+
+// Begin root level $or equivalents
+/**
+ *
+ * 7) (3) with OR i.e $or with single $encStrContains.
+ *   $expr: {$or: [ {$encStrContains: {} }}]}
+ */
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_Or_WithEncStrContains,
+                       R"({$expr: {
+                            $or: [
+                                { $encStrContains: {
+                                    input: '$ssn',
+                                    substring: 'original'}}
+                                ]}})",
+                       R"({$or: [
+                            { __safeContent__: { $elemMatch: { $in: [] } } }
+                       ]})")
+
+// $expr not pushed down because generateTags failed on rewrite agg as match.
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_Or_WithEncStrContains,
+    R"({$expr: {
+            $or: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}}
+                ]}})",
+    R"({$expr: {
+            $or: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}}
+                ]}})")
+
+/**
+ *
+ * 8) (4) with OR i.e $or with single $not $encStrContains.
+ *   $expr: {$or: [{$not: {$encStrContains: {} }}]}
+ */
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_Or_WithNotEncStrContains,
+                       R"(
+    { $expr: {
+        $or: [
+            { $not:[
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}} 
+                    ]
+            }]}})",
+                       R"(
+    { $or: [
+        { $expr: { 
+            $not: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: {$const: 'rewritten'}}}
+                ]
+            }}
+        ]})")
+
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_Or_WithNotEncStrContains,
+    R"(
+    { $expr: {
+        $or: [
+            { $not:[
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}} 
+                    ]
+            }]}})",
+    R"(
+    { $or: [
+        { $expr: { 
+            $not: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: {$const: 'rewritten'}}}
+                ]
+            }}
+        ]})")
+
+/**
+ *
+ * 9) (5) with OR i.e $or with $encStrContains and $eq.
+ *   $expr: {$or: [{$encStrContains: {} }, {$eq:[]}]}
+ */
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_Or_WithEncStrContains_EncryptedEq,
+                       R"(
+    { $expr: {
+        $or: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: 'original'}},
+             {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+            ]}})",
+                       R"(
+    { $or: [
+        { __safeContent__: { $elemMatch: { $in: [] } } },
+        {$expr: {
+            $gt: ['$ssn', {$const: 2}]
+        }}
+]})")
+
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_Or_WithEncStrContains_EncryptedEq,
+    R"(
+    { $expr: {
+        $or: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: 'original'}},
+             {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+            ]}})",
+    R"(
+    { $or: [
+        {$expr: {
+            $encStrContains: {
+                input: '$ssn',
+                substring: {$const: 'original'}}}},
+        {$expr: {
+            $gt: ['$ssn', {$const: 2}]
+        }}
+]})")
+/**
+ *
+ * 10) (6) with OR i.e  $or with $encStrContains and $not:{$encStrContains}}.
+ *   $expr: {$or: [{$encStrContains: {} }, {$not:{$encStrContains:{}}}]}
+ */
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_Or_WithEncStrContains_NotEncStrContains,
+                       R"(
+    { $expr: {
+        $or: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: 'original'}},
+             {$not: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}}]}
+            ]}})",
+                       R"(
+    { $or: [
+        { __safeContent__: { $elemMatch: { $in: [] } } },
+        { $expr: {
+            $not: [
+                { $encStrContains: { 
+                    input: '$ssn', substring: {$const: 'rewritten'}}}
+                ]
+         }}
+    ]})")
+
+
+// $expr is pushed down because the substring in $not is rewritten in a code path that doesn't call
+// generateTags() which results in a rewrite.
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_Or_WithEncStrContains_NotEncStrContains,
+    R"(
+    { $expr: {
+        $or: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: 'original'}},
+             {$not: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}}]}
+            ]}})",
+    R"(
+    { $or: [
+        {$expr: { $encStrContains: {
+            input: '$ssn',
+            substring: {$const: 'original'}}}},
+        { $expr: {
+            $not: [
+                { $encStrContains: { 
+                    input: '$ssn', substring: {$const: 'rewritten'}}}
+                ]
+         }}
+    ]})")
+
+
+// Begin double nested tests, we can just use the $and versions since we've already verified $or at
+// the root level behaves the same as $and.
+
+/**
+ *
+ * 11) Nested $and with $eq -> No pushdown for $expr
+ *   $expr: {
+ *      $and: [
+ *        { $and: [
+ *              {$eq: {} }
+ *                 ]
+ *        }
+ *        ]
+ *     }
+ */
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_NestedAnd_WithEncryptedEq,
+                       R"({$expr: {
+                            $and: [
+                            { $and: [
+                                {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+                                ]
+                            }]}})",
+                       R"({$expr: {
+                            $and: [ {
+                            $and: [
+                                {$gt: ['$ssn', {$const: 2}]}
+]}]}})")
+
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_NestedAnd_WithEncryptedEq,
+    R"({$expr: {
+                            $and: [
+                            { $and: [
+                                {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+                                ]
+                            }]}})",
+    R"({$expr: {
+                            $and: [ {
+                            $and: [
+                                {$gt: ['$ssn', {$const: 2}]}
+]}]}})")
+/**
+ *
+ * 12) Nested $and with single $encStrContains.
+ *   $expr: {
+ *      $and: [
+ *        { $and: [
+ *              {$encStrContains: {} }
+ *                 ]
+ *        }
+ *        ]
+ *     }
+ */
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_NestedAnd_WithEncStrContains,
+                       R"({$expr: {
+                            $and: [{
+                            $and: [
+                                { $encStrContains: {
+                                    input: '$ssn',
+                                    substring: 'original'}}
+]}]}})",
+                       R"({$and: [ 
+                            {$and:[
+                                { __safeContent__: { $elemMatch: { $in: [] } } }
+                                 ]}
+                       ]})")
+
+// no pushdown of $expr because tag generation failed for $encStrContains
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_NestedAnd_WithEncStrContains,
+    R"({$expr: {
+            $and: [
+                { $and: [
+                    { $encStrContains: {
+                        input: '$ssn',
+                        substring: 'original'}}
+                    ]
+                }
+                ]}})",
+    R"({$expr: {
+            $and: [
+                { $and: [
+                    { $encStrContains: {
+                        input: '$ssn',
+                        substring: 'original'}}
+                    ]
+                }
+                ]}})")
+
+/**
+ *
+ * 13) Nested $and with single $not $encStrContains.
+ *   $expr: {
+ *      $and: [
+ *        { $and: [
+ *              {$not: {$encStrContains: {} }}
+ *                ]
+ *        }
+ *        ]
+ *     }
+ */
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_NestedAnd_WithNotEncStrContains,
+                       R"(
+    { $expr: {
+        $and: [ {
+        $and: [
+            { $not:[
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}} 
+                    ]
+}]}]}})",
+                       R"(
+    { $and: [{ $and: [
+        { $expr: { 
+            $not: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: {$const: 'rewritten'}}}
+                ]
+            }}
+]}]})")
+
+// $expr is pushed down because $not does not result in call to  rewriteToTagDisjunctionAsMatch().
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_NestedAnd_WithNotEncStrContains,
+    R"(
+    { $expr: {
+        $and: [ {
+            $and: [
+                { $not:[
+                    { $encStrContains: {
+                        input: '$ssn',
+                        substring: 'original'}} 
+                    ]
+                }]
+            }]
+            }})",
+    R"(
+    { $and: [
+     { $and: [
+        { $expr: { 
+            $not: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: {$const: 'rewritten'}}}
+                ]
+            }}
+]}]})")
+/**
+ *
+ * 14) Nested $and with $encStrContains and $eq.
+ *   $expr: {
+ *      $and: [
+ *        { $and: [
+ *             {$encStrContains: {} },
+ *              {$eq:[]}
+ *              ]
+ *        }
+ *        ]
+ *     }
+ */
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_NestedAnd_WithEncStrContains_EncryptedEq,
+                       R"(
+    { $expr: {
+        $and: [{
+        $and: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: 'original'}},
+             {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+]}]}})",
+                       R"(
+    { $and: [ {$and: [
+        { __safeContent__: { $elemMatch: { $in: [] } } },
+        {$expr: {
+            $gt: ['$ssn', {$const: 2}]
+        }}
+]}]})")
+
+// $expr is pushed down because $eq results in a rewrite, however, $encStrContains should remain
+// unchanged since generateTags() failed, resulting in a collection scan.
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_NestedAnd_WithEncStrContains_EncryptedEq,
+    R"(
+    { $expr: {
+        $and: [
+            {$and: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}},
+                {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+]}]}})",
+    R"(
+    { $and: [ 
+        {$and: [
+            {$expr: { 
+                $encStrContains: {
+                    input: '$ssn',
+                    substring: {$const:'original'}}}},
+            {$expr: {
+                $gt: ['$ssn', {$const: 2}]
+            }}
+            ]
+        }
+        ]
+})")
+
+/**
+ *
+ * 15) Double nested $and with $encStrContains and $not:{$encStrContains}}.
+ *   $expr: {
+ *      $and: [
+ *        { $and: [
+ *             {$encStrContains: {} },
+ *              {$not:{$encStrContains:{}}}
+ *              ]
+ *        }
+ *        ]
+ *     }
+ */
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_NestedAnd_WithEncStrContains_NotEncStrContains,
+                       R"(
+    { $expr: {
+        $and: [{
+        $and: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: 'original'}},
+             {$not: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}}]}
+]}]}})",
+                       R"(
+    { $and: [{ $and: [
+        { __safeContent__: { $elemMatch: { $in: [] } } },
+        { $expr: {
+            $not: [
+                { $encStrContains: { 
+                    input: '$ssn', substring: {$const: 'rewritten'}}}
+                ]
+         }}
+]}]})")
+
+/**
+ * $expr is pushed down because the $not expression does not result in a call to
+ * generateTagDisjunctionAsMatch(), so we get a rewrite in an nested expression.  Note,
+ * $encStrContains at the $and level remains unchanged, because text search predicates which fail to
+ * generate tags as match will also fail to generate tags as aggregate, so we explicitly want to
+ * avoid trying to generate tags twice.
+ */
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_NestedAnd_WithEncStrContains_NotEncStrContains,
+    R"(
+    { $expr: {
+        $and: [{
+        $and: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: 'original'}},
+             {$not: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}}]}
+]}]}})",
+    R"(
+    { $and: [
+        { $and: [
+            {$expr:
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: {$const:'original'}}}},
+            { $expr: {
+                $not: [
+                    { $encStrContains: { 
+                        input: '$ssn', substring: {$const: 'rewritten'}}}
+                    ]
+                }
+            }
+]}]})")
+
+// Begin double nested with equality on rhs
+/**
+ *
+ * 16) Double nested $and with $eq  and equality on rhs of top level and -> No pushdown for $expr
+ *   $expr: {
+ *      $and: [
+ *          { $and: [
+ *                  {$eq: {} }
+ *                     ]
+ *          },
+ *          {$eq: [] }
+ *        ]
+ *     }
+ */
+TEST_FLE_REWRITE_MATCH(
+    FleTextSearchExprPushdown_NestedAnd_WithEncryptedEq_EncryptedEq_TopLevel_EncryptedEq,
+    R"({$expr: {
+            $and: [
+                { $and: [
+                 {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+                        ]
+                },
+                {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+                ]}})",
+    R"({$expr: {
+            $and: [
+                { $and: [
+                    {$gt: ['$ssn', {$const: 2}]}]},
+                {$gt: ['$ssn', {$const: 2}]}
+                            ]}})")
+
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_NestedAnd_WithEncryptedEq_EncryptedEq_TopLevel_EncryptedEq,
+    R"({$expr: {
+            $and: [
+                { $and: [
+                 {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+                        ]
+                },
+                {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+                ]}})",
+    R"({$expr: {
+            $and: [
+                { $and: [
+                    {$gt: ['$ssn', {$const: 2}]}]},
+                {$gt: ['$ssn', {$const: 2}]}
+                            ]}})")
+
+/**
+ *
+ * 17) Double nested $and with single $encStrContains and $eq on rhs of top level
+ *   $expr: {
+ *      $and: [
+ *          { $and: [
+ *               {$encStrContains: {} }
+ *                  ]
+ *          },
+ *          { $eq: []}
+ *        ]
+ *     }
+ */
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_NestedAnd_WithEncStrContains_TopLevel_EncryptedEq,
+                       R"({$expr: {
+                            $and: [
+                            { $and: [
+                                { $encStrContains: {
+                                    input: '$ssn',
+                                    substring: 'original'}}
+                                ]
+                            },
+                            {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+                            ]}})",
+                       R"({$and: [ 
+                            {$and:[
+                                { __safeContent__: { $elemMatch: { $in: [] } } }
+                                 ]},
+                            {$expr: {$gt: ['$ssn', {$const: 2}]}}
+                       ]})")
+
+// $expr is pushed down because of the encrypted equality predicate. We always convert the entire
+// tree to an $and/$or in match language before trying to perform FLE rewrites on it again. If any
+// expression in the new subtree generated rewrites, we use the pushed down $expr conversion.
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_NestedAnd_WithEncStrContains_TopLevel_EncryptedEq,
+    R"({$expr: {
+            $and: [
+            { $and: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}}
+                ]
+            },
+            {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+            ]}})",
+    R"({$and: [ 
+            { 
+                $and: [
+                    { $expr: { $encStrContains: {
+                        input: '$ssn',
+                        substring: {$const:'original'}}}}
+                    ]
+            },
+            {$expr: {$gt: ['$ssn', {$const: 2}]}}
+                       ]})")
+/**
+ *
+ * 18) Double $and with single $not $encStrContains and $eq on rhs of top level
+ *   $expr: {
+ *      $and: [
+ *        { $and: [
+ *              {$not: {$encStrContains: {} }}
+ *                ]
+ *        },
+ *        { $eq: []}
+ *        ]
+ *     }
+ */
+TEST_FLE_REWRITE_MATCH(
+    FleTextSearchExprPushdown_NestedAnd_WithNotEncStrContains_TopLevel_EncryptedEq,
+    R"(
+    { $expr: {
+        $and: [ {
+        $and: [
+            { $not:[
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}} 
+                    ]
+            }]},
+            {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+            ]}})",
+    R"(
+    { $and: [
+     { $and: [
+        { $expr: { 
+            $not: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: {$const: 'rewritten'}}}
+                ]
+            }}]},
+            {$expr: {$gt: ['$ssn', {$const: 2}]}}
+            ]})")
+
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_NestedAnd_WithNotEncStrContains_TopLevel_EncryptedEq,
+    R"(
+    { $expr: {
+        $and: [ {
+        $and: [
+            { $not:[
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}} 
+                    ]
+            }]},
+            {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+            ]}})",
+    R"(
+    { $and: [
+     { $and: [
+        { $expr: { 
+            $not: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: {$const: 'rewritten'}}}
+                ]
+            }}]},
+            {$expr: {$gt: ['$ssn', {$const: 2}]}}
+            ]})")
+/**
+ *
+ * 19) Double nested $and with $encStrContains and $eq and $eq on rhs of top level
+ *   $expr: {
+ *      $and: [
+ *        { $and: [
+ *             {$encStrContains: {} },
+ *              {$eq:[]}
+ *              ]
+ *        },
+ *        { $eq: []}
+ *        ]
+ *     }
+ */
+TEST_FLE_REWRITE_MATCH(
+    FleTextSearchExprPushdown_NestedAnd_WithEncStrContains_EncryptedEq_TopLevel_EncryptedEq,
+    R"(
+    { $expr: {
+        $and: [{
+        $and: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: 'original'}},
+             {$eq: ['$ssn', {$const: {encrypt: 2}}]}]},
+            {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+            ]}})",
+    R"(
+    { $and: [ 
+        { $and: [
+            { __safeContent__: { $elemMatch: { $in: [] } } },
+            {$expr: {
+                $gt: ['$ssn', {$const: 2}]
+            }}
+            ]
+        },
+        {$expr: {$gt: ['$ssn', {$const: 2}]}}
+        ]})")
+
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_NestedAnd_WithEncStrContains_EncryptedEq_TopLevel_EncryptedEq,
+    R"(
+    { $expr: {
+        $and: [{
+        $and: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: 'original'}},
+             {$eq: ['$ssn', {$const: {encrypt: 2}}]}]},
+            {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+            ]}})",
+    R"(
+    { $and: [ 
+        { $and: [
+            { $expr:{ 
+                $encStrContains: {
+                    input: '$ssn',
+                    substring: {$const:'original'}}}},
+            {$expr: {
+                $gt: ['$ssn', {$const: 2}]
+            }}
+            ]
+        },
+        {$expr: {$gt: ['$ssn', {$const: 2}]}}
+        ]})")
+
+/**
+ *
+ * 20) Double nested $and with $encStrContains and $not:{$encStrContains}} and $eq on rhs of top
+ * level $expr: { $and: [ { $and: [
+ *             {$encStrContains: {} },
+ *              {$not:{$encStrContains:{}}}
+ *              ]
+ *        },
+ *        { $eq: []}
+ *        ]
+ *     }
+ */
+TEST_FLE_REWRITE_MATCH(
+    FleTextSearchExprPushdown_NestedAnd_WithEncStrContains_NotEncStrContains_TopLevel_EncryptedEq,
+    R"(
+    { $expr: {
+        $and: [
+        { $and: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: 'original'}},
+             {$not: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}}]}
+            ]},
+            {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+            ]}})",
+    R"(
+    { $and: [
+     { $and: [
+        { __safeContent__: { $elemMatch: { $in: [] } } },
+        { $expr: {
+            $not: [
+                { $encStrContains: { 
+                    input: '$ssn', substring: {$const: 'rewritten'}}}
+                ]
+        }}]},
+        {$expr: {$gt: ['$ssn', {$const: 2}]}}
+        ]})")
+
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_NestedAnd_WithEncStrContains_NotEncStrContains_TopLevel_EncryptedEq,
+    R"(
+    { $expr: {
+        $and: [
+        { $and: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: 'original'}},
+             {$not: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}}]}
+            ]},
+            {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+            ]}})",
+    R"(
+    { $and: [
+     { $and: [
+            { $expr: {
+                $encStrContains: {
+                    input: '$ssn',
+                    substring: {$const:'original'}}}},
+            { $expr: {
+                $not: [
+                    { $encStrContains: { 
+                        input: '$ssn', substring: {$const: 'rewritten'}}}
+                    ]
+        }}]},
+        {$expr: {$gt: ['$ssn', {$const: 2}]}}
+        ]})")
+
+// Begin rhs testing on top level with $not
+/**
+ *
+ * 21) Double nested $and with $eq  and equality on rhs of top level and -> pushdown due to rhs
+ *   $expr: {
+ *      $and: [
+ *          { $and: [
+ *                  {$eq: {} }
+ *                     ]
+ *          },
+ *          {$not:{$encStrContains:{}}}
+ *        ]
+ *     }
+ */
+TEST_FLE_REWRITE_MATCH(
+    FleTextSearchExprPushdown_NestedAnd_WithEncryptedEq_EncryptedEq_TopLevel_NotEncStrContains,
+    R"({$expr: {
+            $and: [
+                { $and: 
+                    [
+                    {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+                    ]
+                },
+                { $not:
+                 [
+                    { $encStrContains: {
+                        input: '$ssn',
+                        substring: 'original'}} 
+                ]
+                }
+            ]}})",
+    R"({$and: [
+            { $and: [
+                {$expr: {$gt: ['$ssn', {$const: 2}]}}
+                ]
+            },
+            { $expr: {
+                $not: [
+                    { $encStrContains: {
+                        input: '$ssn',
+                        substring: {$const: 'rewritten'}}}
+                    ]}}
+            ]})")
+
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_NestedAnd_WithEncryptedEq_EncryptedEq_TopLevel_NotEncStrContains,
+    R"({$expr: {
+            $and: [
+                { $and: 
+                    [
+                    {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+                    ]
+                },
+                { $not:
+                 [
+                    { $encStrContains: {
+                        input: '$ssn',
+                        substring: 'original'}} 
+                ]
+                }
+            ]}})",
+    R"({$and: [
+            { $and: [
+                {$expr: {$gt: ['$ssn', {$const: 2}]}}
+                ]
+            },
+            { $expr: {
+                $not: [
+                    { $encStrContains: {
+                        input: '$ssn',
+                        substring: {$const: 'rewritten'}}}
+                    ]}}
+            ]})")
+
+/**
+ *
+ * 22) Double nested $and with single $encStrContains and $eq on rhs of top level
+ *   $expr: {
+ *      $and: [
+ *          { $and: [
+ *               {$encStrContains: {} }
+ *                  ]
+ *          },
+ *          {$not:{$encStrContains:{}}}
+ *        ]
+ *     }
+ */
+TEST_FLE_REWRITE_MATCH(
+    FleTextSearchExprPushdown_NestedAnd_WithEncStrContains_TopLevel_NotEncStrContains,
+    R"({$expr: {
+            $and: [
+                { $and: [
+                    { $encStrContains: {
+                        input: '$ssn',
+                        substring: 'original'}}
+                    ]
+                },
+                { $not:[
+                    { $encStrContains: {
+                        input: '$ssn',
+                        substring: 'original'}} 
+                    ]
+                }
+                ]}})",
+    R"({$and: [ 
+            {$and:[
+                { __safeContent__: { $elemMatch: { $in: [] } } }
+                ]
+            },
+            {$expr: {
+                $not: [
+                    { $encStrContains: {
+                        input: '$ssn',
+                        substring: {$const: 'rewritten'}}}
+                    ]
+                }}
+            ]})")
+
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_NestedAnd_WithEncStrContains_TopLevel_NotEncStrContains,
+    R"({$expr: {
+            $and: [
+                { $and: [
+                    { $encStrContains: {
+                        input: '$ssn',
+                        substring: 'original'}}
+                    ]
+                },
+                { $not:[
+                    { $encStrContains: {
+                        input: '$ssn',
+                        substring: 'original'}} 
+                    ]
+                }
+                ]}})",
+    R"({$and: [ 
+            { $and: [
+                { $expr: {
+                    $encStrContains: {
+                        input: '$ssn',
+                        substring: {$const:'original'}}}}
+                ]
+            },
+            {$expr: {
+                $not: [
+                    { $encStrContains: {
+                        input: '$ssn',
+                        substring: {$const: 'rewritten'}}}
+                    ]
+                }}
+            ]})")
+/**
+ *
+ * 23) Double $and with single $not $encStrContains and $eq on rhs of top level
+ *   $expr: {
+ *      $and: [
+ *        { $and: [
+ *              {$not: {$encStrContains: {} }}
+ *                ]
+ *        },
+ *        {$not:{$encStrContains:{}}}
+ *        ]
+ *     }
+ */
+TEST_FLE_REWRITE_MATCH(
+    FleTextSearchExprPushdown_NestedAnd_WithNotEncStrContains_TopLevel_NotEncStrContains,
+    R"(
+    { $expr: {
+        $and: [ {
+        $and: [
+            { $not:[
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}} 
+                    ]
+            }]},
+            { $not:[
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}} 
+                    ]
+            }
+            ]}})",
+    R"(
+    { $and: [
+     { $and: [
+        { $expr: { 
+            $not: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: {$const: 'rewritten'}}}
+                ]
+            }}]},
+        {$expr: {$not: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: {$const: 'rewritten'}}}
+            ]}}
+    ]})")
+
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_NestedAnd_WithNotEncStrContains_TopLevel_NotEncStrContains,
+    R"(
+    { $expr: {
+        $and: [ {
+        $and: [
+            { $not:[
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}} 
+                    ]
+            }]},
+            { $not:[
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}} 
+                    ]
+            }
+            ]}})",
+    R"(
+    { $and: [
+     { $and: [
+        { $expr: { 
+            $not: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: {$const: 'rewritten'}}}
+                ]
+            }}]},
+        {$expr: {$not: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: {$const: 'rewritten'}}}
+            ]}}
+    ]})")
+
+// $expr is not pushed down because no subexpression generates rewrites
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_NestedAnd_WithNotEncStrContains_TopLevel_EncStrContains,
+    R"(
+    { $expr: {
+        $and: [ {
+            $and: [
+                { $encStrContains: {
+                        input: '$ssn',
+                        substring: 'original'}} 
+                        ]
+                },
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}} 
+                ]}})",
+    R"(
+    { $expr: {
+        $and: [ {
+            $and: [
+                { $encStrContains: {
+                        input: '$ssn',
+                        substring: 'original'}} 
+                        ]
+                },
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}} 
+                ]}})")
+
+/**
+ *
+ * 24) Double nested $and with $encStrContains and $eq and $eq on rhs of top level
+ *   $expr: {
+ *      $and: [
+ *        { $and: [
+ *             {$encStrContains: {} },
+ *              {$eq:[]}
+ *              ]
+ *        },
+ *        {$not:[$encStrContains:{}]}
+ *        ]
+ *     }
+ */
+TEST_FLE_REWRITE_MATCH(
+    FleTextSearchExprPushdown_NestedAnd_WithEncStrContains_EncryptedEq_TopLevel_NotEncStrContains,
+    R"(
+    { $expr: {
+        $and: [
+            {$and: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}},
+                {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+                ]
+            },
+            { $not:[
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}} 
+                ]
+            }
+        ]}})",
+    R"(
+    { $and: [ 
+        { $and: [
+            { __safeContent__: { $elemMatch: { $in: [] } } },
+            {$expr: {
+                $gt: ['$ssn', {$const: 2}]
+            }}
+            ]
+        },
+        {$expr: {$not: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: {$const: 'rewritten'}}}
+            ]}}
+        ]})")
+
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_NestedAnd_WithEncStrContains_EncryptedEq_TopLevel_NotEncStrContains,
+    R"(
+    { $expr: {
+        $and: [
+            {$and: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}},
+                {$eq: ['$ssn', {$const: {encrypt: 2}}]}
+                ]
+            },
+            { $not:[
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}} 
+                ]
+            }
+        ]}})",
+    R"(
+    { $and: [ 
+        { $and: [
+            { $expr: {
+                $encStrContains: {
+                    input: '$ssn',
+                    substring: {$const:'original'}}}},
+            {$expr: {
+                $gt: ['$ssn', {$const: 2}]
+            }}
+            ]
+        },
+        {$expr: {$not: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: {$const: 'rewritten'}}}
+            ]}}
+        ]})")
+
+/**
+ *
+ * 25) Double nested $and with $encStrContains and $not:{$encStrContains}} and $not $encStrContains
+ on rhs of
+ * top level
+ * $expr: { $and: [
+            { $and: [
+ *              {$encStrContains: {} },
+ *              {$not:{$encStrContains:{}}}
+ *              ]
+ *        },
+ *        {$not:{$encStrContains:{}}}
+ *        ]
+ *     }
+ */
+TEST_FLE_REWRITE_MATCH(
+    FleTextSearchExprPushdown_NestedAnd_WithEncStrContains_NotEncStrContains_TopLevel_NotEncStrContains,
+    R"(
+    { $expr: {
+        $and: [
+            { $and: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}},
+                {$not: [
+                    { $encStrContains: {
+                        input: '$ssn',
+                        substring: 'original'}}
+                    ]
+                }
+                ]
+            },
+            { $not:[
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}} 
+                ]
+            }]}})",
+    R"(
+    { $and: [
+     { $and: [
+        { __safeContent__: { $elemMatch: { $in: [] } } },
+        { $expr: {
+            $not: [
+                { $encStrContains: { 
+                    input: '$ssn', substring: {$const: 'rewritten'}}}
+                ]
+        }}]},
+        {$expr: {$not: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: {$const: 'rewritten'}}}
+            ]}}
+        ]})")
+
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_NestedAnd_WithEncStrContains_NotEncStrContains_TopLevel_NotEncStrContains,
+    R"(
+    { $expr: {
+        $and: [
+            { $and: [
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}},
+                {$not: [
+                    { $encStrContains: {
+                        input: '$ssn',
+                        substring: 'original'}}
+                    ]
+                }
+                ]
+            },
+            { $not:[
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}} 
+                ]
+            }]}})",
+    R"(
+    { $and: [
+     { $and: [
+        { $expr: {
+            $encStrContains: {
+                input: '$ssn',
+                substring: {$const: 'original'}}}},
+        { $expr: {
+            $not: [
+                { $encStrContains: { 
+                    input: '$ssn', substring: {$const: 'rewritten'}}}
+                ]
+        }}]},
+        {$expr: {$not: [
+            { $encStrContains: {
+                input: '$ssn',
+                substring: {$const: 'rewritten'}}}
+            ]}}
+        ]})")
+
+// no $expr pushdown, $encStrContains is within $eq which can't be converted to match.
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_EncStrContains_Within_Equality,
+                       R"(
+    { $expr: {
+        $eq: [        
+            { $encStrContains: {
+                input: '$ssn',
+                substring: 'original'}},
+            "$foo"      
+            ]
+}})",
+                       R"(
+    { $expr: {
+        $eq: [
+        { $encStrContains: { 
+            input: '$ssn', substring: {$const: 'rewritten'}}},
+            "$foo"
+]}})")
+
+// $expr is pushed down because $encStrContains generates a rewrite in aggregate tag disjunction
+// style.
+TEST_FLE_REWRITE_MATCH(FleTextSearchExprPushdown_EncStrContains_Within_Equality_InsideAnd,
+                       R"(
+    { $expr: {
+        $and: [ 
+            { $eq: [       
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}},
+                "$foo"      
+                ]
+            }
+        ]}})",
+                       R"(
+    { $and: [
+        { $expr: {
+            $eq: [
+                { $encStrContains: { 
+                    input: '$ssn', substring: {$const: 'rewritten'}}},
+                "$foo"
+                ]
+                }
+            }
+        ]})")
+
+TEST_FLE_REWRITE_MATCH_FORCE_TEXT_PREDICATE_GENERATE_TAGS_AS_MATCH_EXCEPTION(
+    FleTextSearchExprPushdown_EncStrContains_Within_Equality_InsideAnd,
+    R"(
+    { $expr: {
+        $and: [ 
+            { $eq: [       
+                { $encStrContains: {
+                    input: '$ssn',
+                    substring: 'original'}},
+                "$foo"      
+                ]
+            }
+        ]}})",
+    R"(
+    { $and: [
+        { $expr: {
+            $eq: [
+                { $encStrContains: { 
+                    input: '$ssn', substring: {$const: 'rewritten'}}},
+                "$foo"
+                ]
+                }
+            }
+        ]})")
 }  // namespace
 }  // namespace mongo

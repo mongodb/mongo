@@ -51,6 +51,18 @@ class TextSearchPredicate : public EncryptedPredicate {
 public:
     TextSearchPredicate(const QueryRewriterInterface* rewriter) : EncryptedPredicate(rewriter) {}
 
+    /**
+     * Encrypted text search predicates may exhibit poor performance when they generate an
+     * aggregation expression tag disjunction, because the query optimization rewrite relies on a
+     * residual filter which has an added cost that does not perform well at scale. For this reason,
+     * we provide this method to allow for ExpressionEncTextSearch to generate a match style tag
+     * disjunction instead.
+     */
+    std::unique_ptr<MatchExpression> rewriteToTagDisjunctionAsMatch(
+        const ExpressionEncTextSearch& expr) const;
+
+    bool hasValidPayload(const ExpressionEncTextSearch& expr) const;
+
 protected:
     std::vector<PrfBlock> generateTags(BSONValue payload) const override;
 
@@ -65,6 +77,9 @@ private:
     EncryptedBinDataType encryptedBinDataType() const override {
         return EncryptedBinDataType::kFLE2FindTextPayload;
     }
+
+    std::unique_ptr<MatchExpression> _rewriteToTagDisjunctionAsMatch(
+        const ExpressionEncTextSearch& expr) const;
 };
 
 }  // namespace mongo::fle
