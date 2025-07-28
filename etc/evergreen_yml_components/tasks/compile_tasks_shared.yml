@@ -14,7 +14,6 @@ variables:
       - func: "f_expansions_write"
       - func: "override task timeout"
       - func: "get engflow creds"
-      - func: "fetch pgo profile"
     teardown_task:
       - func: "f_expansions_write"
       - func: "create bazel test report"
@@ -137,7 +136,6 @@ tasks:
             - "src/evergreen/run_python_script.sh"
             - "evergreen/macos_notary.py"
             - "bazel-bin/dist-test-stripped.${ext|tgz}"
-      - func: "BOLT"
 
       - command: subprocess.exec
         params:
