@@ -469,7 +469,6 @@ function fieldPresent(field, containingObj) {
     assert.eq(results, []);
 })();
 
-// TODO SERVER-93218 Test scoreDetails with nested rankFusion.
 dropSearchIndex(coll, {name: getMovieSearchIndexSpec().name});
 dropSearchIndex(coll, {name: getMovieVectorSearchIndexSpec().name});
 
