@@ -1,6 +1,6 @@
 version: 2.0.0
 filters:
-  - "*.yml": # Temporary owners until these yml files are better split out
+  - "**/*.yml": # Temporary owners until these yml files are better split out
     approvers:
       - 10gen/devprod-build
   - "backports_required_for_multiversion_tests.yml":
