@@ -459,6 +459,20 @@ public:
         static constexpr std::size_t kCipherLengthESCAndLeafFlag = kCipherLengthESCOnly + 1;
         static constexpr std::size_t kCipherLengthESCAndMsize = kCipherLengthESCOnly + 3;
 
+    public:
+        /**
+         * Assert that _encryptedTokens is of the expected length for text search.
+         */
+        void assertIsValidForTextSearch() const {
+            uassert(ErrorCodes::BadValue,
+                    fmt::format("Invalid length for EncryptedStateCollectionTokensV2 for text "
+                                "search: Expected {}, got {}",
+                                kCipherLengthESCAndMsize,
+                                _encryptedTokens.size()),
+                    _encryptedTokens.size() == kCipherLengthESCAndMsize);
+        }
+
+    private:
         static void assertLength(std::size_t sz) {
             uassert(ErrorCodes::BadValue,
                     fmt::format("Invalid length for EncryptedStateCollectionTokensV2, expected {}, "

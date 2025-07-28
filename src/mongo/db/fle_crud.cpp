@@ -927,17 +927,22 @@ void processFieldsForInsert(FLEQueryInterface* queryImpl,
             }
         } else if (payload.isTextSearchPayload()) {
             const auto& tsts = payload.payload.getTextSearchTokenSets().get();
-            ecocDocuments.push_back(tsts.getExactTokenSet().getEncryptedTokens().generateDocument(
-                payload.fieldPathName));
+            auto exactSet = tsts.getExactTokenSet();
+            exactSet.getEncryptedTokens().assertIsValidForTextSearch();
+            ecocDocuments.push_back(
+                exactSet.getEncryptedTokens().generateDocument(payload.fieldPathName));
             for (const auto& ts : tsts.getSubstringTokenSets()) {
+                ts.getEncryptedTokens().assertIsValidForTextSearch();
                 ecocDocuments.push_back(
                     ts.getEncryptedTokens().generateDocument(payload.fieldPathName));
             }
             for (const auto& ts : tsts.getSuffixTokenSets()) {
+                ts.getEncryptedTokens().assertIsValidForTextSearch();
                 ecocDocuments.push_back(
                     ts.getEncryptedTokens().generateDocument(payload.fieldPathName));
             }
             for (const auto& ts : tsts.getPrefixTokenSets()) {
+                ts.getEncryptedTokens().assertIsValidForTextSearch();
                 ecocDocuments.push_back(
                     ts.getEncryptedTokens().generateDocument(payload.fieldPathName));
             }
