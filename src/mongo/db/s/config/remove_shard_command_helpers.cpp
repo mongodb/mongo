@@ -157,5 +157,14 @@ boost::optional<RemoveShardProgress> startShardDraining(OperationContext* opCtx,
     return shardingCatalogManager->checkPreconditionsAndStartDrain(opCtx, shardId);
 }
 
+void stopShardDraining(OperationContext* opCtx, const ShardId& shardId) {
+    const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
+
+    DDLLockManager::ScopedCollectionDDLLock ddlLock(
+        opCtx, NamespaceString::kConfigsvrShardsNamespace, "stopShardDraining", LockMode::MODE_X);
+
+    shardingCatalogManager->stopDrain(opCtx, shardId);
+}
+
 }  // namespace topology_change_helpers
 }  // namespace mongo

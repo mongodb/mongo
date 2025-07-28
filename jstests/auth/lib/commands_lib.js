@@ -6689,6 +6689,21 @@ export const authCommandsLib = {
           ]
         },
         {
+          testname: "stopShardDraining",
+          command: {stopShardDraining: "x"},
+          skipUnlessSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: roles_clusterManager,
+                privileges: [{resource: {cluster: true}, actions: ["removeShard"]}],
+                expectFail: true
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           // Test that clusterMonitor has permission to run $queryStats without transformation
           testname: "testQueryStatsReadPrivilege",
           command: {aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}},

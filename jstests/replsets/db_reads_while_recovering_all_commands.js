@@ -63,6 +63,7 @@ const allCommands = {
     _configsvrSetUserWriteBlockMode: {skip: isPrimaryOnly},
     _configsvrShardDrainingStatus: {skip: isAnInternalCommand},
     _configsvrStartShardDraining: {skip: isPrimaryOnly},
+    _configsvrStopShardDraining: {skip: isPrimaryOnly},
     _configsvrTransitionFromDedicatedConfigServer: {skip: isPrimaryOnly},
     _configsvrTransitionToDedicatedConfigServer: {skip: isPrimaryOnly},
     _configsvrUpdateZoneKeyRange: {skip: isPrimaryOnly},

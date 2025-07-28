@@ -489,6 +489,7 @@ let testCases = {
     startShardDraining: {skip: "primary only"},
     startTrafficRecording: {skip: "does not return user data"},
     startSession: {skip: "does not return user data"},
+    stopShardDraining: {skip: "primary only"},
     stopTrafficRecording: {skip: "does not return user data"},
     sysprofile: {skip: "internal command"},
     testDeprecation: {skip: "does not return user data"},

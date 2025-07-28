@@ -50,5 +50,7 @@ RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId)
 boost::optional<RemoveShardProgress> startShardDraining(OperationContext* opCtx,
                                                         const ShardId& shardId);
 
+
+void stopShardDraining(OperationContext* opCtx, const ShardId& shardId);
 }  // namespace topology_change_helpers
 }  // namespace mongo

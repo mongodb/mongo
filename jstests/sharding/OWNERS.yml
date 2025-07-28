@@ -70,3 +70,9 @@ filters:
   - "replica_set_promotion_demotion.js":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "stop_shard_draining_test.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "remove_shard_interoperability_tests.js":
+    approvers:
+      - 10gen/server-catalog-and-routing

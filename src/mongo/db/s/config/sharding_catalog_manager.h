@@ -551,6 +551,13 @@ public:
     boost::optional<RemoveShardProgress> checkPreconditionsAndStartDrain(OperationContext* opCtx,
                                                                          const ShardId& shardId);
 
+
+    /**
+     * Checks if the shard has already been removed from the cluster. If not, checks that shard is
+     * draining and stops the draining.
+     */
+    void stopDrain(OperationContext* opCtx, const ShardId& shardId);
+
     /**
      * Checks if the shard is still draining and returns the draining status if so. If not, returns
      * drainingComplete indicating that the commit of the shard removal can proceed.

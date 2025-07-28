@@ -760,6 +760,7 @@ let testCases = {
     startShardDraining: {skip: "not on a user database"},
     startTrafficRecording: {skip: "executes locally on mongos (not sent to any remote node)"},
     startSession: {skip: "executes locally on mongos (not sent to any remote node)"},
+    stopShardDraining: {skip: "not on a user database"},
     stopTrafficRecording: {skip: "executes locally on mongos (not sent to any remote node)"},
     testDeprecation: {skip: "executes locally on mongos (not sent to any remote node)"},
     testDeprecationInVersion2: {skip: "executes locally on mongos (not sent to any remote node)"},

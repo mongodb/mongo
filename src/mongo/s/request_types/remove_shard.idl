@@ -122,7 +122,6 @@ commands:
         strict: false
         chained_structs:
             RemoveShardRequestBase: RemoveShardRequestBase
-
     shardDrainingStatus:
         command_name: shardDrainingStatus
         description: "The public shardDrainingStatus command on mongos"
@@ -138,6 +137,28 @@ commands:
         command_name: _configsvrShardDrainingStatus
         description: "The internal shardDrainingStatus command on config server"
         cpp_name: ConfigSvrShardDrainingStatus
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false
+        chained_structs:
+            RemoveShardRequestBase: RemoveShardRequestBase
+
+    stopShardDraining:
+        command_name: stopShardDraining
+        description: "The public stopShardDraining on mongos"
+        cpp_name: StopShardDraining
+        namespace: type
+        type: shard_id
+        api_version: ""
+        strict: false
+        chained_structs:
+            RemoveShardRequestBase: RemoveShardRequestBase
+
+    _configsvrStopShardDraining:
+        command_name: _configsvrStopShardDraining
+        description: "The internal stopShardDraining command on config server"
+        cpp_name: ConfigSvrStopShardDraining
         namespace: type
         type: shard_id
         api_version: ""

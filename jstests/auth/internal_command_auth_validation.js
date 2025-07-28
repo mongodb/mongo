@@ -292,6 +292,10 @@ const internalCommandsMap = {
         testname: "_configsvrStartShardDraining",
         command: {_configsvrStartShardDraining: shard0name, startShardDraining: shard0name},
     },
+    _configsvrStopShardDraining: {
+        testname: "_configsvrStopShardDraining",
+        command: {_configsvrStopShardDraining: shard0name, stopShardDraining: shard0name},
+    },
     _configsvrTransitionFromDedicatedConfigServer: {
         testname: "_configsvrTransitionFromDedicatedConfigServer",
         command: {_configsvrTransitionFromDedicatedConfigServer: 1},

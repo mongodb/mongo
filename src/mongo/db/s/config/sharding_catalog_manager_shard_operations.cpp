@@ -810,6 +810,56 @@ boost::optional<RemoveShardProgress> ShardingCatalogManager::checkPreconditionsA
     return boost::none;
 }
 
+void ShardingCatalogManager::stopDrain(OperationContext* opCtx, const ShardId& shardId) {
+    // Unset the addOrRemoveShardInProgress cluster parameter in case it was left set by a previous
+    // failed addShard/removeShard operation.
+    topology_change_helpers::resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
+
+    const auto shardName = shardId.toString();
+
+    // Take the cluster cardinality parameter lock and the shard membership lock in exclusive mode
+    // so that no add/remove shard operation and its set cluster cardinality parameter operation can
+    // interleave with the ones below. Release the shard membership lock before initiating the
+    // _configsvrSetClusterParameter command after finishing the remove shard operation since
+    // setting a cluster parameter requires taking this lock.
+    Lock::ExclusiveLock clusterCardinalityParameterLock =
+        acquireClusterCardinalityParameterLockForTopologyChange(opCtx);
+    Lock::ExclusiveLock shardMembershipLock =
+        ShardingCatalogManager::acquireShardMembershipLockForTopologyChange(opCtx);
+
+    auto optShard = topology_change_helpers::getShardIfExists(opCtx, _localConfigShard, shardId);
+
+    uassert(ErrorCodes::ShardNotFound,
+            fmt::format("Couldn't find the shard {} in the cluster", shardName),
+            optShard);
+
+    // Check if shard is already draining
+    const bool isShardCurrentlyDraining =
+        ShardingCatalogManager::isShardCurrentlyDraining(opCtx, shardId);
+
+    if (isShardCurrentlyDraining) {
+        // Record stop in changelog
+        uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
+            opCtx,
+            "removeShard.stopShardDraining",
+            NamespaceString::kEmpty,
+            BSON("shard" << shardName),
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            _localConfigShard,
+            _localCatalogClient.get()));
+
+        uassertStatusOKWithContext(
+            _localCatalogClient->updateConfigDocument(
+                opCtx,
+                NamespaceString::kConfigsvrShardsNamespace,
+                BSON(ShardType::name() << shardName),
+                BSON("$unset" << BSON(ShardType::draining(""))),
+                false,
+                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter()),
+            "error stopping shard draining");
+    }
+}
+
 RemoveShardProgress ShardingCatalogManager::checkDrainingProgress(OperationContext* opCtx,
                                                                   const ShardId& shardId) {
     hangRemoveShardAfterSettingDrainingFlag.pauseWhileSet(opCtx);

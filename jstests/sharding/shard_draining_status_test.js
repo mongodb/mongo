@@ -35,9 +35,8 @@ describe("shardDrainingStatus correct functionality test", function() {
     });
 
     afterEach(() => {
-        // TODO-SERVER-107018: Use stopShardDraining instead of manually unsetting the flag.
-        this.st.s.getDB('config').shards.updateOne({_id: this.st.shard1.shardName},
-                                                   {$set: {draining: false}});
+        assert.commandWorked(this.st.s.adminCommand({stopShardDraining: this.st.shard1.shardName}));
+
         // Clean the data
         assert.commandWorked(this.st.s.getDB('TestDB').dropDatabase());
     });

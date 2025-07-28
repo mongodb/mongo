@@ -67,6 +67,7 @@ const allCommands = {
     _configsvrSetUserWriteBlockMode: {skip: isAnInternalCommand},
     _configsvrShardDrainingStatus: {skip: isAnInternalCommand},
     _configsvrStartShardDraining: {skip: isAnInternalCommand},
+    _configsvrStopShardDraining: {skip: isAnInternalCommand},
     _configsvrTransitionFromDedicatedConfigServer: {skip: isAnInternalCommand},
     _configsvrTransitionToDedicatedConfigServer: {skip: isAnInternalCommand},
     _configsvrUpdateZoneKeyRange: {skip: isAnInternalCommand},
@@ -1148,6 +1149,7 @@ const allCommands = {
             assert.commandWorked(withoutDirectConnections.adminCommand({endSessions: [res.id]}));
         }
     },
+    stopShardDraining: {skip: requiresMongoS},
     stopTrafficRecording: {
         // Skipping command because it requires an actual file path for recording traffic to.
         skip: "requires an actual file path to record traffic to",
