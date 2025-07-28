@@ -596,6 +596,74 @@ TEST_F(WiredTigerUtilTest, SkipPreparedUpdateNoBound) {
     ASSERT_EQ(0, cursor2->next(cursor2));
 }
 
+TEST_F(WiredTigerUtilTest, ExportTableToBSONFilter) {
+    const std::string uri = "table:test";
+    const std::vector<std::string> categoryFilter{"autocommit"};
+    const std::vector<std::string> statFilter{"autocommit: retries for readonly operations"};
+    // exportTableToBSON will always return the uri and version fields.
+    const int baseNumFields = 2;
+
+    // Initialize WiredTiger.
+    WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
+    WiredTigerSession session(harnessHelper.getConnection());
+    ASSERT_OK(wtRCToStatus(session.create(uri.c_str(), nullptr), session));
+
+    // No filter
+    BSONObjBuilder bob0;
+    Status status =
+        WiredTigerUtil::exportTableToBSON(session, "statistics:" + uri, "statistics=(fast)", bob0);
+    ASSERT_OK(status);
+    auto totalNumFields = bob0.obj().nFields();
+
+    // Correctly excludes categories
+    BSONObjBuilder bob1;
+    status = WiredTigerUtil::exportTableToBSON(session,
+                                               "statistics:" + uri,
+                                               "statistics=(fast)",
+                                               bob1,
+                                               categoryFilter,
+                                               WiredTigerUtil::FilterBehavior::kExcludeCategories);
+    ASSERT_OK(status);
+    auto excludeFilterRes = bob1.obj();
+    ASSERT_FALSE(excludeFilterRes.hasField("autocommit"));
+    ASSERT_EQ(excludeFilterRes.nFields(), totalNumFields - 1);
+
+    // Filters that are not stats are not included
+    BSONObjBuilder bob2;
+    status = WiredTigerUtil::exportTableToBSON(session,
+                                               "statistics:" + uri,
+                                               "statistics=(fast)",
+                                               bob2,
+                                               categoryFilter,
+                                               WiredTigerUtil::FilterBehavior::kIncludeStats);
+    ASSERT_OK(status);
+    ASSERT_EQ(bob2.obj().nFields(), baseNumFields);
+
+    // Correctly includes only stats in filter
+    BSONObjBuilder bob3;
+    status = WiredTigerUtil::exportTableToBSON(session,
+                                               "statistics:" + uri,
+                                               "statistics=(fast)",
+                                               bob3,
+                                               statFilter,
+                                               WiredTigerUtil::FilterBehavior::kIncludeStats);
+    ASSERT_OK(status);
+    auto insertFilterRes = bob3.obj();
+    ASSERT_TRUE(insertFilterRes.getField("autocommit")["retries for readonly operations"].ok());
+    ASSERT_EQ(insertFilterRes.nFields(), baseNumFields + 1);
+
+    // Filters that are not categories are not excluded
+    BSONObjBuilder bob4;
+    status = WiredTigerUtil::exportTableToBSON(session,
+                                               "statistics:" + uri,
+                                               "statistics=(fast)",
+                                               bob4,
+                                               statFilter,
+                                               WiredTigerUtil::FilterBehavior::kExcludeCategories);
+    ASSERT_OK(status);
+    ASSERT_EQ(bob4.obj().nFields(), totalNumFields);
+}
+
 TEST(WiredTigerConfigParserTest, IterationAndKeyLookup) {
     // Configuration string containing a mix of value types, including a repeated key.
     WiredTigerConfigParser parser(
