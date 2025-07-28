@@ -198,6 +198,18 @@
         - jstests/noPassthrough/timeseries/write/timeseries_use_after_meta_update.js
         - jstests/noPassthrough/timeseries/write/timeseries_write_concern.js
         - jstests/noPassthrough/versioning_protocol/stale_shard_version_with_timeseries.js
+- name: all_replica_sets_timeseries_tests_selector
+  value:
+    selector:
+      exclude_files: null
+      roots:
+        - jstests/replsets/**/*timeseries*.js
+        - jstests/replsets/secondary_as_sync_source.js
+- name: only_validated_replica_sets_timeseries_tests_selector
+  value:
+    selector:
+      exclude_files: null
+      roots: []
 - name: exclude_viewless_timeseries_incompabile_tag
   value:
     exclude_with_any_tags:

@@ -3,13 +3,13 @@
  * collection options are correctly applied by secondaries and cloned on initial sync according to
  * the format introduced under SERVER-91195 (relying on storageEngine.wiredTiger.configString).
  */
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = "testdb";
 const collName = "testcoll";
-const bucketCollName = 'system.buckets.' + collName;
 
 const rst = new ReplSetTest({name: 'rs', nodes: 2});
 rst.startSet();
@@ -38,11 +38,10 @@ const expectedAppMetadata =
     ? "app_metadata=(timeseriesBucketingParametersHaveChanged=true,timeseriesBucketsMayHaveMixedSchemaData=true)"
     : "app_metadata=(timeseriesBucketsMayHaveMixedSchemaData=true)";
 
-const configStringAfterCollMod =
-    primaryDb()
-        .runCommand({listCollections: 1, filter: {name: bucketCollName}})
-        .cursor.firstBatch[0]
-        .options.storageEngine.wiredTiger.configString;
+const configStringAfterCollMod = primaryDb()
+                                     .runCommand({listCollections: 1, filter: {name: collName}})
+                                     .cursor.firstBatch[0]
+                                     .options.storageEngine.wiredTiger.configString;
 
 assert.eq(configStringAfterCollMod, expectedAppMetadata);
 
@@ -62,7 +61,7 @@ function assertSameOutputFromDifferentNodes(func) {
     assert.eq(outputs[1], outputs[2]);
 }
 
-// Assert that collection options for the view and for the buckets namespace
+// Assert that collection options in both regular and raw mode
 // are the same on primary, secondary and initial-synced secondary.
 assertSameOutputFromDifferentNodes(node => {
     return node.getDB(dbName)
@@ -72,7 +71,11 @@ assertSameOutputFromDifferentNodes(node => {
 
 assertSameOutputFromDifferentNodes(node => {
     return node.getDB(dbName)
-        .runCommand({listCollections: 1, filter: {name: bucketCollName}})
+        .runCommand({
+            listCollections: 1,
+            filter: {name: getTimeseriesCollForDDLOps(primaryDb(), collName)},
+            ...getRawOperationSpec(primaryDb())
+        })
         .cursor.firstBatch[0];
 });
 
