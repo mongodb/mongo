@@ -56,6 +56,7 @@ export const $config = (function() {
     }
 
     function teardown(db, collName, cluster) {
+        db[collName].drop();
         cluster.executeOnMongodNodes((db) => {
             assert.commandWorked(db.adminCommand({
                 setParameter: 1,
