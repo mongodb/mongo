@@ -4423,5 +4423,677 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineRankFusionFullDesugaring) {
         })",
         asOneObj);
 }
+
+TEST_F(DocumentSourceRankFusionTest, CheckFourPipelinesScoreDetailsDesugaring) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    matchWithTextScore: [
+                        { $match: { $text: { $search: "Agatha Christie" } } },
+                        { $sort: {author: 1} }
+                    ],
+                    searchPipe: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                },
+                                scoreDetails: true
+                            }
+                        }
+                    ],
+                    vectorSearchPipe: [
+                        {
+                            $vectorSearch: {
+                                queryVector: [1.0, 2.0, 3.0],
+                                path: "plot_embedding",
+                                numCandidates: 300,
+                                index: "vector_index",
+                                limit: 10
+                            }
+                        }
+                    ],
+                    matchWithoutTextScore: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ]
+                }
+            },
+            combination: {
+                weights: {
+                    matchWithTextScore: 3,
+                    searchPipe: 2,
+                    vectorSearchPipe: 4,
+                    matchWithoutTextScore: 5
+                }
+            },
+            scoreDetails: true
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+    const std::string expectedStages = std::string(R"({
+            "expectedStages": [)") +
+        std::string(R"({
+                    "$match": {
+                        "$text": {
+                            "$search": "Agatha Christie"
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "author": 1,
+                        "$_internalOutputSortKeyMetadata": true
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "order": 1
+                        },
+                        "output": {
+                            "matchWithTextScore_rank": {
+                                "$rank": {}
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "matchWithTextScore_score": {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$add": [
+                                                "$matchWithTextScore_rank",
+                                                {
+                                                    "$const": 60
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": 3
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "matchWithTextScore_scoreDetails": {
+                            "value": {
+                                "$meta": "score"
+                            },
+                            "details": []
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$match": {
+                                    "author": "Agatha Christie"
+                                }
+                            },
+                            {
+                                "$sort": {
+                                    "author": 1,
+                                    "$_internalOutputSortKeyMetadata": true
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "order": 1
+                                    },
+                                    "output": {
+                                        "matchWithoutTextScore_rank": {
+                                            "$rank": {}
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "matchWithoutTextScore_score": {
+                                        "$multiply": [
+                                            {
+                                                "$divide": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$add": [
+                                                            "$matchWithoutTextScore_rank",
+                                                            {
+                                                                "$const": 60
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "$const": 5
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "matchWithoutTextScore_scoreDetails": {
+                                        "details": []
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },)") +
+        std::string(R"(
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$search": {
+                                    "mongotQuery": {
+                                        "index": "search_index",
+                                        "text": {
+                                            "query": "mystery",
+                                            "path": "genres"
+                                        },
+                                        "scoreDetails": true
+                                    },
+                                    "requiresSearchSequenceToken": false,
+                                    "requiresSearchMetaCursor": true
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "order": 1
+                                    },
+                                    "output": {
+                                        "searchPipe_rank": {
+                                            "$rank": {}
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "searchPipe_score": {
+                                        "$multiply": [
+                                            {
+                                                "$divide": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$add": [
+                                                            "$searchPipe_rank",
+                                                            {
+                                                                "$const": 60
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "$const": 2
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "searchPipe_scoreDetails": {
+                                        "$meta": "scoreDetails"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$vectorSearch": {
+                                    "queryVector": [
+                                        1,
+                                        2,
+                                        3
+                                    ],
+                                    "path": "plot_embedding",
+                                    "numCandidates": 300,
+                                    "index": "vector_index",
+                                    "limit": 10
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "order": 1
+                                    },
+                                    "output": {
+                                        "vectorSearchPipe_rank": {
+                                            "$rank": {}
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "vectorSearchPipe_score": {
+                                        "$multiply": [
+                                            {
+                                                "$divide": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$add": [
+                                                            "$vectorSearchPipe_rank",
+                                                            {
+                                                                "$const": 60
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "$const": 4
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "vectorSearchPipe_scoreDetails": {
+                                        "value": {
+                                            "$meta": "score"
+                                        },
+                                        "details": []
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },)") +
+        std::string(R"(
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "matchWithTextScore_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchWithTextScore_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "matchWithTextScore_rank": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchWithTextScore_rank",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "matchWithTextScore_scoreDetails": {
+                            "$mergeObjects": "$matchWithTextScore_scoreDetails"
+                        },
+                        "matchWithoutTextScore_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchWithoutTextScore_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "matchWithoutTextScore_rank": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchWithoutTextScore_rank",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "matchWithoutTextScore_scoreDetails": {
+                            "$mergeObjects": "$matchWithoutTextScore_scoreDetails"
+                        },
+                        "searchPipe_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$searchPipe_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "searchPipe_rank": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$searchPipe_rank",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "searchPipe_scoreDetails": {
+                            "$mergeObjects": "$searchPipe_scoreDetails"
+                        },
+                        "vectorSearchPipe_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$vectorSearchPipe_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "vectorSearchPipe_rank": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$vectorSearchPipe_rank",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "vectorSearchPipe_scoreDetails": {
+                            "$mergeObjects": "$vectorSearchPipe_scoreDetails"
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$addFields": {
+                        "score": {
+                            "$add": [
+                                "$matchWithTextScore_score",
+                                "$matchWithoutTextScore_score",
+                                "$searchPipe_score",
+                                "$vectorSearchPipe_score"
+                            ]
+                        }
+                    }
+                },)") +
+        std::string(R"(
+                {
+                    "$addFields": {
+                        "matchWithTextScore_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$matchWithTextScore_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$matchWithTextScore_rank"
+                            ]
+                        },
+                        "matchWithoutTextScore_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$matchWithoutTextScore_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$matchWithoutTextScore_rank"
+                            ]
+                        },
+                        "searchPipe_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$searchPipe_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$searchPipe_rank"
+                            ]
+                        },
+                        "vectorSearchPipe_rank": {
+                            "$cond": [
+                                {
+                                    "$eq": [
+                                        "$vectorSearchPipe_rank",
+                                        {
+                                            "$const": 0
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": "NA"
+                                },
+                                "$vectorSearchPipe_rank"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "calculatedScoreDetails": [
+                            {
+                                "$mergeObjects": [
+                                    {
+                                        "inputPipelineName": {
+                                            "$const": "matchWithTextScore"
+                                        },
+                                        "rank": "$matchWithTextScore_rank",
+                                        "weight": {
+                                            "$cond": [
+                                                {
+                                                    "$eq": [
+                                                        "$matchWithTextScore_rank",
+                                                        {
+                                                            "$const": "NA"
+                                                        }
+                                                    ]
+                                                },
+                                                "$$REMOVE",
+                                                {
+                                                    "$const": 3
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "$matchWithTextScore_scoreDetails"
+                                ]
+                            },
+                            {
+                                "$mergeObjects": [
+                                    {
+                                        "inputPipelineName": {
+                                            "$const": "matchWithoutTextScore"
+                                        },
+                                        "rank": "$matchWithoutTextScore_rank",
+                                        "weight": {
+                                            "$cond": [
+                                                {
+                                                    "$eq": [
+                                                        "$matchWithoutTextScore_rank",
+                                                        {
+                                                            "$const": "NA"
+                                                        }
+                                                    ]
+                                                },
+                                                "$$REMOVE",
+                                                {
+                                                    "$const": 5
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "$matchWithoutTextScore_scoreDetails"
+                                ]
+                            },
+                            {
+                                "$mergeObjects": [
+                                    {
+                                        "inputPipelineName": {
+                                            "$const": "searchPipe"
+                                        },
+                                        "rank": "$searchPipe_rank",
+                                        "weight": {
+                                            "$cond": [
+                                                {
+                                                    "$eq": [
+                                                        "$searchPipe_rank",
+                                                        {
+                                                            "$const": "NA"
+                                                        }
+                                                    ]
+                                                },
+                                                "$$REMOVE",
+                                                {
+                                                    "$const": 2
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "$searchPipe_scoreDetails"
+                                ]
+                            },
+                            {
+                                "$mergeObjects": [
+                                    {
+                                        "inputPipelineName": {
+                                            "$const": "vectorSearchPipe"
+                                        },
+                                        "rank": "$vectorSearchPipe_rank",
+                                        "weight": {
+                                            "$cond": [
+                                                {
+                                                    "$eq": [
+                                                        "$vectorSearchPipe_rank",
+                                                        {
+                                                            "$const": "NA"
+                                                        }
+                                                    ]
+                                                },
+                                                "$$REMOVE",
+                                                {
+                                                    "$const": 4
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "$vectorSearchPipe_scoreDetails"
+                                ]
+                            }
+                        ]
+                    }
+                },)") +
+        std::string(R"(
+                {
+                    "$setMetadata": {
+                        "scoreDetails": {
+                            "value": "$score",
+                            "description": {
+                                "$const": "value output by reciprocal rank fusion algorithm, computed as sum of (weight * (1 / (60 + rank))) across input pipelines from which this document is output, from:"
+                            },
+                            "details": "$calculatedScoreDetails"
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "score": -1,
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })");
+    ASSERT_BSONOBJ_EQ_AUTO(expectedStages, asOneObj);
+}
 }  // namespace
 }  // namespace mongo
