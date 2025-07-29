@@ -2068,6 +2068,8 @@ const wcCommandsTests = {
                     "coll2"
             },
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
+                coll.getDB().coll2.drop();
+
                 assert.commandWorked(coll.insert({_id: 1}));
                 assert.eq(coll.find().itcount(), 1);
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
@@ -5951,6 +5953,13 @@ export function checkWriteConcernBehaviorForAllCommands(
         limitToTimeseriesViews ? wcTimeseriesViewsCommandsTests : wcCommandsTests;
     const commandsList = AllCommandsTest.checkCommandCoverage(conn, commandsToTest);
 
+    // Randomly execute commands with 50% probability to reduce test runtime.
+    // This mitigates long internal write concern timeouts (30-60s) that override
+    // test-specified timeouts, as timeout handling improvements from SERVER-102770
+    // and SERVER-103553 are not being backported to versions below 8.2.
+    const selectedCommands = commandsList.filter(() => Math.random() < 0.5);
+    jsTestLog("Running " + selectedCommands.length + "/" + commandsList.length + " commands");
+
     let coll = conn.getDB(dbName).getCollection(collName);
 
     if (clusterType == "rs") {
@@ -5959,7 +5968,7 @@ export function checkWriteConcernBehaviorForAllCommands(
         stopSecondaries(cluster, clusterType);
 
         executeWriteConcernBehaviorTests(
-            conn, coll, cluster, clusterType, preSetup, commandsList, commandsToTest);
+            conn, coll, cluster, clusterType, preSetup, selectedCommands, commandsToTest);
 
         restartSecondaries(cluster, clusterType);
 
@@ -5977,7 +5986,7 @@ export function checkWriteConcernBehaviorForAllCommands(
     // test case.
     let cmdsTargetConfigServer = [];
     let cmdsTargetShards = [];
-    commandsList.forEach((command) => {
+    selectedCommands.forEach((command) => {
         let cmd = commandsToTest[command];
         if (cmd.targetConfigServer) {
             cmdsTargetConfigServer.push(command);
