@@ -1289,12 +1289,7 @@ __wt_txn_upd_visible_type(WT_SESSION_IMPL *session, WT_UPDATE *upd)
               upd->type == WT_UPDATE_STANDARD))
             return (WT_VISIBLE_TRUE);
 
-        upd_visible = __wt_txn_visible(session, upd->txnid,
-          F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) &&
-              prepare_state == WT_PREPARE_INPROGRESS ?
-            upd->prepare_ts :
-            upd->upd_start_ts,
-          upd->upd_durable_ts);
+        upd_visible = __wt_txn_visible(session, upd->txnid, upd->upd_start_ts, upd->upd_durable_ts);
 
         /*
          * The visibility check is only valid if the update does not change state. If the state does
@@ -2069,7 +2064,7 @@ __txn_modify_block(
     WT_TIME_WINDOW tw;
     WT_TXN *txn;
     uint32_t snap_count;
-    char ts_string[WT_TS_INT_STRING_SIZE];
+    char ts_string[2][WT_TS_INT_STRING_SIZE];
     bool ignore_prepare_set, rollback, tw_found;
 
     rollback = tw_found = false;
@@ -2084,8 +2079,10 @@ __txn_modify_block(
     for (; upd != NULL && !__wt_txn_upd_visible(session, upd); upd = upd->next) {
         if (upd->txnid != WT_TXN_ABORTED) {
             __wt_verbose_debug1(session, WT_VERB_TRANSACTION,
-              "Conflict with update with txn id %" PRIu64 " at timestamp: %s", upd->txnid,
-              __wt_timestamp_to_string(upd->upd_start_ts, ts_string));
+              "Conflict with update with txn id %" PRIu64
+              " at start timestamp: %s, prepare timestamp: %s",
+              upd->txnid, __wt_timestamp_to_string(upd->upd_start_ts, ts_string[0]),
+              __wt_timestamp_to_string(upd->prepare_ts, ts_string[1]));
             rollback = true;
             break;
         }
@@ -2110,14 +2107,18 @@ __txn_modify_block(
                 rollback = !__wt_txn_tw_stop_visible(session, &tw);
                 if (rollback)
                     __wt_verbose_debug1(session, WT_VERB_TRANSACTION,
-                      "Conflict with update %" PRIu64 " at stop timestamp: %s", tw.stop_txn,
-                      __wt_timestamp_to_string(tw.stop_ts, ts_string));
+                      "Conflict with update %" PRIu64
+                      " at stop timestamp: %s, prepare timestamp: %s",
+                      tw.stop_txn, __wt_timestamp_to_string(tw.stop_ts, ts_string[0]),
+                      __wt_timestamp_to_string(tw.stop_prepare_ts, ts_string[1]));
             } else {
                 rollback = !__wt_txn_tw_start_visible(session, &tw);
                 if (rollback)
                     __wt_verbose_debug1(session, WT_VERB_TRANSACTION,
-                      "Conflict with update %" PRIu64 " at start timestamp: %s", tw.start_txn,
-                      __wt_timestamp_to_string(tw.start_ts, ts_string));
+                      "Conflict with update %" PRIu64
+                      " at start timestamp: %s, prepare timestamp: %s",
+                      tw.start_txn, __wt_timestamp_to_string(tw.start_ts, ts_string[0]),
+                      __wt_timestamp_to_string(tw.start_prepare_ts, ts_string[1]));
             }
         }
     }

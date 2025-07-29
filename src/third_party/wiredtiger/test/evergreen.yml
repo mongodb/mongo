@@ -4960,6 +4960,48 @@ tasks:
         vars:
           test-name: evict-btree-1.wtperf
 
+  - name: perf-cache-workload-dirty-trigger
+    tags: ["evict-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          test_type: workgen
+          exec_path: ${python_binary|python3}
+          perf-test-path: ../../../bench/workgen/runner
+          perf-test-name: cache_workload_dirty_trigger.py
+          maxruns: 1
+          wtarg: -ops ['"app_dirty_attempt", "app_attempt", "trigger_updates", "trigger_dirty"']
+      - func: "upload stats to atlas"
+        vars:
+          test-name: cache_workload_dirty_trigger.py
+      - func: "upload stats to evergreen"
+        vars:
+          test-name: cache_workload_dirty_trigger.py
+
+  - name: perf-cache-workload-update-trigger
+    tags: ["evict-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          test_type: workgen
+          exec_path: ${python_binary|python3}
+          perf-test-path: ../../../bench/workgen/runner
+          perf-test-name: cache_workload_update_trigger.py
+          maxruns: 1
+          wtarg: -ops ['"app_dirty_attempt", "app_attempt", "trigger_updates", "trigger_dirty"']
+      - func: "upload stats to atlas"
+        vars:
+          test-name: cache_workload_update_trigger.py
+      - func: "upload stats to evergreen"
+        vars:
+          test-name: cache_workload_update_trigger.py
+
     ###########################################
     # Performance Tests for log consolidation #
     ###########################################

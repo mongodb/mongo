@@ -81,8 +81,8 @@ __rec_hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor
 #ifdef HAVE_DIAGNOSTIC
     int cmp;
 #endif
-    char ts_string[5][WT_TS_INT_STRING_SIZE];
-
+    char ts_string[WT_TS_INT_STRING_SIZE];
+    char tw_string[WT_TIME_STRING_SIZE];
     hs_insert_cursor = NULL;
     hs_cbt = __wt_curhs_get_cbt(hs_cursor);
     WT_CLEAR(hs_key);
@@ -180,14 +180,9 @@ __rec_hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor
                 ++cache_hs_order_lose_durable_timestamp;
 
             __wt_verbose(session, WT_VERB_TIMESTAMP,
-              "fixing existing updates by moving them; start_ts=%s, "
-              "durable_start_ts=%s, "
-              "stop_ts=%s, durable_stop_ts=%s, new_ts=%s",
-              __wt_timestamp_to_string(hs_cbt->upd_value->tw.start_ts, ts_string[0]),
-              __wt_timestamp_to_string(hs_cbt->upd_value->tw.durable_start_ts, ts_string[1]),
-              __wt_timestamp_to_string(hs_cbt->upd_value->tw.stop_ts, ts_string[2]),
-              __wt_timestamp_to_string(hs_cbt->upd_value->tw.durable_stop_ts, ts_string[3]),
-              __wt_timestamp_to_string(ts, ts_string[4]));
+              "fixing existing updates by moving them; tw=%s, new_ts=%s",
+              __wt_time_window_to_string(&(hs_cbt->upd_value->tw), tw_string),
+              __wt_timestamp_to_string(ts, ts_string));
 
             /*
              * Use the original start time window's timestamps if its timestamp is less than the new
@@ -347,15 +342,15 @@ __rec_hs_cursor_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, uint32_t btr
      * If we find a key with a timestamp larger than or equal to the specified timestamp then the
      * specified timestamp must be mixed mode.
      */
-    char ts_string[4][WT_TS_INT_STRING_SIZE];
+    char ts_string[2][WT_TS_INT_STRING_SIZE];
+    char tw_string[WT_TIME_STRING_SIZE];
     WT_ASSERT_ALWAYS(session, ts == 1 || ts == WT_TS_NONE,
       "out-of-order timestamp update detected, found an existing update with "
-      "hs_start_ts=%s, start_ts=%s, stop_ts=%s, that exists later than specified ts=%s",
+      "hs_start_ts=%s, time_window=%s, that "
+      "exists later than specified ts=%s",
       __wt_timestamp_to_string(hs_start_ts, ts_string[0]),
-      __wt_timestamp_to_string(twp == NULL ? WT_TS_NONE : twp->start_ts, ts_string[1]),
-      __wt_timestamp_to_string(twp == NULL ? WT_TS_NONE : twp->stop_ts, ts_string[2]),
-      __wt_timestamp_to_string(ts, ts_string[3]));
-    return (ret);
+      __wt_time_window_to_string(twp, tw_string), __wt_timestamp_to_string(ts, ts_string[1]));
+    return (0);
 }
 
 /*

@@ -49,6 +49,32 @@ class PerfStatCollection:
             values = stat.find_stat(test_stat_path=test_stat_path)
             stat.add_values(values=values)
 
+
+    @staticmethod
+    def cache_eviction_stats():
+        return [
+            PerfStat(short_label="app_dirty_attempt",
+                     stat_file='cache_eviction.stat',
+                     pattern=r'App evict dirty attempts\s+:\s+\d+',
+                     input_offset=5,
+                     output_label='App evict dirty attempts'),
+            PerfStat(short_label="app_attempt",
+                     stat_file='cache_eviction.stat',
+                     pattern=r'App evict clean attempts\s+:\s+\d+',
+                     input_offset=5,
+                     output_label='App evict clean attempts'),
+            PerfStat(short_label="trigger_updates",
+                     stat_file='cache_eviction.stat',
+                     pattern=r'Cache updates trigger\s+:\s+\d+',
+                     input_offset=4,
+                     output_label='Cache updates trigger'),
+            PerfStat(short_label="trigger_dirty",
+                     stat_file='cache_eviction.stat',
+                     pattern=r'Cache dirty trigger\s+:\s+\d+',
+                     input_offset=4,
+                     output_label='Cache dirty trigger'),
+            ]
+
     @staticmethod
     def all_stats():
         return [
@@ -177,4 +203,4 @@ class PerfStatCollection:
                                    input_offset=11),
             PerfStatDBSize(short_label="database_size",
                            output_label='Database Size (in bytes)')
-        ]
+        ] + PerfStatCollection.cache_eviction_stats()

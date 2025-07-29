@@ -163,7 +163,6 @@ pop_workload = Workload(context, populate_threads * pop_thread)
 ret = pop_workload.run(conn)
 assert ret == 0, ret
 cache_eviction_file = context.args.home + "/cache_eviction.stat"
-get_cache_eviction_stats(s, cache_eviction_file)
 
 print('Populate complete')
 
@@ -252,6 +251,7 @@ cache_workload.options.sample_interval_ms = 1000
 ret = cache_workload.run(conn)
 assert ret == 0, ret
 
+# print stats after workload run
 get_cache_eviction_stats(s, cache_eviction_file)
 
 latency_filename = context.args.home + "/latency.stat"

@@ -552,9 +552,10 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
         upd->prepared_id = hs_tw->start_prepared_id;
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           WT_RTS_VERB_TAG_HS_UPDATE_RESTORED "history store update restored txnid=%" PRIu64
-                                             ", start_ts=%s and durable_ts=%s",
+                                             ", start_ts=%s, prepare_ts=%s and durable_ts=%s",
           upd->txnid, __wt_timestamp_to_string(upd->upd_start_ts, ts_string[0]),
-          __wt_timestamp_to_string(upd->upd_durable_ts, ts_string[1]));
+          __wt_timestamp_to_string(upd->prepare_ts, ts_string[1]),
+          __wt_timestamp_to_string(upd->upd_durable_ts, ts_string[2]));
 
         /*
          * Set the flag to indicate that this update has been restored from history store for the
@@ -594,9 +595,11 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
             tombstone->prepared_id = hs_tw->stop_prepared_id;
             __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
               WT_RTS_VERB_TAG_HS_RESTORE_TOMBSTONE
-              "history store tombstone restored, txnid=%" PRIu64 ", start_ts=%s and durable_ts=%s",
+              "history store tombstone restored, txnid=%" PRIu64
+              ", start_ts=%s, prepare_ts=%s and durable_ts=%s",
               tombstone->txnid, __wt_timestamp_to_string(tombstone->upd_start_ts, ts_string[0]),
-              __wt_timestamp_to_string(tombstone->upd_durable_ts, ts_string[1]));
+              __wt_timestamp_to_string(tombstone->prepare_ts, ts_string[1]),
+              __wt_timestamp_to_string(tombstone->upd_durable_ts, ts_string[2]));
 
             /*
              * Set the flag to indicate that this update has been restored from history store for
