@@ -12,10 +12,16 @@ filters:
   - "code_lockdown.yml":
     approvers:
       - 10gen/devprod-correctness
+  - "coverity.yml":
+    approvers:
+      - 10gen/server-programmability
   - "evergreen_yml_components/tasks/compile_tasks*.yml":
     approvers:
       - 10gen/devprod-build
   - "performance_thresholds.yml":
+    approvers:
+      - 10gen/performance
+  - "system_perf.yml":
     approvers:
       - 10gen/performance
   - "/evergreen_yml_components/tasks/release_tasks.yml":

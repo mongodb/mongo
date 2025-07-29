@@ -280,8 +280,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /etc/backports_required_for_multiversion_tests.yml @10gen/devprod-correctness @svc-auto-approve-bot
 /etc/burn_in_tests.yml @10gen/devprod-correctness @svc-auto-approve-bot
 /etc/code_lockdown.yml @10gen/devprod-correctness @svc-auto-approve-bot
+/etc/coverity.yml @10gen/server-programmability @svc-auto-approve-bot
 /etc/evergreen_yml_components/tasks/compile_tasks*.yml @10gen/devprod-build @svc-auto-approve-bot
 /etc/performance_thresholds.yml @10gen/performance @svc-auto-approve-bot
+/etc/system_perf.yml @10gen/performance @svc-auto-approve-bot
 /etc/evergreen_yml_components/tasks/release_tasks.yml @10gen/devprod-release-infrastructure @svc-auto-approve-bot
 /etc/evergreen_yml_components/variants/release/release.yml @10gen/devprod-release-infrastructure @svc-auto-approve-bot
 
