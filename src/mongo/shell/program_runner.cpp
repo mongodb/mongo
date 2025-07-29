@@ -152,8 +152,11 @@ ProgramOutputMultiplexer* ProgramRegistry::getProgramOutputMultiplexer() {
     return &_programOutputMultiplexer;
 }
 
-ProgramRunner ProgramRegistry::createProgramRunner(BSONObj args, BSONObj env, bool isMongo) {
-    return ProgramRunner(args, env, isMongo, this);
+ProgramRunner ProgramRegistry::createProgramRunner(BSONObj args,
+                                                   BSONObj env,
+                                                   bool isMongo,
+                                                   const std::string& loggingPrefix) {
+    return ProgramRunner(args, env, isMongo, loggingPrefix, this);
 }
 
 bool ProgramRegistry::isPortRegistered(int port) const {
@@ -398,7 +401,11 @@ void ProgramOutputMultiplexer::clear() {
     _buffer.str("");
 }
 
-ProgramRunner::ProgramRunner(BSONObj args, BSONObj env, bool isMongo, ProgramRegistry* registry)
+ProgramRunner::ProgramRunner(BSONObj args,
+                             BSONObj env,
+                             bool isMongo,
+                             const std::string& loggingPrefix,
+                             ProgramRegistry* registry)
     : _parentRegistry(registry) {
     uassert(ErrorCodes::FailedToParse,
             "cannot pass an empty argument to ProgramRunner",
@@ -427,7 +434,8 @@ ProgramRunner::ProgramRunner(BSONObj args, BSONObj env, bool isMongo, ProgramReg
         (string("mongotmock") == programName ||
          programName.string().compare(0, prefix.size(), prefix) == 0);
 
-    parseName(isMongo, isMongodProgram, isMongosProgram, isMongotMockProgram, programName);
+    parseName(
+        isMongo, isMongodProgram, isMongosProgram, isMongotMockProgram, loggingPrefix, programName);
 
     _argv.push_back(programPath.string());
 
@@ -849,6 +857,7 @@ void ProgramRunner::parseName(bool isMongo,
                               bool isMongodProgram,
                               bool isMongosProgram,
                               bool isMongotMockProgram,
+                              const std::string& loggingPrefix,
                               const boost::filesystem::path& programName) {
     if (!isMongo) {
         _name = "sh";
@@ -860,6 +869,8 @@ void ProgramRunner::parseName(bool isMongo,
         _name = "tm";
     } else if (programName == "mongobridge") {
         _name = "b";
+    } else if (!loggingPrefix.empty()) {
+        _name = loggingPrefix + ":";
     } else {
         _name = "sh";
     }

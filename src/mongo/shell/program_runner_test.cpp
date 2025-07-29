@@ -73,7 +73,7 @@ TEST_F(ProgramRunnerTestFixture, ArgumentEscaping) {
     BSONObj env{};
 
     // Create a program runner and start
-    auto runner = registry->createProgramRunner(args, env, true);
+    auto runner = registry->createProgramRunner(args, env, true, "");
     runner.start(true);
 
     // Wait for PID so we can read output

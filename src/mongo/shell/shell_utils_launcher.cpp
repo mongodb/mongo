@@ -244,12 +244,14 @@ BSONObj StartMongoProgram(const BSONObj& a, void* data) {
     shellGlobalParams.nokillop.store(true);
     BSONObj args = a;
     BSONObj env{};
+    std::string loggingPrefix;
     BSONElement firstElement = args.firstElement();
 
     if (firstElement.ok() && firstElement.isABSONObj()) {
         BSONObj subobj = firstElement.Obj();
         BSONElement argsElem = subobj["args"];
         BSONElement envElem = subobj["env"];
+        BSONElement loggingPrefixElem = subobj["loggingPrefix"];
         uassert(40098,
                 "If StartMongoProgram is called with a BSONObj, "
                 "it must contain an 'args' subobject." +
@@ -260,10 +262,13 @@ BSONObj StartMongoProgram(const BSONObj& a, void* data) {
         if (envElem.ok() && envElem.isABSONObj()) {
             env = envElem.Obj();
         }
+        if (loggingPrefixElem.ok()) {
+            loggingPrefix = loggingPrefixElem.str();
+        }
     }
 
     auto registry = ProgramRegistry::get(getGlobalServiceContext());
-    auto runner = registry->createProgramRunner(args, env, true);
+    auto runner = registry->createProgramRunner(args, env, /*isMongo=*/true, loggingPrefix);
     runner.start();
     invariant(registry->isPidRegistered(runner.pid()));
     stdx::thread t(runner, registry->getProgramOutputMultiplexer(), true /* shouldLogOutput */);
@@ -274,7 +279,7 @@ BSONObj StartMongoProgram(const BSONObj& a, void* data) {
 BSONObj RunProgram(const BSONObj& a, void* data, bool isMongo, bool isQuiet = false) {
     BSONObj env{};
     auto registry = ProgramRegistry::get(getGlobalServiceContext());
-    auto runner = registry->createProgramRunner(a, env, isMongo);
+    auto runner = registry->createProgramRunner(a, env, isMongo, /*loggingPrefix=*/std::string());
 
     runner.start(!isQuiet);
 
