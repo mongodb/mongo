@@ -75,7 +75,7 @@ namespace str {
 */
 class stream {
 public:
-    mongo::StringBuilder ss;
+    StringBuilder ss;
     template <class T>
     stream& operator<<(const T& v) {
         ss << v;
@@ -84,7 +84,7 @@ public:
     operator std::string() const {
         return ss.str();
     }
-    operator mongo::StringData() const {
+    operator StringData() const {
         return ss.stringData();
     }
 
@@ -95,6 +95,14 @@ public:
      */
     template <typename R, typename... Args>
     stream& operator<<(R (*val)(Args...)) = delete;
+
+    bool operator==(StringData s) const {
+        return ss.stringData() == s;
+    }
+
+    auto operator<=>(StringData s) const {
+        return ss.stringData() <=> s;
+    }
 };
 
 inline bool startsWith(const char* str, const char* prefix) {
