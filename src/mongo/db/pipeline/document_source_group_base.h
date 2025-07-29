@@ -34,7 +34,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
@@ -73,7 +72,7 @@ namespace mongo {
  *  - Computing the group key
  *  - Accumulating values in a hash table and populating output documents.
  */
-class DocumentSourceGroupBase : public DocumentSource, public exec::agg::Stage {
+class DocumentSourceGroupBase : public DocumentSource {
 public:
     using Accumulators = std::vector<boost::intrusive_ptr<AccumulatorState>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;
@@ -129,7 +128,7 @@ public:
     }
 
     GroupProcessor* getGroupProcessor() {
-        return &_groupProcessor;
+        return _groupProcessor.get();
     }
 
     /**
@@ -142,25 +141,14 @@ public:
      * results from earlier partial groups.
      */
     bool doingMerge() const {
-        return _groupProcessor.doingMerge();
-    }
-
-    const SpecificStats* getSpecificStats() const final {
-        return &_groupProcessor.getStats();
-    }
-
-    /**
-     * Returns true if this $group stage used disk during execution and false otherwise.
-     */
-    bool usedDisk() const final {
-        return _groupProcessor.usedDisk();
+        return _groupProcessor->doingMerge();
     }
 
     /**
      * Returns maximum allowed memory footprint.
      */
     size_t getMaxMemoryUsageBytes() const {
-        return _groupProcessor.getMemoryTracker().maxAllowedMemoryUsageBytes();
+        return _groupProcessor->getMemoryTracker().maxAllowedMemoryUsageBytes();
     }
 
     /**
@@ -168,7 +156,7 @@ public:
      * return an empty vector.
      */
     const std::vector<std::string>& getIdFieldNames() const {
-        return _groupProcessor.getIdFieldNames();
+        return _groupProcessor->getIdFieldNames();
     }
 
     /**
@@ -176,7 +164,7 @@ public:
      * this will return a vector with one element.
      */
     const std::vector<boost::intrusive_ptr<Expression>>& getIdExpressions() const {
-        return _groupProcessor.getIdExpressions();
+        return _groupProcessor->getIdExpressions();
     }
 
     /**
@@ -194,7 +182,7 @@ public:
     /**
      * When possible, creates a document transformer that transforms the first document in a group
      * into one of the output documents of the $group stage. This is possible when we are grouping
-     * on a single field and all accumulators are $first or $top (or there are no accumluators).
+     * on a single field and all accumulators are $first or $top (or there are no accumulators).
      *
      * It is sometimes possible to use a DISTINCT_SCAN to scan the first document of each group,
      * in which case this transformation can replace the actual $group stage in the pipeline
@@ -220,15 +208,11 @@ public:
     }
 
     bool willBeMerged() const {
-        return _groupProcessor.willBeMerged();
+        return _groupProcessor->willBeMerged();
     }
 
     bool groupIsOnShardKey(const Pipeline& pipeline,
                            const boost::optional<OrderedPathSet>& initialShardKeyPaths) const;
-
-    void doForceSpill() override {
-        _groupProcessor.spill();
-    }
 
 protected:
     DocumentSourceGroupBase(StringData stageName,
@@ -237,8 +221,6 @@ protected:
 
     void initializeFromBson(BSONElement elem);
     virtual bool isSpecFieldReserved(StringData fieldName) = 0;
-
-    void doDispose() final;
 
     virtual void serializeAdditionalFields(
         MutableDocument& out, const SerializationOptions& opts = SerializationOptions{}) const {};
@@ -255,7 +237,7 @@ protected:
      */
     boost::optional<RewriteGroupRequirements> getRewriteGroupRequirements() const;
 
-    GroupProcessor _groupProcessor;
+    std::shared_ptr<GroupProcessor> _groupProcessor;
 
 private:
     static constexpr StringData kDoingMergeSpecField = "$doingMerge"_sd;

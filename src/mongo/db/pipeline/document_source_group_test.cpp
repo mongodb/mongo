@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/group_base_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -72,6 +73,7 @@
 #include <utility>
 #include <vector>
 
+#include "src/mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -160,15 +162,17 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoading) {
                                            DocumentSource::GetNextResult::makePauseExecution(),
                                            Document()},
                                           expCtx);
-    group->setSource(mock.get());
+    auto groupStage = exec::agg::buildStage(group);
+
+    groupStage->setSource(mock.get());
 
     // There were 3 pauses, so we should expect 3 paused results before any results can be returned.
-    ASSERT_TRUE(group->getNext().isPaused());
-    ASSERT_TRUE(group->getNext().isPaused());
-    ASSERT_TRUE(group->getNext().isPaused());
+    ASSERT_TRUE(groupStage->getNext().isPaused());
+    ASSERT_TRUE(groupStage->getNext().isPaused());
+    ASSERT_TRUE(groupStage->getNext().isPaused());
 
     // There were 4 documents, so we expect a count of 4.
-    auto result = group->getNext();
+    auto result = groupStage->getNext();
     ASSERT_TRUE(result.isAdvanced());
     ASSERT_DOCUMENT_EQ(result.releaseDocument(), (Document{{"_id", BSONNULL}, {"count", 4}}));
 }
@@ -199,18 +203,20 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoadingWhileSpilled) {
                                            DocumentSource::GetNextResult::makePauseExecution(),
                                            Document{{"_id", 2}, {"largeStr", largeStr}}},
                                           expCtx);
-    group->setSource(mock.get());
+    auto groupStage = exec::agg::buildStage(group);
+
+    groupStage->setSource(mock.get());
 
     // There were 2 pauses, so we should expect 2 paused results before any results can be returned.
-    ASSERT_TRUE(group->getNext().isPaused());
-    ASSERT_TRUE(group->getNext().isPaused());
+    ASSERT_TRUE(groupStage->getNext().isPaused());
+    ASSERT_TRUE(groupStage->getNext().isPaused());
 
     // Now we expect to get the results back, although in no particular order.
     stdx::unordered_set<int> idSet;
-    for (auto result = group->getNext(); result.isAdvanced(); result = group->getNext()) {
+    for (auto result = groupStage->getNext(); result.isAdvanced(); result = groupStage->getNext()) {
         idSet.insert(result.releaseDocument()["_id"].coerceToInt());
     }
-    ASSERT_TRUE(group->getNext().isEOF());
+    ASSERT_TRUE(groupStage->getNext().isEOF());
 
     ASSERT_EQ(idSet.size(), 3UL);
     ASSERT_EQ(idSet.count(0), 1UL);
@@ -237,10 +243,12 @@ TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSet
     auto mock = DocumentSourceMock::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
                                                    Document{{"_id", 1}, {"largeStr", largeStr}}},
                                                   expCtx);
-    group->setSource(mock.get());
+    auto groupStage = exec::agg::buildStage(group);
+    groupStage->setSource(mock.get());
 
-    ASSERT_THROWS_CODE(
-        group->getNext(), AssertionException, ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
+    ASSERT_THROWS_CODE(groupStage->getNext(),
+                       AssertionException,
+                       ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
 }
 
 TEST_F(DocumentSourceGroupTest, ShouldBeAbleToForceSpillAfterReturningResults) {
@@ -265,25 +273,26 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToForceSpillAfterReturningResults) {
                                                    Document{{"_id", 1}, {"largeStr", largeStr}},
                                                    Document{{"_id", 2}, {"largeStr", largeStr}}},
                                                   expCtx);
-    group->setSource(mock.get());
+    auto groupStage = exec::agg::buildStage(group);
+    groupStage->setSource(mock.get());
 
-    auto next = group->getNext();
+    auto next = groupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     stdx::unordered_set<int> idSet;
     idSet.insert(next.releaseDocument()["_id"].coerceToInt());
 
-    const auto* stats = static_cast<const GroupStats*>(group->getSpecificStats());
+    const auto* stats = static_cast<const GroupStats*>(groupStage->getSpecificStats());
     ASSERT_EQ(stats->spillingStats.getSpills(), 0);
 
-    group->forceSpill();
+    groupStage->forceSpill();
 
     ASSERT_EQ(stats->spillingStats.getSpills(), 1);
     ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 2);
 
-    for (auto result = group->getNext(); result.isAdvanced(); result = group->getNext()) {
+    for (auto result = groupStage->getNext(); result.isAdvanced(); result = groupStage->getNext()) {
         idSet.insert(result.releaseDocument()["_id"].coerceToInt());
     }
-    ASSERT_TRUE(group->getNext().isEOF());
+    ASSERT_TRUE(groupStage->getNext().isEOF());
 
     ASSERT_EQ(idSet.size(), 3UL);
     ASSERT_EQ(idSet.count(0), 1UL);
@@ -313,14 +322,16 @@ TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
                                            Document{{"_id", 1}, {"largeStr", largeStr}},
                                            Document{{"_id", 2}, {"largeStr", largeStr}}},
                                           expCtx);
-    group->setSource(mock.get());
+    auto groupStage = exec::agg::buildStage(group);
+    groupStage->setSource(mock.get());
 
     // The first getNext() should pause.
-    ASSERT_TRUE(group->getNext().isPaused());
+    ASSERT_TRUE(groupStage->getNext().isPaused());
 
     // The next should realize it's used too much memory.
-    ASSERT_THROWS_CODE(
-        group->getNext(), AssertionException, ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
+    ASSERT_THROWS_CODE(groupStage->getNext(),
+                       AssertionException,
+                       ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
 }
 
 DEATH_TEST_REGEX_F(DocumentSourceGroupTest,
@@ -340,9 +351,11 @@ DEATH_TEST_REGEX_F(DocumentSourceGroupTest,
     MutableDocument doc(Document{{"_id", 0}});
     doc.metadata().setChangeStreamControlEvent();
     auto mock = DocumentSourceMock::createForTest({doc.freeze()}, expCtx);
-    group->setSource(mock.get());
+    auto groupStage = exec::agg::buildStage(group);
 
-    ASSERT_THROWS_CODE(group->getNext(), AssertionException, 10358900);
+    groupStage->setSource(mock.get());
+
+    ASSERT_THROWS_CODE(groupStage->getNext(), AssertionException, 10358900);
 }
 
 DEATH_TEST_REGEX_F(DocumentSourceGroupTest,
@@ -524,8 +537,10 @@ TEST_F(DocumentSourceGroupTest, CanHandleEmptyExpressionObject) {
     auto group =
         DocumentSourceGroup::create(getExpCtx(), idExpression, accumulationStatements, false);
     auto mock = DocumentSourceMock::createForTest({Document{{"_id"_sd, 0}}}, getExpCtx());
-    group->setSource(mock.get());
-    auto next = group->getNext();
+    auto groupStage = exec::agg::buildStage(group);
+
+    groupStage->setSource(mock.get());
+    auto next = groupStage->getNext();
     ASSERT(next.isAdvanced());
     // The constant _id value from the $group spec is passed through.
     ASSERT_DOCUMENT_EQ((Document{{"_id", Document{}}}), next.getDocument());
@@ -550,7 +565,8 @@ TEST_F(DocumentSourceGroupTest, CanOutputExecutionStatsExplainWithoutProcessingD
                                         ExpressionConstant::create(expCtx.get(), Value(BSONNULL)),
                                         {countStatement},
                                         false);
-        group->dispose();
+        auto groupStage = exec::agg::buildStage(group);
+        groupStage->dispose();
 
         SerializationOptions explainOpts;
         explainOpts.verbosity = expCtx->getExplain();
@@ -721,7 +737,6 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateMemoryUsageTrackerDuringGroup) {
             })");
             auto src = DocumentSourceGroup::createFromBson(spec.firstElement(), expCtx.get());
             auto group = boost::dynamic_pointer_cast<DocumentSourceGroup>(src);
-            group->setSource(mock.get());
             return group;
         }();
 
@@ -729,30 +744,33 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateMemoryUsageTrackerDuringGroup) {
         const MemoryUsageTracker& memTracker = groupProcessor->getMemoryTracker();
         ASSERT_EQUALS(memTracker.currentMemoryBytes(), 0);
 
+        auto groupStage = exec::agg::buildStage(group);
+        groupStage->setSource(mock.get());
+
         // Tracked memory increases as rows are processed. Different platforms have different
         // amounts of memory here, so just show that the amount is increasing.
-        ASSERT_TRUE(group->getNext().isPaused());
+        ASSERT_TRUE(groupStage->getNext().isPaused());
         int64_t curBytes1 = memTracker.currentMemoryBytes();
         ASSERT_GREATER_THAN(curBytes1, 0);
 
-        ASSERT_TRUE(group->getNext().isPaused());
+        ASSERT_TRUE(groupStage->getNext().isPaused());
         int64_t curBytes2 = memTracker.currentMemoryBytes();
         ASSERT_GREATER_THAN(curBytes2, curBytes1);
 
-        ASSERT_TRUE(group->getNext().isPaused());
+        ASSERT_TRUE(groupStage->getNext().isPaused());
         int64_t curBytes3 = memTracker.currentMemoryBytes();
         ASSERT_GREATER_THAN(curBytes3, curBytes2);
 
         std::vector<Document> outDocs;
         {
-            auto result = group->getNext();
+            auto result = groupStage->getNext();
             ASSERT_TRUE(result.isAdvanced());
             int64_t curBytes4 = memTracker.currentMemoryBytes();
             ASSERT_GREATER_THAN(curBytes4, curBytes3);
             outDocs.push_back(result.releaseDocument());
 
             // There are no more input documents, so memory usage stays the same here.
-            result = group->getNext();
+            result = groupStage->getNext();
             ASSERT_TRUE(result.isAdvanced());
             int64_t curBytes5 = memTracker.currentMemoryBytes();
             ASSERT_EQUALS(curBytes4, curBytes5);
@@ -770,7 +788,7 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateMemoryUsageTrackerDuringGroup) {
             outDocs[1],
             Document{fromjson(R"({_id: 20, concatted: ["bird", "elephant", "dog", "giraffe"]})")});
 
-        ASSERT_TRUE(group->getNext().isEOF());
+        ASSERT_TRUE(groupStage->getNext().isEOF());
         // Tracked memory goes back to zero once all output has been produced.
         ASSERT_EQUALS(memTracker.currentMemoryBytes(), 0);
     }
@@ -808,9 +826,11 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateCurOpStatsDuringGroup) {
             })");
         auto src = DocumentSourceGroup::createFromBson(spec.firstElement(), expCtx.get());
         auto group = boost::dynamic_pointer_cast<DocumentSourceGroup>(src);
-        group->setSource(mock.get());
         return group;
     }();
+
+    auto groupStage = exec::agg::buildStage(group);
+    groupStage->setSource(mock.get());
 
     int64_t inUseMemoryBytes, maxUsedMemoryBytes;
     std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
@@ -819,12 +839,12 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateCurOpStatsDuringGroup) {
 
     // Tracked memory increases as rows are processed. Different platforms have different
     // amounts of memory here, so just show that the amount is increasing.
-    ASSERT_TRUE(group->getNext().isPaused());
+    ASSERT_TRUE(groupStage->getNext().isPaused());
     std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
     ASSERT_GREATER_THAN(inUseMemoryBytes, 0);
     ASSERT_GREATER_THAN(maxUsedMemoryBytes, 0);
 
-    ASSERT_TRUE(group->getNext().isPaused());
+    ASSERT_TRUE(groupStage->getNext().isPaused());
     int64_t prevInUseMemoryBytes, prevMaxUsedMemoryBytes;
     prevInUseMemoryBytes = inUseMemoryBytes;
     prevMaxUsedMemoryBytes = maxUsedMemoryBytes;
@@ -832,7 +852,7 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateCurOpStatsDuringGroup) {
     ASSERT_GREATER_THAN(inUseMemoryBytes, prevInUseMemoryBytes);
     ASSERT_GREATER_THAN_OR_EQUALS(maxUsedMemoryBytes, prevMaxUsedMemoryBytes);
 
-    ASSERT_TRUE(group->getNext().isPaused());
+    ASSERT_TRUE(groupStage->getNext().isPaused());
     prevInUseMemoryBytes = inUseMemoryBytes;
     prevMaxUsedMemoryBytes = maxUsedMemoryBytes;
     std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
@@ -841,7 +861,7 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateCurOpStatsDuringGroup) {
 
     std::vector<Document> outDocs;
     {
-        auto result = group->getNext();
+        auto result = groupStage->getNext();
         ASSERT_TRUE(result.isAdvanced());
         prevInUseMemoryBytes = inUseMemoryBytes;
         prevMaxUsedMemoryBytes = maxUsedMemoryBytes;
@@ -852,7 +872,7 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateCurOpStatsDuringGroup) {
         outDocs.push_back(result.releaseDocument());
 
         // There are no more input documents, so memory usage stays the same here.
-        result = group->getNext();
+        result = groupStage->getNext();
         ASSERT_TRUE(result.isAdvanced());
         prevInUseMemoryBytes = inUseMemoryBytes;
         prevMaxUsedMemoryBytes = maxUsedMemoryBytes;
@@ -874,7 +894,7 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateCurOpStatsDuringGroup) {
 
     // When we reach the end of the documents, current memory goes to zero, while the max used
     // remains the same.
-    ASSERT_TRUE(group->getNext().isEOF());
+    ASSERT_TRUE(groupStage->getNext().isEOF());
     std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
     ASSERT_EQUALS(inUseMemoryBytes, 0);
     ASSERT_EQ(maxUsedMemoryBytes, prevMaxUsedMemoryBytes);
@@ -908,9 +928,11 @@ TEST_F(DocumentSourceGroupTest, CurOpStatsAreNotUpdatedIfFeatureFlagOff) {
             })");
         auto src = DocumentSourceGroup::createFromBson(spec.firstElement(), expCtx.get());
         auto group = boost::dynamic_pointer_cast<DocumentSourceGroup>(src);
-        group->setSource(mock.get());
         return group;
     }();
+
+    auto groupStage = exec::agg::buildStage(group);
+    groupStage->setSource(mock.get());
 
     int64_t inUseMemoryBytes, maxUsedMemoryBytes;
     std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
@@ -919,7 +941,7 @@ TEST_F(DocumentSourceGroupTest, CurOpStatsAreNotUpdatedIfFeatureFlagOff) {
 
     std::vector<Document> outDocs;
     {
-        auto result = group->getNext();
+        auto result = groupStage->getNext();
         ASSERT_TRUE(result.isAdvanced());
         std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
         ASSERT_EQ(inUseMemoryBytes, 0);
@@ -928,7 +950,7 @@ TEST_F(DocumentSourceGroupTest, CurOpStatsAreNotUpdatedIfFeatureFlagOff) {
         outDocs.push_back(result.releaseDocument());
 
         // There are no more input documents, so memory usage stays the same here.
-        result = group->getNext();
+        result = groupStage->getNext();
         ASSERT_TRUE(result.isAdvanced());
         std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
         ASSERT_EQ(inUseMemoryBytes, 0);
@@ -947,7 +969,7 @@ TEST_F(DocumentSourceGroupTest, CurOpStatsAreNotUpdatedIfFeatureFlagOff) {
         Document{fromjson(R"({_id: 20, concatted: ["bird", "elephant", "dog", "giraffe"]})")});
 
     // All output has been produced.
-    ASSERT_TRUE(group->getNext().isEOF());
+    ASSERT_TRUE(groupStage->getNext().isEOF());
     std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
     ASSERT_EQ(inUseMemoryBytes, 0);
     ASSERT_EQ(maxUsedMemoryBytes, 0);
@@ -1003,6 +1025,19 @@ protected:
         }
     }
 
+    exec::agg::StagePtr createGroupStage() {
+        switch (_groupStageType) {
+            case GroupStageType::Default:
+                return exec::agg::buildStage(
+                    boost::dynamic_pointer_cast<DocumentSourceGroup>(_group));
+            case GroupStageType::Streaming:
+                return exec::agg::buildStage(
+                    boost::dynamic_pointer_cast<DocumentSourceStreamingGroup>(_group));
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+
     void createGroup(const BSONObj& spec, bool inShard = false, bool inRouter = false) {
         BSONObjBuilder bob;
         for (auto&& elem : spec) {
@@ -1031,10 +1066,14 @@ protected:
         expressionContext->setTempDir(_tempDir.path());
 
         _group = createFromBson(specElement, expressionContext);
+        _groupStage = createGroupStage();
         assertRoundTrips(_group, expressionContext);
     }
     DocumentSourceGroupBase* group() {
         return static_cast<DocumentSourceGroupBase*>(_group.get());
+    }
+    exec::agg::StagePtr groupStage() {
+        return _groupStage;
     }
     /** Assert that iterator state accessors consistently report the source is exhausted. */
     void assertEOF(const boost::intrusive_ptr<exec::agg::Stage>& stage) const {
@@ -1063,6 +1102,7 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
     boost::intrusive_ptr<ExpressionContextForTest> _ctx;
     boost::intrusive_ptr<DocumentSource> _group;
+    exec::agg::StagePtr _groupStage;
     unittest::TempDir _tempDir;
     GroupStageType _groupStageType;
 };
@@ -1084,9 +1124,9 @@ public:
     void _doTest() final {
         createGroup(spec());
         auto source = DocumentSourceMock::createForTest(Document(doc()), ctx());
-        group()->setSource(source.get());
+        groupStage()->setSource(source.get());
         // A group result is available.
-        auto next = group()->getNext();
+        auto next = groupStage()->getNext();
         ASSERT(next.isAdvanced());
         // The constant _id value from the $group spec is passed through.
         ASSERT_BSONOBJ_EQ(expected(), next.getDocument().toBson());
@@ -1334,15 +1374,15 @@ public:
     void runSharded(bool sharded) {
         createGroup(groupSpec());
         auto source = DocumentSourceMock::createForTest(inputData(), ctx());
-        group()->setSource(source.get());
+        groupStage()->setSource(source.get());
 
-        boost::intrusive_ptr<exec::agg::Stage> sink = group();
+        boost::intrusive_ptr<exec::agg::Stage> sink = groupStage();
         if (sharded) {
             sink = createMerger();
             // Serialize and re-parse the shard stage.
             createGroup(toBson(group())[group()->getSourceName()].Obj(), true);
-            group()->setSource(source.get());
-            sink->setSource(group());
+            groupStage()->setSource(source.get());
+            sink->setSource(groupStage().get());
         }
 
         checkResultSet(sink);
@@ -1648,7 +1688,8 @@ public:
     void _doTest() final {
         for (int sharded = 0; sharded < 2; ++sharded) {
             runSharded(sharded);
-            const auto* groupStats = static_cast<const GroupStats*>(group()->getSpecificStats());
+            const auto* groupStats =
+                static_cast<const GroupStats*>(groupStage()->getSpecificStats());
             ASSERT_EQ(groupStats->spillingStats.getSpills(), _expectedSpills);
         }
     }

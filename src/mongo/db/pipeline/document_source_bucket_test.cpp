@@ -48,6 +48,7 @@
 #include <memory>
 #include <vector>
 
+#include "src/mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -374,7 +375,7 @@ TEST_F(InvalidBucketSpec, SwitchFailsForBucketWhenNoDefaultSpecified) {
 
     ASSERT_EQUALS(bucketStages.size(), 2UL);
 
-    auto* groupStage = dynamic_cast<DocumentSourceGroup*>(bucketStages.front().get());
+    auto groupStage = exec::agg::buildStage(bucketStages.front());
     ASSERT(groupStage);
 
     const auto* sortStage = dynamic_cast<DocumentSourceSort*>(bucketStages.back().get());
@@ -382,6 +383,7 @@ TEST_F(InvalidBucketSpec, SwitchFailsForBucketWhenNoDefaultSpecified) {
 
     auto doc = Document{{"x", 4}};
     auto source = DocumentSourceMock::createForTest(doc, getExpCtx());
+
     groupStage->setSource(source.get());
     ASSERT_THROWS_CODE(groupStage->getNext(), AssertionException, 40066);
 }

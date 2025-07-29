@@ -42,7 +42,6 @@
 
 #include <cstddef>
 #include <memory>
-#include <utility>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
@@ -62,11 +61,11 @@ namespace mongo {
  *
  * Groups are processes in batches. One batch corresponds to a set of groups when each monotonic
  * id field have the same value. Non-monotonic fields can have different values, so we still may
- * have multiple groups and even spill to disk, but we still consume significanty less memory
+ * have multiple groups and even spill to disk, but we still consume significantly less memory
  * than general hash based group.
  * When a document with a different value in at least one group id field is encountered, it is
  * cached in '_firstDocumentOfNextBatch', current groups are finalized and returned in
- * subsequent getNext() called and when the current batch is depleted, memory is freeed and the
+ * subsequent getNext() called and when the current batch is depleted, memory is freed and the
  * process starts again.
  *
  * TODO SERVER-71437 Implement an optimization for a special case where all group fields are
@@ -109,41 +108,22 @@ public:
         boost::optional<int64_t> maxMemoryUsageBytes);
 
 protected:
-    GetNextResult doGetNext() final;
-
     bool isSpecFieldReserved(StringData fieldName) final;
     void serializeAdditionalFields(
         MutableDocument& out,
         const SerializationOptions& opts = SerializationOptions{}) const final;
 
 private:
+    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceStreamingGroupToStageFn(
+        const boost::intrusive_ptr<DocumentSource>& documentSource);
+
     static constexpr StringData kMonotonicIdFieldsSpecField = "$monotonicIdFields"_sd;
 
     explicit DocumentSourceStreamingGroup(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<int64_t> maxMemoryUsageBytes = boost::none);
 
-
-    GetNextResult getNextDocument();
-
-    GetNextResult readyNextBatch();
-    /**
-     * Readies next batch after all children are initialized. See readyNextBatch() for
-     * more details.
-     */
-    GetNextResult readyNextBatchInner(GetNextResult input);
-
-    bool isBatchFinished(const Value& id);
-
-    template <typename IdValueGetter>
-    bool checkForBatchEndAndUpdateLastIdValues(const IdValueGetter& idValueGetter);
-
     std::vector<size_t> _monotonicExpressionIndexes;
-    std::vector<Value> _lastMonotonicIdFieldValues;
-
-    boost::optional<Document> _firstDocumentOfNextBatch;
-
-    bool _sourceDepleted;
 };
 
 }  // namespace mongo
