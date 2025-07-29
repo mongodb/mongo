@@ -1088,6 +1088,27 @@ public:
     static constexpr uint32_t kFLE2PerTagStorageBytes =
         sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob) + sizeof(PrfBlock);
     static void checkTagLimitsAndStorageNotExceeded(const EncryptedFieldConfig& ef);
+
+    /**
+     * Soft limits for substringPreview parameters. These can be bypassed
+     * through setParameter fleDisableSubstringPreviewParameterLimits.
+     */
+    static constexpr int32_t kSubstringPreviewLowerBoundMin = 2;
+    static constexpr int32_t kSubstringPreviewUpperBoundMax = 10;
+    static constexpr int32_t kSubstringPreviewMaxLengthMax = 60;
+
+    /**
+     * checkSubstringPreviewParameterLimitsNotExceeded throws if
+     * fleDisableSubstringPreviewParameterLimits is false and either of the following conditions
+     * are met:
+     *    1. There exists a substringPreview field in EncryptedFieldConfig with strMinQueryLength
+     *       less than kSubstringPreviewLowerBoundMin.
+     *    2. There exists a substringPreview field in EncryptedFieldConfig with strMaxQueryLength
+     *       greater than kSubstringPreviewUpperBoundMax.
+     *    3. There exists a substringPreview field in EncryptedFieldConfig with strMaxLength
+     *       greater than kSubstringPreviewMaxLengthMax.
+     */
+    static void checkSubstringPreviewParameterLimitsNotExceeded(const EncryptedFieldConfig& ef);
 };
 
 /**

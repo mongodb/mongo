@@ -87,6 +87,18 @@ structs:
                 type: bool
                 default: false
 
+    FLEOverrideSubstringPreviewLimits:
+        description: "Container for the fleDisableSubstringPreviewParameterLimits CSP"
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            shouldOverride:
+                description: "Flag indicating whether or not the substring preview limits should be overridden"
+                type: bool
+                default: false
+
 server_parameters:
     unsupportedDangerousTestingFLEDiagnosticsEnabled:
         description: "Start with test-only FLE statistics behavior enabled"
@@ -113,6 +125,18 @@ server_parameters:
         set_at: cluster
         cpp_varname: "fleOverrideTagOverheadParameter"
         cpp_vartype: FLEOverrideTagOverheadData
+        condition:
+            min_fcv: 8.2
+        redact: false
+        omit_in_ftdc: false
+
+    fleDisableSubstringPreviewParameterLimits:
+        description:
+            "If set to true, allows QE collection creation to succeed if there exists
+            substringPreview fields whose parameters exceed the preview soft limits."
+        set_at: cluster
+        cpp_varname: "fleOverrideParameterLimits"
+        cpp_vartype: FLEOverrideSubstringPreviewLimits
         condition:
             min_fcv: 8.2
         redact: false

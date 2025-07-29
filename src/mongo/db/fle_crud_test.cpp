@@ -2205,9 +2205,9 @@ void QETextSearchCrudTest::doInsertsAndVerifyExpectations(
 
 TEST_F(QETextSearchCrudTest, BasicSubstring) {
     addSchema({.type = QueryTypeEnum::SubstringPreview,
-               .lb = 2,
-               .ub = 10,
-               .mlen = 400,
+               .lb = 10,
+               .ub = 100,
+               .mlen = 1000,
                .casef = false,
                .diacf = false});
     doInsertsAndVerifyExpectations({{"demonstration", "demonstration"}});
@@ -2247,9 +2247,9 @@ TEST_F(QETextSearchCrudTest, BasicPrefixAndSuffix) {
 
 TEST_F(QETextSearchCrudTest, RepeatingSubstring) {
     addSchema({.type = QueryTypeEnum::SubstringPreview,
-               .lb = 2,
-               .ub = 10,
-               .mlen = 400,
+               .lb = 10,
+               .ub = 100,
+               .mlen = 1000,
                .casef = false,
                .diacf = false});
     doInsertsAndVerifyExpectations({{"aaaaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaaaa"}});
@@ -2268,9 +2268,9 @@ TEST_F(QETextSearchCrudTest, FoldAsciiSuffix) {
 
 TEST_F(QETextSearchCrudTest, UnicodeSubstring) {
     addSchema({.type = QueryTypeEnum::SubstringPreview,
-               .lb = 2,
+               .lb = 1,
                .ub = 5,
-               .mlen = 400,
+               .mlen = 1000,
                .casef = false,
                .diacf = false});
     doInsertsAndVerifyExpectations({{"私はぺんです.", "私はぺんです."}});
@@ -2280,7 +2280,7 @@ TEST_F(QETextSearchCrudTest, FoldUnicodeSubstring) {
     addSchema({.type = QueryTypeEnum::SubstringPreview,
                .lb = 3,
                .ub = 5,
-               .mlen = 400,
+               .mlen = 1000,
                .casef = true,
                .diacf = true});
     doInsertsAndVerifyExpectations(
@@ -2290,9 +2290,9 @@ TEST_F(QETextSearchCrudTest, FoldUnicodeSubstring) {
 
 TEST_F(QETextSearchCrudTest, BasicSubstringMultipleInserts) {
     addSchema({.type = QueryTypeEnum::SubstringPreview,
-               .lb = 2,
-               .ub = 10,
-               .mlen = 400,
+               .lb = 10,
+               .ub = 100,
+               .mlen = 1000,
                .casef = false,
                .diacf = false});
     doInsertsAndVerifyExpectations({{"demonstration", "demonstration"},
