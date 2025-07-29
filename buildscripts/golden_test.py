@@ -11,6 +11,8 @@ import platform
 import re
 import shutil
 import sys
+from dataclasses import dataclass
+from datetime import datetime
 from subprocess import call, check_output
 
 import click
@@ -23,6 +25,15 @@ from buildscripts.util.fileops import read_yaml_file
 
 assert sys.version_info >= (3, 7)
 
+@dataclass
+class Output:
+    name: str
+    ctime: int
+
+    def __repr__(self) -> str:
+        ts = datetime.fromtimestamp(self.ctime)
+        iso_date = ts.strftime("%Y-%m-%d %H:%M:%S")
+        return f"{self.name} {iso_date}"
 
 class AppError(Exception):
     """Application execution error."""
@@ -185,7 +196,7 @@ class GoldenTestApp(object):
             raise AppError(f"No such directory: '{output_path}'")
         return output_path
 
-    def list_outputs(self):
+    def get_outputs(self) -> list[Output]:
         """Return names of all available outputs."""
         self.vprint(
             f"Listing outputs in path: '{self.output_parent_path}' "
@@ -195,31 +206,36 @@ class GoldenTestApp(object):
         if not os.path.isdir(self.output_parent_path):
             return []
         return [
-            o
-            for o in os.listdir(self.output_parent_path)
-            if re.match(self.output_name_regex, o)
-            and os.path.isdir(os.path.join(self.output_parent_path, o))
+            Output(name = name, ctime = os.path.getctime(self.get_output_path(name)))
+            for name in os.listdir(self.output_parent_path)
+            if re.match(self.output_name_regex, name)
+            and os.path.isdir(os.path.join(self.output_parent_path, name))
         ]
 
-    def get_latest_output(self):
+    def get_latest_output(self) -> Output:
         """Return the output name wit most recent created timestamp."""
-        latest_name = None
-        latest_ctime = None
         self.vprint("Searching for output with latest creation time")
-        for output_name in self.list_outputs():
-            stat = os.stat(self.get_output_path(output_name))
-            if (latest_ctime is None) or (stat.st_ctime > latest_ctime):
-                latest_name = output_name
-                latest_ctime = stat.st_ctime
-
-        if latest_name is None:
+        outputs = self.get_outputs()
+        if (len(outputs) == 0):
             raise AppError("No outputs found")
+        else:
+            latest = max(outputs, key=lambda output: output.ctime)
+            self.vprint(
+               f"Found output with latest creation time: {latest.name} " + f"created at {latest.ctime}"
+            )
+            return latest
 
-        self.vprint(
-            f"Found output with latest creation time: {latest_name} " + f"created at {latest_ctime}"
-        )
-
-        return latest_name
+    def get_latest_or_matching_output(self, output_name) -> Output:
+        if output_name is None:
+            return self.get_latest_output()
+        else:
+            outputs = [output for output in self.get_outputs() if output.name == output_name]
+            if len(outputs) == 1:
+                return outputs[0]
+            elif len(outputs) == 0:
+                raise AppError("No outputs found")
+            else:
+                raise AppError("Multiple outputs match the provided filter")
 
     def get_paths(self, output_name):
         """Return actual and expected paths for given output name."""
@@ -301,12 +317,10 @@ class GoldenTestApp(object):
         """Diff the expected and actual folders of the test output."""
         self.init_config()
 
-        if output_name is None:
-            output_name = self.get_latest_output()
+        output = self.get_latest_or_matching_output(output_name)
+        self.vprint(f"Diffing results from output '{output.name}'")
 
-        self.vprint(f"Diffing results from output '{output_name}'")
-
-        paths = self.get_paths(output_name)
+        paths = self.get_paths(output.name)
         diff_cmd = replace_variables(
             self.config.diffCmd, {"actual": paths.actual, "expected": paths.expected}
         )
@@ -320,10 +334,8 @@ class GoldenTestApp(object):
         """Get the root folder path of the test output."""
         self.init_config()
 
-        if output_name is None:
-            output_name = self.get_latest_output()
-
-        print(self.get_output_path(output_name))
+        output = self.get_latest_or_matching_output(output_name)
+        print(self.get_output_path(output.name))
 
     @cli.command(
         "accept",
@@ -335,13 +347,11 @@ class GoldenTestApp(object):
         """Accept the actual test output and copy it as new golden data to the source repo."""
         self.init_config()
 
-        if output_name is None:
-            output_name = self.get_latest_output()
-
-        self.vprint(f"Accepting actual results from output '{output_name}'")
+        output = self.get_latest_or_matching_output(output_name)
+        self.vprint(f"Accepting actual results from output '{output.name}'")
 
         repo_root = self.get_git_root()
-        paths = self.get_paths(output_name)
+        paths = self.get_paths(output.name)
 
         self.vprint(f"Copying files recursively from '{paths.actual}' to '{repo_root}'")
         if not self.dry_run:
@@ -353,10 +363,10 @@ class GoldenTestApp(object):
         """Remove all test outputs."""
         self.init_config()
 
-        outputs = self.list_outputs()
+        outputs = self.get_outputs()
         self.vprint(f"Deleting {len(outputs)} outputs")
-        for output_name in outputs:
-            output_path = self.get_output_path(output_name)
+        for output in outputs:
+            output_path = self.get_output_path(output.name)
             self.vprint(f"Deleting folder: '{output_path}'")
             if not self.dry_run:
                 shutil.rmtree(output_path)
@@ -367,8 +377,8 @@ class GoldenTestApp(object):
         """Get the name of the most recent test output."""
         self.init_config()
 
-        output_name = self.get_latest_output()
-        print(output_name)
+        output = self.get_latest_output()
+        print(output.name)
 
     @cli.command("list", help="List all names of the available test outputs")
     @click.pass_obj
@@ -376,8 +386,8 @@ class GoldenTestApp(object):
         """List all names of the available test outputs."""
         self.init_config()
 
-        for output_name in self.list_outputs():
-            print(output_name)
+        for output in sorted(self.get_outputs(), key=lambda output: output.ctime):
+            print(output)
 
     @cli.command("setup", help="Performs default setup based on current platform")
     @click.pass_obj
