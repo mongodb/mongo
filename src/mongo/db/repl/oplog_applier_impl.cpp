@@ -1007,8 +1007,8 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
         opsAppliedStats.increment(1);
     };
 
-    auto clockSource = opCtx->getServiceContext()->getFastClockSource();
-    auto applyStartTime = clockSource->now();
+    auto& clockSource = opCtx->fastClockSource();
+    auto applyStartTime = clockSource.now();
 
     if (MONGO_unlikely(hangAfterRecordingOpApplicationStartTime.shouldFail())) {
         LOGV2(21233,
@@ -1037,7 +1037,8 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
 
         return status;
     } else {
-        return finishAndLogApply(opCtx, clockSource, status, applyStartTime, entryOrGroupedInserts);
+        return finishAndLogApply(
+            opCtx, &clockSource, status, applyStartTime, entryOrGroupedInserts);
     }
 }
 

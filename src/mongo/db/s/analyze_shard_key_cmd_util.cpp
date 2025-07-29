@@ -1007,7 +1007,7 @@ std::pair<BSONObj, Timestamp> generateSplitPoints(OperationContext* opCtx,
     std::vector<BSONObj> splitPointsToInsert;
     int64_t objSize = 0;
 
-    auto expireAt = opCtx->getServiceContext()->getFastClockSource()->now() +
+    auto expireAt = opCtx->fastClockSource().now() +
         mongo::Milliseconds(gAnalyzeShardKeySplitPointExpirationSecs.load() * 1000);
     for (const auto& splitPoint : splitPoints) {
         // Performs best-effort validation again that the shard key does not contain an array field

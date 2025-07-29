@@ -511,7 +511,7 @@ void updateSessionRecord(OperationContext* opCtx,
     oplogEntry.setPreImageOpTime(std::move(preImageOpTime));
     oplogEntry.setPostImageOpTime(std::move(postImageOpTime));
     oplogEntry.setPrevWriteOpTimeInTransaction(txnParticipant.getLastWriteOpTime());
-    oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+    oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
     oplogEntry.setFromMigrate(true);
 
     writeConflictRetry(

@@ -44,7 +44,7 @@ void waitForRefreshToComplete(OperationContext* opCtx, SharedSemiFuture<void> fu
     // different shard that prevent the future from completing. Limiting the wait will ensure that
     // the transaction will eventually get aborted.
     if (opCtx->inMultiDocumentTransaction()) {
-        opCtx->runWithDeadline(opCtx->getServiceContext()->getFastClockSource()->now() +
+        opCtx->runWithDeadline(opCtx->fastClockSource().now() +
                                    Milliseconds(metadataRefreshInTransactionMaxWaitMS.load()),
                                ErrorCodes::ExceededTimeLimit,
                                [&] { future.get(opCtx); });

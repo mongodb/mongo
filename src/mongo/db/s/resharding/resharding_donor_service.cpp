@@ -758,7 +758,7 @@ void ReshardingDonorService::DonorStateMachine::
             oplog.setObject2(changeEvent.toBSON());
             oplog.setFromMigrate(true);
             oplog.setOpTime(OplogSlot());
-            oplog.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+            oplog.setWallClockTime(opCtx->fastClockSource().now());
             return oplog;
         };
 
@@ -929,7 +929,7 @@ void ReshardingDonorService::DonorStateMachine::
                                                         SerializationContext::stateDefault()))));
             oplog.setObject2(changeEvent.toBSON());
             oplog.setOpTime(OplogSlot());
-            oplog.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+            oplog.setWallClockTime(opCtx->fastClockSource().now());
             return oplog;
         };
 

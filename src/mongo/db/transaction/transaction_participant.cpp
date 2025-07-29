@@ -1917,7 +1917,7 @@ TransactionParticipant::Participant::prepareTransaction(
     }
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
-    const auto wallClockTime = opCtx->getServiceContext()->getFastClockSource()->now();
+    const auto wallClockTime = opCtx->fastClockSource().now();
     opObserver->preTransactionPrepare(opCtx,
                                       reservedSlots,
                                       *completedTransactionOperations,

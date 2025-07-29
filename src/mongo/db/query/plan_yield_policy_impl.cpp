@@ -47,7 +47,7 @@ PlanYieldPolicyImpl::PlanYieldPolicyImpl(
     std::unique_ptr<YieldPolicyCallbacks> callbacks)
     : PlanYieldPolicy(opCtx,
                       policy,
-                      opCtx->getServiceContext()->getFastClockSource(),
+                      &opCtx->fastClockSource(),
                       internalQueryExecYieldIterations.load(),
                       Milliseconds{internalQueryExecYieldPeriodMS.load()},
                       yieldable,
@@ -76,7 +76,7 @@ PlanYieldPolicyClassicTrialPeriod::PlanYieldPolicyClassicTrialPeriod(
     std::unique_ptr<YieldPolicyCallbacks> callbacks)
     : PlanYieldPolicy(opCtx,
                       policy,
-                      opCtx->getServiceContext()->getFastClockSource(),
+                      &opCtx->fastClockSource(),
                       internalQueryExecYieldIterations.load(),
                       Milliseconds{internalQueryExecYieldPeriodMS.load()},
                       yieldable,

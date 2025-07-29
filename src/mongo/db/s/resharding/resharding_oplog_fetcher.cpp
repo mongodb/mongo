@@ -168,8 +168,7 @@ std::vector<OplogInsertBatch> getOplogInsertBatches(OperationContext* opCtx,
 
             auto currentMutableOplogEntry =
                 uassertStatusOK(repl::MutableOplogEntry::parse(currentDoc));
-            currentMutableOplogEntry.setWallClockTime(
-                opCtx->getServiceContext()->getFastClockSource()->now());
+            currentMutableOplogEntry.setWallClockTime(opCtx->fastClockSource().now());
             auto currentMutableOplogBson = currentMutableOplogEntry.toBSON();
 
             insertBatch.statements.emplace_back(currentMutableOplogBson);
@@ -249,7 +248,7 @@ Milliseconds calculateTimeToFetch(OperationContext* opCtx,
     }
     // The cursor advanced. Return the amount of time between the current timestamp and the
     // clusterTime timestamp of the oplog entry on the donor.
-    auto currentWallTime = opCtx->getServiceContext()->getFastClockSource()->now();
+    auto currentWallTime = opCtx->fastClockSource().now();
     int elapsedTimeMillis =
         currentWallTime.toMillisSinceEpoch() - currBatchLastOplogTs.getSecs() * 1000;
 
@@ -537,8 +536,7 @@ bool ReshardingOplogFetcher::_needToUpdateAverageTimeToApply(WithLock,
         return true;
     }
 
-    auto elapsedTime =
-        opCtx->getServiceContext()->getFastClockSource()->now() - *_lastUpdatedProgressMarkAt;
+    auto elapsedTime = opCtx->fastClockSource().now() - *_lastUpdatedProgressMarkAt;
     return durationCount<Milliseconds>(elapsedTime) >=
         resharding::gReshardingExponentialMovingAverageTimeToFetchAndApplyIntervalMillis.load();
 }
@@ -604,7 +602,7 @@ repl::MutableOplogEntry ReshardingOplogFetcher::_makeProgressMarkOplog(
     oplog.setObject2(o2Field.toBSON());
 
     oplog.setOpTime(OplogSlot());
-    oplog.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+    oplog.setWallClockTime(opCtx->fastClockSource().now());
     return oplog;
 }
 
@@ -731,8 +729,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
                         {
                             stdx::lock_guard lk(_mutex);
                             _startAt = *oplogId;
-                            _lastUpdatedProgressMarkAt =
-                                opCtx->getServiceContext()->getFastClockSource()->now();
+                            _lastUpdatedProgressMarkAt = opCtx->fastClockSource().now();
                             _onInsertPromise.emplaceValue();
                             _onInsertPromise = std::move(p);
                             _onInsertFuture = std::move(f);

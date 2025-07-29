@@ -97,7 +97,7 @@ void removeExpiredDocuments(Client* client) {
     try {
         auto opCtx = client->makeOperationContext();
         hangBeforeRemovingExpiredChanges.pauseWhileSet(opCtx.get());
-        const auto clock = client->getServiceContext()->getFastClockSource();
+        auto& clock = opCtx->fastClockSource();
         auto currentWallTime =
             change_stream_serverless_helpers::getCurrentTimeForChangeCollectionRemoval(opCtx.get());
 
@@ -163,7 +163,7 @@ void removeExpiredDocuments(Client* client) {
                 maxStartWallTime);
         }
 
-        const auto jobDurationMillis = clock->now() - currentWallTime;
+        const auto jobDurationMillis = clock.now() - currentWallTime;
         if (removedCount > 0) {
             LOGV2_DEBUG(6663503,
                         3,

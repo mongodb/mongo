@@ -656,7 +656,7 @@ void MigrationChunkClonerSource::_nextCloneBatchFromIndexScan(
     OperationContext* opCtx,
     boost::optional<CollectionAcquisition> collection,
     BSONArrayBuilder* arrBuilder) {
-    ElapsedTracker tracker(opCtx->getServiceContext()->getFastClockSource(),
+    ElapsedTracker tracker(&opCtx->fastClockSource(),
                            internalQueryExecYieldIterations.load(),
                            Milliseconds(internalQueryExecYieldPeriodMS.load()));
     boost::optional<HandleTransactionResourcesFromStasher> scopedResourceHandler;
@@ -731,7 +731,7 @@ void MigrationChunkClonerSource::_nextCloneBatchFromCloneRecordIds(
     OperationContext* opCtx,
     const CollectionAcquisition& collection,
     BSONArrayBuilder* arrBuilder) {
-    ElapsedTracker tracker(opCtx->getServiceContext()->getFastClockSource(),
+    ElapsedTracker tracker(&opCtx->fastClockSource(),
                            internalQueryExecYieldIterations.load(),
                            Milliseconds(internalQueryExecYieldPeriodMS.load()));
 

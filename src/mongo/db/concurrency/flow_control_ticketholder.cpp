@@ -113,10 +113,10 @@ void FlowControlTicketholder::getTicket(OperationContext* opCtx,
 
         // Since tickets are only added every second, the fast clock source is good enough.
         // We record the time in micros anyway to be consistent with other metrics like mutexes.
-        auto* clockSource = opCtx->getServiceContext()->getFastClockSource();
-        auto currentWaitTime = clockSource->now();
+        auto& clockSource = opCtx->fastClockSource();
+        auto currentWaitTime = clockSource.now();
         auto updateTotalTime = [&]() {
-            auto oldWaitTime = std::exchange(currentWaitTime, clockSource->now());
+            auto oldWaitTime = std::exchange(currentWaitTime, clockSource.now());
             auto waitTimeDelta = currentWaitTime - oldWaitTime;
             auto waitTimeDeltaMicros = durationCount<Microseconds>(waitTimeDelta);
             _totalTimeAcquiringMicros.fetchAndAddRelaxed(waitTimeDeltaMicros);

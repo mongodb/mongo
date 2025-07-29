@@ -100,7 +100,7 @@ boost::optional<repl::OpTime> ReshardingOplogSessionApplication::_logPrePostImag
     auto noopEntry = uassertStatusOK(repl::MutableOplogEntry::parse(prePostImageOp.toBSON()));
     // Reset the OpTime so logOp() can assign a new one.
     noopEntry.setOpTime(OplogSlot());
-    noopEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+    noopEntry.setWallClockTime(opCtx->fastClockSource().now());
     noopEntry.setFromMigrate(true);
 
     return writeConflictRetry(

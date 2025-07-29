@@ -1568,7 +1568,7 @@ void ExecCommandDatabase::_initiateCommand() {
 
     // Record the time here to ensure that maxTimeMS, if set by the command, considers the time
     // spent before the deadline is set on `opCtx`.
-    const auto startedCommandExecAt = opCtx->getServiceContext()->getFastClockSource()->now();
+    const auto startedCommandExecAt = opCtx->fastClockSource().now();
 
     Client* client = opCtx->getClient();
 

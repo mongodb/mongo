@@ -86,7 +86,7 @@ void commitCreateDatabaseMetadataLocally(OperationContext* opCtx, const Database
         oplogEntry.setNss(NamespaceString::makeCommandNamespace(dbName));
         oplogEntry.setObject(CreateDatabaseMetadataOplogEntry{dbNameStr, dbMetadata}.toBSON());
         oplogEntry.setOpTime(OplogSlot());
-        oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+        oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
 
         writeConflictRetry(
             opCtx, "createDatabaseMetadata", NamespaceString::kRsOplogNamespace, [&] {

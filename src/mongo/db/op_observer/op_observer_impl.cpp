@@ -112,8 +112,7 @@ constexpr auto kMsgFieldName = "msg"_sd;
 constexpr long long kInvalidNumRecords = -1LL;
 
 Date_t getWallClockTimeForOpLog(OperationContext* opCtx) {
-    auto const clockSource = opCtx->getServiceContext()->getFastClockSource();
-    return clockSource->now();
+    return opCtx->fastClockSource().now();
 }
 
 repl::OpTime logOperation(OperationContext* opCtx,

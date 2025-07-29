@@ -341,7 +341,7 @@ inline void createTransactionCoordinator(OperationContext* opCtx,
                                          TxnNumber clientTxnNumber,
                                          boost::optional<TxnRetryCounter> clientTxnRetryCounter) {
     auto clientLsid = opCtx->getLogicalSessionId().value();
-    auto clockSource = opCtx->getServiceContext()->getFastClockSource();
+    auto& clockSource = opCtx->fastClockSource();
 
     // If this shard has been selected as the coordinator, set up the coordinator state
     // to be ready to receive votes.
@@ -349,7 +349,7 @@ inline void createTransactionCoordinator(OperationContext* opCtx,
         opCtx,
         clientLsid,
         {clientTxnNumber, clientTxnRetryCounter ? *clientTxnRetryCounter : 0},
-        clockSource->now() + Seconds(gTransactionLifetimeLimitSeconds.load()));
+        clockSource.now() + Seconds(gTransactionLifetimeLimitSeconds.load()));
 }
 }  // namespace service_entry_point_shard_role_helpers
 }  // namespace mongo

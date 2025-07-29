@@ -151,7 +151,7 @@ public:
         auto kv = std::make_unique<WiredTigerKVEngine>(
             std::string{getCanonicalName()},
             params.dbpath,
-            opCtx->getServiceContext()->getFastClockSource(),
+            &opCtx->fastClockSource(),
             std::move(wtConfig),
             WiredTigerExtensions::get(opCtx->getServiceContext()),
             params.repair,
@@ -176,7 +176,7 @@ public:
             spillWiredTigerKVEngine = std::make_unique<SpillWiredTigerKVEngine>(
                 std::string{getCanonicalName()},
                 params.getSpillDbPath(),
-                opCtx->getServiceContext()->getFastClockSource(),
+                &opCtx->fastClockSource(),
                 std::move(wtConfig),
                 SpillWiredTigerExtensions::get(opCtx->getServiceContext()));
 

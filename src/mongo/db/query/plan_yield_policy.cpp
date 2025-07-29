@@ -62,7 +62,7 @@ PlanYieldPolicy::PlanYieldPolicy(OperationContext* opCtx,
       _yieldable(yieldable),
       _callbacks(std::move(callbacks)),
       _elapsedTracker(cs, yieldIterations, yieldPeriod),
-      _fastClock(opCtx->getServiceContext()->getFastClockSource()) {
+      _fastClock(&opCtx->fastClockSource()) {
     visit(OverloadedVisitor{[&](const Yieldable* collectionPtr) {
                                 invariant(!collectionPtr || collectionPtr->yieldable() ||
                                           policy == YieldPolicy::WRITE_CONFLICT_RETRY_ONLY ||

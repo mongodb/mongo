@@ -782,7 +782,7 @@ void initializeShardingAwarenessAndLoadGlobalSettings(OperationContext* opCtx,
                                                       const ShardIdentity& shardIdentity,
                                                       BSONObjBuilder* startupTimeElapsedBuilder) {
     {
-        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+        SectionScopedTimer scopedTimer(&opCtx->fastClockSource(),
                                        TimedSectionId::initializeFromShardIdentity,
                                        startupTimeElapsedBuilder);
         Lock::GlobalWrite lk(opCtx);
@@ -791,7 +791,7 @@ void initializeShardingAwarenessAndLoadGlobalSettings(OperationContext* opCtx,
 
     {
         // Config servers can't always perform remote reads here, so they use a local client.
-        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+        SectionScopedTimer scopedTimer(&opCtx->fastClockSource(),
                                        TimedSectionId::loadGlobalSettings,
                                        startupTimeElapsedBuilder);
         auto catalogClient = serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)

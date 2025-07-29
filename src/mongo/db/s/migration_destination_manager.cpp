@@ -1370,8 +1370,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
 
         // 1. Ensure any data which might have been left orphaned in the range being moved has been
         // deleted.
-        const auto rangeDeletionWaitDeadline =
-            outerOpCtx->getServiceContext()->getFastClockSource()->now() +
+        const auto rangeDeletionWaitDeadline = outerOpCtx->fastClockSource().now() +
             Milliseconds(drainOverlappingRangeDeletionsOnStartTimeoutMS.load());
 
         while (runWithoutSession(outerOpCtx, [&] {
@@ -1403,8 +1402,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                 "of the range being migrated that was previously owned by the recipient "
                 "shard.",
                 status != ErrorCodes::ExceededTimeLimit &&
-                    outerOpCtx->getServiceContext()->getFastClockSource()->now() <
-                        rangeDeletionWaitDeadline);
+                    outerOpCtx->fastClockSource().now() < rangeDeletionWaitDeadline);
 
             // If the filtering metadata was cleared while the range deletion task was ongoing, then
             // 'waitForClean' would return immediately even though there really is an ongoing range

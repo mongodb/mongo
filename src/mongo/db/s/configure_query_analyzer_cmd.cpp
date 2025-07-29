@@ -217,7 +217,7 @@ public:
 
             using doc = QueryAnalyzerDocument;
 
-            auto currentTime = opCtx->getServiceContext()->getFastClockSource()->now();
+            auto currentTime = opCtx->fastClockSource().now();
             if (mode == QueryAnalyzerModeEnum::kOff) {
                 request.setUpsert(false);
                 // If the mode is 'off', do not perform the update since that would overwrite the

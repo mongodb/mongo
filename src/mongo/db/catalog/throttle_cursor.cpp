@@ -135,8 +135,7 @@ boost::optional<KeyStringEntry> SortedDataInterfaceThrottleCursor::nextKeyString
 }
 
 void DataThrottle::awaitIfNeeded(OperationContext* opCtx, const int64_t dataSize) {
-    int64_t currentMillis =
-        opCtx->getServiceContext()->getFastClockSource()->now().toMillisSinceEpoch();
+    int64_t currentMillis = opCtx->fastClockSource().now().toMillisSinceEpoch();
 
     // Reset the tracked information as the second has rolled over the starting point.
     if (currentMillis >= _startMillis + 1000) {
@@ -192,8 +191,7 @@ void DataThrottle::awaitIfNeeded(OperationContext* opCtx, const int64_t dataSize
         invariant(millisToSleep >= 0);
 
         opCtx->sleepFor(Milliseconds(millisToSleep));
-        currentMillis =
-            opCtx->getServiceContext()->getFastClockSource()->now().toMillisSinceEpoch();
+        currentMillis = opCtx->fastClockSource().now().toMillisSinceEpoch();
     } while (currentMillis < _startMillis + maxWaitMs);
 }
 

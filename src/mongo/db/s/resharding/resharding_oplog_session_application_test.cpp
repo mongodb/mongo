@@ -147,7 +147,7 @@ public:
         SessionTxnRecord sessionTxnRecord(*opCtx->getLogicalSessionId(),
                                           *opCtx->getTxnNumber(),
                                           opTime,
-                                          opCtx->getServiceContext()->getFastClockSource()->now());
+                                          opCtx->fastClockSource().now());
         txnParticipant.onWriteOpCompletedOnPrimary(opCtx, std::move(stmtIds), sessionTxnRecord);
         wuow.commit();
 

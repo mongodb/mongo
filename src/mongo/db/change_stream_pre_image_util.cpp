@@ -248,7 +248,7 @@ stdx::unordered_set<UUID, UUID::Hash> getNsUUIDs(OperationContext* opCtx,
 }
 
 Date_t getCurrentTimeForPreImageRemoval(OperationContext* opCtx) {
-    auto currentTime = opCtx->getServiceContext()->getFastClockSource()->now();
+    auto currentTime = opCtx->fastClockSource().now();
     changeStreamPreImageRemoverCurrentTime.execute([&](const BSONObj& data) {
         // Populate the current time for time based expiration of pre-images.
         if (auto currentTimeElem = data["currentTimeForTimeBasedExpiration"]) {

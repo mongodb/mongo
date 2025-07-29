@@ -334,7 +334,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
     // targeted range (a task issued by a previous migration may still be present when the migration
     // gets interrupted post-commit).
     const ChunkRange range(*_args.getMin(), *_args.getMax());
-    const auto rangeDeletionWaitDeadline = opCtx->getServiceContext()->getFastClockSource()->now() +
+    const auto rangeDeletionWaitDeadline = opCtx->fastClockSource().now() +
         Milliseconds(drainOverlappingRangeDeletionsOnStartTimeoutMS.load());
     // CollectionShardingRuntime::waitForClean() allows to sync on tasks already registered on the
     // RangeDeleterService, but may miss pending ones in case this code runs after a failover. The
@@ -349,8 +349,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         auto status = CollectionShardingRuntime::waitForClean(
             opCtx, nss(), collectionUUID, range, rangeDeletionWaitDeadline);
 
-        if (status.isOK() &&
-            opCtx->getServiceContext()->getFastClockSource()->now() >= rangeDeletionWaitDeadline) {
+        if (status.isOK() && opCtx->fastClockSource().now() >= rangeDeletionWaitDeadline) {
             status = Status(
                 ErrorCodes::ExceededTimeLimit,
                 "Failed to start new migration - a conflicting range deletion is still pending");

@@ -158,7 +158,7 @@ int64_t getExpireAfterSeconds(const TenantId& tenantId) {
 }
 
 Date_t getCurrentTimeForChangeCollectionRemoval(OperationContext* opCtx) {
-    auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+    auto now = opCtx->fastClockSource().now();
     injectCurrentWallTimeForChangeCollectionRemoval.execute(
         [&](const BSONObj& data) { now = data.getField("currentWallTime").date(); });
     return now;

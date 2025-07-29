@@ -125,7 +125,7 @@ QueryAnalysisSampleTracker::_getOrCreateCollectionSampleTracker(
     if (it == _trackers.end()) {
         // Do not create a new set of counters without collUuid specified:
         invariant(collUuid);
-        auto startTime = opCtx->getServiceContext()->getFastClockSource()->now();
+        auto startTime = opCtx->fastClockSource().now();
         it = _trackers
                  .emplace(std::make_pair(
                      nss,

@@ -96,13 +96,13 @@ public:
                 AuthorizationSession::get(*client)->grantInternalAuthorization();
             };
 
-            auto metrics = ReshardingMetrics::makeInstance_forTest(
-                request().getUuid(),
-                request().getShardKey(),
-                ns(),
-                ReshardingMetrics::Role::kRecipient,
-                opCtx->getServiceContext()->getFastClockSource()->now(),
-                opCtx->getServiceContext());
+            auto metrics =
+                ReshardingMetrics::makeInstance_forTest(request().getUuid(),
+                                                        request().getShardKey(),
+                                                        ns(),
+                                                        ReshardingMetrics::Role::kRecipient,
+                                                        opCtx->fastClockSource().now(),
+                                                        opCtx->getServiceContext());
 
             auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
             hookList->addHook(

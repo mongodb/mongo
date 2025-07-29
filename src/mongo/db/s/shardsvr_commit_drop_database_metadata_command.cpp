@@ -84,7 +84,7 @@ void commitDropDatabaseMetadataLocally(OperationContext* opCtx, const DatabaseNa
         oplogEntry.setNss(NamespaceString::makeCommandNamespace(dbName));
         oplogEntry.setObject(DropDatabaseMetadataOplogEntry{dbNameStr, dbName}.toBSON());
         oplogEntry.setOpTime(OplogSlot());
-        oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+        oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
 
         writeConflictRetry(opCtx, "dropDatabaseMetadata", NamespaceString::kRsOplogNamespace, [&] {
             AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);

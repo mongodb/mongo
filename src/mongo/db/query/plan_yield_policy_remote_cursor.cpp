@@ -70,7 +70,7 @@ PlanYieldPolicyRemoteCursor::PlanYieldPolicyRemoteCursor(
     PlanExecutor* exec)
     : PlanYieldPolicy(opCtx,
                       policy,
-                      opCtx->getServiceContext()->getFastClockSource(),
+                      &opCtx->fastClockSource(),
                       internalQueryExecYieldIterations.load(),
                       Milliseconds{internalQueryExecYieldPeriodMS.load()},
                       yieldable,

@@ -65,7 +65,7 @@ OplogWriterBatch OplogWriterBatcher::getNextBatch(OperationContext* opCtx,
     size_t totalBytes = 0;
     size_t totalOps = 0;
     boost::optional<long long> termWhenExhausted;
-    auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+    auto now = opCtx->fastClockSource().now();
     auto delaySecsLatestTimestamp = _calculateSecondaryDelaySecsLatestTimestamp(opCtx, now);
     auto delayMillis = Milliseconds(oplogBatchDelayMillis);
     Date_t waitForDataDeadline = now + maxWaitTime;

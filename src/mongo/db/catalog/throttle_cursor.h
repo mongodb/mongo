@@ -141,8 +141,7 @@ private:
 class DataThrottle {
 public:
     DataThrottle(OperationContext* opCtx, std::function<int()> maxMBperSec)
-        : _startMillis(
-              opCtx->getServiceContext()->getFastClockSource()->now().toMillisSinceEpoch()),
+        : _startMillis(opCtx->fastClockSource().now().toMillisSinceEpoch()),
           _bytesProcessed(0),
           _totalElapsedTimeSec(0),
           _totalMBProcessed(0),

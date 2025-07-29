@@ -84,7 +84,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingApplyOplogBatchTwice);
 Milliseconds calculateTimeElapsedSinceOplogWallClockTime(OperationContext* opCtx,
                                                          const repl::OplogEntry& oplogEntry) {
     auto oplogWallTime = oplogEntry.getWallClockTime();
-    auto currentWallTime = opCtx->getServiceContext()->getFastClockSource()->now();
+    auto currentWallTime = opCtx->fastClockSource().now();
     // If there are clock skews, then the difference below may be negative so cap it at zero.
     return std::max(Milliseconds(0), currentWallTime - oplogWallTime);
 }

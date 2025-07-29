@@ -802,10 +802,8 @@ void SessionCatalogMigrationSource::_tryFetchNextNewWriteOplog(stdx::unique_lock
 
         // This applyOps oplog entry corresponds to non-internal transaction prepare/commit,
         // replace it with a dead-end sentinel oplog entry.
-        auto sentinelOplogEntry =
-            makeSentinelOplogEntry(sessionId,
-                                   *nextNewWriteOplog.getTxnNumber(),
-                                   opCtx->getServiceContext()->getFastClockSource()->now());
+        auto sentinelOplogEntry = makeSentinelOplogEntry(
+            sessionId, *nextNewWriteOplog.getTxnNumber(), opCtx->fastClockSource().now());
         _unprocessedNewWriteOplogBuffer.emplace_back(sentinelOplogEntry);
         _newWriteOpTimeList.pop_front();
         _sessionOplogEntriesToBeMigratedSoFar.addAndFetch(1);
@@ -940,10 +938,9 @@ boost::optional<repl::OplogEntry> SessionCatalogMigrationSource::SessionOplogIte
                 if (!_record.getState() ||
                     _record.getState().value() == DurableTxnStateEnum::kCommitted ||
                     _record.getState().value() == DurableTxnStateEnum::kPrepared) {
-                    return makeSentinelOplogEntry(
-                        _record.getSessionId(),
-                        _record.getTxnNum(),
-                        opCtx->getServiceContext()->getFastClockSource()->now());
+                    return makeSentinelOplogEntry(_record.getSessionId(),
+                                                  _record.getTxnNum(),
+                                                  opCtx->fastClockSource().now());
                 } else {
                     return boost::none;
                 }

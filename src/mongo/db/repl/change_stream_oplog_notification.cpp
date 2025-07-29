@@ -100,7 +100,7 @@ void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
     oplogEntry.setObject(BSON("msg" << BSON(opName << nssStr)));
     oplogEntry.setObject2(fullCmd);
     oplogEntry.setOpTime(repl::OpTime());
-    oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+    oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
 
     insertNotificationOplogEntries(opCtx, {std::move(oplogEntry)}, "ShardCollectionWritesOplog");
 }
@@ -120,7 +120,7 @@ void notifyChangeStreamsOnMovePrimary(OperationContext* opCtx,
     oplogEntry.setObject2(
         BSON("movePrimary" << dbNameStr << "from" << oldPrimary << "to" << newPrimary));
     oplogEntry.setOpTime(repl::OpTime());
-    oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+    oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
 
     insertNotificationOplogEntries(opCtx, {std::move(oplogEntry)}, "MovePrimaryWritesOplog");
 }
@@ -179,7 +179,7 @@ void notifyChangeStreamsOnReshardCollectionComplete(OperationContext* opCtx,
         }
 
         oplogEntry.setOpTime(repl::OpTime());
-        oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+        oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
         return oplogEntry;
     };
 
@@ -229,7 +229,7 @@ void notifyChangeStreamsOnNamespacePlacementChanged(OperationContext* opCtx,
     oplogEntry.setObject2(buildO2Field());
 
     oplogEntry.setOpTime(repl::OpTime());
-    oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+    oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
 
     insertNotificationOplogEntries(
         opCtx, {std::move(oplogEntry)}, "NamespacePlacementChangedWritesOplog");
@@ -240,12 +240,12 @@ void notifyChangeStreamOnEndOfTransaction(OperationContext* opCtx,
                                           const LogicalSessionId& lsid,
                                           const TxnNumber& txnNumber,
                                           const std::vector<NamespaceString>& affectedNamespaces) {
-    repl::MutableOplogEntry oplogEntry = change_stream::createEndOfTransactionOplogEntry(
-        lsid,
-        txnNumber,
-        affectedNamespaces,
-        repl::OpTime().getTimestamp(),
-        opCtx->getServiceContext()->getFastClockSource()->now());
+    repl::MutableOplogEntry oplogEntry =
+        change_stream::createEndOfTransactionOplogEntry(lsid,
+                                                        txnNumber,
+                                                        affectedNamespaces,
+                                                        repl::OpTime().getTimestamp(),
+                                                        opCtx->fastClockSource().now());
     insertNotificationOplogEntries(opCtx, {std::move(oplogEntry)}, "EndOfTransactionWritesOplog");
 }
 
@@ -272,7 +272,7 @@ void notifyChangeStreamsOnChunkMigrated(OperationContext* opCtx,
                                           << "allCollectionChunksMigratedFromDonor"
                                           << noMoreCollectionChunksOnDonor));
         oplogEntry.setOpTime(repl::OpTime());
-        oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+        oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
 
         oplogEntries.push_back(std::move(oplogEntry));
     }
@@ -292,7 +292,7 @@ void notifyChangeStreamsOnChunkMigrated(OperationContext* opCtx,
         legacyOplogEntry.setObject(BSON("msg" << oMessage));
         legacyOplogEntry.setObject2(BSON("migrateLastChunkFromShard" << nss << "shardId" << donor));
         legacyOplogEntry.setOpTime(repl::OpTime());
-        legacyOplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+        legacyOplogEntry.setWallClockTime(opCtx->fastClockSource().now());
 
         oplogEntries.push_back(std::move(legacyOplogEntry));
     }
@@ -310,7 +310,7 @@ void notifyChangeStreamsOnChunkMigrated(OperationContext* opCtx,
         legacyOplogEntry.setObject2(BSON("migrateChunkToNewShard" << nss << "fromShardId" << donor
                                                                   << "toShardId" << recipient));
         legacyOplogEntry.setOpTime(repl::OpTime());
-        legacyOplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+        legacyOplogEntry.setWallClockTime(opCtx->fastClockSource().now());
 
         oplogEntries.push_back(std::move(legacyOplogEntry));
     }

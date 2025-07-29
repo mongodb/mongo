@@ -151,8 +151,8 @@ StatusWith<repl::OpTime> _logOp(OperationContext* opCtx,
         AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
         return writeConflictRetry(
             opCtx, "dbCheck oplog entry", NamespaceString::kRsOplogNamespace, [&] {
-                auto const clockSource = opCtx->getServiceContext()->getFastClockSource();
-                oplogEntry.setWallClockTime(clockSource->now());
+                auto& clockSource = opCtx->fastClockSource();
+                oplogEntry.setWallClockTime(clockSource.now());
 
                 WriteUnitOfWork uow(opCtx);
                 repl::OpTime result = repl::logOp(opCtx, &oplogEntry);

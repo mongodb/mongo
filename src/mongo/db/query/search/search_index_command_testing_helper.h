@@ -186,7 +186,7 @@ inline void blockUntilIndexQueryable(OperationContext* opCtx,
                                      const BSONObj& listSearchIndexesCmdObj,
                                      std::vector<HostAndPort> allClusterHosts,
                                      boost::optional<BSONObj> indexDefinition) {
-    auto clock = opCtx->getServiceContext()->getFastClockSource();
+    auto& clock = opCtx->fastClockSource();
     // This is 10 minutes to match the max timeout of assert.soon() when running on evergreen.
     // TODO SERVER-101359 dynamically set maxTimeout depending on if we're running on evergreen or
     // locally.
@@ -195,7 +195,7 @@ inline void blockUntilIndexQueryable(OperationContext* opCtx,
     auto executor = Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor();
 
     for (auto& host : allClusterHosts) {
-        auto runStart = clock->now();
+        auto runStart = clock.now();
         do {
             executor::RemoteCommandRequest request(host,
                                                    dbName,
@@ -256,7 +256,7 @@ inline void blockUntilIndexQueryable(OperationContext* opCtx,
 
             LOGV2_DEBUG(9638404, 1, "Index not yet queryable, retrying", "response"_attr = result);
 
-            runElapsed = clock->now() - runStart;
+            runElapsed = clock.now() - runStart;
         } while (runElapsed < maxTimeout);
     }
 

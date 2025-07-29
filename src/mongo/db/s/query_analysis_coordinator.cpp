@@ -256,7 +256,7 @@ void QueryAnalysisCoordinator::onSetCurrentConfig(OperationContext* opCtx) {
             }
 
             auto samplerName = member.getHostAndPort().toString();
-            auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+            auto now = opCtx->fastClockSource().now();
             auto it = _samplers.find(samplerName);
             if (it == _samplers.end()) {
                 // Initialize a sampler for every new data-bearing replica set member.
@@ -286,7 +286,7 @@ QueryAnalysisCoordinator::getNewConfigurationsForSampler(OperationContext* opCtx
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     // Update the last ping time and last number of queries executed per second of this sampler.
-    auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+    auto now = opCtx->fastClockSource().now();
     auto it = _samplers.find(samplerName);
     if (it == _samplers.end()) {
         auto sampler = Sampler{std::string{samplerName}, now};

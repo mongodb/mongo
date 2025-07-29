@@ -3004,7 +3004,7 @@ void IndexBuildsCoordinator::_awaitLastOpTimeBeforeInterceptorsMajorityCommitted
     Date_t deadline;
     if (timeoutMillis > 0) {
         timeout = Milliseconds(timeoutMillis);
-        deadline = opCtx->getServiceContext()->getFastClockSource()->now() + timeout;
+        deadline = opCtx->fastClockSource().now() + timeout;
     } else {
         // Wait indefinitely for majority commit point.
         // Setting 'deadline' to Date_t::max() achieves the same effect as boost::none in

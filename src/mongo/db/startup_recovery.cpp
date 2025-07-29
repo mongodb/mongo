@@ -153,7 +153,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(
               "Re-creating featureCompatibilityVersion document that was deleted. Creating new "
               "document with last LTS version.",
               "version"_attr = multiversion::toString(multiversion::GenericFCV::kLastLTS));
-        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+        SectionScopedTimer scopedTimer(&opCtx->fastClockSource(),
                                        TimedSectionId::createFCVDocument,
                                        startupTimeElapsedBuilder);
         uassertStatusOK(createCollection(opCtx, fcvNss.dbName(), BSON("create" << fcvNss.coll())));
@@ -174,7 +174,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(
                           fcvColl.getCollectionPtr(),
                           BSON("_id" << multiversion::kParameterName),
                           featureCompatibilityVersion)) {
-        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+        SectionScopedTimer scopedTimer(&opCtx->fastClockSource(),
                                        TimedSectionId::restoreFCVDocument,
                                        startupTimeElapsedBuilder);
         // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
@@ -589,7 +589,7 @@ void reconcileCatalogAndRestartUnfinishedIndexBuilds(
 
     StorageEngine::ReconcileResult reconcileResult;
     {
-        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+        SectionScopedTimer scopedTimer(&opCtx->fastClockSource(),
                                        TimedSectionId::dropAbandonedIdents,
                                        startupTimeElapsedBuilder);
         reconcileResult =

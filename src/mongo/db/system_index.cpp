@@ -151,7 +151,7 @@ Status verifySystemIndexes(OperationContext* opCtx, BSONObjBuilder* startupTimeE
         AutoGetCollection collection(opCtx, systemUsers, MODE_X, options);
 
         if (collection) {
-            SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+            SectionScopedTimer scopedTimer(&opCtx->fastClockSource(),
                                            TimedSectionId::createSystemUsersIndex,
                                            startupTimeElapsedBuilder);
             const IndexCatalog* indexCatalog = collection->getIndexCatalog();
@@ -190,7 +190,7 @@ Status verifySystemIndexes(OperationContext* opCtx, BSONObjBuilder* startupTimeE
 
         // Ensure that system indexes exist for the roles collection, if it exists.
         if (collection) {
-            SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+            SectionScopedTimer scopedTimer(&opCtx->fastClockSource(),
                                            TimedSectionId::createSystemRolesIndex,
                                            startupTimeElapsedBuilder);
             const IndexCatalog* indexCatalog = collection->getIndexCatalog();

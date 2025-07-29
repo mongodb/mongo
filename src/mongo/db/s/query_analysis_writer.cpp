@@ -740,7 +740,7 @@ ExecutorFuture<void> QueryAnalysisWriter::_addReadQuery(
                 return;
             }
 
-            auto expireAt = opCtx->getServiceContext()->getFastClockSource()->now() +
+            auto expireAt = opCtx->fastClockSource().now() +
                 mongo::Milliseconds(gQueryAnalysisSampleExpirationSecs.load() * 1000);
             auto doc = SampledQueryDocument{sampledReadCmd.sampleId,
                                             sampledReadCmd.nss,
@@ -788,7 +788,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addUpdateQuery(SampledCommandNameEnum 
                     return;
                 }
 
-                auto expireAt = opCtx->getServiceContext()->getFastClockSource()->now() +
+                auto expireAt = opCtx->fastClockSource().now() +
                     mongo::Milliseconds(gQueryAnalysisSampleExpirationSecs.load() * 1000);
                 auto doc = SampledQueryDocument{sampledUpdateCmd.sampleId,
                                                 sampledUpdateCmd.nss,
@@ -855,7 +855,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addDeleteQuery(SampledCommandNameEnum 
                     return;
                 }
 
-                auto expireAt = opCtx->getServiceContext()->getFastClockSource()->now() +
+                auto expireAt = opCtx->fastClockSource().now() +
                     mongo::Milliseconds(gQueryAnalysisSampleExpirationSecs.load() * 1000);
                 auto doc = SampledQueryDocument{sampledDeleteCmd.sampleId,
                                                 sampledDeleteCmd.nss,
@@ -921,7 +921,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addFindAndModifyQuery(
                 return;
             }
 
-            auto expireAt = opCtx->getServiceContext()->getFastClockSource()->now() +
+            auto expireAt = opCtx->fastClockSource().now() +
                 mongo::Milliseconds(gQueryAnalysisSampleExpirationSecs.load() * 1000);
             auto doc = SampledQueryDocument{sampledFindAndModifyCmd.sampleId,
                                             sampledFindAndModifyCmd.nss,
@@ -988,7 +988,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addDiff(const UUID& sampleId,
                 return;
             }
 
-            auto expireAt = opCtx->getServiceContext()->getFastClockSource()->now() +
+            auto expireAt = opCtx->fastClockSource().now() +
                 mongo::Milliseconds(gQueryAnalysisSampleExpirationSecs.load() * 1000);
             auto doc =
                 SampledQueryDiffDocument{sampleId, nss, collUuid, std::move(*diff), expireAt};

@@ -175,7 +175,7 @@ public:
             msToSleep = 10 * 1000;
         }
 
-        auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+        auto now = opCtx->fastClockSource().now();
         auto deadline = now + Milliseconds(msToSleep);
 
         // Note that if the system clock moves _backwards_ (which has been known to happen), this
@@ -191,8 +191,7 @@ public:
                                   << " ms during sleep command",
                     msRemaining.count() < msToSleep + threshold.count());
 
-            ON_BLOCK_EXIT(
-                [&now, opCtx] { now = opCtx->getServiceContext()->getFastClockSource()->now(); });
+            ON_BLOCK_EXIT([&now, opCtx] { now = opCtx->fastClockSource().now(); });
 
             StringData lockTarget;
             if (cmdObj["lockTarget"]) {

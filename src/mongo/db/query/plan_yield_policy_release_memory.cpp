@@ -41,7 +41,7 @@ PlanYieldPolicyReleaseMemory::PlanYieldPolicyReleaseMemory(
     std::unique_ptr<YieldPolicyCallbacks> callbacks)
     : PlanYieldPolicy(opCtx,
                       policy,
-                      opCtx->getServiceContext()->getFastClockSource(),
+                      &opCtx->fastClockSource(),
                       internalQueryExecYieldIterations.load(),
                       Milliseconds{internalQueryExecYieldPeriodMS.load()},
                       yieldable,

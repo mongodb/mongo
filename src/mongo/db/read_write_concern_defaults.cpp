@@ -214,9 +214,8 @@ void ReadWriteConcernDefaults::invalidate() {
 }
 
 void ReadWriteConcernDefaults::setDefault(OperationContext* opCtx, RWConcernDefault&& rwc) {
-    _defaults.insertOrAssignAndGet(Type::kReadWriteConcernEntry,
-                                   std::move(rwc),
-                                   opCtx->getServiceContext()->getFastClockSource()->now());
+    _defaults.insertOrAssignAndGet(
+        Type::kReadWriteConcernEntry, std::move(rwc), opCtx->fastClockSource().now());
 }
 
 void ReadWriteConcernDefaults::refreshIfNecessary(OperationContext* opCtx) {

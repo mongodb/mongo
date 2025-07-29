@@ -226,7 +226,7 @@ public:
                                                       Milliseconds timeout,
                                                       const NamespaceString& nss,
                                                       Callback&& cb) {
-            const auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+            const auto now = opCtx->fastClockSource().now();
             const auto deadline = now + timeout;
             const auto guard = opCtx->makeDeadlineGuard(deadline, ErrorCodes::MaxTimeMSExpired);
             try {
@@ -236,7 +236,7 @@ public:
                 // above to use ExceptionFor.
                 // Need to catch the entire category of errors because there are parts across the
                 // code base where we throw a specific error, ignoring the one set on the opCtx.
-                const auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+                const auto now = opCtx->fastClockSource().now();
                 if (now >= deadline) {
                     // Convert the error code to a specific one, indicating that the
                     // specific deadline related to DbMetadataLockMaxTimeMS has been exceeded

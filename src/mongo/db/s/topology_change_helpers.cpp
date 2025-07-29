@@ -1106,7 +1106,7 @@ void getClusterTimeKeysFromReplicaSet(OperationContext* opCtx,
         Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
     std::vector<ExternalKeysCollectionDocument> keyDocs;
 
-    auto expireAt = opCtx->getServiceContext()->getFastClockSource()->now() +
+    auto expireAt = opCtx->fastClockSource().now() +
         Seconds(gNewShardExistingClusterTimeKeysExpirationSecs.load());
     auto fetcher = createFindFetcher(
         opCtx,

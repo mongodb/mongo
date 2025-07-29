@@ -548,7 +548,7 @@ protected:
                 return boost::optional<ScopedTimer>(
                     boost::in_place_init,
                     &_commonStats.executionTime.executionTimeEstimate,
-                    opCtx->getServiceContext()->getFastClockSource());
+                    &opCtx->fastClockSource());
             } else {
                 return boost::optional<ScopedTimer>(
                     boost::in_place_init,

@@ -154,7 +154,7 @@ void BM_Simple(benchmark::State& state) {
     solution->setRoot(std::move(root));
     auto yieldPolicy = PlanYieldPolicySBE::make(opCtx,
                                                 PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                                opCtx->getServiceContext()->getFastClockSource(),
+                                                &opCtx->fastClockSource(),
                                                 0,
                                                 Milliseconds::zero(),
                                                 PlanYieldPolicy::YieldThroughAcquisitions{});

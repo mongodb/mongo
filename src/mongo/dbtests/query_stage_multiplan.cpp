@@ -182,7 +182,7 @@ public:
 
 protected:
     const ServiceContext::UniqueOperationContext _opCtx = cc().makeOperationContext();
-    ClockSource* const _clock = _opCtx->getServiceContext()->getFastClockSource();
+    ClockSource* const _clock = &_opCtx->fastClockSource();
 
     boost::intrusive_ptr<ExpressionContext> _expCtx =
         ExpressionContextBuilder{}.opCtx(_opCtx.get()).ns(nss).build();
@@ -280,10 +280,9 @@ std::unique_ptr<MultiPlanStage> runMultiPlanner(ExpressionContext* expCtx,
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
     // Plan 0 aka the first plan aka the index scan should be the best.
-    NoopYieldPolicy yieldPolicy(
-        expCtx->getOperationContext(),
-        expCtx->getOperationContext()->getServiceContext()->getFastClockSource(),
-        PlanYieldPolicy::YieldThroughAcquisitions{});
+    NoopYieldPolicy yieldPolicy(expCtx->getOperationContext(),
+                                &expCtx->getOperationContext()->fastClockSource(),
+                                PlanYieldPolicy::YieldThroughAcquisitions{});
     ASSERT_OK(mps->pickBestPlan(&yieldPolicy));
     ASSERT(mps->bestPlanChosen());
     ASSERT_EQUALS(getBestPlanRoot(mps.get()), ixScanRootPtr);

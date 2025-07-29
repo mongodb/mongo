@@ -239,7 +239,7 @@ RollbackImpl::~RollbackImpl() {
 }
 
 Status RollbackImpl::runRollback(OperationContext* opCtx) {
-    _rollbackStats.startTime = opCtx->getServiceContext()->getFastClockSource()->now();
+    _rollbackStats.startTime = opCtx->fastClockSource().now();
 
     auto status = _transitionToRollback(opCtx);
     if (!status.isOK()) {
@@ -1436,7 +1436,7 @@ void RollbackImpl::_checkForAllIdIndexes(OperationContext* opCtx) {
 void RollbackImpl::_summarizeRollback(OperationContext* opCtx) const {
     logv2::DynamicAttributes attrs;
     attrs.add("startTime", _rollbackStats.startTime);
-    auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+    auto now = opCtx->fastClockSource().now();
     attrs.add("endTime", now);
     auto syncSource = _remoteOplog->hostAndPort().toString();
     attrs.add("syncSource", syncSource);

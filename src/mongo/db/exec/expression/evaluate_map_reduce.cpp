@@ -51,7 +51,7 @@ void mapReduceFilterWaitBeforeLoop(OperationContext* opCtx) {
 
 std::function<void()> getExpressionInterruptChecker(OperationContext* opCtx) {
     if (opCtx) {
-        ElapsedTracker et(opCtx->getServiceContext()->getFastClockSource(),
+        ElapsedTracker et(&opCtx->fastClockSource(),
                           internalQueryExpressionInterruptIterations.load(),
                           Milliseconds{internalQueryExpressionInterruptPeriodMS.load()});
         return [=]() mutable {

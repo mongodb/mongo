@@ -185,7 +185,7 @@ protected:
                                 const dbtests::WriteContextForTests& ctx);
 
     const ServiceContext::UniqueOperationContext _opCtx = cc().makeOperationContext();
-    ClockSource* _clock = _opCtx->getServiceContext()->getFastClockSource();
+    ClockSource* _clock = &_opCtx->fastClockSource();
     boost::intrusive_ptr<ExpressionContext> _expCtx =
         ExpressionContextBuilder{}.opCtx(_opCtx.get()).ns(nss).build();
 

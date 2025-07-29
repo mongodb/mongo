@@ -205,7 +205,7 @@ void AuthorizationSessionImpl::startRequest(OperationContext* opCtx) {
         // For non-security token users, check if expiration has passed and move session into
         // expired state if so.
         if (_authenticatedUser && _expirationTime &&
-            _expirationTime.value() <= opCtx->getServiceContext()->getFastClockSource()->now()) {
+            _expirationTime.value() <= opCtx->fastClockSource().now()) {
             _expiredUserName = std::exchange(_authenticatedUser, boost::none).value()->getName();
             _expirationTime = boost::none;
             rpc::AuditUserAttrs::resetToAuthenticatedUser(opCtx);
@@ -302,9 +302,7 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
     } else {
         uassert(7070102,
                 "Invalid expiration time specified",
-                !expirationTime ||
-                    expirationTime.value() >
-                        opCtx->getServiceContext()->getFastClockSource()->now());
+                !expirationTime || expirationTime.value() > opCtx->fastClockSource().now());
         _authenticationMode = AuthenticationMode::kConnection;
     }
     _authenticatedUser = std::move(user);

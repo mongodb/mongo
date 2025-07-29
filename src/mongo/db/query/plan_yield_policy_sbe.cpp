@@ -48,7 +48,7 @@ std::unique_ptr<PlanYieldPolicySBE> PlanYieldPolicySBE::make(
 
     return make(opCtx,
                 policy,
-                opCtx->getServiceContext()->getFastClockSource(),
+                &opCtx->fastClockSource(),
                 internalQueryExecYieldIterations.load(),
                 Milliseconds{internalQueryExecYieldPeriodMS.load()},
                 yieldable,

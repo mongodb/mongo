@@ -795,7 +795,7 @@ ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFi
     if (coordinatorDoc.getUserReshardingUUID()) {
         updatedCoordinatorDoc.setState(CoordinatorStateEnum::kQuiesced);
         updatedCoordinatorDoc.setQuiescePeriodEnd(
-            opCtx->getServiceContext()->getFastClockSource()->now() +
+            opCtx->fastClockSource().now() +
             Milliseconds(resharding::gReshardingCoordinatorQuiescePeriodMillis));
     } else {
         updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
