@@ -2,7 +2,7 @@
  * Tests the --extensions startup parameter on mongos and mongod.
  * This is NOT robustly testing loading extensions but rather ensuring that the extensions parameter
  * provided to the server is properly passed to the extension loading module.
- * @tags: [featureFlagExtensionsApi]
+ * @tags: [featureFlagExtensionsAPI]
  */
 
 import {isLinux} from "jstests/libs/os_helpers.js";
@@ -48,14 +48,14 @@ if (isLinux()) {
     runTest({options: {extensions: ""}, shouldFail: true, validateExitCode: false});
     // Extensions parameter is not allowed when the feature flag is disabled.
     runTest({
-        options: {extensions: pathToExtensionFoo, featureFlagExtensionsAPI: false},
+        options: {extensions: pathToExtensionFoo, setParameter: {featureFlagExtensionsAPI: false}},
         shouldFail: true
     });
     // Extensions is a scalar, non-string.
     runTest({options: {extensions: 12345}, shouldFail: true});
     // Path to extension does not exist.
     runTest({options: {extensions: "path/does/not/exist.so"}, shouldFail: true});
-    // TODO SERVER-106929 Enable these tests.
+    // TODO SERVER-107864 Enable these tests.
     // Single valid extension.
     // runTest({options: {extensions: pathToExtensionFoo}});
     // List of valid extensions.
