@@ -1104,6 +1104,56 @@ tasks:
           content_type: text/plain
           remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
           skip_existing: ${is_release}
+      # Put the crypt tarball/zipfile
+      - command: s3.put
+        params:
+          local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+          bucket: ${push_bucket_new}
+          role_arn: ${push_role_arn}
+          permissions: private
+          content_type: ${content_type|application/gzip}
+          remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+          skip_existing: ${is_release}
+      # Put the crypt tarball signature
+      - command: s3.put
+        params:
+          local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+          bucket: ${push_bucket_new}
+          role_arn: ${push_role_arn}
+          permissions: private
+          content_type: ${content_type|application/gzip}
+          remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+          skip_existing: ${is_release}
+      # Put the crypt tarball sha1
+      - command: s3.put
+        params:
+          local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+          permissions: private
+          role_arn: ${push_role_arn}
+          bucket: ${push_bucket_new}
+          content_type: text/plain
+          remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+          skip_existing: ${is_release}
+      # Put the crypt tarball sha256
+      - command: s3.put
+        params:
+          local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+          permissions: private
+          bucket: ${push_bucket_new}
+          role_arn: ${push_role_arn}
+          content_type: text/plain
+          remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+          skip_existing: ${is_release}
+      # Put the crypt tarball md5
+      - command: s3.put
+        params:
+          local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+          bucket: ${push_bucket_new}
+          role_arn: ${push_role_arn}
+          permissions: private
+          content_type: text/plain
+          remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+          skip_existing: ${is_release}
       #Trace artifacts (crypt) using Papertrail
       - command: subprocess.exec
         params:
