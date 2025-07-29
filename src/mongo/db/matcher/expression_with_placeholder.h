@@ -89,20 +89,15 @@ public:
         return _filter.get();
     }
 
-    void resetFilter(MatchExpression* other) {
-        _filter.reset(other);
+    MatchExpression* releaseFilter() {
+        return _filter.release();
     }
+
+    void resetFilter(MatchExpression* other);
 
     std::unique_ptr<ExpressionWithPlaceholder> clone() const {
         return std::make_unique<ExpressionWithPlaceholder>(_placeholder, _filter->clone());
     }
-
-    /*
-     * Uses MatchExpression::optimize() to replace the Expression part of this
-     * ExpressionWithPlaceholder with an optimized expression. If the rewritten expression operates
-     * on a different field, we also update the placeholder to match.
-     */
-    void optimizeFilter();
 
 private:
     // The top-level field that _filter is over.

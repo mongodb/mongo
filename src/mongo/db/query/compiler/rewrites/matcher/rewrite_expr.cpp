@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/db/matcher/rewrite_expr.h"
+#include "mongo/db/query/compiler/rewrites/matcher/rewrite_expr.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
@@ -103,7 +104,7 @@ RewriteExpr::RewriteResult RewriteExpr::rewrite(const boost::intrusive_ptr<Expre
         // The Boolean simplifier is disabled since we don't want to simplify sub-expressions, but
         // simplify the whole expression instead.
         matchExpression =
-            MatchExpression::optimize(std::move(matchExpression), /* enableSimplification */ false);
+            optimizeMatchExpression(std::move(matchExpression), /* enableSimplification */ false);
         LOGV2_DEBUG(20727,
                     5,
                     "Post-rewrite/post-optimized MatchExpression",

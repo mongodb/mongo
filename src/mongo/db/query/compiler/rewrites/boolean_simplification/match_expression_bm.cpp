@@ -29,6 +29,7 @@
 
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 
 #include <benchmark/benchmark.h>
 
@@ -185,7 +186,7 @@ void matchExpressionOptimize_triviallySimple(benchmark::State& state) {
     auto expr = std::make_unique<EqualityMatchExpression>("a"_sd, operand["$eq"]);
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(MatchExpression::optimize(
+        benchmark::DoNotOptimize(optimizeMatchExpression(
             expr->clone(), std::is_same_v<EnableSimplifier, SimplifierStatus>));
     }
 }
@@ -205,7 +206,7 @@ void matchExpressionOptimize_simpleAnd(benchmark::State& state) {
     expr->add(std::make_unique<EqualityMatchExpression>("c"_sd, operand["$eq"]));
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(MatchExpression::optimize(
+        benchmark::DoNotOptimize(optimizeMatchExpression(
             expr->clone(), std::is_same_v<EnableSimplifier, SimplifierStatus>));
     }
 }
@@ -225,7 +226,7 @@ void matchExpressionOptimize_simpleOr(benchmark::State& state) {
     expr->add(std::make_unique<EqualityMatchExpression>("c"_sd, operand["$eq"]));
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(MatchExpression::optimize(
+        benchmark::DoNotOptimize(optimizeMatchExpression(
             expr->clone(), std::is_same_v<EnableSimplifier, SimplifierStatus>));
     }
 }
@@ -245,7 +246,7 @@ void matchExpressionOptimize_mediumComplex(benchmark::State& state) {
     expr->add(buildAndOfOrs(6, 9, bsonObjs));
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(MatchExpression::optimize(
+        benchmark::DoNotOptimize(optimizeMatchExpression(
             expr->clone(), std::is_same_v<EnableSimplifier, SimplifierStatus>));
     }
 }
@@ -282,7 +283,7 @@ void matchExpressionOptimize_maxComplex(benchmark::State& state) {
     }
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(MatchExpression::optimize(
+        benchmark::DoNotOptimize(optimizeMatchExpression(
             expr->clone(), std::is_same_v<EnableSimplifier, SimplifierStatus>));
     }
 }
@@ -313,7 +314,7 @@ void matchExpressionOptimize_overComplex(benchmark::State& state) {
     }
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(MatchExpression::optimize(
+        benchmark::DoNotOptimize(optimizeMatchExpression(
             expr->clone(), std::is_same_v<EnableSimplifier, SimplifierStatus>));
     }
 }

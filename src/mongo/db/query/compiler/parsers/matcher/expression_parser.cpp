@@ -76,6 +76,7 @@
 #include "mongo/db/query/compiler/parsers/matcher/expression_geo_parser.h"
 #include "mongo/db/query/compiler/parsers/matcher/matcher_type_set_parser.h"
 #include "mongo/db/query/compiler/parsers/matcher/schema/json_schema_parser.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/db/query/dbref.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/stats/counters.h"
@@ -2205,7 +2206,7 @@ std::unique_ptr<MatchExpression> MatchExpressionParser::parseAndNormalize(
 
     // TODO SERVER-81846: Enable Boolean Expression Simplifier in change streams.
     // TODO SERVER-81847: Enable the boolean expression simplifier for index partial filters.
-    return MatchExpression::normalize(std::move(parsedTree), /* enableSimplification */ false);
+    return normalizeMatchExpression(std::move(parsedTree), /* enableSimplification */ false);
 }
 
 namespace {

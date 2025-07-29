@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -148,11 +149,11 @@ TEST(CanonicalQueryTest, IsValidSortKeyMetaProjection) {
 }
 
 //
-// Tests for MatchExpression::sortTree
+// Tests for sortMatchExpressionTree
 //
 
 /**
- * Helper function for testing MatchExpression::sortTree().
+ * Helper function for testing sortMatchExpressionTree().
  *
  * Verifies that sorting the expression 'unsortedQueryStr' yields an expression equivalent to
  * the expression 'sortedQueryStr'.
@@ -170,12 +171,12 @@ void testSortTree(const char* unsortedQueryStr, const char* sortedQueryStr) {
     // Sanity check that sorting the sorted expression is a no-op.
     {
         unique_ptr<MatchExpression> sortedQueryExprClone(parseMatchExpression(sortedQueryObj));
-        MatchExpression::sortTree(sortedQueryExprClone.get());
+        sortMatchExpressionTree(sortedQueryExprClone.get());
         assertEquivalent(unsortedQueryStr, sortedQueryExpr.get(), sortedQueryExprClone.get());
     }
 
     // Test that sorting the unsorted expression yields the sorted expression.
-    MatchExpression::sortTree(unsortedQueryExpr.get());
+    sortMatchExpressionTree(unsortedQueryExpr.get());
     assertEquivalent(unsortedQueryStr, unsortedQueryExpr.get(), sortedQueryExpr.get());
 }
 

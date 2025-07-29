@@ -92,12 +92,4 @@ std::unique_ptr<MatchExpression> InternalSchemaMatchArrayIndexMatchExpression::c
     return clone;
 }
 
-MatchExpression::ExpressionOptimizerFunc
-InternalSchemaMatchArrayIndexMatchExpression::getOptimizer() const {
-    return [](std::unique_ptr<MatchExpression> expression) {
-        static_cast<InternalSchemaMatchArrayIndexMatchExpression&>(*expression)
-            ._expression->optimizeFilter();
-        return expression;
-    };
-}
 }  // namespace mongo

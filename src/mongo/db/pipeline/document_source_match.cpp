@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -134,8 +135,8 @@ intrusive_ptr<DocumentSource> DocumentSourceMatch::optimize() {
     }
 
     _matchProcessor->setExpression(
-        MatchExpression::optimize(std::move(_matchProcessor->getExpression()),
-                                  /* enableSimplification */ false));
+        optimizeMatchExpression(std::move(_matchProcessor->getExpression()),
+                                /* enableSimplification */ false));
 
     return this;
 }

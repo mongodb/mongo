@@ -88,12 +88,4 @@ void InternalSchemaAllElemMatchFromIndexMatchExpression::appendSerializedRightHa
                            << _expression->getFilter()->serialize(opts, includePath)));
 }
 
-MatchExpression::ExpressionOptimizerFunc
-InternalSchemaAllElemMatchFromIndexMatchExpression::getOptimizer() const {
-    return [](std::unique_ptr<MatchExpression> expression) {
-        static_cast<InternalSchemaAllElemMatchFromIndexMatchExpression&>(*expression)
-            ._expression->optimizeFilter();
-        return expression;
-    };
-}
 }  //  namespace mongo

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/expression_bitset_tree_converter.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_bitset_tree_converter.h"
 
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"

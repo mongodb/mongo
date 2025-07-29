@@ -76,6 +76,7 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/timeseries/bucket_spec.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
@@ -1154,7 +1155,7 @@ void DocumentSourceInternalUnpackBucket::setEventFilter(BSONObj eventFilterBson,
         _eventFilterBson, pExpCtx, ExtensionsCallbackNoop(), Pipeline::kAllowedMatcherFeatures));
     if (shouldOptimize) {
         _eventFilter =
-            MatchExpression::optimize(std::move(_eventFilter), /* enableSimplification */ false);
+            optimizeMatchExpression(std::move(_eventFilter), /* enableSimplification */ false);
     }
     _isEventFilterSbeCompatible.emplace(pExpCtx->getSbeCompatibility());
 
@@ -2018,8 +2019,8 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimize
                                                              pExpCtx,
                                                              ExtensionsCallbackNoop(),
                                                              Pipeline::kAllowedMatcherFeatures));
-            _wholeBucketFilter = MatchExpression::optimize(std::move(_wholeBucketFilter),
-                                                           /* enableSimplification */ false);
+            _wholeBucketFilter = optimizeMatchExpression(std::move(_wholeBucketFilter),
+                                                         /* enableSimplification */ false);
         }
 
         if (!predicates.rewriteProvidesExactMatchPredicate) {

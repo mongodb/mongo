@@ -371,4 +371,30 @@ private:
     MatchExpressionParameterizationVisitor* _visitor;
 };
 
+/**
+ * Assigns an optional input parameter ID to each node which is eligible for
+ * auto-parameterization.
+ * - tree - The MatchExpression to be parameterized.
+ * - maxParamCount - Optional maximum number of parameters that can be created. If the
+ *   number of parameters would exceed this value, no parameterization will be performed.
+ * - startingParamId - Optional first parameter ID to use. This enables parameterizing a forest
+ *   of match expressions, where each tree continues IDs where the prior one left off.
+ * - parameterized - Optional output argument. If non-null, the method sets this output to
+ *   indicate whether parameterization was actually done.
+ *
+ * Returns a vector-form map to a parameterized MatchExpression from assigned InputParamId. (The
+ * vector index serves as the map key.)
+ */
+std::vector<const MatchExpression*> parameterizeMatchExpression(
+    MatchExpression* tree,
+    boost::optional<size_t> maxParamCount = boost::none,
+    MatchExpression::InputParamId startingParamId = 0,
+    bool* parameterized = nullptr);
+
+/**
+ * Sets max param count in parameterizeMatchExpression to 0, clearing MatchExpression
+ * auto-parameterization before CanonicalQuery to ABT translation.
+ */
+std::vector<const MatchExpression*> unparameterizeMatchExpression(MatchExpression* tree);
+
 }  // namespace mongo

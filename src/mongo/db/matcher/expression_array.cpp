@@ -86,22 +86,6 @@ void ElemMatchObjectMatchExpression::appendSerializedRightHandSide(BSONObjBuilde
     elemMatchBob.doneFast();
 }
 
-MatchExpression::ExpressionOptimizerFunc ElemMatchObjectMatchExpression::getOptimizer() const {
-    return [](std::unique_ptr<MatchExpression> expression) -> std::unique_ptr<MatchExpression> {
-        auto& elemExpression = static_cast<ElemMatchObjectMatchExpression&>(*expression);
-        // The Boolean simplifier is disabled since we don't want to simplify sub-expressions, but
-        // simplify the whole expression instead.
-        elemExpression._sub = MatchExpression::optimize(std::move(elemExpression._sub),
-                                                        /* enableSimplification */ false);
-
-        if (elemExpression._sub->isTriviallyFalse()) {
-            return std::make_unique<AlwaysFalseMatchExpression>();
-        }
-
-        return expression;
-    };
-}
-
 // -------
 
 ElemMatchValueMatchExpression::ElemMatchValueMatchExpression(
@@ -139,24 +123,6 @@ void ElemMatchValueMatchExpression::appendSerializedRightHandSide(BSONObjBuilder
         child->serialize(&emBob, options, false);
     }
     emBob.doneFast();
-}
-
-MatchExpression::ExpressionOptimizerFunc ElemMatchValueMatchExpression::getOptimizer() const {
-    return [](std::unique_ptr<MatchExpression> expression) -> std::unique_ptr<MatchExpression> {
-        auto& subs = static_cast<ElemMatchValueMatchExpression&>(*expression)._subs;
-
-        for (auto& subExpression : subs) {
-            // The Boolean simplifier is disabled since we don't want to simplify sub-expressions,
-            // but simplify the whole expression instead.
-            subExpression = MatchExpression::optimize(std::move(subExpression),
-                                                      /* enableSimplification */ false);
-            if (subExpression->isTriviallyFalse()) {
-                return std::make_unique<AlwaysFalseMatchExpression>();
-            }
-        }
-
-        return expression;
-    };
 }
 
 // ---------

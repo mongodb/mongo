@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/idl/idl_parser.h"
 
 #include <algorithm>
@@ -110,7 +111,7 @@ std::unique_ptr<MatchExpression> buildOplogMatchFilter(
 
     // Perform a final optimization pass on the complete filter before returning.
     // TODO SERVER-81846: Enable the Boolean Expression Simplifier in change streams.
-    return MatchExpression::optimize(std::move(oplogFilter), /* enableSimplification */ false);
+    return optimizeMatchExpression(std::move(oplogFilter), /* enableSimplification */ false);
 }
 }  // namespace change_stream_filter
 

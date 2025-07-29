@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/expression_parameterization.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_parameterization.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
@@ -37,6 +37,7 @@
 #include <cmath>
 
 namespace mongo {
+
 void MatchExpressionParameterizationVisitor::visitBitTestExpression(BitTestMatchExpression* expr) {
     if (_context->availableParamIds(2)) {
         expr->setBitPositionsParamId(_context->nextInputParamId(expr));
@@ -199,4 +200,27 @@ void MatchExpressionParameterizationVisitor::visit(InMatchExpression* expr) {
 void MatchExpressionParameterizationVisitor::visit(TypeMatchExpression* expr) {
     // TODO SERVER-64776: reenable auto-parameterization for $type expressions.
 }
+
+std::vector<const MatchExpression*> parameterizeMatchExpression(
+    MatchExpression* tree,
+    boost::optional<size_t> maxParamCount,
+    MatchExpression::InputParamId startingParamId,
+    bool* parameterized) {
+    MatchExpressionParameterizationVisitorContext context{maxParamCount, startingParamId};
+    MatchExpressionParameterizationVisitor visitor{&context};
+    MatchExpressionParameterizationWalker walker{&visitor};
+    tree_walker::walk<false, MatchExpression>(tree, &walker);
+
+    // If the caller provided a non-null 'parameterized' argument, set this output.
+    if (parameterized != nullptr) {
+        *parameterized = context.parameterized;
+    }
+
+    return std::move(context.inputParamIdToExpressionMap);
+}
+
+std::vector<const MatchExpression*> unparameterizeMatchExpression(MatchExpression* tree) {
+    return parameterizeMatchExpression(tree, 0);
+}
+
 }  // namespace mongo

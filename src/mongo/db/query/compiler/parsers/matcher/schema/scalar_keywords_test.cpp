@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/parsers/matcher/schema/assert_serializes_to.h"
 #include "mongo/db/query/compiler/parsers/matcher/schema/json_schema_parser.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -52,7 +53,7 @@ TEST(JSONSchemaParserScalarTest, MaximumTranslatesCorrectlyWithTypeNumber) {
     BSONObj schema = fromjson("{properties: {num: {type: 'number', maximum: 0}}, type: 'object'}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult,
                          fromjson("{$or: [{num: {$not: {$exists: true}}}, {$and: [{num: {$lte: "
                                   "0}}, {num: {$_internalSchemaType: ['number']}}]}]}"));
@@ -63,7 +64,7 @@ TEST(JSONSchemaParserScalarTest, MaximumTranslatesCorrectlyWithBsonTypeLong) {
         fromjson("{properties: {num: {bsonType: 'long', maximum: 0}}, type: 'object'}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult,
                          fromjson("{$or: [{num: {$not: {$exists: true}}}, {$and: [{num: {$lte: "
                                   "0}}, {num: {$_internalSchemaType: [18]}}]}]}"));
@@ -73,7 +74,7 @@ TEST(JSONSchemaParserScalarTest, MaximumTranslatesCorrectlyWithTypeString) {
     BSONObj schema = fromjson("{properties: {num: {type: 'string', maximum: 0}}, type: 'object'}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(
         optimizedResult,
         fromjson("{$or: [{num: {$not: {$exists: true }}}, {num: {$_internalSchemaType: [2]}}]}"));
@@ -83,7 +84,7 @@ TEST(JSONSchemaParserScalarTest, MaximumTranslatesCorrectlyWithNoType) {
     BSONObj schema = fromjson("{properties: {num: {maximum: 0}}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
                 $or:
                     [{num: {$not: {$exists : true}}},
@@ -114,7 +115,7 @@ TEST(JSONSchemaParserScalarTest, MinimumTranslatesCorrectlyWithTypeNumber) {
     BSONObj schema = fromjson("{properties: {num: {type: 'number', minimum: 0}}, type: 'object'}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
                 $or:
                     [{num: {$not: {$exists : true}}},
@@ -134,7 +135,7 @@ TEST(JSONSchemaParserScalarTest, MaxLengthTranslatesCorrectlyWithIntegralDouble)
         fromjson("{properties: {foo: {type: 'string', maxLength: 5.0}}, type: 'object'}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
                 $or:
                     [{foo: {$not: {$exists: true}}},
@@ -147,7 +148,7 @@ TEST(JSONSchemaParserScalarTest, MaxLengthTranslatesCorrectlyWithTypeString) {
         fromjson("{properties: {foo: {type: 'string', maxLength: 5}}, type: 'object'}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
                 $or:
                     [{foo: {$not: {$exists : true}}},
@@ -160,7 +161,7 @@ TEST(JSONSchemaParserScalarTest, MinimumTranslatesCorrectlyWithBsonTypeLong) {
         fromjson("{properties: {num: {bsonType: 'long', minimum: 0}}, type: 'object'}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
                 $or:
                     [{num: {$not: {$exists: true}}},
@@ -172,7 +173,7 @@ TEST(JSONSchemaParserScalarTest, MinimumTranslatesCorrectlyWithTypeString) {
     BSONObj schema = fromjson("{properties: {num: {type: 'string', minimum: 0}}, type: 'object'}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
                 $or:
                     [{num: {$not: {$exists: true}}}, {num: {$_internalSchemaType: [2]}}]
@@ -184,7 +185,7 @@ TEST(JSONSchemaParserScalarTest, MinimumTranslatesCorrectlyWithNoType) {
     BSONObj schema = fromjson("{properties: {num: {minimum: 0}}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
                 $or:
                     [{num: {$not: {$exists: true}}},
@@ -199,7 +200,7 @@ TEST(JSONSchemaParserScalarTest, MaximumTranslatesCorrectlyWithExclusiveMaximumT
         "type: 'object'}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
                 $or:
                     [{num: {$not: {$exists: true}}},
@@ -213,7 +214,7 @@ TEST(JSONSchemaParserScalarTest, MaximumTranslatesCorrectlyWithExclusiveMaximumF
         "type: 'object'}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
                 $or:
                     [{num: {$not: {$exists: true}}},
@@ -239,7 +240,7 @@ TEST(JSONSchemaParserScalarTest, MinimumTranslatesCorrectlyWithExclusiveMinimumT
         "type: 'object'}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
                 $or:
                     [{num: {$not: {$exists: true}}},
@@ -253,7 +254,7 @@ TEST(JSONSchemaParserScalarTest, MinimumTranslatesCorrectlyWithExclusiveMinimumF
         "type: 'object'}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
                 $or:
                     [{num: {$not: {$exists: true}}},
@@ -297,7 +298,7 @@ TEST(JSONSchemaParserScalarTest, MinLengthTranslatesCorrectlyWithTypeString) {
         fromjson("{properties: {foo: {type: 'string', minLength: 5}}, type: 'object'}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
                 $or:
                     [{foo: {$not: {$exists: true}}},
@@ -310,7 +311,7 @@ TEST(JSONSchemaParserScalarTest, MinLengthTranslatesCorrectlyWithIntegralDouble)
         fromjson("{properties: {foo: {type: 'string', minLength: 5.0}}, type: 'object'}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
                 $or:
                     [{foo: {$not: {$exists: true}}},
@@ -335,7 +336,7 @@ TEST(JSONSchemaParserScalarTest, PatternTranslatesCorrectlyWithString) {
         fromjson("{properties: {foo: {type: 'string', pattern: 'abc'}}, type: 'object'}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     auto expected =
         BSON("$or" << BSON_ARRAY(
                  BSON("foo" << BSON("$not" << BSON("$exists" << true)))
@@ -368,7 +369,7 @@ TEST(JSONSchemaParserScalarTest, MultipleOfTranslatesCorrectlyWithTypeNumber) {
         "{properties: {foo: {type: 'number', multipleOf: NumberDecimal('5.3')}}, type: 'object'}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
                 $or:
                     [{foo: {$not: {$exists: true}}}, {

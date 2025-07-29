@@ -145,12 +145,6 @@ public:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) {
-            return expression;
-        };
-    }
-
     std::shared_ptr<GeometryContainer> _geoContainer;
     std::string _indexField;
     FieldRef _fieldRef;

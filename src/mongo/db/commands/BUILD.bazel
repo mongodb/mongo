@@ -756,6 +756,7 @@ mongo_cc_library(
         "//src/mongo/db/query/compiler/physical_model/index_bounds:index_bounds.h",
         "//src/mongo/db/query/compiler/physical_model/interval:interval.h",
         "//src/mongo/db/query/compiler/physical_model/query_solution:query_solution.h",
+        "//src/mongo/db/query/compiler/rewrites/matcher:expression_optimizer.h",
         "//src/mongo/db/query/compiler/stats:stats_gen_for_histograms",
         "//src/mongo/db/query/compiler/stats:value_utils.h",
         "//src/mongo/db/query/plan_cache:classic_plan_cache.h",

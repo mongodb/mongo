@@ -96,13 +96,6 @@ public:
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
         return nullptr;
     }
-
-private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) {
-            return expression;
-        };
-    }
 };
 
 class AlwaysFalseMatchExpression final : public AlwaysBooleanMatchExpression {

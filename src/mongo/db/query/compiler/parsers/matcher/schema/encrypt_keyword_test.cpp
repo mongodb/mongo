@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/parsers/matcher/schema/assert_serializes_to.h"
 #include "mongo/db/query/compiler/parsers/matcher/schema/json_schema_parser.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/uuid.h"
@@ -56,7 +57,7 @@ TEST(JSONSchemaParserEncryptTest, EncryptTranslatesCorrectly) {
     BSONObj schema = fromjson("{properties: {foo: {encrypt: {}}}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"(
         {
         $or:
@@ -71,7 +72,7 @@ TEST(JSONSchemaParserEncryptTest, EncryptWithSingleBsonTypeTranslatesCorrectly) 
     BSONObj schema = fromjson("{properties: {foo: {encrypt: {bsonType: \"string\"}}}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"(
         {
         $or:
@@ -88,7 +89,7 @@ TEST(JSONSchemaParserEncryptTest, EncryptWithArrayOfMultipleTypesTranslatesCorre
     BSONObj schema = fromjson("{properties: {foo: {encrypt: {bsonType: [\"string\",\"date\"]}}}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"(
         {
         $or:
@@ -105,7 +106,7 @@ TEST(JSONSchemaParserEncryptTest, TopLevelEncryptTranslatesCorrectly) {
     BSONObj schema = fromjson("{encrypt: {}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, BSON(AlwaysFalseMatchExpression::kName << 1));
 }
 
@@ -114,7 +115,7 @@ TEST(JSONSchemaParserEncryptTest, NestedEncryptTranslatesCorrectly) {
         fromjson("{properties: {a: {type: 'object', properties: {b: {encrypt: {}}}}}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"(
         {
         $or:
@@ -145,7 +146,7 @@ TEST(JSONSchemaParserEncryptTest, NestedEncryptInArrayTranslatesCorrectly) {
     BSONObj schema = fromjson("{properties: {a: {type: 'array', items: {encrypt: {}}}}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"(
         {
         $or:

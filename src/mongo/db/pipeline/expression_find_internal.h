@@ -93,7 +93,7 @@ public:
         }
         // SERVER-43740: ideally we'd want to optimize '_matchExpr' here as well. However, given
         // that the match expression is stored as a shared copyable expression in this class, and
-        // 'MatchExpression::optimize()' takes and returns a unique pointer on a match expression,
+        // 'optimizeMatchExpression()' takes and returns a unique pointer on a match expression,
         // there is no easy way to replace a copyable match expression with its optimized
         // equivalent. So, for now we will assume that the copyable match expression is passed to
         // this expression already optimized. Once we have MatchExpression and Expression combined,
@@ -215,7 +215,7 @@ public:
         _children[0] = _children[0]->optimize();
         // SERVER-43740: ideally we'd want to optimize '_matchExpr' here as well. However, given
         // that the match expression is stored as a shared copyable expression in this class, and
-        // 'MatchExpression::optimize()' takes and returns a unique pointer on a match expression,
+        // 'optimizeMatchExpression()' takes and returns a unique pointer on a match expression,
         // there is no easy way to replace a copyable match expression with its optimized
         // equivalent. So, for now we will assume that the copyable match expression is passed to
         // this expression already optimized. Once we have MatchExpression and Expression combined,

@@ -436,47 +436,6 @@ Status InMatchExpression::addRegex(std::unique_ptr<RegexMatchExpression> expr) {
     return Status::OK();
 }
 
-MatchExpression::ExpressionOptimizerFunc InMatchExpression::getOptimizer() const {
-    return [](std::unique_ptr<MatchExpression> expression) -> std::unique_ptr<MatchExpression> {
-        // NOTE: We do not recursively call optimize() on the RegexMatchExpression children in the
-        // _regexes list. We assume that optimize() on a RegexMatchExpression is a no-op.
-        auto& ime = static_cast<InMatchExpression&>(*expression);
-        auto& regexes = ime._regexes;
-        auto collator = ime.getCollator();
-
-        if (regexes.size() == 1 && ime._equalities->elementsIsEmpty()) {
-            // Simplify IN of exactly one regex to be a regex match.
-            auto& childRe = regexes.front();
-            invariant(!childRe->getTag());
-
-            auto simplifiedExpression = std::make_unique<RegexMatchExpression>(
-                expression->path(), childRe->getString(), childRe->getFlags());
-            if (expression->getTag()) {
-                simplifiedExpression->setTag(expression->getTag()->clone());
-            }
-            return simplifiedExpression;
-        } else if (ime._equalities->hasSingleElement() && regexes.empty()) {
-            // Simplify IN of exactly one equality to be an EqualityMatchExpression.
-            BSONObj obj(BSON(expression->path() << *(ime._equalities->getElements().begin())));
-            auto simplifiedExpression =
-                std::make_unique<EqualityMatchExpression>(expression->path(), obj.firstElement());
-            simplifiedExpression->setBackingBSON(obj);
-
-            simplifiedExpression->setCollator(collator);
-            if (expression->getTag()) {
-                simplifiedExpression->setTag(expression->getTag()->clone());
-            }
-
-            return simplifiedExpression;
-        } else if (regexes.empty() && ime._equalities->elementsIsEmpty()) {
-            // Empty IN is always false
-            return std::make_unique<AlwaysFalseMatchExpression>();
-        }
-
-        return expression;
-    };
-}
-
 // -----------
 
 BitTestMatchExpression::BitTestMatchExpression(MatchType type,

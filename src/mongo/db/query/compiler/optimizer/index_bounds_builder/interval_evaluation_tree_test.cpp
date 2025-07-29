@@ -43,6 +43,8 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_parameterization.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -78,8 +80,8 @@ public:
     interval_evaluation_tree::IET createIET(const BSONObj& predicate) {
         BSONObj obj = BSON("a" << predicate);
         auto expr = parseMatchExpression(obj);
-        expr = MatchExpression::normalize(std::move(expr));
-        auto inputParamIdMap = MatchExpression::parameterize(expr.get());
+        expr = normalizeMatchExpression(std::move(expr));
+        auto inputParamIdMap = parameterizeMatchExpression(expr.get());
         BSONElement elt = obj.firstElement();
         return build(expr.get(), elt, inputParamIdMap);
     }
@@ -91,8 +93,8 @@ public:
     void assertOne(const BSONObj& predicate, const std::string& expectedResult) const {
         BSONObj obj = BSON("a" << predicate);
         auto expr = parseMatchExpression(obj);
-        expr = MatchExpression::normalize(std::move(expr));
-        auto inputParamIdMap = MatchExpression::parameterize(expr.get());
+        expr = normalizeMatchExpression(std::move(expr));
+        auto inputParamIdMap = parameterizeMatchExpression(expr.get());
         BSONElement elt = obj.firstElement();
 
         std::string actualResult = buildStr(expr.get(), elt, inputParamIdMap);

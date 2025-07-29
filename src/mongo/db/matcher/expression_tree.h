@@ -131,8 +131,6 @@ protected:
                      bool includePath = true) const;
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final;
-
     std::vector<std::unique_ptr<MatchExpression>> _expressions;
 };
 
@@ -330,8 +328,6 @@ private:
                                             BSONObjBuilder* out,
                                             const SerializationOptions& opts = {},
                                             bool includePath = true);
-
-    ExpressionOptimizerFunc getOptimizer() const final;
 
     std::unique_ptr<MatchExpression> _exp;
 };

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2024-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,23 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/pipeline_test_util.h"
+#pragma once
 
-#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/compiler/rewrites/boolean_simplification/bitset_algebra.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_bitset_tree_converter.h"
 
 namespace mongo {
-
-std::unique_ptr<Pipeline> normalizeMatchStageInPipeline(std::unique_ptr<Pipeline> pipeline) {
-    for (auto&& source : pipeline->getSources()) {
-        if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(source.get())) {
-            auto matchProcessor = matchStage->getMatchProcessor();
-            auto normalizedExpr =
-                normalizeMatchExpression(std::move(matchProcessor->getExpression()));
-            matchProcessor->setExpression(std::move(normalizedExpr));
-        }
-    }
-
-    return pipeline;
-}
-
+/**
+ * Restore MatchExpression tree from a bitset tree and a list of expressions representing bits in
+ * the the bitset tree: i-th expression in the expressions lists represents i-th bit in the bitset
+ * tree.
+ */
+std::unique_ptr<MatchExpression> restoreMatchExpression(
+    const boolean_simplification::BitsetTreeNode& bitsetTree,
+    const BitsetTreeTransformResult::ExpressionList& expressions);
 }  // namespace mongo

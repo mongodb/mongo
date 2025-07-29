@@ -301,57 +301,6 @@ public:
         const SchemaAnnotations schemaAnnotations;
     };
 
-    /**
-     * Make simplifying changes to the structure of a MatchExpression tree without altering its
-     * semantics. This function may return:
-     *   - a pointer to the original, unmodified MatchExpression,
-     *   - a pointer to the original MatchExpression that has been mutated, or
-     *   - a pointer to a new MatchExpression.
-     *
-     * The value of 'expression' must not be nullptr.
-     * 'enableSimplification' parameter controls Boolean Expression Simplifier.
-     */
-    static std::unique_ptr<MatchExpression> optimize(std::unique_ptr<MatchExpression> expression,
-                                                     bool enableSimplification = true);
-
-    /**
-     * Traverses expression tree post-order. Sorts children at each non-leaf node by (MatchType,
-     * path(), children, number of children).
-     */
-    static void sortTree(MatchExpression* tree);
-
-    /**
-     * Convenience method which normalizes a MatchExpression tree by optimizing and then sorting it.
-     */
-    static std::unique_ptr<MatchExpression> normalize(std::unique_ptr<MatchExpression> tree,
-                                                      bool enableSimplification = true);
-
-    /**
-     * Assigns an optional input parameter ID to each node which is eligible for
-     * auto-parameterization.
-     * - tree - The MatchExpression to be parameterized.
-     * - maxParamCount - Optional maximum number of parameters that can be created. If the
-     *   number of parameters would exceed this value, no parameterization will be performed.
-     * - startingParamId - Optional first parameter ID to use. This enables parameterizing a forest
-     *   of match expressions, where each tree continues IDs where the prior one left off.
-     * - parameterized - Optional output argument. If non-null, the method sets this output to
-     *   indicate whether parameterization was actually done.
-     *
-     * Returns a vector-form map to a parameterized MatchExpression from assigned InputParamId. (The
-     * vector index serves as the map key.)
-     */
-    static std::vector<const MatchExpression*> parameterize(
-        MatchExpression* tree,
-        boost::optional<size_t> maxParamCount = boost::none,
-        InputParamId startingParamId = 0,
-        bool* parameterized = nullptr);
-
-    /**
-     * Sets max param count in MatchExpression::parameterize to 0, clearing MatchExpression
-     * auto-parameterization before CanonicalQuery to ABT translation.
-     */
-    static std::vector<const MatchExpression*> unparameterize(MatchExpression* tree);
-
     MatchExpression(MatchType type, clonable_ptr<ErrorAnnotation> annotation = nullptr);
     virtual ~MatchExpression() {}
 
@@ -572,15 +521,6 @@ public:
 
 protected:
     /**
-     * An ExpressionOptimizerFunc implements tree simplifications for a MatchExpression tree with a
-     * specific type of MatchExpression at the root. Except for requiring a specific MatchExpression
-     * subclass, an ExpressionOptimizerFunc has the same requirements and functionality as described
-     * in the specification of MatchExpression::getOptimizer(std::unique_ptr<MatchExpression>).
-     */
-    using ExpressionOptimizerFunc =
-        std::function<std::unique_ptr<MatchExpression>(std::unique_ptr<MatchExpression>)>;
-
-    /**
      * Subclasses that are collation-aware must implement this method in order to capture changes
      * to the collator that occur after initialization time.
      */
@@ -601,23 +541,6 @@ protected:
     clonable_ptr<ErrorAnnotation> _errorAnnotation;
 
 private:
-    /**
-     * Subclasses should implement this function to provide an ExpressionOptimizerFunc specific to
-     * the subclass. This function is only called by
-     * MatchExpression::optimize(std::unique_ptr<MatchExpression>), which is responsible for calling
-     * MatchExpression::getOptimizer() on its input MatchExpression and then passing the same
-     * MatchExpression to the resulting ExpressionOptimizerFunc. There should be no other callers
-     * to this function.
-     *
-     * Any MatchExpression subclass that stores child MatchExpression objects is responsible for
-     * returning an ExpressionOptimizerFunc that recursively calls
-     * MatchExpression::optimize(std::unique_ptr<MatchExpression>) on those children.
-     *
-     * See the descriptions of MatchExpression::optimize(std::unique_ptr<MatchExpression>) and
-     * ExpressionOptimizerFunc for additional explanation of their interfaces and functionality.
-     */
-    virtual ExpressionOptimizerFunc getOptimizer() const = 0;
-
     MatchType _matchType;
     std::unique_ptr<TagData> _tagData;
 };

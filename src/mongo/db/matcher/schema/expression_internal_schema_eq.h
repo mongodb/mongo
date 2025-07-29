@@ -104,12 +104,6 @@ public:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) {
-            return expression;
-        };
-    }
-
     UnorderedFieldsBSONElementComparator _eltCmp;
     BSONElement _rhsElem;
 };

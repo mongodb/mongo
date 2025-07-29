@@ -30,16 +30,35 @@
 #pragma once
 
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_bitset_tree_converter.h"
-#include "mongo/db/query/compiler/rewrites/boolean_simplification/bitset_algebra.h"
 
 namespace mongo {
 /**
- * Restore MatchExpression tree from a bitset tree and a list of expressions representing bits in
- * the the bitset tree: i-th expression in the expressions lists represents i-th bit in the bitset
- * tree.
+ * Make simplifying changes to the structure of a MatchExpression tree without altering its
+ * semantics. This function may return:
+ *   - a pointer to the original, unmodified MatchExpression,
+ *   - a pointer to the original MatchExpression that has been mutated, or
+ *   - a pointer to a new MatchExpression.
+ *
+ * The value of 'expression' must not be nullptr.
+ * 'enableSimplification' parameter controls Boolean Expression Simplifier.
  */
-std::unique_ptr<MatchExpression> restoreMatchExpression(
-    const boolean_simplification::BitsetTreeNode& bitsetTree,
-    const BitsetTreeTransformResult::ExpressionList& expressions);
+std::unique_ptr<MatchExpression> optimizeMatchExpression(
+    std::unique_ptr<MatchExpression> expression, bool enableSimplification = true);
+
+/**
+ * Traverses expression tree post-order. Sorts children at each non-leaf node by (MatchType,
+ * path(), children, number of children).
+ *
+ * The value of 'tree' must not be nullptr.
+ */
+void sortMatchExpressionTree(MatchExpression* tree);
+
+/**
+ * Convenience method which normalizes a MatchExpression tree by optimizing and then sorting it.
+ *
+ * The value of 'tree' must not be nullptr.
+ * 'enableSimplification' parameter controls Boolean Expression Simplifier.
+ */
+std::unique_ptr<MatchExpression> normalizeMatchExpression(std::unique_ptr<MatchExpression> tree,
+                                                          bool enableSimplification = true);
 }  // namespace mongo

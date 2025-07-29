@@ -53,7 +53,7 @@ flowchart TD
     del -- filter --> cq
     update -- filter --> cq
     fam -- filter --> cq
-    me --> C1["MatchExpression::optimize()"]
+    me --> C1["optimizeMatchExpression()"]
     C1 --> C3["Plan Enumerator"]
     C3 --> n2["Candidate QuerySolutions"]
     n2 --> C4["Classic Multiplanner"] & C5["Classic Multiplanner for SBE"] & C6["Cost Based Ranker"]

@@ -61,5 +61,6 @@ mongo_cc_benchmark(
     deps = [
         ":boolean_simplification",
         "//src/mongo/db:query_expressions",
+        "//src/mongo/db/query/compiler/rewrites/matcher:matcher_rewrites",
     ],
 )

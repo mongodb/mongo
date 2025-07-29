@@ -63,6 +63,7 @@
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
@@ -94,7 +95,7 @@ Status filterMatches(const BSONObj& testFilter,
         return {ErrorCodes::Error{6298503}, "actual (true) filter was null"};
     }
     std::unique_ptr<MatchExpression> trueFilterClone(trueFilter->clone());
-    MatchExpression::sortTree(trueFilterClone.get());
+    sortMatchExpressionTree(trueFilterClone.get());
 
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     expCtx->setCollator(std::move(collator));
@@ -107,9 +108,9 @@ Status filterMatches(const BSONObj& testFilter,
     if (root->matchType() == mongo::MatchExpression::NOT) {
         // Ideally we would optimize() everything, but some of the tests depend on structural
         // equivalence of single-arg $or expressions.
-        root = MatchExpression::optimize(std::move(root));
+        root = optimizeMatchExpression(std::move(root));
     }
-    MatchExpression::sortTree(root.get());
+    sortMatchExpressionTree(root.get());
     if (!trueFilterClone->equivalent(root.get())) {
         return {ErrorCodes::Error{5619211},
                 str::stream()

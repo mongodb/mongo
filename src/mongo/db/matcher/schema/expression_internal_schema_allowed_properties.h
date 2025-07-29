@@ -171,6 +171,16 @@ public:
         }
     }
 
+    MatchExpression* releaseChild(size_t i) {
+        tassert(10806401, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
+
+        if (i == 0) {
+            return _otherwise->releaseFilter();
+        } else {
+            return _patternProperties[i - 1].second->releaseFilter();
+        }
+    }
+
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
     }
@@ -196,8 +206,6 @@ public:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final;
-
     // The names of the properties are owned by the BSONObj used to create this match expression.
     // Since that BSONObj must outlive this object, we can safely store StringData.
     StringDataSet _properties;

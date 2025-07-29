@@ -36,6 +36,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -91,7 +92,7 @@ TEST(ElemMatchValueMatchExpression, IsReducedToAlwaysFalseIfContainsIt) {
     auto expr = std::make_unique<ElemMatchValueMatchExpression>("a"_sd, std::move(gt));
     expr->add(std::make_unique<AlwaysFalseMatchExpression>());
     ASSERT_FALSE(expr->isTriviallyFalse());
-    auto optimizedExpr = MatchExpression::optimize(std::move(expr), true);
+    auto optimizedExpr = optimizeMatchExpression(std::move(expr), true);
     ASSERT(optimizedExpr->isTriviallyFalse());
 }
 

@@ -95,6 +95,11 @@ public:
         return _expressions[i].get();
     }
 
+    MatchExpression* releaseChild(size_t i) {
+        tassert(10806402, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
+        return _expressions[i].release();
+    }
+
     void resetChild(size_t i, MatchExpression* other) override {
         tassert(6329406, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
         _expressions[i].reset(other);
@@ -156,23 +161,6 @@ protected:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) {
-            for (auto& subExpression :
-                 static_cast<FixedArityMatchExpression&>(*expression)._expressions) {
-                // Since 'subExpression' is a reference to a member of the
-                // FixedArityMatchExpression's child array, this assignment replaces the original
-                // child with the optimized child.
-                // The Boolean simplifier is disabled since we don't want to simplify
-                // sub-expressions, but simplify the whole expression instead.
-                subExpression = MatchExpression::optimize(std::move(subExpression),
-                                                          /* enableSimplification */ false);
-            }
-
-            return expression;
-        };
-    }
-
     std::array<std::unique_ptr<MatchExpression>, nargs> _expressions;
 };
 

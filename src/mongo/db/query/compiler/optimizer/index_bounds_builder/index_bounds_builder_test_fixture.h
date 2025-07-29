@@ -44,6 +44,8 @@
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/interval_evaluation_tree.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_parameterization.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>
@@ -72,9 +74,9 @@ public:
         ASSERT_OK(status.getStatus()) << obj;
         auto expr = std::move(status.getValue());
         if (shouldNormalize) {
-            expr = MatchExpression::normalize(std::move(expr));
+            expr = normalizeMatchExpression(std::move(expr));
         }
-        auto inputParamIdMap = MatchExpression::parameterize(expr.get());
+        auto inputParamIdMap = parameterizeMatchExpression(expr.get());
         return {std::move(expr), inputParamIdMap};
     }
 

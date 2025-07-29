@@ -255,12 +255,6 @@ protected:
     const CollatorInterface* _collator = nullptr;
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) {
-            return expression;
-        };
-    }
-
     void setData(boost::optional<StringData>& path, BSONElement elem) {
         _rhs = elem;
     }
@@ -629,12 +623,6 @@ public:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) {
-            return expression;
-        };
-    }
-
     void _init();
 
     std::string _regex;
@@ -707,12 +695,6 @@ public:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) {
-            return expression;
-        };
-    }
-
     long long _divisor;
     long long _remainder;
 
@@ -748,13 +730,6 @@ public:
 
     void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
         visitor->visit(this);
-    }
-
-private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) {
-            return expression;
-        };
     }
 };
 
@@ -885,6 +860,9 @@ public:
     bool equalitiesHasSingleElement() const {
         return _equalities->hasSingleElement();
     }
+    bool equalitiesIsEmpty() const {
+        return _equalities->elementsIsEmpty();
+    }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
@@ -932,8 +910,6 @@ private:
             _equalities = _equalities->clone();
         }
     }
-
-    ExpressionOptimizerFunc getOptimizer() const final;
 
     // A helper to serialize to something like {$in: "?array<?number>"} or similar, depending on
     // 'opts' and whether we have a mixed-type $in or not.
@@ -1011,12 +987,6 @@ public:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) {
-            return expression;
-        };
-    }
-
     // Vector of bit positions to test, with bit position 0 being the least significant bit.
     // Used to perform bit tests against BinData.
     std::vector<uint32_t> _bitPositions;

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/rewrite_expr.h"
+#include "mongo/db/query/compiler/rewrites/matcher/rewrite_expr.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"

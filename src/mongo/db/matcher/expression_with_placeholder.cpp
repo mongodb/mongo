@@ -125,11 +125,12 @@ StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> ExpressionWithPlaceholder
     return {std::move(exprWithPlaceholder)};
 }
 
-void ExpressionWithPlaceholder::optimizeFilter() {
-    // The Boolean simplifier is disabled since we don't want to simplify sub-expressions, but
-    // simplify the whole expression instead.
-    _filter = MatchExpression::optimize(std::move(_filter), /* enableSimplification */ false);
+void ExpressionWithPlaceholder::resetFilter(MatchExpression* filter) {
+    _filter.reset(filter);
 
+    // When the filter is reset we potentially can get a totally different expression where a
+    // placeholder field is different from the original one, so we need to recompute it whenever
+    // we reset the filter.
     auto newPlaceholder = parseTopLevelFieldName(_filter.get());
     invariant(newPlaceholder.getStatus());
 

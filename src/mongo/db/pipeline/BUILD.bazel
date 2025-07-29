@@ -733,6 +733,7 @@ mongo_cc_library(
         "//src/mongo/db/query/compiler/logical_model/projection:projection_ast",
         "//src/mongo/db/query/compiler/logical_model/sort_pattern",
         "//src/mongo/db/query/compiler/physical_model/query_solution",
+        "//src/mongo/db/query/compiler/rewrites/matcher:matcher_rewrites",
         "//src/mongo/db/query/compiler/stats",
         "//src/mongo/db/query/compiler/stats:stats_gen",
         "//src/mongo/db/query/datetime:date_time_support",

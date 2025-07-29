@@ -110,9 +110,11 @@ public:
         return _expression.get();
     }
 
-private:
-    ExpressionOptimizerFunc getOptimizer() const final;
+    ExpressionWithPlaceholder* getExpression() {
+        return _expression.get();
+    }
 
+private:
     long long _index = 0;
     std::unique_ptr<ExpressionWithPlaceholder> _expression;
 };

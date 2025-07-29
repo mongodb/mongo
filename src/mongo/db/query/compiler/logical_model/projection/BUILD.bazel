@@ -24,11 +24,13 @@ mongo_cc_library(
         "projection_ast_visitor.h",
         "projection_parser.h",
         "//src/mongo/base:exact_cast.h",
+        "//src/mongo/db/query/compiler/rewrites/matcher:expression_optimizer.h",
     ],
     deps = [
         "//src/mongo/db:query_expressions",
         "//src/mongo/db:server_base",
         "//src/mongo/db/query/compiler/parsers/matcher:matcher_parser",
+        "//src/mongo/db/query/compiler/rewrites/matcher:matcher_rewrites",
     ],
 )
 

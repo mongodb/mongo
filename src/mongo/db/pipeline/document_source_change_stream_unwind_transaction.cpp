@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -115,7 +116,7 @@ std::unique_ptr<MatchExpression> buildUnwindTransactionFilter(
             expCtx, userMatch, bsonObj, {}, kUnwindExcludedFields)) {
         unwindFilter->add(std::move(rewrittenMatch));
     }
-    return MatchExpression::optimize(std::move(unwindFilter));
+    return optimizeMatchExpression(std::move(unwindFilter));
 }
 
 /**

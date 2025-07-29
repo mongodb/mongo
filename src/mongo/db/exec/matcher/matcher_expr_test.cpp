@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::evaluate_expr_matcher_test {
@@ -52,7 +53,7 @@ public:
                                          _expCtx,
                                          ExtensionsCallbackNoop(),
                                          MatchExpressionParser::kAllowAllSpecialFeatures));
-        _matchExpression = MatchExpression::optimize(std::move(_matchExpression));
+        _matchExpression = optimizeMatchExpression(std::move(_matchExpression));
     }
 
     void setCollator(std::unique_ptr<CollatorInterface> collator) {

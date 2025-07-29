@@ -224,7 +224,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateNotEqualToNullShouldBuildExactBoundsIfIn
         // It's necessary to call optimize since the $not will have a singleton $and child, which
         // IndexBoundsBuilder::translate cannot handle.
         auto [expr, inputParamIdMap] = parseMatchExpression(obj);
-        expr = MatchExpression::optimize(std::move(expr));
+        expr = optimizeMatchExpression(std::move(expr));
 
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
@@ -251,7 +251,7 @@ TEST_F(IndexBoundsBuilderTest,
         // It's necessary to call optimize since the $not will have a singleton $and child, which
         // IndexBoundsBuilder::translate cannot handle.
         auto [expr, inputParamIdMap] = parseMatchExpression(obj);
-        expr = MatchExpression::optimize(std::move(expr));
+        expr = optimizeMatchExpression(std::move(expr));
 
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
@@ -275,7 +275,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateNotEqualToNullShouldBuildExactBoundsOnRe
         // It's necessary to call optimize since the $not will have a singleton $and child, which
         // IndexBoundsBuilder::translate cannot handle.
         auto [expr, inputParamIdMap] = parseMatchExpression(obj);
-        expr = MatchExpression::optimize(std::move(expr));
+        expr = optimizeMatchExpression(std::move(expr));
 
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
@@ -300,7 +300,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateNotEqualToNullShouldBuildInexactBoundsIf
         // It's necessary to call optimize since the $not will have a singleton $and child, which
         // IndexBoundsBuilder::translate cannot handle.
         auto [expr, inputParamIdMap] = parseMatchExpression(obj);
-        expr = MatchExpression::optimize(std::move(expr));
+        expr = optimizeMatchExpression(std::move(expr));
 
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
@@ -352,7 +352,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateNotInequalityToNullShouldProduceExactFul
         // It's necessary to call optimize since the $not will have a singleton $and child, which
         // IndexBoundsBuilder::translate cannot handle.
         auto [expr, inputParamIdMap] = parseMatchExpression(obj);
-        expr = MatchExpression::optimize(std::move(expr));
+        expr = optimizeMatchExpression(std::move(expr));
 
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;
@@ -382,7 +382,7 @@ TEST_F(IndexBoundsBuilderTest,
         // It's necessary to call optimize since the $not will have a singleton $and child, which
         // IndexBoundsBuilder::translate cannot handle.
         auto [expr, inputParamIdMap] = parseMatchExpression(obj);
-        expr = MatchExpression::optimize(std::move(expr));
+        expr = optimizeMatchExpression(std::move(expr));
 
         OrderedIntervalList oil;
         IndexBoundsBuilder::BoundsTightness tightness;

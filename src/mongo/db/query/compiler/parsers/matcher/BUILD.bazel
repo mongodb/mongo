@@ -27,6 +27,7 @@ mongo_cc_library(
         "//src/mongo/db/geo:geoparser",
         "//src/mongo/db/matcher/doc_validation",
         "//src/mongo/db/query/compiler/parsers/matcher/schema:json_schema_parser",
+        "//src/mongo/db/query/compiler/rewrites/matcher:matcher_rewrites",
     ],
 )
 

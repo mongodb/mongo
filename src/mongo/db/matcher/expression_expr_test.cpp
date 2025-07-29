@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -72,7 +73,7 @@ public:
                                          _expCtx,
                                          ExtensionsCallbackNoop(),
                                          MatchExpressionParser::kAllowAllSpecialFeatures));
-        _matchExpression = MatchExpression::optimize(std::move(_matchExpression));
+        _matchExpression = optimizeMatchExpression(std::move(_matchExpression));
     }
 
     void setCollator(std::unique_ptr<CollatorInterface> collator) {
@@ -140,7 +141,7 @@ TEST(ExprMatchTest, IdenticalPostOptimizedExpressionsAreEquivalent) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::unique_ptr<MatchExpression> matchExpr =
         std::make_unique<ExprMatchExpression>(expression.firstElement(), expCtx);
-    matchExpr = MatchExpression::optimize(std::move(matchExpr));
+    matchExpr = optimizeMatchExpression(std::move(matchExpr));
 
     // We expect that the optimized 'matchExpr' is still an ExprMatchExpression.
     std::unique_ptr<ExprMatchExpression> pipelineExpr(
@@ -170,7 +171,7 @@ TEST(ExprMatchTest, ExpressionOptimizeRewritesVariableDereferenceAsConstant) {
     // Create and optimize an ExprMatchExpression.
     std::unique_ptr<MatchExpression> matchExpr =
         std::make_unique<ExprMatchExpression>(expression.firstElement(), expCtx);
-    matchExpr = MatchExpression::optimize(std::move(matchExpr));
+    matchExpr = optimizeMatchExpression(std::move(matchExpr));
 
     // We expect that the optimized 'matchExpr' is still an ExprMatchExpression.
     auto& pipelineExpr = dynamic_cast<ExprMatchExpression&>(*matchExpr);
@@ -190,7 +191,7 @@ TEST(ExprMatchTest, OptimizingIsANoopWhenAlreadyOptimized) {
     // Create and optimize an ExprMatchExpression.
     std::unique_ptr<MatchExpression> singlyOptimized =
         std::make_unique<ExprMatchExpression>(expression.firstElement(), expCtx);
-    singlyOptimized = MatchExpression::optimize(std::move(singlyOptimized));
+    singlyOptimized = optimizeMatchExpression(std::move(singlyOptimized));
 
     // We expect that the optimized 'matchExpr' is now an $and.
     ASSERT(dynamic_cast<const AndMatchExpression*>(singlyOptimized.get()));
@@ -199,7 +200,7 @@ TEST(ExprMatchTest, OptimizingIsANoopWhenAlreadyOptimized) {
     std::unique_ptr<MatchExpression> doublyOptimized =
         std::make_unique<ExprMatchExpression>(expression.firstElement(), expCtx);
     for (size_t i = 0; i < 2u; ++i) {
-        doublyOptimized = MatchExpression::optimize(std::move(doublyOptimized));
+        doublyOptimized = optimizeMatchExpression(std::move(doublyOptimized));
     }
     ASSERT_TRUE(doublyOptimized->equivalent(singlyOptimized.get()));
 }
@@ -211,7 +212,7 @@ TEST(ExprMatchTest, OptimizingAnAlreadyOptimizedCloneIsANoop) {
     // Create and optimize an ExprMatchExpression.
     std::unique_ptr<MatchExpression> singlyOptimized =
         std::make_unique<ExprMatchExpression>(expression.firstElement(), expCtx);
-    singlyOptimized = MatchExpression::optimize(std::move(singlyOptimized));
+    singlyOptimized = optimizeMatchExpression(std::move(singlyOptimized));
 
     // We expect that the optimized 'matchExpr' is now an $and.
     ASSERT(dynamic_cast<const AndMatchExpression*>(singlyOptimized.get()));
@@ -219,7 +220,7 @@ TEST(ExprMatchTest, OptimizingAnAlreadyOptimizedCloneIsANoop) {
     // Clone the match expression and optimize it again. We expect the twice-optimized match
     // expression to be equivalent to the once-optimized one.
     std::unique_ptr<MatchExpression> doublyOptimized = singlyOptimized->clone();
-    doublyOptimized = MatchExpression::optimize(std::move(doublyOptimized));
+    doublyOptimized = optimizeMatchExpression(std::move(doublyOptimized));
     ASSERT_TRUE(doublyOptimized->equivalent(singlyOptimized.get()));
 }
 
@@ -238,7 +239,7 @@ TEST(ExprMatchTest, OptimizingExprAbsorbsAndOfAnd) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto matchExpr =
         std::make_unique<ExprMatchExpression>(exprBson.firstElement(), std::move(expCtx));
-    auto optimized = MatchExpression::optimize(std::move(matchExpr));
+    auto optimized = optimizeMatchExpression(std::move(matchExpr));
 
     // The optimized match expression should not have and AND children of AND nodes. This should be
     // collapsed during optimization.
@@ -254,7 +255,7 @@ TEST(ExprMatchTest, OptimizingExprRemovesTrueConstantExpression) {
 
     auto matchExpr =
         std::make_unique<ExprMatchExpression>(exprBson.firstElement(), std::move(expCtx));
-    auto optimized = MatchExpression::optimize(std::move(matchExpr));
+    auto optimized = optimizeMatchExpression(std::move(matchExpr));
 
     auto serialization = optimized->serialize();
     auto expectedSerialization = fromjson("{}");
@@ -267,7 +268,7 @@ TEST(ExprMatchTest, OptimizingExprRemovesTruthyConstantExpression) {
 
     auto matchExpr =
         std::make_unique<ExprMatchExpression>(exprBson.firstElement(), std::move(expCtx));
-    auto optimized = MatchExpression::optimize(std::move(matchExpr));
+    auto optimized = optimizeMatchExpression(std::move(matchExpr));
 
     auto serialization = optimized->serialize();
     auto expectedSerialization = fromjson("{}");

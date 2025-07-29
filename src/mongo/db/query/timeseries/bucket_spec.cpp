@@ -41,8 +41,9 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/matcher/rewrite_expr.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
+#include "mongo/db/query/compiler/rewrites/matcher/rewrite_expr.h"
 #include "mongo/db/query/timeseries/bucket_level_comparison_predicate_generator.h"
 #include "mongo/db/query/timeseries/bucket_level_id_predicate_generator.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
@@ -472,13 +473,13 @@ BucketSpec::SplitPredicates BucketSpec::getPushdownPredicates(
             bool changed = generateBucketLevelIdPredicates(
                 *expCtx, bucketSpec, *tsOptions.getBucketMaxSpanSeconds(), bucketMetricPred.get());
             if (changed) {
-                bucketMetricPred = MatchExpression::normalize(std::move(bucketMetricPred));
+                bucketMetricPred = normalizeMatchExpression(std::move(bucketMetricPred));
             }
         }
         if (bucketPredicate.rewriteProvidesExactMatchPredicate) {
             residualPred = nullptr;
         } else {
-            residualPred = MatchExpression::normalize(std::move(residualPred));
+            residualPred = normalizeMatchExpression(std::move(residualPred));
         }
     }
 

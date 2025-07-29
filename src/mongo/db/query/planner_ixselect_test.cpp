@@ -59,6 +59,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
@@ -84,7 +85,7 @@ unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj, bool should
     ASSERT_TRUE(status.isOK());
     auto expr = std::move(status.getValue());
     if (shouldNormalize) {
-        expr = MatchExpression::normalize(std::move(expr));
+        expr = normalizeMatchExpression(std::move(expr));
     }
     return expr;
 }

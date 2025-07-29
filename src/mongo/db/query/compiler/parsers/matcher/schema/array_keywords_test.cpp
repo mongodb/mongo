@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/parsers/matcher/schema/assert_serializes_to.h"
 #include "mongo/db/query/compiler/parsers/matcher/schema/json_schema_parser.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -68,13 +69,13 @@ TEST(JSONSchemaArrayKeywordTest, MinItemsTranslatesCorrectlyWithNoType) {
     auto schema = BSON("minItems" << 1);
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson("{}"));
 
     schema = fromjson("{properties: {a: {minItems: 1}}}");
     result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
                 $or:
                     [{a: {$not: {$exists: true}}},
@@ -87,7 +88,7 @@ TEST(JSONSchemaArrayKeywordTest, MinItemsTranslatesCorrectlyWithArrayType) {
     auto schema = fromjson("{properties: {a: {minItems: 1, type: 'array'}}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
         $or:
             [{a: {$not: {$exists: true}}},
@@ -99,7 +100,7 @@ TEST(JSONSchemaArrayKeywordTest, MinItemsTranslatesCorrectlyWithNonArrayType) {
     auto schema = fromjson("{properties: {a: {minItems: 1, type: 'number'}}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
         $or:
             [{a: {$not: {$exists: true}}}, {a: {$_internalSchemaType: ["number"]}}]
@@ -126,13 +127,13 @@ TEST(JSONSchemaArrayKeywordTest, MaxItemsTranslatesCorrectlyWithNoType) {
     auto schema = BSON("maxItems" << 1);
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson("{}"));
 
     schema = fromjson("{properties: {a: {maxItems: 1}}}");
     result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
                 $or:
                     [{a: {$not: {$exists: true}}},
@@ -145,7 +146,7 @@ TEST(JSONSchemaArrayKeywordTest, MaxItemsTranslatesCorrectlyWithArrayType) {
     auto schema = fromjson("{properties: {a: {maxItems: 1, type: 'array'}}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
         $or:
             [{a: {$not: {$exists: true}}},
@@ -157,7 +158,7 @@ TEST(JSONSchemaArrayKeywordTest, MaxItemsTranslatesCorrectlyWithNonArrayType) {
     auto schema = fromjson("{properties: {a: {maxItems: 1, type: 'string'}}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
         $or:
             [{a: {$not: {$exists : true}}}, {a: {$_internalSchemaType: [2]}}]
@@ -174,7 +175,7 @@ TEST(JSONSchemaArrayKeywordTest, UniqueItemsFalseGeneratesAlwaysTrueExpression) 
     auto schema = fromjson("{properties: {a: {uniqueItems: false}}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson("{}"));
 }
 
@@ -182,13 +183,13 @@ TEST(JSONSchemaArrayKeywordTest, UniqueItemsTranslatesCorrectlyWithNoType) {
     auto schema = BSON("uniqueItems" << true);
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson("{}"));
 
     schema = fromjson("{properties: {a: {uniqueItems: true}}}");
     result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
         $or:
             [{a: {$not: {$exists: true}}},
@@ -201,7 +202,7 @@ TEST(JSONSchemaArrayKeywordTest, UniqueItemsTranslatesCorrectlyWithTypeArray) {
     auto schema = fromjson("{properties: {a: {type: 'array', uniqueItems: true}}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
         $or:
             [{a: {$not: {$exists: true}}},
@@ -237,7 +238,7 @@ TEST(JSONSchemaArrayKeywordTest, ItemsParsesSuccessfullyAsArrayAtTopLevel) {
     auto schema = fromjson("{items: [{type: 'string'}]}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson("{}"));
 }
 
@@ -245,7 +246,7 @@ TEST(JSONSchemaArrayKeywordTest, ItemsParsesSuccessfullyAsObjectAtTopLevel) {
     auto schema = fromjson("{items: {type: 'string'}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson("{}"));
 }
 
@@ -253,7 +254,7 @@ TEST(JSONSchemaArrayKeywordTest, ItemsParsesSuccessfullyAsArrayInNestedSchema) {
     auto schema = fromjson("{properties: {a: {items: [{maxLength: 4}, {minimum: 0}]}}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     auto expectedResult = fromjson(R"(
         {
         $or:
@@ -297,7 +298,7 @@ TEST(JSONSchemaArrayKeywordTest, ItemsParsesSuccessfullyAsObjectInNestedSchema) 
     auto schema = fromjson("{properties: {a: {items: {type: 'string'}}}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
-    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    auto optimizedResult = optimizeMatchExpression(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
         $or:
             [{a: {$not: {$exists: true}}},
@@ -330,13 +331,13 @@ TEST(JSONSchemaArrayKeywordTest, AdditionalItemsTranslatesSucessfullyAsBooleanAt
     auto schema = fromjson("{items: [], additionalItems: true}");
     auto expr = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(expr.getStatus());
-    auto optimizedExpr = MatchExpression::optimize(std::move(expr.getValue()));
+    auto optimizedExpr = optimizeMatchExpression(std::move(expr.getValue()));
     ASSERT_SERIALIZES_TO(optimizedExpr, fromjson("{}"));
 
     schema = fromjson("{items: [], additionalItems: false}");
     expr = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(expr.getStatus());
-    optimizedExpr = MatchExpression::optimize(std::move(expr.getValue()));
+    optimizedExpr = optimizeMatchExpression(std::move(expr.getValue()));
     ASSERT_SERIALIZES_TO(optimizedExpr, fromjson("{}"));
 }
 
@@ -344,7 +345,7 @@ TEST(JSONSchemaArrayKeywordTest, AdditionalItemsTranslatesSucessfullyAsObjectAtT
     auto schema = fromjson("{items: [], additionalItems: {multipleOf: 7}}");
     auto expr = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(expr.getStatus());
-    auto optimizedExpr = MatchExpression::optimize(std::move(expr.getValue()));
+    auto optimizedExpr = optimizeMatchExpression(std::move(expr.getValue()));
     ASSERT_SERIALIZES_TO(optimizedExpr, fromjson("{}"));
 }
 
@@ -352,7 +353,7 @@ TEST(JSONSchemaArrayKeywordTest, AdditionalItemsTranslatesSucessfullyAsBooleanIn
     auto schema = fromjson("{properties: {a: {items: [], additionalItems: true}}}");
     auto expr = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(expr.getStatus());
-    auto optimizedExpr = MatchExpression::optimize(std::move(expr.getValue()));
+    auto optimizedExpr = optimizeMatchExpression(std::move(expr.getValue()));
     auto expectedResult = fromjson(R"(
         {
         $or:
@@ -365,7 +366,7 @@ TEST(JSONSchemaArrayKeywordTest, AdditionalItemsTranslatesSucessfullyAsBooleanIn
     schema = fromjson("{properties: {a: {items: [], additionalItems: false}}}");
     expr = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(expr.getStatus());
-    optimizedExpr = MatchExpression::optimize(std::move(expr.getValue()));
+    optimizedExpr = optimizeMatchExpression(std::move(expr.getValue()));
     expectedResult = fromjson(R"(
         {
         $or:
@@ -381,19 +382,19 @@ TEST(JSONSchemaArrayKeywordTest,
     auto schema = BSON("additionalItems" << true);
     auto expr = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(expr.getStatus());
-    auto optimizedExpr = MatchExpression::optimize(std::move(expr.getValue()));
+    auto optimizedExpr = optimizeMatchExpression(std::move(expr.getValue()));
     ASSERT_SERIALIZES_TO(optimizedExpr, fromjson("{}"));
 
     schema = BSON("additionalItems" << false);
     expr = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(expr.getStatus());
-    optimizedExpr = MatchExpression::optimize(std::move(expr.getValue()));
+    optimizedExpr = optimizeMatchExpression(std::move(expr.getValue()));
     ASSERT_SERIALIZES_TO(optimizedExpr, fromjson("{}"));
 
     schema = BSON("additionalItems" << BSON("minLength" << 1));
     expr = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(expr.getStatus());
-    optimizedExpr = MatchExpression::optimize(std::move(expr.getValue()));
+    optimizedExpr = optimizeMatchExpression(std::move(expr.getValue()));
     ASSERT_SERIALIZES_TO(optimizedExpr, fromjson("{}"));
 }
 
@@ -402,14 +403,14 @@ TEST(JSONSchemaArrayKeywordTest,
     auto schema = fromjson("{properties: {foo: {additionalItems: true}}}");
     auto expr = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(expr.getStatus());
-    auto optimizedExpr = MatchExpression::optimize(std::move(expr.getValue()));
+    auto optimizedExpr = optimizeMatchExpression(std::move(expr.getValue()));
     ASSERT_SERIALIZES_TO(optimizedExpr, fromjson("{}"));
 
 
     schema = fromjson("{properties: {foo: {additionalItems: false}}}");
     expr = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(expr.getStatus());
-    optimizedExpr = MatchExpression::optimize(std::move(expr.getValue()));
+    optimizedExpr = optimizeMatchExpression(std::move(expr.getValue()));
     ASSERT_SERIALIZES_TO(optimizedExpr, fromjson("{}"));
 }
 
@@ -417,7 +418,7 @@ TEST(JSONSchemaArrayKeywordTest, AdditionalItemsGeneratesEmptyExpressionIfItemsA
     auto schema = fromjson("{properties: {a: {items: {minimum: 7}, additionalItems: false}}}");
     auto expr = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(expr.getStatus());
-    auto optimizedExpr = MatchExpression::optimize(std::move(expr.getValue()));
+    auto optimizedExpr = optimizeMatchExpression(std::move(expr.getValue()));
     auto expectedResult = fromjson(R"(
         {
         $or:
@@ -437,7 +438,7 @@ TEST(JSONSchemaArrayKeywordTest, AdditionalItemsGeneratesEmptyExpressionIfItemsA
     schema = fromjson("{properties: {a: {items: {minimum: 7}, additionalItems: {minLength: 7}}}}");
     expr = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(expr.getStatus());
-    optimizedExpr = MatchExpression::optimize(std::move(expr.getValue()));
+    optimizedExpr = optimizeMatchExpression(std::move(expr.getValue()));
     expectedResult = fromjson(R"(
         {
         $or:

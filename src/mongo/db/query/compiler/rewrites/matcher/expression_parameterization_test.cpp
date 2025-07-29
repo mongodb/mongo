@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/expression_parameterization.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_parameterization.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -637,7 +637,7 @@ TEST(MatchExpressionParameterizationVisitor,
         ASSERT_TRUE(result.isOK());
         MatchExpression* expression = result.getValue().get();
 
-        auto inputParamIdToExpressionMap = MatchExpression::parameterize(expression);
+        auto inputParamIdToExpressionMap = parameterizeMatchExpression(expression);
         ASSERT_EQ(6, inputParamIdToExpressionMap.size());
         ASSERT_EQ(6, collectInputParams(expression).size());
     }
@@ -648,7 +648,7 @@ TEST(MatchExpressionParameterizationVisitor,
         ASSERT_TRUE(result.isOK());
         MatchExpression* expression = result.getValue().get();
 
-        auto inputParamIdToExpressionMap = MatchExpression::parameterize(expression, 6);
+        auto inputParamIdToExpressionMap = parameterizeMatchExpression(expression, 6);
         ASSERT_EQ(6, inputParamIdToExpressionMap.size());
         ASSERT_EQ(6, collectInputParams(expression).size());
     }
@@ -660,7 +660,7 @@ TEST(MatchExpressionParameterizationVisitor,
         MatchExpression* expression = result.getValue().get();
 
         // This tests the optional limit on the maximum number of parameters allowed.
-        auto inputParamIdToExpressionMap = MatchExpression::parameterize(expression, 5);
+        auto inputParamIdToExpressionMap = parameterizeMatchExpression(expression, 5);
         ASSERT_EQ(5, inputParamIdToExpressionMap.size());
         ASSERT_EQ(5, collectInputParams(expression).size());
     }
@@ -678,7 +678,7 @@ TEST(MatchExpressionParameterizationVisitor,
         // binary ops for a total of four possible parameters, each of which has a unique value so
         // cannot share a prior parameter. With a limit of 3, the first two get parameterized but
         // the last two do not.
-        auto inputParamIdToExpressionMap = MatchExpression::parameterize(expression, 3);
+        auto inputParamIdToExpressionMap = parameterizeMatchExpression(expression, 3);
         ASSERT_EQ(2, inputParamIdToExpressionMap.size());
         ASSERT_EQ(2, collectInputParams(expression).size());
     }
@@ -695,7 +695,7 @@ TEST(MatchExpressionParameterizationVisitor, AutoParametrizationWalkerSetsCorrec
         ASSERT_TRUE(result.isOK());
         MatchExpression* expression = result.getValue().get();
 
-        auto inputParamIdToExpressionMap = MatchExpression::parameterize(expression);
+        auto inputParamIdToExpressionMap = parameterizeMatchExpression(expression);
         // Check that the two MatchExpression reuse the same parameter.
         ASSERT_EQ(1, inputParamIdToExpressionMap.size());
         auto parameters = collectInputParams(expression);
@@ -709,8 +709,7 @@ TEST(MatchExpressionParameterizationVisitor, AutoParametrizationWalkerSetsCorrec
         ASSERT_TRUE(result.isOK());
         MatchExpression* expression = result.getValue().get();
 
-        auto inputParamIdToExpressionMap =
-            MatchExpression::parameterize(expression, boost::none, 15);
+        auto inputParamIdToExpressionMap = parameterizeMatchExpression(expression, boost::none, 15);
         ASSERT_EQ(1, inputParamIdToExpressionMap.size());
         auto parameters = collectInputParams(expression);
         ASSERT_EQ(2, parameters.size());
@@ -755,8 +754,7 @@ TEST(MatchExpressionParameterizationVisitor, AutoParametrizationWalkerSetsCorrec
         ASSERT_TRUE(result.isOK());
         MatchExpression* expression = result.getValue().get();
 
-        auto inputParamIdToExpressionMap =
-            MatchExpression::parameterize(expression, boost::none, 15);
+        auto inputParamIdToExpressionMap = parameterizeMatchExpression(expression, boost::none, 15);
         // There should be kUseMapThreshold expressions plus 1.
         ASSERT_EQ(MatchExpressionParameterizationVisitorContext::kUseMapThreshold + 1,
                   inputParamIdToExpressionMap.size());

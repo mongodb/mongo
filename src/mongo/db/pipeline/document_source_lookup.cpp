@@ -71,6 +71,7 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -1066,7 +1067,7 @@ DocumentSourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
     // longer be true for the combined $match's MatchExpression.
     _additionalFilter =
         DocumentSourceMatch::descendMatchOnPath(
-            needToOptimize ? MatchExpression::optimize(
+            needToOptimize ? optimizeMatchExpression(
                                  std::move(_matchSrc->getMatchProcessor()->getExpression()),
                                  /* enableSimplification */ false)
                                  .get()

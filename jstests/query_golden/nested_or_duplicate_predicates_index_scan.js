@@ -1,6 +1,6 @@
 /*
  * Test a nested $or query which reproduces SERVER-84013, a bug in the subplanner. This bug had to
- * do with the subplanner assuming that multiple invocations of MatchExpression::optimize() yielded
+ * do with the subplanner assuming that multiple invocations of optimizeMatchExpression() yielded
  * the same expressions, which turns out not to be the case. The queries in this regression test
  * excerise the $or -> $in rewrite which produce new $in expressions which themselves could be
  * further optimized.

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/expression_simplifier.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_simplifier.h"
 
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression.h"

@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/expression_simplifier.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_simplifier.h"
 
-#include "mongo/db/matcher/expression_restorer.h"
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/match_expression_walker.h"
 #include "mongo/db/query/compiler/rewrites/boolean_simplification/quine_mccluskey.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_restorer.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/logv2/log.h"
 

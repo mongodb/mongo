@@ -88,6 +88,10 @@ public:
         _sub.reset(other);
     }
 
+    MatchExpression* releaseChild() {
+        return _sub.release();
+    }
+
     MatchCategory getCategory() const final {
         return MatchCategory::kOther;
     }
@@ -101,8 +105,6 @@ public:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final;
-
     std::unique_ptr<MatchExpression> _sub;
 };
 }  // namespace mongo

@@ -40,6 +40,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/parsers/matcher/parsed_match_expression_for_test.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/db/query/query_shape/query_shape_test_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
@@ -426,7 +427,7 @@ BSONObj queryShapeForOptimizedExprExpression(std::string exprPredicateJson) {
     // not clear we'd want to do optimization before computing the query shape, but we should
     // support the computation on any MatchExpression, and this is the easiest way we can create
     // this type of MatchExpression node.
-    auto optimized = MatchExpression::optimize(expr.release());
+    auto optimized = optimizeMatchExpression(expr.release());
     return predicateShape(optimized.get());
 }
 

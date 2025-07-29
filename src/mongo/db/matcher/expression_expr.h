@@ -37,11 +37,11 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/matcher/rewrite_expr.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/compiler/rewrites/matcher/rewrite_expr.h"
 #include "mongo/db/query/expression_walker.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
@@ -112,6 +112,14 @@ public:
         return _rewriteResult;
     }
 
+    boost::optional<RewriteExpr::RewriteResult>& getRewriteResult() {
+        return _rewriteResult;
+    }
+
+    void setRewriteResult(boost::optional<RewriteExpr::RewriteResult> result) {
+        _rewriteResult = std::move(result);
+    }
+
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
         return nullptr;
     }
@@ -163,8 +171,6 @@ public:
     }
 
 private:
-    ExpressionOptimizerFunc getOptimizer() const final;
-
     void _doSetCollator(const CollatorInterface* collator) final;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;

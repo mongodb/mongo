@@ -60,6 +60,7 @@
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/transformer_interface.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_parameterization.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -423,7 +424,7 @@ BSONObj Pipeline::getInitialQuery() const {
 void Pipeline::parameterize() {
     if (!_sources.empty()) {
         if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(_sources.front().get())) {
-            MatchExpression::parameterize(matchStage->getMatchExpression());
+            parameterizeMatchExpression(matchStage->getMatchExpression());
             _isParameterized = true;
         }
     }
@@ -432,9 +433,9 @@ void Pipeline::parameterize() {
 void Pipeline::unparameterize() {
     if (!_sources.empty()) {
         if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(_sources.front().get())) {
-            // Sets max param count in MatchExpression::parameterize() to 0, clearing
+            // Sets max param count in parameterizeMatchExpression() to 0, clearing
             // MatchExpression auto-parameterization before pipeline to ABT translation.
-            MatchExpression::unparameterize(matchStage->getMatchExpression());
+            unparameterizeMatchExpression(matchStage->getMatchExpression());
             _isParameterized = false;
         }
     }

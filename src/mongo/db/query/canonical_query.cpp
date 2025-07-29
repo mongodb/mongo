@@ -39,6 +39,8 @@
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast_util.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_parameterization.h"
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
@@ -135,7 +137,7 @@ CanonicalQuery::CanonicalQuery(OperationContext* opCtx, const CanonicalQuery& ba
 
     // Note: we do not optimize the MatchExpression representing the branch of the top-level $or
     // that we are currently examining. This is because repeated invocations of
-    // MatchExpression::optimize() may change the order of predicates in the MatchExpression, due to
+    // optimizeMatchExpression() may change the order of predicates in the MatchExpression, due to
     // new rewrites being unlocked by previous ones. We need to preserve the order of predicates to
     // allow index tagging to work properly. See SERVER-84013 for more details.
     initCq(baseQuery.getExpCtx(),
@@ -163,7 +165,7 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
     if (optimizeMatchExpression) {
         const bool enableSimplification = !_expCtx->getInLookup() && !_expCtx->getIsUpsert();
         _primaryMatchExpression =
-            MatchExpression::normalize(std::move(parsedFind->filter), enableSimplification);
+            normalizeMatchExpression(std::move(parsedFind->filter), enableSimplification);
     } else {
         _primaryMatchExpression = std::move(parsedFind->filter);
     }
@@ -229,7 +231,7 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
         // leaf nodes unless it has too many predicates. If it did not actually get parameterized,
         // we mark the query as uncacheable for SBE to avoid plan cache flooding.
         bool parameterized;
-        _inputParamIdToExpressionMap = MatchExpression::parameterize(
+        _inputParamIdToExpressionMap = parameterizeMatchExpression(
             _primaryMatchExpression.get(), _maxMatchExpressionParams, 0, &parameterized);
         if (!parameterized) {
             // Avoid plan cache flooding by not fully parameterized plans.
@@ -400,7 +402,7 @@ void CanonicalQuery::setCqPipeline(std::vector<boost::intrusive_ptr<DocumentSour
             MatchExpression* matchExpr = matchStage->getMatchExpression();
             if (shouldParameterizeSbe(matchExpr)) {
                 bool parameterized;
-                std::vector<const MatchExpression*> newParams = MatchExpression::parameterize(
+                std::vector<const MatchExpression*> newParams = parameterizeMatchExpression(
                     matchExpr, getMaxMatchExpressionParams(), numParams(), &parameterized);
                 if (parameterized) {
                     addMatchParams(newParams);
