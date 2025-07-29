@@ -90,8 +90,20 @@ function testUserCollections({featureFlagTrackUnshardedCollectionsUponCreation})
     const transitionRes0 =
         assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));
     jsTest.log("The first transitionToDedicatedConfigServer response: " + tojson(transitionRes0));
-    assert.eq(transitionRes0.state, "started", transitionRes0);
-    assert.eq(transitionRes0.dbsToMove.length, 0, transitionRes0);
+    if (featureFlagTrackUnshardedCollectionsUponCreation) {
+        assert.eq(transitionRes0.state, "started", transitionRes0);
+        assert.eq(transitionRes0.dbsToMove.length, 0, transitionRes0);
+        assert.eq(transitionRes0.collectionsToMove.length, 2, transitionRes0);
+        assert.eq(
+            transitionRes0.note,
+            'you need to call moveCollection for collectionsToMove and afterwards movePrimary for the dbsToMove',
+            transitionRes0);
+    } else {
+        assert.eq(transitionRes0.state, "started", transitionRes0);
+        assert.eq(transitionRes0.dbsToMove.length, 0, transitionRes0);
+        assert.eq(transitionRes0.collectionsToMove.length, 0, transitionRes0);
+        assert(transitionRes0.note === undefined);
+    }
 
     const transitionRes1 =
         assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));
@@ -99,9 +111,24 @@ function testUserCollections({featureFlagTrackUnshardedCollectionsUponCreation})
     assert.eq(transitionRes1.state, "ongoing", transitionRes1);
     assert.eq(transitionRes1.remaining.dbs, 0, transitionRes1);
     // There is still data left on shard0.
-    assert.gte(transitionRes1.remaining.chunks, 0, transitionRes1);
-    assert.eq(transitionRes1.remaining.jumboChunks, 0, transitionRes1);
-    assert.eq(transitionRes1.dbsToMove.length, 0, transitionRes1);
+    if (featureFlagTrackUnshardedCollectionsUponCreation) {
+        assert.gte(transitionRes1.remaining.chunks, 0, transitionRes1);
+        assert.eq(transitionRes1.remaining.jumboChunks, 0, transitionRes1);
+        assert.eq(transitionRes1.remaining.collectionsToMove, 2, transitionRes1);
+        assert.eq(transitionRes1.collectionsToMove.length, 2, transitionRes1);
+        assert.eq(transitionRes1.dbsToMove.length, 0, transitionRes1);
+        assert.eq(
+            transitionRes1.note,
+            'you need to call moveCollection for collectionsToMove and afterwards movePrimary for the dbsToMove',
+            transitionRes1);
+    } else {
+        assert.gte(transitionRes1.remaining.chunks, 0, transitionRes1);
+        assert.eq(transitionRes1.remaining.jumboChunks, 0, transitionRes1);
+        assert.eq(transitionRes1.remaining.collectionsToMove, 0, transitionRes1);
+        assert.eq(transitionRes1.collectionsToMove.length, 0, transitionRes1);
+        assert.eq(transitionRes1.dbsToMove.length, 0, transitionRes1);
+        assert(transitionRes1.note === undefined);
+    }
 
     // Move the remaining data on shard0 to shard1.
     assert.commandWorked(st.s.adminCommand(

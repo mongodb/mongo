@@ -847,6 +847,8 @@ last-continuous:
     ticket: SERVER-102477
   - test_file: jstests/noPassthrough/network/set_step_params.js
     ticket: SERVER-102477
+  - test_file: jstests/sharding/remove_shard_with_unsharded.js
+    ticket: SERVER-89883
   suites: null
 last-lts:
   all:
@@ -1756,4 +1758,6 @@ last-lts:
     ticket: SERVER-102477
   - test_file: jstests/noPassthrough/network/set_step_params.js
     ticket: SERVER-102477
+  - test_file: jstests/sharding/remove_shard_with_unsharded.js
+    ticket: SERVER-89883
   suites: null
