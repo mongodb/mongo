@@ -2259,6 +2259,13 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "pgo_profile_generate_disabled",
+    flag_values = {
+        "//bazel/config:pgo_profile_generate": "False",
+    },
+)
+
 selects.config_setting_group(
     name = "pgo_profile_generate_clang_enabled",
     match_all = [
@@ -2288,6 +2295,13 @@ config_setting(
     name = "pgo_profile_use_enabled",
     flag_values = {
         "//bazel/config:pgo_profile_use": "True",
+    },
+)
+
+config_setting(
+    name = "pgo_profile_use_disabled",
+    flag_values = {
+        "//bazel/config:pgo_profile_use": "False",
     },
 )
 
@@ -2469,6 +2483,8 @@ selects.config_setting_group(
         "@platforms//os:linux",
         ":opt_any",
         ":linker_lld",
+        ":pgo_profile_generate_disabled",
+        ":pgo_profile_use_disabled",
         "//bazel/config:not_amazon_linux_2023",
     ],
 )
