@@ -23,13 +23,20 @@ def _collect_failed_tests(testlog_dir: str) -> List[str]:
 def _relink_binaries_with_symbols(failed_tests: List[str]):
     # Enable this when/if we want to strip debug symbols during linking unit tests
     # print("Relinking unit tests without stripping debug symbols...")
-    with open(".bazel_build_flags", "r", encoding="utf-8") as f:
-        bazel_build_flags = f.read().strip()
+    bazel_build_flags = ""
+    if os.path.isfile(".bazel_build_flags"):
+        with open(".bazel_build_flags", "r", encoding="utf-8") as f:
+            bazel_build_flags = f.read().strip()
 
     bazel_build_flags.replace("--config=strip-debug-during-link", "")
 
+    # Remap //src/mongo/testabc to //src/mongo:testabc
+    failed_test_labels = [
+        ":".join(test.rsplit("/", 1)) for test in failed_tests
+    ]
+
     relink_command = [
-        arg for arg in ["bazel", "build", *bazel_build_flags.split(" "), *failed_tests] if arg
+        arg for arg in ["bazel", "build", *bazel_build_flags.split(" "), *failed_test_labels] if arg
     ]
 
     # Enable this when/if we want to strip debug symbols during linking unit tests
@@ -44,14 +51,13 @@ def _relink_binaries_with_symbols(failed_tests: List[str]):
         f.write(repro_test_command)
     print(f"Repro command written to .failed_unittest_repro.txt: {repro_test_command}")
 
-
 def _copy_bins_to_upload(failed_tests: List[str], upload_bin_dir: str, upload_lib_dir: str) -> bool:
     success = True
-    bazel_bin_dir = Path("./bazel-bin")
+    bazel_bin_dir = Path("./bazel-bin/src")
     for failed_test in failed_tests:
         full_binary_path = bazel_bin_dir / failed_test
         binary_name = failed_test.split(os.sep)[-1]
-        files_to_upload = []
+        bin_to_upload = []
         for pattern in [
             "*.core",
             "*.mdmp",
@@ -60,18 +66,18 @@ def _copy_bins_to_upload(failed_tests: List[str], upload_bin_dir: str, upload_li
             f"{binary_name}.exe",
             f"{binary_name}",
         ]:
-            files_to_upload.extend(bazel_bin_dir.rglob(pattern))
+            bin_to_upload.extend(bazel_bin_dir.rglob(pattern))
 
         # core dumps may be in the root directory
-        files_to_upload.extend(Path(".").rglob("*.core"))
-        files_to_upload.extend(Path(".").rglob("*.mdmp"))
+        bin_to_upload.extend(Path(".").rglob("*.core"))
+        bin_to_upload.extend(Path(".").rglob("*.mdmp"))
 
-        if not files_to_upload:
+        if not bin_to_upload:
             print(f"Cannot locate the files to upload for ({failed_test})")
             success = False
             continue
 
-        for binary_file in files_to_upload:
+        for binary_file in bin_to_upload:
             new_binary_file = upload_bin_dir / binary_file.name
             if not os.path.exists(new_binary_file):
                 print(f"Copying {binary_file} to {new_binary_file}")
@@ -82,11 +88,20 @@ def _copy_bins_to_upload(failed_tests: List[str], upload_bin_dir: str, upload_li
             print(f"Copying dsym {dsym_dir} to {upload_bin_dir}")
             shutil.copytree(dsym_dir, upload_bin_dir / dsym_dir.name, dirs_exist_ok=True)
 
-    # Copy debug symbols for dynamic builds
-    lib_dir = Path("bazel-bin/install/lib")
-    if lib_dir.is_dir():
-        print(f"Copying debug symbols from {lib_dir} to {upload_lib_dir}")
-        shutil.copytree(lib_dir, upload_lib_dir, dirs_exist_ok=True)
+        # Copy debug symbols for dynamic builds
+        lib_to_upload = []
+        for pattern in [
+            "*.so",
+            "*.dylib",
+        ]:
+            lib_to_upload.extend(bazel_bin_dir.rglob(pattern))
+
+        for lib_file in lib_to_upload:
+            new_lib_file = upload_lib_dir / lib_file.name
+            if not os.path.exists(new_lib_file):
+                print(f"Copying {lib_file} to {new_lib_file}")
+                shutil.copy(lib_file, new_lib_file)
+    print("All binaries and debug symbols copied successfully.")
     return success
 
 
