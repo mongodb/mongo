@@ -380,3 +380,4 @@ def _add_testing_set_parameters(suite_set_parameters):
     # The placeholder is needed so older versions don't have this option won't have this value set.
     suite_set_parameters.setdefault("backtraceLogFile", True)
     suite_set_parameters.setdefault("disableTransitionFromLatestToLastContinuous", False)
+    suite_set_parameters.setdefault("oplogApplicationEnforcesSteadyStateConstraints", True)
