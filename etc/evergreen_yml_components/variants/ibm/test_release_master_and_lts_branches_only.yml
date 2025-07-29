@@ -27,6 +27,8 @@ buildvariants:
       packager_distro: rhel81
       push_path: linux
       push_bucket: downloads.10gen.com
+      push_bucket_new: cdn-origin-mongodb-server-enterprise
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: ppc64le-enterprise-rhel81
       repo_edition: enterprise
@@ -93,6 +95,8 @@ buildvariants:
       packager_distro: rhel9
       push_path: linux
       push_bucket: downloads.10gen.com
+      push_bucket_new: cdn-origin-mongodb-server-enterprise
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: ppc64le-enterprise-rhel9
       repo_edition: enterprise
@@ -160,6 +164,8 @@ buildvariants:
       packager_distro: rhel83
       push_path: linux
       push_bucket: downloads.10gen.com
+      push_bucket_new: cdn-origin-mongodb-server-enterprise
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: s390x-enterprise-rhel83
       repo_edition: enterprise
@@ -224,6 +230,8 @@ buildvariants:
       packager_distro: rhel9
       push_path: linux
       push_bucket: downloads.10gen.com
+      push_bucket_new: cdn-origin-mongodb-server-enterprise
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: s390x-enterprise-rhel9
       repo_edition: enterprise

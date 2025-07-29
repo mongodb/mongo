@@ -40,6 +40,8 @@ variables:
     large_distro_name: windows-2022-large
     push_path: windows
     push_bucket: downloads.10gen.com
+    push_bucket_new: cdn-origin-mongodb-server-enterprise
+    push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
     push_name: windows
     push_arch: x86_64-enterprise
     test_flags: --excludeWithAnyTags=incompatible_with_windows_tls

@@ -17,6 +17,8 @@ buildvariants:
         --enableEnterpriseTests=off
       push_path: osx
       push_bucket: downloads.mongodb.org
+      push_bucket_new: cdn-origin-mongodb-server-community
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: macos
       push_arch: arm64
       bazel_compile_flags: --build_enterprise=False
@@ -41,6 +43,8 @@ buildvariants:
         archive-mongocryptd-debug
       push_path: osx
       push_bucket: downloads.10gen.com
+      push_bucket_new: cdn-origin-mongodb-server-enterprise
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: macos
       push_arch: arm64-enterprise
       resmoke_jobs_max: 6
@@ -63,6 +67,8 @@ buildvariants:
         --enableEnterpriseTests=off
       push_path: osx
       push_bucket: downloads.mongodb.org
+      push_bucket_new: cdn-origin-mongodb-server-community
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: macos
       push_arch: x86_64
       bazel_compile_flags: --build_enterprise=False
@@ -87,6 +93,8 @@ buildvariants:
         archive-mongocryptd-debug
       push_path: osx
       push_bucket: downloads.10gen.com
+      push_bucket_new: cdn-origin-mongodb-server-enterprise
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: macos
       push_arch: x86_64-enterprise
       resmoke_jobs_max: 6

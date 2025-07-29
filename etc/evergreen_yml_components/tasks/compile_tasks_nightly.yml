@@ -432,6 +432,229 @@ tasks:
           remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.md5
           skip_existing: ${is_release}
 
+      # Put the binaries tarball/zipfile
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+          bucket: ${push_bucket_new}
+          permissions: private
+          content_type: ${content_type|application/gzip}
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+          skip_existing: ${is_release}
+      # Put the cryptd tarball/zipfile
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          local_file: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+          bucket: ${push_bucket_new}
+          permissions: private
+          content_type: ${content_type|application/gzip}
+          remote_file: ${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+          skip_existing: ${is_release}
+          build_variants: *mongocryptd_variants
+
+      # Put the debug symbols
+      # push directly to repo due to limitations in file size SERVER-63432
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          permissions: private
+          local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
+          bucket: ${push_bucket_new}
+          content_type: ${content_type|application/gzip}
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
+          skip_existing: ${is_release}
+          optional: true
+
+      # Put the binaries tarball signature
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+          bucket: ${push_bucket_new}
+          permissions: private
+          content_type: ${content_type|application/gzip}
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+          skip_existing: ${is_release}
+
+      # Put the cryptd tarball signature
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          local_file: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+          bucket: ${push_bucket_new}
+          permissions: private
+          content_type: ${content_type|application/gzip}
+          remote_file: ${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+          skip_existing: ${is_release}
+          build_variants: *mongocryptd_variants
+
+      # Put the debug symbols signature
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          permissions: private
+          local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig
+          bucket: ${push_bucket_new}
+          content_type: ${content_type|application/gzip}
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig
+          skip_existing: ${is_release}
+          optional: true
+
+      # Put the signed MSI file
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          permissions: private
+          build_variants: ["enterprise-windows", "windows"]
+          local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.msi
+          bucket: ${push_bucket_new}
+          content_type: application/x-msi
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi
+          skip_existing: ${is_release}
+
+      # Put the binaries tarball sha1
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+          permissions: private
+          bucket: ${push_bucket_new}
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+          skip_existing: ${is_release}
+
+      # Put the cryptd tarball sha1
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          local_file: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+          permissions: private
+          bucket: ${push_bucket_new}
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+          skip_existing: ${is_release}
+          build_variants: *mongocryptd_variants
+
+      # Put the debug symbols sha1
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          permissions: private
+          local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha1
+          bucket: ${push_bucket_new}
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha1
+          skip_existing: ${is_release}
+          optional: true
+
+      # Push the signed MSI sha1
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          permissions: private
+          build_variants: ["enterprise-windows", "windows"]
+          local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.sha1
+          bucket: ${push_bucket_new}
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha1
+          skip_existing: ${is_release}
+
+      # Put the binaries tarball sha256
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+          permissions: private
+          bucket: ${push_bucket_new}
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+          skip_existing: ${is_release}
+
+      # Put the cryptd tarball sha256
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          local_file: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+          permissions: private
+          bucket: ${push_bucket_new}
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+          skip_existing: ${is_release}
+          build_variants: *mongocryptd_variants
+
+      # Put the debug symbols sha256
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha256
+          bucket: ${push_bucket_new}
+          permissions: private
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha256
+          skip_existing: ${is_release}
+          optional: true
+
+      # Put the signed MSI sha256
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          build_variants: ["enterprise-windows", "windows"]
+          local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.sha256
+          bucket: ${push_bucket_new}
+          permissions: private
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha256
+          skip_existing: ${is_release}
+          content_type: text/plain
+
+      # Put the binaries tarball md5
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+          bucket: ${push_bucket_new}
+          permissions: private
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+          skip_existing: ${is_release}
+
+      # Put the cryptd tarball md5
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          local_file: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+          bucket: ${push_bucket_new}
+          permissions: private
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+          skip_existing: ${is_release}
+          build_variants: *mongocryptd_variants
+
+      # Put the debug symbols md5
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5
+          bucket: ${push_bucket_new}
+          content_type: text/plain
+          permissions: private
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5
+          skip_existing: ${is_release}
+          optional: true
+
+      # Put the signed MSI md5
+      - command: s3.put
+        params:
+          role_arn: ${push_role_arn}
+          build_variants: ["enterprise-windows", "windows"]
+          local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.md5
+          bucket: ${push_bucket_new}
+          permissions: private
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.md5
+          skip_existing: ${is_release}
+
       - command: subprocess.exec
         params:
           continue_on_err: true

@@ -15,6 +15,8 @@ buildvariants:
     expansions:
       push_path: linux
       push_bucket: downloads.mongodb.org
+      push_bucket_new: cdn-origin-mongodb-server-community
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: x86_64-ubuntu2204
       bazel_compile_flags: >-
@@ -73,6 +75,8 @@ buildvariants:
     expansions:
       push_path: linux
       push_bucket: downloads.mongodb.org
+      push_bucket_new: cdn-origin-mongodb-server-community
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: x86_64-ubuntu2404
       bazel_compile_flags: >-
@@ -130,6 +134,8 @@ buildvariants:
     expansions:
       push_path: linux
       push_bucket: downloads.mongodb.org
+      push_bucket_new: cdn-origin-mongodb-server-community
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: x86_64-ubuntu2004
       bazel_compile_flags: >-
@@ -182,6 +188,8 @@ buildvariants:
         archive-mongocryptd-debug
       push_path: linux
       push_bucket: downloads.10gen.com
+      push_bucket_new: cdn-origin-mongodb-server-enterprise
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: x86_64-enterprise-ubuntu2004
       bazel_compile_flags: >-
@@ -244,6 +252,8 @@ buildvariants:
         archive-mongocryptd-debug
       push_path: linux
       push_bucket: downloads.10gen.com
+      push_bucket_new: cdn-origin-mongodb-server-enterprise
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: x86_64-enterprise-ubuntu2204
       bazel_compile_flags: >-
@@ -335,6 +345,8 @@ buildvariants:
         archive-mongocryptd-debug
       push_path: linux
       push_bucket: downloads.10gen.com
+      push_bucket_new: cdn-origin-mongodb-server-enterprise
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: aarch64-enterprise-ubuntu2004
       bazel_compile_flags: >-
@@ -381,6 +393,8 @@ buildvariants:
     expansions:
       push_path: linux
       push_bucket: downloads.mongodb.org
+      push_bucket_new: cdn-origin-mongodb-server-community
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: aarch64-ubuntu2004
       bazel_compile_flags: >-
@@ -431,6 +445,8 @@ buildvariants:
       additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
       push_path: linux
       push_bucket: downloads.10gen.com
+      push_bucket_new: cdn-origin-mongodb-server-enterprise
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: aarch64-enterprise-ubuntu2204
       bazel_compile_flags: --define=MONGO_DISTMOD=ubuntu2204
@@ -476,6 +492,8 @@ buildvariants:
     expansions:
       push_path: linux
       push_bucket: downloads.mongodb.org
+      push_bucket_new: cdn-origin-mongodb-server-community
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: aarch64-ubuntu2204
       bazel_compile_flags: >-
@@ -529,6 +547,8 @@ buildvariants:
         archive-mongocryptd-debug
       push_path: linux
       push_bucket: downloads.10gen.com
+      push_bucket_new: cdn-origin-mongodb-server-enterprise
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: x86_64-enterprise-ubuntu2404
       bazel_compile_flags: >-
@@ -576,6 +596,8 @@ buildvariants:
     expansions:
       push_path: linux
       push_bucket: downloads.mongodb.org
+      push_bucket_new: cdn-origin-mongodb-server-community
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: aarch64-ubuntu2404
       bazel_compile_flags: >-
@@ -626,6 +648,8 @@ buildvariants:
       additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
       push_path: linux
       push_bucket: downloads.10gen.com
+      push_bucket_new: cdn-origin-mongodb-server-enterprise
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: aarch64-enterprise-ubuntu2404
       bazel_compile_flags: --define=MONGO_DISTMOD=ubuntu2404
