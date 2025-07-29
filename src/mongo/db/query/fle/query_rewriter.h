@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/fle/encrypted_predicate.h"
 #include "mongo/db/query/fle/query_rewriter_interface.h"
+#include "mongo/db/query/fle/text_search_predicate.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/intrusive_counter.h"
@@ -218,6 +219,41 @@ private:
      */
     std::unique_ptr<MatchExpression> _rewrite(MatchExpression* me);
 
+    /**
+     * Performs FLE rewrites of an aggregation expression under a match $expr, returns a new $expr
+     * wrapping the rewritten expression if a top level rewrite took place. Otherwise returns
+     * nullptr.
+     * This method updates _rewroteLastExpression if a rewrite took place which did not generate a
+     * top level rewrite, which ensures that we serialize the expression in rewriteMatchExpression
+     * to reflect the nested rewrites.
+     */
+    std::unique_ptr<MatchExpression> _rewriteExprMatchExpression(
+        ExprMatchExpression& exprMatchExpression);
+
+    /**
+     * We provide friendship to EncryptedTextSearchExpressionDetector so that it can access
+     * _getEncryptedTextSearchPredicate without having to expose this method as part of the public
+     * interface.
+     */
+    friend class EncryptedTextSearchExpressionDetector;
+
+    /**
+     * This method is required to facilitate unit testing the specific changes implemented to
+     * generate index scans for encrypted text search predicates. This requires that we expose the
+     * TextSearchPredicate name in this header. If we find this to be a problem, we can fix this by
+     * implementing our changes in the EncryptedPredicate interface instead, but that requires more
+     * plumbing changes.
+     *
+     * NOTE: It is only valid to call this method if _hasValidTextSearchPredicate() is true.
+     */
+    const TextSearchPredicate& _getEncryptedTextSearchPredicate() const;
+    bool _hasValidTextSearchPredicate() const;
+    bool _initializeTextSearchPredicate();
+
+    // _initializeTextSearchPredicateInternal() is only called from _initializeTextSearchPredicate,
+    // which guarantees that we never re-initialize our predicate.
+    virtual std::unique_ptr<TextSearchPredicate> _initializeTextSearchPredicateInternal() const;
+
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
     // True if the last Expression or MatchExpression processed by this rewriter was rewritten.
@@ -233,5 +269,6 @@ private:
     // Map of collection Ns to ESC metadata collection name.
     // Owned by caller. Lifetime must always exceed QueryRewriter.
     const std::map<NamespaceString, NamespaceString>& _escMap;
+    std::unique_ptr<TextSearchPredicate> _textSearchPredicate;
 };
 }  // namespace mongo::fle

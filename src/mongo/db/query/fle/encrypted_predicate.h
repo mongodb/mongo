@@ -125,7 +125,7 @@ bool isPayloadOfType(EncryptedBinDataType ty, const Value& elt);
 class EncryptedPredicate {
 public:
     EncryptedPredicate(const QueryRewriterInterface* rewriter) : _rewriter(rewriter) {}
-
+    virtual ~EncryptedPredicate() {};
     /**
      * Rewrite a terminal expression for this encrypted predicate. If this function returns
      * nullptr, then no rewrite needs to be done. Rewrites generally transform predicates from one
@@ -134,10 +134,45 @@ public:
      */
     template <typename T>
     std::unique_ptr<T> rewrite(T* expr) const {
+        std::unique_ptr<T> tagDisjunction =
+            _tryRewriteToTagDisjunction<T>([&]() { return this->rewriteToTagDisjunction(expr); });
+        if (tagDisjunction) {
+            return tagDisjunction;
+        }
+        // If we failed to generate the tag disjunction, we rewrite to a runtime comparison instead,
+        // which generates a collection scan.
+        return rewriteToRuntimeComparison(expr);
+    }
+
+protected:
+    /**
+     * This helper method expects to receive a functor that performs the FLE rewrite into a tag
+     * disjunction. It wraps the invocation to the functor in a try/catch block that specifically
+     * detect if the rewrite failed to generate tags because it exceeded the tag limit. In most
+     * cases, if we receive the exception for ErrorCodes::FLEMaxTagLimitExceeded, we will log an
+     * error for the exception, swallow the exception and return a nullptr to indicate we could not
+     * generate the tag disjunction.
+     *
+     * Generally, the type of the rewritten FLE expression is the same input:
+     * 1) MatchExpression -> MatchExpression tag disjunction.
+     * 2) Expression -> Expression tag disjunction.
+     *
+     * However, encrypted text search predicates (only implemented as Expressions) may exhibit poor
+     * performance at scale. This is because the query optimization rewrite relies on a residual
+     * predicate which does not perform well at scale. This is most likely to affect text
+     * predicates, because there is a higher chance that a collection with a substring index will
+     * have a high number of documents with the same substring.
+     *
+     * We template this method to accept a templated functor, so we can accommodate
+     * TextSearchPredicate::rewriteToTagDisjunctionAsMatch() using the same code path for this
+     * try/catch block as other expressions (i.e EncryptedPredicate::rewrite()).
+     */
+    template <typename T, typename Fn>
+    std::unique_ptr<T> _tryRewriteToTagDisjunction(Fn&& rewriteToTagDisjunctionFunc) const {
         auto mode = _rewriter->getEncryptedCollScanMode();
         if (mode != EncryptedCollScanMode::kForceAlways) {
             try {
-                return rewriteToTagDisjunction(expr);
+                return rewriteToTagDisjunctionFunc();
             } catch (const ExceptionFor<ErrorCodes::FLEMaxTagLimitExceeded>& ex) {
                 // LOGV2 can't be called from a header file, so this call is factored out to a
                 // function defined in the cpp file.
@@ -147,10 +182,9 @@ public:
                 }
             }
         }
-        return rewriteToRuntimeComparison(expr);
+        return nullptr;
     }
 
-protected:
     /**
      * Check if the passed-in payload is a FLE2 find payload for the right encrypted index type.
      */

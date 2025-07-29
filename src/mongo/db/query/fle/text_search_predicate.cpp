@@ -69,6 +69,24 @@ std::unique_ptr<Expression> TextSearchPredicate::rewriteToTagDisjunction(Express
     MONGO_UNREACHABLE_TASSERT(10112602);
 }
 
+std::unique_ptr<MatchExpression> TextSearchPredicate::rewriteToTagDisjunctionAsMatch(
+    const ExpressionEncTextSearch& expr) const {
+    return _tryRewriteToTagDisjunction<MatchExpression>(
+        [&]() { return this->_rewriteToTagDisjunctionAsMatch(expr); });
+}
+
+std::unique_ptr<MatchExpression> TextSearchPredicate::_rewriteToTagDisjunctionAsMatch(
+    const ExpressionEncTextSearch& expr) const {
+    const auto& textConstant = expr.getText();
+    auto payload = textConstant.getValue();
+    if (!isPayload(payload)) {
+        return nullptr;
+    }
+    // Here we create a match style in list. It is only allowed when replacing a single
+    // root level $expr predicate.
+    return makeTagDisjunction(toBSONArray(generateTags(payload)));
+}
+
 std::unique_ptr<Expression> TextSearchPredicate::rewriteToRuntimeComparison(
     Expression* expr) const {
     if (auto textSearchExpr = dynamic_cast<ExpressionEncTextSearch*>(expr); textSearchExpr) {
@@ -90,6 +108,12 @@ std::unique_ptr<MatchExpression> TextSearchPredicate::rewriteToRuntimeComparison
     MatchExpression* expr) const {
     tasserted(10112601,
               "Encrypted text search predicates are only supported as aggregation expressions.");
+}
+
+bool TextSearchPredicate::hasValidPayload(const ExpressionEncTextSearch& expr) const {
+    const auto& textConstant = expr.getText();
+    auto payload = textConstant.getValue();
+    return isPayload(payload);
 }
 
 }  // namespace mongo::fle
