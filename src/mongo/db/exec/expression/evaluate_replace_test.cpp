@@ -104,6 +104,9 @@ TEST(ExpressionEvaluateReplaceTest, ExpectsStringsOrNullish) {
     ASSERT_THROWS(replaceAll(""_sd, 1, ""_sd).second, AssertionException);
     ASSERT_THROWS(replaceAll(""_sd, ""_sd, 1).second, AssertionException);
 
+    ASSERT_THROWS(replaceOne(1, BSONRegEx(), ""_sd).second, AssertionException);
+    ASSERT_THROWS(replaceOne(""_sd, BSONRegEx(), 1).second, AssertionException);
+
     ASSERT_THROWS(replaceAll(1, BSONRegEx(), ""_sd).second, AssertionException);
     ASSERT_THROWS(replaceAll(""_sd, BSONRegEx(), 1).second, AssertionException);
 }
@@ -115,6 +118,8 @@ TEST(ExpressionEvaluateReplaceTest, HandlesNullish) {
     ASSERT_VALUE_EQ(replaceOne(BSONNULL, ""_sd, ""_sd).second, Value(BSONNULL));
     ASSERT_VALUE_EQ(replaceOne(""_sd, BSONNULL, ""_sd).second, Value(BSONNULL));
     ASSERT_VALUE_EQ(replaceOne(""_sd, ""_sd, BSONNULL).second, Value(BSONNULL));
+    ASSERT_VALUE_EQ(replaceOne(BSONNULL, BSONRegEx(), ""_sd).second, Value(BSONNULL));
+    ASSERT_VALUE_EQ(replaceOne(""_sd, BSONRegEx(), BSONNULL).second, Value(BSONNULL));
 
     ASSERT_VALUE_EQ(replaceAll(BSONNULL, ""_sd, ""_sd).second, Value(BSONNULL));
     ASSERT_VALUE_EQ(replaceAll(""_sd, BSONNULL, ""_sd).second, Value(BSONNULL));
@@ -132,6 +137,12 @@ TEST(ExpressionEvaluateReplaceTest, ReplacesNothingWhenNoMatches) {
     ASSERT_VALUE_EQ(replaceOne("abcd"_sd, "x"_sd, "y"_sd).second, Value("abcd"_sd));
     ASSERT_VALUE_EQ(replaceOne("abcd"_sd, "xyz"_sd, "y"_sd).second, Value("abcd"_sd));
     ASSERT_VALUE_EQ(replaceOne("xyyz"_sd, "xyz"_sd, "y"_sd).second, Value("xyyz"_sd));
+
+    ASSERT_VALUE_EQ(replaceOne(""_sd, BSONRegEx("x"), "y"_sd).second, Value(""_sd));
+    ASSERT_VALUE_EQ(replaceOne("a"_sd, BSONRegEx("x"), "y"_sd).second, Value("a"_sd));
+    ASSERT_VALUE_EQ(replaceOne("abcd"_sd, BSONRegEx("xyz"), "y"_sd).second, Value("abcd"_sd));
+    ASSERT_VALUE_EQ(replaceOne("abcd"_sd, BSONRegEx("xyz"), "y"_sd).second, Value("abcd"_sd));
+    ASSERT_VALUE_EQ(replaceOne("xyyz"_sd, BSONRegEx("xyz"), "y"_sd).second, Value("xyyz"_sd));
 
     ASSERT_VALUE_EQ(replaceAll(""_sd, "x"_sd, "y"_sd).second, Value(""_sd));
     ASSERT_VALUE_EQ(replaceAll("a"_sd, "x"_sd, "y"_sd).second, Value("a"_sd));
@@ -156,6 +167,14 @@ TEST(ExpressionEvaluateReplaceTest, ReplacesOnlyMatch) {
     ASSERT_VALUE_EQ(replaceOne("..xyz"_sd, "xyz"_sd, "abc"_sd).second, Value("..abc"_sd));
     ASSERT_VALUE_EQ(replaceOne("xyz.."_sd, "xyz"_sd, "abc"_sd).second, Value("abc.."_sd));
 
+    ASSERT_VALUE_EQ(replaceOne(""_sd, BSONRegEx(""), "abc"_sd).second, Value("abc"_sd));
+    ASSERT_VALUE_EQ(replaceOne("x"_sd, BSONRegEx("x"), "abc"_sd).second, Value("abc"_sd));
+    ASSERT_VALUE_EQ(replaceOne("xyz"_sd, BSONRegEx("xyz"), "abc"_sd).second, Value("abc"_sd));
+    ASSERT_VALUE_EQ(replaceOne("..xyz.."_sd, BSONRegEx("xyz"), "abc"_sd).second,
+                    Value("..abc.."_sd));
+    ASSERT_VALUE_EQ(replaceOne("..xyz"_sd, BSONRegEx("xyz"), "abc"_sd).second, Value("..abc"_sd));
+    ASSERT_VALUE_EQ(replaceOne("xyz.."_sd, BSONRegEx("xyz"), "abc"_sd).second, Value("abc.."_sd));
+
     ASSERT_VALUE_EQ(replaceAll(""_sd, ""_sd, "abc"_sd).second, Value("abc"_sd));
     ASSERT_VALUE_EQ(replaceAll("x"_sd, "x"_sd, "abc"_sd).second, Value("abc"_sd));
     ASSERT_VALUE_EQ(replaceAll("xyz"_sd, "xyz"_sd, "abc"_sd).second, Value("abc"_sd));
@@ -173,10 +192,18 @@ TEST(ExpressionEvaluateReplaceTest, ReplacesOnlyMatch) {
 }
 
 TEST(ExpressionReplaceOneTest, ReplacesFirstMatchOnly) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
+
     ASSERT_VALUE_EQ(replaceOne("."_sd, ""_sd, "abc"_sd).second, Value("abc."_sd));
     ASSERT_VALUE_EQ(replaceOne(".."_sd, ""_sd, "abc"_sd).second, Value("abc.."_sd));
     ASSERT_VALUE_EQ(replaceOne(".."_sd, "."_sd, "abc"_sd).second, Value("abc."_sd));
     ASSERT_VALUE_EQ(replaceOne("abc->defg->hij"_sd, "->"_sd, "."_sd).second,
+                    Value("abc.defg->hij"_sd));
+
+    ASSERT_VALUE_EQ(replaceOne("."_sd, BSONRegEx(""), "abc"_sd).second, Value("abc."_sd));
+    ASSERT_VALUE_EQ(replaceOne(".."_sd, BSONRegEx(""), "abc"_sd).second, Value("abc.."_sd));
+    ASSERT_VALUE_EQ(replaceOne(".."_sd, BSONRegEx("[.]"), "abc"_sd).second, Value("abc."_sd));
+    ASSERT_VALUE_EQ(replaceOne("abc->defg->hij"_sd, BSONRegEx("->"), "."_sd).second,
                     Value("abc.defg->hij"_sd));
 }
 
@@ -202,6 +229,7 @@ TEST(ExpressionEvaluateReplaceTest, DoesNotReplaceInTheReplacement) {
     ASSERT_VALUE_EQ(replaceOne("a.b.c"_sd, "."_sd, ".."_sd).second, Value("a..b.c"_sd));
     ASSERT_VALUE_EQ(replaceAll("a.b.c"_sd, "."_sd, ".."_sd).second, Value("a..b..c"_sd));
 
+    ASSERT_VALUE_EQ(replaceOne("a.b.c"_sd, BSONRegEx("[.]"), ".."_sd).second, Value("a..b.c"_sd));
     ASSERT_VALUE_EQ(replaceAll("a.b.c"_sd, BSONRegEx("[.]"), ".."_sd).second, Value("a..b..c"_sd));
 }
 
@@ -219,11 +247,14 @@ TEST(ExpressionEvaluateReplaceTest, DoesNotNormalizeUnicode) {
     // If the input has combining characters, you can match and replace the base letter.
     ASSERT_VALUE_EQ(replaceOne(combinedAcuteE, "e"_sd, "a"_sd).second, Value("á"_sd));
     ASSERT_VALUE_EQ(replaceAll(combinedAcuteE, "e"_sd, "a"_sd).second, Value("á"_sd));
+    ASSERT_VALUE_EQ(replaceOne(combinedAcuteE, BSONRegEx("e"), "a"_sd).second, Value("á"_sd));
     ASSERT_VALUE_EQ(replaceAll(combinedAcuteE, BSONRegEx("e"), "a"_sd).second, Value("á"_sd));
 
     // If the input has precomposed characters, you can't replace the base letter.
     ASSERT_VALUE_EQ(replaceOne(precomposedAcuteE, "e"_sd, "x"_sd).second, Value(precomposedAcuteE));
     ASSERT_VALUE_EQ(replaceAll(precomposedAcuteE, "e"_sd, "x"_sd).second, Value(precomposedAcuteE));
+    ASSERT_VALUE_EQ(replaceOne(precomposedAcuteE, BSONRegEx("e"), "x"_sd).second,
+                    Value(precomposedAcuteE));
     ASSERT_VALUE_EQ(replaceAll(precomposedAcuteE, BSONRegEx("e"), "x"_sd).second,
                     Value(precomposedAcuteE));
 
@@ -236,14 +267,24 @@ TEST(ExpressionEvaluateReplaceTest, DoesNotNormalizeUnicode) {
                     Value(combinedAcuteE));
     ASSERT_VALUE_EQ(replaceAll(combinedAcuteE, precomposedAcuteE, "x"_sd).second,
                     Value(combinedAcuteE));
+    ASSERT_VALUE_EQ(replaceOne(precomposedAcuteE, BSONRegEx(combinedAcuteE), "x"_sd).second,
+                    Value(precomposedAcuteE));
     ASSERT_VALUE_EQ(replaceAll(precomposedAcuteE, BSONRegEx(combinedAcuteE), "x"_sd).second,
                     Value(precomposedAcuteE));
+    ASSERT_VALUE_EQ(replaceOne(combinedAcuteE, BSONRegEx(precomposedAcuteE), "x"_sd).second,
+                    Value(combinedAcuteE));
     ASSERT_VALUE_EQ(replaceAll(combinedAcuteE, BSONRegEx(precomposedAcuteE), "x"_sd).second,
                     Value(combinedAcuteE));
 }
 
 TEST(ExpressionEvaluateReplaceTest, ReplacesWithVariableRegExPattern) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", true);
+
+    ASSERT_VALUE_EQ(replaceOne("xyz"_sd, BSONRegEx("x*"), "a"_sd).second, Value("ayz"_sd));
+    ASSERT_VALUE_EQ(replaceOne("abcdefghij"_sd, BSONRegEx("...."), "<-->"_sd).second,
+                    Value("<-->efghij"_sd));
+    ASSERT_VALUE_EQ(replaceOne("xyzxx"_sd, BSONRegEx("x+"), "abc"_sd).second, Value("abcyzxx"_sd));
+    ASSERT_VALUE_EQ(replaceOne("abc->defg->hij"_sd, BSONRegEx(".*"), "a"_sd).second, Value("a"_sd));
 
     ASSERT_VALUE_EQ(replaceAll("xyz"_sd, BSONRegEx("x*"), "a"_sd).second, Value("aayaza"_sd));
     ASSERT_VALUE_EQ(replaceAll("abcdefghij"_sd, BSONRegEx("...."), "<-->"_sd).second,

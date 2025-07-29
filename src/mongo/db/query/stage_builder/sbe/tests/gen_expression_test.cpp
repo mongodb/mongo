@@ -234,16 +234,6 @@ TEST_F(GoldenGenExpressionTest, TestExprStr) {
         runTest(&concatExpr, rootSlot, Value("This is a test"_sd), "ExpressionConcat"_sd);
     }
     {
-        auto findConstExpr = ExpressionConstant::create(_expCtx.get(), Value("test"_sd));
-        auto replaceConstExpr = ExpressionConstant::create(_expCtx.get(), Value("nice place"_sd));
-        ExpressionReplaceOne replaceOneExpr(
-            _expCtx.get(), strFieldExpr, findConstExpr, replaceConstExpr);
-        runTest(&replaceOneExpr,
-                rootSlot,
-                Value("This is a nice place."_sd),
-                "ExpressionReplaceOne"_sd);
-    }
-    {
         Value val = Value(" "_sd);
         auto constExpr = ExpressionConstant::create(_expCtx.get(), val);
         ExpressionSplit splitExpr(_expCtx.get(), {strFieldExpr, constExpr});

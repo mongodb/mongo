@@ -2821,7 +2821,14 @@ private:
 
 class ExpressionReplaceOne final : public ExpressionReplaceBase {
 public:
-    using ExpressionReplaceBase::ExpressionReplaceBase;
+    ExpressionReplaceOne(ExpressionContext* const expCtx,
+                         boost::intrusive_ptr<Expression> input,
+                         boost::intrusive_ptr<Expression> find,
+                         boost::intrusive_ptr<Expression> replacement)
+        : ExpressionReplaceBase(expCtx, input, find, replacement) {
+        // TODO(SERVER-108244): Support $replaceOne with regex in SBE.
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,

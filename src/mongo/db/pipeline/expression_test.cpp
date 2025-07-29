@@ -2756,6 +2756,58 @@ TEST(ExpressionSplitTest, RegExCorrectSerializationTest) {
     ASSERT_VALUE_EQ_AUTO("{$split: [\"?\", //?//]}", serializedStr);
 }
 
+TEST(ExpressionReplaceOneTest, CorrectSerializationTest) {
+    auto expCtx = ExpressionContextForTest{};
+
+    auto exprBSON = fromjson(R"({$replaceOne: {input: "abcabc", find: "b", replacement: "d"}})");
+    auto replaceExp = Expression::parseExpression(&expCtx, exprBSON, expCtx.variablesParseState);
+
+    auto opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    auto serialized = replaceExp->serialize(opts).getDocument().toBson();
+    ASSERT_BSONOBJ_EQ(
+        fromjson(R"({$replaceOne: {input: "?string", find: "?string", replacement: "?string"}})"),
+        serialized);
+
+    opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
+    serialized = replaceExp->serialize(opts).getDocument().toBson();
+    ASSERT_BSONOBJ_EQ(
+        fromjson(R"({$replaceOne: {input: "?string", find: "?string", replacement: "?string"}})"),
+        serialized);
+
+    opts = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
+    serialized = replaceExp->serialize(opts).getDocument().toBson();
+    ASSERT_BSONOBJ_EQ(
+        fromjson(
+            R"({$replaceOne: {input: {$const: "?"}, find: {$const: "?"}, replacement: {$const: "?"}}})"),
+        serialized);
+}
+
+TEST(ExpressionReplaceOneTest, RegExCorrectSerializationTest) {
+    auto expCtx = ExpressionContextForTest{};
+
+    auto exprBSON = fromjson(R"({$replaceOne: {input: "abcabc", find: /.*/, replacement: "d"}})");
+    auto replaceExp = Expression::parseExpression(&expCtx, exprBSON, expCtx.variablesParseState);
+
+    auto opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    auto serialized = replaceExp->serialize(opts).getDocument().toBson();
+    ASSERT_BSONOBJ_EQ(
+        fromjson(R"({$replaceOne: {input: "?string", find: "?regex", replacement: "?string"}})"),
+        serialized);
+
+    opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
+    serialized = replaceExp->serialize(opts).getDocument().toBson();
+    ASSERT_BSONOBJ_EQ(
+        fromjson(R"({$replaceOne: {input: "?string", find: "?regex", replacement: "?string"}})"),
+        serialized);
+
+    opts = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
+    auto serializedStr = replaceExp->serialize(opts);
+    ASSERT_VALUE_EQ_AUTO(
+        "{$replaceOne: {input: {$const: \"?\"}, find: {$const: //?//}, replacement: {$const: "
+        "\"?\"}}}",
+        serializedStr);
+}
+
 TEST(ExpressionReplaceAllTest, CorrectSerializationTest) {
     auto expCtx = ExpressionContextForTest{};
 

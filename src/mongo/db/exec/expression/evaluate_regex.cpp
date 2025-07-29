@@ -519,8 +519,7 @@ Value evaluateReplace(
             str::stream() << expr.getOpName()
                           << " requires that 'input' be a string, found: " << input.toString(),
             input.getType() == BSONType::string || input.nullish());
-    if (replaceOpRegEx != nullptr &&
-        expr.getExpressionContext()->isFeatureFlagMqlJsEngineGapEnabled()) {
+    if (expr.getExpressionContext()->isFeatureFlagMqlJsEngineGapEnabled()) {
         uassert(10503903,
                 str::stream() << expr.getOpName()
                               << " requires that 'find' be a string or regular expression, found: "
@@ -580,7 +579,18 @@ Value evaluate(const ExpressionReplaceOne& expr, const Document& root, Variables
         output << input.substr(endIndex);
         return Value(output.stringData());
     };
-    return evaluateReplace(expr, root, variables, replaceOneOp, nullptr);
+    auto replaceOneOpRegEx =
+        [&](StringData input, RegexExecutionState executionState, StringData replacement) -> Value {
+        auto [match, beforeMatch] = nextMatchAndPrecedingString(&executionState, expr.getOpName());
+        if (!match) {
+            // No match.
+            return Value(input);
+        }
+        StringBuilder output;
+        output << beforeMatch << replacement << input.substr(executionState.beforeMatchStrStart);
+        return Value(output.stringData());
+    };
+    return evaluateReplace(expr, root, variables, replaceOneOp, replaceOneOpRegEx);
 }
 
 Value evaluate(const ExpressionReplaceAll& expr, const Document& root, Variables* variables) {

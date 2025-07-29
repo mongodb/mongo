@@ -1,4 +1,4 @@
-// Test $replaceOne aggregation expressions.
+// Test $replaceAll aggregation expressions.
 /**
  * @tags: [
  *   featureFlagMqlJsEngineGap,
@@ -55,7 +55,7 @@ function runAndAssertThrows(args, code) {
     assert.commandFailedWithCode(error, code);
 }
 
-// Test find one.
+// Test find all.
 runAndAssert({input: "albatross", find: "ross", replacement: "rachel"}, "albatrachel");
 runAndAssert({input: "albatross", find: "", replacement: "one "},
              "one aone lone bone aone tone rone oone sone sone ");
@@ -116,7 +116,7 @@ runAndAssert({input: "123-456-7890", find: /(\d{3})/, replacement: "xxx"}, "xxx-
 runAndAssert({input: "123.456.7890", find: /([0-9]+)(\.)/, replacement: "x"}, "xx7890");
 runAndAssert({input: "helloworld", find: /(([aeiou]+)l)/, replacement: "X"}, "hXloworld");
 //
-// Reset and test that if any input is not a string, replaceOne fails with an error.
+// Reset and test that if any input is not a string, replaceAll fails with an error.
 //
 
 assert(coll.drop());

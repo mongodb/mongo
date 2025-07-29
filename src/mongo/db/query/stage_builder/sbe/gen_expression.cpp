@@ -2511,6 +2511,9 @@ public:
         unsupportedExpression("$reduce");
     }
     void visit(const ExpressionReplaceOne* expr) final {
+        unsupportedExpression(expr->getOpName());
+
+        // TODO(SERVER-108244): Update code below to have replaceOne support regex in SBE.
         _context->ensureArity(3);
 
         auto replacementArg = popExpr();
