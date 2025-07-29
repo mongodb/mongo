@@ -7,7 +7,8 @@
  * @tags: [
  *      resource_intensive,
  *      tsan_incompatible,
- *      incompatible_aubsan]
+ *      incompatible_aubsan,
+ * ]
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -17,7 +18,10 @@ var st = new ShardingTest({
     chunkSize: 1,
     // Double the balancer interval to produce fewer migrations per unit time.
     // Ensures that the test does not run out of stale shard version retries.
-    other: {configOptions: {setParameter: {balancerMigrationsThrottlingMs: 2000}}}
+    other: {
+        configOptions: {setParameter: {balancerMigrationsThrottlingMs: 2000}},
+        rsOptions: {setParameter: {useBatchedDeletesForRangeDeletion: true}}
+    }
 });
 
 assert.commandWorked(
