@@ -27,9 +27,11 @@ try {
     // Start a new session and capture its sessionId.
     const myid = assert.commandWorked(db.runCommand({startSession: 1})).id.id;
     assert(myid !== undefined);
+    jsTestLog("Started new session with id " + tojson(myid));
 
     // Ensure that the cache now contains the session and is visible by admin.
     const resultArray = assert.doesNotThrow(listAllLocalSessions).toArray();
+    jsTestLog("listAllLocalSessions result: " + tojson(resultArray));
     assert.gte(resultArray.length, 1);
     const resultArrayMine = resultArray
                                 .map(function(sess) {

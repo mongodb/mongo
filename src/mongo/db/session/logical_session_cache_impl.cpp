@@ -146,6 +146,7 @@ Status LogicalSessionCacheImpl::vivify(OperationContext* opCtx, const LogicalSes
 
 Status LogicalSessionCacheImpl::refreshNow(OperationContext* opCtx) {
     try {
+        LOGV2_DEBUG(10720700, 1, "Refreshing logical session cache");
         _refresh(opCtx->getClient());
     } catch (const DBException& ex) {
         LOGV2(20714,
@@ -169,6 +170,7 @@ size_t LogicalSessionCacheImpl::size() {
 
 void LogicalSessionCacheImpl::_periodicRefresh(Client* client) {
     try {
+        LOGV2_DEBUG(10720701, 1, "Refreshing logical session cache due to periodic refresh");
         _refresh(client);
     } catch (const DBException& ex) {
         LOGV2(20710,
