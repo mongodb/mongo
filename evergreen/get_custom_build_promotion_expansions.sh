@@ -20,15 +20,15 @@ else
     promote_extension="tgz"
 fi
 
-promote_project_id=$(cat task_data.json | jq -r ".project_id")
+promote_project_identifier=$(cat task_data.json | jq -r ".project_identifier")
 promote_version_id=$(cat task_data.json | jq -r ".version_id")
 promote_build_id=$(cat task_data.json | jq -r ".build_id")
 promote_build_variant=$(cat task_data.json | jq -r ".build_variant")
 promote_revision=$(cat task_data.json | jq -r ".revision")
-artifact_address="https://internal-downloads.mongodb.com/${CDN_PATH}/${promote_project_id}/${promote_version_id}/${promote_build_variant}/${promote_build_id}/mongo-binaries.${promote_extension}"
+artifact_address="https://internal-downloads.mongodb.com/${CDN_PATH}/${promote_project_identifier}/${promote_version_id}/${promote_build_variant}/${promote_build_id}/mongo-binaries.${promote_extension}"
 
 cat <<EOT >./promote-expansions.yml
-promote_project_id: "$promote_project_id"
+promote_project_identifier: "$promote_project_identifier"
 promote_version_id: "$promote_version_id"
 promote_build_id: "$promote_build_id"
 promote_build_variant: "$promote_build_variant"

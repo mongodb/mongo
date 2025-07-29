@@ -20,7 +20,7 @@ else
     promote_extension="tgz"
 fi
 
-promote_project_id=$(cat debug_task_data.json | jq -r ".project_id")
+promote_project_identifier=$(cat debug_task_data.json | jq -r ".project_identifier")
 promote_version_id=$(cat debug_task_data.json | jq -r ".version_id")
 promote_build_id=$(cat debug_task_data.json | jq -r ".build_id")
 promote_build_variant=$(cat debug_task_data.json | jq -r ".build_variant")
@@ -31,7 +31,7 @@ if [[ ! "$promote_archive_dist_test_task_id" =~ "archive_dist_test" ]]; then
     exit 1
 fi
 
-artifact_address="https://internal-downloads.mongodb.com/server-custom-builds/${promote_project_id}/${promote_version_id}/${promote_build_variant}/${promote_build_id}/mongo-debugsymbols.${promote_extension}"
+artifact_address="https://internal-downloads.mongodb.com/server-custom-builds/${promote_project_identifier}/${promote_version_id}/${promote_build_variant}/${promote_build_id}/mongo-debugsymbols.${promote_extension}"
 
 cat <<EOT >./debug-promote-expansions.yml
 promote_archive_dist_test_task_id: "$promote_archive_dist_test_task_id"

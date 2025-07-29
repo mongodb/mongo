@@ -902,7 +902,7 @@ tasks:
         params:
           aws_key: ${aws_key}
           aws_secret: ${aws_secret}
-          remote_file: ${promote_project_id}/${promote_version_id}/version_expansions.yml
+          remote_file: ${promote_project_identifier}/${promote_version_id}/version_expansions.yml
           bucket: mciuploads
           local_file: src/promote-version-expansions.yml
       - command: expansions.update
@@ -912,7 +912,7 @@ tasks:
       - command: s3.put
         params:
           role_arn: "arn:aws:iam::119629040606:role/s3-access.cdn-origin-server-custom-builds"
-          remote_file: "server-custom-builds/${promote_project_id}/${promote_version_id}/${promote_build_variant}/${promote_build_id}/mongo-binaries.${promote_extension}"
+          remote_file: "server-custom-builds/${promote_project_identifier}/${promote_version_id}/${promote_build_variant}/${promote_build_id}/mongo-binaries.${promote_extension}"
           bucket: cdn-origin-server-custom-builds
           permissions: private
           local_file: mongo-binaries.${promote_extension}
@@ -921,7 +921,7 @@ tasks:
       - command: s3.put
         params:
           role_arn: "arn:aws:iam::119629040606:role/s3-access.cdn-origin-server-custom-builds"
-          remote_file: "server-custom-builds/${promote_project_id}/${promote_version_id}/${promote_build_variant}/${promote_build_id}/mongo-debugsymbols.${promote_extension}"
+          remote_file: "server-custom-builds/${promote_project_identifier}/${promote_version_id}/${promote_build_variant}/${promote_build_id}/mongo-debugsymbols.${promote_extension}"
           bucket: cdn-origin-server-custom-builds
           permissions: private
           local_file: mongo-debugsymbols.${promote_extension}
@@ -971,7 +971,7 @@ tasks:
         params:
           aws_key: ${aws_key}
           aws_secret: ${aws_secret}
-          remote_file: ${promote_project_id}/${promote_version_id}/version_expansions.yml
+          remote_file: ${promote_project_identifier}/${promote_version_id}/version_expansions.yml
           bucket: mciuploads
           local_file: src/promote-version-expansions.yml
       - command: expansions.update
@@ -981,7 +981,7 @@ tasks:
       - command: s3.put
         params:
           role_arn: "arn:aws:iam::119629040606:role/s3-access.cdn-origin-sys-perf-builds"
-          remote_file: "sys-perf-builds/${promote_project_id}/${promote_version_id}/${promote_build_variant}/${promote_build_id}/mongo-binaries.${promote_extension}"
+          remote_file: "sys-perf-builds/${promote_project_identifier}/${promote_version_id}/${promote_build_variant}/${promote_build_id}/mongo-binaries.${promote_extension}"
           bucket: cdn-origin-sys-perf-builds
           permissions: private
           local_file: mongo-binaries.${promote_extension}
