@@ -11,6 +11,8 @@
  *  uses_getmore_outside_of_transaction,
  *  # This test relies on aggregations returning specific batch-sized responses.
  *  assumes_no_implicit_cursor_exhaustion,
+ *  # This test assumes that query stats is enabled, but it may be disabled by the config fuzzer.
+ *  does_not_support_config_fuzzer,
  * ]
  *
  */

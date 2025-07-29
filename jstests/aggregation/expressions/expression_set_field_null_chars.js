@@ -3,7 +3,10 @@
  *
  * @tags: [
  *   # The test runs commands that are not allowed with security token: bulkWrite.
- *   not_allowed_with_signed_security_token
+ *   not_allowed_with_signed_security_token,
+ *   # TODO SERVER-96515 Remove this tag.
+ *   # The config fuzzer also manipulates query stats knobs.
+ *   does_not_support_config_fuzzer,
  * ]
  */
 

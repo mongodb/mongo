@@ -14,6 +14,9 @@
  *     requires_pipeline_optimization,
  *     # During fcv upgrade/downgrade the engine might not be what we expect.
  *     cannot_run_during_upgrade_downgrade,
+ *     # The config fuzzer can enable logical session refresh, which will
+ *     # increment serverStatus metrics with system.sessions operations.
+ *     does_not_support_config_fuzzer,
  * ]
  */
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";

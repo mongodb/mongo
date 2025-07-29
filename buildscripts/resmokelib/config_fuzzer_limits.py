@@ -501,6 +501,33 @@ config_fuzzer_params = {
             "period": 5,
             "fuzz_at": ["startup", "runtime"],
         },
+        "internalQueryStatsRateLimit": {
+            "min": -1,
+            "max": 1,
+            "period": 10,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "internalQueryStatsSampleRate": {
+            "choices": [0, 0.0001, 0.1, 1.0],
+            "period": 10,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "internalQueryStatsCacheSize": {
+            "choices": ["0.00001MB", "0MB", "1MB", "10MB"],
+            "period": 10,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        # If we are enabling the above query stats flags in a test, we should also enable this one to catch any errors on collected queries.
+        "internalQueryStatsErrorsAreCommandFatal": {
+            "default": True,
+            "fuzz_at": ["startup"],
+        },
+        "internalQueryPercentileExprSelectToSortThreshold": {
+            "min": 0,
+            "max": 30,
+            "period": 10,
+            "fuzz_at": ["startup", "runtime"], 
+        },
     },
     "mongos": {
         # We need a higher timeout to account for test slowness
@@ -545,6 +572,29 @@ config_fuzzer_params = {
             "choices": [{"mode": "off"}],
             "fuzz_at": ["startup"],
         },
+        "internalQueryStatsRateLimit": {
+            "min": -1,
+            "max": 1,
+            "period": 10,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "internalQueryStatsSampleRate": {
+            "min": 0,
+            "max": 1,
+            "choices": [0, 0.0001, 0.1, 1.0],
+            "period": 10,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "internalQueryStatsCacheSize": {
+            "choices": ["0.00001MB", "0MB", "1MB", "10MB"],
+            "period": 10,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        # If we are enabling the above query stats flags in a test, we should also enable this one to catch any errors on collected queries.
+        "internalQueryStatsErrorsAreCommandFatal": {
+            "default": True,
+            "fuzz_at": ["startup"],
+        }
     },
 }
 

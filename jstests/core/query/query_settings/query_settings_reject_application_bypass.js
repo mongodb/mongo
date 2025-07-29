@@ -26,7 +26,7 @@ const adminDB = db.getSiblingDB("admin");
 const configDB = db.getSiblingDB("config");
 
 // Stages which, if present in a pipeline, prevent the application of query settings.
-const stages = [
+let stages = [
     //[Stage name, db, collection/1]
     ["$querySettings", db, 1],
     ["$planCacheStats", db, coll.getName()],
@@ -36,11 +36,15 @@ const stages = [
     // db or collection. However, this test still verifies that reject=true is ignored if present.
     ["$listSessions", configDB, "system.sessions"],
     ["$listSampledQueries", adminDB, 1],
-    ["$queryStats", adminDB, 1],
     ["$currentOp", adminDB, 1],
     ["$listCatalog", adminDB, 1],
     ["$listLocalSessions", adminDB, 1],
 ];
+
+// Query stats may be disabled by the config fuzzer.
+if (!TestData.fuzzMongodConfigs) {
+    stages.push(["$queryStats", adminDB, 1]);
+}
 
 // The following stages cannot be tested here:
 // Requires mongot

@@ -2299,6 +2299,53 @@ tasks:
           display_name: Benchmarks
 
   - <<: *task_template
+    name: config_fuzzer_aggregation
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "config_fuzzer",
+        "incompatible_inmemory",
+        "incompatible_tsan",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: aggregation
+          resmoke_args: >-
+            --fuzzMongodConfigs=normal
+            --fuzzRuntimeParams
+            --excludeWithAnyTags=does_not_support_config_fuzzer
+            --setShellParameter='{defaultFindReplicaSetHostTimeoutMS: 120000}'
+
+  - <<: *gen_task_template
+    name: config_fuzzer_aggregation_mongos_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_query_integration",
+        "default",
+        "config_fuzzer",
+        "large",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "incompatible_inmemory",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: aggregation_mongos_passthrough
+          resmoke_args: >-
+            --fuzzMongodConfigs=normal
+            --fuzzMongosConfigs=normal
+            --fuzzRuntimeParams
+            --excludeWithAnyTags=does_not_support_config_fuzzer
+          use_large_distro: "true"
+
+  - <<: *task_template
     name: query_stats_aggregation_passthrough
     tags: ["assigned_to_jira_team_server_query_integration", "default"]
     commands:

@@ -1,7 +1,11 @@
 /**
  * Tests for the validatioon of 'whenMatched' field when it is a pipeline.
- * TODO SERVER-96515 remove this tag.
- * @tags: [known_query_shape_computation_problem]
+ * TODO SERVER-96515 remove these tags.
+ * @tags: [
+ *     known_query_shape_computation_problem,
+ *     # The config fuzzer also manipulates query stats knobs.
+ *     does_not_support_config_fuzzer,
+ * ]
  */
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
