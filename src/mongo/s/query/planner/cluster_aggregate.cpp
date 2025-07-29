@@ -440,7 +440,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     // If the routing table exists, then the collection is tracked in the router role and we can
     // validate if it is timeseries. If the collection is untracked, this validation will happen in
     // the shard role.
-    if (request.getIsRankFusion() && cri && cri->hasRoutingTable()) {
+    if (request.getIsHybridSearch() && cri && cri->hasRoutingTable()) {
         uassert(10557300,
                 "$rankFusion is unsupported on timeseries collections",
                 !(cri->getChunkManager().isTimeseriesCollection()));
@@ -457,9 +457,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
         search_helpers::checkAndSetViewOnExpCtx(
             expCtx, originalRequest->getPipeline(), *resolvedView, viewName);
 
-        if (request.getIsRankFusion()) {
+        if (request.getIsHybridSearch()) {
             uassert(ErrorCodes::OptionNotSupportedOnView,
-                    "$rankFusion is currently unsupported on views",
+                    "$rankFusion and $scoreFusion are currently unsupported on views",
                     feature_flags::gFeatureFlagSearchHybridScoringFull
                         .isEnabledUseLatestFCVWhenUninitialized(
                             VersionContext::getDecoration(opCtx),
@@ -655,10 +655,10 @@ Status runAggregateImpl(OperationContext* opCtx,
     // Given that in single shard/sharded cluster unsharded collection scenarios the query doesn't
     // go through retryOnViewError mongos doesn't know it's running against a view, and then it
     // passes the desugared query to the shard, so the shard knows it is running against a view but
-    // it doesn't know it used to be $rankFusion. This means that we need the request to persist
-    // this flag in order to do LiteParsedPipeline validation.
-    if (liteParsedPipeline.hasRankFusionStage()) {
-        req.setIsRankFusion(true);
+    // it doesn't know it used to be $rankFusion/$scoreFusion. This means that we need the request
+    // to persist this flag in order to do LiteParsedPipeline validation.
+    if (liteParsedPipeline.hasHybridSearchStage()) {
+        req.setIsHybridSearch(true);
     }
 
     // Start with clean `result` and `request` variables this function has been retried due to
@@ -1103,8 +1103,8 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     auto resolvedAggRequest =
         resolvedView.asExpandedViewAggregation(VersionContext::getDecoration(opCtx), request);
 
-    if (request.getIsRankFusion()) {
-        resolvedAggRequest.setIsRankFusion(true);
+    if (request.getIsHybridSearch()) {
+        resolvedAggRequest.setIsHybridSearch(true);
     }
 
     result->resetToEmpty();
@@ -1123,7 +1123,7 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
 
     uassert(ErrorCodes::OptionNotSupportedOnView,
             "$rankFusion is unsupported on timeseries collections",
-            !(resolvedView.timeseries() && request.getIsRankFusion()));
+            !(resolvedView.timeseries() && request.getIsHybridSearch()));
 
     sharding::router::CollectionRouter router(opCtx->getServiceContext(), nsStruct.executionNss);
     try {

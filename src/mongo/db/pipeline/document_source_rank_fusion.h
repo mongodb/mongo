@@ -96,7 +96,7 @@ public:
             return _pipelines[0].hasSearchStage();
         }
 
-        bool isRankFusionStage() const final {
+        bool isHybridSearchStage() const final {
             return true;
         }
     };

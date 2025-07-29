@@ -3,7 +3,7 @@
  *
  * TODO SERVER-101721 Enable $rankFusion to be run in a view definition.
  *
- * @tags: [featureFlagRankFusionBasic, requires_fcv_81]
+ * @tags: [featureFlagRankFusionBasic, requires_fcv_82]
  */
 
 const collName = jsTestName();

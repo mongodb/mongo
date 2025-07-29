@@ -3,7 +3,7 @@
  * be careful. For example, when $search produces a sorted order, or when a sub-pipeline specifies a
  * $sort. We manually observe returned results and see that they clearly relate to the input
  * pipeline criteria specified, then codify the results as an ordered list of document ids.
- * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_81 ]
+ * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_82 ]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {getRentalData, getRentalSearchIndexSpec} from "jstests/with_mongot/e2e_lib/data/rentals.js";

@@ -892,10 +892,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     // Pipeline::parse() will first check if a view exists directly on the stage specification and
     // if none is found, will then check for the view using the expCtx. As such, it's necessary to
     // add the resolved namespace to the expCtx prior to any call to Pipeline::parse().
-    const bool isRankFusionPipeline = aggExState.isRankFusionPipeline();
-    if (isRankFusionPipeline) {
+    const bool isHybridSearchPipeline = aggExState.isHybridSearchPipeline();
+    if (isHybridSearchPipeline) {
         uassert(10557301,
-                "$rankFusion is unsupported on timeseries collections",
+                "$rankFusion and $scoreFusion are unsupported on timeseries collections",
                 !aggCatalogState.isTimeseries());
     }
     if (aggExState.isView()) {
@@ -904,9 +904,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
                                                 aggExState.getResolvedView(),
                                                 aggExState.getOriginalNss());
 
-        if (isRankFusionPipeline) {
+        if (isHybridSearchPipeline) {
             uassert(ErrorCodes::OptionNotSupportedOnView,
-                    "$rankFusion is currently unsupported on views",
+                    "$rankFusion and $scoreFusion are currently unsupported on views",
                     feature_flags::gFeatureFlagSearchHybridScoringFull
                         .isEnabledUseLatestFCVWhenUninitialized(
                             VersionContext::getDecoration(expCtx->getOperationContext()),

@@ -4,7 +4,7 @@
  * $rankFusion and $scoreFusion will give an error message that suggests the valid pipeline that was
  * intended. This test validates the error message is correct, and the typo suggester is giving good
  * suggestions.
- * @tags: [ featureFlagRankFusionFull, featureFlagSearchHybridScoringFull, requires_fcv_81 ]
+ * @tags: [ featureFlagRankFusionFull, featureFlagSearchHybridScoringFull, requires_fcv_82 ]
  */
 
 import {

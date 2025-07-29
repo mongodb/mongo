@@ -145,9 +145,9 @@ void LiteParsedPipeline::validate(const OperationContext* opCtx,
         // TODO SERVER-101722: Re-implement this validation with a more generic
         // StageConstraints-like validation.
         uassert(10170100,
-                "$rankFusion can only be the first stage of an aggregation pipeline.",
-                !((stage_it != _stageSpecs.begin()) && stage->isRankFusionStage() &&
-                  !isRunningAgainstViewForRankFusion()));
+                "$rankFusion/$scoreFusion can only be the first stage of an aggregation pipeline.",
+                !((stage_it != _stageSpecs.begin()) && stage->isHybridSearchStage() &&
+                  !isRunningAgainstViewForHybridSearch()));
 
         const auto& stageName = (*stage_it)->getParseTimeName();
         const auto& stageInfo = LiteParsedDocumentSource::getInfo(stageName);
@@ -179,10 +179,10 @@ void LiteParsedPipeline::checkStagesAllowedInViewDefinition() const {
     for (auto stage_it = _stageSpecs.begin(); stage_it != _stageSpecs.end(); stage_it++) {
         const auto& stage = *stage_it;
 
-        // TODO SERVER-101721 Enable $rankFusion run in a view definition.
+        // TODO SERVER-101721 Enable $rankFusion/$scoreFusion run in a view definition.
         uassert(ErrorCodes::OptionNotSupportedOnView,
-                "$rankFusion is currently unsupported in a view definition",
-                !stage->isRankFusionStage());
+                "$rankFusion and $scoreFusion is currently unsupported in a view definition",
+                !stage->isHybridSearchStage());
 
         uassert(ErrorCodes::OptionNotSupportedOnView,
                 "$score is currently unsupported in a view definition",

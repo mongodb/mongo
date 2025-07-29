@@ -9,7 +9,7 @@
  *   assumes_unsharded_collection,
  *   featureFlagRankFusionFull,
  *   featureFlagSearchHybridScoringFull,
- *   requires_fcv_81
+ *   requires_fcv_82
  * ]
  */
 
@@ -196,5 +196,4 @@ assert.commandFailedWithCode(
             }
         }
     }]),
-    // TODO SERVER-104725 Change this to the error code from LiteParsedPipeline::validate().
-    10473003);
+    10170100);

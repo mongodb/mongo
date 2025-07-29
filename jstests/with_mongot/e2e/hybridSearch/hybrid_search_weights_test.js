@@ -2,7 +2,7 @@
  * Tests applying weights to $rankFusion and $scoreFusion. Uses the same input pipelines as
  * ranked_fusion_test.js, but with different weighting to produce different result ordering. Also
  * tests that proper error codes are thrown for specifying bad pipeline weights.
- * @tags: [ featureFlagRankFusionFull, featureFlagSearchHybridScoringFull, requires_fcv_81 ]
+ * @tags: [ featureFlagRankFusionFull, featureFlagSearchHybridScoringFull, requires_fcv_82 ]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {

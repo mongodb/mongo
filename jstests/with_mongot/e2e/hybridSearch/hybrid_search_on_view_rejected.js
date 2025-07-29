@@ -1,9 +1,9 @@
 /**
- * Tests that $rankFusion can't be used on a view namespace or if the $rankFusion query has mongot
- * input pipelines. A corresponding test for timeseries collections is in
- * jstests/core/timeseries/query/timeseries_rank_fusion_disallowed.js.
+ * Tests that $rankFusion/$scoreFusion can't be used on a view namespace or if the
+ * $rankFusion/$scoreFusion query has mongot input pipelines. A corresponding test for timeseries
+ * collections is in jstests/core/timeseries/query/timeseries_rank_fusion_disallowed.js.
  *
- * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_81]
+ * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_82]
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";

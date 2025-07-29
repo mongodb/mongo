@@ -1,6 +1,6 @@
 /**
  * Tests that the $score normalization works as expected.
- * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_81 ]
+ * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_82 ]
  */
 
 const test_field_name = "counter";

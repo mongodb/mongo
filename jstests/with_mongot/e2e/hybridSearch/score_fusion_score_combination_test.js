@@ -1,6 +1,6 @@
 /**
  * Tests that the $scoreFusion.combination.method works as expected.
- * @tags: [ featureFlagRankFusionFull, featureFlagSearchHybridScoringFull, requires_fcv_81 ]
+ * @tags: [ featureFlagRankFusionFull, featureFlagSearchHybridScoringFull, requires_fcv_82 ]
  */
 
 /**

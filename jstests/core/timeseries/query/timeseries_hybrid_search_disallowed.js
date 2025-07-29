@@ -1,7 +1,7 @@
 /**
- * Tests that $rankFusion can't be used on a timeseries collection.
+ * Tests that $rankFusion/$scoreFusion can't be used on a timeseries collection.
  *
- * @tags: [requires_fcv_81, requires_timeseries]
+ * @tags: [requires_fcv_82, featureFlagSearchHybridScoringFull, requires_timeseries]
  */
 
 const timeFieldName = "time";
@@ -35,12 +35,38 @@ const rankFusionPipeline = [{
     }
 }];
 
+const scoreFusionPipeline = [{
+    $scoreFusion: {
+        input: {
+            pipelines: {
+                single: [{$score: {score: "$single", normalization: "minMaxScaler"}}],
+                double: [{$score: {score: "$double", normalization: "none"}}]
+            },
+            normalization: "none"
+        },
+        combination: {method: "avg"}
+    }
+}];
+
 // Running $rankFusion on timeseries collection is disallowed.
 // TODO SERVER-101599 remove 'ErrorCodes.OptionNotSupportedOnView',
 // 'ErrorCodes.CommandNotSupportedOnView', and 10170100 once 9.0 becomes lastLTS, and timeseries
 // collections will not have views anymore.
 assert.commandFailedWithCode(
     tsColl.runCommand("aggregate", {pipeline: rankFusionPipeline, cursor: {}}), [
+        10557301,
+        10557300,
+        ErrorCodes.OptionNotSupportedOnView,
+        ErrorCodes.CommandNotSupportedOnView,
+        10170100
+    ]);
+
+// Running $rankFusion on timeseries collection is disallowed.
+// TODO SERVER-101599 remove 'ErrorCodes.OptionNotSupportedOnView',
+// 'ErrorCodes.CommandNotSupportedOnView', and 10170100 once 9.0 becomes lastLTS, and timeseries
+// collections will not have views anymore.
+assert.commandFailedWithCode(
+    tsColl.runCommand("aggregate", {pipeline: scoreFusionPipeline, cursor: {}}), [
         10557301,
         10557300,
         ErrorCodes.OptionNotSupportedOnView,

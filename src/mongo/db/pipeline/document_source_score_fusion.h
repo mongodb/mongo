@@ -89,6 +89,10 @@ public:
         };
 
         bool isSearchStage() const final {
+            return _pipelines[0].hasSearchStage();
+        }
+
+        bool isHybridSearchStage() const final {
             return true;
         }
     };

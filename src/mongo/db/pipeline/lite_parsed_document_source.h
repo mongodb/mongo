@@ -238,7 +238,7 @@ public:
     /**
      * Returns true if this is a $rankFusion pipeline
      */
-    virtual bool isRankFusionStage() const {
+    virtual bool isHybridSearchStage() const {
         return false;
     }
 
