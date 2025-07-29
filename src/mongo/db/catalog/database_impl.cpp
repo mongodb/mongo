@@ -208,7 +208,7 @@ CreateCollCatalogIdentifier acquireCatalogIdentifierForCreate(
 
     if (providedIdentifier) {
         catalogIdentifiers.ident = providedIdentifier->ident;
-        catalogIdentifiers.idIndexIdent = storageEngine->generateNewIndexIdent(nss.dbName());
+        catalogIdentifiers.idIndexIdent = providedIdentifier->idIndexIdent;
     } else {
         catalogIdentifiers.ident = storageEngine->generateNewCollectionIdent(nss.dbName());
         catalogIdentifiers.idIndexIdent = storageEngine->generateNewIndexIdent(nss.dbName());

@@ -59,6 +59,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -511,6 +512,125 @@ TEST_F(CreateCollectionTest, ValidationDisabledForTemporaryReshardingCollection)
     ASSERT_OK(status);
 }
 
+TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsDoesNotCreateIdIndexOnClusteredCollection) {
+    auto opCtx = makeOpCtx();
+    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    auto uuid = UUID::gen();
+
+    {
+        Lock::GlobalLock lk(opCtx.get(), MODE_X);
+        ASSERT_OK(createCollectionForApplyOps(
+            opCtx.get(),
+            nss.dbName(),
+            uuid,
+            BSON("create" << nss.coll() << "clusteredIndex"
+                          << BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
+                                      << "clustered_index" << "unique" << true)),
+            /*allowRenameOutOfTheWay*/ false));
+    }
+
+    auto coll = acquireCollForRead(opCtx.get(), nss);
+    auto indexCatalog = coll.getCollectionPtr()->getIndexCatalog();
+    ASSERT_FALSE(indexCatalog->haveAnyIndexes());
+}
+
+TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsUsesDefaultIdIndexSpecIfEmpty) {
+    auto opCtx = makeOpCtx();
+    auto noIdNss = NamespaceString::createNamespaceString_forTest("test.noId");
+    auto emptySpecNss = NamespaceString::createNamespaceString_forTest("test.emptyIdSpec");
+
+
+    {
+        Lock::GlobalLock lk(opCtx.get(), MODE_X);
+        ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
+                                              noIdNss.dbName(),
+                                              UUID::gen(),
+                                              BSON("create" << noIdNss.coll()),
+                                              false,
+                                              boost::none));
+        ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
+                                              emptySpecNss.dbName(),
+                                              UUID::gen(),
+                                              BSON("create" << emptySpecNss.coll()),
+                                              false,
+                                              BSONObj()));
+    }
+
+    auto noIdIndex = acquireCollForRead(opCtx.get(), noIdNss);
+    ASSERT_FALSE(noIdIndex.getCollectionPtr()->isIndexPresent("_id_"));
+    auto emptySpec = acquireCollForRead(opCtx.get(), emptySpecNss);
+    ASSERT(emptySpec.getCollectionPtr()->isIndexPresent("_id_"));
+}
+
+TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsUsesIdIndexIdentIfSupplied) {
+    auto opCtx = makeOpCtx();
+    auto noIdNss = NamespaceString::createNamespaceString_forTest("test.noId");
+    auto explicitIdNss = NamespaceString::createNamespaceString_forTest("test.explicitId");
+    auto implicitIdNss = NamespaceString::createNamespaceString_forTest("test.implicitId");
+
+    // Internal collections have id indexes and we need to filter out the idents for those later
+    auto originalIdents = opCtx->getServiceContext()->getStorageEngine()->getEngine()->getAllIdents(
+        *shard_role_details::getRecoveryUnit(opCtx.get()));
+
+    {
+        // Create three collections: one with no id index (but an ident specified), one with an id
+        // index and an ident specified, and one with an id index but no ident specified
+        Lock::GlobalLock lk(opCtx.get(), MODE_X);
+        const auto idIndexSpec = BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << "_id_");
+        ASSERT_OK(createCollectionForApplyOps(
+            opCtx.get(),
+            noIdNss.dbName(),
+            UUID::gen(),
+            BSON("create" << noIdNss.coll()),
+            false,
+            boost::none,
+            CreateCollCatalogIdentifier{.ident = "collection-1", .idIndexIdent = "index-1"s}));
+        ASSERT_OK(createCollectionForApplyOps(
+            opCtx.get(),
+            explicitIdNss.dbName(),
+            UUID::gen(),
+            BSON("create" << explicitIdNss.coll()),
+            false,
+            idIndexSpec,
+            CreateCollCatalogIdentifier{.ident = "collection-2", .idIndexIdent = "index-2"s}));
+        ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
+                                              implicitIdNss.dbName(),
+                                              UUID::gen(),
+                                              BSON("create" << implicitIdNss.coll()),
+                                              false,
+                                              idIndexSpec,
+                                              boost::none));
+    }
+
+    auto noIdIndex = acquireCollForRead(opCtx.get(), noIdNss);
+    ASSERT_FALSE(noIdIndex.getCollectionPtr()->isIndexPresent("_id_"));
+
+    auto explicitIdent = acquireCollForRead(opCtx.get(), explicitIdNss);
+    ASSERT(explicitIdent.getCollectionPtr()->isIndexPresent("_id_"));
+    ASSERT(explicitIdent.getCollectionPtr()->getIndexCatalog()->findIndexByIdent(opCtx.get(),
+                                                                                 "index-2"));
+    auto implicitIdent = acquireCollForRead(opCtx.get(), implicitIdNss);
+    ASSERT(explicitIdent.getCollectionPtr()->isIndexPresent("_id_"));
+
+    // There should be exactly two new idents starting with index- once we exclude the idents which
+    // existed before we created out collections. One should be "index-2" and one should be a newly
+    // generated ident. "ident-1" should *not* be present as that collection doesn't have an id
+    // index.
+    auto newIdents = opCtx->getServiceContext()->getStorageEngine()->getEngine()->getAllIdents(
+        *shard_role_details::getRecoveryUnit(opCtx.get()));
+    std::set<StringData> indexIdents;
+    for (auto& ident : newIdents) {
+        if (ident.starts_with("index-"))
+            indexIdents.insert(ident);
+    }
+    for (auto& ident : originalIdents) {
+        indexIdents.erase(ident);
+    }
+    ASSERT_FALSE(indexIdents.contains("index-1"));
+    ASSERT(indexIdents.contains("index-2"));
+    ASSERT_EQ(indexIdents.size(), 2);
+}
+
 const auto kValidUrl1 = ExternalDataSourceMetadata::kUrlProtocolFile + "named_pipe1"s;
 const auto kValidUrl2 = ExternalDataSourceMetadata::kUrlProtocolFile + "named_pipe2"s;
 
@@ -563,7 +683,6 @@ TEST_F(CreateVirtualCollectionTest, VirtualCollectionOptionsWithMultiSource) {
 }
 
 TEST_F(CreateVirtualCollectionTest, InvalidVirtualCollectionOptions) {
-
     NamespaceString vcollNss = NamespaceString::createNamespaceString_forTest("myDb", "vcoll.name");
     auto opCtx = makeOpCtx();
 
