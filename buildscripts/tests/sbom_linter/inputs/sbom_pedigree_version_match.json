@@ -12,7 +12,7 @@
     {
       "type": "library",
       "name": "kafka",
-      "version": "2.0.2",
+      "version": "v2.0.0",
       "scope": "required",
       "licenses": [
         {
@@ -20,6 +20,15 @@
         }
       ],
       "cpe": "test_cpe",
+      "pedigree": {
+        "descendants": [
+          {
+            "type": "library",
+            "name": "kafka-fork",
+            "version": "v2.0.2"
+          }
+        ]
+      },
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -27,13 +36,13 @@
         },
         {
           "name": "import_script_path",
-          "value": "buildscripts/tests/sbom_linter/inputs/kafka_nonexisting_import.sh"
+          "value": "buildscripts/tests/sbom_linter/inputs/kafka_valid_import.sh"
         }
       ],
       "evidence": {
         "occurrences": [
           {
-            "location": "src/third_party/librdkafka"
+            "location": "src/third_party/kafka"
           }
         ]
       }

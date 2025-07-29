@@ -5,6 +5,7 @@ import sys
 from typing import List
 
 import jsonschema
+from license_expression import get_spdx_licensing
 from referencing import Registry, Resource
 
 BOM_SCHEMA_LOCATION = os.path.join("buildscripts", "tests", "sbom_linter", "bom-1.5.schema.json")
@@ -32,6 +33,7 @@ MISSING_TEAM_ERROR = "Component must include a 'internal:team_responsible' prope
 SCHEMA_MATCH_FAILURE = "File did not match the CycloneDX schema"
 MISSING_VERSION_IN_SBOM_COMPONENT_ERROR = "Component must include a version."
 MISSING_VERSION_IN_IMPORT_FILE_ERROR = "Missing version in the import file: "
+MISSING_LICENSE_IN_SBOM_COMPONENT_ERROR = "Component must include a license."
 COULD_NOT_FIND_OR_READ_SCRIPT_FILE_ERROR = "Could not find or read the import script file"
 VERSION_MISMATCH_ERROR = "Version mismatch: "
 
@@ -114,31 +116,48 @@ def get_script_version(
 def strip_extra_prefixes(string_with_prefix: str) -> str:
     return string_with_prefix.removeprefix("mongo/").removeprefix("v")
 
+def validate_license(component: dict, error_manager: ErrorManager) -> None:
+    if "licenses" not in component:
+        error_manager.append_full_error_message(MISSING_LICENSE_IN_SBOM_COMPONENT_ERROR)
+        return
+    
+    valid_license = False
+    for license in component["licenses"]:
+        if "expression" in license:
+            expression = license.get("expression")
+        elif "license" in license:
+            if "id" in license["license"]:
+                # Should be a valid SPDX license ID
+                expression = license["license"].get("id")
+            elif "name" in license["license"]:
+                # If SPDX does not define the license used, the name field may be used to provide the license name
+                valid_license = True
+        
+        if not valid_license:
+            licensing_validate = get_spdx_licensing().validate( expression, validate=True )
+            # ExpressionInfo(
+            #   original_expression='',
+            #   normalized_expression='',
+            #   errors=[],
+            #   invalid_symbols=[]
+            #)
+            valid_license = not licensing_validate.errors or not licensing_validate.invalid_symbols
+            if not valid_license:
+                error_manager.append_full_error_message(licensing_validate)
+                return
+
 
 def validate_evidence(component: dict, third_party_libs: set, error_manager: ErrorManager) -> None:
-    if "evidence" not in component or "occurrences" not in component["evidence"]:
-        error_manager.append_full_error_message(MISSING_EVIDENCE_ERROR)
-        return
+    if component["scope"] == "required":
+        if "evidence" not in component or "occurrences" not in component["evidence"]:
+            error_manager.append_full_error_message(MISSING_EVIDENCE_ERROR)
+            return
 
-    occurrences = component["evidence"]["occurrences"]
-    if not occurrences:
-        error_manager.append_full_error_message(
-            "'evidence.occurrences' field must include at least one location."
-        )
-    for occurrence in occurrences:
-        location = occurrence["location"]
-
-        if not os.path.exists(location) and not SKIP_FILE_CHECKING:
-            error_manager.append_full_error_message("location does not exist in repo.")
-
-        if location.startswith(THIRD_PARTY_LOCATION_PREFIX):
-            lib = location.removeprefix(THIRD_PARTY_LOCATION_PREFIX)
-            if lib in third_party_libs:
-                third_party_libs.remove(lib)
+    validate_location(component, third_party_libs, error_manager)
 
 
 def validate_properties(component: dict, error_manager: ErrorManager) -> None:
-    has_team_responsible_property = False
+    has_team_responsible_property = False or component["scope"] == "excluded"
     script_path = ""
     if "properties" in component:
         for prop in component["properties"]:
@@ -159,14 +178,22 @@ def validate_properties(component: dict, error_manager: ErrorManager) -> None:
     if comp_version == "Unknown" or script_path == "":
         return
 
+    # Include the .pedigree.descendants[0] version for version matching
+    if "pedigree" in component and "descendants" in component["pedigree"] and "version" in component["pedigree"]["descendants"][0]:
+        comp_pedigree_version = component["pedigree"]["descendants"][0]["version"]
+    else:
+        comp_pedigree_version = ""
+    
+
     # At this point a version is attempted to be read from the import script file
     script_version = get_script_version(script_path, "VERSION", error_manager)
     if script_version == "":
         error_manager.append_full_error_message(MISSING_VERSION_IN_IMPORT_FILE_ERROR + script_path)
-    elif strip_extra_prefixes(script_version) != strip_extra_prefixes(comp_version):
+    elif strip_extra_prefixes(script_version) != strip_extra_prefixes(comp_version) and \
+        strip_extra_prefixes(script_version) != strip_extra_prefixes(comp_pedigree_version):
         error_manager.append_full_error_message(
             VERSION_MISMATCH_ERROR
-            + f"\nscript version:{script_version}\nsbom version:{comp_version}"
+            + f"\nscript version:{script_version}\nsbom component version:{comp_version}\nsbom component pedigree version:{comp_pedigree_version}"
         )
 
 
@@ -174,14 +201,36 @@ def validate_component(component: dict, third_party_libs: set, error_manager: Er
     error_manager.update_component_attribute(component["name"])
     if "scope" not in component:
         error_manager.append_full_error_message("component must include a scope.")
-    elif component["scope"] != "optional":
+    else:
         validate_evidence(component, third_party_libs, error_manager)
     validate_properties(component, error_manager)
+    validate_license(component, error_manager)
 
     if "purl" not in component and "cpe" not in component:
         error_manager.append_full_error_message(MISSING_PURL_CPE_ERROR)
     error_manager.update_component_attribute("")
 
+
+def validate_location(component: dict, third_party_libs: set, error_manager: ErrorManager) -> None:
+    if "evidence" in component:
+        if "occurrences" not in component["evidence"]:
+            error_manager.append_full_error_message(
+                "'evidence.occurrences' field must include at least one location."
+            )
+        
+        occurrences = component["evidence"]["occurrences"]
+        for occurrence in occurrences:
+            if "location" in occurrence:
+                location = occurrence["location"]
+
+                if not os.path.exists(location) and not SKIP_FILE_CHECKING:
+                    error_manager.append_full_error_message("location does not exist in repo.")
+
+                if location.startswith(THIRD_PARTY_LOCATION_PREFIX):
+                    lib = location.removeprefix(THIRD_PARTY_LOCATION_PREFIX)
+                    if lib in third_party_libs:
+                        third_party_libs.remove(lib)
+    
 
 def lint_sbom(
     input_file: str, output_file: str, third_party_libs: set, should_format: bool
@@ -257,8 +306,6 @@ def main() -> int:
     )
     # the only files in this dir that are not third party libs
     third_party_libs.remove("scripts")
-    # wiredtiger will not be included in the sbom since it is considered part of the server
-    third_party_libs.remove("wiredtiger")
     # the only files in the sasl dir are BUILD files to setup the sasl library in Windows
     third_party_libs.remove("sasl")
     error_manager = lint_sbom(input_file, output_file, third_party_libs, should_format)
