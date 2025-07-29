@@ -62,10 +62,10 @@ filters:
       - 10gen/server-catalog-and-routing
   - "update_zone_key_range*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-cluster-scalability
   - "*balanc*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-cluster-scalability
   - "move_primary.idl":
     approvers:
       - 10gen/server-catalog-and-routing

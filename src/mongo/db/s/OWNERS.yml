@@ -8,9 +8,6 @@ filters:
   - "*migration*":
     approvers:
       - 10gen/server-cluster-scalability
-  - "*active_migrations_registry*":
-    approvers:
-      - 10gen/server-cluster-scalability
   - "*analyze_shard_key*":
     approvers:
       - 10gen/server-cluster-scalability
@@ -44,9 +41,6 @@ filters:
   - "*reshard*":
     approvers:
       - 10gen/server-cluster-scalability
-  - "session_catalog_migration*":
-    approvers:
-      - 10gen/server-cluster-scalability
   - "sharding_runtime_d_params*":
     approvers:
       - 10gen/server-cluster-scalability
@@ -64,7 +58,7 @@ filters:
       - 10gen/server-transactions
   - "balancer_stats_registry*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-cluster-scalability
   - "chunk_operation_precondition_checks*":
     approvers:
       - 10gen/server-catalog-and-routing
@@ -170,9 +164,9 @@ filters:
   - "shardsvr_set*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "*stats_for_balancing*":
+  - "shardsvr_get_stats_for_balancing_command.cpp":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-cluster-scalability
   - "*add_shard*":
     approvers:
       - 10gen/server-catalog-and-routing
@@ -206,9 +200,6 @@ filters:
   - "README.md":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "README_balancer.md":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "README_startup_and_shutdown.md":
     approvers:
       - 10gen/server-catalog-and-routing
@@ -239,21 +230,6 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing
   - "get_sharding_ready_command.cpp":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "migration_coordinator*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "migration_destination_manager.*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "migration_source_manager*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "migration_util*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "random_migration_testing_utils*":
     approvers:
       - 10gen/server-catalog-and-routing
   - "range_arithmetic*":
@@ -334,3 +310,6 @@ filters:
   - "periodic_replica_set_configshard_maintenance_mode_checker.*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "remove_tags.idl":
+    approvers:
+      - 10gen/server-cluster-scalability

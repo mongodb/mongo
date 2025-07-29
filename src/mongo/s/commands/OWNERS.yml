@@ -110,7 +110,7 @@ filters:
       - 10gen/query-execution-router
   - "*balanc*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-cluster-scalability
   - "cluster_clear_jumbo_flag_cmd.cpp":
     approvers:
       - 10gen/server-catalog-and-routing
@@ -146,7 +146,7 @@ filters:
       - 10gen/server-catalog-and-routing
   - "cluster_update_zone_key_range_cmd.cpp":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-cluster-scalability
   - "cluster_validate_db_metadata_cmd*":
     approvers:
       - 10gen/server-catalog-and-routing

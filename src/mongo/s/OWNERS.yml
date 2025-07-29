@@ -107,7 +107,7 @@ filters:
       - 10gen/server-catalog-and-routing
   - "balancer_configuration*":
     approvers:
-      - 10gen/server-catalog-and-routing
+      - 10gen/server-cluster-scalability
   - "gossiped_routing_cache.idl":
     approvers:
       - 10gen/server-catalog-and-routing
