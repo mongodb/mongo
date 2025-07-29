@@ -517,7 +517,7 @@ palm_init_lsn(PALM *palm)
      * Get the LSN. If it's never been set, we'll get not found, but that's okay, that will leave
      * our beginning LSN at zero, which is fine for our purposes.
      */
-    ret = palm_kv_get_global(&context, PALM_KV_GLOBAL_REVISION, &palm->begin_lsn);
+    ret = palm_kv_get_global(&context, PALM_KV_GLOBAL_LSN, &palm->begin_lsn);
     if (ret == MDB_NOTFOUND)
         ret = 0;
     palm_kv_rollback_transaction(&context);
@@ -551,22 +551,13 @@ palm_add_reference(WT_PAGE_LOG *page_log)
 static int
 palm_begin_checkpoint(WT_PAGE_LOG *page_log, WT_SESSION *session, uint64_t checkpoint_id)
 {
-    PALM *palm;
-    PALM_KV_CONTEXT context;
     int ret;
+    ret = 0;
 
-    palm = (PALM *)page_log;
-    palm_init_context(palm, &context);
+    (void)page_log;      /* Unused parameter */
+    (void)session;       /* Unused parameter */
+    (void)checkpoint_id; /* Unused parameter */
 
-    PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, false));
-    PALM_KV_ERR(palm, session,
-      palm_kv_put_global(&context, PALM_KV_GLOBAL_CHECKPOINT_STARTED, checkpoint_id));
-    PALM_KV_ERR(palm, session, palm_kv_commit_transaction(&context));
-
-    return (0);
-
-err:
-    palm_kv_rollback_transaction(&context);
     return (ret);
 }
 
@@ -580,86 +571,28 @@ palm_complete_checkpoint_ext(WT_PAGE_LOG *page_log, WT_SESSION *session, uint64_
 {
     PALM *palm;
     PALM_KV_CONTEXT context;
-    uint64_t completed_checkpoint, lsn, started_checkpoint;
+    uint64_t lsn;
     int ret;
+
+    (void)checkpoint_id; /* Unused parameter */
 
     palm = (PALM *)page_log;
     palm_init_context(palm, &context);
 
     PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, false));
-    PALM_KV_ERR(palm, session,
-      palm_kv_get_global(&context, PALM_KV_GLOBAL_CHECKPOINT_STARTED, &started_checkpoint));
-    ret = palm_kv_get_global(&context, PALM_KV_GLOBAL_CHECKPOINT_COMPLETED, &completed_checkpoint);
-    if (ret == MDB_NOTFOUND) {
-        /* This trips the first time we complete a checkpoint. */
-        completed_checkpoint = 0;
-        ret = 0;
-    }
-    PALM_KV_ERR(palm, session, ret);
-    ret = palm_kv_get_global(&context, PALM_KV_GLOBAL_REVISION, &lsn);
+    ret = palm_kv_get_global(&context, PALM_KV_GLOBAL_LSN, &lsn);
     if (ret == MDB_NOTFOUND) {
         lsn = 1;
         ret = 0;
     }
     PALM_KV_ERR(palm, session, ret);
-
-    if (completed_checkpoint >= started_checkpoint) {
-        ret = palm_err(palm, session, EINVAL, "complete checkpoint id that was never begun");
-        goto err;
-    }
-
     PALM_KV_ERR(palm, session,
-      palm_kv_put_checkpoint(
-        &context, lsn, checkpoint_id, checkpoint_timestamp, checkpoint_metadata));
-    PALM_KV_ERR(palm, session, palm_kv_put_global(&context, PALM_KV_GLOBAL_REVISION, lsn + 1));
-    PALM_KV_ERR(palm, session, palm_kv_put_global(&context, PALM_KV_GLOBAL_CHECKPOINT_STARTED, 0));
-    PALM_KV_ERR(palm, session,
-      palm_kv_put_global(&context, PALM_KV_GLOBAL_CHECKPOINT_COMPLETED, checkpoint_id));
+      palm_kv_put_checkpoint(&context, lsn, checkpoint_timestamp, checkpoint_metadata));
+    PALM_KV_ERR(palm, session, palm_kv_put_global(&context, PALM_KV_GLOBAL_LSN, lsn + 1));
     PALM_KV_ERR(palm, session, palm_kv_commit_transaction(&context));
 
     if (lsnp != NULL)
         *lsnp = lsn;
-    return (0);
-
-err:
-    palm_kv_rollback_transaction(&context);
-    return (ret);
-}
-
-/*
- * palm_complete_checkpoint --
- *     Complete a checkpoint.
- */
-static int
-palm_complete_checkpoint(WT_PAGE_LOG *page_log, WT_SESSION *session, uint64_t checkpoint_id)
-{
-    return (palm_complete_checkpoint_ext(page_log, session, checkpoint_id, 0, NULL, NULL));
-}
-
-/*
- * palm_get_complete_checkpoint --
- *     Get the last completed checkpoint id.
- */
-static int
-palm_get_complete_checkpoint(WT_PAGE_LOG *page_log, WT_SESSION *session, uint64_t *checkpoint_id)
-{
-    PALM *palm;
-    PALM_KV_CONTEXT context;
-    uint64_t kv_checkpoint;
-    int ret;
-
-    *checkpoint_id = 0;
-
-    palm = (PALM *)page_log;
-    palm_init_context(palm, &context);
-
-    PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, true));
-    PALM_KV_ERR(palm, session,
-      palm_kv_get_global(&context, PALM_KV_GLOBAL_CHECKPOINT_COMPLETED, &kv_checkpoint));
-    PALM_KV_ERR(palm, session, palm_kv_commit_transaction(&context));
-
-    *checkpoint_id = kv_checkpoint;
-
     return (0);
 
 err:
@@ -682,12 +615,12 @@ palm_get_complete_checkpoint_ext(WT_PAGE_LOG *page_log, WT_SESSION *session,
     size_t metadata_len;
     int ret;
 
+    (void)checkpoint_id; /* Unused parameter */
+
     metadata = NULL;
     metadata_len = 0;
     if (checkpoint_lsn != NULL)
         *checkpoint_lsn = 0;
-    if (checkpoint_id != NULL)
-        *checkpoint_id = 0;
     if (checkpoint_timestamp != NULL)
         *checkpoint_timestamp = 0;
     if (checkpoint_metadata != NULL)
@@ -699,7 +632,7 @@ palm_get_complete_checkpoint_ext(WT_PAGE_LOG *page_log, WT_SESSION *session,
     PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, true));
 
     ret = palm_kv_get_last_checkpoint(
-      &context, checkpoint_lsn, checkpoint_id, checkpoint_timestamp, &metadata, &metadata_len);
+      &context, checkpoint_lsn, checkpoint_timestamp, &metadata, &metadata_len);
     if (ret == MDB_NOTFOUND) {
         ret = WT_NOTFOUND;
         goto err;
@@ -736,39 +669,10 @@ palm_get_last_lsn(WT_PAGE_LOG *page_log, WT_SESSION *session, uint64_t *lsn)
     palm_init_context(palm, &context);
 
     PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, true));
-    PALM_KV_ERR(palm, session, palm_kv_get_global(&context, PALM_KV_GLOBAL_REVISION, &kv_lsn));
+    PALM_KV_ERR(palm, session, palm_kv_get_global(&context, PALM_KV_GLOBAL_LSN, &kv_lsn));
     PALM_KV_ERR(palm, session, palm_kv_commit_transaction(&context));
 
     *lsn = kv_lsn > 0 ? kv_lsn - 1 : 0;
-
-    return (0);
-
-err:
-    palm_kv_rollback_transaction(&context);
-    return (ret);
-}
-
-/*
- * palm_get_open_checkpoint --
- *     Get the currently open checkpoint id.
- */
-static int
-palm_get_open_checkpoint(WT_PAGE_LOG *page_log, WT_SESSION *session, uint64_t *checkpoint_id)
-{
-    PALM *palm;
-    PALM_KV_CONTEXT context;
-    uint64_t kv_checkpoint;
-    int ret;
-
-    palm = (PALM *)page_log;
-    palm_init_context(palm, &context);
-
-    PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, true));
-    PALM_KV_ERR(palm, session,
-      palm_kv_get_global(&context, PALM_KV_GLOBAL_CHECKPOINT_STARTED, &kv_checkpoint));
-    PALM_KV_ERR(palm, session, palm_kv_commit_transaction(&context));
-
-    *checkpoint_id = kv_checkpoint;
 
     return (0);
 
@@ -790,13 +694,15 @@ palm_handle_discard(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_
     PALM_KV_CONTEXT context;
     palm_init_context(palm, &context);
 
+    (void)checkpoint_id; /* Unused parameter */
+
     /* We always write full pages for tombstones, PALM has its own flag. */
     bool is_delta = false;
     uint32_t flags = WT_PALM_KV_TOMBSTONE;
 
     PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, false));
     uint64_t lsn;
-    int ret = palm_kv_get_global(&context, PALM_KV_GLOBAL_REVISION, &lsn);
+    int ret = palm_kv_get_global(&context, PALM_KV_GLOBAL_LSN, &lsn);
     if (ret == MDB_NOTFOUND) {
         lsn = 1;
         ret = 0;
@@ -804,12 +710,10 @@ palm_handle_discard(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_
     PALM_KV_ERR(palm, session, ret);
 
     PALM_VERBOSE_PRINT(palm_handle->palm, session,
-      "palm_handle_discard(plh=%p, table_id=%" PRIu64 ", page_id=%" PRIu64
-      ", checkpoint_id=%" PRIu64 ", backlink_lsn=%" PRIu64 ", base_lsn=%" PRIu64
-      ", backlink_checkpoint_id=%" PRIu64 ", base_checkpoint_id=%" PRIu64 ")\n",
-      (void *)plh, palm_handle->table_id, page_id, checkpoint_id, discard_args->backlink_lsn,
-      discard_args->base_lsn, discard_args->backlink_checkpoint_id,
-      discard_args->base_checkpoint_id);
+      "palm_handle_discard(plh=%p, table_id=%" PRIu64 ", page_id=%" PRIu64 ", backlink_lsn=%" PRIu64
+      ", base_lsn=%" PRIu64 ")\n",
+      (void *)plh, palm_handle->table_id, page_id, discard_args->backlink_lsn,
+      discard_args->base_lsn);
 
     /* There should not be any flag set. */
     assert(discard_args->flags == 0);
@@ -819,10 +723,9 @@ palm_handle_discard(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_
         return (errno);
 
     PALM_KV_ERR(palm, session,
-      palm_kv_put_page(&context, palm_handle->table_id, page_id, lsn, checkpoint_id, is_delta,
-        discard_args->backlink_lsn, discard_args->base_lsn, discard_args->backlink_checkpoint_id,
-        discard_args->base_checkpoint_id, &zero_encryption, flags, tombstone));
-    PALM_KV_ERR(palm, session, palm_kv_put_global(&context, PALM_KV_GLOBAL_REVISION, lsn + 1));
+      palm_kv_put_page(&context, palm_handle->table_id, page_id, lsn, is_delta,
+        discard_args->backlink_lsn, discard_args->base_lsn, &zero_encryption, flags, tombstone));
+    PALM_KV_ERR(palm, session, palm_kv_put_global(&context, PALM_KV_GLOBAL_LSN, lsn + 1));
     PALM_KV_ERR(palm, session, palm_kv_commit_transaction(&context));
 
     discard_args->lsn = lsn;
@@ -833,8 +736,8 @@ err:
 
         PALM_VERBOSE_PRINT(palm_handle->palm, session,
           "palm_handle_discard(plh=%p, table_id=%" PRIu64 ", page_id=%" PRIu64 ", lsn=%" PRIu64
-          ", checkpoint_id=%" PRIu64 ", is_delta=%d) returned %d\n",
-          (void *)plh, palm_handle->table_id, page_id, lsn, checkpoint_id, is_delta, ret);
+          ", is_delta=%d) returned %d\n",
+          (void *)plh, palm_handle->table_id, page_id, lsn, is_delta, ret);
     }
 
     free(tombstone);
@@ -854,6 +757,8 @@ palm_handle_put(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
     bool is_delta;
     WT_PAGE_LOG_ENCRYPTION encryption;
 
+    (void)checkpoint_id; /* Unused parameter */
+
     is_delta = (put_args->flags & WT_PAGE_LOG_DELTA) != 0;
     lsn = 0;
     palm_handle = (PALM_HANDLE *)plh;
@@ -868,7 +773,7 @@ palm_handle_put(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
         put_args->base_lsn, &encryption));
 
     PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, false));
-    ret = palm_kv_get_global(&context, PALM_KV_GLOBAL_REVISION, &lsn);
+    ret = palm_kv_get_global(&context, PALM_KV_GLOBAL_LSN, &lsn);
     if (ret == MDB_NOTFOUND) {
         lsn = 1;
         ret = 0;
@@ -877,18 +782,14 @@ palm_handle_put(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
 
     PALM_VERBOSE_PRINT(palm_handle->palm, session,
       "palm_handle_put(plh=%p, table_id=%" PRIu64 ", page_id=%" PRIu64 ", lsn=%" PRIu64
-      ", checkpoint_id=%" PRIu64 ", backlink_lsn=%" PRIu64 ", base_lsn=%" PRIu64
-      ", backlink_checkpoint_id=%" PRIu64 ", base_checkpoint_id=%" PRIu64
-      ", is_delta=%d, buf=\n%s)\n",
-      (void *)plh, palm_handle->table_id, page_id, lsn, checkpoint_id, put_args->backlink_lsn,
-      put_args->base_lsn, put_args->backlink_checkpoint_id, put_args->base_checkpoint_id, is_delta,
-      palm_verbose_item(buf));
+      ", backlink_lsn=%" PRIu64 ", base_lsn=%" PRIu64 ", is_delta=%d, buf=\n%s)\n",
+      (void *)plh, palm_handle->table_id, page_id, lsn, put_args->backlink_lsn, put_args->base_lsn,
+      is_delta, palm_verbose_item(buf));
 
     PALM_KV_ERR(palm, session,
-      palm_kv_put_page(&context, palm_handle->table_id, page_id, lsn, checkpoint_id, is_delta,
-        put_args->backlink_lsn, put_args->base_lsn, put_args->backlink_checkpoint_id,
-        put_args->base_checkpoint_id, &encryption, put_args->flags, buf));
-    PALM_KV_ERR(palm, session, palm_kv_put_global(&context, PALM_KV_GLOBAL_REVISION, lsn + 1));
+      palm_kv_put_page(&context, palm_handle->table_id, page_id, lsn, is_delta,
+        put_args->backlink_lsn, put_args->base_lsn, &encryption, put_args->flags, buf));
+    PALM_KV_ERR(palm, session, palm_kv_put_global(&context, PALM_KV_GLOBAL_LSN, lsn + 1));
     PALM_KV_ERR(palm, session, palm_kv_commit_transaction(&context));
     put_args->lsn = lsn;
     return (0);
@@ -898,8 +799,8 @@ err:
 
     PALM_VERBOSE_PRINT(palm_handle->palm, session,
       "palm_handle_put(plh=%p, table_id=%" PRIu64 ", page_id=%" PRIu64 ", lsn=%" PRIu64
-      ", checkpoint_id=%" PRIu64 ", is_delta=%d) returned %d\n",
-      (void *)plh, palm_handle->table_id, page_id, lsn, checkpoint_id, is_delta, ret);
+      ", is_delta=%d) returned %d\n",
+      (void *)plh, palm_handle->table_id, page_id, lsn, is_delta, ret);
     return (ret);
 }
 
@@ -927,12 +828,13 @@ palm_handle_get(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
     PALM_HANDLE *palm_handle;
     PALM_KV_PAGE_MATCHES matches;
     uint32_t count, i;
-    uint64_t last_checkpoint_id, last_lsn, lsn;
+    uint64_t last_lsn, lsn;
     int ret;
     bool zeroed_encryption, was_zeroed_encryption;
 
+    (void)checkpoint_id; /* Unused parameter */
+
     count = 0;
-    last_checkpoint_id = 0;
     last_lsn = 0;
     lsn = get_args->lsn;
     palm_handle = (PALM_HANDLE *)plh;
@@ -945,13 +847,11 @@ palm_handle_get(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
     palm_init_context(palm, &context);
 
     PALM_VERBOSE_PRINT(palm_handle->palm, session,
-      "palm_handle_get(plh=%p, table_id=%" PRIu64 ", page_id=%" PRIu64 ", lsn=%" PRIu64
-      ", checkpoint_id=%" PRIu64 ")...\n",
-      (void *)plh, palm_handle->table_id, page_id, lsn, checkpoint_id);
+      "palm_handle_get(plh=%p, table_id=%" PRIu64 ", page_id=%" PRIu64 ", lsn=%" PRIu64 ")...\n",
+      (void *)plh, palm_handle->table_id, page_id, lsn);
     PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, false));
     PALM_KV_ERR(palm, session,
-      palm_kv_get_page_matches(
-        &context, palm_handle->table_id, page_id, lsn, checkpoint_id, &matches));
+      palm_kv_get_page_matches(&context, palm_handle->table_id, page_id, lsn, &matches));
     get_args->encryption = zero_encryption;
     was_zeroed_encryption = true;
     for (count = 0; count < *results_count; ++count) {
@@ -962,18 +862,14 @@ palm_handle_get(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
         memcpy(results_array[count].mem, matches.data, matches.size);
 
         /* Validate back links. */
-        if (count > 0) {
+        if (count > 0)
             PALM_GET_VERIFY_EQUAL(matches.backlink_lsn, last_lsn);
-            PALM_GET_VERIFY_EQUAL(matches.backlink_checkpoint_id, last_checkpoint_id);
-        }
 
         /* Validate base. */
         if (count == 1) {
             PALM_GET_VERIFY_EQUAL(matches.base_lsn, last_lsn);
-            PALM_GET_VERIFY_EQUAL(matches.base_checkpoint_id, last_checkpoint_id);
         } else if (count > 1) {
             PALM_GET_VERIFY_EQUAL(matches.base_lsn, get_args->base_lsn);
-            PALM_GET_VERIFY_EQUAL(matches.base_checkpoint_id, get_args->base_checkpoint_id);
         }
 
         /* We should not request a page that is discarded. */
@@ -981,11 +877,8 @@ palm_handle_get(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
         PALM_KV_ERR(palm, session, ret);
 
         last_lsn = matches.lsn;
-        last_checkpoint_id = matches.checkpoint_id;
         get_args->backlink_lsn = matches.backlink_lsn;
         get_args->base_lsn = matches.base_lsn;
-        get_args->backlink_checkpoint_id = matches.backlink_checkpoint_id;
-        get_args->base_checkpoint_id = matches.base_checkpoint_id;
         get_args->encryption = matches.encryption;
         zeroed_encryption = PALM_ENCRYPTION_EQUAL(get_args->encryption, zero_encryption);
         if (zeroed_encryption)
@@ -1011,17 +904,15 @@ err:
     palm_kv_rollback_transaction(&context);
     PALM_VERBOSE_PRINT(palm_handle->palm, session,
       "palm_handle_get(plh=%p, table_id=%" PRIu64 ", page_id=%" PRIu64 ", lsn=%" PRIu64
-      ", checkpoint_id=%" PRIu64 ") returns %d (in %d parts)\n",
-      (void *)plh, palm_handle->table_id, page_id, lsn, checkpoint_id, ret, (int)count);
+      ") returns %d (in %d parts)\n",
+      (void *)plh, palm_handle->table_id, page_id, lsn, ret, (int)count);
     if (ret == 0) {
         for (i = 0; i < count; ++i)
             PALM_VERBOSE_PRINT(palm_handle->palm, session, "   part %d: %s\n", (int)i,
               palm_verbose_item(&results_array[i]));
         PALM_VERBOSE_PRINT(palm_handle->palm, session,
-          "   metadata: backlink_lsn=%" PRIu64 ", base_lsn=%" PRIu64
-          ", backlink_checkpoint_id=%" PRIu64 ", base_checkpoint_id=%" PRIu64 "\n",
-          get_args->backlink_lsn, get_args->base_lsn, get_args->backlink_checkpoint_id,
-          get_args->base_checkpoint_id);
+          "   metadata: backlink_lsn=%" PRIu64 ", base_lsn=%" PRIu64 "\n", get_args->backlink_lsn,
+          get_args->base_lsn);
     }
     return (ret);
 }
@@ -1170,12 +1061,12 @@ palm_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
      */
     palm->page_log.pl_add_reference = palm_add_reference;
     palm->page_log.pl_begin_checkpoint = palm_begin_checkpoint;
-    palm->page_log.pl_complete_checkpoint = palm_complete_checkpoint;
+    palm->page_log.pl_complete_checkpoint = NULL;
     palm->page_log.pl_complete_checkpoint_ext = palm_complete_checkpoint_ext;
-    palm->page_log.pl_get_complete_checkpoint = palm_get_complete_checkpoint;
+    palm->page_log.pl_get_complete_checkpoint = NULL;
     palm->page_log.pl_get_complete_checkpoint_ext = palm_get_complete_checkpoint_ext;
     palm->page_log.pl_get_last_lsn = palm_get_last_lsn;
-    palm->page_log.pl_get_open_checkpoint = palm_get_open_checkpoint;
+    palm->page_log.pl_get_open_checkpoint = NULL;
     palm->page_log.pl_open_handle = palm_open_handle;
     palm->page_log.pl_set_last_materialized_lsn = palm_set_last_materialized_lsn;
     palm->page_log.terminate = palm_terminate;

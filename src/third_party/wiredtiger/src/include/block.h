@@ -505,30 +505,19 @@ struct __wt_block_disagg_header {
     uint32_t checksum;          /* 04-07: checksum */
     uint32_t previous_checksum; /* 08-11: checksum for previous delta or page */
 
-    /*
-     * The reconciliation id tracks the "version" of a page or delta within a checkpoint. The first
-     * write of a page at a checkpoint has id 0, the second has id 1. We use this number as a
-     * diagnostic to detect the kind of discrepancy that occurred when there is a checksum error.
-     * Thus, overflowing a byte is not a cause for concern. Besides, overflows should be exceedingly
-     * rare. It means checkpointing is much less frequent than the number of times a page needed to
-     * be reconciled.
-     */
-#define WT_BLOCK_OVERFLOW_RECONCILIATION_ID 0xff
-    uint8_t reconciliation_id; /* 12: disaggregated identifier */
-
 /*
  * No automatic generation: flag values cannot change, they're written to disk.
  */
 #define WT_BLOCK_DISAGG_DATA_CKSUM 0x1u /* Block data is part of the checksum */
 #define WT_BLOCK_DISAGG_ENCRYPTED 0x2u  /* Data following header is encrypted */
 #define WT_BLOCK_DISAGG_COMPRESSED 0x4u /* Data following header is compressed */
-    uint8_t flags;                      /* 13: flags */
+    uint8_t flags;                      /* 12: flags */
 
     /*
-     * End the structure with 2 bytes of padding: it wastes space, but it leaves the structure
+     * End the structure with 3 bytes of padding: it wastes space, but it leaves the structure
      * 32-bit aligned and having an extra couple bytes to play with in the future can't hurt.
      */
-    uint8_t unused[2]; /* 14-15: unused padding */
+    uint8_t unused[3]; /* 13-15: unused padding */
 };
 
 /*

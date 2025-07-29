@@ -56,10 +56,6 @@ class test_disagg01(wttest.WiredTigerTestCase, DisaggConfigMixin):
         sys.stderr = open('/dev/tty', 'w')
         pdb.set_trace()
 
-    def check_current_checkpoint(self, page_log, session, value):
-        # Note: get_complete_checkpoint returns an tuple: [return_value, checkpoint_id]
-        self.assertEquals(page_log.pl_get_complete_checkpoint(session), [0, value])
-
     def check_package(self, page_log, package, values):
         i = 0
         while True:
@@ -77,13 +73,8 @@ class test_disagg01(wttest.WiredTigerTestCase, DisaggConfigMixin):
         session = self.session
         page_log = self.conn.get_page_log('palm')
 
-        self.check_current_checkpoint(page_log, session, 0)
-
         page_log.pl_begin_checkpoint(session, 1)
-        self.check_current_checkpoint(page_log, session, 0)
-
         page_log.pl_complete_checkpoint(session, 1)
-        self.check_current_checkpoint(page_log, session, 1)
 
         page_log.pl_begin_checkpoint(session, 2)
         handle = page_log.pl_open_handle(session, 1)

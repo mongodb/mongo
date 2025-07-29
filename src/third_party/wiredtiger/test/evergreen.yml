@@ -782,10 +782,22 @@ functions:
     # Since we later remove the WiredTiger folder, we need to check for core dumps now.
     - *dump_stacktraces
     - *upload_stacktraces
-    - command: perf.send
-      type: setup
+    - command: subprocess.exec
       params:
-        file: ./wiredtiger/cmake_build/test/cppsuite/${test_name}.json
+        binary: bash
+        args:
+          - ./wiredtiger/test/evergreen/perf_submission.sh
+        env:
+          perf_file_path: ./wiredtiger/cmake_build/test/cppsuite/${test_name}.json
+        include_expansions_in_env:
+          - requester
+          - revision_order_id
+          - project_id
+          - version_id
+          - build_variant
+          - task_name
+          - task_id
+          - execution
     # Cleanup tasks.
     - *cppsuite_remove_files
     - *cppsuite_archive
@@ -1189,10 +1201,22 @@ functions:
           ${python_binary|python3} ../../../bench/perf_run_py/perf_run.py --${test_type|wtperf} -e ${exec_path|./wtperf} -t ${perf-test-path|../../../bench/wtperf/runners}/${perf-test-name} -ho WT_TEST -m ${maxruns} -v -re -o test_stats/atlas_out_${perf-test-name}.json ${wtarg}
 
   "upload test stats":
-    - command: perf.send
-      type: setup
+    - command: subprocess.exec
       params:
-        file: ./wiredtiger/cmake_build/${test_path}.json
+        binary: bash
+        args:
+          - ./wiredtiger/test/evergreen/perf_submission.sh
+        env:
+          perf_file_path: ./wiredtiger/cmake_build/${test_path}.json
+        include_expansions_in_env:
+          - requester
+          - revision_order_id
+          - project_id
+          - version_id
+          - build_variant
+          - task_name
+          - task_id
+          - execution
 
   "convert-to-atlas-evergreen-format":
     - command: shell.exec
@@ -1221,10 +1245,22 @@ functions:
           ${python_binary|python3} automation-scripts/evergreen/upload_stats_atlas.py -u ${atlas_perf_test_username} -p ${atlas_perf_test_password} -c ${collection|} -d ${database|} -f ${stats_dir|./wiredtiger/cmake_build/bench/wtperf/test_stats}/atlas_out_${test-name}.json -t ${created_at} -i "$EVERGREEN_TASK_INFO" -g "./wiredtiger"
 
   "upload stats to evergreen":
-    - command: perf.send
-      type: setup
+    - command: subprocess.exec
       params:
-        file: ${stats_dir|./wiredtiger/cmake_build/bench/wtperf/test_stats}/evergreen_out_${test-name}.json
+        binary: bash
+        args:
+          - ./wiredtiger/test/evergreen/perf_submission.sh
+        env:
+          perf_file_path: ${stats_dir|./wiredtiger/cmake_build/bench/wtperf/test_stats}/evergreen_out_${test-name}.json
+        include_expansions_in_env:
+          - requester
+          - revision_order_id
+          - project_id
+          - version_id
+          - build_variant
+          - task_name
+          - task_id
+          - execution
     # Push the json results to the 'Files' tab of the task in Evergreen
     # Parameterised using the 'test-name' variable
     - command: s3.put

@@ -919,6 +919,7 @@ struct __wt_connection_stats {
     int64_t dh_sweep_skip_ckpt;
     int64_t dh_session_handles;
     int64_t dh_session_sweeps;
+    int64_t disagg_role_leader;
     int64_t layered_curs_insert;
     int64_t layered_curs_next;
     int64_t layered_curs_next_ingest;

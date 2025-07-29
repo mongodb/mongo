@@ -48,15 +48,13 @@ __bmd_checkpoint_pack_raw(WT_BLOCK_DISAGG *block_disagg, WT_SESSION_IMPL *sessio
         WT_RET(__wti_block_disagg_write_internal(
           session, block_disagg, root_image, block_meta, &size, &checksum, true, true));
         __wt_page_header_byteswap((void *)root_image->data);
-        WT_RET(__wti_block_disagg_ckpt_pack(block_disagg, &endp, block_meta->page_id,
-          block_meta->disagg_lsn, block_meta->checkpoint_id, block_meta->reconciliation_id, size,
-          checksum));
+        WT_RET(__wti_block_disagg_ckpt_pack(
+          block_disagg, &endp, block_meta->page_id, block_meta->disagg_lsn, size, checksum));
         ckpt->raw.size = WT_PTRDIFF(endp, ckpt->raw.mem);
         __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
-          "Checkpoint root page: root_id=%" PRIu64 " lsn=%" PRIu64 " checkpoint_id=%" PRIu64
-          " reconciliation_id=%" PRIu64 " root_size=%" PRIu32 " root_checksum=%" PRIx32,
-          block_meta->page_id, block_meta->disagg_lsn, block_meta->checkpoint_id,
-          block_meta->reconciliation_id, size, checksum);
+          "Checkpoint root page: root_id=%" PRIu64 " lsn=%" PRIu64 " root_size=%" PRIu32
+          " root_checksum=%" PRIx32,
+          block_meta->page_id, block_meta->disagg_lsn, size, checksum);
     }
 
     return (0);
@@ -105,7 +103,7 @@ __wti_block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool 
     WT_DECL_ITEM(buf);
     WT_DECL_RET;
     size_t len;
-    uint64_t checkpoint_id, checkpoint_timestamp, lsn;
+    uint64_t checkpoint_timestamp, lsn;
     char *md_key;
     const char *md_value;
 
@@ -118,9 +116,6 @@ __wti_block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool 
 
     if (failed)
         return (0);
-
-    /* Get the checkpoint ID. */
-    WT_ACQUIRE_READ(checkpoint_id, conn->disaggregated_storage.global_checkpoint_id);
 
     /* Allocate a buffer for metadata keys. */
     len = strlen("file:") + strlen(block_disagg->name) + 4;
@@ -153,8 +148,7 @@ __wti_block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool 
           "%.*s\n"
           "timestamp=%" PRIx64,
           (int)cval.len, cval.str, checkpoint_timestamp));
-        WT_ERR(
-          __wt_disagg_put_meta(session, WT_DISAGG_METADATA_MAIN_PAGE_ID, checkpoint_id, buf, &lsn));
+        WT_ERR(__wt_disagg_put_meta(session, WT_DISAGG_METADATA_MAIN_PAGE_ID, buf, &lsn));
         WT_RELEASE_WRITE(conn->disaggregated_storage.last_checkpoint_meta_lsn, lsn);
     } else {
         /* Keep all metadata for regular tables. */
@@ -196,7 +190,7 @@ __wti_block_disagg_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session, const ui
   size_t addr_size, uint8_t *root_addr, size_t *root_addr_sizep, bool checkpoint)
 {
     WT_BLOCK_DISAGG *block_disagg;
-    uint64_t checkpoint_id, lsn, reconciliation_id, root_id;
+    uint64_t lsn, root_id;
     uint32_t root_size, root_checksum;
     uint8_t *endp;
 
@@ -211,21 +205,20 @@ __wti_block_disagg_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session, const ui
     if (addr == NULL || addr_size == 0)
         return (0);
 
-    WT_RET(__wti_block_disagg_ckpt_unpack(block_disagg, addr, addr_size, &root_id, &lsn,
-      &checkpoint_id, &reconciliation_id, &root_size, &root_checksum));
+    WT_RET(__wti_block_disagg_ckpt_unpack(
+      block_disagg, addr, addr_size, &root_id, &lsn, &root_size, &root_checksum));
 
     /*
      * Read root page address.
      */
     endp = root_addr;
-    WT_RET(__wti_block_disagg_addr_pack(
-      &endp, root_id, lsn, checkpoint_id, reconciliation_id, root_size, root_checksum));
+    WT_RET(__wti_block_disagg_addr_pack(&endp, root_id, lsn, root_size, root_checksum));
     *root_addr_sizep = WT_PTRDIFF(endp, root_addr);
 
     __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
-      "Loading checkpoint: root_id=%" PRIu64 " lsn=%" PRIu64 " checkpoint_id=%" PRIu64
-      " reconciliation_id=%" PRIu64 " root_size=%" PRIu32 " root_checksum=%" PRIx32,
-      root_id, lsn, checkpoint_id, reconciliation_id, root_size, root_checksum);
+      "Loading checkpoint: root_id=%" PRIu64 " lsn=%" PRIu64 " root_size=%" PRIu32
+      " root_checksum=%" PRIx32,
+      root_id, lsn, root_size, root_checksum);
 
     return (0);
 }

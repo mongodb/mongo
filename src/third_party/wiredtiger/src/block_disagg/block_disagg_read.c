@@ -19,7 +19,7 @@ __wti_block_disagg_corrupt(
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     WT_PAGE_BLOCK_META block_meta;
-    uint64_t checkpoint_id, lsn, page_id, reconciliation_id;
+    uint64_t lsn, page_id;
     uint32_t checksum, size;
 
     /* Read the block. */
@@ -27,8 +27,7 @@ __wti_block_disagg_corrupt(
     WT_ERR(__wti_block_disagg_read(bm, session, tmp, &block_meta, addr, addr_size));
 
     /* Crack the cookie, dump the block. */
-    WT_ERR(__wti_block_disagg_addr_unpack(
-      &addr, addr_size, &page_id, &lsn, &checkpoint_id, &reconciliation_id, &size, &checksum));
+    WT_ERR(__wti_block_disagg_addr_unpack(&addr, addr_size, &page_id, &lsn, &size, &checksum));
     WT_ERR(__wt_bm_corrupt_dump(session, tmp, 0, (wt_off_t)page_id, size, checksum));
 
 err:
@@ -42,16 +41,15 @@ err:
  */
 static void
 __block_disagg_read_checksum_err(WT_SESSION_IMPL *session, const char *name, uint32_t size,
-  uint64_t page_id, uint64_t checkpoint_id, uint32_t checksum, uint32_t expected_checksum,
-  uint64_t rec_id, uint64_t expected_rec_id, const char *context_msg)
+  uint64_t page_id, uint64_t lsn, uint32_t checksum, uint32_t expected_checksum,
+  const char *context_msg)
 {
     __wt_errx(session,
       "%s: read checksum error for %" PRIu32
       "B block at "
-      "page %" PRIu64 ", ckpt %" PRIu64 ": %s of %" PRIu32 " (%" PRIu64
-      ") doesn't match expected checksum of %" PRIx32 " (%" PRIu64 ")",
-      name, size, page_id, checkpoint_id, context_msg, checksum, rec_id, expected_checksum,
-      expected_rec_id);
+      "page %" PRIu64 ", lsn %" PRIu64 ": %s of %" PRIu32
+      " doesn't match expected checksum of %" PRIx32,
+      name, size, page_id, lsn, context_msg, checksum, expected_checksum);
 }
 
 /*
@@ -61,9 +59,8 @@ __block_disagg_read_checksum_err(WT_SESSION_IMPL *session, const char *name, uin
  */
 static int
 __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_disagg,
-  WT_PAGE_BLOCK_META *block_meta, uint64_t page_id, uint64_t lsn, uint64_t checkpoint_id,
-  uint64_t reconciliation_id, uint32_t size, uint32_t checksum, WT_ITEM *results_array,
-  uint32_t *results_count)
+  WT_PAGE_BLOCK_META *block_meta, uint64_t page_id, uint64_t lsn, uint32_t size, uint32_t checksum,
+  WT_ITEM *results_array, uint32_t *results_count)
 {
     WT_BLOCK_DISAGG_HEADER *blk, swap;
     WT_DECL_RET;
@@ -85,9 +82,8 @@ __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_di
         WT_CLEAR(*block_meta);
 
     __wt_verbose(session, WT_VERB_READ,
-      "page_id %" PRIu64 ", lsn %" PRIu64 ", checkpoint_id %" PRIu64 ", reconciliation_id %" PRIu64
-      ", size %" PRIu32 ", checksum %" PRIx32,
-      page_id, lsn, checkpoint_id, reconciliation_id, size, checksum);
+      "page_id %" PRIu64 ", lsn %" PRIu64 ", size %" PRIu32 ", checksum %" PRIx32, page_id, lsn,
+      size, checksum);
 
     WT_STAT_CONN_INCR(session, disagg_block_get);
     WT_STAT_CONN_INCR(session, block_read);
@@ -107,9 +103,9 @@ reread:
          * delta.
          */
         __wt_verbose_notice(session, WT_VERB_READ,
-          "retry #%" PRIu32 " for page_id %" PRIu64 ", lsn %" PRIu64 ", checkpoint_id %" PRIu64
-          ", reconciliation_id %" PRIu64 ", size %" PRIu32 ", checksum %" PRIx32,
-          retry, page_id, lsn, checkpoint_id, reconciliation_id, size, checksum);
+          "retry #%" PRIu32 " for page_id %" PRIu64 ", lsn %" PRIu64 ", size %" PRIu32
+          ", checksum %" PRIx32,
+          retry, page_id, lsn, size, checksum);
         __wt_sleep(0, 10000 + retry * 5000);
 
         for (i = 0; i < *results_count; i++)
@@ -122,8 +118,8 @@ reread:
     /*
      * Output buffers do not need to be pre-allocated, the PALI interface does that.
      */
-    WT_ERR(block_disagg->plhandle->plh_get(block_disagg->plhandle, &session->iface, page_id,
-      checkpoint_id, &get_args, results_array, results_count));
+    WT_ERR(block_disagg->plhandle->plh_get(block_disagg->plhandle, &session->iface, page_id, 0,
+      &get_args, results_array, results_count));
 
     WT_ASSERT(session, *results_count <= WT_DELTA_LIMIT + 1);
 
@@ -159,16 +155,6 @@ reread:
         blk = WT_BLOCK_HEADER_REF(current->data);
         __wti_block_disagg_header_byteswap_copy(blk, &swap);
 
-        /*
-         * Make a quick check of the checksum on the final delta, it should match the cookie. If it
-         * doesn't and the reconciliation id does not match what is expected, retry with a delay.
-         *
-         * This code may go away once we establish a way to ask for a particular delta.
-         */
-        if (result == last && swap.checksum != checksum &&
-          swap.reconciliation_id < reconciliation_id && retry < 100)
-            goto reread;
-
         if (swap.checksum == checksum) {
             blk->checksum = 0;
             if (__wt_checksum_match(current->data,
@@ -179,9 +165,8 @@ reread:
                     __wt_errx(session,
                       "%s: magic error for %" PRIu32
                       "B block at "
-                      "page %" PRIu64 " ckpt %" PRIu64 ", magic %" PRIu8
-                      ": doesn't match expected magic of %" PRIu8,
-                      block_disagg->name, size, page_id, checkpoint_id, swap.magic, expected_magic);
+                      "page %" PRIu64 ", magic %" PRIu8 ": doesn't match expected magic of %" PRIu8,
+                      block_disagg->name, size, page_id, swap.magic, expected_magic);
                     goto corrupt;
                 }
                 /* TODO: workaround MacOS build failure when passing macro to a string format. */
@@ -190,9 +175,9 @@ reread:
                     __wt_errx(session,
                       "%s: compatible version error for %" PRIu32
                       "B block at "
-                      "page %" PRIu64 " ckpt %" PRIu64 ", version %" PRIu8
+                      "page %" PRIu64 ", version %" PRIu8
                       ": is greater than compatible version of %" PRIu8,
-                      block_disagg->name, size, page_id, checkpoint_id, swap.compatible_version,
+                      block_disagg->name, size, page_id, swap.compatible_version,
                       compatible_version);
                     goto corrupt;
                 }
@@ -201,21 +186,15 @@ reread:
                     WT_ASSERT(session, get_args.lsn > 0);
                     /* Set the other metadata returned by the Page Service. */
                     block_meta->page_id = page_id;
-                    block_meta->checkpoint_id = checkpoint_id;
-                    block_meta->reconciliation_id = reconciliation_id;
                     block_meta->backlink_lsn = get_args.backlink_lsn;
                     block_meta->base_lsn = get_args.base_lsn;
-                    block_meta->backlink_checkpoint_id = get_args.backlink_checkpoint_id;
-                    block_meta->base_checkpoint_id = get_args.base_checkpoint_id;
                     block_meta->disagg_lsn = get_args.lsn;
                     block_meta->delta_count =
                       get_args.delta_count == 0 ? *results_count - 1 : get_args.delta_count;
                     block_meta->checksum = checksum;
                     block_meta->encryption = get_args.encryption;
                     if (block_meta->delta_count > 0)
-                        WT_ASSERT(session,
-                          get_args.base_lsn > 0 ||
-                            get_args.base_checkpoint_id >= WT_DISAGG_CHECKPOINT_ID_FIRST);
+                        WT_ASSERT(session, get_args.base_lsn > 0);
                     else
                         WT_ASSERT(
                           session, get_args.base_lsn == 0 && get_args.base_checkpoint_id == 0);
@@ -231,13 +210,11 @@ reread:
             }
 
             if (!F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
-                __block_disagg_read_checksum_err(session, block_disagg->name, size, page_id,
-                  checkpoint_id, swap.checksum, checksum, swap.reconciliation_id, reconciliation_id,
-                  "calculated block checksum");
+                __block_disagg_read_checksum_err(session, block_disagg->name, size, page_id, lsn,
+                  swap.checksum, checksum, "calculated block checksum");
         } else if (!F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
-            __block_disagg_read_checksum_err(session, block_disagg->name, size, page_id,
-              checkpoint_id, swap.checksum, checksum, swap.reconciliation_id, reconciliation_id,
-              "block header checksum");
+            __block_disagg_read_checksum_err(session, block_disagg->name, size, page_id, lsn,
+              swap.checksum, checksum, "block header checksum");
 
 corrupt:
         if (!F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
@@ -286,18 +263,17 @@ __wti_block_disagg_read_multiple(WT_BM *bm, WT_SESSION_IMPL *session,
   u_int *buffer_count)
 {
     WT_BLOCK_DISAGG *block_disagg;
-    uint64_t checkpoint_id, lsn, page_id, reconciliation_id;
+    uint64_t lsn, page_id;
     uint32_t checksum, size;
 
     block_disagg = (WT_BLOCK_DISAGG *)bm->block;
 
     /* Crack the cookie. */
-    WT_RET(__wti_block_disagg_addr_unpack(
-      &addr, addr_size, &page_id, &lsn, &checkpoint_id, &reconciliation_id, &size, &checksum));
+    WT_RET(__wti_block_disagg_addr_unpack(&addr, addr_size, &page_id, &lsn, &size, &checksum));
 
     /* Read the block. */
-    WT_RET(__block_disagg_read_multiple(session, block_disagg, block_meta, page_id, lsn,
-      checkpoint_id, reconciliation_id, size, checksum, buffer_array, buffer_count));
+    WT_RET(__block_disagg_read_multiple(
+      session, block_disagg, block_meta, page_id, lsn, size, checksum, buffer_array, buffer_count));
 
     return (0);
 }

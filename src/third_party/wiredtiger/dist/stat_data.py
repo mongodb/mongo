@@ -104,6 +104,10 @@ class DhandleStat(Stat):
     prefix = 'data-handle'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, DhandleStat.prefix, desc, flags)
+class DisaggStat(Stat):
+    prefix = 'disagg'
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, DisaggStat.prefix, desc, flags)
 class EvictCacheWalkStat(Stat):
     prefix = 'cache_walk'
     def __init__(self, name, desc, flags=''):
@@ -541,6 +545,11 @@ conn_stats = [
     CursorSweepStat('cursor_sweep_buckets', 'cursor sweep buckets'),
     CursorSweepStat('cursor_sweep_closed', 'cursor sweep cursors closed'),
     CursorSweepStat('cursor_sweep_examined', 'cursor sweep cursors examined'),
+
+    ##########################################
+    # Disagg statistics
+    ##########################################
+    DisaggStat('disagg_role_leader', 'role leader'),
 
     ##########################################
     # Dhandle statistics

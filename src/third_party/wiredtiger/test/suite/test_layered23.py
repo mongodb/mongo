@@ -300,12 +300,6 @@ class test_layered23(wttest.WiredTigerTestCase, DisaggConfigMixin):
         self.assertEqual(stat_cur[stat.conn.checkpoints_total_succeed][2], expected)
         stat_cur.close()
 
-    # Make sure the follower has received each checkpoint. The follower's checkpoint id
-    # should match the count of checkpoints performed on the leader.
-    def check_checkpoint_follower(self, conn, expected):
-        (_, ckpt_id, _, _) = self.disagg_get_complete_checkpoint_ext(conn)
-        self.assertEqual(ckpt_id, expected)
-
     # Test simple inserts to a leader/follower
     def test_leader_follower(self):
         # Create the oplog
@@ -353,7 +347,6 @@ class test_layered23(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # Then advance the checkpoint and make sure everything is still good
         self.pr('advance checkpoint')
         self.disagg_advance_checkpoint(conn_follow)
-        self.check_checkpoint_follower(conn_follow, checkpoint_count)
         oplog.check(self, session_follow, 0, 2100)
 
         # Now go back to leader, checkpoint and insert more.
@@ -397,7 +390,6 @@ class test_layered23(wttest.WiredTigerTestCase, DisaggConfigMixin):
             # advance checkpoint
             self.pr('advance checkpoint')
             self.disagg_advance_checkpoint(conn_follow)
-            self.check_checkpoint_follower(conn_follow, checkpoint_count)
 
             # The check begins at 0, which means this test will have quadratic performance.
             self.pr(f'checking follower from pos 0 to {follower_pos} after checkpoint pick-up')

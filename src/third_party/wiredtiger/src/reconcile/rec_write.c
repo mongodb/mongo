@@ -2520,31 +2520,19 @@ __rec_write_delta(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
     WT_CONNECTION_IMPL *conn;
     WT_MULTI *multi;
     WT_PAGE_BLOCK_META *block_meta;
-    uint64_t checkpoint_id, delta_pct;
+    uint64_t delta_pct;
 
     conn = S2C(session);
     multi = &r->multi[r->multi_next - 1];
     block_meta = &r->ref->page->block_meta;
 
-    WT_ASSERT(session, block_meta->checkpoint_id >= WT_DISAGG_CHECKPOINT_ID_FIRST);
     multi->block_meta = *block_meta;
-    WT_ACQUIRE_READ(checkpoint_id, conn->disaggregated_storage.global_checkpoint_id);
-    /* The first delta needs to explicitly initialize the base LSN and checkpoint id. */
-    if (multi->block_meta.delta_count == 0) {
+
+    /* The first delta needs to explicitly initialize the base LSN. */
+    if (multi->block_meta.delta_count == 0)
         multi->block_meta.base_lsn = multi->block_meta.disagg_lsn;
-        multi->block_meta.base_checkpoint_id = multi->block_meta.checkpoint_id;
-    }
-    WT_ASSERT(session,
-      multi->block_meta.base_lsn > 0 ||
-        multi->block_meta.base_checkpoint_id >= WT_DISAGG_CHECKPOINT_ID_FIRST);
+    WT_ASSERT(session, multi->block_meta.base_lsn > 0);
     multi->block_meta.backlink_lsn = block_meta->disagg_lsn;
-    multi->block_meta.backlink_checkpoint_id = multi->block_meta.checkpoint_id;
-    if (checkpoint_id != multi->block_meta.checkpoint_id) {
-        WT_ASSERT(session, checkpoint_id > multi->block_meta.checkpoint_id);
-        multi->block_meta.checkpoint_id = checkpoint_id;
-        multi->block_meta.reconciliation_id = 0;
-    } else
-        ++multi->block_meta.reconciliation_id;
     ++multi->block_meta.delta_count;
 
     /* Get the checkpoint ID. */
@@ -2626,13 +2614,10 @@ static int
 __rec_write_image(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chunk, uint8_t *addr,
   size_t *addr_sizep, size_t *compressed_sizep, bool last_block)
 {
-    WT_CONNECTION_IMPL *conn;
     WT_MULTI *multi;
     WT_PAGE *page;
     WT_PAGE_BLOCK_META *block_meta;
-    uint64_t checkpoint_id;
 
-    conn = S2C(session);
     page = r->page;
     multi = &r->multi[r->multi_next - 1];
     block_meta = &page->block_meta;
@@ -2645,25 +2630,12 @@ __rec_write_image(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
          * base as the new backlink. Otherwise, use the previous page as the backlink.
          */
         if (multi->block_meta.delta_count > 0) {
-            WT_ASSERT(session,
-              multi->block_meta.base_lsn > 0 ||
-                multi->block_meta.base_checkpoint_id >= WT_DISAGG_CHECKPOINT_ID_FIRST);
-            multi->block_meta.backlink_checkpoint_id = multi->block_meta.base_checkpoint_id;
+            WT_ASSERT(session, multi->block_meta.base_lsn > 0);
             multi->block_meta.backlink_lsn = multi->block_meta.base_lsn;
-        } else {
-            multi->block_meta.backlink_checkpoint_id = multi->block_meta.checkpoint_id;
+        } else
             multi->block_meta.backlink_lsn = multi->block_meta.disagg_lsn;
-        }
         multi->block_meta.delta_count = 0;
         multi->block_meta.base_lsn = 0;
-        multi->block_meta.base_checkpoint_id = 0;
-        WT_ACQUIRE_READ(checkpoint_id, conn->disaggregated_storage.global_checkpoint_id);
-        if (checkpoint_id != multi->block_meta.checkpoint_id) {
-            WT_ASSERT(session, checkpoint_id > multi->block_meta.checkpoint_id);
-            multi->block_meta.checkpoint_id = checkpoint_id;
-            multi->block_meta.reconciliation_id = 0;
-        } else
-            ++multi->block_meta.reconciliation_id;
     } else
         __wt_page_block_meta_assign(session, &multi->block_meta);
     WT_RET(__rec_write(session, &chunk->image, &multi->block_meta, addr, addr_sizep,

@@ -171,19 +171,6 @@ class DisaggConfigMixin:
             extlist.skip_if_missing = True
         extlist.extension('page_log', self.ds_name + config)
 
-    # Get the last completed checkpoint
-    def disagg_get_complete_checkpoint(self, conn=None):
-        if conn is None:
-            conn = self.conn
-        page_log = conn.get_page_log('palm')
-
-        session = conn.open_session('')
-        (ret, n) = page_log.pl_get_complete_checkpoint(session)
-        session.close()
-
-        self.assertEqual(ret, 0)
-        return n
-
     # Get the information about the last completed checkpoint: ID, LSN, and metadata
     def disagg_get_complete_checkpoint_ext(self, conn=None):
         if conn is None:
@@ -200,19 +187,6 @@ class DisaggConfigMixin:
         (_, _, _, m) = self.disagg_get_complete_checkpoint_ext(conn)
         return m
 
-    # Get the currently open checkpoint
-    def disagg_get_open_checkpoint(self, conn=None):
-        if conn is None:
-            conn = self.conn
-        page_log = conn.get_page_log('palm')
-
-        session = conn.open_session('')
-        (ret, n) = page_log.pl_get_open_checkpoint(session)
-        session.close()
-
-        self.assertEqual(ret, 0)
-        return n
-
     # Let the follower pick up the latest checkpoint
     def disagg_advance_checkpoint(self, conn_follower, conn_leader=None):
         m = self.disagg_get_complete_checkpoint_meta(conn_leader)
@@ -226,18 +200,11 @@ class DisaggConfigMixin:
         # Leader step down
         conn_leader.reconfigure(f'disaggregated=(role="follower")')
 
-        (_, complete_id, _, meta) = self.disagg_get_complete_checkpoint_ext(conn_leader)
-        self.assertGreater(complete_id, 0)
-        open_id = self.disagg_get_open_checkpoint(conn_leader)
-        if open_id == 0:
-            next_id = complete_id + 1
-        else:
-            self.assertGreaterEqual(open_id, complete_id)
-            next_id = open_id + 1
+        meta = self.disagg_get_complete_checkpoint_meta(conn_leader)
 
         # Follower step up, including picking up the last complete checkpoint
         conn_follower.reconfigure(f'disaggregated=(checkpoint_meta="{meta}",' +\
-                                  f'next_checkpoint_id={next_id},role="leader")')
+                                  f'role="leader")')
 
     def reopen_disagg_conn(self, base_config, directory="."):
         """

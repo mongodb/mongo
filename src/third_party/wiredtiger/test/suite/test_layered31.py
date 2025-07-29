@@ -279,7 +279,7 @@ class test_layered31(wttest.WiredTigerTestCase, DisaggConfigMixin):
             self.put_data(value_prefix6, session=session_follow)
 
             # Step down.
-            conn_follow.reconfigure('disaggregated=(role="follower",checkpoint_meta=,checkpoint_id=-1)')
+            conn_follow.reconfigure('disaggregated=(role="follower",checkpoint_meta=)')
 
             # Read a couple items to make sure the cursor has been insulated.
             cursors = self.scan_data_follower(value_prefix5, first_read, first_read + 2)

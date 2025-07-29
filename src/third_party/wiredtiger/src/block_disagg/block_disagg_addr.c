@@ -13,29 +13,25 @@
  *     Convert the filesystem components into its address cookie.
  */
 int
-__wti_block_disagg_addr_pack(uint8_t **pp, uint64_t page_id, uint64_t lsn, uint64_t checkpoint_id,
-  uint64_t reconciliation_id, uint32_t size, uint32_t checksum)
+__wti_block_disagg_addr_pack(
+  uint8_t **pp, uint64_t page_id, uint64_t lsn, uint32_t size, uint32_t checksum)
 {
-    uint64_t c, cp, l, p, r, s;
+    uint64_t c, l, p, s;
 
     /* FIXME-WT-14644: write extensible byte */
     /* See the comment above: this is the reverse operation. */
     if (size == 0) {
         p = WT_BLOCK_INVALID_PAGE_ID;
         s = c = 0;
-        cp = l = r = 0;
+        l = 0;
     } else {
         p = page_id;
         l = lsn;
-        cp = checkpoint_id;
-        r = reconciliation_id;
         s = size;
         c = checksum;
     }
     WT_RET(__wt_vpack_uint(pp, 0, p));
     WT_RET(__wt_vpack_uint(pp, 0, l));
-    WT_RET(__wt_vpack_uint(pp, 0, cp));
-    WT_RET(__wt_vpack_uint(pp, 0, r));
     WT_RET(__wt_vpack_uint(pp, 0, s));
     WT_RET(__wt_vpack_uint(pp, 0, c));
 
@@ -49,10 +45,9 @@ __wti_block_disagg_addr_pack(uint8_t **pp, uint64_t page_id, uint64_t lsn, uint6
  */
 int
 __wti_block_disagg_addr_unpack(const uint8_t **buf, size_t buf_size, uint64_t *page_idp,
-  uint64_t *lsnp, uint64_t *checkpoint_idp, uint64_t *reconciliation_idp, uint32_t *sizep,
-  uint32_t *checksump)
+  uint64_t *lsnp, uint32_t *sizep, uint32_t *checksump)
 {
-    uint64_t c, cp, l, p, r, s;
+    uint64_t c, l, p, s;
     const uint8_t *begin;
 
     p = 0; /* Avoid compiler warnings. */
@@ -61,8 +56,6 @@ __wti_block_disagg_addr_unpack(const uint8_t **buf, size_t buf_size, uint64_t *p
     begin = *buf;
     WT_RET(__wt_vunpack_uint(buf, 0, &p));
     WT_RET(__wt_vunpack_uint(buf, 0, &l));
-    WT_RET(__wt_vunpack_uint(buf, 0, &cp));
-    WT_RET(__wt_vunpack_uint(buf, 0, &r));
     WT_RET(__wt_vunpack_uint(buf, 0, &s));
     WT_RET(__wt_vunpack_uint(buf, 0, &c));
 
@@ -71,13 +64,11 @@ __wti_block_disagg_addr_unpack(const uint8_t **buf, size_t buf_size, uint64_t *p
      */
     if (s == 0) {
         *page_idp = WT_BLOCK_INVALID_PAGE_ID;
-        *checkpoint_idp = *lsnp = *reconciliation_idp = 0;
+        *lsnp = 0;
         *sizep = *checksump = 0;
     } else {
         *page_idp = p;
         *lsnp = l;
-        *checkpoint_idp = cp;
-        *reconciliation_idp = r;
         *sizep = (uint32_t)s;
         *checksump = (uint32_t)c;
     }
@@ -94,12 +85,11 @@ __wti_block_disagg_addr_unpack(const uint8_t **buf, size_t buf_size, uint64_t *p
 int
 __wti_block_disagg_addr_invalid(const uint8_t *addr, size_t addr_size)
 {
-    uint64_t checkpoint_id, lsn, page_id, reconciliation_id;
+    uint64_t lsn, page_id;
     uint32_t checksum, size;
 
     /* Crack the cookie - there aren't further checks for object blocks. */
-    WT_RET(__wti_block_disagg_addr_unpack(
-      &addr, addr_size, &page_id, &lsn, &checkpoint_id, &reconciliation_id, &size, &checksum));
+    WT_RET(__wti_block_disagg_addr_unpack(&addr, addr_size, &page_id, &lsn, &size, &checksum));
 
     return (0);
 }
@@ -112,20 +102,17 @@ int
 __wti_block_disagg_addr_string(
   WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, size_t addr_size)
 {
-    uint64_t checkpoint_id, lsn, page_id, reconciliation_id;
+    uint64_t lsn, page_id;
     uint32_t checksum, size;
 
     WT_UNUSED(bm);
 
     /* Crack the cookie. */
-    WT_RET(__wti_block_disagg_addr_unpack(
-      &addr, addr_size, &page_id, &lsn, &checkpoint_id, &reconciliation_id, &size, &checksum));
+    WT_RET(__wti_block_disagg_addr_unpack(&addr, addr_size, &page_id, &lsn, &size, &checksum));
 
     /* Printable representation. */
-    WT_RET(__wt_buf_fmt(session, buf,
-      "[%" PRIuMAX ", %" PRIuMAX ", %" PRIuMAX ", %" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]",
-      (uintmax_t)page_id, (uintmax_t)lsn, (uintmax_t)checkpoint_id, (uintmax_t)reconciliation_id,
-      size, checksum));
+    WT_RET(__wt_buf_fmt(session, buf, "[%" PRIuMAX ", %" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]",
+      (uintmax_t)page_id, (uintmax_t)lsn, size, checksum));
 
     return (0);
 }
@@ -137,13 +124,11 @@ __wti_block_disagg_addr_string(
  */
 int
 __wti_block_disagg_ckpt_pack(WT_BLOCK_DISAGG *block_disagg, uint8_t **buf, uint64_t root_id,
-  uint64_t lsn, uint64_t checkpoint_id, uint64_t reconciliation_id, uint32_t root_sz,
-  uint32_t root_checksum)
+  uint64_t lsn, uint32_t root_sz, uint32_t root_checksum)
 {
     WT_UNUSED(block_disagg);
 
-    WT_RET(__wti_block_disagg_addr_pack(
-      buf, root_id, lsn, checkpoint_id, reconciliation_id, root_sz, root_checksum));
+    WT_RET(__wti_block_disagg_addr_pack(buf, root_id, lsn, root_sz, root_checksum));
 
     return (0);
 }
@@ -155,14 +140,12 @@ __wti_block_disagg_ckpt_pack(WT_BLOCK_DISAGG *block_disagg, uint8_t **buf, uint6
  */
 int
 __wti_block_disagg_ckpt_unpack(WT_BLOCK_DISAGG *block_disagg, const uint8_t *buf, size_t buf_size,
-  uint64_t *root_id, uint64_t *lsn, uint64_t *checkpoint_id, uint64_t *reconciliation_id,
-  uint32_t *root_sz, uint32_t *root_checksum)
+  uint64_t *root_id, uint64_t *lsn, uint32_t *root_sz, uint32_t *root_checksum)
 {
     WT_UNUSED(block_disagg);
 
     /* Retrieve the root page information */
-    WT_RET(__wti_block_disagg_addr_unpack(
-      &buf, buf_size, root_id, lsn, checkpoint_id, reconciliation_id, root_sz, root_checksum));
+    WT_RET(__wti_block_disagg_addr_unpack(&buf, buf_size, root_id, lsn, root_sz, root_checksum));
 
     return (0);
 }

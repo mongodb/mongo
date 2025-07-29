@@ -123,7 +123,6 @@ struct __wt_layered_table_manager_entry {
     WT_LAYERED_TABLE *layered_table;
 
     uint64_t checkpoint_txn_id;
-    uint64_t read_checkpoint;
 };
 
 /*
@@ -180,8 +179,7 @@ struct __wt_disaggregated_checkpoint_track {
 struct __wt_disaggregated_storage {
     char *page_log;
 
-    wt_shared uint64_t global_checkpoint_id;     /* The ID of the currently opened checkpoint. */
-                                                 /* Updates are protected by the checkpoint lock. */
+    /* Updates are protected by the checkpoint lock. */
     wt_shared uint64_t last_checkpoint_meta_lsn; /* The LSN of the last checkpoint metadata. */
     wt_shared uint64_t last_materialized_lsn;    /* The LSN of the last materialized page. */
 

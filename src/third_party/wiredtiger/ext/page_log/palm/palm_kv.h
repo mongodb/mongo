@@ -74,17 +74,13 @@ typedef struct PALM_KV_PAGE_MATCHES {
     bool first;
 
     uint64_t query_lsn;
-    uint64_t query_checkpoint_id;
 
     uint64_t table_id;
     uint64_t page_id;
     uint64_t lsn;
-    uint64_t checkpoint_id;
 
     uint64_t backlink_lsn;
     uint64_t base_lsn;
-    uint64_t backlink_checkpoint_id;
-    uint64_t base_checkpoint_id;
     WT_PAGE_LOG_ENCRYPTION encryption;
     uint32_t flags;
 } PALM_KV_PAGE_MATCHES;
@@ -98,22 +94,18 @@ int palm_kv_commit_transaction(PALM_KV_CONTEXT *context);
 void palm_kv_rollback_transaction(PALM_KV_CONTEXT *context);
 
 typedef enum PALM_KV_GLOBAL_KEY {
-    PALM_KV_GLOBAL_REVISION = 0,
-    PALM_KV_GLOBAL_CHECKPOINT_COMPLETED = 1,
-    PALM_KV_GLOBAL_CHECKPOINT_STARTED = 2,
+    PALM_KV_GLOBAL_LSN = 0,
 } PALM_KV_GLOBAL_KEY;
 
 int palm_kv_put_global(PALM_KV_CONTEXT *context, PALM_KV_GLOBAL_KEY key, uint64_t value);
 int palm_kv_get_global(PALM_KV_CONTEXT *context, PALM_KV_GLOBAL_KEY key, uint64_t *valuep);
 int palm_kv_put_page(PALM_KV_CONTEXT *context, uint64_t table_id, uint64_t page_id, uint64_t lsn,
-  uint64_t checkpoint_id, bool is_delta, uint64_t backlink_lsn, uint64_t base_lsn,
-  uint64_t backlink_checkpoint_id, uint64_t base_checkpoint_id,
-  const WT_PAGE_LOG_ENCRYPTION *encryption, uint32_t flags, const WT_ITEM *buf);
+  bool is_delta, uint64_t backlink_lsn, uint64_t base_lsn, const WT_PAGE_LOG_ENCRYPTION *encryption,
+  uint32_t flags, const WT_ITEM *buf);
 int palm_kv_get_page_matches(PALM_KV_CONTEXT *context, uint64_t table_id, uint64_t page_id,
-  uint64_t lsn, uint64_t checkpoint_id, PALM_KV_PAGE_MATCHES *matchesp);
+  uint64_t lsn, PALM_KV_PAGE_MATCHES *matchesp);
 bool palm_kv_next_page_match(PALM_KV_PAGE_MATCHES *matches);
 int palm_kv_put_checkpoint(PALM_KV_CONTEXT *context, uint64_t checkpoint_lsn,
-  uint64_t checkpoint_id, uint64_t checkpoint_timestamp, const WT_ITEM *checkpoint_metadata);
+  uint64_t checkpoint_timestamp, const WT_ITEM *checkpoint_metadata);
 int palm_kv_get_last_checkpoint(PALM_KV_CONTEXT *context, uint64_t *checkpoint_lsn,
-  uint64_t *checkpoint_id, uint64_t *checkpoint_timestamp, void **checkpoint_metadata,
-  size_t *checkpoint_metadata_size);
+  uint64_t *checkpoint_timestamp, void **checkpoint_metadata, size_t *checkpoint_metadata_size);
