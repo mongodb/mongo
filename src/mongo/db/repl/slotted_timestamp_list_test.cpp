@@ -29,9 +29,8 @@
 
 #include "mongo/db/repl/slotted_timestamp_list.h"
 
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace repl {

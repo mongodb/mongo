@@ -37,7 +37,7 @@
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
 
 #include <limits>
 
