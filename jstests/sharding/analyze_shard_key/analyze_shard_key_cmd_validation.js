@@ -165,6 +165,23 @@ function testValidationOnShardedTimeseriesCollections(cmdConn, validationTest, p
     awaitResult();
 }
 
+function testSettingInvalidNumRanges(mongodConn) {
+    jsTest.log(`Testing that analyzeShardKeyNumRanges must be greater than 1`);
+    assert.commandFailedWithCode(
+        mongodConn.adminCommand({setParameter: 1, analyzeShardKeyNumRanges: -1}),
+        ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        mongodConn.adminCommand({setParameter: 1, analyzeShardKeyNumRanges: 0}),
+        ErrorCodes.BadValue);
+
+    const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+    if (!isMultiversion) {
+        assert.commandFailedWithCode(
+            mongodConn.adminCommand({setParameter: 1, analyzeShardKeyNumRanges: 1}),
+            ErrorCodes.BadValue);
+    }
+}
+
 const setParameterOpts = {analyzeShardKeyNumRanges};
 
 {
@@ -177,6 +194,7 @@ const setParameterOpts = {analyzeShardKeyNumRanges};
     testValidationDuringKeyCharacteristicsMetricsCalculation(st.s, validationTest);
     testValidationDuringReadWriteDistributionMetricsCalculation(
         st.s, validationTest, shard0Primary);
+    testSettingInvalidNumRanges(shard0Primary);
     testValidationOnShardedTimeseriesCollections(st.s, validationTest, shard0Primary);
 
     st.stop();
@@ -193,6 +211,7 @@ if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove 
     testValidationBeforeMetricsCalculation(primary, primary, validationTest);
     testValidationDuringKeyCharacteristicsMetricsCalculation(primary, validationTest);
     testValidationDuringReadWriteDistributionMetricsCalculation(primary, validationTest, primary);
+    testSettingInvalidNumRanges(primary);
 
     rst.stopSet();
 }

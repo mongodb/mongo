@@ -475,8 +475,12 @@ function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
     // Wait for the write to be applied on the secondary node.
     fixture.waitForReplicationFn();
 
-    assert.commandFailedWithCode(
-        fixture.conn.adminCommand({analyzeShardKey: sampledNs, key: shardKey}), 4952606);
+    let res = fixture.conn.adminCommand({analyzeShardKey: sampledNs, key: shardKey});
+    if (analyzeShardKeyNumRanges == 2) {
+        assert.commandWorked(res);
+    } else {
+        assert.commandFailedWithCode(res, 4952606);
+    }
 
     // Insert documents into the sampled collection. The range of values is selected such that the
     // documents will be distributed across all the shards if the collection is sharded.
@@ -500,7 +504,7 @@ function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
 
     // Verify that the analyzeShardKey command returns zeros for the read and write sample size
     // when there are no sampled queries.
-    let res = assert.commandWorked(
+    res = assert.commandWorked(
         fixture.conn.adminCommand({analyzeShardKey: sampledNs, key: shardKey}));
     assertMetricsEmptySampleSize(res);
 
@@ -539,7 +543,10 @@ const queryAnalysisSamplerConfigurationRefreshSecs = 1;
 const queryAnalysisWriterIntervalSecs = 1;
 
 const samplesPerSecond = 10000;
-const analyzeShardKeyNumRanges = 10;
+// Test both the case where there is only one split point to generate and the case where there are
+// multiple split points to generate
+const analyzeShardKeyNumRanges = Math.random() < 0.5 ? 2 : 10;
+jsTest.log("Testing with " + tojsononeline({samplesPerSecond, analyzeShardKeyNumRanges}));
 
 const mongodSetParameterOpts = {
     queryAnalysisSamplerConfigurationRefreshSecs,

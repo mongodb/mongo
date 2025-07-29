@@ -56,6 +56,12 @@ If the min/max is not inclusive, this is added as a note above the parameter.
 
 config_fuzzer_params = {
     "mongod": {
+        "analyzeShardKeyNumRanges": {
+            "min": 2,
+            "max": 100,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
         "analyzeShardKeySplitPointExpirationSecs": {"min": 1, "max": 300, "fuzz_at": ["startup"]},
         "collectionSamplingLogIntervalSeconds": {
             "min": 5,

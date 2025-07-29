@@ -978,6 +978,7 @@ std::pair<BSONObj, Timestamp> generateSplitPoints(OperationContext* opCtx,
             throw;
         }
     }();
+    uassert(10828001, "Expected to find at least one split point", !splitPoints.empty());
 
     Timestamp splitPointsAfterClusterTime;
     auto uassertWriteStatusFn = [&](const BSONObj& resObj) {
@@ -1039,7 +1040,10 @@ std::pair<BSONObj, Timestamp> generateSplitPoints(OperationContext* opCtx,
         splitPointsToInsert.clear();
     }
 
-    invariant(!splitPointsAfterClusterTime.isNull());
+    tassert(10828002,
+            "Expected to have set the afterClusterTime since there is at least one split point "
+            "document to insert",
+            !splitPointsAfterClusterTime.isNull());
     auto splitPointsFilter = BSON((AnalyzeShardKeySplitPointDocument::kIdFieldName + "." +
                                    AnalyzeShardKeySplitPointId::kAnalyzeShardKeyIdFieldName)
                                   << analyzeShardKeyId);
