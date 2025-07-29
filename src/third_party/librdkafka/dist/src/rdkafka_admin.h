@@ -1,8 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2018-2022, Magnus Edenhill
- *               2023, Confluent Inc.
+ * Copyright (c) 2018 Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,18 +31,10 @@
 
 
 #include "rdstring.h"
-#include "rdmap.h"
 #include "rdkafka_error.h"
 #include "rdkafka_confval.h"
-#if WITH_SSL
-typedef struct rd_kafka_broker_s rd_kafka_broker_t;
-extern int rd_kafka_ssl_hmac(rd_kafka_broker_t *rkb,
-                             const EVP_MD *evp,
-                             const rd_chariov_t *in,
-                             const rd_chariov_t *salt,
-                             int itcnt,
-                             rd_chariov_t *out);
-#endif
+
+
 
 /**
  * @brief Common AdminOptions type used for all admin APIs.
@@ -78,8 +69,14 @@ struct rd_kafka_AdminOptions_s {
                                            *     CreateTopics
                                            *     CreatePartitions
                                            *     AlterConfigs
-                                           *     IncrementalAlterConfigs
                                            */
+
+        rd_kafka_confval_t incremental; /**< BOOL: Incremental rather than
+                                         *         absolute application
+                                         *         of config.
+                                         *   Valid for:
+                                         *     AlterConfigs
+                                         */
 
         rd_kafka_confval_t broker; /**< INT: Explicitly override
                                     *        broker id to send
@@ -94,33 +91,12 @@ struct rd_kafka_AdminOptions_s {
                                      * Valid for:
                                      *     ListConsumerGroupOffsets
                                      */
-        rd_kafka_confval_t
-            include_authorized_operations; /**< BOOL: Whether broker should
-                                            * return authorized operations.
-                                            * Valid for:
-                                            *     DescribeConsumerGroups
-                                            *     DescribeCluster
-                                            *     DescribeTopics
-                                            */
 
         rd_kafka_confval_t
             match_consumer_group_states; /**< PTR: list of consumer group states
                                           *   to query for.
                                           *   Valid for: ListConsumerGroups.
                                           */
-
-        rd_kafka_confval_t
-            match_consumer_group_types; /**< PTR: list of consumer group types
-                                         *   to query for.
-                                         *   Valid for: ListConsumerGroups.
-                                         */
-
-        rd_kafka_confval_t
-            isolation_level; /**< INT:Isolation Level needed for list Offset
-                              *   to query for.
-                              *   Default Set to
-                              * RD_KAFKA_ISOLATION_LEVEL_READ_UNCOMMITTED
-                              */
 
         rd_kafka_confval_t opaque; /**< PTR: Application opaque.
                                     *   Valid for all. */
@@ -212,6 +188,13 @@ struct rd_kafka_NewPartitions_s {
  * @{
  */
 
+/* KIP-248 */
+typedef enum rd_kafka_AlterOperation_t {
+        RD_KAFKA_ALTER_OP_ADD    = 0,
+        RD_KAFKA_ALTER_OP_SET    = 1,
+        RD_KAFKA_ALTER_OP_DELETE = 2,
+} rd_kafka_AlterOperation_t;
+
 struct rd_kafka_ConfigEntry_s {
         rd_strtup_t *kv; /**< Name/Value pair */
 
@@ -219,9 +202,8 @@ struct rd_kafka_ConfigEntry_s {
 
         /* Attributes: this is a struct for easy copying */
         struct {
-                /** Operation type, used for IncrementalAlterConfigs */
-                rd_kafka_AlterConfigOpType_t op_type;
-                rd_kafka_ConfigSource_t source; /**< Config source */
+                rd_kafka_AlterOperation_t operation; /**< Operation */
+                rd_kafka_ConfigSource_t source;      /**< Config source */
                 rd_bool_t is_readonly;  /**< Value is read-only (on broker) */
                 rd_bool_t is_default;   /**< Value is at its default */
                 rd_bool_t is_sensitive; /**< Value is sensitive */
@@ -265,10 +247,6 @@ struct rd_kafka_ConfigResource_s {
 
 
 struct rd_kafka_AlterConfigs_result_s {
-        rd_list_t resources; /**< Type (rd_kafka_ConfigResource_t *) */
-};
-
-struct rd_kafka_IncrementalAlterConfigs_result_s {
         rd_list_t resources; /**< Type (rd_kafka_ConfigResource_t *) */
 };
 
@@ -320,47 +298,6 @@ struct rd_kafka_DeleteRecords_s {
 
 /**@}*/
 
-/**
- * @name ListConsumerGroupOffsets
- * @{
- */
-
-/**
- * @brief ListConsumerGroupOffsets result
- */
-struct rd_kafka_ListConsumerGroupOffsets_result_s {
-        rd_list_t groups; /**< Type (rd_kafka_group_result_t *) */
-};
-
-struct rd_kafka_ListConsumerGroupOffsets_s {
-        char *group_id; /**< Points to data */
-        rd_kafka_topic_partition_list_t *partitions;
-        char data[1]; /**< The group id is allocated along with
-                       *   the struct here. */
-};
-
-/**@}*/
-
-/**
- * @name AlterConsumerGroupOffsets
- * @{
- */
-
-/**
- * @brief AlterConsumerGroupOffsets result
- */
-struct rd_kafka_AlterConsumerGroupOffsets_result_s {
-        rd_list_t groups; /**< Type (rd_kafka_group_result_t *) */
-};
-
-struct rd_kafka_AlterConsumerGroupOffsets_s {
-        char *group_id; /**< Points to data */
-        rd_kafka_topic_partition_list_t *partitions;
-        char data[1]; /**< The group id is allocated along with
-                       *   the struct here. */
-};
-
-/**@}*/
 
 /**
  * @name DeleteConsumerGroupOffsets
@@ -381,24 +318,6 @@ struct rd_kafka_DeleteConsumerGroupOffsets_s {
                        *   the struct here. */
 };
 
-/**@}*/
-
-/**
- * @name ListOffsets
- * @{
- */
-
-/**
- * @struct ListOffsets result about a single partition
- */
-struct rd_kafka_ListOffsetsResultInfo_s {
-        rd_kafka_topic_partition_t *topic_partition;
-        int64_t timestamp;
-};
-
-rd_kafka_ListOffsetsResultInfo_t *
-rd_kafka_ListOffsetsResultInfo_new(rd_kafka_topic_partition_t *rktpar,
-                                   rd_ts_t timestamp);
 /**@}*/
 
 /**
@@ -438,6 +357,50 @@ struct rd_kafka_DeleteAcls_result_response_s {
 
 /**@}*/
 
+
+/**
+ * @name AlterConsumerGroupOffsets
+ * @{
+ */
+
+/**
+ * @brief AlterConsumerGroupOffsets result
+ */
+struct rd_kafka_AlterConsumerGroupOffsets_result_s {
+        rd_list_t groups; /**< Type (rd_kafka_group_result_t *) */
+};
+
+struct rd_kafka_AlterConsumerGroupOffsets_s {
+        char *group_id; /**< Points to data */
+        rd_kafka_topic_partition_list_t *partitions;
+        char data[1]; /**< The group id is allocated along with
+                       *   the struct here. */
+};
+
+/**@}*/
+
+
+/**
+ * @name ListConsumerGroupOffsets
+ * @{
+ */
+
+/**
+ * @brief ListConsumerGroupOffsets result
+ */
+struct rd_kafka_ListConsumerGroupOffsets_result_s {
+        rd_list_t groups; /**< Type (rd_kafka_group_result_t *) */
+};
+
+struct rd_kafka_ListConsumerGroupOffsets_s {
+        char *group_id; /**< Points to data */
+        rd_kafka_topic_partition_list_t *partitions;
+        char data[1]; /**< The group id is allocated along with
+                       *   the struct here. */
+};
+
+/**@}*/
+
 /**
  * @name ListConsumerGroups
  * @{
@@ -451,7 +414,6 @@ struct rd_kafka_ConsumerGroupListing_s {
         /** Is it a simple consumer group? That means empty protocol_type. */
         rd_bool_t is_simple_consumer_group;
         rd_kafka_consumer_group_state_t state; /**< Consumer group state. */
-        rd_kafka_consumer_group_type_t type;   /**< Consumer group type. */
 };
 
 
@@ -511,108 +473,9 @@ struct rd_kafka_ConsumerGroupDescription_s {
         rd_kafka_consumer_group_state_t state;
         /** Consumer group coordinator. */
         rd_kafka_Node_t *coordinator;
-        /** Count of operations allowed for topic. -1 indicates operations not
-         * requested.*/
-        int authorized_operations_cnt;
-        /** Operations allowed for topic. May be NULL if operations were not
-         * requested */
-        rd_kafka_AclOperation_t *authorized_operations;
         /** Group specific error. */
         rd_kafka_error_t *error;
 };
-
-/**@}*/
-
-/**
- * @name DescribeTopics
- * @{
- */
-
-/**
- * @brief TopicCollection contains a list of topics.
- *
- */
-struct rd_kafka_TopicCollection_s {
-        char **topics;     /**< List of topic names. */
-        size_t topics_cnt; /**< Count of topic names. */
-};
-
-/**
- * @brief TopicPartition result type in DescribeTopics result.
- *
- */
-struct rd_kafka_TopicPartitionInfo_s {
-        int partition;              /**< Partition id. */
-        rd_kafka_Node_t *leader;    /**< Leader of the partition. */
-        size_t isr_cnt;             /**< Count of insync replicas. */
-        rd_kafka_Node_t **isr;      /**< List of in sync replica nodes. */
-        size_t replica_cnt;         /**< Count of partition replicas. */
-        rd_kafka_Node_t **replicas; /**< List of replica nodes. */
-};
-
-/**
- * @struct DescribeTopics result
- */
-struct rd_kafka_TopicDescription_s {
-        char *topic;              /**< Topic name */
-        rd_kafka_Uuid_t topic_id; /**< Topic Id */
-        int partition_cnt;        /**< Number of partitions in \p partitions*/
-        rd_bool_t is_internal;    /**< Is the topic is internal to Kafka? */
-        rd_kafka_TopicPartitionInfo_t **partitions; /**< Partitions */
-        rd_kafka_error_t *error;       /**< Topic error reported by broker */
-        int authorized_operations_cnt; /**< Count of operations allowed for
-                                        * topic. -1 indicates operations not
-                                        * requested. */
-        rd_kafka_AclOperation_t
-            *authorized_operations; /**< Operations allowed for topic. May be
-                                     * NULL if operations were not requested */
-};
-
-/**@}*/
-
-/**
- * @name DescribeCluster
- * @{
- */
-/**
- * @struct DescribeCluster result - internal type.
- */
-typedef struct rd_kafka_ClusterDescription_s {
-        char *cluster_id;              /**< Cluster id */
-        rd_kafka_Node_t *controller;   /**< Current controller. */
-        size_t node_cnt;               /**< Count of brokers in the cluster. */
-        rd_kafka_Node_t **nodes;       /**< Brokers in the cluster. */
-        int authorized_operations_cnt; /**< Count of operations allowed for
-                                        * cluster. -1 indicates operations not
-                                        * requested. */
-        rd_kafka_AclOperation_t
-            *authorized_operations; /**< Operations allowed for cluster. May be
-                                     * NULL if operations were not requested */
-
-} rd_kafka_ClusterDescription_t;
-
-/**@}*/
-
-/**
- * @name ElectLeaders
- * @{
- */
-
-/**
- * @struct ElectLeaders request object
- */
-struct rd_kafka_ElectLeaders_s {
-        rd_kafka_ElectionType_t election_type; /*Election Type*/
-        rd_kafka_topic_partition_list_t
-            *partitions; /*TopicPartitions for election*/
-};
-
-/**
- * @struct ElectLeaders result object
- */
-typedef struct rd_kafka_ElectLeadersResult_s {
-        rd_list_t partitions; /**< Type (rd_kafka_topic_partition_result_t *) */
-} rd_kafka_ElectLeadersResult_t;
 
 /**@}*/
 

@@ -1,8 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2016-2022, Magnus Edenhill
- *               2023, Confluent Inc.
+ * Copyright (c) 2016, Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -205,7 +204,7 @@ static const struct rd_kafka_feature_map {
         .depends =
             {
                 {RD_KAFKAP_SaslHandshake, 1, 1},
-                {RD_KAFKAP_SaslAuthenticate, 0, 1},
+                {RD_KAFKAP_SaslAuthenticate, 0, 0},
                 {-1},
             },
     },

@@ -1212,14 +1212,14 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/confluentinc/librdkafka@v2.6.0",
+      "bom-ref": "pkg:github/confluentinc/librdkafka@v2.0.2",
       "supplier": {
         "name": "Confluent Inc."
       },
       "author": "Magnus Edenhill",
       "group": "confluentinc",
       "name": "librdkafka - The Apache Kafka C/C++ library",
-      "version": "2.6.0",
+      "version": "2.0.2",
       "licenses": [
         {
           "license": {
@@ -1228,8 +1228,8 @@
         }
       ],
       "copyright": "Copyright (c) 2012-2022, Magnus Edenhill; 2023, Confluent Inc.",
-      "cpe": "cpe:2.3:a:confluent:librdkafka:2.6.0:*:*:*:*:*:*:*",
-      "purl": "pkg:github/confluentinc/librdkafka@v2.6.0",
+      "cpe": "cpe:2.3:a:confluent:librdkafka:2.0.2:*:*:*:*:*:*:*",
+      "purl": "pkg:github/confluentinc/librdkafka@v2.0.2",
       "properties": [
         {
           "name": "internal:team_responsible",

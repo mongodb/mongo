@@ -1,8 +1,7 @@
 /*
  * librdkafka - Apache Kafka C library
  *
- * Copyright (c) 2012-2022, Magnus Edenhill,
- *               2023, Confluent Inc.
+ * Copyright (c) 2012-2015, Magnus Edenhill
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -300,18 +299,6 @@ void *rd_list_last(const rd_list_t *rl);
  */
 void *rd_list_find_duplicate(const rd_list_t *rl,
                              int (*cmp)(const void *, const void *));
-
-
-/**
- * @brief Deduplicates a list.
- *
- * @param rl is a ptrptr since a new list is created and assigned to *rl, for
- * efficiency.
- * @returns a deduplicated and sorted version of \p *rl.
- * @warning the original \p *rl is destroyed.
- */
-void rd_list_deduplicate(rd_list_t **rl,
-                         int (*cmp)(const void *, const void *));
 
 
 /**

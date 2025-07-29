@@ -314,7 +314,7 @@ buildvariants:
     tags: ["suggested"]
     tasks:
       &experimental-task-list # TODO(SERVER-90936): Remove streams_kafka* and streams_lambda tests when they work with the "default" tag.
-      - name: streams_kafka_gen
+      - name: streams_kafka
       - name: streams_kafka_gwproxy
       - name: streams_lambda
       - name: streams_s3

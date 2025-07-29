@@ -293,14 +293,12 @@ tasks:
         vars:
           fallback_num_sub_suites: 2
 
-  - <<: *gen_task_template
-    name: streams_kafka_gen
+  - <<: *task_template
+    name: streams_kafka
     tags: ["assigned_to_jira_team_streams", "experimental"]
     commands:
-      - func: "generate resmoke tasks"
-        vars:
-          fallback_num_sub_suites: 2
-          resmoke_jobs_max: 1
+      - func: "do setup"
+      - func: "run tests"
 
   - <<: *task_template
     name: streams_kafka_gwproxy
