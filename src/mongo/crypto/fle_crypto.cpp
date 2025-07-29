@@ -391,30 +391,6 @@ ConstDataRange hmacKey(const KeyMaterial& keyMaterial) {
     return {keyMaterial->data() + kHmacKeyOffset, crypto::sym256KeySize};
 }
 
-
-PrfBlock prf(ConstDataRange key, uint64_t value, int64_t value2) {
-    uassert(6378003, "Invalid key length", key.length() == crypto::sym256KeySize);
-
-    SHA256Block block;
-
-    std::array<char, sizeof(uint64_t)> bufValue;
-    DataView(bufValue.data()).write<LittleEndian<uint64_t>>(value);
-
-
-    std::array<char, sizeof(uint64_t)> bufValue2;
-    DataView(bufValue2.data()).write<LittleEndian<uint64_t>>(value2);
-
-    SHA256Block::computeHmac(key.data<uint8_t>(),
-                             key.length(),
-                             {
-                                 ConstDataRange{bufValue},
-                                 ConstDataRange{bufValue2},
-                             },
-                             &block);
-    return FLEUtil::blockToArray(block);
-}
-
-
 ConstDataRange binDataToCDR(const BSONBinData binData) {
     int len = binData.length;
     const char* data = static_cast<const char*>(binData.data);
@@ -630,6 +606,7 @@ boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader
                                           valueTokenT valueToken) {
 
     auto tracker = FLEStatusSection::get().makeEmuBinaryTracker();
+    HmacContext context;
 
     // Default search parameters
     uint64_t lambda = 0;
@@ -637,7 +614,7 @@ boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader
 
     // Step 2:
     // Search for null record
-    PrfBlock nullRecordId = collectionT::generateId(tagToken, boost::none);
+    PrfBlock nullRecordId = collectionT::generateId(&context, tagToken, boost::none);
 
     BSONObj nullDoc = reader.getById(nullRecordId);
 
@@ -672,7 +649,8 @@ boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader
     // condition
     while (flag) {
         // 7 a
-        bool docExists = reader.existsById(collectionT::generateId(tagToken, rho + lambda));
+        bool docExists =
+            reader.existsById(collectionT::generateId(&context, tagToken, rho + lambda));
 
 #ifdef DEBUG_ENUM_BINARY
         std::cout << fmt::format("search1: rho: {},  doc: {}", rho, doc.toString()) << std::endl;
@@ -703,7 +681,8 @@ boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader
 
 
         // 9b
-        bool docExists = reader.existsById(collectionT::generateId(tagToken, median + lambda));
+        bool docExists =
+            reader.existsById(collectionT::generateId(&context, tagToken, median + lambda));
 
 #ifdef DEBUG_ENUM_BINARY
         std::cout << fmt::format("search_stat: min: {}, median: {}, max: {}, i: {}, doc: {}",
@@ -734,7 +713,8 @@ boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader
             // explicitly
             if (j == maxIterations && min == 1) {
                 // 9 d ii A
-                bool docExists2 = reader.existsById(collectionT::generateId(tagToken, 1 + lambda));
+                bool docExists2 =
+                    reader.existsById(collectionT::generateId(&context, tagToken, 1 + lambda));
                 // 9 d ii B
                 if (docExists2) {
                     i = 1 + lambda;
@@ -1806,7 +1786,8 @@ BSONObj runStateMachineForDecryption(mongocrypt_ctx_t* ctx, FLEKeyVault* keyVaul
     return result;
 }
 
-FLEEdgeCountInfo getEdgeCountInfoForCompact(const FLEStateCollectionReader& reader,
+FLEEdgeCountInfo getEdgeCountInfoForCompact(HmacContext* hmacCtx,
+                                            const FLEStateCollectionReader& reader,
                                             ConstDataRange tag,
                                             const boost::optional<PrfBlock>& edc) {
 
@@ -1815,7 +1796,7 @@ FLEEdgeCountInfo getEdgeCountInfoForCompact(const FLEStateCollectionReader& read
     auto tagToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escToken);
     auto valueToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escToken);
 
-    auto positions = ESCCollection::emuBinaryV2(reader, tagToken, valueToken);
+    auto positions = ESCCollection::emuBinaryV2(hmacCtx, reader, tagToken, valueToken);
 
     // Handle case where cpos is none. This means that no new non-anchors have been inserted
     // since since the last compact/cleanup.
@@ -1836,9 +1817,8 @@ FLEEdgeCountInfo getEdgeCountInfoForCompact(const FLEStateCollectionReader& read
     }
 
     uint64_t nextAnchorPos = 0;
-
     if (!positions.apos.has_value()) {
-        auto r_esc = reader.getById(ESCCollection::generateNullAnchorId(tagToken));
+        auto r_esc = reader.getById(ESCCollection::generateNullAnchorId(hmacCtx, tagToken));
 
         uassert(7293601, "ESC null anchor document not found", !r_esc.isEmpty());
 
@@ -1861,7 +1841,8 @@ FLEEdgeCountInfo getEdgeCountInfoForCompact(const FLEStateCollectionReader& read
         }));
 }
 
-FLEEdgeCountInfo getEdgeCountInfo(const FLEStateCollectionReader& reader,
+FLEEdgeCountInfo getEdgeCountInfo(HmacContext* hmacCtx,
+                                  const FLEStateCollectionReader& reader,
                                   ConstDataRange tag,
                                   FLETagQueryInterface::TagQueryType type,
                                   const boost::optional<PrfBlock>& edc) {
@@ -1873,7 +1854,7 @@ FLEEdgeCountInfo getEdgeCountInfo(const FLEStateCollectionReader& reader,
     auto tagToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escToken);
     auto valueToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escToken);
 
-    auto positions = ESCCollection::emuBinaryV2(reader, tagToken, valueToken);
+    auto positions = ESCCollection::emuBinaryV2(hmacCtx, reader, tagToken, valueToken);
 
     if (positions.cpos.has_value()) {
         // Either no ESC documents exist yet (cpos == 0), OR new non-anchors
@@ -1888,9 +1869,9 @@ FLEEdgeCountInfo getEdgeCountInfo(const FLEStateCollectionReader& reader,
 
         PrfBlock anchorId;
         if (!positions.apos.has_value()) {
-            anchorId = ESCCollection::generateNullAnchorId(tagToken);
+            anchorId = ESCCollection::generateNullAnchorId(hmacCtx, tagToken);
         } else {
-            anchorId = ESCCollection::generateAnchorId(tagToken, positions.apos.value());
+            anchorId = ESCCollection::generateAnchorId(hmacCtx, tagToken, positions.apos.value());
         }
 
         BSONObj anchorDoc = reader.getById(anchorId);
@@ -2058,114 +2039,135 @@ std::vector<uint8_t> FLEUtil::vectorFromCDR(ConstDataRange cdr) {
 
 CollectionsLevel1Token FLELevel1TokenGenerator::generateCollectionsLevel1Token(
     FLEIndexKey indexKey) {
-    return FLEUtil::prf(hmacKey(indexKey.data), kLevel1Collection);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, hmacKey(indexKey.data), kLevel1Collection);
 }
 
 ServerTokenDerivationLevel1Token FLELevel1TokenGenerator::generateServerTokenDerivationLevel1Token(
     FLEIndexKey indexKey) {
-    return FLEUtil::prf(hmacKey(indexKey.data), kLevel1ServerTokenDerivation);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, hmacKey(indexKey.data), kLevel1ServerTokenDerivation);
 }
 
 ServerDataEncryptionLevel1Token FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(
     FLEIndexKey indexKey) {
-    return FLEUtil::prf(hmacKey(indexKey.data), kLevelServerDataEncryption);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, hmacKey(indexKey.data), kLevelServerDataEncryption);
 }
 
 
 EDCToken FLECollectionTokenGenerator::generateEDCToken(CollectionsLevel1Token token) {
-    return FLEUtil::prf(token.data, kEDC);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kEDC);
 }
 
 ESCToken FLECollectionTokenGenerator::generateESCToken(CollectionsLevel1Token token) {
-    return FLEUtil::prf(token.data, kESC);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kESC);
 }
 
 ECCToken FLECollectionTokenGenerator::generateECCToken(CollectionsLevel1Token token) {
-    return FLEUtil::prf(token.data, kECC);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kECC);
 }
 
 ECOCToken FLECollectionTokenGenerator::generateECOCToken(CollectionsLevel1Token token) {
-    return FLEUtil::prf(token.data, kECOC);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kECOC);
 }
 
 
 EDCDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(
     EDCToken token, ConstDataRange value) {
-    return FLEUtil::prf(token.data, value);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, value);
 }
 
 ESCDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(
     ESCToken token, ConstDataRange value) {
-    return FLEUtil::prf(token.data, value);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, value);
 }
 
 ECCDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(
     ECCToken token, ConstDataRange value) {
-    return FLEUtil::prf(token.data, value);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, value);
 }
 
 ServerDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateServerDerivedFromDataToken(
     ServerTokenDerivationLevel1Token token, ConstDataRange value) {
-    return FLEUtil::prf(token.data, value);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, value);
 }
 
 EDCDerivedFromDataTokenAndContentionFactorToken
 FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
     generateEDCDerivedFromDataTokenAndContentionFactorToken(EDCDerivedFromDataToken token,
                                                             FLECounter counter) {
-    return FLEUtil::prf(token.data, counter);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, counter);
 }
 
 ESCDerivedFromDataTokenAndContentionFactorToken
 FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
     generateESCDerivedFromDataTokenAndContentionFactorToken(ESCDerivedFromDataToken token,
                                                             FLECounter counter) {
-    return FLEUtil::prf(token.data, counter);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, counter);
 }
 
 ECCDerivedFromDataTokenAndContentionFactorToken
 FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
     generateECCDerivedFromDataTokenAndContentionFactorToken(ECCDerivedFromDataToken token,
                                                             FLECounter counter) {
-    return FLEUtil::prf(token.data, counter);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, counter);
 }
 
 
 EDCTwiceDerivedToken FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(
     EDCDerivedFromDataTokenAndContentionFactorToken token) {
-    return FLEUtil::prf(token.data, kTwiceDerivedTokenFromEDC);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kTwiceDerivedTokenFromEDC);
 }
 
 ESCTwiceDerivedTagToken FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(
     ESCDerivedFromDataTokenAndContentionFactorToken token) {
-    return FLEUtil::prf(token.data, kTwiceDerivedTokenFromESCTag);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kTwiceDerivedTokenFromESCTag);
 }
 
 ESCTwiceDerivedValueToken FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(
     ESCDerivedFromDataTokenAndContentionFactorToken token) {
-    return FLEUtil::prf(token.data, kTwiceDerivedTokenFromESCValue);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kTwiceDerivedTokenFromESCValue);
 }
 
 ECCTwiceDerivedTagToken FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedTagToken(
     ECCDerivedFromDataTokenAndContentionFactorToken token) {
-    return FLEUtil::prf(token.data, kTwiceDerivedTokenFromECCTag);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kTwiceDerivedTokenFromECCTag);
 }
 
 ECCTwiceDerivedValueToken FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedValueToken(
     ECCDerivedFromDataTokenAndContentionFactorToken token) {
-    return FLEUtil::prf(token.data, kTwiceDerivedTokenFromECCValue);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kTwiceDerivedTokenFromECCValue);
 }
 
 ServerCountAndContentionFactorEncryptionToken
 FLEServerMetadataEncryptionTokenGenerator::generateServerCountAndContentionFactorEncryptionToken(
     ServerDerivedFromDataToken token) {
-    return FLEUtil::prf(token.data, kServerCountAndContentionFactorEncryption);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kServerCountAndContentionFactorEncryption);
 }
 
 ServerZerosEncryptionToken
 FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(
     ServerDerivedFromDataToken token) {
-    return FLEUtil::prf(token.data, kServerZerosEncryption);
+    HmacContext ctx;
+    return FLEUtil::prf(&ctx, token.data, kServerZerosEncryption);
 }
 
 StatusWith<EncryptedStateCollectionTokens> EncryptedStateCollectionTokens::decryptAndParse(
@@ -2417,34 +2419,39 @@ void FLEClientCrypto::validateDocument(const BSONObj& doc,
             count == tags.size());
 }
 
-PrfBlock ESCCollection::generateId(ESCTwiceDerivedTagToken tagToken,
+PrfBlock ESCCollection::generateId(HmacContext* context,
+                                   ESCTwiceDerivedTagToken tagToken,
                                    boost::optional<uint64_t> index) {
     if (index.has_value()) {
-        return prf(tagToken.data, kESCNonNullId, index.value());
+        return FLEUtil::prf(context, tagToken.toCDR(), kESCNonNullId, index.value());
     } else {
-        return prf(tagToken.data, kESCNullId, 0);
+        return FLEUtil::prf(context, tagToken.toCDR(), kESCNullId, 0);
     }
 }
 
-PrfBlock ESCCollection::generateNonAnchorId(const ESCTwiceDerivedTagToken& tagToken,
+PrfBlock ESCCollection::generateNonAnchorId(HmacContext* context,
+                                            const ESCTwiceDerivedTagToken& tagToken,
                                             uint64_t cpos) {
-    return FLEUtil::prf(tagToken.data, cpos);
+    return FLEUtil::prf(context, tagToken.toCDR(), cpos);
 }
 
-PrfBlock ESCCollection::generateAnchorId(const ESCTwiceDerivedTagToken& tagToken, uint64_t apos) {
-    return prf(tagToken.data, kESCAnchorId, apos);
+PrfBlock ESCCollection::generateAnchorId(HmacContext* context,
+                                         const ESCTwiceDerivedTagToken& tagToken,
+                                         uint64_t apos) {
+    return FLEUtil::prf(context, tagToken.toCDR(), kESCAnchorId, apos);
 }
 
-PrfBlock ESCCollection::generateNullAnchorId(const ESCTwiceDerivedTagToken& tagToken) {
-    return ESCCollection::generateAnchorId(tagToken, kESCNullAnchorPosition);
+PrfBlock ESCCollection::generateNullAnchorId(HmacContext* hmacCtx,
+                                             const ESCTwiceDerivedTagToken& tagToken) {
+    return ESCCollection::generateAnchorId(hmacCtx, tagToken, kESCNullAnchorPosition);
 }
 
-BSONObj ESCCollection::generateNullDocument(ESCTwiceDerivedTagToken tagToken,
+BSONObj ESCCollection::generateNullDocument(HmacContext* hmacCtx,
+                                            ESCTwiceDerivedTagToken tagToken,
                                             ESCTwiceDerivedValueToken valueToken,
                                             uint64_t pos,
                                             uint64_t count) {
-    auto block = ESCCollection::generateId(tagToken, boost::none);
-
+    auto block = ESCCollection::generateId(hmacCtx, tagToken, boost::none);
     auto swCipherText = packAndEncrypt(std::tie(pos, count), valueToken);
     uassertStatusOK(swCipherText);
 
@@ -2460,13 +2467,12 @@ BSONObj ESCCollection::generateNullDocument(ESCTwiceDerivedTagToken tagToken,
     return builder.obj();
 }
 
-
-BSONObj ESCCollection::generateInsertDocument(ESCTwiceDerivedTagToken tagToken,
+BSONObj ESCCollection::generateInsertDocument(HmacContext* hmacCtx,
+                                              ESCTwiceDerivedTagToken tagToken,
                                               ESCTwiceDerivedValueToken valueToken,
                                               uint64_t index,
                                               uint64_t count) {
-    auto block = ESCCollection::generateId(tagToken, index);
-
+    auto block = ESCCollection::generateId(hmacCtx, tagToken, index);
     auto swCipherText = packAndEncrypt(std::tie(KESCInsertRecordValue, count), valueToken);
     uassertStatusOK(swCipherText);
 
@@ -2481,11 +2487,12 @@ BSONObj ESCCollection::generateInsertDocument(ESCTwiceDerivedTagToken tagToken,
     return builder.obj();
 }
 
-BSONObj ESCCollection::generateCompactionPlaceholderDocument(ESCTwiceDerivedTagToken tagToken,
+BSONObj ESCCollection::generateCompactionPlaceholderDocument(HmacContext* hmacCtx,
+                                                             ESCTwiceDerivedTagToken tagToken,
                                                              ESCTwiceDerivedValueToken valueToken,
                                                              uint64_t index,
                                                              uint64_t count) {
-    auto block = ESCCollection::generateId(tagToken, index);
+    auto block = ESCCollection::generateId(hmacCtx, tagToken, index);
 
     auto swCipherText = packAndEncrypt(std::tie(kESCompactionRecordValue, count), valueToken);
     uassertStatusOK(swCipherText);
@@ -2497,20 +2504,21 @@ BSONObj ESCCollection::generateCompactionPlaceholderDocument(ESCTwiceDerivedTagT
     return builder.obj();
 }
 
-BSONObj ESCCollection::generateNonAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
+BSONObj ESCCollection::generateNonAnchorDocument(HmacContext* hmacCtx,
+                                                 const ESCTwiceDerivedTagToken& tagToken,
                                                  uint64_t cpos) {
-    auto block = ESCCollection::generateNonAnchorId(tagToken, cpos);
+    auto block = ESCCollection::generateNonAnchorId(hmacCtx, tagToken, cpos);
     BSONObjBuilder builder;
     toBinData(kId, block, &builder);
     return builder.obj();
 }
 
-BSONObj ESCCollection::generateAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
+BSONObj ESCCollection::generateAnchorDocument(HmacContext* hmacCtx,
+                                              const ESCTwiceDerivedTagToken& tagToken,
                                               const ESCTwiceDerivedValueToken& valueToken,
                                               uint64_t apos,
                                               uint64_t cpos) {
-    auto block = ESCCollection::generateAnchorId(tagToken, apos);
-
+    auto block = ESCCollection::generateAnchorId(hmacCtx, tagToken, apos);
     auto swCipherText = packAndEncrypt(std::tie(kESCNonNullAnchorValuePrefix, cpos), valueToken);
     uassertStatusOK(swCipherText);
 
@@ -2520,12 +2528,12 @@ BSONObj ESCCollection::generateAnchorDocument(const ESCTwiceDerivedTagToken& tag
     return builder.obj();
 }
 
-BSONObj ESCCollection::generateNullAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
+BSONObj ESCCollection::generateNullAnchorDocument(HmacContext* hmacCtx,
+                                                  const ESCTwiceDerivedTagToken& tagToken,
                                                   const ESCTwiceDerivedValueToken& valueToken,
                                                   uint64_t apos,
                                                   uint64_t cpos) {
-    auto block = ESCCollection::generateNullAnchorId(tagToken);
-
+    auto block = ESCCollection::generateNullAnchorId(hmacCtx, tagToken);
     auto swCipherText = packAndEncrypt(std::tie(apos, cpos), valueToken);
     uassertStatusOK(swCipherText);
 
@@ -2663,17 +2671,19 @@ boost::optional<uint64_t> binarySearchCommon(const FLEStateCollectionReader& rea
 }  // namespace
 
 ESCCollection::EmuBinaryResult ESCCollection::emuBinaryV2(
+    HmacContext* context,
     const FLEStateCollectionReader& reader,
     const ESCTwiceDerivedTagToken& tagToken,
     const ESCTwiceDerivedValueToken& valueToken) {
     auto tracker = FLEStatusSection::get().makeEmuBinaryTracker();
 
-    auto x = ESCCollection::anchorBinaryHops(reader, tagToken, valueToken, tracker);
-    auto i = ESCCollection::binaryHops(reader, tagToken, valueToken, x, tracker);
+    auto x = ESCCollection::anchorBinaryHops(context, reader, tagToken, valueToken, tracker);
+    auto i = ESCCollection::binaryHops(context, reader, tagToken, valueToken, x, tracker);
     return EmuBinaryResult{i, x};
 }
 
 boost::optional<uint64_t> ESCCollection::anchorBinaryHops(
+    HmacContext* context,
     const FLEStateCollectionReader& reader,
     const ESCTwiceDerivedTagToken& tagToken,
     const ESCTwiceDerivedValueToken& valueToken,
@@ -2683,7 +2693,7 @@ boost::optional<uint64_t> ESCCollection::anchorBinaryHops(
     boost::optional<uint64_t> x;
 
     // 1. find null anchor
-    PrfBlock nullAnchorId = ESCCollection::generateNullAnchorId(tagToken);
+    PrfBlock nullAnchorId = ESCCollection::generateNullAnchorId(context, tagToken);
     BSONObj nullAnchorDoc = reader.getById(nullAnchorId);
 
     // 2. case: null anchor exists
@@ -2703,8 +2713,8 @@ boost::optional<uint64_t> ESCCollection::anchorBinaryHops(
     uint64_t rho = 2;
 
     // 5-8. perform binary searches
-    auto idGenerator = [&tagToken](uint64_t value) -> PrfBlock {
-        return ESCCollection::generateAnchorId(tagToken, value);
+    auto idGenerator = [context, &tagToken](uint64_t value) -> PrfBlock {
+        return ESCCollection::generateAnchorId(context, tagToken, value);
     };
 
 #ifdef DEBUG_ENUM_BINARY
@@ -2715,7 +2725,8 @@ boost::optional<uint64_t> ESCCollection::anchorBinaryHops(
     return binarySearchCommon(reader, rho, lambda, x, idGenerator, tracker);
 }
 
-boost::optional<uint64_t> ESCCollection::binaryHops(const FLEStateCollectionReader& reader,
+boost::optional<uint64_t> ESCCollection::binaryHops(HmacContext* context,
+                                                    const FLEStateCollectionReader& reader,
                                                     const ESCTwiceDerivedTagToken& tagToken,
                                                     const ESCTwiceDerivedValueToken& valueToken,
                                                     boost::optional<uint64_t> x,
@@ -2730,8 +2741,8 @@ boost::optional<uint64_t> ESCCollection::binaryHops(const FLEStateCollectionRead
         i = 0;
         lambda = 0;
     } else {
-        auto id = x.has_value() ? ESCCollection::generateAnchorId(tagToken, *x)
-                                : ESCCollection::generateNullAnchorId(tagToken);
+        auto id = x.has_value() ? ESCCollection::generateAnchorId(context, tagToken, *x)
+                                : ESCCollection::generateNullAnchorId(context, tagToken);
         auto doc = reader.getById(id);
         uassert(7291501, "ESC anchor document not found", !doc.isEmpty());
 
@@ -2747,8 +2758,8 @@ boost::optional<uint64_t> ESCCollection::binaryHops(const FLEStateCollectionRead
         rho = 2;
     }
 
-    auto idGenerator = [&tagToken](uint64_t value) -> PrfBlock {
-        return ESCCollection::generateNonAnchorId(tagToken, value);
+    auto idGenerator = [context, &tagToken](uint64_t value) -> PrfBlock {
+        return ESCCollection::generateNonAnchorId(context, tagToken, value);
     };
 
 #ifdef DEBUG_ENUM_BINARY
@@ -2763,6 +2774,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> ESCCollection::getTags(
     const std::vector<std::vector<FLEEdgePrfBlock>>& tokensSets,
     FLETagQueryInterface::TagQueryType type) {
 
+    HmacContext hmacCtx;
     std::vector<std::vector<FLEEdgeCountInfo>> countInfoSets;
     countInfoSets.reserve(tokensSets.size());
 
@@ -2772,9 +2784,11 @@ std::vector<std::vector<FLEEdgeCountInfo>> ESCCollection::getTags(
 
         for (const auto& token : tokens) {
             if (type == FLETagQueryInterface::TagQueryType::kCompact) {
-                countInfos.push_back(getEdgeCountInfoForCompact(reader, token.esc, token.edc));
+                countInfos.push_back(
+                    getEdgeCountInfoForCompact(&hmacCtx, reader, token.esc, token.edc));
             } else {
-                countInfos.push_back(getEdgeCountInfo(reader, token.esc, type, token.edc));
+                countInfos.push_back(
+                    getEdgeCountInfo(&hmacCtx, reader, token.esc, type, token.edc));
             }
         }
 
@@ -2784,19 +2798,21 @@ std::vector<std::vector<FLEEdgeCountInfo>> ESCCollection::getTags(
     return countInfoSets;
 }
 
-PrfBlock ECCCollection::generateId(ECCTwiceDerivedTagToken tagToken,
+PrfBlock ECCCollection::generateId(HmacContext* hmacCtx,
+                                   ECCTwiceDerivedTagToken tagToken,
                                    boost::optional<uint64_t> index) {
     if (index.has_value()) {
-        return prf(tagToken.data, kECCNonNullId, index.value());
+        return FLEUtil::prf(hmacCtx, tagToken.toCDR(), kECCNonNullId, index.value());
     } else {
-        return prf(tagToken.data, kECCNullId, 0);
+        return FLEUtil::prf(hmacCtx, tagToken.toCDR(), kECCNullId, 0);
     }
 }
 
-BSONObj ECCCollection::generateNullDocument(ECCTwiceDerivedTagToken tagToken,
+BSONObj ECCCollection::generateNullDocument(HmacContext* hmacCtx,
+                                            ECCTwiceDerivedTagToken tagToken,
                                             ECCTwiceDerivedValueToken valueToken,
                                             uint64_t count) {
-    auto block = ECCCollection::generateId(tagToken, boost::none);
+    auto block = ECCCollection::generateId(hmacCtx, tagToken, boost::none);
 
     auto swCipherText = packAndEncrypt(std::tie(count, count), valueToken);
     uassertStatusOK(swCipherText);
@@ -2812,12 +2828,13 @@ BSONObj ECCCollection::generateNullDocument(ECCTwiceDerivedTagToken tagToken,
     return builder.obj();
 }
 
-BSONObj ECCCollection::generateDocument(ECCTwiceDerivedTagToken tagToken,
+BSONObj ECCCollection::generateDocument(HmacContext* hmacCtx,
+                                        ECCTwiceDerivedTagToken tagToken,
                                         ECCTwiceDerivedValueToken valueToken,
                                         uint64_t index,
                                         uint64_t start,
                                         uint64_t end) {
-    auto block = ECCCollection::generateId(tagToken, index);
+    auto block = ECCCollection::generateId(hmacCtx, tagToken, index);
 
     auto swCipherText = packAndEncrypt(std::tie(start, end), valueToken);
     uassertStatusOK(swCipherText);
@@ -2834,17 +2851,19 @@ BSONObj ECCCollection::generateDocument(ECCTwiceDerivedTagToken tagToken,
     return builder.obj();
 }
 
-BSONObj ECCCollection::generateDocument(ECCTwiceDerivedTagToken tagToken,
+BSONObj ECCCollection::generateDocument(HmacContext* hmacCtx,
+                                        ECCTwiceDerivedTagToken tagToken,
                                         ECCTwiceDerivedValueToken valueToken,
                                         uint64_t index,
                                         uint64_t count) {
-    return generateDocument(tagToken, valueToken, index, count, count);
+    return generateDocument(hmacCtx, tagToken, valueToken, index, count, count);
 }
 
-BSONObj ECCCollection::generateCompactionDocument(ECCTwiceDerivedTagToken tagToken,
+BSONObj ECCCollection::generateCompactionDocument(HmacContext* hmacCtx,
+                                                  ECCTwiceDerivedTagToken tagToken,
                                                   ECCTwiceDerivedValueToken valueToken,
                                                   uint64_t index) {
-    auto block = ECCCollection::generateId(tagToken, index);
+    auto block = ECCCollection::generateId(hmacCtx, tagToken, index);
 
     auto swCipherText =
         packAndEncrypt(std::tie(kECCompactionRecordValue, kECCompactionRecordValue), valueToken);
@@ -3678,8 +3697,10 @@ std::vector<EDCServerPayloadInfo> EDCServerCollection::getEncryptedFieldInfo(BSO
     return fields;
 }
 
-PrfBlock EDCServerCollection::generateTag(EDCTwiceDerivedToken edcTwiceDerived, FLECounter count) {
-    return FLEUtil::prf(edcTwiceDerived.toCDR(), count);
+PrfBlock EDCServerCollection::generateTag(HmacContext* hmacCtx,
+                                          EDCTwiceDerivedToken edcTwiceDerived,
+                                          FLECounter count) {
+    return FLEUtil::prf(hmacCtx, edcTwiceDerived.toCDR(), count);
 }
 
 PrfBlock EDCServerCollection::generateTag(const EDCServerPayloadInfo& payload) {
@@ -3688,7 +3709,8 @@ PrfBlock EDCServerCollection::generateTag(const EDCServerPayloadInfo& payload) {
     auto edcTwiceDerived = FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(token);
     dassert(payload.isRangePayload() == false);
     dassert(payload.counts.size() == 1);
-    return generateTag(edcTwiceDerived, payload.counts[0]);
+    HmacContext obj;
+    return generateTag(&obj, edcTwiceDerived, payload.counts[0]);
 }
 
 std::vector<PrfBlock> EDCServerCollection::generateTags(const EDCServerPayloadInfo& rangePayload) {
@@ -3706,11 +3728,13 @@ std::vector<PrfBlock> EDCServerCollection::generateTags(const EDCServerPayloadIn
     std::vector<PrfBlock> tags;
     tags.reserve(edgeTokenSets.size());
 
+    HmacContext obj;
     for (size_t i = 0; i < edgeTokenSets.size(); i++) {
         auto edcTwiceDerived = FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(
             FLETokenFromCDR<FLETokenType::EDCDerivedFromDataTokenAndContentionFactorToken>(
                 edgeTokenSets[i].getEdcDerivedToken()));
-        tags.push_back(EDCServerCollection::generateTag(edcTwiceDerived, rangePayload.counts[i]));
+        tags.push_back(
+            EDCServerCollection::generateTag(&obj, edcTwiceDerived, rangePayload.counts[i]));
     }
     return tags;
 }
@@ -4879,19 +4903,42 @@ PrfBlock FLEUtil::blockToArray(const SHA256Block& block) {
     return data;
 }
 
-PrfBlock FLEUtil::prf(ConstDataRange key, ConstDataRange cdr) {
-    uassert(6378002, "Invalid key length", key.length() == crypto::sym256KeySize);
+PrfBlock FLEUtil::prf(HmacContext* context, ConstDataRange key, uint64_t value, int64_t value2) {
+    uassert(6378003, "Invalid key length", key.length() == crypto::sym256KeySize);
 
     SHA256Block block;
-    SHA256Block::computeHmac(key.data<uint8_t>(), key.length(), {cdr}, &block);
-    return blockToArray(block);
-}
 
-PrfBlock FLEUtil::prf(ConstDataRange key, uint64_t value) {
     std::array<char, sizeof(uint64_t)> bufValue;
     DataView(bufValue.data()).write<LittleEndian<uint64_t>>(value);
 
-    return prf(key, bufValue);
+
+    std::array<char, sizeof(uint64_t)> bufValue2;
+    DataView(bufValue2.data()).write<LittleEndian<uint64_t>>(value2);
+
+    SHA256Block::computeHmacWithCtx(context,
+                                    key.data<uint8_t>(),
+                                    key.length(),
+                                    {
+                                        ConstDataRange{bufValue},
+                                        ConstDataRange{bufValue2},
+                                    },
+                                    &block);
+    return FLEUtil::blockToArray(block);
+}
+
+PrfBlock FLEUtil::prf(HmacContext* hmacCtx, ConstDataRange key, ConstDataRange cdr) {
+    uassert(6378002, "Invalid key length", key.length() == crypto::sym256KeySize);
+
+    SHA256Block block;
+    SHA256Block::computeHmacWithCtx(hmacCtx, key.data<uint8_t>(), key.length(), {cdr}, &block);
+    return blockToArray(block);
+}
+
+PrfBlock FLEUtil::prf(HmacContext* hmacCtx, ConstDataRange key, uint64_t value) {
+    std::array<char, sizeof(uint64_t)> bufValue;
+    DataView(bufValue.data()).write<LittleEndian<uint64_t>>(value);
+
+    return prf(hmacCtx, key, bufValue);
 }
 
 StatusWith<std::vector<uint8_t>> FLEUtil::decryptData(ConstDataRange key,

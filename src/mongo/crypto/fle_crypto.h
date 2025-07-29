@@ -50,6 +50,9 @@
 #include "mongo/crypto/fle_crypto_types.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_stats.h"
+#include "mongo/crypto/fle_stats_gen.h"
+#include "mongo/crypto/hash_block.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
@@ -395,12 +398,15 @@ public:
     /**
      * Generate the _id value
      */
-    static PrfBlock generateId(ESCTwiceDerivedTagToken tagToken, boost::optional<uint64_t> index);
+    static PrfBlock generateId(HmacContext* context,
+                               ESCTwiceDerivedTagToken tagToken,
+                               boost::optional<uint64_t> index);
 
     /**
      * Generate a null document which will be the "first" document for a given field.
      */
-    static BSONObj generateNullDocument(ESCTwiceDerivedTagToken tagToken,
+    static BSONObj generateNullDocument(HmacContext* context,
+                                        ESCTwiceDerivedTagToken tagToken,
                                         ESCTwiceDerivedValueToken valueToken,
                                         uint64_t pos,
                                         uint64_t count);
@@ -408,7 +414,8 @@ public:
     /**
      * Generate a insert ESC document.
      */
-    static BSONObj generateInsertDocument(ESCTwiceDerivedTagToken tagToken,
+    static BSONObj generateInsertDocument(HmacContext* context,
+                                          ESCTwiceDerivedTagToken tagToken,
                                           ESCTwiceDerivedValueToken valueToken,
                                           uint64_t index,
                                           uint64_t count);
@@ -416,11 +423,11 @@ public:
     /**
      * Generate a compaction placeholder ESC document.
      */
-    static BSONObj generateCompactionPlaceholderDocument(ESCTwiceDerivedTagToken tagToken,
+    static BSONObj generateCompactionPlaceholderDocument(HmacContext* context,
+                                                         ESCTwiceDerivedTagToken tagToken,
                                                          ESCTwiceDerivedValueToken valueToken,
                                                          uint64_t index,
                                                          uint64_t count);
-
     /**
      * Decrypt the null document.
      */
@@ -456,28 +463,35 @@ public:
     /**
      * Generate the _id value for a non-anchor record
      */
-    static PrfBlock generateNonAnchorId(const ESCTwiceDerivedTagToken& tagToken, uint64_t cpos);
+    static PrfBlock generateNonAnchorId(HmacContext* context,
+                                        const ESCTwiceDerivedTagToken& tagToken,
+                                        uint64_t cpos);
 
     /**
      * Generate the _id value for an anchor record
      */
-    static PrfBlock generateAnchorId(const ESCTwiceDerivedTagToken& tagToken, uint64_t apos);
+    static PrfBlock generateAnchorId(HmacContext* context,
+                                     const ESCTwiceDerivedTagToken& tagToken,
+                                     uint64_t apos);
 
     /**
      * Generate the _id value for a null anchor record
      */
-    static PrfBlock generateNullAnchorId(const ESCTwiceDerivedTagToken& tagToken);
+    static PrfBlock generateNullAnchorId(HmacContext* context,
+                                         const ESCTwiceDerivedTagToken& tagToken);
 
     /**
      * Generate a non-anchor ESC document for inserts.
      */
-    static BSONObj generateNonAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
+    static BSONObj generateNonAnchorDocument(HmacContext* context,
+                                             const ESCTwiceDerivedTagToken& tagToken,
                                              uint64_t cpos);
 
     /**
      * Generate an anchor ESC document for compacts.
      */
-    static BSONObj generateAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
+    static BSONObj generateAnchorDocument(HmacContext* context,
+                                          const ESCTwiceDerivedTagToken& tagToken,
                                           const ESCTwiceDerivedValueToken& valueToken,
                                           uint64_t apos,
                                           uint64_t cpos);
@@ -485,7 +499,8 @@ public:
     /**
      * Generate a null anchor ESC document for cleanups.
      */
-    static BSONObj generateNullAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
+    static BSONObj generateNullAnchorDocument(HmacContext* context,
+                                              const ESCTwiceDerivedTagToken& tagToken,
                                               const ESCTwiceDerivedValueToken& valueToken,
                                               uint64_t apos,
                                               uint64_t cpos);
@@ -520,14 +535,17 @@ public:
         boost::optional<uint64_t> cpos;
         boost::optional<uint64_t> apos;
     };
-    static EmuBinaryResult emuBinaryV2(const FLEStateCollectionReader& reader,
+    static EmuBinaryResult emuBinaryV2(HmacContext* context,
+                                       const FLEStateCollectionReader& reader,
                                        const ESCTwiceDerivedTagToken& tagToken,
                                        const ESCTwiceDerivedValueToken& valueToken);
-    static boost::optional<uint64_t> anchorBinaryHops(const FLEStateCollectionReader& reader,
+    static boost::optional<uint64_t> anchorBinaryHops(HmacContext* context,
+                                                      const FLEStateCollectionReader& reader,
                                                       const ESCTwiceDerivedTagToken& tagToken,
                                                       const ESCTwiceDerivedValueToken& valueToken,
                                                       FLEStatusSection::EmuBinaryTracker& tracker);
-    static boost::optional<uint64_t> binaryHops(const FLEStateCollectionReader& reader,
+    static boost::optional<uint64_t> binaryHops(HmacContext* context,
+                                                const FLEStateCollectionReader& reader,
                                                 const ESCTwiceDerivedTagToken& tagToken,
                                                 const ESCTwiceDerivedValueToken& valueToken,
                                                 boost::optional<uint64_t> x,
@@ -654,12 +672,15 @@ public:
     /**
      * Generate the _id value
      */
-    static PrfBlock generateId(ECCTwiceDerivedTagToken tagToken, boost::optional<uint64_t> index);
+    static PrfBlock generateId(HmacContext* context,
+                               ECCTwiceDerivedTagToken tagToken,
+                               boost::optional<uint64_t> index);
 
     /**
      * Generate a null document which will be the "first" document for a given field.
      */
-    static BSONObj generateNullDocument(ECCTwiceDerivedTagToken tagToken,
+    static BSONObj generateNullDocument(HmacContext* context,
+                                        ECCTwiceDerivedTagToken tagToken,
                                         ECCTwiceDerivedValueToken valueToken,
                                         uint64_t count);
 
@@ -668,7 +689,8 @@ public:
      *
      * Note: it is stored as (count, count)
      */
-    static BSONObj generateDocument(ECCTwiceDerivedTagToken tagToken,
+    static BSONObj generateDocument(HmacContext* context,
+                                    ECCTwiceDerivedTagToken tagToken,
                                     ECCTwiceDerivedValueToken valueToken,
                                     uint64_t index,
                                     uint64_t count);
@@ -676,7 +698,8 @@ public:
     /**
      * Generate a regular ECC document for (start, end)
      */
-    static BSONObj generateDocument(ECCTwiceDerivedTagToken tagToken,
+    static BSONObj generateDocument(HmacContext* context,
+                                    ECCTwiceDerivedTagToken tagToken,
                                     ECCTwiceDerivedValueToken valueToken,
                                     uint64_t index,
                                     uint64_t start,
@@ -685,7 +708,8 @@ public:
     /**
      * Generate a compaction ECC document.
      */
-    static BSONObj generateCompactionDocument(ECCTwiceDerivedTagToken tagToken,
+    static BSONObj generateCompactionDocument(HmacContext* context,
+                                              ECCTwiceDerivedTagToken tagToken,
                                               ECCTwiceDerivedValueToken valueToken,
                                               uint64_t index);
 
@@ -1214,9 +1238,10 @@ public:
      *
      * HMAC(EDCTwiceDerivedToken, count)
      */
-    static PrfBlock generateTag(EDCTwiceDerivedToken edcTwiceDerived, FLECounter count);
+    static PrfBlock generateTag(HmacContext* obj,
+                                EDCTwiceDerivedToken edcTwiceDerived,
+                                FLECounter count);
     static PrfBlock generateTag(const EDCServerPayloadInfo& payload);
-    static PrfBlock generateTag(const FLEEdgeToken& token, FLECounter count);
     static std::vector<PrfBlock> generateTags(const EDCServerPayloadInfo& rangePayload);
 
     /**
@@ -1543,9 +1568,11 @@ public:
     /**
      * Compute HMAC-SHA-256
      */
-    static PrfBlock prf(ConstDataRange key, ConstDataRange cdr);
+    static PrfBlock prf(HmacContext* hmacCtx, ConstDataRange key, uint64_t value, int64_t value2);
 
-    static PrfBlock prf(ConstDataRange key, uint64_t value);
+    static PrfBlock prf(HmacContext* hmacCtx, ConstDataRange key, ConstDataRange cdr);
+
+    static PrfBlock prf(HmacContext* hmacCtx, ConstDataRange key, uint64_t value);
 
     /**
      * Decrypt AES-256-CTR encrypted data. Exposed for benchmarking purposes.

@@ -73,8 +73,9 @@ void generateTags(uint64_t numInserts,
 
     auto edcTag = TwiceDerived::generateEDCTwiceDerivedToken(edcTok);
 
+    HmacContext hmacCtx;
     for (uint64_t i = 1; i <= numInserts; i++) {
-        binaryTags.emplace_back(EDCServerCollection::generateTag(edcTag, i));
+        binaryTags.emplace_back(EDCServerCollection::generateTag(&hmacCtx, edcTag, i));
     }
 }
 

@@ -36,7 +36,10 @@ if "tom" in env["MONGO_CRYPTO"]:
 
 cryptoEnv.Library(
     target='sha_block_${MONGO_CRYPTO}',
-    source=['sha_block_${MONGO_CRYPTO}.cpp'],
+    source=[
+        'hash_block.cpp',
+        'sha_block_${MONGO_CRYPTO}.cpp',
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         'sha1_block',

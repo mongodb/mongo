@@ -745,6 +745,8 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
     std::vector<BSONObj> escDocuments;
     escDocuments.reserve(totalTokens);
 
+    HmacContext hmacCtx;
+
     for (size_t i = 0; i < countInfoSets.size(); i++) {
         auto& countInfos = countInfoSets[i];
 
@@ -755,8 +757,8 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
         for (auto const& countInfo : countInfos) {
             serverPayload[i].counts.push_back(countInfo.count);
 
-            escDocuments.push_back(
-                ESCCollection::generateNonAnchorDocument(countInfo.tagToken, countInfo.count));
+            escDocuments.push_back(ESCCollection::generateNonAnchorDocument(
+                &hmacCtx, countInfo.tagToken, countInfo.count));
         }
     }
 

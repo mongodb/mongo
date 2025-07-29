@@ -77,6 +77,7 @@ stdx::unordered_set<ECOCCompactionDocumentV2> getUniqueCompactionDocumentsV2(
  * Used by unit tests.
  */
 void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
+                                HmacContext* hmacCtx,
                                 const ECOCCompactionDocumentV2& ecocDoc,
                                 const NamespaceString& escNss,
                                 ECStats* escStats);

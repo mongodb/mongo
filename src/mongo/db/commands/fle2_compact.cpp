@@ -188,6 +188,7 @@ stdx::unordered_set<ECOCCompactionDocumentV2> getUniqueCompactionDocumentsV2(
 }
 
 void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
+                                HmacContext* hmacCtx,
                                 const ECOCCompactionDocumentV2& ecocDoc,
                                 const NamespaceString& escNss,
                                 ECStats* escStats) {
@@ -247,8 +248,8 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
         return;
     }
 
-    auto anchorDoc =
-        ESCCollection::generateAnchorDocument(tagToken, escValueToken, val.count, cpos.value());
+    auto anchorDoc = ESCCollection::generateAnchorDocument(
+        hmacCtx, tagToken, escValueToken, val.count, cpos.value());
     StmtId stmtId = kUninitializedStmtId;
 
     if (MONGO_unlikely(fleCompactHangBeforeESCAnchorInsert.shouldFail())) {
@@ -320,11 +321,12 @@ void processFLECompactV2(OperationContext* opCtx,
             opCtx,
             [sharedBlock, innerEscStats](const txn_api::TransactionClient& txnClient,
                                          ExecutorPtr txnExec) {
+                HmacContext hmacCtx;
                 FLEQueryInterfaceImpl queryImpl(txnClient, getGlobalServiceContext());
-
                 auto [ecocDoc2, escNss] = *sharedBlock.get();
 
-                compactOneFieldValuePairV2(&queryImpl, ecocDoc2, escNss, innerEscStats.get());
+                compactOneFieldValuePairV2(
+                    &queryImpl, &hmacCtx, ecocDoc2, escNss, innerEscStats.get());
 
                 return SemiFuture<void>::makeReady();
             });

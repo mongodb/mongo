@@ -200,6 +200,8 @@ protected:
     TestKeyVault _keyVault;
 
     EncryptedStateCollectionsNamespaces _namespaces;
+
+    HmacContext hmacCtx;
 };
 
 void FleCompactTest::setUp() {
@@ -255,7 +257,8 @@ void FleCompactTest::assertDocumentCounts(uint64_t edc, uint64_t esc, uint64_t e
 void FleCompactTest::assertESCNonAnchorDocument(BSONObj obj, bool exists, uint64_t cpos) {
     auto tokens = getTestESCTokens(obj);
     auto doc = _queryImpl->getById(
-        _namespaces.escNss, ESCCollection::generateNonAnchorId(tokens.twiceDerivedTag, cpos));
+        _namespaces.escNss,
+        ESCCollection::generateNonAnchorId(&hmacCtx, tokens.twiceDerivedTag, cpos));
     ASSERT_EQ(doc.isEmpty(), !exists);
     ASSERT(!doc.hasField("value"_sd));
 }
@@ -265,8 +268,9 @@ void FleCompactTest::assertESCAnchorDocument(BSONObj obj,
                                              uint64_t apos,
                                              uint64_t cpos) {
     auto tokens = getTestESCTokens(obj);
-    auto doc = _queryImpl->getById(_namespaces.escNss,
-                                   ESCCollection::generateAnchorId(tokens.twiceDerivedTag, apos));
+    auto doc = _queryImpl->getById(
+        _namespaces.escNss,
+        ESCCollection::generateAnchorId(&hmacCtx, tokens.twiceDerivedTag, apos));
     ASSERT_EQ(doc.isEmpty(), !exists);
 
     if (exists) {
@@ -445,10 +449,10 @@ TEST_F(FleCompactTest, CompactValueV2_NoNonAnchors) {
     // Compact an empty ESC; assert an error is thrown because compact should not be called
     // if there are no ESC entries that correspond to the ECOC document.
     // Note: this tests compact where EmuBinary returns (cpos = 0, apos = 0)
-    ASSERT_THROWS_CODE(
-        compactOneFieldValuePairV2(_queryImpl.get(), ecocDoc, _namespaces.escNss, &escStats),
-        DBException,
-        7666502);
+    ASSERT_THROWS_CODE(compactOneFieldValuePairV2(
+                           _queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, &escStats),
+                       DBException,
+                       7666502);
     assertDocumentCounts(0, 0, 0, 0);
 }
 
@@ -470,13 +474,13 @@ TEST_F(FleCompactTest, CompactValueV2_NoNullAnchors) {
 
     // Compact ESC which should only have non-anchors
     // Note: this tests compact where EmuBinary returns (cpos > 0, apos = 0)
-    compactOneFieldValuePairV2(_queryImpl.get(), ecocDoc, _namespaces.escNss, &escStats);
+    compactOneFieldValuePairV2(_queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, &escStats);
     assertDocumentCounts(15, 16, 0, 15);
     assertESCAnchorDocument(testPair, true, 1, 15);
 
     // Compact ESC which should now have a fresh anchor and stale non-anchors
     // Note: this tests compact where EmuBinary returns (cpos = null, apos > 0)
-    compactOneFieldValuePairV2(_queryImpl.get(), ecocDoc, _namespaces.escNss, &escStats);
+    compactOneFieldValuePairV2(_queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, &escStats);
     assertDocumentCounts(15, 16, 0, 15);
 
     // Insert another 15 of the same value; assert non-anchors 16 thru 30
@@ -489,7 +493,7 @@ TEST_F(FleCompactTest, CompactValueV2_NoNullAnchors) {
 
     // Compact ESC which should now have fresh anchors and fresh non-anchors
     // Note: this tests compact where EmuBinary returns (cpos > 0, apos > 0)
-    compactOneFieldValuePairV2(_queryImpl.get(), ecocDoc, _namespaces.escNss, &escStats);
+    compactOneFieldValuePairV2(_queryImpl.get(), &hmacCtx, ecocDoc, _namespaces.escNss, &escStats);
     assertDocumentCounts(30, 32, 0, 30);
     assertESCAnchorDocument(testPair, true, 2, 30);
 }
@@ -534,13 +538,13 @@ TEST_F(FleCompactTest, RandomESCNonAnchorDeletions) {
     int counter = 0;
     for (uint64_t i = 1; i <= deleteCount; i++) {
         auto doc = _queryImpl->getById(
-            _namespaces.escNss, ESCCollection::generateNonAnchorId(tokens.twiceDerivedTag, i));
+            _namespaces.escNss,
+            ESCCollection::generateNonAnchorId(&hmacCtx, tokens.twiceDerivedTag, i));
         if (!doc.isEmpty()) {
             counter++;
         }
     }
     ASSERT_LT(counter, deleteCount);
 }
-
 }  // namespace
 }  // namespace mongo
