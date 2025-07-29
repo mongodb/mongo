@@ -61,17 +61,17 @@ struct HasStringParam {
 };
 
 TEST(FixedString, StringTemplateParameter) {
-    ASSERT_EQ(HasStringParam<"hi">::string(), "hi");
+    ASSERT_EQ(HasStringParam<"hi">::string(), FixedString{"hi"});
 }
 
 TEST(FixedString, Plus) {
-    ASSERT_EQ(FixedString{"abc"} + FixedString{"xyz"}, "abcxyz");
+    ASSERT_EQ(FixedString{"abc"} + FixedString{"xyz"}, FixedString{"abcxyz"});
 
-    ASSERT_EQ(FixedString{"abc"} + "xyz", "abcxyz");
-    ASSERT_EQ("xyz" + FixedString{"abc"}, "xyzabc");
+    ASSERT_EQ(FixedString{"abc"} + "xyz", FixedString{"abcxyz"});
+    ASSERT_EQ("xyz" + FixedString{"abc"}, FixedString{"xyzabc"});
 
-    ASSERT_EQ(FixedString{"abc"} + 'x', "abcx");
-    ASSERT_EQ('x' + FixedString{"abc"}, "xabc");
+    ASSERT_EQ(FixedString{"abc"} + 'x', FixedString{"abcx"});
+    ASSERT_EQ('x' + FixedString{"abc"}, FixedString{"xabc"});
 }
 
 TEST(FixedString, EmbeddedNul) {
