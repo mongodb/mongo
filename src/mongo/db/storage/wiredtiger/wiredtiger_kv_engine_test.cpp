@@ -61,6 +61,12 @@
 namespace mongo {
 namespace {
 
+#if __has_feature(address_sanitizer)
+constexpr bool kMemLeakAllowed = false;
+#else
+constexpr bool kMemLeakAllowed = true;
+#endif
+
 class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
     WiredTigerKVHarnessHelper(ServiceContext* svcCtx, bool forRepair = false)
@@ -77,11 +83,11 @@ public:
     }
 
     ~WiredTigerKVHarnessHelper() {
-        getWiredTigerKVEngine()->cleanShutdown();
+        getWiredTigerKVEngine()->cleanShutdown(kMemLeakAllowed);
     }
 
     virtual KVEngine* restartEngine() override {
-        getEngine()->cleanShutdown();
+        getEngine()->cleanShutdown(kMemLeakAllowed);
         _svcCtx->clearStorageEngine();
         _svcCtx->setStorageEngine(makeEngine());
         getEngine()->notifyStartupComplete();

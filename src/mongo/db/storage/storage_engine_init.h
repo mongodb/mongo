@@ -70,8 +70,9 @@ StorageEngine::LastShutdownState initializeStorageEngine(
 
 /**
  * Shuts down storage engine cleanly and releases any locks on mongod.lock.
+ * Set `memLeakAllowed` to true for faster shutdown.
  */
-void shutdownGlobalStorageEngineCleanly(ServiceContext* service);
+void shutdownGlobalStorageEngineCleanly(ServiceContext* service, bool memLeakAllowed);
 
 /**
  * Changes the storage engine for the given service by shutting down the old one and starting

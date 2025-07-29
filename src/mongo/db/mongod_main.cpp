@@ -1894,7 +1894,8 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                                                   "Shut down the storage engine",
                                                   &shutdownTimeElapsedBuilder);
         LOGV2(4784930, "Shutting down the storage engine");
-        shutdownGlobalStorageEngineCleanly(serviceContext);
+        // Allow memory leak for faster shutdown.
+        shutdownGlobalStorageEngineCleanly(serviceContext, true /* memLeakAllowed */);
     }
 
     {

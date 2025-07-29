@@ -84,7 +84,7 @@ int runDbTests(int argc, char** argv) {
         if (!getGlobalServiceContext()->getStorageEngine())
             return;
 
-        shutdownGlobalStorageEngineCleanly(getGlobalServiceContext());
+        shutdownGlobalStorageEngineCleanly(getGlobalServiceContext(), true /* memLeakAllowed */);
     });
 
     Client::initThread("testsuite");

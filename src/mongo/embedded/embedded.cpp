@@ -178,7 +178,7 @@ void shutdown(ServiceContext* srvContext) {
 
             // Global storage engine may not be started in all cases before we exit
             if (serviceContext->getStorageEngine()) {
-                shutdownGlobalStorageEngineCleanly(serviceContext);
+                shutdownGlobalStorageEngineCleanly(serviceContext, true /* memLeakAllowed */);
             }
         }
     }

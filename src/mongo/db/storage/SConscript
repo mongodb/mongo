@@ -1,5 +1,8 @@
 # -*- mode: python -*-
-Import("env")
+Import([
+    "env",
+    "use_system_version_of_library",
+])
 
 env = env.Clone()
 
@@ -703,6 +706,9 @@ env.Library(
         'storage_options',
     ],
 )
+
+if not use_system_version_of_library('valgrind'):
+    env.InjectThirdParty('valgrind')
 
 env.Library(
     target='storage_engine_impl',

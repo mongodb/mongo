@@ -128,7 +128,7 @@ public:
     std::vector<std::string> getAllIdents(OperationContext* opCtx) const override {
         return {};
     }
-    void cleanShutdown() override {}
+    void cleanShutdown(bool memLeakAllowed) override {}
     void setJournalListener(JournalListener* jl) override {}
     Timestamp getAllDurableTimestamp() const override {
         return {};

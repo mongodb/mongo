@@ -382,7 +382,7 @@ public:
      * On error, the storage engine should assert and crash.
      * There is intentionally no uncleanShutdown().
      */
-    virtual void cleanShutdown(ServiceContext* svcCtx) = 0;
+    virtual void cleanShutdown(ServiceContext* svcCtx, bool memLeakAllowed) = 0;
 
     /**
      * Returns the SnapshotManager for this StorageEngine or NULL if not supported.

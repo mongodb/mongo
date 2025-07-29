@@ -99,7 +99,7 @@ public:
         OperationContext* opCtx, StringData ident) final {
         return {};
     }
-    void cleanShutdown(ServiceContext* svcCtx) final {}
+    void cleanShutdown(ServiceContext* svcCtx, bool memLeakAllowed) final {}
     SnapshotManager* getSnapshotManager() const final {
         return nullptr;
     }

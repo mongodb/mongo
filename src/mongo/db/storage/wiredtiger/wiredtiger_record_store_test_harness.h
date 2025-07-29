@@ -45,7 +45,14 @@ public:
         : WiredTigerHarnessHelper(Options::ReplicationEnabled, extraStrings) {}
 
     WiredTigerHarnessHelper(Options options, StringData extraStrings);
-    ~WiredTigerHarnessHelper() {}
+    ~WiredTigerHarnessHelper() {
+#if __has_feature(address_sanitizer)
+        constexpr bool memLeakAllowed = false;
+#else
+        constexpr bool memLeakAllowed = true;
+#endif
+        _engine.cleanShutdown(memLeakAllowed);
+    }
 
     virtual std::unique_ptr<RecordStore> newRecordStore() override {
         return newRecordStore("a.b");

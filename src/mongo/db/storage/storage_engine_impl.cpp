@@ -30,7 +30,12 @@
 
 #include "mongo/db/storage/storage_engine_impl.h"
 
+#ifdef _WIN32
+#define NVALGRIND
+#endif
+
 #include <algorithm>
+#include <valgrind/valgrind.h>
 
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/catalog_control.h"
@@ -890,7 +895,7 @@ std::string StorageEngineImpl::getFilesystemPathForDb(const DatabaseName& dbName
     return _catalog->getFilesystemPathForDb(dbName.toString());
 }
 
-void StorageEngineImpl::cleanShutdown(ServiceContext* svcCtx) {
+void StorageEngineImpl::cleanShutdown(ServiceContext* svcCtx, bool memLeakAllowed) {
     _timestampMonitor.reset();
 
     CollectionCatalog::write(svcCtx, [svcCtx](CollectionCatalog& catalog) {
@@ -901,7 +906,13 @@ void StorageEngineImpl::cleanShutdown(ServiceContext* svcCtx) {
     _catalog.reset();
     _catalogRecordStore.reset();
 
-    _engine->cleanShutdown();
+#if __has_feature(address_sanitizer)
+    memLeakAllowed = false;
+#endif
+    if (RUNNING_ON_VALGRIND) {  // NOLINT
+        memLeakAllowed = false;
+    }
+    _engine->cleanShutdown(memLeakAllowed);
     // intentionally not deleting _engine
 }
 

@@ -281,7 +281,8 @@ StorageEngine::LastShutdownState initializeStorageEngine(
 namespace {
 void shutdownGlobalStorageEngineCleanly(ServiceContext* service,
                                         Status errorToReport,
-                                        bool forRestart) {
+                                        bool forRestart,
+                                        bool memLeakAllowed) {
     auto storageEngine = service->getStorageEngine();
     invariant(storageEngine);
     // We always use 'forRestart' = false here because 'forRestart' = true is only appropriate if
@@ -289,7 +290,7 @@ void shutdownGlobalStorageEngineCleanly(ServiceContext* service,
     // are shutting the storage engine down. Additionally, we need to terminate any background
     // threads as they may be holding onto an OperationContext, as opposed to pausing them.
     StorageControl::stopStorageControls(service, errorToReport, /*forRestart=*/false);
-    storageEngine->cleanShutdown(service);
+    storageEngine->cleanShutdown(service, memLeakAllowed);
     auto& lockFile = StorageEngineLockFile::get(service);
     if (lockFile) {
         lockFile->clearPidAndUnlock();
@@ -298,11 +299,12 @@ void shutdownGlobalStorageEngineCleanly(ServiceContext* service,
 }
 } /* namespace */
 
-void shutdownGlobalStorageEngineCleanly(ServiceContext* service) {
+void shutdownGlobalStorageEngineCleanly(ServiceContext* service, bool memLeakAllowed) {
     shutdownGlobalStorageEngineCleanly(
         service,
         {ErrorCodes::ShutdownInProgress, "The storage catalog is being closed."},
-        /*forRestart=*/false);
+        /*forRestart=*/false,
+        memLeakAllowed);
 }
 
 StorageEngine::LastShutdownState reinitializeStorageEngine(
@@ -311,10 +313,12 @@ StorageEngine::LastShutdownState reinitializeStorageEngine(
     std::function<void()> changeConfigurationCallback) {
     auto service = opCtx->getServiceContext();
     opCtx->recoveryUnit()->abandonSnapshot();
+    // Tell storage engine to free memory since the process is not exiting.
     shutdownGlobalStorageEngineCleanly(
         service,
         {ErrorCodes::InterruptedDueToStorageChange, "The storage engine is being reinitialized."},
-        /*forRestart=*/true);
+        /*forRestart=*/true,
+        /*memLeakAllowed=*/false);
     opCtx->setRecoveryUnit(std::make_unique<RecoveryUnitNoop>(),
                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     changeConfigurationCallback();

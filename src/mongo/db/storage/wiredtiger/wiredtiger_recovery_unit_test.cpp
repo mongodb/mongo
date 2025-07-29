@@ -74,7 +74,14 @@ public:
         _engine.notifyStartupComplete();
     }
 
-    ~WiredTigerRecoveryUnitHarnessHelper() {}
+    ~WiredTigerRecoveryUnitHarnessHelper() {
+#if __has_feature(address_sanitizer)
+        constexpr bool memLeakAllowed = false;
+#else
+        constexpr bool memLeakAllowed = true;
+#endif
+        _engine.cleanShutdown(memLeakAllowed);
+    }
 
     virtual std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
         return std::unique_ptr<RecoveryUnit>(_engine.newRecoveryUnit());

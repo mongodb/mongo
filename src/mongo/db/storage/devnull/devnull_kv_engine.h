@@ -136,7 +136,7 @@ public:
         return std::vector<std::string>();
     }
 
-    virtual void cleanShutdown(){};
+    virtual void cleanShutdown(bool memLeakAllowed){};
 
     void setJournalListener(JournalListener* jl) final {}
 
