@@ -13,6 +13,7 @@
  *
  * @tags: [
  *   requires_fcv_53,
+ *   featureFlagIntentRegistration_incompatible,
  * ]
  */
 
