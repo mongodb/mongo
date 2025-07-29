@@ -1397,7 +1397,7 @@ Status WiredTigerUtil::canRunAutoCompact(bool isEphemeral) {
         return Status(ErrorCodes::IllegalOperation,
                       "autoCompact() cannot be executed for in-memory configurations");
     }
-    if (storageGlobalParams.syncdelay == 0) {
+    if (storageGlobalParams.syncdelay.load() == 0) {
         return Status(ErrorCodes::IllegalOperation,
                       "autoCompact() can only be executed when checkpoints are enabled");
     }

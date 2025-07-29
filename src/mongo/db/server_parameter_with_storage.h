@@ -47,7 +47,6 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/platform/atomic_proxy.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
@@ -152,42 +151,6 @@ private:
     U _defaultValue;
 };
 
-// Covers AtomicDouble
-template <typename U, typename P>
-struct storage_wrapper<AtomicProxy<U, P>> {
-    static constexpr bool isTenantAware = false;
-
-    using type = U;
-    storage_wrapper(AtomicProxy<U, P>& storage)
-        : _storage(storage), _defaultValue(storage.load()) {}
-
-    void store(const U& value, const boost::optional<TenantId>& id) {
-        invariant(!id.is_initialized());
-        _storage.store(value);
-    }
-
-    U load(const boost::optional<TenantId>& id) const {
-        invariant(!id.is_initialized());
-        return _storage.load();
-    }
-
-    void reset(const boost::optional<TenantId>& id) {
-        invariant(!id.is_initialized());
-        _storage.store(_defaultValue);
-    }
-
-    // Not thread-safe, will only be called once at most per ServerParameter in its initialization
-    // block.
-    void setDefault(const U& value) {
-        _defaultValue = value;
-    }
-
-private:
-    AtomicProxy<U, P>& _storage;
-
-    // Copy of original value to be read from during resets.
-    U _defaultValue;
-};
 
 template <typename U>
 struct storage_wrapper<synchronized_value<U>> {

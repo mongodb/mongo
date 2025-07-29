@@ -100,7 +100,7 @@ Status CachedPlanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
     // If we work this many times during the trial period, then we will replan the
     // query from scratch.
     size_t maxWorksBeforeReplan =
-        static_cast<size_t>(internalQueryCacheEvictionRatio * _decisionWorks);
+        static_cast<size_t>(internalQueryCacheEvictionRatio.load() * _decisionWorks);
 
     // The trial period ends without replanning if the cached plan produces this many results.
     size_t numResults = trial_period::getTrialPeriodNumToReturn(*_canonicalQuery);

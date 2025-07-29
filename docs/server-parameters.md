@@ -97,7 +97,7 @@ must be unique across the server instance. More information on the specific fiel
 
 - `set_at` (required): Must contain the value `startup`, `runtime`, [`startup`, `runtime`], or
   `cluster`. If `runtime` is specified along with `cpp_varname`, then `decltype(cpp_varname)` must
-  refer to a thread-safe storage type, specifically: `AtomicWord<T>`, `AtomicDouble`, `std::atomic<T>`,
+  refer to a thread-safe storage type, specifically: `AtomicWord<T>`, `std::atomic<T>`,
   or `boost::synchronized<T>`. Parameters declared as `cluster` can only be set at runtime and exhibit
   numerous differences. See [Cluster Server Parameters](cluster-server-parameters) below.
 

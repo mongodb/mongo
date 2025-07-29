@@ -52,7 +52,6 @@
 #include "mongo/db/query/plan_cache/plan_cache_log_utils.h"
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/platform/atomic_proxy.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/container_size_helper.h"
@@ -550,7 +549,8 @@ public:
                     hasOldEntry ? &**oldEntryWithStatus.getValue() : nullptr,
                     newReadsOrWorks,
                     *cachedPlan.get(),
-                    worksGrowthCoefficient.get_value_or(internalQueryCacheWorksGrowthCoefficient),
+                    worksGrowthCoefficient.get_value_or(
+                        internalQueryCacheWorksGrowthCoefficient.load()),
                     callbacks);
 
                 // Avoid recomputing the hashes if we've got an old entry to grab them from.

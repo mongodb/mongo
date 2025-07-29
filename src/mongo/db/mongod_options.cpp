@@ -62,7 +62,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_proxy.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
@@ -517,7 +516,7 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
 
     if (params.count("storage.syncPeriodSecs")) {
-        storageGlobalParams.syncdelay = params["storage.syncPeriodSecs"].as<double>();
+        storageGlobalParams.syncdelay.store(params["storage.syncPeriodSecs"].as<double>());
         Status conflictStatus =
             checkConflictWithSetParameter("storage.syncPeriodSecs", "syncdelay");
         if (!conflictStatus.isOK()) {

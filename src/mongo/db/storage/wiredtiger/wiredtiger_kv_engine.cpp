@@ -441,18 +441,18 @@ std::string generateWTOpenConfigString(const WiredTigerKVEngineBase::WiredTigerC
         // checkpoints more often.
         const double fourMinutesInSeconds = 240.0;
         int ckptsPerFourMinutes;
-        if (storageGlobalParams.syncdelay <= 0.0) {
+        if (storageGlobalParams.syncdelay.load() <= 0.0) {
             ckptsPerFourMinutes = 1;
         } else {
             ckptsPerFourMinutes =
-                static_cast<int>(fourMinutesInSeconds / storageGlobalParams.syncdelay);
+                static_cast<int>(fourMinutesInSeconds / storageGlobalParams.syncdelay.load());
         }
 
         if (ckptsPerFourMinutes < 1) {
             LOGV2_WARNING(8423377,
                           "Unexpected value for checkpoint retention",
                           "syncdelay"_attr =
-                              static_cast<std::int64_t>(storageGlobalParams.syncdelay),
+                              static_cast<std::int64_t>(storageGlobalParams.syncdelay.load()),
                           "ckptsPerFourMinutes"_attr = ckptsPerFourMinutes);
             ckptsPerFourMinutes = 1;
         }

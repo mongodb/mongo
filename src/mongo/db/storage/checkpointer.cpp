@@ -98,16 +98,18 @@ void Checkpointer::run() {
             LOGV2_DEBUG(7702900,
                         1,
                         "Checkpoint thread sleeping",
-                        "duration"_attr = static_cast<std::int64_t>(storageGlobalParams.syncdelay));
-            _sleepCV.wait_for(
-                lock,
-                stdx::chrono::seconds(static_cast<std::int64_t>(storageGlobalParams.syncdelay)),
-                [&] { return _shuttingDown || _triggerCheckpoint; });
+                        "duration"_attr =
+                            static_cast<std::int64_t>(storageGlobalParams.syncdelay.load()));
+            _sleepCV.wait_for(lock,
+                              stdx::chrono::seconds(
+                                  static_cast<std::int64_t>(storageGlobalParams.syncdelay.load())),
+                              [&] { return _shuttingDown || _triggerCheckpoint; });
 
             // If the syncdelay is set to 0, that means we should skip checkpointing. However,
             // syncdelay is adjustable by a runtime server parameter, so we need to wake up to check
             // periodically. The wakeup to check period is arbitrary.
-            while (storageGlobalParams.syncdelay == 0 && !_shuttingDown && !_triggerCheckpoint) {
+            while (storageGlobalParams.syncdelay.load() == 0 && !_shuttingDown &&
+                   !_triggerCheckpoint) {
                 _sleepCV.wait_for(lock, stdx::chrono::seconds(static_cast<std::int64_t>(3)), [&] {
                     return _shuttingDown || _triggerCheckpoint;
                 });

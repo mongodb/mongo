@@ -69,7 +69,6 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/platform/atomic_proxy.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -201,7 +200,7 @@ public:
         auto plannerParams = makePlannerParams(collection, *cq);
         const size_t decisionWorks = 10;
         const size_t mockWorks =
-            1U + static_cast<size_t>(internalQueryCacheEvictionRatio * decisionWorks);
+            1U + static_cast<size_t>(internalQueryCacheEvictionRatio.load() * decisionWorks);
         auto mockChild = std::make_unique<MockStage>(_expCtx.get(), &_ws);
         for (size_t i = 0; i < mockWorks; i++) {
             mockChild->enqueueStateCode(PlanStage::NEED_TIME);
@@ -306,7 +305,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanHitMaxWorks) {
     auto plannerParams = makePlannerParams(collection, *cq);
     const size_t decisionWorks = 10;
     const size_t mockWorks =
-        1U + static_cast<size_t>(internalQueryCacheEvictionRatio * decisionWorks);
+        1U + static_cast<size_t>(internalQueryCacheEvictionRatio.load() * decisionWorks);
     auto mockChild = std::make_unique<MockStage>(_expCtx.get(), &_ws);
     for (size_t i = 0; i < mockWorks; i++) {
         mockChild->enqueueStateCode(PlanStage::NEED_TIME);

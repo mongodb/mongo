@@ -35,7 +35,6 @@ global:
         - "mongo/db/query/plan_cache/sbe_plan_cache_on_parameter_change.h"
         - "mongo/db/query/query_knob_expressions.h"
         - "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
-        - "mongo/platform/atomic_proxy.h"
         - "mongo/platform/atomic_word.h"
 
 enums:
@@ -138,7 +137,7 @@ server_parameters:
             is taken as this fraction of the collection size. Applies only to the classic execution engine.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlanEvaluationCollFraction"
-        cpp_vartype: AtomicDouble
+        cpp_vartype: AtomicWord<double>
         default: 0.3
         validator:
             gte: 0.0
@@ -151,7 +150,7 @@ server_parameters:
             the number of times we work() all candidate plans in total. Applies only to the classic execution engine.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryPlanTotalEvaluationCollFraction"
-        cpp_vartype: AtomicDouble
+        cpp_vartype: AtomicWord<double>
         default: 2.0
         validator:
             gte: 0.0
@@ -304,7 +303,7 @@ server_parameters:
             and replanning?
         set_at: [startup, runtime]
         cpp_varname: "internalQueryCacheEvictionRatio"
-        cpp_vartype: AtomicDouble
+        cpp_vartype: AtomicWord<double>
         default: 10.0
         validator:
             gte: 0.0
@@ -317,7 +316,7 @@ server_parameters:
             exponentially. The value of this server parameter is the base.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryCacheWorksGrowthCoefficient"
-        cpp_vartype: AtomicDouble
+        cpp_vartype: AtomicWord<double>
         default: 2.0
         validator:
             gt: 1.0
@@ -912,7 +911,7 @@ server_parameters:
             internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill].
         set_at: [startup, runtime]
         cpp_varname: "internalQuerySBEAggMemoryUseCheckMargin"
-        cpp_vartype: AtomicDouble
+        cpp_vartype: AtomicWord<double>
         default: 0.7
         validator:
             gt: 0.0
@@ -1270,7 +1269,7 @@ server_parameters:
             internalQueryStatsRateLimit to 0.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryStatsSampleRate"
-        cpp_vartype: AtomicDouble
+        cpp_vartype: AtomicWord<double>
         default: 0
         validator:
             gte: 0.0
@@ -1360,7 +1359,7 @@ server_parameters:
         description: "The minimal density required for the hybrid container to switch from hash table to Roaring Bitmaps."
         set_at: [startup, runtime]
         cpp_varname: internalRoaringBitmapsMinimalDensity
-        cpp_vartype: AtomicDouble
+        cpp_vartype: AtomicWord<double>
         default: 0.00001
         redact: false
 
@@ -1450,7 +1449,7 @@ server_parameters:
             `internalQueryMaxSizeFactorToSimplify`, the simplified one will be rejected.
         set_at: [startup, runtime]
         cpp_varname: internalQueryMaxSizeFactorToSimplify
-        cpp_vartype: AtomicDouble
+        cpp_vartype: AtomicWord<double>
         default: 1.0
         redact: false
 
@@ -1630,7 +1629,7 @@ server_parameters:
             than 10% lead to very wide confidence interval and poor estimate accuracy.
         set_at: [startup, runtime]
         cpp_varname: samplingMarginOfError
-        cpp_vartype: AtomicDouble
+        cpp_vartype: AtomicWord<double>
         default: 5.0
         validator:
             gte: 1.0

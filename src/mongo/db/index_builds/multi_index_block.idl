@@ -57,7 +57,7 @@ server_parameters:
             - runtime
             - startup
         cpp_varname: maxIndexBuildMemoryUsageMegabytes
-        cpp_vartype: AtomicDouble
+        cpp_vartype: AtomicWord<double>
         default: 200
         validator:
             callback: validateMaxIndexBuildMemoryUsageMegabytesSetting

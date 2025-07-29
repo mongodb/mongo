@@ -98,7 +98,6 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "platform_test",
     srcs = [
-        "atomic_proxy_test.cpp",
         "atomic_test.cpp",
         "bits_test.cpp",
         "decimal128_bson_test.cpp",

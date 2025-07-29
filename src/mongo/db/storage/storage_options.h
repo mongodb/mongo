@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_proxy.h"
 #include "mongo/platform/atomic_word.h"
 
 #include <string>
@@ -116,7 +115,7 @@ struct StorageGlobalParams {
     // This parameter is both a server parameter and a configuration parameter, and to resolve
     // conflicts between the two the default must be set here.
     static constexpr double kMaxSyncdelaySecs = 60 * 60;  // 1hr
-    AtomicDouble syncdelay{60.0};                         // seconds between checkpoints
+    AtomicWord<double> syncdelay{60.0};                   // seconds between checkpoints
 
     // --queryableBackupMode
     // Prevents user-originating operations from performing writes to the server. Internally

@@ -219,7 +219,7 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
                                                                   std::move(sbePlanAndData));
     }
 
-    const size_t maxReadsBeforeReplan = internalQueryCacheEvictionRatio * *decisionReads;
+    const size_t maxReadsBeforeReplan = internalQueryCacheEvictionRatio.load() * *decisionReads;
     auto candidate = collectExecutionStatsForCachedPlan(plannerData,
                                                         std::move(solution),
                                                         indexExistenceChecker,

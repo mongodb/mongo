@@ -60,7 +60,7 @@ void StorageGlobalParams::reset() {
 
     noTableScan.store(false);
     directoryperdb = false;
-    syncdelay = 60.0;
+    syncdelay.store(60.0);
     queryableBackupMode = false;
     groupCollections = false;
     oplogMinRetentionHours.store(0.0);

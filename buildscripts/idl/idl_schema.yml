@@ -575,9 +575,9 @@ properties:
             description: >
               Must contain the value startup, runtime, [startup, runtime], or cluster. If runtime
               is specified along with cpp_varname, then decltype(cpp_varname) must refer to a
-              thread-safe storage type, specifically: AtomicWord<T>, AtomicDouble,
-              std::atomic<T>, or boost::synchronized<T>. Parameters declared as cluster can only
-              be set at runtime and exhibit numerous differences.
+              thread-safe storage type, specifically: AtomicWord<T>, AtomicWord<double>, std::atomic<T>,
+              or boost::synchronized<T>. Parameters declared as cluster can only be set at
+              runtime and exhibit numerous differences.
             oneOf:
               - type: string
                 enum:
