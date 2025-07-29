@@ -197,6 +197,9 @@ Status createIndexFromSpec(OperationContext* opCtx,
         invariant(coll);
         wunit.commit();
     }
+
+    auto indexBuildInfo =
+        IndexBuildInfo(spec, ident::generateNewIndexIdent(nss.dbName(), false, false));
     MultiIndexBlock indexer;
     CollectionWriter collection(opCtx, nss);
     ScopeGuard abortOnExit(
@@ -206,8 +209,7 @@ Status createIndexFromSpec(OperationContext* opCtx,
             .init(
                 opCtx,
                 collection,
-                {spec},
-                {ident::generateNewIndexIdent(nss.dbName(), false, false)},
+                {indexBuildInfo},
                 [opCtx, clock] {
                     if (opCtx->writesAreReplicated() &&
                         shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull()) {
@@ -478,6 +480,9 @@ public:
     }
 
     void createIndex(CollectionWriter& coll, std::string indexName, const BSONObj& indexKey) {
+        auto indexBuildInfo =
+            IndexBuildInfo(BSON("v" << 2 << "name" << indexName << "key" << indexKey),
+                           ident::generateNewIndexIdent(coll->ns().dbName(), false, false));
 
         // Build an index.
         MultiIndexBlock indexer;
@@ -489,8 +494,7 @@ public:
             auto swIndexInfoObj =
                 indexer.init(_opCtx,
                              coll,
-                             {BSON("v" << 2 << "name" << indexName << "key" << indexKey)},
-                             {ident::generateNewIndexIdent(coll->ns().dbName(), false, false)},
+                             {indexBuildInfo},
                              MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, coll.get()));
             ASSERT_OK(swIndexInfoObj.getStatus());
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
@@ -506,8 +510,9 @@ public:
                 _opCtx,
                 coll.getWritableCollection(_opCtx),
                 [&](const BSONObj& indexSpec, StringData ident) {
+                    auto indexBuildInfo = IndexBuildInfo(indexSpec, std::string{ident});
                     _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                        _opCtx, coll->ns(), coll->uuid(), indexSpec, ident, false);
+                        _opCtx, coll->ns(), coll->uuid(), indexBuildInfo, false);
                 },
                 MultiIndexBlock::kNoopOnCommitFn));
             // The timestamping responsibility is placed on the caller rather than the
@@ -2037,13 +2042,14 @@ public:
                 unreplicated.emplace(_opCtx);
             }
 
+            auto indexBuildInfo = IndexBuildInfo(BSON("v" << 2 << "unique" << true << "name"
+                                                          << "a_1"
+                                                          << "key" << BSON("a" << 1)),
+                                                 indexIdent);
             auto swIndexInfoObj = indexer.init(
                 _opCtx,
                 coll,
-                {BSON("v" << 2 << "unique" << true << "name"
-                          << "a_1"
-                          << "key" << BSON("a" << 1))},
-                {indexIdent},
+                {indexBuildInfo},
                 MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, autoColl.getCollection()));
             ASSERT_OK(swIndexInfoObj.getStatus());
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
@@ -2068,8 +2074,9 @@ public:
                     if (simulatePrimary) {
                         // The timestamping responsibility for each index is placed
                         // on the caller.
+                        auto indexBuildInfo = IndexBuildInfo(indexSpec, std::string{ident});
                         _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                            _opCtx, nss, coll->uuid(), indexSpec, ident, false);
+                            _opCtx, nss, coll->uuid(), indexBuildInfo, false);
                     } else {
                         const auto currentTime = _clock->getTime();
                         ASSERT_OK(shard_role_details::getRecoveryUnit(_opCtx)->setTimestamp(
@@ -2653,14 +2660,15 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
         {
             TimestampBlock tsBlock(_opCtx, indexInit.asTimestamp());
 
+            auto indexBuildInfo = IndexBuildInfo(BSON("v" << 2 << "name"
+                                                          << "a_1_b_1"
+                                                          << "ns" << collection->ns().ns_forTest()
+                                                          << "key" << BSON("a" << 1 << "b" << 1)),
+                                                 std::string{"index-ident"});
             auto swSpecs = indexer.init(
                 _opCtx,
                 collection,
-                {BSON("v" << 2 << "name"
-                          << "a_1_b_1"
-                          << "ns" << collection->ns().ns_forTest() << "key"
-                          << BSON("a" << 1 << "b" << 1))},
-                {"index-ident"},
+                {indexBuildInfo},
                 MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, collection.get()));
             ASSERT_OK(swSpecs.getStatus());
         }
@@ -2749,8 +2757,9 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
             _opCtx,
             collection.getWritableCollection(_opCtx),
             [&](const BSONObj& indexSpec, StringData ident) {
+                auto indexBuildInfo = IndexBuildInfo(indexSpec, std::string{ident});
                 _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                    _opCtx, collection->ns(), collection->uuid(), indexSpec, ident, false);
+                    _opCtx, collection->ns(), collection->uuid(), indexBuildInfo, false);
             },
             MultiIndexBlock::kNoopOnCommitFn));
         wuow.commit();

@@ -62,6 +62,8 @@
 
 namespace mongo {
 
+struct IndexBuildInfo;
+
 /**
  * Implementation of the OpObserver interface that allows multiple observers to be registered.
  * All observers will be called in order of registration. Once an observer throws an exception,
@@ -134,25 +136,22 @@ public:
     void onCreateIndex(OperationContext* const opCtx,
                        const NamespaceString& nss,
                        const UUID& uuid,
-                       BSONObj indexDoc,
-                       StringData ident,
+                       const IndexBuildInfo& indexBuildInfo,
                        bool fromMigrate) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onCreateIndex(opCtx, nss, uuid, indexDoc, ident, fromMigrate);
+            o->onCreateIndex(opCtx, nss, uuid, indexBuildInfo, fromMigrate);
     }
 
     void onStartIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const UUID& collUUID,
                            const UUID& indexBuildUUID,
-                           const std::vector<BSONObj>& indexes,
-                           const std::vector<std::string>& idents,
+                           const std::vector<IndexBuildInfo>& indexes,
                            bool fromMigrate) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {
-            o->onStartIndexBuild(
-                opCtx, nss, collUUID, indexBuildUUID, indexes, idents, fromMigrate);
+            o->onStartIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate);
         }
     }
 

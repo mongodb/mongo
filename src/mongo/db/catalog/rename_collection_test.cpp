@@ -100,16 +100,14 @@ public:
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
                        const UUID& uuid,
-                       BSONObj indexDoc,
-                       StringData ident,
+                       const IndexBuildInfo& indexBuildInfo,
                        bool fromMigrate) override;
 
     void onStartIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const UUID& collUUID,
                            const UUID& indexBuildUUID,
-                           const std::vector<BSONObj>& indexes,
-                           const std::vector<std::string>& idents,
+                           const std::vector<IndexBuildInfo>& indexes,
                            bool fromMigrate) override;
 
     void onCommitIndexBuild(OperationContext* opCtx,
@@ -201,23 +199,20 @@ private:
 void OpObserverMock::onCreateIndex(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const UUID& uuid,
-                                   BSONObj indexDoc,
-                                   StringData ident,
+                                   const IndexBuildInfo& indexBuildInfo,
                                    bool fromMigrate) {
     _logOp(opCtx, nss, "index");
-    OpObserverNoop::onCreateIndex(opCtx, nss, uuid, indexDoc, ident, fromMigrate);
+    OpObserverNoop::onCreateIndex(opCtx, nss, uuid, indexBuildInfo, fromMigrate);
 }
 
 void OpObserverMock::onStartIndexBuild(OperationContext* opCtx,
                                        const NamespaceString& nss,
                                        const UUID& collUUID,
                                        const UUID& indexBuildUUID,
-                                       const std::vector<BSONObj>& indexes,
-                                       const std::vector<std::string>& idents,
+                                       const std::vector<IndexBuildInfo>& indexes,
                                        bool fromMigrate) {
     _logOp(opCtx, nss, "startIndex");
-    OpObserverNoop::onStartIndexBuild(
-        opCtx, nss, collUUID, indexBuildUUID, indexes, idents, fromMigrate);
+    OpObserverNoop::onStartIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexes, fromMigrate);
 }
 
 void OpObserverMock::onCommitIndexBuild(OperationContext* opCtx,

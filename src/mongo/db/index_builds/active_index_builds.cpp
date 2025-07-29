@@ -219,11 +219,10 @@ Status ActiveIndexBuilds::registerIndexBuild(
     };
     auto collIndexBuilds = _filterIndexBuilds_inlock(lk, pred);
     for (const auto& existingIndexBuild : collIndexBuilds) {
-        for (const auto& name : replIndexBuildState->indexNames) {
-            if (existingIndexBuild->indexNames.end() !=
-                std::find(existingIndexBuild->indexNames.begin(),
-                          existingIndexBuild->indexNames.end(),
-                          name)) {
+        for (const auto& name : toIndexNames(replIndexBuildState->getIndexes())) {
+            auto existingIndexNames = toIndexNames(existingIndexBuild->getIndexes());
+            if (existingIndexNames.end() !=
+                std::find(existingIndexNames.begin(), existingIndexNames.end(), name)) {
                 return existingIndexBuild->onConflictWithNewIndexBuild(*replIndexBuildState, name);
             }
         }

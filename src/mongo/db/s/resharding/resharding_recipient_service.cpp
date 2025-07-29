@@ -1226,9 +1226,10 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                            // new idents or if we need to do something more complicated for catalog
                            // consistency.
                            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-                           auto indexIdents = storageEngine->generateNewIndexIdents(
-                               _metadata.getTempReshardingNss().dbName(), indexSpecs.size());
-
+                           auto indexes =
+                               toIndexBuildInfoVec(indexSpecs,
+                                                   storageEngine,
+                                                   _metadata.getTempReshardingNss().dbName());
                            auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx.get());
                            auto indexBuildFuture = indexBuildsCoordinator->startIndexBuild(
                                opCtx.get(),
@@ -1236,8 +1237,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                                // When we create the collection we use the metadata resharding UUID
                                // as the collection UUID.
                                _metadata.getReshardingUUID(),
-                               indexSpecs,
-                               indexIdents,
+                               indexes,
                                buildUUID,
                                IndexBuildProtocol::kTwoPhase,
                                indexBuildOptions);
@@ -1273,7 +1273,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                         const auto& tempCollIdxSpecs =
                             listIndexesEmptyListIfMissing(opCtx.get(),
                                                           _metadata.getTempReshardingNss(),
-                                                          ListIndexesInclude::Nothing);
+                                                          ListIndexesInclude::kNothing);
                         resharding::verifyIndexSpecsMatch(sourceIdxSpecs.cbegin(),
                                                           sourceIdxSpecs.cend(),
                                                           tempCollIdxSpecs.cbegin(),

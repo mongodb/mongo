@@ -45,6 +45,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/multi_index_block_gen.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
@@ -284,8 +285,7 @@ MultiIndexBlock::OnInitFn MultiIndexBlock::makeTimestampedIndexOnInitFn(Operatio
 StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     OperationContext* opCtx,
     CollectionWriter& collection,
-    const std::vector<BSONObj>& indexSpecs,
-    const std::vector<std::string>& indexIdents,
+    const std::vector<IndexBuildInfo>& indexes,
     OnInitFn onInit,
     const InitMode initMode,
     const boost::optional<ResumeIndexInfo>& resumeInfo,
@@ -318,7 +318,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             _buildIsCleanedUp = true;
         });
 
-        for (const auto& info : indexSpecs) {
+        for (const auto& indexBuildInfo : indexes) {
+            const auto& info = indexBuildInfo.spec;
             if (info["background"].isBoolean() && !info["background"].Bool()) {
                 LOGV2(20383,
                       "Ignoring obsolete { background: false } index build option because all "
@@ -327,9 +328,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
         }
 
         std::vector<BSONObj> indexInfoObjs;
-        indexInfoObjs.reserve(indexSpecs.size());
+        indexInfoObjs.reserve(indexes.size());
         std::size_t eachIndexBuildMaxMemoryUsageBytes =
-            getEachIndexBuildMaxMemoryUsageBytes(maxMemoryUsageBytes, indexSpecs.size());
+            getEachIndexBuildMaxMemoryUsageBytes(maxMemoryUsageBytes, indexes.size());
 
         // First do a pass over all indexes we have been requested to build to see if there are any
         // conflicts with existing indexes. We do this without adding anything to the index catalog
@@ -337,7 +338,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
         // we've been requested to build. We skip this step when initializing unfinished index
         // builds during startup recovery as they are already in the index catalog.
         if (!forRecovery) {
-            for (auto&& info : indexSpecs) {
+            for (const auto& indexBuildInfo : indexes) {
+                const auto& info = indexBuildInfo.spec;
                 auto status = collection->getIndexCatalog()
                                   ->prepareSpecForCreate(opCtx, collection.get(), info, resumeInfo)
                                   .getStatus();
@@ -357,14 +359,10 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             onInit();
         }
 
-        // When resuming an index build we don't need idents as the indexes already exist in the
-        // catalog
-        invariant(forRecovery || resumeInfo || indexIdents.size() == indexSpecs.size());
-
         // Then proceed to start the index builds. If we encounter conflicts for the index specs at
         // this point we know it is a conflict between the indexes we are requested to build.
-        for (size_t i = 0; i < indexSpecs.size(); i++) {
-            BSONObj info = indexSpecs[i];
+        for (size_t i = 0; i < indexes.size(); i++) {
+            BSONObj info = indexes[i].spec;
             if (!forRecovery) {
                 // We skip this step when initializing unfinished index builds during startup
                 // recovery as they are already in the index catalog.
@@ -427,7 +425,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             } else {
                 auto status = index.block->init(opCtx,
                                                 collection.getWritableCollection(opCtx),
-                                                forRecovery ? "" : indexIdents[i],
+                                                forRecovery ? "" : indexes[i].indexIdent,
                                                 forRecovery);
                 if (!status.isOK())
                     return status;
@@ -465,7 +463,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                   logAttrs(collection->ns()),
                   "properties"_attr = *descriptor,
                   "specIndex"_attr = i,
-                  "numSpecs"_attr = indexSpecs.size(),
+                  "numSpecs"_attr = indexes.size(),
                   "method"_attr = _method,
                   "ident"_attr = indexCatalogEntry->getIdent(),
                   "collectionIdent"_attr = collection->getSharedIdent()->getIdent(),
@@ -494,13 +492,12 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     } catch (const StorageUnavailableException&) {
         throw;
     } catch (...) {
-        return exceptionToStatus().withContext(str::stream()
-                                               << "Caught exception during index builder ("
-                                               << _buildUUID << ") initialization on namespace "
-                                               << collection->ns().toStringForErrorMsg() << " ("
-                                               << _collectionUUID << "). " << indexSpecs.size()
-                                               << " index specs provided. First index spec: "
-                                               << (indexSpecs.empty() ? BSONObj() : indexSpecs[0]));
+        return exceptionToStatus().withContext(
+            str::stream() << "Caught exception during index builder (" << _buildUUID
+                          << ") initialization on namespace "
+                          << collection->ns().toStringForErrorMsg() << " (" << _collectionUUID
+                          << "). " << indexes.size() << " index specs provided. First index spec: "
+                          << (indexes.empty() ? BSONObj() : indexes[0].spec));
     }
 }
 

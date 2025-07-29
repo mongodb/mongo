@@ -337,6 +337,7 @@ void createIndexForApplyOps(OperationContext* opCtx,
     // collections. See SERVER-47439.
     IndexBuildsCoordinator::updateCurOpOpDescription(opCtx, indexNss, {indexSpec});
     auto collUUID = indexCollection->uuid();
+
     std::string indexIdent = [&] {
         if (!indexMetadata || !shouldReplicateLocalCatalogIdentifers(opCtx)) {
             return opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdent(
@@ -356,8 +357,10 @@ void createIndexForApplyOps(OperationContext* opCtx,
     }();
 
     auto indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
-    indexBuildsCoordinator->createIndex(
-        opCtx, collUUID, indexSpec, indexIdent, IndexBuildsManager::IndexConstraints::kRelax);
+    indexBuildsCoordinator->createIndex(opCtx,
+                                        collUUID,
+                                        IndexBuildInfo(indexSpec, indexIdent),
+                                        IndexBuildsManager::IndexConstraints::kRelax);
 }
 
 /**

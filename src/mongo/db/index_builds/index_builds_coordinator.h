@@ -91,6 +91,8 @@ namespace mongo {
 class OperationContext;
 class ServiceContext;
 enum class RepairData;
+struct IndexBuildInfo;
+
 /**
  * This is a coordinator for all things index builds. Index builds can be externally affected,
  * notified, waited upon and aborted through this interface. Index build results are returned to
@@ -187,8 +189,7 @@ public:
         OperationContext* opCtx,
         const DatabaseName& dbName,
         const UUID& collectionUUID,
-        const std::vector<BSONObj>& specs,
-        const std::vector<std::string>& indexIdents,
+        const std::vector<IndexBuildInfo>& indexes,
         const UUID& buildUUID,
         IndexBuildProtocol protocol,
         IndexBuildOptions indexBuildOptions) = 0;
@@ -504,8 +505,7 @@ public:
      */
     void createIndex(OperationContext* opCtx,
                      UUID collectionUUID,
-                     const BSONObj& spec,
-                     StringData ident,
+                     const IndexBuildInfo& indexBuildInfo,
                      IndexBuildsManager::IndexConstraints indexConstraints);
 
     /**
@@ -524,8 +524,7 @@ public:
                                                bool fromMigrate);
     static void createIndexesOnEmptyCollection(OperationContext* opCtx,
                                                CollectionWriter& collection,
-                                               std::span<const BSONObj> specs,
-                                               std::span<const std::string> idents,
+                                               std::span<const IndexBuildInfo> indexes,
                                                bool fromMigrate);
 
     void sleepIndexBuilds_forTestOnly(bool sleep);
@@ -545,12 +544,11 @@ public:
      *
      * This function throws on error. Expects caller to have exclusive access to `collection`.
      */
-    static std::pair<std::vector<BSONObj>, std::vector<std::string>> prepareSpecListForCreate(
+    static std::vector<IndexBuildInfo> prepareSpecListForCreate(
         OperationContext* opCtx,
         const CollectionPtr& collection,
         const NamespaceString& nss,
-        const std::vector<BSONObj>& indexSpecs,
-        const std::vector<std::string>& indexIdents);
+        const std::vector<IndexBuildInfo>& indexes);
 
     /**
      * Returns total number of indexes in collection, including unfinished/in-progress indexes.
@@ -570,7 +568,7 @@ private:
      */
     Status _startIndexBuildForRecovery(OperationContext* opCtx,
                                        CollectionWriter& collWriter,
-                                       const std::vector<BSONObj>& specs,
+                                       std::vector<IndexBuildInfo> indexes,
                                        const UUID& buildUUID,
                                        IndexBuildProtocol protocol);
 
@@ -590,8 +588,7 @@ private:
 
     void _createIndex(OperationContext* opCtx,
                       CollectionWriter& collection,
-                      const BSONObj& spec,
-                      StringData ident,
+                      const IndexBuildInfo& indexBuildInfo,
                       IndexBuildsManager::IndexConstraints indexConstraints,
                       bool fromMigrate);
 
@@ -639,8 +636,7 @@ protected:
     _filterSpecsAndRegisterBuild(OperationContext* opCtx,
                                  const DatabaseName& dbName,
                                  const UUID& collectionUUID,
-                                 const std::vector<BSONObj>& specs,
-                                 const std::vector<std::string>& idents,
+                                 const std::vector<IndexBuildInfo>& indexes,
                                  const UUID& buildUUID,
                                  IndexBuildProtocol protocol);
 
@@ -673,7 +669,7 @@ protected:
     Status _setUpIndexBuildForTwoPhaseRecovery(OperationContext* opCtx,
                                                const DatabaseName& dbName,
                                                const UUID& collectionUUID,
-                                               const std::vector<BSONObj>& specs,
+                                               const std::vector<IndexBuildInfo>& indexes,
                                                const UUID& buildUUID);
     /**
      * Reconstructs the in-memory state of the index build so that it can be resumed from the phase
@@ -682,7 +678,7 @@ protected:
     Status _setUpResumeIndexBuild(OperationContext* opCtx,
                                   const DatabaseName& dbName,
                                   const UUID& collectionUUID,
-                                  const std::vector<BSONObj>& specs,
+                                  const std::vector<IndexBuildInfo>& indexes,
                                   const UUID& buildUUID,
                                   const ResumeIndexInfo& resumeInfo);
 

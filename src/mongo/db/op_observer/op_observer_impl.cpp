@@ -50,6 +50,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/batched_write_context.h"
@@ -322,8 +323,7 @@ OpObserverImpl::OpObserverImpl(std::unique_ptr<OperationLogger> operationLogger)
 void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const UUID& uuid,
-                                   BSONObj indexDoc,
-                                   StringData ident,
+                                   const IndexBuildInfo& indexBuildInfo,
                                    bool fromMigrate) {
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
@@ -335,9 +335,9 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
     // Note that despite using this constant, we are not building a CreateIndexCommand here
     builder.append(CreateIndexesCommand::kCommandName, nss.coll());
     if (replicateLocalCatalogIdentifiers) {
-        builder.append("spec", indexDoc);
+        builder.append("spec", indexBuildInfo.spec);
     } else {
-        builder.appendElements(indexDoc);
+        builder.appendElements(indexBuildInfo.spec);
     }
 
     MutableOplogEntry oplogEntry;
@@ -347,7 +347,7 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
     oplogEntry.setUuid(uuid);
     oplogEntry.setObject(builder.obj());
     if (replicateLocalCatalogIdentifiers) {
-        oplogEntry.setObject2(BSON("ident" << ident));
+        oplogEntry.setObject2(BSON("ident" << indexBuildInfo.indexIdent));
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
 
@@ -377,8 +377,7 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
                                        const NamespaceString& nss,
                                        const UUID& collUUID,
                                        const UUID& indexBuildUUID,
-                                       const std::vector<BSONObj>& indexes,
-                                       const std::vector<std::string>& idents,
+                                       const std::vector<IndexBuildInfo>& indexes,
                                        bool fromMigrate) {
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
@@ -390,14 +389,14 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
     indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");
 
     BSONArrayBuilder indexesArr(oplogEntryBuilder.subarrayStart("indexes"));
-    for (const auto& indexDoc : indexes) {
-        indexesArr.append(indexDoc);
+    for (const auto& indexBuildInfo : indexes) {
+        indexesArr.append(indexBuildInfo.spec);
     }
     indexesArr.done();
 
     BSONArrayBuilder identsArr;
-    for (auto&& ident : idents) {
-        identsArr.append(ident);
+    for (const auto& indexBuildInfo : indexes) {
+        identsArr.append(indexBuildInfo.indexIdent);
     }
 
     MutableOplogEntry oplogEntry;

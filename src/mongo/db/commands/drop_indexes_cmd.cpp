@@ -48,6 +48,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/drop_indexes_gen.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/namespace_string.h"
@@ -215,7 +216,7 @@ public:
 
         const auto defaultIndexVersion = IndexDescriptor::getDefaultIndexVersion();
 
-        std::vector<BSONObj> all;
+        std::vector<IndexBuildInfo> indexes;
         {
             std::vector<std::string> indexNames;
             writeConflictRetry(opCtx, "listIndexes", toReIndexNss, [&] {
@@ -223,8 +224,7 @@ public:
                 acquisition.getCollectionPtr()->getAllIndexes(&indexNames);
             });
 
-            all.reserve(indexNames.size());
-
+            indexes.reserve(indexNames.size());
             for (size_t i = 0; i < indexNames.size(); i++) {
                 const std::string& name = indexNames[i];
                 BSONObj spec = writeConflictRetry(opCtx, "getIndexSpec", toReIndexNss, [&] {
@@ -246,7 +246,10 @@ public:
                         }
                     }
 
-                    all.push_back(bob.obj());
+                    indexes.push_back(IndexBuildInfo(
+                        bob.obj(),
+                        opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdent(
+                            dbName)));
                 }
 
                 const BSONObj key = spec.getObjectField("key");
@@ -261,7 +264,7 @@ public:
             }
         }
 
-        result.appendNumber("nIndexesWas", static_cast<long long>(all.size()));
+        result.appendNumber("nIndexesWas", static_cast<long long>(indexes.size()));
 
         std::unique_ptr<MultiIndexBlock> indexer = std::make_unique<MultiIndexBlock>();
         indexer->setIndexBuildMethod(IndexBuildMethod::kForeground);
@@ -273,14 +276,11 @@ public:
             collection.getWritableCollection(opCtx)->getIndexCatalog()->dropAllIndexes(
                 opCtx, collection.getWritableCollection(opCtx), true, {});
 
-            swIndexesToRebuild = indexer->init(
-                opCtx,
-                collection,
-                all,
-                opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdents(
-                    collection->ns().dbName(), all.size()),
-                MultiIndexBlock::kNoopOnInitFn,
-                MultiIndexBlock::InitMode::SteadyState);
+            swIndexesToRebuild = indexer->init(opCtx,
+                                               collection,
+                                               indexes,
+                                               MultiIndexBlock::kNoopOnInitFn,
+                                               MultiIndexBlock::InitMode::SteadyState);
             uassertStatusOK(swIndexesToRebuild.getStatus());
             wunit.commit();
         });

@@ -335,7 +335,7 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
                 auto existingIt = reconcileResult.indexBuildsToRestart.find(buildUUID);
                 if (existingIt == reconcileResult.indexBuildsToRestart.end()) {
                     reconcileResult.indexBuildsToRestart.insert(
-                        {buildUUID, IndexBuildDetails(*collUUID)});
+                        {buildUUID, IndexBuildsEntry(*collUUID)});
                     existingIt = reconcileResult.indexBuildsToRestart.find(buildUUID);
                 }
 

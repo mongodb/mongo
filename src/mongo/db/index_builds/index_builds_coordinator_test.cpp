@@ -227,20 +227,20 @@ public:
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
                        const UUID& uuid,
-                       BSONObj indexDoc,
-                       StringData ident,
+                       const IndexBuildInfo& indexBuildInfo,
                        bool fromMigrate) override {
-        createIndexIdents.emplace_back(ident);
+        createIndexIdents.emplace_back(indexBuildInfo.indexIdent);
     }
 
     void onStartIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const UUID& collUUID,
                            const UUID& indexBuildUUID,
-                           const std::vector<BSONObj>& indexes,
-                           const std::vector<std::string>& idents,
+                           const std::vector<IndexBuildInfo>& indexes,
                            bool fromMigrate) override {
-        startIndexBuildIdents = idents;
+        for (const auto& indexBuildInfo : indexes) {
+            startIndexBuildIdents.push_back(indexBuildInfo.indexIdent);
+        }
     }
 
     static OpObserverMock* install(OperationContext* opCtx) {
@@ -325,10 +325,12 @@ TEST_F(IndexBuildsCoordinatorTest, CreateIndexUsesSpecifiedIdent) {
         wuow.commit();
 
         auto indexBuildsCoord = IndexBuildsCoordinator::get(operationContext());
+        auto indexBuildInfo =
+            IndexBuildInfo(BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
+                           std::string{"index-ident"});
         indexBuildsCoord->createIndex(operationContext(),
                                       collection.uuid(),
-                                      BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
-                                      "index-ident",
+                                      indexBuildInfo,
                                       IndexBuildsManager::IndexConstraints::kRelax);
     }
 
@@ -346,34 +348,40 @@ TEST_F(IndexBuildsCoordinatorTest, CreateIndexWithExistingIdentReportsError) {
 
     {
         auto collection = getCollectionExclusive(operationContext(), nss);
+        auto indexBuildInfo =
+            IndexBuildInfo(BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
+                           std::string{"index-ident"});
         indexBuildsCoord->createIndex(operationContext(),
                                       collection.uuid(),
-                                      BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
-                                      "index-ident",
+                                      indexBuildInfo,
                                       IndexBuildsManager::IndexConstraints::kRelax);
     }
 
     {
         // This succeeds because it's an exact match for the existing index and so is a no-op
         auto collection = getCollectionExclusive(operationContext(), nss);
+        auto indexBuildInfo =
+            IndexBuildInfo(BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
+                           std::string{"index-ident"});
         indexBuildsCoord->createIndex(operationContext(),
                                       collection.uuid(),
-                                      BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
-                                      "index-ident",
+                                      indexBuildInfo,
                                       IndexBuildsManager::IndexConstraints::kRelax);
     }
 
     {
         // This fails because it's a different index with the same ident
         auto collection = getCollectionExclusive(operationContext(), nss);
-        ASSERT_THROWS_CODE(indexBuildsCoord->createIndex(
-                               operationContext(),
-                               collection.uuid(),
-                               BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1"),
-                               "index-ident",
-                               IndexBuildsManager::IndexConstraints::kRelax),
-                           DBException,
-                           ErrorCodes::ObjectAlreadyExists);
+        auto indexBuildInfo =
+            IndexBuildInfo(BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1"),
+                           std::string{"index-ident"});
+        ASSERT_THROWS_CODE(
+            indexBuildsCoord->createIndex(operationContext(),
+                                          collection.uuid(),
+                                          indexBuildInfo,
+                                          IndexBuildsManager::IndexConstraints::kRelax),
+            DBException,
+            ErrorCodes::ObjectAlreadyExists);
     }
 }
 
@@ -386,12 +394,12 @@ TEST_F(IndexBuildsCoordinatorTest, RetryIndexCreation) {
         auto collection = getCollectionExclusive(operationContext(), nss);
         CollectionWriter writer(operationContext(), &collection);
         WriteUnitOfWork wuow(operationContext());
+        std::vector<IndexBuildInfo> indexes;
+        indexes.push_back(
+            IndexBuildInfo(BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
+                           std::string{"index-ident"}));
         IndexBuildsCoordinator::createIndexesOnEmptyCollection(
-            operationContext(),
-            writer,
-            std::array{BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1")},
-            std::array<std::string, 1>{"index-ident"},
-            false);
+            operationContext(), writer, std::span<IndexBuildInfo>{indexes}, false);
     }
 
     // Write wasn't committed so the ident creation should have been rolled back and creating a
@@ -401,12 +409,12 @@ TEST_F(IndexBuildsCoordinatorTest, RetryIndexCreation) {
         auto collection = getCollectionExclusive(operationContext(), nss);
         CollectionWriter writer(operationContext(), &collection);
         WriteUnitOfWork wuow(operationContext());
+        std::vector<IndexBuildInfo> indexes;
+        indexes.push_back(
+            IndexBuildInfo(BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1"),
+                           std::string{"index-ident"}));
         IndexBuildsCoordinator::createIndexesOnEmptyCollection(
-            operationContext(),
-            writer,
-            std::array{BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1")},
-            std::array<std::string, 1>{"index-ident"},
-            false);
+            operationContext(), writer, std::span<IndexBuildInfo>{indexes}, false);
         wuow.commit();
     }
 }
@@ -419,17 +427,18 @@ TEST_F(IndexBuildsCoordinatorTest, StartIndexBuildOnEmptyCollectionReplicatesAsC
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, CollectionOptions()));
     auto collectionUUID = getCollectionExclusive(operationContext(), nss).uuid();
 
-    std::vector<BSONObj> specs = {BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
-                                  BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1")};
-    std::vector<std::string> idents = {"index-1", "index-2"};
+    std::vector<IndexBuildInfo> indexes;
+    indexes.push_back(IndexBuildInfo(BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
+                                     std::string{"index-1"}));
+    indexes.push_back(IndexBuildInfo(BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1"),
+                                     std::string{"index-2"}));
 
     {
         auto indexBuildsCoord = IndexBuildsCoordinator::get(operationContext());
         auto status = indexBuildsCoord->startIndexBuild(operationContext(),
                                                         nss.dbName(),
                                                         collectionUUID,
-                                                        specs,
-                                                        idents,
+                                                        indexes,
                                                         UUID::gen(),
                                                         IndexBuildProtocol::kTwoPhase,
                                                         {});
@@ -440,6 +449,11 @@ TEST_F(IndexBuildsCoordinatorTest, StartIndexBuildOnEmptyCollectionReplicatesAsC
     // Verify that the op observer was called, that it was given the expected idents, and that the
     // specified idents were actually used. Since the collection was empty, onCreateIndex() was
     // called instead of onStartIndexBuild.
+    std::vector<std::string> idents;
+    for (auto& indexBuildInfo : indexes) {
+        idents.push_back(indexBuildInfo.indexIdent);
+    }
+
     auto collection = getCollectionExclusive(operationContext(), nss);
     ASSERT_EQ(opObserver->createIndexIdents, idents);
     ASSERT(collection.getCollectionPtr()->getIndexCatalog()->findIndexByIdent(
@@ -457,9 +471,11 @@ TEST_F(IndexBuildsCoordinatorTest, StartIndexBuildOnNonEmptyCollectionReplicates
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), NamespaceString::kIndexBuildEntryNamespace, CollectionOptions()));
 
-    std::vector<BSONObj> specs = {BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
-                                  BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1")};
-    std::vector<std::string> idents = {"index-1", "index-2"};
+    std::vector<IndexBuildInfo> indexes;
+    indexes.push_back(IndexBuildInfo(BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
+                                     std::string{"index-1"}));
+    indexes.push_back(IndexBuildInfo(BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1"),
+                                     std::string{"index-2"}));
 
     auto collUUID = [&] {
         auto collection = getCollectionExclusive(operationContext(), nss);
@@ -481,8 +497,7 @@ TEST_F(IndexBuildsCoordinatorTest, StartIndexBuildOnNonEmptyCollectionReplicates
             operationContext(),
             nss.dbName(),
             collUUID,
-            specs,
-            idents,
+            indexes,
             buildUUID,
             IndexBuildProtocol::kTwoPhase,
             IndexBuildsCoordinator::IndexBuildOptions{.commitQuorum = CommitQuorumOptions(1)}));
@@ -493,6 +508,11 @@ TEST_F(IndexBuildsCoordinatorTest, StartIndexBuildOnNonEmptyCollectionReplicates
 
     // Verify that the op observer was called, that it was given the expected idents, and that the
     // specified idents were actually used.
+    std::vector<std::string> idents;
+    for (auto& indexBuildInfo : indexes) {
+        idents.push_back(indexBuildInfo.indexIdent);
+    }
+
     auto collection = getCollectionExclusive(operationContext(), nss);
     ASSERT_EQ(opObserver->startIndexBuildIdents, idents);
     ASSERT(collection.getCollectionPtr()->getIndexCatalog()->findIndexByIdent(

@@ -42,7 +42,7 @@ namespace mongo {
  * Corresponds to flags passed to listIndexes which specify additional information to be returned
  * for each index. BuildUUID = includeBuildUUIDs flag IndexBuildInfo = includeIndexBuildInfo flag
  */
-enum ListIndexesInclude { Nothing, BuildUUID, IndexBuildInfo };
+enum ListIndexesInclude { kNothing, kBuildUUID, kIndexBuildInfo };
 
 std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
                                      const CollectionPtr& collection,

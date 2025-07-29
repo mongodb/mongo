@@ -91,8 +91,7 @@ public:
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
                        const UUID& uuid,
-                       BSONObj indexDoc,
-                       StringData ident,
+                       const IndexBuildInfo& indexBuildInfo,
                        bool fromMigrate) final;
 
     // We need to check the startIndexBuild ops because onCreateIndex is only called for empty
@@ -101,8 +100,7 @@ public:
                            const NamespaceString& nss,
                            const UUID& collUUID,
                            const UUID& indexBuildUUID,
-                           const std::vector<BSONObj>& indexes,
-                           const std::vector<std::string>& idents,
+                           const std::vector<IndexBuildInfo>& indexes,
                            bool fromMigrate) final;
 
     void onStartIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) final;

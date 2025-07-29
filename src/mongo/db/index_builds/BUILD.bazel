@@ -33,6 +33,7 @@ mongo_cc_library(
         "index_build_block.h",
     ],
     deps = [
+        ":index_builds_common",
         "//src/mongo/db:audit",
         "//src/mongo/db:collection_index_usage_tracker",
         "//src/mongo/db:common",
@@ -95,6 +96,21 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db/repl:oplog_entry",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_builds_common",
+    srcs = [
+        "index_builds_common.cpp",
+    ],
+    hdrs = [
+        "index_builds_common.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/index:index_access_method",
     ],
 )
 

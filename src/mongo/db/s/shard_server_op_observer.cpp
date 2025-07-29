@@ -731,8 +731,7 @@ repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,
 void ShardServerOpObserver::onCreateIndex(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const UUID& uuid,
-                                          BSONObj indexDoc,
-                                          StringData ident,
+                                          const IndexBuildInfo& indexBuildInfo,
                                           bool fromMigrate) {
     // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
     if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
@@ -746,8 +745,7 @@ void ShardServerOpObserver::onStartIndexBuild(OperationContext* opCtx,
                                               const NamespaceString& nss,
                                               const UUID& collUUID,
                                               const UUID& indexBuildUUID,
-                                              const std::vector<BSONObj>& indexes,
-                                              const std::vector<std::string>& idents,
+                                              const std::vector<IndexBuildInfo>& indexes,
                                               bool fromMigrate) {
     // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
     if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {

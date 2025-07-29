@@ -178,8 +178,9 @@ protected:
 
         if (shouldSucceed) {
             try {
-                opObserver.onCreateIndex(opCtx, nss, uuid, BSONObj(), "", false);
-                opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, {}, false);
+                opObserver.onCreateIndex(
+                    opCtx, nss, uuid, IndexBuildInfo{BSONObj(), boost::none}, false);
+                opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, false);
                 opObserver.onStartIndexBuildSinglePhase(opCtx, nss);
                 opObserver.onCreateCollection(
                     opCtx, nss, {}, BSONObj(), OplogSlot(), boost::none, false);
@@ -230,9 +231,10 @@ protected:
                 ASSERT_OK(exceptionToStatus());
             }
         } else {
-            ASSERT_THROWS(opObserver.onCreateIndex(opCtx, nss, uuid, BSONObj(), "", false),
+            ASSERT_THROWS(opObserver.onCreateIndex(
+                              opCtx, nss, uuid, IndexBuildInfo{BSONObj(), boost::none}, false),
                           AssertionException);
-            ASSERT_THROWS(opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, {}, false),
+            ASSERT_THROWS(opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onStartIndexBuildSinglePhase(opCtx, nss), AssertionException);
             ASSERT_THROWS(opObserver.onCreateCollection(

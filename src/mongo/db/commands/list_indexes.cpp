@@ -111,9 +111,9 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
         bool buildUUID = cmd.getIncludeBuildUUIDs().value_or(false);
         bool indexBuildInfo = cmd.getIncludeIndexBuildInfo().value_or(false);
         invariant(!(buildUUID && indexBuildInfo));
-        return buildUUID     ? ListIndexesInclude::BuildUUID
-            : indexBuildInfo ? ListIndexesInclude::IndexBuildInfo
-                             : ListIndexesInclude::Nothing;
+        return buildUUID     ? ListIndexesInclude::kBuildUUID
+            : indexBuildInfo ? ListIndexesInclude::kIndexBuildInfo
+                             : ListIndexesInclude::kNothing;
     }();
 
     // TODO SERVER-79175: Make the instantiation of AutoStatsTracked nicer.

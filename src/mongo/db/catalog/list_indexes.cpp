@@ -87,7 +87,7 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
             collection->getClusteredInfo().value(),
             collation,
             collection->getCollectionOptions().expireAfterSeconds);
-        if (additionalInclude == ListIndexesInclude::IndexBuildInfo) {
+        if (additionalInclude == ListIndexesInclude::kIndexBuildInfo) {
             indexSpecs.push_back(BSON("spec"_sd << clusteredSpec));
         } else {
             indexSpecs.push_back(clusteredSpec);
@@ -101,10 +101,10 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
         bool inProgressInformationExists =
             !collection->isIndexReady(indexNames[i]) && durableBuildUUID;
         switch (additionalInclude) {
-            case ListIndexesInclude::Nothing:
+            case ListIndexesInclude::kNothing:
                 indexSpecs.push_back(spec);
                 break;
-            case ListIndexesInclude::BuildUUID:
+            case ListIndexesInclude::kBuildUUID:
                 if (inProgressInformationExists) {
                     indexSpecs.push_back(
                         BSON("spec"_sd << spec << "buildUUID"_sd << *durableBuildUUID));
@@ -112,7 +112,7 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
                     indexSpecs.push_back(spec);
                 }
                 break;
-            case ListIndexesInclude::IndexBuildInfo:
+            case ListIndexesInclude::kIndexBuildInfo:
                 if (inProgressInformationExists) {
                     // Constructs a sub-document "indexBuildInfo" in the following
                     // format with sample values:

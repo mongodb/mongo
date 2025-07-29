@@ -45,6 +45,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
@@ -206,13 +207,9 @@ Status initializeMultiIndexBlock(OperationContext* opCtx,
                                  MultiIndexBlock& indexer,
                                  const BSONObj& spec,
                                  MultiIndexBlock::OnInitFn onInit) {
-    return indexer
-        .init(opCtx,
-              collection,
-              {spec},
-              {ident::generateNewIndexIdent(collection->ns().dbName(), false, false)},
-              onInit)
-        .getStatus();
+    auto indexBuildInfo =
+        IndexBuildInfo(spec, ident::generateNewIndexIdent(collection->ns().dbName(), false, false));
+    return indexer.init(opCtx, collection, {indexBuildInfo}, onInit).getStatus();
 }
 
 WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData ns)

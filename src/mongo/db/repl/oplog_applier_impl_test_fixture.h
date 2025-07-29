@@ -164,8 +164,7 @@ public:
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
                        const UUID& uuid,
-                       BSONObj indexDoc,
-                       StringData ident,
+                       const IndexBuildInfo& indexBuildInfo,
                        bool fromMigrate) override;
 
     /**
@@ -219,7 +218,8 @@ public:
                        bool)>
         onRenameCollectionFn;
 
-    std::function<void(OperationContext*, const NamespaceString&, UUID, BSONObj, StringData, bool)>
+    std::function<void(
+        OperationContext*, const NamespaceString&, UUID, const IndexBuildInfo&, bool)>
         onCreateIndexFn;
 
     std::function<void(OperationContext*,

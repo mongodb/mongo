@@ -64,6 +64,7 @@ class Collection;
 class CollectionPtr;
 class OperationContext;
 class ServiceContext;
+struct IndexBuildInfo;
 
 enum IndexBuildRecoveryState { Building, Verifying, Committing };
 
@@ -104,8 +105,7 @@ public:
     using OnInitFn = MultiIndexBlock::OnInitFn;
     Status setUpIndexBuild(OperationContext* opCtx,
                            CollectionWriter& collection,
-                           const std::vector<BSONObj>& specs,
-                           const std::vector<std::string>& idents,
+                           const std::vector<IndexBuildInfo>& indexes,
                            const UUID& buildUUID,
                            OnInitFn onInit,
                            SetupOptions options = {},

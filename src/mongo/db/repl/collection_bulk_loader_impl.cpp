@@ -39,6 +39,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -137,15 +138,16 @@ Status CollectionBulkLoaderImpl::init(const BSONObj& idIndexSpec,
                       "numIndexes"_attr = totalIndexBuildsIncludingIdIndex);
                 if (specs.size()) {
                     _secondaryIndexesBlock->ignoreUniqueConstraint();
+
+                    auto indexes =
+                        toIndexBuildInfoVec(specs, storageEngine, collWriter->ns().dbName());
                     auto maxSecondaryIndexMemoryUsageBytes =
                         maxInitialSyncIndexBuildMemoryUsageBytes /
                         totalIndexBuildsIncludingIdIndex * specs.size();
                     auto status = _secondaryIndexesBlock
                                       ->init(_opCtx.get(),
                                              collWriter,
-                                             specs,
-                                             storageEngine->generateNewIndexIdents(
-                                                 collWriter->ns().dbName(), specs.size()),
+                                             indexes,
                                              MultiIndexBlock::kNoopOnInitFn,
                                              MultiIndexBlock::InitMode::InitialSync,
                                              {} /* resumeInfo */,
@@ -158,14 +160,15 @@ Status CollectionBulkLoaderImpl::init(const BSONObj& idIndexSpec,
                     _secondaryIndexesBlock.reset();
                 }
                 if (!idIndexSpec.isEmpty()) {
+                    IndexBuildInfo idIndexBuildInfo(
+                        idIndexSpec,
+                        storageEngine->generateNewIndexIdent(collWriter->ns().dbName()));
                     auto maxIdIndexMemoryUsageBytes =
                         maxInitialSyncIndexBuildMemoryUsageBytes / totalIndexBuildsIncludingIdIndex;
                     auto status = _idIndexBlock
                                       ->init(_opCtx.get(),
                                              collWriter,
-                                             {idIndexSpec},
-                                             storageEngine->generateNewIndexIdents(
-                                                 collWriter->ns().dbName(), 1),
+                                             {idIndexBuildInfo},
                                              MultiIndexBlock::kNoopOnInitFn,
                                              MultiIndexBlock::InitMode::InitialSync,
                                              boost::none,

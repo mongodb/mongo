@@ -37,6 +37,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_id.h"
@@ -310,9 +311,12 @@ public:
     ReplIndexBuildState(const UUID& indexBuildUUID,
                         const UUID& collUUID,
                         const DatabaseName& dbName,
-                        const std::vector<BSONObj>& specs,
-                        const std::vector<std::string>& idents,
+                        std::vector<IndexBuildInfo> indexes,
                         IndexBuildProtocol protocol);
+
+    const std::vector<IndexBuildInfo>& getIndexes() const {
+        return _indexes;
+    }
 
     /**
      * The index build thread has been scheduled, from now on it should be possible to interrupt the
@@ -538,16 +542,6 @@ public:
     // cannot be renamed.
     const DatabaseName dbName;
 
-    // The names of the indexes being built.
-    const std::vector<std::string> indexNames;
-
-    // The specs of the index(es) being built. Facilitates new callers joining an active index
-    // build.
-    const std::vector<BSONObj> indexSpecs;
-
-    // The idents of the indexes being built.
-    const std::vector<std::string> indexIdents;
-
     // Whether to do a two phase index build or a single phase index build like in v4.0. The FCV
     // at the start of the index build will determine this setting.
     const IndexBuildProtocol protocol;
@@ -605,6 +599,9 @@ private:
      * Cancels the vote request if valid and clears its callback handle.
      */
     void _cancelAndClearVoteRequestCbk(WithLock, OperationContext* opCtx);
+
+    // Tracks all the indexes being built.
+    const std::vector<IndexBuildInfo> _indexes;
 
     // Protects the state below.
     mutable stdx::mutex _mutex;

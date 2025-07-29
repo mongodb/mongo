@@ -73,6 +73,7 @@
 #include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/index/index_constants.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/index_builds/rebuild_indexes.h"
@@ -230,14 +231,12 @@ Status buildMissingIdIndex(OperationContext* opCtx, const NamespaceString nss) {
         [&] { indexer.abortIndexBuild(opCtx, collWriter, MultiIndexBlock::kNoopOnCleanUpFn); });
 
     const auto indexCatalog = collWriter->getIndexCatalog();
-    const auto idIndexSpec = indexCatalog->getDefaultIdIndexSpec(collWriter.get());
-    const auto ident =
-        opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdent(nss.dbName());
-
+    IndexBuildInfo idIndexBuildInfo(
+        indexCatalog->getDefaultIdIndexSpec(collWriter.get()),
+        opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdent(nss.dbName()));
     auto swSpecs = indexer.init(opCtx,
                                 collWriter,
-                                {idIndexSpec},
-                                {ident},
+                                {std::move(idIndexBuildInfo)},
                                 MultiIndexBlock::kNoopOnInitFn,
                                 MultiIndexBlock::InitMode::SteadyState);
     if (!swSpecs.isOK()) {

@@ -202,16 +202,13 @@ void IndexBuildState::appendBuildInfo(BSONObjBuilder* builder) const {
 ReplIndexBuildState::ReplIndexBuildState(const UUID& indexBuildUUID,
                                          const UUID& collUUID,
                                          const DatabaseName& dbName,
-                                         const std::vector<BSONObj>& specs,
-                                         const std::vector<std::string>& idents,
+                                         std::vector<IndexBuildInfo> indexes,
                                          IndexBuildProtocol protocol)
     : buildUUID(indexBuildUUID),
       collectionUUID(collUUID),
       dbName(dbName),
-      indexNames(extractIndexNames(specs)),
-      indexSpecs(specs),
-      indexIdents(idents),
-      protocol(protocol) {
+      protocol(protocol),
+      _indexes(std::move(indexes)) {
     _waitForNextAction = std::make_unique<SharedPromise<IndexBuildAction>>();
     if (protocol == IndexBuildProtocol::kTwoPhase)
         commitQuorumLock.emplace(indexBuildUUID.toString());

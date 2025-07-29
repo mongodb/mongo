@@ -428,6 +428,17 @@ protected:
         return ChangeStreamPreImage::parse(IDLParserContext("pre-image"), *container);
     }
 
+    std::vector<IndexBuildInfo> makeSpecs(std::vector<std::string> keys) {
+        std::vector<IndexBuildInfo> indexes;
+        for (size_t i = 0; i < keys.size(); ++i) {
+            const auto& keyName = keys[i];
+            indexes.push_back(IndexBuildInfo(
+                BSON("v" << 2 << "key" << BSON(keyName << 1) << "name" << (keyName + "_1")),
+                fmt::format("index-{}", i + 1)));
+        }
+        return indexes;
+    }
+
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest(TenantId(OID::gen()), "testDB", "testColl");
     const UUID uuid{UUID::gen()};
@@ -675,25 +686,14 @@ TEST_F(OpObserverTest, StartIndexBuildExpectedOplogEntry) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(boost::none, "test.coll");
     UUID indexBuildUUID = UUID::gen();
 
-    BSONObj specX = BSON("key" << BSON("x" << 1) << "name"
-                               << "x_1"
-                               << "v" << 2);
-    BSONObj specA = BSON("key" << BSON("a" << 1) << "name"
-                               << "a_1"
-                               << "v" << 2);
-    std::vector<BSONObj> specs = {specX, specA};
+    auto indexes = makeSpecs({"x", "a"});
 
     // Write to the oplog.
     {
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onStartIndexBuild(opCtx.get(),
-                                     nss,
-                                     uuid,
-                                     indexBuildUUID,
-                                     specs,
-                                     {"index-1", "index-2"},
-                                     false /*fromMigrate*/);
+        opObserver.onStartIndexBuild(
+            opCtx.get(), nss, uuid, indexBuildUUID, indexes, false /*fromMigrate*/);
         wunit.commit();
     }
 
@@ -702,8 +702,8 @@ TEST_F(OpObserverTest, StartIndexBuildExpectedOplogEntry) {
     startIndexBuildBuilder.append("startIndexBuild", nss.coll());
     indexBuildUUID.appendToBuilder(&startIndexBuildBuilder, "indexBuildUUID");
     BSONArrayBuilder indexesArr(startIndexBuildBuilder.subarrayStart("indexes"));
-    indexesArr.append(specX);
-    indexesArr.append(specA);
+    indexesArr.append(indexes[0].spec);
+    indexesArr.append(indexes[1].spec);
     indexesArr.done();
     BSONObj startIndexBuildCmd = startIndexBuildBuilder.done();
 
@@ -5268,13 +5268,7 @@ TEST_F(OpObserverTest, MagicRestoreNoOplog) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(boost::none, "test.coll");
     UUID indexBuildUUID = UUID::gen();
 
-    BSONObj specX = BSON("key" << BSON("x" << 1) << "name"
-                               << "x_1"
-                               << "v" << 2);
-    BSONObj specA = BSON("key" << BSON("a" << 1) << "name"
-                               << "a_1"
-                               << "v" << 2);
-    std::vector<BSONObj> specs = {specX, specA};
+    auto indexes = makeSpecs({"x", "a"});
 
     storageGlobalParams.magicRestore = true;
 
@@ -5283,7 +5277,7 @@ TEST_F(OpObserverTest, MagicRestoreNoOplog) {
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onStartIndexBuild(
-            opCtx.get(), nss, uuid, indexBuildUUID, specs, {}, false /*fromMigrate*/);
+            opCtx.get(), nss, uuid, indexBuildUUID, indexes, false /*fromMigrate*/);
         wunit.commit();
     }
 
@@ -5297,15 +5291,14 @@ TEST_F(OpObserverTest, OnCreateIndexReplicateLocalCatalogIdentifiers) {
     auto opCtx = cc().makeOperationContext();
 
     auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
-    auto indexSpec = BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
-                              << "a_1");
+    auto indexes = makeSpecs({"a"});
 
     for (bool enable : {false, true}) {
         RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
             "featureFlagReplicateLocalCatalogIdentifiers", enable);
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onCreateIndex(opCtx.get(), nss, UUID::gen(), indexSpec, "ident", false);
+        opObserver.onCreateIndex(opCtx.get(), nss, UUID::gen(), indexes[0], false);
         wunit.commit();
     }
 
@@ -5319,7 +5312,7 @@ TEST_F(OpObserverTest, OnCreateIndexReplicateLocalCatalogIdentifiers) {
                                            << "a_1"));
     ASSERT_BSONOBJ_EQ(enabledEntry.getObject(),
                       BSON("createIndexes" << "coll"
-                                           << "spec" << indexSpec));
+                                           << "spec" << indexes[0].spec));
 }
 
 TEST_F(OpObserverTest, OnCreateIndexIncludesIndexIdent) {
@@ -5330,14 +5323,13 @@ TEST_F(OpObserverTest, OnCreateIndexIncludesIndexIdent) {
     auto opCtx = cc().makeOperationContext();
 
     auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
-    auto indexSpec = BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
-                              << "a_1");
+    auto indexes = makeSpecs({"a", "a"});
 
     {
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onCreateIndex(opCtx.get(), nss, UUID::gen(), indexSpec, "ident1", false);
-        opObserver.onCreateIndex(opCtx.get(), nss, UUID::gen(), indexSpec, "ident2", false);
+        opObserver.onCreateIndex(opCtx.get(), nss, UUID::gen(), indexes[0], false);
+        opObserver.onCreateIndex(opCtx.get(), nss, UUID::gen(), indexes[1], false);
         wunit.commit();
     }
 
@@ -5345,8 +5337,8 @@ TEST_F(OpObserverTest, OnCreateIndexIncludesIndexIdent) {
     auto entry1 = assertGet(OplogEntry::parse(oplogEntries[0]));
     auto entry2 = assertGet(OplogEntry::parse(oplogEntries[1]));
 
-    ASSERT_BSONOBJ_EQ(*entry1.getObject2(), BSON("ident" << "ident1"));
-    ASSERT_BSONOBJ_EQ(*entry2.getObject2(), BSON("ident" << "ident2"));
+    ASSERT_BSONOBJ_EQ(*entry1.getObject2(), BSON("ident" << indexes[0].indexIdent));
+    ASSERT_BSONOBJ_EQ(*entry2.getObject2(), BSON("ident" << indexes[1].indexIdent));
 }
 
 TEST_F(OpObserverTest, OnStartIndexBuildIncludesIndexIdent) {
@@ -5357,8 +5349,7 @@ TEST_F(OpObserverTest, OnStartIndexBuildIncludesIndexIdent) {
     auto opCtx = cc().makeOperationContext();
 
     auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
-    auto indexSpec = BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
-                              << "a_1");
+    auto indexes = makeSpecs({"a", "a"});
 
     {
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
@@ -5367,13 +5358,13 @@ TEST_F(OpObserverTest, OnStartIndexBuildIncludesIndexIdent) {
             RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
                 "featureFlagReplicateLocalCatalogIdentifiers", true);
             opObserver.onStartIndexBuild(
-                opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexSpec}, {"ident1"}, false);
+                opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexes[0]}, false);
         }
         {
             RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
                 "featureFlagReplicateLocalCatalogIdentifiers", false);
             opObserver.onStartIndexBuild(
-                opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexSpec}, {"ident2"}, false);
+                opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexes[1]}, false);
         }
         wunit.commit();
     }
@@ -5382,7 +5373,7 @@ TEST_F(OpObserverTest, OnStartIndexBuildIncludesIndexIdent) {
     auto entry1 = assertGet(OplogEntry::parse(oplogEntries[0]));
     auto entry2 = assertGet(OplogEntry::parse(oplogEntries[1]));
 
-    ASSERT_BSONOBJ_EQ(*entry1.getObject2(), BSON("idents" << BSON_ARRAY("ident1")));
+    ASSERT_BSONOBJ_EQ(*entry1.getObject2(), BSON("idents" << BSON_ARRAY(indexes[0].indexIdent)));
     ASSERT_FALSE(entry2.getObject2());
 }
 

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -30,28 +30,46 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/util/uuid.h"
 
 #include <string>
+#include <vector>
 
 namespace mongo {
 
+class StorageEngine;
+class DatabaseName;
+
 /**
- * Describes an index build on a collection.
+ * Encapsulates metadata fields associated with an index build.
  */
-struct IndexBuildsEntry {
-    IndexBuildsEntry(UUID collUUID) : collUUID(collUUID) {}
+struct IndexBuildInfo {
+    IndexBuildInfo(BSONObj specObj, boost::optional<std::string> indexIdent);
 
-    // Collection UUID.
-    const UUID collUUID;
-
-    // Index specs for the build.
-    std::vector<BSONObj> indexSpecs;
+    std::string name;
+    BSONObj spec;
+    std::string indexIdent;
 };
 
 /**
- * IndexBuilds is a mapping from index build UUID to details about how to start the index build.
+ * Constructs IndexBuildInfo instances from the given index specs.
  */
-using IndexBuilds = stdx::unordered_map<UUID, IndexBuildsEntry, UUID::Hash>;
+std::vector<IndexBuildInfo> toIndexBuildInfoVec(const std::vector<BSONObj>& specs,
+                                                StorageEngine* storageEngine,
+                                                const DatabaseName& dbName);
+
+/**
+ * Same as above, but does not populate the ident fields in the IndexBuildInfo instances.
+ */
+std::vector<IndexBuildInfo> toIndexBuildInfoVec(const std::vector<BSONObj>& specs);
+
+/**
+ * Returns the index names from the given list of IndexBuildInfo instances.
+ */
+std::vector<std::string> toIndexNames(const std::vector<IndexBuildInfo>& indexes);
+
+/**
+ * Returns the index specs from the given list of IndexBuildInfo instances.
+ */
+std::vector<BSONObj> toIndexSpecs(const std::vector<IndexBuildInfo>& indexes);
 
 }  // namespace mongo

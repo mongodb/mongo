@@ -66,6 +66,7 @@
 namespace mongo {
 
 class DocumentKey;
+struct IndexBuildInfo;
 struct InsertStatement;
 
 struct OpTimeBundle {
@@ -201,16 +202,14 @@ public:
     virtual void onCreateIndex(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const UUID& uuid,
-                               BSONObj indexDoc,
-                               StringData ident,
+                               const IndexBuildInfo& indexBuildInfo,
                                bool fromMigrate) = 0;
 
     virtual void onStartIndexBuild(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const UUID& collUUID,
                                    const UUID& indexBuildUUID,
-                                   const std::vector<BSONObj>& indexes,
-                                   const std::vector<std::string>& idents,
+                                   const std::vector<IndexBuildInfo>& indexes,
                                    bool fromMigrate) = 0;
 
     virtual void onStartIndexBuildSinglePhase(OperationContext* opCtx,

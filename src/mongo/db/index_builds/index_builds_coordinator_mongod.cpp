@@ -49,6 +49,7 @@
 #include "mongo/db/index_builds/active_index_builds.h"
 #include "mongo/db/index_builds/index_build_entry_gen.h"
 #include "mongo/db/index_builds/index_build_entry_helpers.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_settings.h"
@@ -249,16 +250,14 @@ StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
 IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
                                               const DatabaseName& dbName,
                                               const UUID& collectionUUID,
-                                              const std::vector<BSONObj>& specs,
-                                              const std::vector<std::string>& idents,
+                                              const std::vector<IndexBuildInfo>& indexes,
                                               const UUID& buildUUID,
                                               IndexBuildProtocol protocol,
                                               IndexBuildOptions indexBuildOptions) {
     return _startIndexBuild(opCtx,
                             dbName,
                             collectionUUID,
-                            specs,
-                            idents,
+                            indexes,
                             buildUUID,
                             protocol,
                             indexBuildOptions,
@@ -272,13 +271,14 @@ IndexBuildsCoordinatorMongod::resumeIndexBuild(OperationContext* opCtx,
                                                const std::vector<BSONObj>& specs,
                                                const UUID& buildUUID,
                                                const ResumeIndexInfo& resumeInfo) {
+    auto indexes = toIndexBuildInfoVec(specs);
+
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
     indexBuildOptions.applicationMode = ApplicationMode::kStartupRepair;
     return _startIndexBuild(opCtx,
                             dbName,
                             collectionUUID,
-                            specs,
-                            {},
+                            indexes,
                             buildUUID,
                             IndexBuildProtocol::kTwoPhase,
                             indexBuildOptions,
@@ -289,8 +289,7 @@ StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
 IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                                                const DatabaseName& dbName,
                                                const UUID& collectionUUID,
-                                               const std::vector<BSONObj>& specs,
-                                               const std::vector<std::string>& idents,
+                                               const std::vector<IndexBuildInfo>& indexes,
                                                const UUID& buildUUID,
                                                IndexBuildProtocol protocol,
                                                IndexBuildOptions indexBuildOptions,
@@ -302,6 +301,12 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
     invariant(!shard_role_details::getLocker(opCtx)->isRSTLExclusive(), buildUUID.toString());
 
     const auto nss = CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(opCtx, nssOrUuid);
+
+    std::vector<BSONObj> indexSpecs;
+    indexSpecs.reserve(indexes.size());
+    for (const auto& indexBuildInfo : indexes) {
+        indexSpecs.push_back(indexBuildInfo.spec);
+    }
 
     {
         // Only operations originating from user connections need to wait while there are more than
@@ -352,7 +357,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                         "active index builds is below the threshold",
                         "numActiveIndexBuilds"_attr = _numActiveIndexBuilds,
                         "maxNumActiveUserIndexBuilds"_attr = maxActiveBuilds,
-                        "indexSpecs"_attr = specs,
+                        "indexSpecs"_attr = indexSpecs,
                         "buildUUID"_attr = buildUUID,
                         "collectionUUID"_attr = collectionUUID);
                     messageLogged = true;
@@ -389,17 +394,17 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         auto status = Status::OK();
         if (resumeInfo) {
             status = _setUpResumeIndexBuild(
-                opCtx, dbName, collectionUUID, specs, buildUUID, resumeInfo.value());
+                opCtx, dbName, collectionUUID, indexes, buildUUID, resumeInfo.value());
         } else {
             status = _setUpIndexBuildForTwoPhaseRecovery(
-                opCtx, dbName, collectionUUID, specs, buildUUID);
+                opCtx, dbName, collectionUUID, indexes, buildUUID);
         }
         if (!status.isOK()) {
             return status;
         }
     } else {
         auto statusWithOptionalResult = _filterSpecsAndRegisterBuild(
-            opCtx, dbName, collectionUUID, specs, idents, buildUUID, protocol);
+            opCtx, dbName, collectionUUID, indexes, buildUUID, protocol);
         if (!statusWithOptionalResult.isOK()) {
             return statusWithOptionalResult.getStatus();
         }
@@ -490,7 +495,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
 
         // Set up the thread's currentOp information to display createIndexes cmd information,
         // merged with the caller's opDesc.
-        updateCurOpOpDescription(opCtx.get(), nss, replState->indexSpecs, opDesc);
+        updateCurOpOpDescription(opCtx.get(), nss, toIndexSpecs(replState->getIndexes()), opDesc);
 
         // Forward the forwardable operation metadata from the external client to this thread's
         // client.
@@ -623,8 +628,10 @@ Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(OperationContext* opCt
     // after this point, it's not possible for the index build's commit quorum value to get updated
     // to CommitQuorumOptions::kDisabled.
 
-    IndexBuildEntry indexbuildEntry(
-        buildUUID, replState->collectionUUID, CommitQuorumOptions(), replState->indexNames);
+    IndexBuildEntry indexbuildEntry(buildUUID,
+                                    replState->collectionUUID,
+                                    CommitQuorumOptions(),
+                                    toIndexNames(replState->getIndexes()));
     std::vector<HostAndPort> votersList{votingNode};
     indexbuildEntry.setCommitReadyMembers(votersList);
 
@@ -1041,12 +1048,14 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
         if (collectionUUID != replState.collectionUUID) {
             return false;
         }
-        if (indexNames.size() != replState.indexNames.size()) {
+
+        auto replStateIndexNames = toIndexNames(replState.getIndexes());
+        if (indexNames.size() != replStateIndexNames.size()) {
             return false;
         }
         // Ensure the ReplIndexBuildState has the same indexes as 'indexNames'.
         return std::equal(
-            replState.indexNames.begin(), replState.indexNames.end(), indexNames.begin());
+            replStateIndexNames.begin(), replStateIndexNames.end(), indexNames.begin());
     };
     auto collIndexBuilds = activeIndexBuilds.filterIndexBuilds(pred);
     if (collIndexBuilds.empty()) {
@@ -1108,8 +1117,10 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
         }
     }
 
-    IndexBuildEntry indexbuildEntry(
-        replState->buildUUID, replState->collectionUUID, newCommitQuorum, replState->indexNames);
+    IndexBuildEntry indexbuildEntry(replState->buildUUID,
+                                    replState->collectionUUID,
+                                    newCommitQuorum,
+                                    toIndexNames(replState->getIndexes()));
     status = indexbuildentryhelpers::persistIndexCommitQuorum(opCtx, indexbuildEntry);
     if (!status.isOK()) {
         return status;

@@ -40,6 +40,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -99,8 +100,7 @@ IndexBuildsManager::~IndexBuildsManager() {
 
 Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
                                            CollectionWriter& collection,
-                                           const std::vector<BSONObj>& specs,
-                                           const std::vector<std::string>& idents,
+                                           const std::vector<IndexBuildInfo>& indexes,
                                            const UUID& buildUUID,
                                            OnInitFn onInit,
                                            SetupOptions options,
@@ -135,7 +135,7 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
                 ? MultiIndexBlock::InitMode::Recovery
                 : MultiIndexBlock::InitMode::SteadyState;
             return uassertStatusOK(
-                builder->init(opCtx, collection, specs, idents, onInit, mode, resumeInfo));
+                builder->init(opCtx, collection, indexes, onInit, mode, resumeInfo));
         });
     } catch (const DBException& ex) {
         return ex.toStatus();

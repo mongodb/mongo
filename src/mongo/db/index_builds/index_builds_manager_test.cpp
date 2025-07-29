@@ -72,27 +72,25 @@ void IndexBuildsManagerTest::createCollection(const NamespaceString& nss) {
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, CollectionOptions()));
 }
 
-std::vector<BSONObj> makeSpecs(const NamespaceString& nss, std::vector<std::string> keys) {
+std::vector<IndexBuildInfo> makeSpecs(std::vector<std::string> keys) {
     ASSERT(keys.size());
-    std::vector<BSONObj> indexSpecs;
-    for (const auto& keyName : keys) {
-        indexSpecs.push_back(
-            BSON("v" << 2 << "key" << BSON(keyName << 1) << "name" << (keyName + "_1")));
+    std::vector<IndexBuildInfo> indexes;
+    for (size_t i = 0; i < keys.size(); ++i) {
+        const auto& keyName = keys[i];
+        indexes.push_back(IndexBuildInfo(
+            BSON("v" << 2 << "key" << BSON(keyName << 1) << "name" << (keyName + "_1")),
+            fmt::format("index-{}", i + 1)));
     }
-    return indexSpecs;
+    return indexes;
 }
 
 TEST_F(IndexBuildsManagerTest, IndexBuildsManagerSetUpAndTearDown) {
     AutoGetCollection autoColl(operationContext(), _nss, MODE_X);
     CollectionWriter collection(operationContext(), autoColl);
 
-    auto specs = makeSpecs(_nss, {"a", "b"});
-    ASSERT_OK(_indexBuildsManager.setUpIndexBuild(operationContext(),
-                                                  collection,
-                                                  specs,
-                                                  {"index-1", "index-2"},
-                                                  _buildUUID,
-                                                  MultiIndexBlock::kNoopOnInitFn));
+    auto indexes = makeSpecs({"a", "b"});
+    ASSERT_OK(_indexBuildsManager.setUpIndexBuild(
+        operationContext(), collection, indexes, _buildUUID, MultiIndexBlock::kNoopOnInitFn));
 
     _indexBuildsManager.abortIndexBuild(
         operationContext(), collection, _buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);

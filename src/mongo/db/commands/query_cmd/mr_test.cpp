@@ -278,8 +278,7 @@ public:
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
                        const UUID& uuid,
-                       BSONObj indexDoc,
-                       StringData ident,
+                       const IndexBuildInfo& indexBuildInfo,
                        bool fromMigrate) override;
 
     /**
@@ -290,8 +289,7 @@ public:
                            const NamespaceString& nss,
                            const UUID& collUUID,
                            const UUID& indexBuildUUID,
-                           const std::vector<BSONObj>& indexes,
-                           const std::vector<std::string>& idents,
+                           const std::vector<IndexBuildInfo>& indexes,
                            bool fromMigrate) override;
 
     /**
@@ -342,21 +340,19 @@ public:
 void MapReduceOpObserver::onCreateIndex(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         const UUID& uuid,
-                                        BSONObj indexDoc,
-                                        StringData ident,
+                                        const IndexBuildInfo& indexBuildInfo,
                                         bool fromMigrate) {
-    indexesCreated.push_back(indexDoc.getOwned());
+    indexesCreated.push_back(indexBuildInfo.spec.getOwned());
 }
 
 void MapReduceOpObserver::onStartIndexBuild(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             const UUID& collUUID,
                                             const UUID& indexBuildUUID,
-                                            const std::vector<BSONObj>& indexes,
-                                            const std::vector<std::string>& idents,
+                                            const std::vector<IndexBuildInfo>& indexes,
                                             bool fromMigrate) {
-    for (auto&& obj : indexes) {
-        indexesCreated.push_back(obj.getOwned());
+    for (const auto& indexBuildInfo : indexes) {
+        indexesCreated.push_back(indexBuildInfo.spec.getOwned());
     }
 }
 

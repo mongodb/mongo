@@ -362,8 +362,7 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
  */
 void runCreateIndexesOnNewCollection(OperationContext* opCtx,
                                      const NamespaceString& ns,
-                                     const std::vector<BSONObj>& specs,
-                                     const std::vector<std::string>& idents,
+                                     const std::vector<IndexBuildInfo>& indexes,
                                      bool createCollImplicitly,
                                      CreateIndexesReply* reply) {
     WriteUnitOfWork wunit(opCtx);
@@ -372,10 +371,10 @@ void runCreateIndexesOnNewCollection(OperationContext* opCtx,
             !CollectionCatalog::get(opCtx)->lookupView(opCtx, ns));
 
     if (createCollImplicitly) {
-        for (const auto& spec : specs) {
+        for (const auto& indexBuildInfo : indexes) {
             uassert(6100900,
                     "Cannot implicitly create a new collection with createIndex 'clustered' option",
-                    !spec[IndexDescriptor::kClusteredFieldName]);
+                    !indexBuildInfo.spec[IndexDescriptor::kClusteredFieldName]);
         }
 
         // We need to create the collection.
@@ -433,15 +432,15 @@ void runCreateIndexesOnNewCollection(OperationContext* opCtx,
     const int numIndexesBefore =
         IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection.get());
 
-    auto [filteredSpecs, filteredIdents] = IndexBuildsCoordinator::prepareSpecListForCreate(
-        opCtx, collection.get(), ns, specs, idents);
+    auto filteredIndexes =
+        IndexBuildsCoordinator::prepareSpecListForCreate(opCtx, collection.get(), ns, indexes);
 
     // It's possible for 'filteredSpecs' to be empty if we receive a createIndexes request for
     // the _id index and also create the collection implicitly. By this point, the _id index has
     // already been created, and there is no more work to be done.
-    if (!filteredSpecs.empty()) {
+    if (!filteredIndexes.empty()) {
         IndexBuildsCoordinator::createIndexesOnEmptyCollection(
-            opCtx, collection, filteredSpecs, filteredIdents, false);
+            opCtx, collection, filteredIndexes, false);
     }
 
     const int numIndexesAfter = IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection.get());
@@ -452,7 +451,7 @@ void runCreateIndexesOnNewCollection(OperationContext* opCtx,
     }
     wunit.commit();
 
-    appendFinalIndexFieldsToResult(reply, numIndexesBefore, numIndexesAfter, int(specs.size()));
+    appendFinalIndexFieldsToResult(reply, numIndexesBefore, numIndexesAfter, int(indexes.size()));
     reply->setCreatedCollectionAutomatically(true);
 }
 
@@ -493,8 +492,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
     CreateIndexesReply reply;
 
     auto specs = parseAndValidateIndexSpecs(opCtx, cmd, ns);
-    auto idents = opCtx->getServiceContext()->getStorageEngine()->generateNewIndexIdents(
-        cmd.getDbName(), specs.size());
+    auto indexes =
+        toIndexBuildInfoVec(specs, opCtx->getServiceContext()->getStorageEngine(), cmd.getDbName());
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     auto protocol = determineProtocol(opCtx, ns);
@@ -570,7 +569,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                 return collection.uuid();
             }
 
-            runCreateIndexesOnNewCollection(opCtx, ns, specs, idents, !collection.exists(), &reply);
+            runCreateIndexesOnNewCollection(opCtx, ns, indexes, !collection.exists(), &reply);
             return boost::none;
         });
 
@@ -618,8 +617,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
             uassertStatusOK(indexBuildsCoord->startIndexBuild(opCtx,
                                                               cmd.getDbName(),
                                                               *collectionUUID,
-                                                              specs,
-                                                              idents,
+                                                              indexes,
                                                               buildUUID,
                                                               protocol,
                                                               indexBuildOptions));

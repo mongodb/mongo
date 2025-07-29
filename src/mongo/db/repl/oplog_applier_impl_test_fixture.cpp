@@ -162,13 +162,12 @@ void OplogApplierImplOpObserver::onRenameCollection(OperationContext* opCtx,
 void OplogApplierImplOpObserver::onCreateIndex(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const UUID& uuid,
-                                               BSONObj indexDoc,
-                                               StringData ident,
+                                               const IndexBuildInfo& indexBuildInfo,
                                                bool fromMigrate) {
     if (!onCreateIndexFn) {
         return;
     }
-    onCreateIndexFn(opCtx, nss, uuid, indexDoc, ident, fromMigrate);
+    onCreateIndexFn(opCtx, nss, uuid, indexBuildInfo, fromMigrate);
 }
 
 void OplogApplierImplOpObserver::onDropIndex(OperationContext* opCtx,

@@ -94,8 +94,10 @@ std::unique_ptr<Pipeline> NonShardServerProcessInterface::preparePipelineForExec
 std::list<BSONObj> NonShardServerProcessInterface::getIndexSpecs(OperationContext* opCtx,
                                                                  const NamespaceString& ns,
                                                                  bool includeBuildUUIDs) {
-    return listIndexesEmptyListIfMissing(
-        opCtx, ns, includeBuildUUIDs ? ListIndexesInclude::BuildUUID : ListIndexesInclude::Nothing);
+    return listIndexesEmptyListIfMissing(opCtx,
+                                         ns,
+                                         includeBuildUUIDs ? ListIndexesInclude::kBuildUUID
+                                                           : ListIndexesInclude::kNothing);
 }
 
 std::vector<FieldPath> NonShardServerProcessInterface::collectDocumentKeyFieldsActingAsRouter(
