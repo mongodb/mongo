@@ -282,6 +282,10 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
     if lint_all or any(file.endswith(".yml") for file in files_to_lint):
         subprocess.run([bazel_bin, "run", "//buildscripts:validate_evg_project_config", "--", f"--evg-project-name={parsed_args.lint_yaml_project}", "--evg-auth-config=.evergreen.yml"], check=True)
 
+    # Default to linting everything in rules_lint if no path was passed in.
+    if len([arg for arg in args if not arg.startswith("--")]) == 0:
+        args = ["//..."] + args
+
     fix = ""
     with tempfile.NamedTemporaryFile(delete=False) as buildevents:
         buildevents_path = buildevents.name
