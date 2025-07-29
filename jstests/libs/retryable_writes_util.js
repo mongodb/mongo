@@ -128,6 +128,47 @@ export var RetryableWritesUtil = (function() {
         return ret;
     }
 
+    // Expected to be called with a response for an "explain" command.
+    function shouldRetryExplainCommand(res) {
+        // Several commands that use the plan executor swallow the actual error code from a failed
+        // plan into their error message and instead return OperationFailed.
+        //
+        // TODO SERVER-32208: Remove this function once it is no longer needed.
+        const isRetryableExecutorCodeAndMessage = (code, msg) => {
+            return code === ErrorCodes.OperationFailed && typeof msg !== "undefined" &&
+                msg.indexOf("InterruptedDueToReplStateChange") >= 0;
+        };
+
+        // If an explain is interrupted by a stepdown, and it returns before its connection is
+        // closed, it will return incomplete results. To prevent failing the test, force retries
+        // of interrupted explains.
+        if (res.hasOwnProperty("executionStats")) {
+            const shouldRetryExplain = function(executionStats) {
+                return !executionStats.executionSuccess &&
+                    (isRetryableCode(executionStats.errorCode) ||
+                     isRetryableExecutorCodeAndMessage(executionStats.errorCode,
+                                                       executionStats.errorMessage));
+            };
+            const executionStats = res.executionStats.executionStages.hasOwnProperty("shards")
+                ? res.executionStats.executionStages.shards
+                : [res.executionStats];
+
+            if (executionStats.some(shouldRetryExplain)) {
+                jsTest.log("Forcing retry of interrupted explain");
+                return true;
+            }
+        }
+
+        // An explain command can fail if its child command cannot be run on the current server.
+        // This can be hit if a primary only or not explicitly slaveOk command is accepted by a
+        // primary node that then steps down and returns before having its connection closed.
+        if (!res.ok && res.errmsg.indexOf("child command cannot run on this node") >= 0) {
+            jsTest.log("Forcing retry of explain likely interrupted by transition to secondary");
+            return true;
+        }
+        return false;
+    }
+
     function runCommandWithRetries(conn, cmd) {
         return retryOnRetryableCode(() => assert.commandWorked(conn.runCommand(cmd)),
                                     "Retry interrupt: runCommand(" + tojson(cmd) + ")");
@@ -142,6 +183,7 @@ export var RetryableWritesUtil = (function() {
         runRetryableWrite,
         isFailedToSatisfyPrimaryReadPreferenceError,
         retryOnRetryableCode,
+        shouldRetryExplainCommand,
         runCommandWithRetries
     };
 })();

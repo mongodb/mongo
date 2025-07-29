@@ -5,6 +5,7 @@
 
 import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
+import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 
 // Values in msecs.
 const kRetryTimeout = 10 * 60 * 1000;
@@ -26,9 +27,17 @@ function _runAndExhaustQueryWithRetryUponMigration(
 
     assert.soon(
         () => {
+            let stopRetrying = false;
             attempt++;
 
             queryResponse = func.apply(conn, makeFuncArgs(commandObj));
+
+            if (commandName === "explain" &&
+                RetryableWritesUtil.shouldRetryExplainCommand(queryResponse)) {
+                jsTest.log(`Retrying failed explain command`);
+                return stopRetrying;
+            }
+
             let latestBatchResponse = queryResponse;
 
             while (latestBatchResponse.ok === 1 && latestBatchResponse.cursor &&
@@ -60,7 +69,6 @@ function _runAndExhaustQueryWithRetryUponMigration(
                 }
             }
 
-            let stopRetrying = false;
             if (latestBatchResponse.ok === 1) {
                 stopRetrying = true;
             } else if (!kQueryRetryableErrors.includes(latestBatchResponse.code)) {
