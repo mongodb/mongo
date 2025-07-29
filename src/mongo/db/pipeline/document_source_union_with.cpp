@@ -37,11 +37,13 @@
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_documents.h"
+#include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_union_with_gen.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/views/resolved_view.h"
@@ -269,6 +271,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
         unionNss = NamespaceStringUtil::deserialize(expCtx->getNamespaceString().dbName(),
                                                     elem.valueStringData());
     } else {
+        // TODO SERVER-108117 Validate that the isHybridSearch flag is only set internally. See
+        // helper hybrid_scoring_util::validateIsHybridSearchNotSetByUser to handle this.
         auto unionWithSpec =
             UnionWithSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
         if (unionWithSpec.getColl()) {
@@ -281,6 +285,16 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
                 expCtx->getNamespaceString().dbName());
         }
         pipeline = unionWithSpec.getPipeline().value_or(std::vector<BSONObj>{});
+        if (unionWithSpec.getIsHybridSearch() ||
+            hybrid_scoring_util::isHybridSearchPipeline(pipeline)) {
+            // If there is a hybrid search stage in our pipeline, then we should validate that we
+            // are not running on a timeseries collection.
+            //
+            // If the hybrid search flag is set to true, this request may have
+            // come from a mongos that does not know if the collection is a valid collection for
+            // hybrid search. Therefore, we must validate it here.
+            hybrid_scoring_util::assertForeignCollectionIsNotTimeseries(unionNss, expCtx);
+        }
     }
     return make_intrusive<DocumentSourceUnionWith>(
         expCtx, std::move(unionNss), std::move(pipeline));
@@ -552,10 +566,16 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
             return _pipeline->serializeToBson(opts);
         }();
 
-        auto spec = collectionless ? DOC("pipeline" << serializedPipeline)
-                                   : DOC("coll" << opts.serializeIdentifier(_userNss.coll())
-                                                << "pipeline" << serializedPipeline);
-        return Value(DOC(getSourceName() << spec));
+        bool isHybridSearch = hybrid_scoring_util::isHybridSearchPipeline(_userPipeline);
+        MutableDocument spec;
+        if (!collectionless) {
+            spec["coll"] = Value(opts.serializeIdentifier(_userNss.coll()));
+        }
+        spec["pipeline"] = Value(serializedPipeline);
+        if (isHybridSearch) {
+            spec[hybrid_scoring_util::kIsHybridSearchFlagFieldName] = Value(isHybridSearch);
+        }
+        return Value(DOC(getSourceName() << spec.freezeToValue()));
     }
 }
 

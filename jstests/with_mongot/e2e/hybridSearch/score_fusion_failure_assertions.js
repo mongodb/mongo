@@ -189,11 +189,36 @@ assert.commandFailedWithCode(
                                     normalization: "sigmoid"
                                 },
                             }
-                        }
+                        },
                     ]
                 },
                 normalization: "none"
             }
         }
     }]),
+    // TODO SERVER-104725 Change this to the error code from LiteParsedPipeline::validate().
     10170100);
+
+assert.commandFailedWithCode(
+    runPipeline([{
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    nested: [
+                        {
+                            $scoreFusion: {
+                                input: {
+                                    pipelines: {simple: [{$score: {score: "$score_50"}}]},
+                                    normalization: "sigmoid"
+                                },
+                            }
+                        },
+                        {$score: 10},
+                    ]
+                },
+                normalization: "none"
+            }
+        }
+    }]),
+    // TODO SERVER-104725 Change this to the error code from LiteParsedPipeline::validate().
+    10473003);
