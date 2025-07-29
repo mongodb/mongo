@@ -2002,11 +2002,10 @@ void processFLECountS(OperationContext* opCtx,
     fle::processCountCommand(opCtx, nss, &countCommand, &getTransactionWithRetriesForMongoS);
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> processFLEPipelineS(
-    OperationContext* opCtx,
-    NamespaceString nss,
-    const EncryptionInformation& encryptInfo,
-    std::unique_ptr<Pipeline, PipelineDeleter> toRewrite) {
+std::unique_ptr<Pipeline> processFLEPipelineS(OperationContext* opCtx,
+                                              NamespaceString nss,
+                                              const EncryptionInformation& encryptInfo,
+                                              std::unique_ptr<Pipeline> toRewrite) {
     return fle::processPipeline(
         opCtx, nss, encryptInfo, std::move(toRewrite), &getTransactionWithRetriesForMongoS);
 }

@@ -90,11 +90,11 @@ public:
     static constexpr StringData kStageName = "$facet"_sd;
     static constexpr StringData kTeeConsumerStageName = "$internalFacetTeeConsumer"_sd;
     struct FacetPipeline {
-        FacetPipeline(std::string name, std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
+        FacetPipeline(std::string name, std::unique_ptr<Pipeline> pipeline)
             : name(std::move(name)), pipeline(std::move(pipeline)) {}
 
         std::string name;
-        std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
+        std::unique_ptr<Pipeline> pipeline;
         std::unique_ptr<exec::agg::Pipeline> execPipeline;
     };
 

@@ -127,7 +127,7 @@ DocumentSource::GetNextResult DocumentSourceExchange::doGetNext() {
     return _exchange->getNext(pExpCtx->getOperationContext(), _consumerId, _resourceYielder.get());
 }
 
-Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
+Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline> pipeline)
     : _spec(std::move(spec)),
       _pipeline(std::move(pipeline)),
       _execPipeline{exec::agg::buildPipeline(_pipeline->freeze())},

@@ -171,7 +171,7 @@ private:
     GetNextResult doGetNext() final;
 
     DocumentSourceListSampledQueriesSpec _spec;
-    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
+    std::unique_ptr<Pipeline> _pipeline;
     std::unique_ptr<exec::agg::Pipeline> _execPipeline;
 };
 

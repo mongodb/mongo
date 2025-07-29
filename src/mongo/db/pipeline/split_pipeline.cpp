@@ -99,7 +99,7 @@ boost::optional<long long> getPipelineLimit(Pipeline* pipeline) {
  */
 class PipelineSplitter {
 public:
-    PipelineSplitter(std::unique_ptr<Pipeline, PipelineDeleter> pipelineToSplit,
+    PipelineSplitter(std::unique_ptr<Pipeline> pipelineToSplit,
                      boost::optional<OrderedPathSet> shardKeyPaths)
         : _splitPipeline(
               SplitPipeline::mergeOnlyWithEmptyShardsPipeline(std::move(pipelineToSplit))),
@@ -488,7 +488,7 @@ private:
     boost::optional<OrderedPathSet> _initialShardKeyPaths;
 };
 
-SplitPipeline SplitPipeline::split(std::unique_ptr<Pipeline, PipelineDeleter> pipelineToSplit,
+SplitPipeline SplitPipeline::split(std::unique_ptr<Pipeline> pipelineToSplit,
                                    boost::optional<OrderedPathSet> shardKeyPaths) {
     return PipelineSplitter(std::move(pipelineToSplit), std::move(shardKeyPaths)).split().release();
 }

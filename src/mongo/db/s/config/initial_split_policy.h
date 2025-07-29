@@ -259,7 +259,7 @@ private:
  */
 class SamplingBasedSplitPolicy : public InitialSplitPolicy {
 public:
-    using SampleDocumentPipeline = std::unique_ptr<Pipeline, PipelineDeleter>;
+    using SampleDocumentPipeline = std::unique_ptr<Pipeline>;
 
     // Interface to facilitate testing
     class SampleDocumentSource {

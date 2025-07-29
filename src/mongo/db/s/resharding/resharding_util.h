@@ -327,7 +327,7 @@ std::vector<ReshardingZoneType> getZonesFromExistingCollection(OperationContext*
  * Creates a pipeline that can be serialized into a query for fetching oplog entries. `startAfter`
  * may be `Timestamp::isNull()` to fetch from the beginning of the oplog.
  */
-std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForResharding(
+std::unique_ptr<Pipeline> createOplogFetchingPipelineForResharding(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ReshardingDonorOplogId& startAfter,
     UUID collUUID,

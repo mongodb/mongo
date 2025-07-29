@@ -437,8 +437,8 @@ bool mrSupportsWriteConcern(const BSONObj& cmd) {
     }
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
-    MapReduceCommandRequest parsedMr, boost::intrusive_ptr<ExpressionContext> expCtx) {
+std::unique_ptr<Pipeline> translateFromMR(MapReduceCommandRequest parsedMr,
+                                          boost::intrusive_ptr<ExpressionContext> expCtx) {
     const auto outNss = parsedMr.getOutOptions().getDatabaseName()
         ? (NamespaceStringUtil::deserialize(parsedMr.getDbName().tenantId(),
                                             *parsedMr.getOutOptions().getDatabaseName(),

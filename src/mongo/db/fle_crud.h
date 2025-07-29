@@ -223,20 +223,18 @@ void processFLECountD(OperationContext* opCtx,
 /**
  * Process a pipeline from mongos.
  */
-std::unique_ptr<Pipeline, PipelineDeleter> processFLEPipelineS(
-    OperationContext* opCtx,
-    NamespaceString nss,
-    const EncryptionInformation& encryptInfo,
-    std::unique_ptr<Pipeline, PipelineDeleter> toRewrite);
+std::unique_ptr<Pipeline> processFLEPipelineS(OperationContext* opCtx,
+                                              NamespaceString nss,
+                                              const EncryptionInformation& encryptInfo,
+                                              std::unique_ptr<Pipeline> toRewrite);
 
 /**
  * Process a pipeline from a replica set.
  */
-std::unique_ptr<Pipeline, PipelineDeleter> processFLEPipelineD(
-    OperationContext* opCtx,
-    NamespaceString nss,
-    const EncryptionInformation& encryptInfo,
-    std::unique_ptr<Pipeline, PipelineDeleter> toRewrite);
+std::unique_ptr<Pipeline> processFLEPipelineD(OperationContext* opCtx,
+                                              NamespaceString nss,
+                                              const EncryptionInformation& encryptInfo,
+                                              std::unique_ptr<Pipeline> toRewrite);
 
 /**
  * Abstraction layer for FLE

@@ -614,7 +614,7 @@ Status ShardServerProcessInterface::insertTimeseries(
         expCtx, ns, std::move(insertCommand), wc, targetEpoch);
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> ShardServerProcessInterface::preparePipelineForExecution(
+std::unique_ptr<Pipeline> ShardServerProcessInterface::preparePipelineForExecution(
     Pipeline* ownedPipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern) {
@@ -622,7 +622,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ShardServerProcessInterface::prepareP
         ownedPipeline, shardTargetingPolicy, std::move(readConcern));
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> ShardServerProcessInterface::preparePipelineForExecution(
+std::unique_ptr<Pipeline> ShardServerProcessInterface::preparePipelineForExecution(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const AggregateCommandRequest& aggRequest,
     Pipeline* pipeline,
@@ -630,8 +630,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ShardServerProcessInterface::prepareP
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
     bool shouldUseCollectionDefaultCollator) {
-    std::unique_ptr<Pipeline, PipelineDeleter> targetPipeline(
-        pipeline, PipelineDeleter(expCtx->getOperationContext()));
+    std::unique_ptr<Pipeline> targetPipeline(pipeline);
     return sharded_agg_helpers::targetShardsAndAddMergeCursors(
         expCtx,
         std::make_pair(aggRequest, std::move(targetPipeline)),

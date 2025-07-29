@@ -397,7 +397,7 @@ std::vector<BSONObj> patchPipelineForTimeSeriesQuery(
  * Builds an expCtx with which to parse the request's pipeline, then parses the pipeline and
  * registers the pre-optimized pipeline with query stats collection.
  */
-std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
+std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     OperationContext* opCtx,
     const stdx::unordered_set<NamespaceString>& involvedNamespaces,
     const ClusterAggregate::Namespaces& nsStruct,
@@ -712,8 +712,8 @@ Status runAggregateImpl(OperationContext* opCtx,
 
     // pipelineBuilder will be invoked within AggregationTargeter::make() if and only if it chooses
     // any policy other than "specific shard only".
-    auto [pipeline, expCtx] = [&]() -> std::tuple<std::unique_ptr<Pipeline, PipelineDeleter>,
-                                                  boost::intrusive_ptr<ExpressionContext>> {
+    auto [pipeline, expCtx] =
+        [&]() -> std::tuple<std::unique_ptr<Pipeline>, boost::intrusive_ptr<ExpressionContext>> {
         auto pipeline =
             parsePipelineAndRegisterQueryStats(opCtx,
                                                involvedNamespaces,

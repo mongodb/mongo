@@ -143,7 +143,7 @@ MongosProcessInterface::getWriteSizeEstimator(OperationContext* opCtx,
     return std::make_unique<TargetPrimaryWriteSizeEstimator>();
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::preparePipelineForExecution(
+std::unique_ptr<Pipeline> MongosProcessInterface::preparePipelineForExecution(
     Pipeline* ownedPipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern) {
@@ -156,7 +156,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::preparePipeli
         ownedPipeline, shardTargetingPolicy, std::move(readConcern));
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::preparePipelineForExecution(
+std::unique_ptr<Pipeline> MongosProcessInterface::preparePipelineForExecution(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const AggregateCommandRequest& aggRequest,
     Pipeline* pipeline,
@@ -168,8 +168,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::preparePipeli
     tassert(7393502,
             "shardTargetingPolicy cannot be kNotAllowed on mongos",
             shardTargetingPolicy != ShardTargetingPolicy::kNotAllowed);
-    std::unique_ptr<Pipeline, PipelineDeleter> targetPipeline(
-        pipeline, PipelineDeleter(expCtx->getOperationContext()));
+    std::unique_ptr<Pipeline> targetPipeline(pipeline);
     return sharded_agg_helpers::targetShardsAndAddMergeCursors(
         expCtx,
         std::make_pair(aggRequest, std::move(targetPipeline)),

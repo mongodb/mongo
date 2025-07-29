@@ -103,19 +103,18 @@ public:
     MockMongoInterface(std::deque<DocumentSource::GetNextResult> mockResults)
         : _mockResults(std::move(mockResults)) {}
 
-    std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
+    std::unique_ptr<Pipeline> preparePipelineForExecution(
         Pipeline* ownedPipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) final {
-        std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
-            ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->getOperationContext()));
+        std::unique_ptr<Pipeline> pipeline(ownedPipeline);
 
         pipeline->addInitialSource(
             DocumentSourceMock::createForTest(_mockResults, pipeline->getContext()));
         return pipeline;
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
+    std::unique_ptr<Pipeline> preparePipelineForExecution(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const AggregateCommandRequest& aggRequest,
         Pipeline* pipeline,
@@ -403,7 +402,7 @@ private:
     UUID _reshardingUUID = UUID::gen();
     std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingCollectionCloner> _cloner;
-    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
+    std::unique_ptr<Pipeline> _pipeline;
     std::unique_ptr<exec::agg::Pipeline> _execPipeline;
     // Mock 'postBatchResumeToken'. Incremented every a mock batch is processed.
     int _resumeTokenNum = 0;

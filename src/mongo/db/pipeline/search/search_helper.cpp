@@ -341,7 +341,7 @@ void assertSearchMetaAccessValid(const DocumentSourceContainer& shardsPipeline,
     assertSearchMetaAccessValidHelper({&shardsPipeline, &mergePipeline});
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegacyExecutor(
+std::unique_ptr<Pipeline> prepareSearchForTopLevelPipelineLegacyExecutor(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     Pipeline* origPipeline,
     DocsNeededBounds bounds,
@@ -405,7 +405,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
         origSearchStage->markCollectionEmpty();
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> newPipeline = nullptr;
+    std::unique_ptr<Pipeline> newPipeline = nullptr;
     for (auto& cursor : cursors) {
         auto maybeCursorLabel = cursor->getType();
         if (!maybeCursorLabel) {

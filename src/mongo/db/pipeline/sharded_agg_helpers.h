@@ -90,7 +90,7 @@ struct DispatchShardPipelineResults {
     boost::optional<SplitPipeline> splitPipeline;
 
     // If the pipeline targeted a single shard, this is the pipeline to run on that shard.
-    std::unique_ptr<Pipeline, PipelineDeleter> pipelineForSingleShard;
+    std::unique_ptr<Pipeline> pipelineForSingleShard;
 
     // The command object to send to the targeted shards.
     BSONObj commandForTargetedShards;
@@ -147,7 +147,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     Document serializedCommand,
     PipelineDataSource pipelineDataSource,
     bool eligibleForSampling,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    std::unique_ptr<Pipeline> pipeline,
     boost::optional<ExplainOptions::Verbosity> explain,
     const NamespaceString& targetedNss,
     bool requestQueryStatsFromRemotes = false,
@@ -238,7 +238,7 @@ Shard::RetryPolicy getDesiredRetryPolicy(OperationContext* opCtx);
  * Will retry on network errors and also on StaleConfig errors to avoid restarting the entire
  * operation. Returns `ownedPipeline`, but made-ready for execution.
  */
-std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
+std::unique_ptr<Pipeline> preparePipelineForExecution(
     Pipeline* ownedPipeline,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
     boost::optional<BSONObj> readConcern = boost::none);
@@ -258,18 +258,17 @@ std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
  * options (e.g. read concern) to the shards when establishing remote cursors. Note that doing so
  * incurs the cost of parsing the pipeline.
  *
- * Use the std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline, PipelineDeleter>>
+ * Use the std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline>>
  * alternative for 'targetRequest' to explicitly specify command options (e.g. read concern) to the
  * shards when establishing remote cursors, and to pass a pipeline that has already been parsed.
  * This is useful when the pipeline has already been parsed as it avoids the cost
  * of parsing it again.
  */
-std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
+std::unique_ptr<Pipeline> targetShardsAndAddMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    std::variant<std::unique_ptr<Pipeline, PipelineDeleter>,
+    std::variant<std::unique_ptr<Pipeline>,
                  AggregateCommandRequest,
-                 std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline, PipelineDeleter>>>
-        targetRequest,
+                 std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline>>> targetRequest,
     boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
     boost::optional<BSONObj> readConcern = boost::none,
@@ -286,7 +285,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
  *
  * Note that the specified AggregateCommandRequest must not be for an explain command.
  */
-std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
+std::unique_ptr<Pipeline> runPipelineDirectlyOnSingleShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     AggregateCommandRequest request,
     ShardId shardId,

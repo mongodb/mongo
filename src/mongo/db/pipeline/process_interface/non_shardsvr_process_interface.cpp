@@ -72,16 +72,14 @@
 
 namespace mongo {
 
-std::unique_ptr<Pipeline, PipelineDeleter>
-NonShardServerProcessInterface::preparePipelineForExecution(
+std::unique_ptr<Pipeline> NonShardServerProcessInterface::preparePipelineForExecution(
     Pipeline* ownedPipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern) {
     return attachCursorSourceToPipelineForLocalRead(ownedPipeline);
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter>
-NonShardServerProcessInterface::preparePipelineForExecution(
+std::unique_ptr<Pipeline> NonShardServerProcessInterface::preparePipelineForExecution(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const AggregateCommandRequest& aggRequest,
     Pipeline* pipeline,
@@ -365,8 +363,7 @@ BSONObj NonShardServerProcessInterface::preparePipelineAndExplain(
     if (firstStage && typeid(*firstStage) == typeid(DocumentSourceCursor)) {
         // Managed pipeline goes out of scope at the end of this else block, but we've already
         // extracted the necessary information and won't need it again.
-        std::unique_ptr<Pipeline, PipelineDeleter> managedPipeline(
-            ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->getOperationContext()));
+        std::unique_ptr<Pipeline> managedPipeline(ownedPipeline);
         auto managedExecPipeline = exec::agg::buildPipeline(managedPipeline->freeze());
         pipelineVec = mergeExplains(*managedPipeline, *managedExecPipeline, opts);
         ownedPipeline = nullptr;

@@ -73,7 +73,7 @@ REGISTER_DOCUMENT_SOURCE(unionWith,
 ALLOCATE_DOCUMENT_SOURCE_ID(unionWith, DocumentSourceUnionWith::id)
 
 namespace {
-std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
+std::unique_ptr<Pipeline> buildPipelineFromViewDefinition(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     ResolvedNamespace resolvedNs,
     std::vector<BSONObj> currentPipeline,
@@ -123,8 +123,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
 }
 
 DocumentSourceUnionWith::DocumentSourceUnionWith(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, std::unique_ptr<Pipeline> pipeline)
     : DocumentSource(kStageName, expCtx),
       exec::agg::Stage(kStageName, expCtx),
       _pipeline(std::move(pipeline)),

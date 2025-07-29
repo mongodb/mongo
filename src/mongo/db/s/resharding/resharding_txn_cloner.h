@@ -74,7 +74,7 @@ public:
      *      {$sort: {_id: 1}},
      * ]
      */
-    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
+    std::unique_ptr<Pipeline> makePipeline(
         OperationContext* opCtx,
         std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
         const boost::optional<LogicalSessionId>& startAfter);
@@ -111,10 +111,10 @@ public:
 private:
     boost::optional<LogicalSessionId> _fetchProgressLsid(OperationContext* opCtx);
 
-    std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(OperationContext* opCtx,
-                                                                         const Pipeline& pipeline);
+    std::unique_ptr<Pipeline> _targetAggregationRequest(OperationContext* opCtx,
+                                                        const Pipeline& pipeline);
 
-    std::unique_ptr<Pipeline, PipelineDeleter> _restartPipeline(
+    std::unique_ptr<Pipeline> _restartPipeline(
         OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
 
     boost::optional<SessionTxnRecord> _getNextRecord(OperationContext* opCtx,
@@ -138,7 +138,7 @@ private:
  *
  * fetchTimestamp never isNull()
  */
-std::unique_ptr<Pipeline, PipelineDeleter> createConfigTxnCloningPipelineForResharding(
+std::unique_ptr<Pipeline> createConfigTxnCloningPipelineForResharding(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Timestamp fetchTimestamp,
     boost::optional<LogicalSessionId> startAfter);

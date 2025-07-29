@@ -265,9 +265,9 @@ public:
      * Returns the total aggregation pipeline for a view. If called on the base class, returns the
      * normal pipeline (no op).
      */
-    virtual std::unique_ptr<Pipeline, PipelineDeleter> handleViewHelper(
+    virtual std::unique_ptr<Pipeline> handleViewHelper(
         boost::intrusive_ptr<ExpressionContext> expCtx,
-        std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+        std::unique_ptr<Pipeline> pipeline,
         boost::optional<UUID> uuid) const {
         return pipeline;
     }
@@ -388,10 +388,9 @@ public:
         return _resolvedView;
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> handleViewHelper(
-        boost::intrusive_ptr<ExpressionContext> expCtx,
-        std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-        boost::optional<UUID> uuid) const override;
+    std::unique_ptr<Pipeline> handleViewHelper(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                               std::unique_ptr<Pipeline> pipeline,
+                                               boost::optional<UUID> uuid) const override;
 
     ScopedSetShardRole setShardRole(const CollectionRoutingInfo& cri);
 

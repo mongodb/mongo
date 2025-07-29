@@ -99,7 +99,6 @@ class ExpressionContext;
 class JsExecution;
 
 class Pipeline;
-class PipelineDeleter;
 class RoutingContext;
 class TransactionHistoryIteratorBase;
 
@@ -432,7 +431,7 @@ public:
      * If `shardTargetingPolicy` is kNotAllowed, the cursor will only be for local reads regardless
      * of whether or not this function is called in a sharded environment.
      */
-    virtual std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
+    virtual std::unique_ptr<Pipeline> preparePipelineForExecution(
         Pipeline* pipeline,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) = 0;
@@ -456,7 +455,7 @@ public:
      * This function takes ownership of the 'pipeline' argument, which is expected to be a valid
      * pointer to a Pipeline object.
      */
-    virtual std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
+    virtual std::unique_ptr<Pipeline> preparePipelineForExecution(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const AggregateCommandRequest& aggRequest,
         Pipeline* pipeline,
@@ -490,7 +489,7 @@ public:
      * Changing it to a unique_ptr introduces a circular dependency on certain platforms where the
      * compiler expects to find an implementation of PipelineDeleter.
      */
-    virtual std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
+    virtual std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalRead(
         Pipeline* pipeline,
         boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
         bool shouldUseCollectionDefaultCollator = false,

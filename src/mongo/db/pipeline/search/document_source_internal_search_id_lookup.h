@@ -200,7 +200,7 @@ private:
     DocumentSourceIdLookupStats _stats;
 
     // If a search query is run on a view, we store the parsed view pipeline.
-    std::unique_ptr<Pipeline, PipelineDeleter> _viewPipeline;
+    std::unique_ptr<Pipeline> _viewPipeline;
     std::unique_ptr<exec::agg::Pipeline> _viewExecPipeline;
 };
 

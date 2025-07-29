@@ -54,8 +54,7 @@ public:
     static CanonicalQuery::QueryShapeString parseAndEncode(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const std::vector<BSONObj>& pipeline) {
-        std::unique_ptr<Pipeline, PipelineDeleter> parsedPipeline =
-            Pipeline::parse(pipeline, expCtx);
+        std::unique_ptr<Pipeline> parsedPipeline = Pipeline::parse(pipeline, expCtx);
         parsedPipeline->optimizePipeline();
         parsedPipeline->parameterize();
 

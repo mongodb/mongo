@@ -101,8 +101,8 @@ static const char* const ns = "unittests.document_source_group_tests";
  */
 class OwningDistributedPlanContext : public DocumentSourceGroup::DistributedPlanContext {
 public:
-    OwningDistributedPlanContext(std::unique_ptr<Pipeline, PipelineDeleter> pipelinePrefix,
-                                 std::unique_ptr<Pipeline, PipelineDeleter> pipelineSuffix,
+    OwningDistributedPlanContext(std::unique_ptr<Pipeline> pipelinePrefix,
+                                 std::unique_ptr<Pipeline> pipelineSuffix,
                                  boost::optional<OrderedPathSet> shardKeys)
         : DocumentSourceGroup::DistributedPlanContext{*pipelinePrefix,
                                                       *pipelineSuffix,
@@ -110,8 +110,8 @@ public:
           pipelinePrefix(std::move(pipelinePrefix)),
           pipelineSuffix(std::move(pipelineSuffix)),
           shardKeys(std::move(shardKeys)) {}
-    std::unique_ptr<Pipeline, PipelineDeleter> pipelinePrefix;
-    std::unique_ptr<Pipeline, PipelineDeleter> pipelineSuffix;
+    std::unique_ptr<Pipeline> pipelinePrefix;
+    std::unique_ptr<Pipeline> pipelineSuffix;
     boost::optional<OrderedPathSet> shardKeys;
 };
 

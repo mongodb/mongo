@@ -109,8 +109,7 @@ public:
     /**
      * Helper to create test pipeline.
      */
-    std::unique_ptr<Pipeline, PipelineDeleter> buildTestPipeline(
-        const std::vector<BSONObj>& rawPipeline) {
+    std::unique_ptr<Pipeline> buildTestPipeline(const std::vector<BSONObj>& rawPipeline) {
         auto expCtx = getExpCtx();
         expCtx->setNamespaceString(_nss);
         expCtx->setInRouter(false);

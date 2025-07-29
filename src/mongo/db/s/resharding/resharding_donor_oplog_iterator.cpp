@@ -95,7 +95,7 @@ ReshardingDonorOplogIterator::ReshardingDonorOplogIterator(
       _resumeToken(std::move(resumeToken)),
       _insertNotifier(insertNotifier) {}
 
-std::unique_ptr<Pipeline, PipelineDeleter> ReshardingDonorOplogIterator::makePipeline(
+std::unique_ptr<Pipeline> ReshardingDonorOplogIterator::makePipeline(
     OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface) {
     using Doc = Document;
     using Arr = std::vector<Value>;

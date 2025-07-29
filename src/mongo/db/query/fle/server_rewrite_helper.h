@@ -100,19 +100,19 @@ class PipelineRewrite : public RewriteBase {
 public:
     PipelineRewrite(const NamespaceString& nss,
                     const EncryptionInformation& encryptInfo,
-                    std::unique_ptr<Pipeline, PipelineDeleter> toRewrite);
+                    std::unique_ptr<Pipeline> toRewrite);
     ~PipelineRewrite() override {};
 
     void doRewrite(FLETagQueryInterface* queryImpl) final;
 
-    std::unique_ptr<Pipeline, PipelineDeleter> getPipeline();
+    std::unique_ptr<Pipeline> getPipeline();
 
 protected:
     // This method is used specifically for unit testing, allowing the unit tests to provide their
     // own mocked QueryRewriter.
     virtual QueryRewriter getQueryRewriterForEsc(FLETagQueryInterface* queryImpl);
 
-    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
+    std::unique_ptr<Pipeline> _pipeline;
 };
 }  // namespace fle
 }  // namespace mongo

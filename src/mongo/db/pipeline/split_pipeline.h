@@ -55,14 +55,14 @@ public:
      * cursors have been established, the merge pipeline can be made executable by calling
      * 'addMergeCursorsSource()'.
      */
-    static SplitPipeline split(std::unique_ptr<Pipeline, PipelineDeleter> pipelineToSplit,
+    static SplitPipeline split(std::unique_ptr<Pipeline> pipelineToSplit,
                                boost::optional<OrderedPathSet> shardKeyPaths = boost::none);
 
     /**
      * Creates a SplitPipeline using the given pipeline as the 'mergePipeline', where the
      * 'shardsPipeline' is null.
      */
-    static SplitPipeline mergeOnly(std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline) {
+    static SplitPipeline mergeOnly(std::unique_ptr<Pipeline> mergePipeline) {
         return SplitPipeline(nullptr, std::move(mergePipeline), boost::none);
     }
 
@@ -70,7 +70,7 @@ public:
      * Creates a SplitPipeline using the given pipeline as the 'shardsPipeline', where the
      * 'mergePipeline' is null.
      */
-    static SplitPipeline shardsOnly(std::unique_ptr<Pipeline, PipelineDeleter> shardsPipeline) {
+    static SplitPipeline shardsOnly(std::unique_ptr<Pipeline> shardsPipeline) {
         return SplitPipeline(std::move(shardsPipeline), nullptr, boost::none);
     }
 
@@ -78,22 +78,21 @@ public:
      * Creates a SplitPipeline using the given pipeline as the 'mergePipeline', where the
      * 'shardsPipeline' is an empty pipeline.
      */
-    static SplitPipeline mergeOnlyWithEmptyShardsPipeline(
-        std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline) {
+    static SplitPipeline mergeOnlyWithEmptyShardsPipeline(std::unique_ptr<Pipeline> mergePipeline) {
         const auto& expCtx = mergePipeline->getContext();
         return SplitPipeline(Pipeline::create({}, expCtx), std::move(mergePipeline), boost::none);
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> shardsPipeline;
-    std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline;
+    std::unique_ptr<Pipeline> shardsPipeline;
+    std::unique_ptr<Pipeline> mergePipeline;
 
     // If set, the cursors from the shards are expected to be sorted according to this spec, and to
     // have populated a "$sortKey" metadata field which can be used to compare the results.
     boost::optional<BSONObj> shardCursorsSortSpec;
 
 private:
-    SplitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> shardsPipeline,
-                  std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline,
+    SplitPipeline(std::unique_ptr<Pipeline> shardsPipeline,
+                  std::unique_ptr<Pipeline> mergePipeline,
                   boost::optional<BSONObj> shardCursorsSortSpec)
         : shardsPipeline(std::move(shardsPipeline)),
           mergePipeline(std::move(mergePipeline)),

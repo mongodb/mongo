@@ -467,7 +467,7 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
 BSONObj establishMergingMongosCursor(OperationContext* opCtx,
                                      long long batchSize,
                                      const NamespaceString& requestedNss,
-                                     std::unique_ptr<Pipeline, PipelineDeleter> pipelineForMerging,
+                                     std::unique_ptr<Pipeline> pipelineForMerging,
                                      const PrivilegeVector& privileges,
                                      bool requestQueryStatsFromRemotes) {
     ClusterClientCursorParams params(requestedNss,
@@ -705,8 +705,8 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
                                         numConsumers};
 }
 
-ClusterClientCursorGuard convertPipelineToRouterStages(
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline, ClusterClientCursorParams&& cursorParams) {
+ClusterClientCursorGuard convertPipelineToRouterStages(std::unique_ptr<Pipeline> pipeline,
+                                                       ClusterClientCursorParams&& cursorParams) {
     auto* opCtx = pipeline->getContext()->getOperationContext();
 
     // We expect the pipeline to be fully executable at this point, so if the pipeline was all skips
@@ -752,7 +752,7 @@ bool isAllLimitsAndSkips(Pipeline* pipeline) {
 }  // namespace
 
 ClusterClientCursorGuard buildClusterCursor(OperationContext* opCtx,
-                                            std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+                                            std::unique_ptr<Pipeline> pipeline,
                                             ClusterClientCursorParams&& cursorParams) {
     if (isAllLimitsAndSkips(pipeline.get())) {
         // We can optimize this Pipeline to avoid going through any DocumentSources at all and thus
@@ -764,7 +764,7 @@ ClusterClientCursorGuard buildClusterCursor(OperationContext* opCtx,
 }
 
 AggregationTargeter AggregationTargeter::make(OperationContext* opCtx,
-                                              std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+                                              std::unique_ptr<Pipeline> pipeline,
                                               const NamespaceString& execNss,
                                               boost::optional<CollectionRoutingInfo> cri,
                                               PipelineDataSource pipelineDataSource,
@@ -794,7 +794,7 @@ AggregationTargeter AggregationTargeter::make(OperationContext* opCtx,
 
 Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
                            long long batchSize,
-                           std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+                           std::unique_ptr<Pipeline> pipeline,
                            BSONObjBuilder* result,
                            const PrivilegeVector& privileges,
                            bool requestQueryStatsFromRemotes) {

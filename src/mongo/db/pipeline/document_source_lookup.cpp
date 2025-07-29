@@ -638,7 +638,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
     // '_unwindSrc' would be non-null, and we would not have made it here.
     invariant(!_matchSrc);
 
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
+    std::unique_ptr<Pipeline> pipeline;
     std::unique_ptr<exec::agg::Pipeline> execPipeline;
     try {
         pipeline = buildPipeline(_fromExpCtx, inputDoc);
@@ -684,7 +684,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
     return output.freeze();
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipelineFromViewDefinition(
+std::unique_ptr<Pipeline> DocumentSourceLookUp::buildPipelineFromViewDefinition(
     std::vector<BSONObj> serializedPipeline, ResolvedNamespace resolvedNamespace) {
     // We don't want to optimize or attach a cursor source here because we need to update
     // _resolvedPipeline so we can reuse it on subsequent calls to getNext(), and we may need to

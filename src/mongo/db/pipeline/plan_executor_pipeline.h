@@ -80,7 +80,7 @@ public:
     };
 
     PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContext> expCtx,
-                         std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+                         std::unique_ptr<Pipeline> pipeline,
                          ResumableScanType resumableScanType);
 
     CanonicalQuery* getCanonicalQuery() const override {
@@ -266,7 +266,7 @@ private:
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
-    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
+    std::unique_ptr<Pipeline> _pipeline;
     std::unique_ptr<exec::agg::Pipeline> _execPipeline;
 
     PlanExplainerPipeline _planExplainer;

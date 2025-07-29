@@ -880,7 +880,7 @@ class MockPipelineRewrite : public fle::PipelineRewrite {
 public:
     MockPipelineRewrite(const NamespaceString& nss,
                         const EncryptionInformation& encryptInfo,
-                        std::unique_ptr<Pipeline, PipelineDeleter> toRewrite)
+                        std::unique_ptr<Pipeline> toRewrite)
         : PipelineRewrite(nss, encryptInfo, std::move(toRewrite)) {}
 
     ~MockPipelineRewrite() override {};

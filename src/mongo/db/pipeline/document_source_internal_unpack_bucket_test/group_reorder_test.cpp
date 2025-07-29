@@ -45,13 +45,12 @@ namespace {
 
 using InternalUnpackBucketGroupReorder = AggregationContextFixture;
 
-std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
-    boost::intrusive_ptr<mongo::ExpressionContextForTest> expCtx,
-    std::vector<BSONObj> stages,
-    int bucketMaxSpanSeconds,
-    bool fixedBuckets,
-    BSONArray fields,
-    bool exclude) {
+std::unique_ptr<Pipeline> makePipeline(boost::intrusive_ptr<mongo::ExpressionContextForTest> expCtx,
+                                       std::vector<BSONObj> stages,
+                                       int bucketMaxSpanSeconds,
+                                       bool fixedBuckets,
+                                       BSONArray fields,
+                                       bool exclude) {
 
     BSONObjBuilder unpackSpecBuilder;
     if (exclude) {

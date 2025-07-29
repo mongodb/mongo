@@ -332,8 +332,8 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
     updateSpillingStats();
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceGraphLookUp::makePipeline(
-    BSONObj match, bool allowForeignSharded) {
+std::unique_ptr<Pipeline> DocumentSourceGraphLookUp::makePipeline(BSONObj match,
+                                                                  bool allowForeignSharded) {
     // We've already allocated space for the trailing $match stage in '_fromPipeline'.
     _fromPipeline.back() = std::move(match);
     MakePipelineOptions pipelineOpts;
@@ -349,7 +349,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceGraphLookUp::makePipeli
     // to the '_fromExpCtx' by copying them from the parent query ExpressionContext.
     _fromExpCtx->setQuerySettingsIfNotPresent(pExpCtx->getQuerySettings());
 
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
+    std::unique_ptr<Pipeline> pipeline;
     try {
         return Pipeline::makePipeline(_fromPipeline, _fromExpCtx, pipelineOpts);
     } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {

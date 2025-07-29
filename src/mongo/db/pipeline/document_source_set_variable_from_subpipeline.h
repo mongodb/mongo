@@ -69,7 +69,7 @@ public:
 
     static boost::intrusive_ptr<DocumentSourceSetVariableFromSubPipeline> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        std::unique_ptr<Pipeline, PipelineDeleter> subpipeline,
+        std::unique_ptr<Pipeline> subpipeline,
         Variables::Id varID);
 
     ~DocumentSourceSetVariableFromSubPipeline() override = default;
@@ -140,7 +140,7 @@ public:
 
 protected:
     DocumentSourceSetVariableFromSubPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                             std::unique_ptr<Pipeline, PipelineDeleter> subpipeline,
+                                             std::unique_ptr<Pipeline> subpipeline,
                                              Variables::Id varID)
         : DocumentSource(kStageName, expCtx),
           exec::agg::Stage(kStageName, expCtx),
@@ -153,7 +153,7 @@ protected:
 private:
     GetNextResult doGetNext() final;
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
-    std::unique_ptr<Pipeline, PipelineDeleter> _subPipeline;
+    std::unique_ptr<Pipeline> _subPipeline;
     std::unique_ptr<exec::agg::Pipeline> _subExecPipeline;
     Variables::Id _variableID;
     // $setVariableFromSubPipeline sets the value of $$SEARCH_META only on the first call to

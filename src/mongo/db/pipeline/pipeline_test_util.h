@@ -35,7 +35,6 @@
 namespace mongo {
 
 // Calls MatchExpression::normalize for any DocumentSourceMatch within the pipeline.
-std::unique_ptr<Pipeline, PipelineDeleter> normalizeMatchStageInPipeline(
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline);
+std::unique_ptr<Pipeline> normalizeMatchStageInPipeline(std::unique_ptr<Pipeline> pipeline);
 
 }  // namespace mongo

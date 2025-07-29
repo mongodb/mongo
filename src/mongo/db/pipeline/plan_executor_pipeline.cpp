@@ -71,7 +71,7 @@ bool isRouterOrReplicaSet(ExpressionContext* expCtx) {
 }  // namespace
 
 PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                           std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+                                           std::unique_ptr<Pipeline> pipeline,
                                            ResumableScanType resumableScanType)
     : _expCtx(std::move(expCtx)),
       _pipeline(std::move(pipeline)),

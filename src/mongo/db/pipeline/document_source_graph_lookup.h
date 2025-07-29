@@ -299,8 +299,7 @@ private:
     /**
      * Create pipeline to get documents from the foreign collection.
      */
-    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(BSONObj match,
-                                                            bool allowForeignSharded);
+    std::unique_ptr<Pipeline> makePipeline(BSONObj match, bool allowForeignSharded);
 
     /**
      * If we have internalized a $unwind, getNext() dispatches to this function.

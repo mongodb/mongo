@@ -67,8 +67,9 @@ static std::vector<BSONObj> convertToBSON(const std::vector<SBEValue>& input) {
     return result;
 }
 
-std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
-    const std::vector<BSONObj>& rawPipeline, NamespaceString nss, OperationContext* opCtx) {
+std::unique_ptr<mongo::Pipeline> parsePipeline(const std::vector<BSONObj>& rawPipeline,
+                                               NamespaceString nss,
+                                               OperationContext* opCtx) {
     AggregateCommandRequest request(std::move(nss), rawPipeline);
     boost::intrusive_ptr<ExpressionContextForTest> ctx(
         new ExpressionContextForTest(opCtx, request));
@@ -79,8 +80,9 @@ std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
     return Pipeline::parse(request.getPipeline(), ctx);
 }
 
-std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
-    const std::string& pipelineStr, NamespaceString nss, OperationContext* opCtx) {
+std::unique_ptr<mongo::Pipeline> parsePipeline(const std::string& pipelineStr,
+                                               NamespaceString nss,
+                                               OperationContext* opCtx) {
     const BSONObj inputBson = fromjson("{pipeline: " + pipelineStr + "}");
 
     std::vector<BSONObj> rawPipeline;
@@ -95,8 +97,7 @@ std::vector<BSONObj> runPipeline(OperationContext* opCtx,
                                  const std::string& pipelineStr,
                                  const std::vector<BSONObj>& inputObjs) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test");
-    std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> pipeline =
-        parsePipeline(pipelineStr, nss, opCtx);
+    std::unique_ptr<mongo::Pipeline> pipeline = parsePipeline(pipelineStr, nss, opCtx);
 
     const auto queueStage = DocumentSourceQueue::create(pipeline->getContext());
     for (const auto& bsonObj : inputObjs) {

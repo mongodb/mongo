@@ -286,7 +286,7 @@ public:
         return &_resolvedIntrospectionPipeline->getSources();
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> getSubPipeline_forTest(const Document& inputDoc) {
+    std::unique_ptr<Pipeline> getSubPipeline_forTest(const Document& inputDoc) {
         return buildPipeline(_fromExpCtx, inputDoc);
     }
 
@@ -414,7 +414,7 @@ private:
      * updates the '_resolvedPipeline', as well as '_fieldMatchPipelineIdx' in the case of a
      * 'foreign' join.
      */
-    std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
+    std::unique_ptr<Pipeline> buildPipelineFromViewDefinition(
         std::vector<BSONObj> serializedPipeline, ResolvedNamespace resolvedNamespace);
 
     /**
@@ -504,7 +504,7 @@ private:
     boost::optional<std::vector<BSONObj>> _userPipeline;
     // A pipeline parsed from _resolvedPipeline at creation time, intended to support introspective
     // functions. If sub-$lookup stages are present, their pipelines are constructed recursively.
-    std::unique_ptr<Pipeline, PipelineDeleter> _resolvedIntrospectionPipeline;
+    std::unique_ptr<Pipeline> _resolvedIntrospectionPipeline;
 
     // Holds 'let' variables defined in $lookup stage. 'let' variables are stored in the vector in
     // order to ensure the stability in the query shape serialization.

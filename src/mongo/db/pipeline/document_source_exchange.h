@@ -100,7 +100,7 @@ public:
      * Create an exchange. 'pipeline' represents the input to the exchange operator and must not be
      * nullptr.
      **/
-    Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter> pipeline);
+    Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline> pipeline);
 
     /**
      * Interface for retrieving the next document. 'resourceYielder' is optional, and if provided,
@@ -163,7 +163,7 @@ private:
     const ExchangeSpec _spec;
 
     // An input to the exchange operator
-    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
+    std::unique_ptr<Pipeline> _pipeline;
     std::unique_ptr<exec::agg::Pipeline> _execPipeline;
 
     // A pattern for extracting a key from a document used by range and hash policies.

@@ -148,8 +148,7 @@ BSONObj pipelineFromJsonArray(const std::string& jsonArray) {
 class StubExplainInterface : public StubMongoProcessInterface {
     BSONObj preparePipelineAndExplain(Pipeline* ownedPipeline,
                                       ExplainOptions::Verbosity verbosity) override {
-        std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
-            ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->getOperationContext()));
+        std::unique_ptr<Pipeline> pipeline(ownedPipeline);
         BSONArrayBuilder bab;
         auto opts = SerializationOptions{.verbosity = boost::make_optional(verbosity)};
         auto pipelineVec = pipeline->writeExplainOps(opts);
@@ -158,23 +157,21 @@ class StubExplainInterface : public StubMongoProcessInterface {
         }
         return BSON("pipeline" << bab.arr());
     }
-    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
+    std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalRead(
         Pipeline* ownedPipeline,
         boost::optional<const AggregateCommandRequest&> aggRequest,
         bool shouldUseCollectionDefaultCollator,
         ExecShardFilterPolicy = AutomaticShardFiltering{}) override {
-        std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
-            ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->getOperationContext()));
+        std::unique_ptr<Pipeline> pipeline(ownedPipeline);
         return pipeline;
     }
 };
 
 class PipelineOptimizationTest : public mongo::unittest::Test {
 protected:
-    std::unique_ptr<Pipeline, PipelineDeleter> assertPipelineOptimizesTo(
-        const std::string& inputPipeJson,
-        const std::string& outputPipeJson,
-        NamespaceString aggNss = kTestNss) {
+    std::unique_ptr<Pipeline> assertPipelineOptimizesTo(const std::string& inputPipeJson,
+                                                        const std::string& outputPipeJson,
+                                                        NamespaceString aggNss = kTestNss) {
         const BSONObj inputBson = pipelineFromJsonArray(inputPipeJson);
         const BSONObj outputPipeExpected = pipelineFromJsonArray(outputPipeJson);
 
@@ -3622,8 +3619,7 @@ public:
         return fromjson("{$redact: " + stageStr + "}");
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
-        const std::vector<BSONObj>& rawPipeline) {
+    std::unique_ptr<Pipeline> makePipeline(const std::vector<BSONObj>& rawPipeline) {
         auto pipeline = Pipeline::parse(rawPipeline, _expCtx);
         return pipeline;
     }
@@ -4403,7 +4399,7 @@ TEST_F(PipelineOptimizationTest, UnionWithViewsSampleUseCase) {
         "]");
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> getOptimizedPipeline(const BSONObj inputBson) {
+std::unique_ptr<Pipeline> getOptimizedPipeline(const BSONObj inputBson) {
     QueryTestServiceContext testServiceContext;
     auto opCtx = testServiceContext.makeOperationContext();
 
@@ -4783,8 +4779,8 @@ public:
     }
 
 protected:
-    std::unique_ptr<Pipeline, PipelineDeleter> mergePipe;
-    std::unique_ptr<Pipeline, PipelineDeleter> shardPipe;
+    std::unique_ptr<Pipeline> mergePipe;
+    std::unique_ptr<Pipeline> shardPipe;
 };
 
 TEST_F(PipelineOptimizations, Empty) {
@@ -5703,7 +5699,7 @@ TEST_F(PipelineDeferredMergeSortTest, StageThatCantSwapGoesToMergingHalf) {
 
 class PipelineInitialSource : public ServiceContextTest {
 public:
-    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(const std::string& pipelineStr) {
+    std::unique_ptr<Pipeline> makePipeline(const std::string& pipelineStr) {
         std::vector<BSONObj> rawPipeline = {fromjson(pipelineStr)};
         auto opCtx = makeOperationContext();
         boost::intrusive_ptr<ExpressionContextForTest> ctx = new ExpressionContextForTest(

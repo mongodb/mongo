@@ -713,7 +713,7 @@ SemiFuture<void> ReshardingCollectionCloner::run(
     CancellationToken cancelToken,
     CancelableOperationContextFactory factory) {
     struct ChainContext {
-        std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
+        std::unique_ptr<Pipeline> pipeline;
         bool moreToCome = true;
         TxnNumber batchTxnNumber = TxnNumber(0);
     };

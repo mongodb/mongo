@@ -98,7 +98,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSetVariableFromSubPipeline::c
                       << spec.getSetVariable() << " is not allowed.",
         spec.getSetVariable() == searchMetaStr);
 
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline = Pipeline::parse(
+    std::unique_ptr<Pipeline> pipeline = Pipeline::parse(
         spec.getPipeline(), expCtx->copyForSubPipeline(expCtx->getNamespaceString()));
 
     return DocumentSourceSetVariableFromSubPipeline::create(
@@ -108,7 +108,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSetVariableFromSubPipeline::c
 intrusive_ptr<DocumentSourceSetVariableFromSubPipeline>
 DocumentSourceSetVariableFromSubPipeline::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    std::unique_ptr<Pipeline, PipelineDeleter> subpipeline,
+    std::unique_ptr<Pipeline> subpipeline,
     Variables::Id varID) {
     uassert(625290,
             str::stream()

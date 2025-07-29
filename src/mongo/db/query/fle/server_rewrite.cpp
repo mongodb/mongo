@@ -280,7 +280,7 @@ void FilterRewrite::doRewrite(FLETagQueryInterface* queryImpl) {
 
 PipelineRewrite::PipelineRewrite(const NamespaceString& nss,
                                  const EncryptionInformation& encryptInfo,
-                                 std::unique_ptr<Pipeline, PipelineDeleter> toRewrite)
+                                 std::unique_ptr<Pipeline> toRewrite)
     : RewriteBase(toRewrite->getContext(), nss, encryptInfo, true),
       _pipeline(std::move(toRewrite)) {}
 
@@ -293,7 +293,7 @@ void PipelineRewrite::doRewrite(FLETagQueryInterface* queryImpl) {
     }
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> PipelineRewrite::getPipeline() {
+std::unique_ptr<Pipeline> PipelineRewrite::getPipeline() {
     return std::move(_pipeline);
 }
 
@@ -375,12 +375,11 @@ void processCountCommand(OperationContext* opCtx,
     countCommand->getEncryptionInformation()->setCrudProcessed(true);
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> processPipeline(
-    OperationContext* opCtx,
-    NamespaceString nss,
-    const EncryptionInformation& encryptInfo,
-    std::unique_ptr<Pipeline, PipelineDeleter> toRewrite,
-    GetTxnCallback txn) {
+std::unique_ptr<Pipeline> processPipeline(OperationContext* opCtx,
+                                          NamespaceString nss,
+                                          const EncryptionInformation& encryptInfo,
+                                          std::unique_ptr<Pipeline> toRewrite,
+                                          GetTxnCallback txn) {
     auto sharedBlock = std::make_shared<PipelineRewrite>(nss, encryptInfo, std::move(toRewrite));
     doFLERewriteInTxn(opCtx, sharedBlock, txn);
 

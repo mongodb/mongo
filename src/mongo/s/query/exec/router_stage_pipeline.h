@@ -55,7 +55,7 @@ namespace mongo {
  */
 class RouterStagePipeline final : public RouterExecStage {
 public:
-    RouterStagePipeline(std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline);
+    RouterStagePipeline(std::unique_ptr<Pipeline> mergePipeline);
 
     StatusWith<ClusterQueryResult> next() final;
 
@@ -98,7 +98,7 @@ private:
 
     // TODO SERVER-105521 Consider removing the '_mergePipeline' member
     // ('_mergeExecPipeline' should suffice).
-    std::unique_ptr<Pipeline, PipelineDeleter> _mergePipeline;
+    std::unique_ptr<Pipeline> _mergePipeline;
     std::unique_ptr<exec::agg::Pipeline> _mergeExecPipeline;
 
     // May be null if this pipeline runs exclusively on mongos without contacting the shards at all.

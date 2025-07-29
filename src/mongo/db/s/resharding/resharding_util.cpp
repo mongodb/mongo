@@ -252,7 +252,7 @@ std::vector<ReshardingZoneType> getZonesFromExistingCollection(OperationContext*
     return zones;
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForResharding(
+std::unique_ptr<Pipeline> createOplogFetchingPipelineForResharding(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ReshardingDonorOplogId& startAfter,
     UUID collUUID,

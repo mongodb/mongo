@@ -99,7 +99,7 @@ public:
 
     // Expose a constructor that skips the parsing step for testing purposes.
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                            std::unique_ptr<Pipeline, PipelineDeleter> pipeline);
+                            std::unique_ptr<Pipeline> pipeline);
 
     DocumentSourceUnionWith(const DocumentSourceUnionWith& original,
                             const boost::intrusive_ptr<ExpressionContext>& newExpCtx);
@@ -245,7 +245,7 @@ private:
     void logShardedViewFound(
         const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) const;
 
-    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
+    std::unique_ptr<Pipeline> _pipeline;
     std::unique_ptr<exec::agg::Pipeline> _execPipeline;
     // The original, unresolved namespace to union.
     NamespaceString _userNss;

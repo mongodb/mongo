@@ -384,7 +384,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
     const StringData inputPipelineOneName,
     const ScoreFusionNormalizationEnum normalization,
     const double weight,
-    const std::unique_ptr<Pipeline, PipelineDeleter>& firstInputPipeline,
+    const std::unique_ptr<Pipeline>& firstInputPipeline,
     const bool includeScoreDetails,
     const bool inputGeneratesScoreDetails,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -426,7 +426,7 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipelineStage(
     const StringData inputPipelineName,
     const ScoreFusionNormalizationEnum normalization,
     const double weight,
-    const std::unique_ptr<Pipeline, PipelineDeleter>& oneInputPipeline,
+    const std::unique_ptr<Pipeline>& oneInputPipeline,
     const bool includeScoreDetails,
     const bool inputGeneratesScoreDetails,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -1051,10 +1051,9 @@ static void scoreFusionPipelineValidator(const Pipeline& pipeline) {
  * Validate that each pipeline is a valid scored selection pipeline. Returns a pair of the map of
  * the input pipeline names to pipeline objects and a map of pipeline names to score paths.
  */
-std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>
-parseAndValidateScoredSelectionPipelines(const ScoreFusionSpec& spec,
-                                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
-    std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>> inputPipelines;
+std::map<std::string, std::unique_ptr<Pipeline>> parseAndValidateScoredSelectionPipelines(
+    const ScoreFusionSpec& spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
+    std::map<std::string, std::unique_ptr<Pipeline>> inputPipelines;
     for (const auto& innerPipelineBsonElem : spec.getInput().getPipelines()) {
         auto bsonPipeline = parsePipelineFromBSON(innerPipelineBsonElem);
         // Ensure that all pipelines are valid scored selection pipelines.
@@ -1085,7 +1084,7 @@ parseAndValidateScoredSelectionPipelines(const ScoreFusionSpec& spec,
 // CheckMultiplePipelinesAllowed test cases under document_source_score_fusion_test.cpp.
 std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
     const ScoreFusionSpec& spec,
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputPipelines,
+    const std::map<std::string, std::unique_ptr<Pipeline>>& inputPipelines,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     StringMap<double> weights;
     // If ScoreFusionCombinationSpec has no value (no weights specified), no work to do.

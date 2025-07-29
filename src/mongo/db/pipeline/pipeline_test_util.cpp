@@ -31,8 +31,7 @@
 
 namespace mongo {
 
-std::unique_ptr<Pipeline, PipelineDeleter> normalizeMatchStageInPipeline(
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline) {
+std::unique_ptr<Pipeline> normalizeMatchStageInPipeline(std::unique_ptr<Pipeline> pipeline) {
     for (auto&& source : pipeline->getSources()) {
         if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(source.get())) {
             auto matchProcessor = matchStage->getMatchProcessor();

@@ -152,7 +152,7 @@ void assertSearchMetaAccessValid(const DocumentSourceContainer& shardsPipeline,
  *
  * Returns the additional pipline used for metadata, or nullptr if no pipeline is necessary.
  */
-std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegacyExecutor(
+std::unique_ptr<Pipeline> prepareSearchForTopLevelPipelineLegacyExecutor(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     Pipeline* origPipeline,
     DocsNeededBounds bounds,

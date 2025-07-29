@@ -229,7 +229,7 @@ protected:
      * Until we know if the merge needs to be done, we hold the pipeline containing the merging
      * logic here.
      */
-    std::unique_ptr<Pipeline, PipelineDeleter> _mergingPipeline;
+    std::unique_ptr<Pipeline> _mergingPipeline;
 
     std::unique_ptr<executor::TaskExecutorCursor> _cursor;
 

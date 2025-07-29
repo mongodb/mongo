@@ -698,7 +698,7 @@ protected:
         return std::pair(mockResults, expectedTransactions);
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> constructPipeline(
+    std::unique_ptr<Pipeline> constructPipeline(
         std::deque<DocumentSource::GetNextResult> mockResults,
         Timestamp fetchTimestamp,
         boost::optional<LogicalSessionId> startAfter) {

@@ -49,29 +49,26 @@
 
 namespace mongo {
 
-std::unique_ptr<Pipeline, PipelineDeleter>
+std::unique_ptr<Pipeline>
 StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipelineForLocalRead(
     Pipeline* ownedPipeline,
     boost::optional<const AggregateCommandRequest&> aggRequest,
     bool shouldUseCollectionDefaultCollator,
     ExecShardFilterPolicy shardFilterPolicy) {
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
-        ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->getOperationContext()));
+    std::unique_ptr<Pipeline> pipeline(ownedPipeline);
     pipeline->addInitialSource(
         DocumentSourceMock::createForTest(_mockResults, pipeline->getContext()));
     return pipeline;
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter>
-StubLookupSingleDocumentProcessInterface::preparePipelineForExecution(
+std::unique_ptr<Pipeline> StubLookupSingleDocumentProcessInterface::preparePipelineForExecution(
     Pipeline* ownedPipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern) {
     return attachCursorSourceToPipelineForLocalRead(ownedPipeline);
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter>
-StubLookupSingleDocumentProcessInterface::preparePipelineForExecution(
+std::unique_ptr<Pipeline> StubLookupSingleDocumentProcessInterface::preparePipelineForExecution(
     const boost::intrusive_ptr<mongo::ExpressionContext>& expCtx,
     const AggregateCommandRequest& aggRequest,
     Pipeline* pipeline,
@@ -93,7 +90,7 @@ boost::optional<Document> StubLookupSingleDocumentProcessInterface::lookupSingle
     // case of a change stream on a whole database so we need to make a copy of the
     // ExpressionContext with the new namespace.
     auto foreignExpCtx = expCtx->copyWith(nss, collectionUUID, boost::none);
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
+    std::unique_ptr<Pipeline> pipeline;
     std::unique_ptr<exec::agg::Pipeline> execPipeline;
     try {
         pipeline = Pipeline::makePipeline({BSON("$match" << documentKey)}, foreignExpCtx);

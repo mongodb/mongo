@@ -579,11 +579,11 @@ bool canUseLocalReadAsCursorSource(OperationContext* opCtx,
  * Failure may occur before or after the pipelineToTarget is released; callers must check
  * if the pointer was released before using it again.
  */
-std::unique_ptr<Pipeline, PipelineDeleter> tryAttachCursorSourceForLocalRead(
+std::unique_ptr<Pipeline> tryAttachCursorSourceForLocalRead(
     OperationContext* opCtx,
     const ExpressionContext& expCtx,
     RoutingContext& routingCtx,
-    std::unique_ptr<Pipeline, PipelineDeleter>& pipelineToTarget,
+    std::unique_ptr<Pipeline>& pipelineToTarget,
     const AggregateCommandRequest& aggRequest,
     bool useCollectionDefaultCollator,
     const ShardId& localShardId) {
@@ -648,7 +648,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> tryAttachCursorSourceForLocalRead(
 }
 }  // namespace
 
-std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
+std::unique_ptr<Pipeline> runPipelineDirectlyOnSingleShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     AggregateCommandRequest request,
     ShardId shardId,
@@ -1055,7 +1055,7 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
     PipelineDataSource pipelineDataSource,
     bool eligibleForSampling,
     const NamespaceString& targetedNss,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    std::unique_ptr<Pipeline> pipeline,
     boost::optional<ExplainOptions::Verbosity> explain,
     bool requestQueryStatsFromRemotes,
     boost::optional<BSONObj> readConcern,
@@ -1224,7 +1224,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     Document serializedCommand,
     PipelineDataSource pipelineDataSource,
     bool eligibleForSampling,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    std::unique_ptr<Pipeline> pipeline,
     boost::optional<ExplainOptions::Verbosity> explain,
     const NamespaceString& targetedNss,
     bool requestQueryStatsFromRemotes,
@@ -1529,8 +1529,7 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
 
 BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
     auto expCtx = ownedPipeline->getContext();
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
-        ownedPipeline, PipelineDeleter(expCtx->getOperationContext()));
+    std::unique_ptr<Pipeline> pipeline(ownedPipeline);
     // The pipeline is going to be explained on the shards, and we don't want to send a
     // mergeCursors stage.
     invariant(pipeline->empty() ||
@@ -1636,11 +1635,11 @@ PipelineDataSource getPipelineDataSource(const LiteParsedPipeline& liteParsedPip
     return PipelineDataSource::kNormal;
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> dispatchTargetedPipelineAndAddMergeCursors(
+std::unique_ptr<Pipeline> dispatchTargetedPipelineAndAddMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     RoutingContext& routingCtx,
     AggregateCommandRequest aggRequest,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    std::unique_ptr<Pipeline> pipeline,
     TargetingResults targeting,
     PipelineDataSource pipelineDataSource,
     boost::optional<BSONObj> shardCursorsSortSpec,
@@ -1674,7 +1673,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> dispatchTargetedPipelineAndAddMergeCu
         targetedShards.emplace_back(std::string{remoteCursor->getShardId()});
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline;
+    std::unique_ptr<Pipeline> mergePipeline;
     if (shardDispatchResults.splitPipeline) {
         mergePipeline = std::move(shardDispatchResults.splitPipeline->mergePipeline);
         if (shardDispatchResults.splitPipeline->shardCursorsSortSpec) {
@@ -1694,33 +1693,32 @@ std::unique_ptr<Pipeline, PipelineDeleter> dispatchTargetedPipelineAndAddMergeCu
     return mergePipeline;
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
+std::unique_ptr<Pipeline> targetShardsAndAddMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    std::variant<std::unique_ptr<Pipeline, PipelineDeleter>,
+    std::variant<std::unique_ptr<Pipeline>,
                  AggregateCommandRequest,
-                 std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline, PipelineDeleter>>>
-        targetRequest,
+                 std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline>>> targetRequest,
     boost::optional<BSONObj> shardCursorsSortSpec,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
     bool useCollectionDefaultCollator) {
     auto&& aggRequestPipelinePair = [&] {
         return visit(
-            OverloadedVisitor{
-                [&](std::unique_ptr<Pipeline, PipelineDeleter>&& pipeline) {
-                    return std::make_pair(AggregateCommandRequest(expCtx->getNamespaceString(),
-                                                                  pipeline->serializeToBson()),
-                                          std::move(pipeline));
-                },
-                [&](AggregateCommandRequest&& aggRequest) {
-                    auto rawPipeline = aggRequest.getPipeline();
-                    return std::make_pair(std::move(aggRequest),
-                                          Pipeline::parse(rawPipeline, expCtx));
-                },
-                [&](std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline, PipelineDeleter>>&&
-                        aggRequestPipelinePair) {
-                    return std::move(aggRequestPipelinePair);
-                }},
+            OverloadedVisitor{[&](std::unique_ptr<Pipeline>&& pipeline) {
+                                  return std::make_pair(
+                                      AggregateCommandRequest(expCtx->getNamespaceString(),
+                                                              pipeline->serializeToBson()),
+                                      std::move(pipeline));
+                              },
+                              [&](AggregateCommandRequest&& aggRequest) {
+                                  auto rawPipeline = aggRequest.getPipeline();
+                                  return std::make_pair(std::move(aggRequest),
+                                                        Pipeline::parse(rawPipeline, expCtx));
+                              },
+                              [&](std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline>>&&
+                                      aggRequestPipelinePair) {
+                                  return std::move(aggRequestPipelinePair);
+                              }},
             std::move(targetRequest));
     }();
     const auto& aggRequest = aggRequestPipelinePair.first;
@@ -1810,13 +1808,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
         });
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> preparePipelineForExecution(
-    Pipeline* ownedPipeline,
-    ShardTargetingPolicy shardTargetingPolicy,
-    boost::optional<BSONObj> readConcern) {
+std::unique_ptr<Pipeline> preparePipelineForExecution(Pipeline* ownedPipeline,
+                                                      ShardTargetingPolicy shardTargetingPolicy,
+                                                      boost::optional<BSONObj> readConcern) {
     auto expCtx = ownedPipeline->getContext();
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
-        ownedPipeline, PipelineDeleter(expCtx->getOperationContext()));
+    std::unique_ptr<Pipeline> pipeline(ownedPipeline);
     return targetShardsAndAddMergeCursors(expCtx,
                                           std::move(pipeline),
                                           boost::none /* shardCursorsSortSpec */,

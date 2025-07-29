@@ -71,7 +71,7 @@ namespace cluster_aggregation_planner {
  * RouterStagePipeline will remove an expensive conversion from BSONObj -> Document for each result.
  */
 ClusterClientCursorGuard buildClusterCursor(OperationContext* opCtx,
-                                            std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+                                            std::unique_ptr<Pipeline> pipeline,
                                             ClusterClientCursorParams&&);
 
 /**
@@ -103,7 +103,7 @@ struct AggregationTargeter {
      * 'executionNss'.
      */
     static AggregationTargeter make(OperationContext* opCtx,
-                                    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+                                    std::unique_ptr<Pipeline> pipeline,
                                     const NamespaceString& execNss,
                                     boost::optional<CollectionRoutingInfo> cri,
                                     sharded_agg_helpers::PipelineDataSource pipelineDataSource,
@@ -115,7 +115,7 @@ struct AggregationTargeter {
         kSpecificShardOnly,
     } policy;
 
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
+    std::unique_ptr<Pipeline> pipeline;
 };
 
 /**
@@ -124,7 +124,7 @@ struct AggregationTargeter {
  */
 Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
                            long long batchSize,
-                           std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+                           std::unique_ptr<Pipeline> pipeline,
                            BSONObjBuilder* result,
                            const PrivilegeVector& privileges,
                            bool requestQueryStatsFromRemotes);

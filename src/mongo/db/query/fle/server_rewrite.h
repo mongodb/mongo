@@ -102,12 +102,11 @@ void processCountCommand(OperationContext* opCtx,
  * FLE work to be done. The encryption info does not need to be kept around (e.g. on a command
  * object).
  */
-std::unique_ptr<Pipeline, PipelineDeleter> processPipeline(
-    OperationContext* opCtx,
-    NamespaceString nss,
-    const EncryptionInformation& encryptInfo,
-    std::unique_ptr<Pipeline, PipelineDeleter> toRewrite,
-    GetTxnCallback txn);
+std::unique_ptr<Pipeline> processPipeline(OperationContext* opCtx,
+                                          NamespaceString nss,
+                                          const EncryptionInformation& encryptInfo,
+                                          std::unique_ptr<Pipeline> toRewrite,
+                                          GetTxnCallback txn);
 
 /**
  * Rewrite a filter MatchExpression with FLE Find Payloads into a disjunction over the tag array

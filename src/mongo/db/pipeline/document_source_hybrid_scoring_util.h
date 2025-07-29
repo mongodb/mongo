@@ -58,7 +58,7 @@ double getPipelineWeight(const StringMap<double>& weights, const std::string& pi
  */
 StringMap<double> validateWeights(
     const mongo::BSONObj& inputWeights,
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputPipelines,
+    const std::map<std::string, std::unique_ptr<Pipeline>>& inputPipelines,
     StringData stageName);
 
 /**
@@ -73,7 +73,7 @@ StringMap<double> validateWeights(
  *       inputs, and only needs to call this function in error cases.
  */
 void failWeightsValidationWithPipelineSuggestions(
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& allPipelines,
+    const std::map<std::string, std::unique_ptr<Pipeline>>& allPipelines,
     const stdx::unordered_set<std::string>& matchedPipelines,
     const std::vector<std::string>& invalidWeights,
     StringData stageName);

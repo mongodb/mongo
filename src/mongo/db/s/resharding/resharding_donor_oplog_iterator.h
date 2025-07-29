@@ -103,7 +103,7 @@ public:
     /**
      * Returns a pipeline for iterating the buffered copy of the donor's oplog.
      */
-    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
+    std::unique_ptr<Pipeline> makePipeline(
         OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
 
     ExecutorFuture<std::vector<repl::OplogEntry>> getNextBatch(
@@ -125,7 +125,7 @@ private:
     // oplog entry hasn't been reached yet.
     resharding::OnInsertAwaitable* const _insertNotifier;
 
-    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
+    std::unique_ptr<Pipeline> _pipeline;
     std::unique_ptr<exec::agg::Pipeline> _execPipeline;
     bool _hasSeenFinalOplogEntry{false};
 };

@@ -82,7 +82,7 @@ private:
     bool _checkExistenceForDiffInsertOperations = false;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
-    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
+    std::unique_ptr<Pipeline> _pipeline;
     std::unique_ptr<exec::agg::Pipeline> _execPipeline;
 };
 

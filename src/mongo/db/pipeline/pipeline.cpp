@@ -175,7 +175,7 @@ Pipeline::Pipeline(const intrusive_ptr<ExpressionContext>& pTheCtx) : pCtx(pTheC
 Pipeline::Pipeline(DocumentSourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx)
     : _sources(std::move(stages)), pCtx(expCtx) {}
 
-std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::clone(
+std::unique_ptr<Pipeline> Pipeline::clone(
     const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
     auto expCtx = newExpCtx ? newExpCtx : getContext();
     DocumentSourceContainer clonedStages;
@@ -186,7 +186,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::clone(
 }
 
 template <class T>
-std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseCommon(
+std::unique_ptr<Pipeline> Pipeline::parseCommon(
     const std::vector<T>& rawPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     PipelineValidatorCallback validator,
@@ -206,8 +206,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseCommon(
         stages.insert(stages.end(), parsedSources.begin(), parsedSources.end());
     }
 
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
-        new Pipeline(std::move(stages), expCtx), PipelineDeleter(expCtx->getOperationContext()));
+    std::unique_ptr<Pipeline> pipeline(new Pipeline(std::move(stages), expCtx));
 
     // First call the top level validator, unless this is a $facet
     // (nested) pipeline. Then call the context-specific validator if one
@@ -226,10 +225,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseCommon(
     return pipeline;
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseFromArray(
-    BSONElement rawPipelineElement,
-    const intrusive_ptr<ExpressionContext>& expCtx,
-    PipelineValidatorCallback validator) {
+std::unique_ptr<Pipeline> Pipeline::parseFromArray(BSONElement rawPipelineElement,
+                                                   const intrusive_ptr<ExpressionContext>& expCtx,
+                                                   PipelineValidatorCallback validator) {
 
     tassert(6253719,
             "Expected array for Pipeline::parseFromArray",
@@ -242,24 +240,22 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseFromArray(
     });
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parse(
-    const std::vector<BSONObj>& rawPipeline,
-    const intrusive_ptr<ExpressionContext>& expCtx,
-    PipelineValidatorCallback validator) {
+std::unique_ptr<Pipeline> Pipeline::parse(const std::vector<BSONObj>& rawPipeline,
+                                          const intrusive_ptr<ExpressionContext>& expCtx,
+                                          PipelineValidatorCallback validator) {
     return parseCommon<BSONObj>(rawPipeline, expCtx, validator, false, [](BSONObj o) { return o; });
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseFacetPipeline(
+std::unique_ptr<Pipeline> Pipeline::parseFacetPipeline(
     const std::vector<BSONObj>& rawPipeline,
     const intrusive_ptr<ExpressionContext>& expCtx,
     PipelineValidatorCallback validator) {
     return parseCommon<BSONObj>(rawPipeline, expCtx, validator, true, [](BSONObj o) { return o; });
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::create(
-    DocumentSourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx) {
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
-        new Pipeline(std::move(stages), expCtx), PipelineDeleter(expCtx->getOperationContext()));
+std::unique_ptr<Pipeline> Pipeline::create(DocumentSourceContainer stages,
+                                           const intrusive_ptr<ExpressionContext>& expCtx) {
+    std::unique_ptr<Pipeline> pipeline(new Pipeline(std::move(stages), expCtx));
 
     constexpr bool alreadyOptimized = false;
     pipeline->validateCommon(alreadyOptimized);
@@ -840,7 +836,7 @@ boost::intrusive_ptr<DocumentSource> Pipeline::popFrontWithNameAndCriteria(
     return popFront();
 }
 
-void Pipeline::appendPipeline(std::unique_ptr<Pipeline, PipelineDeleter> otherPipeline) {
+void Pipeline::appendPipeline(std::unique_ptr<Pipeline> otherPipeline) {
     tassert(10706509,
             "attempting to modify a frozen pipeline in 'Pipeline::appendPipeline()'",
             !_frozen);
@@ -854,7 +850,7 @@ void Pipeline::appendPipeline(std::unique_ptr<Pipeline, PipelineDeleter> otherPi
 }
 
 
-std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
+std::unique_ptr<Pipeline> Pipeline::makePipeline(
     const std::vector<BSONObj>& rawPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     MakePipelineOptions opts) {
@@ -889,7 +885,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     return pipeline;
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
+std::unique_ptr<Pipeline> Pipeline::makePipeline(
     AggregateCommandRequest& aggRequest,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<BSONObj> shardCursorsSortSpec,
@@ -940,7 +936,7 @@ DocumentSourceContainer::iterator Pipeline::optimizeEndOfPipeline(
     return std::next(itr);
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::viewPipelineHelperForSearch(
+std::unique_ptr<Pipeline> Pipeline::viewPipelineHelperForSearch(
     const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
     ResolvedNamespace resolvedNs,
     std::vector<BSONObj> currentPipeline,
@@ -962,7 +958,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::viewPipelineHelperForSearch
     // return the user pipeline without appending the view stages.
     return Pipeline::makePipeline(currentPipeline, subPipelineExpCtx, opts);
 }
-std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipelineFromViewDefinition(
+std::unique_ptr<Pipeline> Pipeline::makePipelineFromViewDefinition(
     const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
     ResolvedNamespace resolvedNs,
     std::vector<BSONObj> currentPipeline,

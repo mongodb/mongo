@@ -162,13 +162,12 @@ public:
     /**
      * Helper to create change stream pipeline for testing.
      */
-    std::unique_ptr<Pipeline, PipelineDeleter> buildTestPipeline(
-        const std::vector<BSONObj>& rawPipeline);
+    std::unique_ptr<Pipeline> buildTestPipeline(const std::vector<BSONObj>& rawPipeline);
 
     /**
      * Helper to verify if the change stream pipeline contains expected stages.
      */
-    void assertStagesNameOrder(std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    void assertStagesNameOrder(std::unique_ptr<Pipeline> pipeline,
                                const std::vector<std::string>& expectedStages);
 };
 

@@ -199,8 +199,7 @@ public:
     }
     // End of functions that are used for making parts of the sources for making a pipeline.
 
-    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
-        const DocumentSourceContainer& sources) {
+    std::unique_ptr<Pipeline> makePipeline(const DocumentSourceContainer& sources) {
         return Pipeline::create(sources, _expCtx);
     }
 
@@ -224,7 +223,7 @@ public:
         ASSERT_BSONOBJ_EQ(splitPipeline.shardCursorsSortSpec.value(), shardCursorSortSpec);
     }
 
-    void trackPipelineRenames(const std::unique_ptr<Pipeline, PipelineDeleter>& pipeline,
+    void trackPipelineRenames(const std::unique_ptr<Pipeline>& pipeline,
                               const mongo::OrderedPathSet& pathsOfInterest,
                               Tracking dir) {
         const auto& stages = pipeline->getSources();
@@ -240,10 +239,9 @@ public:
         }
     }
 
-    void trackPipelineRenamesOnEmptyRange(
-        const std::unique_ptr<Pipeline, PipelineDeleter>& pipeline,
-        const mongo::OrderedPathSet& pathsOfInterest,
-        Tracking dir) {
+    void trackPipelineRenamesOnEmptyRange(const std::unique_ptr<Pipeline>& pipeline,
+                                          const mongo::OrderedPathSet& pathsOfInterest,
+                                          Tracking dir) {
         const auto& stages = pipeline->getSources();
         auto renames = (dir == Tracking::forwards)
             ? semantic_analysis::renamedPaths(stages.cbegin(), stages.cbegin(), pathsOfInterest)

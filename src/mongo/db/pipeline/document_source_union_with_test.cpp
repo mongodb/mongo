@@ -76,7 +76,7 @@ using MockMongoInterface = StubLookupSingleDocumentProcessInterface;
 using DocumentSourceUnionWithTest = AggregationContextFixture;
 
 auto makeUnion(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-               std::unique_ptr<Pipeline, PipelineDeleter> pipeline) {
+               std::unique_ptr<Pipeline> pipeline) {
     return std::unique_ptr<DocumentSourceUnionWith, DocumentSourceDeleter>(
         new DocumentSourceUnionWith(expCtx, std::move(pipeline)), DocumentSourceDeleter());
 }

@@ -71,8 +71,7 @@ protected:
     /*
      * Builds a pipeline from raw input.
      */
-    std::unique_ptr<Pipeline, PipelineDeleter> buildTestPipeline(
-        const std::vector<BSONObj>& rawPipeline) {
+    std::unique_ptr<Pipeline> buildTestPipeline(const std::vector<BSONObj>& rawPipeline) {
         expCtx->addResolvedNamespaces({kSecondaryNamespace});
         return Pipeline::parse(rawPipeline, expCtx);
     }

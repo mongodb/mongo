@@ -74,7 +74,7 @@ bool mrSupportsWriteConcern(const BSONObj& cmd);
  * Accepts a parsed mapReduce command and returns the equivalent aggregation pipeline. Note that the
  * returned pipeline does *not* contain a $cursor stage and thus is not runnable.
  */
-std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
-    MapReduceCommandRequest parsedMr, boost::intrusive_ptr<ExpressionContext> expCtx);
+std::unique_ptr<Pipeline> translateFromMR(MapReduceCommandRequest parsedMr,
+                                          boost::intrusive_ptr<ExpressionContext> expCtx);
 
 }  // namespace mongo::map_reduce_common

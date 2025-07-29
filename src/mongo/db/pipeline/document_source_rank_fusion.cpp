@@ -296,7 +296,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
     const StringData prefixOne,
     const int rankConstant,
     const double weight,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    std::unique_ptr<Pipeline> pipeline,
     const bool includeScoreDetails,
     const bool inputGeneratesScore,
     const bool inputGeneratesScoreDetails,
@@ -393,7 +393,7 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipeline(
     const std::string& prefix,
     const int rankConstant,
     const double weight,
-    std::unique_ptr<Pipeline, PipelineDeleter> oneInputPipeline,
+    std::unique_ptr<Pipeline> oneInputPipeline,
     const bool includeScoreDetails,
     const bool inputGeneratesScore,
     const bool inputGeneratesScoreDetails,
@@ -556,12 +556,11 @@ std::unique_ptr<DocumentSourceRankFusion::LiteParsed> DocumentSourceRankFusion::
  * Validate that each pipeline is a valid ranked selection pipeline. Returns a pair of the map of
  * the input pipeline names to pipeline objects and a map of pipeline names to score paths.
  */
-std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>
-parseAndValidateRankedSelectionPipelines(const RankFusionSpec& spec,
-                                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
+std::map<std::string, std::unique_ptr<Pipeline>> parseAndValidateRankedSelectionPipelines(
+    const RankFusionSpec& spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     // It's important to use an ordered map here, so that we get stability in the desugaring =>
     // stability in the query shape.
-    std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>> inputPipelines;
+    std::map<std::string, std::unique_ptr<Pipeline>> inputPipelines;
     // Ensure that all pipelines are valid ranked selection pipelines.
     for (const auto& elem : spec.getInput().getPipelines()) {
         auto bsonPipeline = parsePipelineFromBSON(elem);

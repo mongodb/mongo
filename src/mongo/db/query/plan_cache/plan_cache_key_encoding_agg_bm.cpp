@@ -70,8 +70,7 @@ public:
         auto expCtx = make_intrusive<ExpressionContextForTest>(
             opCtx.get(), NamespaceString::createNamespaceString_forTest("test.bm"));
 
-        std::unique_ptr<Pipeline, PipelineDeleter> parsedPipeline =
-            Pipeline::parse(pipeline, expCtx);
+        std::unique_ptr<Pipeline> parsedPipeline = Pipeline::parse(pipeline, expCtx);
         parsedPipeline->optimizePipeline();
         parsedPipeline->parameterize();
 
