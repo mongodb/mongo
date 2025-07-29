@@ -546,10 +546,12 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_query_integration",
-        "release_critical",
+        "development_critical_single_variant",
         "incompatible_mac",
         "incompatible_windows",
         "requires_compile_variant",
+        "blocked_in_query_alias",
+        "no_commit_queue",
       ]
     depends_on:
       - name: version_expansions_gen

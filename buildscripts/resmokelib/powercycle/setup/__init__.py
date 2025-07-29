@@ -71,7 +71,7 @@ class SetUpEC2Instance(PowercycleCommand):
         cmds = f"{cmds}; activate=$(find {venv} -name 'activate')"
         cmds = f"{cmds}; . $activate"
         cmds = f"{cmds}; pushd $remote_dir && python3 -m pip install -r poetry_requirements.txt && popd"
-        cmds = f"{cmds}; pushd $remote_dir && python3 -m poetry install --no-root --sync && popd"
+        cmds = f"{cmds}; pushd $remote_dir && python3 -m poetry install --no-root --sync --without powercycle-incompatible && popd"
 
         self.remote_op.operation(SSHOperation.SHELL, cmds, retry=True, retry_count=retry_count)
 

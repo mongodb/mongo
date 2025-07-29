@@ -17,6 +17,8 @@ This is enforced by linter. YAML linter configuration could be found [here](../.
 - `development_critical_single_variant` - the same as `development_critical` but these tasks do not require to run on multiple variants, e.g. clang-tidy, formatters, linters etc.
   We run these tasks on the required variant and in the commit-queue.
 
+- `no_commit_queue` - add this to tasks in development_critical that you do not want in the commit-queue
+
 - `release_critical` - these tasks should be green prior to the release.
   We run these tasks on all release and development (required and suggested) variants.
   It should be uncommon to add tasks to this tag but if your task needs to run on many different OSes and it is extremely broad in coverage then you can add it to this tag.

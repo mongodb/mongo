@@ -36,8 +36,8 @@ variables:
     packager_arch: aarch64
     packager_distro: amazon2023
     repo_edition: enterprise
-    large_distro_name: amazon2023-arm64-latest-large
-    core_analyzer_distro_name: amazon2023-arm64-latest-xlarge
+    large_distro_name: amazon2023-arm64-atlas-latest-large
+    core_analyzer_distro_name: amazon2023-arm64-atlas-latest-xlarge
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
@@ -48,8 +48,6 @@ variables:
       - name: archive_dist_test
         variant: &amazon_linux2023_arm64_static_compile_variant_name amazon-linux2023-arm64-static-compile
       - name: archive_jstestshell
-        variant: *amazon_linux2023_arm64_static_compile_variant_name
-      - name: archive_extensions
         variant: *amazon_linux2023_arm64_static_compile_variant_name
       - name: version_gen
         variant: generate-tasks-for-version
@@ -147,7 +145,7 @@ buildvariants:
     tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
     cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
-      - amazon2023-arm64-latest-small
+      - amazon2023-arm64-atlas-latest-small
     stepback: true
     expansions: &enterprise-amazon-linux2023-arm64-expansions
       <<: *amazon_linux2023_arm64_dynamic_expansions
@@ -164,15 +162,15 @@ buildvariants:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
         distros:
-          - amazon2023-arm64-latest-large
+          - amazon2023-arm64-atlas-latest-large
       - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
         distros:
-          - amazon2023-arm64-latest-large
+          - amazon2023-arm64-atlas-latest-large
       - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
       - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
         distros:
-          - amazon2023-arm64-latest-large
+          - amazon2023-arm64-atlas-latest-large
       - name: .fuzzer_deterministic
 
   - <<: *enterprise-amazon-linux2023-arm64-template
@@ -221,12 +219,12 @@ buildvariants:
       - name: .commit_check
         create_check_run:
           path_to_outputs: "github_annotations.json"
-      - name: .development_critical_single_variant !.requires_large_host !.clang_tidy
-      - name: .development_critical_single_variant .requires_large_host !.clang_tidy
+      - name: .development_critical_single_variant !.requires_large_host !.clang_tidy !.no_commit_queue
+      - name: .development_critical_single_variant .requires_large_host !.clang_tidy !.no_commit_queue
         distros:
           - amazon2023-arm64-latest-large
-      - name: .development_critical !.requires_large_host_commit_queue
-      - name: .development_critical .requires_large_host_commit_queue
+      - name: .development_critical !.requires_large_host_commit_queue !.no_commit_queue
+      - name: .development_critical .requires_large_host_commit_queue !.no_commit_queue
         distros:
           - amazon2023-arm64-latest-large
 
