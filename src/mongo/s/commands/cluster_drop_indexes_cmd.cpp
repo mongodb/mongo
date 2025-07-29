@@ -144,19 +144,22 @@ public:
         generic_argument_util::setMajorityWriteConcern(shardsvrDropIndexCmd,
                                                        &opCtx->getWriteConcern());
 
-        const CachedDatabaseInfo dbInfo =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
-
-        auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+        sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), dbName);
+        router.route(
             opCtx,
-            dbName,
-            dbInfo,
-            shardsvrDropIndexCmd.toBSON(),
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            Shard::RetryPolicy::kNotIdempotent);
+            Request::kCommandName,
+            [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+                auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                    opCtx,
+                    dbName,
+                    dbInfo,
+                    shardsvrDropIndexCmd.toBSON(),
+                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                    Shard::RetryPolicy::kNotIdempotent);
 
-        const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-        CommandHelpers::filterCommandReplyForPassthrough(remoteResponse.data, &output);
+                const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+                CommandHelpers::filterCommandReplyForPassthrough(remoteResponse.data, &output);
+            });
         return true;
     }
 

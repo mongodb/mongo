@@ -33,7 +33,6 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db/commands/query_cmd:bulk_write_common",
         "//src/mongo/db/query/write_ops:parsed_update",
-        "//src/mongo/s:sharding_collection_routing_info_targeter",
         "//src/mongo/s:sharding_router_api",
         "//src/mongo/s:sharding_write_without_shard_key_api",
         "//src/mongo/s/write_ops:batch_write_types",

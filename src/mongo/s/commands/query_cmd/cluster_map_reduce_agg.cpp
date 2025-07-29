@@ -342,10 +342,16 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         involvedNamespaces.insert(resolvedOutNss);
     }
 
-    auto routingCtxPtr = uassertStatusOK(sharded_agg_helpers::getExecutionNsRoutingCtx(opCtx, nss));
-    return routing_context_utils::runAndValidate(*routingCtxPtr, [&](RoutingContext& routingCtx) {
-        return _runMapReduceInRoutingContext(opCtx, routingCtx, parsedMr, nss, result, verbosity);
-    });
+    sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+    return router.routeWithRoutingContext(
+        opCtx, "mapReduce"_sd, [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+            // Clear the `result` BSONObjBuilder since this lambda function may be retried if the
+            // router cache is stale.
+            result.resetToEmpty();
+
+            return _runMapReduceInRoutingContext(
+                opCtx, routingCtx, parsedMr, nss, result, verbosity);
+        });
 }
 
 }  // namespace mongo

@@ -88,37 +88,6 @@ namespace {
 
 constexpr auto systemBucketsDot = "system.buckets."_sd;
 
-bool cursorCommandPassthroughPrimaryShard(OperationContext* opCtx,
-                                          const DatabaseName& dbName,
-                                          const CachedDatabaseInfo& dbInfo,
-                                          const BSONObj& cmdObj,
-                                          const NamespaceString& nss,
-                                          BSONObjBuilder* out,
-                                          const PrivilegeVector& privileges) {
-    auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-        opCtx,
-        dbName,
-        dbInfo,
-        CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
-        ReadPreferenceSetting::get(opCtx),
-        Shard::RetryPolicy::kIdempotent);
-    const auto cmdResponse = uassertStatusOK(std::move(response.swResponse));
-
-    auto transformedResponse = uassertStatusOK(
-        storePossibleCursor(opCtx,
-                            dbInfo->getPrimary(),
-                            *response.shardHostAndPort,
-                            cmdResponse.data,
-                            nss,
-                            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                            Grid::get(opCtx)->getCursorManager(),
-                            privileges));
-
-    CommandHelpers::filterCommandReplyForPassthrough(transformedResponse, out);
-    uassertStatusOK(getStatusFromCommandResult(out->asTempObj()));
-    return true;
-}
-
 BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
                                                const DatabaseName& dbName,
                                                const BSONObj& cmdObj) {
@@ -282,23 +251,47 @@ public:
             newCmd = rewriteCommandForListingOwnCollections(opCtx, dbName, cmdObj);
         }
 
-        auto dbInfoStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
-        if (!dbInfoStatus.isOK()) {
-            appendEmptyResultSet(opCtx, output, dbInfoStatus.getStatus(), nss);
+        // Use the original command object rather than the rewritten one to preserve whether
+        // 'authorizedCollections' field is set.
+        const auto& privileges =
+            uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
+                                ->checkAuthorizedToListCollections(requestParser.request()));
+
+        const auto cmdToSend = applyReadWriteConcern(opCtx, this, newCmd);
+
+        try {
+            sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+            router.route(
+                opCtx,
+                Request::kCommandName,
+                [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+                    auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                        opCtx,
+                        dbName,
+                        dbInfo,
+                        CommandHelpers::filterCommandRequestForPassthrough(cmdToSend),
+                        ReadPreferenceSetting::get(opCtx),
+                        Shard::RetryPolicy::kIdempotent);
+                    const auto cmdResponse = uassertStatusOK(std::move(response.swResponse));
+
+                    auto transformedResponse = uassertStatusOK(storePossibleCursor(
+                        opCtx,
+                        dbInfo->getPrimary(),
+                        *response.shardHostAndPort,
+                        cmdResponse.data,
+                        nss,
+                        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                        Grid::get(opCtx)->getCursorManager(),
+                        privileges));
+
+                    CommandHelpers::filterCommandReplyForPassthrough(transformedResponse, &output);
+                    uassertStatusOK(getStatusFromCommandResult(output.asTempObj()));
+                });
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& e) {
+            appendEmptyResultSet(opCtx, output, e.toStatus(), nss);
             return true;
         }
-
-        return cursorCommandPassthroughPrimaryShard(
-            opCtx,
-            dbName,
-            dbInfoStatus.getValue(),
-            applyReadWriteConcern(opCtx, this, newCmd),
-            nss,
-            &output,
-            // Use the original command object rather than the rewritten one to preserve whether
-            // 'authorizedCollections' field is set.
-            uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
-                                ->checkAuthorizedToListCollections(requestParser.request())));
+        return true;
     }
 
     void validateResult(const BSONObj& result) final {

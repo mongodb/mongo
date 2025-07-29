@@ -413,8 +413,12 @@ MongosProcessInterface::fieldsHaveSupportingUniqueIndex(
     // this is any shard that currently owns at least one chunk. This helper sends database and/or
     // shard versions to ensure this router is not stale, but will not automatically retry if either
     // version is stale.
-    return routing_context_utils::withValidatedRoutingContext(
-        expCtx->getOperationContext(), {nss}, [&](RoutingContext& routingCtx) {
+    sharding::router::CollectionRouter router{expCtx->getOperationContext()->getServiceContext(),
+                                              nss};
+    return router.routeWithRoutingContext(
+        expCtx->getOperationContext(),
+        "MongosProcessInterface::fieldsHaveSupportingUniqueIndex"_sd,
+        [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             auto response =
                 loadIndexesFromAuthoritativeShard(expCtx->getOperationContext(), routingCtx, nss);
 

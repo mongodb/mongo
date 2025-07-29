@@ -66,8 +66,11 @@ public:
             const auto nss = ns();
             const auto& req = request();
 
-            return routing_context_utils::withValidatedRoutingContext(
-                opCtx, {nss}, [&](RoutingContext& routingCtx) {
+            sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+            return router.routeWithRoutingContext(
+                opCtx,
+                Request::kCommandName,
+                [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                     BSONObj filteredCmdObj =
                         CommandHelpers::filterCommandRequestForPassthrough(req.toBSON());
 

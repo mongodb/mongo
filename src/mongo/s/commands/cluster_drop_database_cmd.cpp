@@ -98,9 +98,6 @@ public:
                     request().getCommandParameter() == 1);
 
             try {
-                const CachedDatabaseInfo dbInfo =
-                    uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
-
                 // Invalidate the database metadata so the next access kicks off a full reload, even
                 // if sending the command to the config server fails due to e.g. a NetworkError.
                 ON_BLOCK_EXIT(
@@ -112,16 +109,23 @@ public:
                 generic_argument_util::setMajorityWriteConcern(dropDatabaseCommand,
                                                                &opCtx->getWriteConcern());
 
-                auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-                    opCtx,
-                    dbName,
-                    dbInfo,
-                    dropDatabaseCommand.toBSON(),
-                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                    Shard::RetryPolicy::kIdempotent);
+                sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), dbName);
+                router.route(opCtx,
+                             Request::kCommandParameterFieldName,
+                             [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+                                 auto cmdResponse =
+                                     executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                                         opCtx,
+                                         dbName,
+                                         dbInfo,
+                                         dropDatabaseCommand.toBSON(),
+                                         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                         Shard::RetryPolicy::kIdempotent);
 
-                const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-                uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+                                 const auto remoteResponse =
+                                     uassertStatusOK(cmdResponse.swResponse);
+                                 uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+                             });
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 // If the namespace isn't found, treat the drop as a success
             }

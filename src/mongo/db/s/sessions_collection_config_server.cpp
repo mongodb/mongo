@@ -135,44 +135,40 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
 void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* opCtx) {
     const auto nss = NamespaceString::kLogicalSessionsNamespace;
     sharding::router::CollectionRouter router(opCtx->getServiceContext(), nss);
-    auto shardResults =
-        router.route(opCtx,
-                     "SessionsCollectionConfigServer::_generateIndexesIfNeeded",
-                     [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                         // (SERVER-61214) This assertion ensures that the catalog cache recognizes
-                         // the sessions collection as sharded, guaranteeing the retrieval of a
-                         // valid routing table.
-                         uassert(StaleConfigInfo(nss,
-                                                 cri.getCollectionVersion() /* receivedVersion */,
-                                                 ShardVersion::UNSHARDED() /* wantedVersion */,
-                                                 ShardingState::get(opCtx)->shardId()),
-                                 str::stream() << "Collection " << nss.toStringForErrorMsg()
-                                               << " is not sharded",
-                                 cri.isSharded());
+    router.routeWithRoutingContext(
+        opCtx,
+        "SessionsCollectionConfigServer::_generateIndexesIfNeeded"_sd,
+        [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+            const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
+            // (SERVER-61214) This assertion ensures that the catalog cache recognizes
+            // the sessions collection as sharded, guaranteeing the retrieval of a
+            // valid routing table.
+            uassert(StaleConfigInfo(nss,
+                                    cri.getCollectionVersion() /* receivedVersion */,
+                                    ShardVersion::UNSHARDED() /* wantedVersion */,
+                                    ShardingState::get(opCtx)->shardId()),
+                    str::stream() << "Collection " << nss.toStringForErrorMsg()
+                                  << " is not sharded",
+                    cri.isSharded());
 
-                         // TODO SERVER-104347 Acquire CollectionRoutingInfo through RoutingContext
-                         // only and remove direct CatalogCache access in the check above.
-                         return routing_context_utils::withValidatedRoutingContext(
-                             opCtx, {{nss, cri}}, [&](RoutingContext& routingCtx) {
-                                 return scatterGatherVersionedTargetByRoutingTable(
-                                     opCtx,
-                                     routingCtx,
-                                     nss,
-                                     SessionsCollection::generateCreateIndexesCmd(),
-                                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                     Shard::RetryPolicy::kNoRetry,
-                                     BSONObj() /*query*/,
-                                     BSONObj() /*collation*/,
-                                     boost::none /*letParameters*/,
-                                     boost::none /*runtimeConstants*/);
-                             });
-                     });
+            auto shardResults = scatterGatherVersionedTargetByRoutingTable(
+                opCtx,
+                routingCtx,
+                nss,
+                SessionsCollection::generateCreateIndexesCmd(),
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                Shard::RetryPolicy::kNoRetry,
+                BSONObj() /*query*/,
+                BSONObj() /*collation*/,
+                boost::none /*letParameters*/,
+                boost::none /*runtimeConstants*/);
 
-    for (auto& shardResult : shardResults) {
-        const auto shardResponse = uassertStatusOK(std::move(shardResult.swResponse));
-        const auto& res = shardResponse.data;
-        uassertStatusOK(getStatusFromCommandResult(res));
-    }
+            for (auto& shardResult : shardResults) {
+                const auto shardResponse = uassertStatusOK(std::move(shardResult.swResponse));
+                const auto& res = shardResponse.data;
+                uassertStatusOK(getStatusFromCommandResult(res));
+            }
+        });
 }
 
 void SessionsCollectionConfigServer::setupSessionsCollection(OperationContext* opCtx) {

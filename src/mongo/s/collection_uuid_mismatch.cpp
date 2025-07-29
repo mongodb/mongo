@@ -82,41 +82,41 @@ Status populateCollectionUUIDMismatch(OperationContext* opCtx,
     opCtx = alternativeOpCtx.get();
     AlternativeClientRegion acr{client};
 
-    auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, info->dbName());
-    if (!swDbInfo.isOK()) {
-        return swDbInfo.getStatus();
-    }
-
     ListCollections listCollections;
     // Empty tenant id is acceptable here as command's tenant id will not be serialized to BSON.
     listCollections.setDbName(info->dbName());
     listCollections.setFilter(BSON("info.uuid" << info->collectionUUID()));
 
-    auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), info->dbName());
+    return router.route(
         opCtx,
-        info->dbName(),
-        swDbInfo.getValue(),
-        listCollections.toBSON(),
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        Shard::RetryPolicy::kIdempotent);
-    if (!response.swResponse.isOK()) {
-        return response.swResponse.getStatus();
-    }
+        "populateCollectionUUIDMismatch"_sd,
+        [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) -> Status {
+            auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                opCtx,
+                info->dbName(),
+                dbInfo,
+                listCollections.toBSON(),
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                Shard::RetryPolicy::kIdempotent);
+            if (!response.swResponse.isOK()) {
+                return response.swResponse.getStatus();
+            }
 
-    if (auto status = getStatusFromCommandResult(response.swResponse.getValue().data);
-        !status.isOK()) {
-        return status;
-    }
+            if (auto status = getStatusFromCommandResult(response.swResponse.getValue().data);
+                !status.isOK()) {
+                return status;
+            }
 
-    if (auto actualCollectionElem = bson::extractElementAtDottedPath(
-            response.swResponse.getValue().data, "cursor.firstBatch.0.name")) {
-        return {CollectionUUIDMismatchInfo{info->dbName(),
-                                           info->collectionUUID(),
-                                           info->expectedCollection(),
-                                           actualCollectionElem.str()},
-                collectionUUIDMismatch.reason()};
-    }
-
-    return collectionUUIDMismatch;
+            if (auto actualCollectionElem = bson::extractElementAtDottedPath(
+                    response.swResponse.getValue().data, "cursor.firstBatch.0.name")) {
+                return {CollectionUUIDMismatchInfo{info->dbName(),
+                                                   info->collectionUUID(),
+                                                   info->expectedCollection(),
+                                                   actualCollectionElem.str()},
+                        collectionUUIDMismatch.reason()};
+            }
+            return collectionUUIDMismatch;
+        });
 }
 }  // namespace mongo

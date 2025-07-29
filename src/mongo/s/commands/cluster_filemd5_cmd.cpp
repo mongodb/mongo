@@ -125,8 +125,9 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
-        return routing_context_utils::withValidatedRoutingContext(
-            opCtx, {nss}, [&](RoutingContext& routingCtx) {
+        sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+        return router.routeWithRoutingContext(
+            opCtx, getName(), [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                 const auto callShardFn = [&](const BSONObj& cmdObj, const BSONObj& routingQuery) {
                     auto shardResults = scatterGatherVersionedTargetByRoutingTable(
                         opCtx,

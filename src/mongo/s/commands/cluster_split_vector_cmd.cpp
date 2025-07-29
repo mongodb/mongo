@@ -114,8 +114,9 @@ public:
                 "Performing splitVector across dbs isn't supported via mongos",
                 nss.dbName() == dbName);
 
-        return routing_context_utils::withValidatedRoutingContext(
-            opCtx, {nss}, [&](RoutingContext& routingCtx) {
+        sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+        return router.routeWithRoutingContext(
+            opCtx, getName(), [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                 BSONObj min = cmdObj.getObjectField("min");
                 BSONObj max = cmdObj.getObjectField("max");
                 BSONObj keyPattern = cmdObj.getObjectField("keyPattern");

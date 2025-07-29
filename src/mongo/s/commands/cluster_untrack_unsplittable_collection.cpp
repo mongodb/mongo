@@ -56,18 +56,21 @@ public:
             generic_argument_util::setMajorityWriteConcern(shardsvrRequest);
 
             // Route the command to the primary shard.
-            const auto dbInfo = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, ns().dbName()));
-
-            auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+            sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), ns().dbName());
+            router.route(
                 opCtx,
-                ns().dbName(),
-                dbInfo,
-                shardsvrRequest.toBSON(),
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kIdempotent);
+                Request::kCommandParameterFieldName,
+                [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+                    auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                        opCtx,
+                        ns().dbName(),
+                        dbInfo,
+                        shardsvrRequest.toBSON(),
+                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                        Shard::RetryPolicy::kIdempotent);
 
-            uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
+                    uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
+                });
         }
 
     private:

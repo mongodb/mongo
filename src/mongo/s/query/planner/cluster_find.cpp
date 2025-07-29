@@ -61,6 +61,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
@@ -71,6 +72,9 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
+#include "mongo/db/query/query_shape/find_cmd_shape.h"
+#include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/query/util/cluster_find_util.h"
@@ -613,18 +617,40 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
     return Status::OK();
 }
 
-CursorId earlyExitWithNoResults(OperationContext* opCtx,
-                                const auto& query,
-                                const auto& findCommand) {
-    uassert(CollectionUUIDMismatchInfo(query.nss().dbName(),
-                                       *findCommand.getCollectionUUID(),
-                                       std::string{query.nss().coll()},
+
+void earlyExitWithNoResults(OperationContext* opCtx,
+                            std::unique_ptr<FindCommandRequest> origRequest,
+                            rpc::ReplyBuilderInterface* const result,
+                            const MatchExpressionParser::AllowedFeatureSet& allowedFeatures,
+                            bool didDoFLERewrite) {
+    const auto& origNss = origRequest->getNamespaceOrUUID().nss();
+    uassert(CollectionUUIDMismatchInfo(origNss.dbName(),
+                                       *origRequest->getCollectionUUID(),
+                                       std::string{origNss.coll()},
                                        boost::none),
             "Database does not exist",
-            !findCommand.getCollectionUUID());
+            !origRequest->getCollectionUUID());
+
+    // Register the query into the query stats.
+    const auto query = ClusterFind::generateAndValidateCanonicalQuery(
+        opCtx,
+        origNss,
+        std::move(origRequest),
+        boost::none,
+        allowedFeatures,
+        !didDoFLERewrite /* mustRegisterRequestToQueryStats */);
     collectQueryStatsMongos(opCtx, std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
 
-    return CursorId(0);
+    auto cursorId = CursorId(0);
+
+    CursorResponseBuilder::Options options;
+    options.isInitialResponse = true;
+    if (!opCtx->inMultiDocumentTransaction()) {
+        options.atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+    }
+    CursorResponseBuilder firstBatch(result, options);
+    firstBatch.setPartialResultsReturned(false);
+    firstBatch.done(cursorId, origNss);
 }
 
 StatusWith<ClusterCursorManager::PinnedCursor> checkOutCursorWithRetries(
@@ -676,34 +702,51 @@ StatusWith<ClusterCursorManager::PinnedCursor> checkOutCursorWithRetries(
 
 }  // namespace
 
-CursorId ClusterFind::runQuery(OperationContext* opCtx,
-                               const CanonicalQuery& query,
-                               const NamespaceString& origNss,
-                               const ReadPreferenceSetting& readPref,
-                               std::vector<BSONObj>* results,
-                               bool* partialResultsReturned,
-                               bool* builtResponse,
-                               rpc::ReplyBuilderInterface* const result,
-                               const query_settings::QuerySettings* querySettings) {
-    CurOp::get(opCtx)->debug().planCacheShapeHash = canonical_query_encoder::computeHash(
-        /* Mongos doesn't know beforehand which execution engine will be used, so we use the classic
-           encoding method by default. */
-        canonical_query_encoder::encodeClassic(query));
 
-    // If the user supplied a 'partialResultsReturned' out-parameter, default it to false here.
-    if (partialResultsReturned) {
-        *partialResultsReturned = false;
+std::unique_ptr<CanonicalQuery> ClusterFind::generateAndValidateCanonicalQuery(
+    OperationContext* opCtx,
+    const NamespaceString& origNss,
+    std::unique_ptr<FindCommandRequest> cmdRequest,
+    boost::optional<ExplainOptions::Verbosity> explain,
+    const MatchExpressionParser::AllowedFeatureSet& allowedFeatures,
+    bool mustRegisterRequestToQueryStats) {
+
+    auto expCtx =
+        ExpressionContextBuilder{}.fromRequest(opCtx, *cmdRequest).explain(explain).build();
+
+    auto parsedFind = uassertStatusOK(parsed_find_command::parse(
+        expCtx, {.findCommand = std::move(cmdRequest), .allowedFeatures = allowedFeatures}));
+
+    // Perform the query settings lookup and attach it to 'expCtx'.
+    query_shape::DeferredQueryShape deferredShape{[&]() {
+        return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedFind, expCtx);
+    }};
+
+    auto querySettings = query_settings::lookupQuerySettingsWithRejectionCheckOnRouter(
+        expCtx, deferredShape, origNss);
+    expCtx->setQuerySettingsIfNotPresent(querySettings);
+
+    if (mustRegisterRequestToQueryStats) {
+        query_stats::registerRequest(
+            expCtx->getOperationContext(), expCtx->getNamespaceString(), [&]() {
+                // This callback is either never invoked or invoked immediately within
+                // registerRequest, so use-after-move of parsedFind isn't an issue.
+                uassertStatusOKWithContext(deferredShape->getStatus(),
+                                           "Failed to compute query shape");
+                return std::make_unique<query_stats::FindKey>(
+                    expCtx, *parsedFind->findCommandRequest, std::move(deferredShape->getValue()));
+            });
     }
 
-    // If the user supplied a 'builtResponse' out-parameter, default it to false here.
-    if (builtResponse) {
-        *builtResponse = false;
-    }
+    auto query = std::make_unique<CanonicalQuery>(
+        CanonicalQueryParams{.expCtx = expCtx, .parsedFind = std::move(parsedFind)});
 
-    // We must always have a BSONObj vector into which to output our results.
-    invariant(results);
+    //
+    //  Performing some validations against the canonical query.
+    //
+    const auto& findCommand = query->getFindCommandRequest();
+    const auto& qNss = query->nss();
 
-    const auto& findCommand = query.getFindCommandRequest();
     // Projection on the reserved sort key field is illegal in mongos.
     if (findCommand.getProjection().hasField(AsyncResultsMerger::kSortKeyField)) {
         uasserted(ErrorCodes::BadValue,
@@ -718,58 +761,107 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             !findCommand.getRequestResumeToken() && findCommand.getResumeAfter().isEmpty() &&
                 findCommand.getStartAt().isEmpty());
 
-    const auto& nss = query.nss();
     uassert(ErrorCodes::InvalidNamespace,
             "Cannot specify find without a real namespace",
-            !nss.isCollectionlessAggregateNS());
+            !qNss.isCollectionlessAggregateNS());
 
-    // Try to generate a sample id for this query here instead of inside 'runQueryWithoutRetrying()'
-    // since it is incorrect to generate multiple sample ids for a single query.
-    const auto sampleId = analyze_shard_key::tryGenerateSampleId(
-        opCtx, nss, analyze_shard_key::SampledCommandNameEnum::kFind);
 
-    // Evaluate let params once: not per shard, and not per retry.
-    if (auto letParams = findCommand.getLet()) {
-        auto* expCtx = query.getExpCtx().get();
-        expCtx->variables.seedVariablesWithLetParameters(expCtx, *letParams);
-    }
-
-    if (query.getExpCtx()->getServerSideJsConfig().where && _samplerWhereClause.tick()) {
+    if (query->getExpCtx()->getServerSideJsConfig().where && _samplerWhereClause.tick()) {
         LOGV2_WARNING(8996504,
                       "$where is deprecated. For more information, see "
                       "https://www.mongodb.com/docs/manual/reference/operator/query/where/");
     }
 
-    if (query.getExpCtx()->getServerSideJsConfig().function && _samplerFunctionJs.tick()) {
-        LOGV2_WARNING(
-            8996505,
-            "$function is deprecated. For more information, see "
-            "https://www.mongodb.com/docs/manual/reference/operator/aggregation/function/");
+    if (query->getExpCtx()->getServerSideJsConfig().function && _samplerFunctionJs.tick()) {
+        LOGV2_WARNING(8996505,
+                      "$function is deprecated. For more information, see "
+                      "https://www.mongodb.com/docs/manual/reference/operator/"
+                      "aggregation/function/");
     }
 
-    sharding::router::CollectionRouter router(opCtx->getServiceContext(), query.nss());
+    // Evaluate let params once: not per shard, and not per retry.
+    if (auto letParams = findCommand.getLet()) {
+        auto* expCtx = query->getExpCtx().get();
+        expCtx->variables.seedVariablesWithLetParameters(expCtx, *letParams);
+    }
+
+    return query;
+}
+
+void ClusterFind::runQuery(OperationContext* opCtx,
+                           std::unique_ptr<FindCommandRequest> originalRequest,
+                           const NamespaceString& origNss,
+                           const ReadPreferenceSetting& readPref,
+                           const MatchExpressionParser::AllowedFeatureSet& allowedFeatures,
+                           rpc::ReplyBuilderInterface* const result,
+                           bool didDoFLERewrite) {
+    sharding::router::CollectionRouter router(opCtx->getServiceContext(), origNss);
     try {
-        return router.routeWithRoutingContext(
-            opCtx, "find", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+        router.routeWithRoutingContext(
+            opCtx,
+            FindCommandRequest::kCommandName,
+            [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
+                // Clear the bodyBuilder since this lambda function may be retried if the router
+                // cache is stale.
+                result->getBodyBuilder().resetToEmpty();
+
+                // Transform the nss, routingCtx and cmdObj if the 'rawData' field is enabled and
+                // the collection is timeseries.
+                const auto targeter = CollectionRoutingInfoTargeter(opCtx, origNss);
+                auto qNss = origNss;
+                auto cmdRequest = std::make_unique<FindCommandRequest>(*originalRequest);
+                auto& routingCtx = translateNssForRawDataAccordingToRoutingInfo(
+                    opCtx,
+                    origNss,
+                    targeter,
+                    originalRoutingCtx,
+                    [&](const NamespaceString& translatedNss) {
+                        cmdRequest->setNss(translatedNss);
+                        qNss = translatedNss;
+                    });
+
+                auto query = ClusterFind::generateAndValidateCanonicalQuery(
+                    opCtx,
+                    origNss,
+                    std::move(cmdRequest),
+                    boost::none,
+                    allowedFeatures,
+                    !didDoFLERewrite /* mustRegisterRequestToQueryStats */);
+
+                // Create an RAII object that prints useful information about the ExpressionContext
+                // in the case of a tassert or crash.
+                ScopedDebugInfo expCtxDiagnostics(
+                    "ExpCtxDiagnostics",
+                    diagnostic_printers::ExpressionContextPrinter{query->getExpCtx()});
+
+                CurOp::get(opCtx)->debug().planCacheShapeHash =
+                    canonical_query_encoder::computeHash(
+                        /* Mongos doesn't know beforehand which execution engine will be used, so we
+                           use the classic encoding method by default. */
+                        canonical_query_encoder::encodeClassic(*query));
+
+                // Try to generate a sample id for this query here instead of inside
+                // 'runQueryWithoutRetrying()' since it is incorrect to generate multiple sample ids
+                // for a single query.
+                const auto sampleId = analyze_shard_key::tryGenerateSampleId(
+                    opCtx, query->nss(), analyze_shard_key::SampledCommandNameEnum::kFind);
+
                 // If this is a viewless timeseries namespace, run the equivalent aggregation (which
                 // writes its own cursor response into 'result') and short-circuit the normal find
                 // path.
-                if (result && querySettings) {
+                if (result) {
                     if (auto cursorId =
                             cluster_find_util::convertFindAndRunAggregateIfViewlessTimeseries(
                                 opCtx,
                                 routingCtx,
                                 origNss,
                                 result,
-                                query.getFindCommandRequest(),
-                                *querySettings)) {
-                        if (builtResponse) {
-                            *builtResponse = true;
-                        }
-                        return *cursorId;
+                                query->getFindCommandRequest(),
+                                query->getExpCtx()->getQuerySettings())) {
+                        return;
                     }
                 }
-                const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
+                const auto& cri = routingCtx.getCollectionRoutingInfo(qNss);
 
                 // Create an RAII object that prints the collection's shard key in the case of a
                 // tassert or crash.
@@ -778,23 +870,70 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                     diagnostic_printers::ShardKeyDiagnosticPrinter{
                         cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON()
                                         : BSONObj()});
-                return runQueryWithoutRetrying(
-                    opCtx, routingCtx, query, readPref, sampleId, results, partialResultsReturned);
+
+                try {
+                    std::vector<BSONObj> batch;
+                    bool partialResultsReturned = false;
+
+                    // Do the work to generate the first batch of results. This blocks waiting to
+                    // get responses from the shard(s).
+                    auto cursorId = runQueryWithoutRetrying(opCtx,
+                                                            routingCtx,
+                                                            *query,
+                                                            readPref,
+                                                            sampleId,
+                                                            &batch,
+                                                            &partialResultsReturned);
+                    CursorResponseBuilder::Options options;
+                    options.isInitialResponse = true;
+                    if (!opCtx->inMultiDocumentTransaction()) {
+                        options.atClusterTime =
+                            repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+                    }
+                    CursorResponseBuilder firstBatch(result, options);
+                    for (const auto& obj : batch) {
+                        firstBatch.append(obj);
+                    }
+                    firstBatch.setPartialResultsReturned(partialResultsReturned);
+                    firstBatch.done(cursorId, query->nss());
+                } catch (
+                    const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
+                    auto bodyBuilder = result->getBodyBuilder();
+                    bodyBuilder.resetToEmpty();
+
+                    auto aggRequestOnView = query_request_conversion::asAggregateCommandRequest(
+                        query->getFindCommandRequest(), false /* hasExplain */);
+
+                    if (!query_settings::isDefault(query->getExpCtx()->getQuerySettings())) {
+                        aggRequestOnView.setQuerySettings(query->getExpCtx()->getQuerySettings());
+                    }
+
+                    uassertStatusOK(ClusterAggregate::retryOnViewError(
+                        opCtx,
+                        aggRequestOnView,
+                        *ex.extraInfo<ResolvedView>(),
+                        origNss,
+                        {Privilege(ResourcePattern::forExactNamespace(origNss), ActionType::find)},
+                        boost::none,
+                        &bodyBuilder));
+
+                } catch (DBException& ex) {
+                    LOGV2_DEBUG(10369901,
+                                1,
+                                "Received error status for query",
+                                "query"_attr = redact(query->toStringShort()),
+                                "error"_attr = redact(ex));
+                    throw;
+                }
             });
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        result->getBodyBuilder().resetToEmpty();
+
         // If the database doesn't exist, we successfully return an empty result set without
         // creating a cursor.
-        return earlyExitWithNoResults(opCtx, query, findCommand);
-    } catch (DBException& ex) {
-        LOGV2_DEBUG(10369901,
-                    1,
-                    "Received error status for query",
-                    "query"_attr = redact(query.toStringShort()),
-                    "error"_attr = redact(ex));
-        throw;
+        earlyExitWithNoResults(
+            opCtx, std::move(originalRequest), result, allowedFeatures, didDoFLERewrite);
     }
-
-    MONGO_UNREACHABLE
 }
 
 /**

@@ -47,6 +47,7 @@
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/router_role.h"
@@ -497,5 +498,31 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationCont
  */
 StatusWith<boost::optional<int64_t>> addLimitAndSkipForShards(boost::optional<int64_t> limit,
                                                               boost::optional<int64_t> skip);
+
+
+/**
+ * This function abstracts the complexity of using the appropriate routingContext when the operation
+ * is of type rawData.
+ *
+ * If `rawData` is enabled for the current operation, and the collection is a tracked viewful
+ * timeseries, and the buckets nss is present on the router cache:
+ *   1. Executes `translateNssFunc` using the appropriate buckets namespace.
+ *   2. Returns the routing context held by the CollectionRoutingInfoTargeter.
+ * Otherwise, it will just return the `originalRoutingCtx`.
+ *
+ * Important notes:
+ *   - This function must be invoked within a CollectionRouter wrapper.
+ *   - The caller must retain ownership of the `CollectionRoutingInfoTargeter` for the entire
+ *     lifetime of the RoutingContext object returned by this function.
+ *
+ * TODO (SERVER-108351) Remove all usages of this function once all timeseries collections become
+ * viewless.
+ */
+RoutingContext& translateNssForRawDataAccordingToRoutingInfo(
+    OperationContext* opCtx,
+    const NamespaceString& originalNss,
+    const CollectionRoutingInfoTargeter& targeter,
+    RoutingContext& originalRoutingCtx,
+    std::function<void(const NamespaceString& translatedNss)> translateNssFunc);
 
 }  // namespace mongo

@@ -141,24 +141,26 @@ BSONObj executeCoordinateMultiUpdate(OperationContext* opCtx,
     coordinateCommand.setUuid(UUID::gen());
     coordinateCommand.setCommand(std::move(writeCommand));
 
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-    const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.dbName()));
-
     generic_argument_util::setMajorityWriteConcern(coordinateCommand, &opCtx->getWriteConcern());
-    auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-        opCtx,
-        DatabaseName::kAdmin,
-        dbInfo,
-        coordinateCommand.toBSON(),
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        Shard::RetryPolicy::kIdempotent);
 
-    uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
-    auto parsed = ShardsvrCoordinateMultiUpdateResponse::parse(
-        IDLParserContext{"coordinate_multi_update_util::executeCoordinateMultiUpdate"},
-        response.swResponse.getValue().data);
-    invariant(parsed.getResult());
-    return *parsed.getResult();
+    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+    return router.route(
+        opCtx, "multi update"_sd, [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+            auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                opCtx,
+                DatabaseName::kAdmin,
+                dbInfo,
+                coordinateCommand.toBSON(),
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                Shard::RetryPolicy::kIdempotent);
+
+            uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
+            auto parsed = ShardsvrCoordinateMultiUpdateResponse::parse(
+                IDLParserContext{"coordinate_multi_update_util::executeCoordinateMultiUpdate"},
+                response.swResponse.getValue().data);
+            invariant(parsed.getResult());
+            return *parsed.getResult();
+        });
 }
 
 BatchedCommandResponse parseBatchedResponse(const BSONObj& response) {

@@ -46,6 +46,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_gen.h"
@@ -65,6 +66,7 @@
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/router_role.h"
+#include "mongo/s/routing_context.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/util/assert_util.h"
@@ -1142,4 +1144,26 @@ StatusWith<boost::optional<int64_t>> addLimitAndSkipForShards(boost::optional<in
 
     return newLimit;
 }
+
+RoutingContext& translateNssForRawDataAccordingToRoutingInfo(
+    OperationContext* opCtx,
+    const NamespaceString& originalNss,
+    const CollectionRoutingInfoTargeter& targeter,
+    RoutingContext& originalRoutingCtx,
+    std::function<void(const NamespaceString& translatedNss)> translateNssFunc) {
+    const bool shouldTranslateCmdForRawDataOperation =
+        isRawDataOperation(opCtx) && targeter.timeseriesNamespaceNeedsRewrite(originalNss);
+
+    if (shouldTranslateCmdForRawDataOperation) {
+        const auto& nss = originalNss.makeTimeseriesBucketsNamespace();
+        translateNssFunc(nss);
+
+        // Swap the routingCtx with the CollectionRoutingInfoTargeter one, which
+        // has been implicitly initialized with the buckets nss.
+        originalRoutingCtx.skipValidation();
+        return targeter.getRoutingCtx();
+    }
+    return originalRoutingCtx;
+}
+
 }  // namespace mongo

@@ -86,102 +86,111 @@ public:
             const auto& nss = ns();
             uassertStatusOK(validateNamespace(nss));
 
-            const auto& catalogCache = Grid::get(opCtx)->catalogCache();
-            const auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
-            auto primaryShardId = cri.getDbPrimaryShardId();
+            sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+            return router.route(
+                opCtx,
+                Request::kCommandName,
+                [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+                    auto primaryShardId = cri.getDbPrimaryShardId();
 
-            std::set<ShardId> candidateShardIds;
-            if (cri.hasRoutingTable()) {
-                cri.getChunkManager().getAllShardIds(&candidateShardIds);
-            } else {
-                candidateShardIds.insert(primaryShardId);
-            }
-
-            PseudoRandom random{SecureRandom{}.nextInt64()};
-
-            // On secondaries, the database and shard version check is only performed for commands
-            // that specify a readConcern (that is not "available"). Therefore, to opt into the
-            // check, explicitly attach the readConcern.
-            auto newRequest = request();
-            if (!newRequest.getReadConcern()) {
-                newRequest.setReadConcern(extractReadConcern(opCtx));
-            }
-            const auto unversionedCmdObj =
-                CommandHelpers::filterCommandRequestForPassthrough(newRequest.toBSON());
-
-            while (true) {
-                // Select a random shard.
-                invariant(!candidateShardIds.empty());
-                auto shardId = [&] {
-                    // The monotonicity check can return an incorrect result if the collection has
-                    // gone through chunk migrations since chunk migration deletes documents from
-                    // the donor shard and re-inserts them on the recipient shard so there is no
-                    // guarantee that the insertion order from the client is preserved. Therefore,
-                    // the likelihood of an incorrect result is correlated to the ratio between
-                    // the number of documents inserted by the client and the number of documents
-                    // inserted by chunk migrations. Prioritizing the primary shard helps lower the
-                    // risk of incorrect results since if the collection did not start out as being
-                    // sharded (which applies to most cases), the primary shard is likely to be the
-                    // shard with the least number of documents inserted by chunk migrations since
-                    // all the data starts out there.
-                    if (candidateShardIds.find(primaryShardId) != candidateShardIds.end()) {
-                        return primaryShardId;
+                    std::set<ShardId> candidateShardIds;
+                    if (cri.hasRoutingTable()) {
+                        cri.getChunkManager().getAllShardIds(&candidateShardIds);
+                    } else {
+                        candidateShardIds.insert(primaryShardId);
                     }
 
-                    auto it = candidateShardIds.begin();
-                    std::advance(it, random.nextInt64(candidateShardIds.size()));
-                    return *it;
-                }();
-                candidateShardIds.erase(shardId);
+                    PseudoRandom random{SecureRandom{}.nextInt64()};
 
-                uassert(ErrorCodes::IllegalOperation,
-                        "Cannot analyze a shard key for a collection in a fixed database",
-                        !cri.getDbVersion().isFixed());
+                    // On secondaries, the database and shard version check is only performed for
+                    // commands that specify a readConcern (that is not "available"). Therefore, to
+                    // opt into the check, explicitly attach the readConcern.
+                    auto newRequest = request();
+                    if (!newRequest.getReadConcern()) {
+                        newRequest.setReadConcern(extractReadConcern(opCtx));
+                    }
+                    const auto unversionedCmdObj =
+                        CommandHelpers::filterCommandRequestForPassthrough(newRequest.toBSON());
 
-                auto expCtx = makeExpressionContextWithDefaultsForTargeter(
-                    opCtx, nss, cri, BSONObj(), boost::none, boost::none, boost::none);
-                // Execute the command against the shard.
-                auto requests =
-                    buildVersionedRequests(expCtx, nss, cri, {shardId}, unversionedCmdObj);
-                invariant(requests.size() == 1);
+                    while (true) {
+                        // Select a random shard.
+                        invariant(!candidateShardIds.empty());
+                        auto shardId = [&] {
+                            // The monotonicity check can return an incorrect result if the
+                            // collection has gone through chunk migrations since chunk migration
+                            // deletes documents from the donor shard and re-inserts them on the
+                            // recipient shard so there is no guarantee that the insertion order
+                            // from the client is preserved. Therefore, the likelihood of an
+                            // incorrect result is correlated to the ratio between the number of
+                            // documents inserted by the client and the number of documents inserted
+                            // by chunk migrations. Prioritizing the primary shard helps lower the
+                            // risk of incorrect results since if the collection did not start out
+                            // as being sharded (which applies to most cases), the primary shard is
+                            // likely to be the shard with the least number of documents inserted by
+                            // chunk migrations since all the data starts out there.
+                            if (candidateShardIds.find(primaryShardId) != candidateShardIds.end()) {
+                                return primaryShardId;
+                            }
 
-                ReadPreferenceSetting readPref = request().getReadPreference().value_or(
-                    ReadPreferenceSetting(ReadPreference::SecondaryPreferred));
+                            auto it = candidateShardIds.begin();
+                            std::advance(it, random.nextInt64(candidateShardIds.size()));
+                            return *it;
+                        }();
+                        candidateShardIds.erase(shardId);
 
-                try {
-                    auto response = gatherResponses(opCtx,
-                                                    DatabaseName::kAdmin,
-                                                    nss,
-                                                    std::move(readPref),
-                                                    Shard::RetryPolicy::kIdempotent,
-                                                    requests)
-                                        .front();
-                    uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
-                    return AnalyzeShardKeyResponse::parse(
-                        IDLParserContext("clusterAnalyzeShardKey"),
-                        response.swResponse.getValue().data);
-                } catch (const ExceptionFor<ErrorCodes::CollectionIsEmptyLocally>& ex) {
-                    uassert(ErrorCodes::IllegalOperation,
-                            str::stream() << "Cannot analyze a shard key for an empty collection: "
-                                          << redact(ex),
-                            !candidateShardIds.empty());
+                        uassert(ErrorCodes::IllegalOperation,
+                                "Cannot analyze a shard key for a collection in a fixed database",
+                                !cri.getDbVersion().isFixed());
 
-                    LOGV2(6875300,
-                          "Failed to analyze shard key on the selected shard since it did not "
-                          "have any documents for the collection locally. Retrying on a different "
-                          "shard.",
-                          logAttrs(nss),
-                          "shardKey"_attr = request().getKey(),
-                          "shardId"_attr = shardId,
-                          "error"_attr = ex.toString());
-                } catch (
-                    const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>&) {
-                    // Don't propagate CommandOnShardedViewNotSupportedOnMongod errors for clarity,
-                    // even for the cases where this is thrown as an exception.
-                    uasserted(ErrorCodes::CommandNotSupportedOnView,
-                              "Operation not supported for a view");
-                }
-            }
+                        auto expCtx = makeExpressionContextWithDefaultsForTargeter(
+                            opCtx, nss, cri, BSONObj(), boost::none, boost::none, boost::none);
+                        // Execute the command against the shard.
+                        auto requests =
+                            buildVersionedRequests(expCtx, nss, cri, {shardId}, unversionedCmdObj);
+                        invariant(requests.size() == 1);
+
+                        ReadPreferenceSetting readPref = request().getReadPreference().value_or(
+                            ReadPreferenceSetting(ReadPreference::SecondaryPreferred));
+
+                        try {
+                            auto response = gatherResponses(opCtx,
+                                                            DatabaseName::kAdmin,
+                                                            nss,
+                                                            std::move(readPref),
+                                                            Shard::RetryPolicy::kIdempotent,
+                                                            requests)
+                                                .front();
+                            uassertStatusOK(
+                                AsyncRequestsSender::Response::getEffectiveStatus(response));
+                            return AnalyzeShardKeyResponse::parse(
+                                IDLParserContext("clusterAnalyzeShardKey"),
+                                response.swResponse.getValue().data);
+                        } catch (const ExceptionFor<ErrorCodes::CollectionIsEmptyLocally>& ex) {
+                            uassert(ErrorCodes::IllegalOperation,
+                                    str::stream()
+                                        << "Cannot analyze a shard key for an empty collection: "
+                                        << redact(ex),
+                                    !candidateShardIds.empty());
+
+                            LOGV2(6875300,
+                                  "Failed to analyze shard key on the selected shard since it did "
+                                  "not "
+                                  "have any documents for the collection locally. Retrying on a "
+                                  "different "
+                                  "shard.",
+                                  logAttrs(nss),
+                                  "shardKey"_attr = request().getKey(),
+                                  "shardId"_attr = shardId,
+                                  "error"_attr = ex.toString());
+                        } catch (const ExceptionFor<
+                                 ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>&) {
+                            // Don't propagate CommandOnShardedViewNotSupportedOnMongod errors for
+                            // clarity, even for the cases where this is thrown as an exception.
+                            uasserted(ErrorCodes::CommandNotSupportedOnView,
+                                      "Operation not supported for a view");
+                        }
+                    }
+                });
         }
 
     private:

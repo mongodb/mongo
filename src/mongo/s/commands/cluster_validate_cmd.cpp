@@ -104,8 +104,9 @@ public:
              BSONObjBuilder& output) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
-        return routing_context_utils::withValidatedRoutingContext(
-            opCtx, {nss}, [&](RoutingContext& routingCtx) {
+        sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+        return router.routeWithRoutingContext(
+            opCtx, getName(), [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                 auto results = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
                     routingCtx,

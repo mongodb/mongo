@@ -98,8 +98,11 @@ public:
             auto& cmd = request();
             setReadWriteConcern(opCtx, cmd, this);
 
-            routing_context_utils::withValidatedRoutingContext(
-                opCtx, {nss}, [&](RoutingContext& routingCtx) {
+            sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+            router.routeWithRoutingContext(
+                opCtx,
+                Request::kCommandName,
+                [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                     auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
                         opCtx,
                         routingCtx,
@@ -117,7 +120,6 @@ public:
                             uassertStatusOK(std::move(shardResult.swResponse));
 
                         uassertStatusOK(shardResponse.status);
-
                         uassertStatusOK(getStatusFromCommandResult(shardResponse.data));
                     }
                 });

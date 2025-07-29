@@ -116,8 +116,6 @@ Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {
     }
 
     auto nss = request().getNamespace();
-    const auto dbInfo =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
 
     auto req = request();
     generic_argument_util::setMajorityWriteConcern(req, &opCtx->getWriteConcern());
@@ -133,22 +131,26 @@ Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {
         }
     }
 
-    auto response =
-        uassertStatusOK(executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-                            opCtx,
-                            nss.dbName(),
-                            dbInfo,
-                            CommandHelpers::filterCommandRequestForPassthrough(reqBuilder.obj()),
-                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                            Shard::RetryPolicy::kIdempotent)
-                            .swResponse);
+    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+    return router.route(
+        opCtx,
+        Request::kCommandName,
+        [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+            auto response = uassertStatusOK(
+                executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                    opCtx,
+                    nss.dbName(),
+                    dbInfo,
+                    CommandHelpers::filterCommandRequestForPassthrough(reqBuilder.obj()),
+                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                    Shard::RetryPolicy::kIdempotent)
+                    .swResponse);
 
-    BSONObjBuilder result;
-    CommandHelpers::filterCommandReplyForPassthrough(response.data, &result);
-
-    auto reply = result.obj();
-    uassertStatusOK(getStatusFromCommandResult(reply));
-    return Reply::parse(IDLParserContext{Request::kCommandName}, reply.removeField("ok"_sd));
+            auto reply = CommandHelpers::filterCommandReplyForPassthrough(response.data);
+            uassertStatusOK(getStatusFromCommandResult(reply));
+            return Reply::parse(IDLParserContext{Request::kCommandName},
+                                reply.removeField("ok"_sd));
+        });
 }
 
 }  // namespace

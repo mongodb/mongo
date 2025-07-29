@@ -210,152 +210,150 @@ public:
             setReadConcern(opCtx);
             doFLERewriteIfNeeded(opCtx);
 
-            NamespaceString expNs = ns();
-            if (isRawDataOperation(opCtx) &&
-                _cmdRequest->getNamespaceOrUUID().isNamespaceString() &&
-                CollectionRoutingInfoTargeter{opCtx, _cmdRequest->getNamespaceOrUUID().nss()}
-                    .timeseriesNamespaceNeedsRewrite(_cmdRequest->getNamespaceOrUUID().nss())) {
-                expNs = _cmdRequest->getNamespaceOrUUID().nss().makeTimeseriesBucketsNamespace();
-                _cmdRequest->setNss(expNs);
-            }
+            auto findBodyFn = [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
+                // Clear the bodyBuilder since this lambda function may be retried if the
+                // router cache is stale.
+                result->getBodyBuilder().resetToEmpty();
 
-            auto expCtx = ExpressionContextBuilder{}
-                              .fromRequest(opCtx, *_cmdRequest)
-                              .explain(verbosity)
-                              .build();
+                // Transform the nss, routingCtx and cmdObj if the 'rawData' field is enabled and
+                // the collection is timeseries.
+                auto nss = ns();
+                auto cmdRequest = std::make_unique<FindCommandRequest>(*_cmdRequest);
+                bool cmdShouldBeTranslatedForRawData = false;
+                const auto targeter = CollectionRoutingInfoTargeter(opCtx, ns());
+                auto& routingCtx = translateNssForRawDataAccordingToRoutingInfo(
+                    opCtx,
+                    ns(),
+                    targeter,
+                    originalRoutingCtx,
+                    [&](const NamespaceString& translatedNss) {
+                        cmdRequest->setNss(translatedNss);
+                        nss = translatedNss;
+                        cmdShouldBeTranslatedForRawData = true;
+                    });
 
-            // Create an RAII object that prints useful information about the ExpressionContext in
-            // the case of a tassert or crash.
-            ScopedDebugInfo expCtxDiagnostics(
-                "ExpCtxDiagnostics", diagnostic_printers::ExpressionContextPrinter{expCtx});
+                auto query = ClusterFind::generateAndValidateCanonicalQuery(
+                    opCtx,
+                    ns(),
+                    std::move(cmdRequest),
+                    verbosity,
+                    MatchExpressionParser::kAllowAllSpecialFeatures,
+                    false /* mustRegisterRequestToQueryStats */);
 
-            auto parsedFind = uassertStatusOK(parsed_find_command::parse(
-                expCtx,
-                {.findCommand = std::move(_cmdRequest),
-                 .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
-
-            // Perform the query settings lookup and attach it to 'expCtx'.
-            query_shape::DeferredQueryShape deferredShape{[&]() {
-                return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedFind, expCtx);
-            }};
-            auto querySettings = query_settings::lookupQuerySettingsWithRejectionCheckOnRouter(
-                expCtx, deferredShape, expNs);
-            expCtx->setQuerySettingsIfNotPresent(querySettings);
-
-            auto cq = CanonicalQuery(CanonicalQueryParams{
-                .expCtx = std::move(expCtx),
-                .parsedFind = std::move(parsedFind),
-            });
-
-            _cmdRequest = std::make_unique<FindCommandRequest>(cq.getFindCommandRequest());
-            expCtx = ExpressionContextBuilder{}
-                         .fromRequest(opCtx, *_cmdRequest)
-                         .explain(verbosity)
-                         .build();
-
-            try {
-                long long millisElapsed;
-                std::vector<AsyncRequestsSender::Response> shardResponses;
+                // Create an RAII object that prints useful information about the
+                // ExpressionContext in the case of a tassert or crash.
+                ScopedDebugInfo expCtxDiagnostics(
+                    "ExpCtxDiagnostics",
+                    diagnostic_printers::ExpressionContextPrinter{query->getExpCtx()});
 
                 // We will time how long it takes to run the commands on the shards.
                 Timer timer;
-                const auto& nss = cq.getFindCommandRequest().getNamespaceOrUUID().nss();
 
-                routing_context_utils::withValidatedRoutingContext(
-                    opCtx, {nss}, [&](RoutingContext& routingCtx) {
-                        // Handle requests against a viewless timeseries collection.
-                        if (auto cursorId =
-                                cluster_find_util::convertFindAndRunAggregateIfViewlessTimeseries(
-                                    opCtx,
-                                    routingCtx,
-                                    ns(),
-                                    result,
-                                    cq.getFindCommandRequest(),
-                                    querySettings,
-                                    verbosity)) {
-                            return;
-                        }
-                        const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
-
-                        // Create an RAII object that prints the collection's shard key in the case
-                        // of a tassert or crash.
-                        ScopedDebugInfo shardKeyDiagnostics(
-                            "ShardKeyDiagnostics",
-                            diagnostic_printers::ShardKeyDiagnosticPrinter{
-                                cri.isSharded()
-                                    ? cri.getChunkManager().getShardKeyPattern().toBSON()
-                                    : BSONObj()});
-
-                        auto numShards = getTargetedShardsForCanonicalQuery(cq, cri).size();
-                        // When forwarding the command to multiple shards, need to transform it by
-                        // adjusting query parameters such as limits and sorts.
-                        auto userLimit = _cmdRequest->getLimit();
-                        auto userSkip = _cmdRequest->getSkip();
-                        if (numShards > 1) {
-                            _cmdRequest = uassertStatusOK(ClusterFind::transformQueryForShards(cq));
-                        }
-
-                        const auto explainCmd = ClusterExplain::wrapAsExplain(
-                            !isRawDataOperation(opCtx) || expNs == ns()
-                                ? _cmdRequest->toBSON()
-                                : rewriteCommandForRawDataOperation<FindCommandRequest>(
-                                      _cmdRequest->toBSON(), expNs.coll()),
-                            verbosity,
-                            querySettings.toBSON());
-
-                        shardResponses = scatterGatherVersionedTargetByRoutingTable(
+                // Handle requests against a viewless timeseries collection.
+                if (auto cursorId =
+                        cluster_find_util::convertFindAndRunAggregateIfViewlessTimeseries(
                             opCtx,
                             routingCtx,
-                            _cmdRequest->getNamespaceOrUUID().nss(),
-                            explainCmd,
-                            ReadPreferenceSetting::get(opCtx),
-                            Shard::RetryPolicy::kIdempotent,
-                            _cmdRequest->getFilter(),
-                            _cmdRequest->getCollation(),
-                            _cmdRequest->getLet(),
-                            _cmdRequest->getLegacyRuntimeConstants());
-                        millisElapsed = timer.millis();
+                            ns(),
+                            result,
+                            query->getFindCommandRequest(),
+                            query->getExpCtx()->getQuerySettings(),
+                            verbosity)) {
+                    return;
+                }
 
-                        const char* mongosStageName = ClusterExplain::getStageNameForReadOp(
-                            shardResponses.size(), _request.body);
+                const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
-                        auto bodyBuilder = result->getBodyBuilder();
-                        uassertStatusOK(ClusterExplain::buildExplainResult(expCtx,
-                                                                           shardResponses,
-                                                                           mongosStageName,
-                                                                           millisElapsed,
-                                                                           _request.body,
-                                                                           &bodyBuilder,
-                                                                           userLimit,
-                                                                           userSkip));
-                    });
+                // Create an RAII object that prints the collection's shard key in the case
+                // of a tassert or crash.
+                ScopedDebugInfo shardKeyDiagnostics(
+                    "ShardKeyDiagnostics",
+                    diagnostic_printers::ShardKeyDiagnosticPrinter{
+                        cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON()
+                                        : BSONObj()});
 
-            } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
-                retryOnViewError(opCtx,
-                                 result,
-                                 *_cmdRequest,
-                                 querySettings,
-                                 *ex.extraInfo<ResolvedView>(),
-                                 // An empty PrivilegeVector is acceptable because these privileges
-                                 // are only checked on getMore and explain will not open a cursor.
-                                 {},
-                                 verbosity);
+                auto numShards = getTargetedShardsForCanonicalQuery(*query, cri).size();
+                // When forwarding the command to multiple shards, need to transform it by
+                // adjusting query parameters such as limits and sorts.
+                auto userLimit = query->getFindCommandRequest().getLimit();
+                auto userSkip = query->getFindCommandRequest().getSkip();
+                if (numShards > 1) {
+                    cmdRequest = uassertStatusOK(ClusterFind::transformQueryForShards(*query));
+                } else {
+                    // Forwards the FindCommandRequest as is to a single shard so that limit and
+                    // skip can be applied on mongod.
+                    cmdRequest =
+                        std::make_unique<FindCommandRequest>(query->getFindCommandRequest());
+                }
+
+                const auto explainCmd = ClusterExplain::wrapAsExplain(
+                    cmdShouldBeTranslatedForRawData
+                        ? rewriteCommandForRawDataOperation<FindCommandRequest>(
+                              cmdRequest->toBSON(), nss.coll())
+                        : cmdRequest->toBSON(),
+                    verbosity,
+                    query->getExpCtx()->getQuerySettings().toBSON());
+
+                try {
+                    auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
+                        opCtx,
+                        routingCtx,
+                        nss,
+                        explainCmd,
+                        ReadPreferenceSetting::get(opCtx),
+                        Shard::RetryPolicy::kIdempotent,
+                        cmdRequest->getFilter(),
+                        cmdRequest->getCollation(),
+                        cmdRequest->getLet(),
+                        cmdRequest->getLegacyRuntimeConstants());
+
+                    long long millisElapsed = timer.millis();
+
+                    const char* mongosStageName =
+                        ClusterExplain::getStageNameForReadOp(shardResponses.size(), _request.body);
+
+                    auto bodyBuilder = result->getBodyBuilder();
+                    uassertStatusOK(ClusterExplain::buildExplainResult(query->getExpCtx(),
+                                                                       shardResponses,
+                                                                       mongosStageName,
+                                                                       millisElapsed,
+                                                                       _request.body,
+                                                                       &bodyBuilder,
+                                                                       userLimit,
+                                                                       userSkip));
+                } catch (
+                    const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
+                    retryOnViewError(
+                        opCtx,
+                        result,
+                        *cmdRequest,
+                        query->getExpCtx()->getQuerySettings(),
+                        *ex.extraInfo<ResolvedView>(),
+                        // An empty PrivilegeVector is acceptable because these privileges
+                        // are only checked on getMore and explain will not open a cursor.
+                        {},
+                        verbosity);
+                }
+            };
+
+            try {
+                sharding::router::CollectionRouter router{opCtx->getServiceContext(), ns()};
+                router.routeWithRoutingContext(opCtx, "explain find"_sd, findBodyFn);
 
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 auto bodyBuilder = result->getBodyBuilder();
+
                 auto findRequest = parseCmdObjectToFindCommandRequest(opCtx, _request);
-                setReadConcern(opCtx);
-                doFLERewriteIfNeeded(opCtx);
-                auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findRequest).build();
-                auto&& parsedFindResult = uassertStatusOK(parsed_find_command::parse(
-                    expCtx,
-                    {.findCommand = std::move(findRequest),
-                     .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
-                auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-                    .expCtx = std::move(expCtx),
-                    .parsedFind = std::move(parsedFindResult),
-                });
-                ClusterExplain::buildEOFExplainResult(opCtx, cq.get(), _request.body, &bodyBuilder);
+                auto query = ClusterFind::generateAndValidateCanonicalQuery(
+                    opCtx,
+                    ns(),
+                    std::move(findRequest),
+                    verbosity,
+                    MatchExpressionParser::kAllowAllSpecialFeatures,
+                    false /* mustRegisterRequestToQueryStats */);
+
+                ClusterExplain::buildEOFExplainResult(
+                    opCtx, query.get(), _request.body, &bodyBuilder);
             }
         }
 
@@ -363,96 +361,16 @@ public:
             Impl::checkCanRunHere(opCtx);
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
-            if (isRawDataOperation(opCtx) &&
-                _cmdRequest->getNamespaceOrUUID().isNamespaceString() &&
-                CollectionRoutingInfoTargeter{opCtx, _cmdRequest->getNamespaceOrUUID().nss()}
-                    .timeseriesNamespaceNeedsRewrite(_cmdRequest->getNamespaceOrUUID().nss())) {
-                _cmdRequest->setNss(
-                    _cmdRequest->getNamespaceOrUUID().nss().makeTimeseriesBucketsNamespace());
-            }
-
             setReadConcern(opCtx);
             doFLERewriteIfNeeded(opCtx);
 
-            auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *_cmdRequest).build();
-
-            // Create an RAII object that prints useful information about the ExpressionContext in
-            // the case of a tassert or crash.
-            ScopedDebugInfo expCtxDiagnostics(
-                "ExpCtxDiagnostics", diagnostic_printers::ExpressionContextPrinter{expCtx});
-
-            auto parsedFind = uassertStatusOK(parsed_find_command::parse(
-                expCtx,
-                {.findCommand = std::move(_cmdRequest),
-                 .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
-
-            // Perform the query settings lookup and attach it to 'expCtx'.
-            query_shape::DeferredQueryShape deferredShape{[&]() {
-                return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedFind, expCtx);
-            }};
-            auto querySettings = query_settings::lookupQuerySettingsWithRejectionCheckOnRouter(
-                expCtx, deferredShape, ns());
-            expCtx->setQuerySettingsIfNotPresent(querySettings);
-
-            if (!_didDoFLERewrite) {
-                query_stats::registerRequest(
-                    expCtx->getOperationContext(), expCtx->getNamespaceString(), [&]() {
-                        // This callback is either never invoked or invoked immediately within
-                        // registerRequest, so use-after-move of parsedFind isn't an issue.
-                        uassertStatusOKWithContext(deferredShape->getStatus(),
-                                                   "Failed to compute query shape");
-                        return std::make_unique<query_stats::FindKey>(
-                            expCtx,
-                            *parsedFind->findCommandRequest,
-                            std::move(deferredShape->getValue()));
-                    });
-            }
-
-            auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-                .expCtx = std::move(expCtx), .parsedFind = std::move(parsedFind)});
-
-            try {
-                // Do the work to generate the first batch of results. This blocks waiting to
-                // get responses from the shard(s).
-                auto partialResultsReturned = false;
-                auto builtResponse = false;
-                std::vector<BSONObj> batch;
-                auto cursorId = ClusterFind::runQuery(opCtx,
-                                                      *cq,
-                                                      ns(),
-                                                      ReadPreferenceSetting::get(opCtx),
-                                                      &batch,
-                                                      &partialResultsReturned,
-                                                      &builtResponse,
-                                                      result,
-                                                      &querySettings);
-
-                if (builtResponse) {
-                    return;
-                }
-
-                // Build the response document.
-                CursorResponseBuilder::Options options;
-                options.isInitialResponse = true;
-                if (!opCtx->inMultiDocumentTransaction()) {
-                    options.atClusterTime =
-                        repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
-                }
-                CursorResponseBuilder firstBatch(result, options);
-                for (const auto& obj : batch) {
-                    firstBatch.append(obj);
-                }
-                firstBatch.setPartialResultsReturned(partialResultsReturned);
-                firstBatch.done(cursorId, cq->nss());
-            } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
-                retryOnViewError(
-                    opCtx,
-                    result,
-                    cq->getFindCommandRequest(),
-                    querySettings,
-                    *ex.extraInfo<ResolvedView>(),
-                    {Privilege(ResourcePattern::forExactNamespace(ns()), ActionType::find)});
-            }
+            ClusterFind::runQuery(opCtx,
+                                  std::move(_cmdRequest),
+                                  ns(),
+                                  ReadPreferenceSetting::get(opCtx),
+                                  MatchExpressionParser::kAllowAllSpecialFeatures,
+                                  result,
+                                  _didDoFLERewrite);
         }
 
         const GenericArguments& getGenericArguments() const override {

@@ -128,17 +128,6 @@ public:
         auto nss = cmd.getNamespace();
         LOGV2_DEBUG(22748, 1, "CMD: collMod", logAttrs(nss), "command"_attr = redact(cmdObj));
 
-        auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, cmd.getDbName());
-        if (swDbInfo == ErrorCodes::NamespaceNotFound) {
-            uassert(CollectionUUIDMismatchInfo(cmd.getDbName(),
-                                               *cmd.getCollectionUUID(),
-                                               std::string{nss.coll()},
-                                               boost::none),
-                    "Database does not exist",
-                    !cmd.getCollectionUUID());
-        }
-        const auto dbInfo = uassertStatusOK(swDbInfo);
-
         if (cmd.getValidator() || cmd.getValidationLevel() || cmd.getValidationAction()) {
             // Check for config.settings in the user command since a validator is allowed
             // internally on this collection but the user may not modify the validator.
@@ -148,21 +137,40 @@ public:
                     nss != NamespaceString::kConfigSettingsNamespace);
         }
 
-        ShardsvrCollMod collModCommand(nss);
-        collModCommand.setCollModRequest(cmd.getCollModRequest());
-        generic_argument_util::setMajorityWriteConcern(collModCommand, &opCtx->getWriteConcern());
-        auto cmdResponse =
-            uassertStatusOK(executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-                                opCtx,
-                                dbName,
-                                dbInfo,
-                                collModCommand.toBSON(),
-                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                Shard::RetryPolicy::kIdempotent)
-                                .swResponse);
+        sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), cmd.getDbName());
 
-        CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.data, &result);
-        return cmdResponse.isOK();
+        try {
+            return router.route(
+                opCtx,
+                Request::kCommandName,
+                [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+                    ShardsvrCollMod collModCommand(nss);
+                    collModCommand.setCollModRequest(cmd.getCollModRequest());
+                    generic_argument_util::setMajorityWriteConcern(collModCommand,
+                                                                   &opCtx->getWriteConcern());
+                    auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                        opCtx,
+                        dbName,
+                        dbInfo,
+                        collModCommand.toBSON(),
+                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                        Shard::RetryPolicy::kIdempotent);
+
+                    const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+                    CommandHelpers::filterCommandReplyForPassthrough(remoteResponse.data, &result);
+                    return remoteResponse.isOK();
+                });
+        } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            // Throw a CollectionUUIDMismatchInfo instead of a NamespaceNotFound error if the
+            // collectionUUID was provided.
+            uassert(CollectionUUIDMismatchInfo(cmd.getDbName(),
+                                               *cmd.getCollectionUUID(),
+                                               std::string{nss.coll()},
+                                               boost::none),
+                    "Database does not exist",
+                    !cmd.getCollectionUUID());
+            throw;
+        }
     }
 
     void validateResult(const BSONObj& resultObj) final {

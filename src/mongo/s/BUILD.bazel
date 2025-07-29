@@ -97,6 +97,8 @@ mongo_cc_library(
     name = "sharding_router_api",
     srcs = [
         "cluster_commands_helpers.cpp",
+        "cluster_ddl.cpp",
+        "collection_routing_info_targeter.cpp",
         "collection_uuid_mismatch.cpp",
         "multi_statement_transaction_requests_sender.cpp",
         "router_role.cpp",
@@ -112,8 +114,11 @@ mongo_cc_library(
     ],
     hdrs = [
         "cluster_commands_helpers.h",
+        "cluster_ddl.h",
+        "collection_routing_info_targeter.h",
         "collection_uuid_mismatch.h",
         "multi_statement_transaction_requests_sender.h",
+        "ns_targeter.h",
         "router_role.h",
         "router_transactions_metrics.h",
         "session_catalog_router.h",
@@ -121,6 +126,7 @@ mongo_cc_library(
         "shard_key_pattern_query_util.h",
         "transaction_router.h",
         "transaction_router_resource_yielder.h",
+        "//src/mongo/db/query/write_ops:update_request.h",
         "//src/mongo/db/stats:single_transaction_stats.h",
     ],
     deps = [
@@ -144,6 +150,7 @@ mongo_cc_library(
         "//src/mongo/db/session:session_catalog",
         "//src/mongo/db/session:sessions_collection",
         "//src/mongo/db/stats:transaction_stats",
+        "//src/mongo/db/timeseries:timeseries_metadata",
         "//src/mongo/rpc:command_status",
         "//src/mongo/util/concurrency:spin_lock",
     ],
@@ -725,24 +732,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "sharding_collection_routing_info_targeter",
-    srcs = [
-        "cluster_ddl.cpp",
-        "collection_routing_info_targeter.cpp",
-    ],
-    hdrs = [
-        "cluster_ddl.h",
-        "collection_routing_info_targeter.h",
-        "ns_targeter.h",
-        "//src/mongo/db/query/write_ops:update_request.h",
-    ],
-    deps = [
-        ":sharding_router_api",
-        "//src/mongo/db/timeseries:timeseries_metadata",
-    ],
-)
-
-mongo_cc_library(
     name = "sharding_write_without_shard_key_api",
     srcs = [
         "//src/mongo/s/write_ops:write_without_shard_key_util.cpp",
@@ -751,7 +740,7 @@ mongo_cc_library(
         "//src/mongo/s/write_ops:write_without_shard_key_util.h",
     ],
     deps = [
-        ":sharding_collection_routing_info_targeter",
+        ":sharding_router_api",
         "//src/mongo/db/query/write_ops:parsed_update",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/timeseries/write_ops:timeseries_write_ops_utils",
@@ -788,7 +777,6 @@ mongo_cc_library(
     ],
     no_undefined_ref_DO_NOT_USE = False,
     deps = [
-        ":sharding_collection_routing_info_targeter",
         ":sharding_router_api",
         ":sharding_write_without_shard_key_api",
         "//src/mongo/db:fle_crud",

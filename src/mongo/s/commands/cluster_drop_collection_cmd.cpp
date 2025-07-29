@@ -117,9 +117,6 @@ public:
                     Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss);
                 });
 
-                const auto dbInfo = uassertStatusOK(
-                    Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
-
                 // Send it to the primary shard
                 ShardsvrDropCollection dropCollectionCommand(nss);
                 dropCollectionCommand.setDbName(nss.dbName());
@@ -127,23 +124,29 @@ public:
                 generic_argument_util::setMajorityWriteConcern(dropCollectionCommand,
                                                                &opCtx->getWriteConcern());
 
-                auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-                    opCtx,
-                    nss.dbName(),
-                    dbInfo,
-                    dropCollectionCommand.toBSON(),
-                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                    Shard::RetryPolicy::kIdempotent);
 
-                const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-                BSONObjBuilder result;
-                CommandHelpers::filterCommandReplyForPassthrough(remoteResponse.data, &result);
-                auto resultObj = result.obj();
-                // TODO SERVER-103506 consider removing the following line since `writeConcernError`
-                // will be included in the DropReply (check SERVER-104220 for additional details)
-                uassertStatusOK(getStatusFromWriteCommandReply(resultObj));
-                // Ensure our reply conforms to the IDL-defined reply structure.
-                return DropReply::parse(IDLParserContext{"drop"}, resultObj);
+                sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+                return router.route(
+                    opCtx,
+                    Request::kCommandName,
+                    [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+                        auto cmdResponse =
+                            executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                                opCtx,
+                                nss.dbName(),
+                                dbInfo,
+                                dropCollectionCommand.toBSON(),
+                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                Shard::RetryPolicy::kIdempotent);
+
+                        const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+                        auto resultObj =
+                            CommandHelpers::filterCommandReplyForPassthrough(remoteResponse.data);
+                        uassertStatusOK(getStatusFromWriteCommandReply(resultObj));
+
+                        // Ensure our reply conforms to the IDL-defined reply structure.
+                        return DropReply::parse(IDLParserContext{"drop"}, resultObj);
+                    });
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 uassert(CollectionUUIDMismatchInfo(request().getDbName(),
                                                    *request().getCollectionUUID(),

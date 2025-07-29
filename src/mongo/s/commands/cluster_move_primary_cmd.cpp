@@ -79,25 +79,29 @@ public:
                 Grid::get(opCtx)->catalogCache()->purgeDatabase(dbNss.dbName());
             });
 
-            const auto dbInfo = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbNss.dbName()));
-
             ShardsvrMovePrimary shardsvrRequest{dbNss.dbName()};
             shardsvrRequest.setDbName(DatabaseName::kAdmin);
             shardsvrRequest.getMovePrimaryRequestBase().setTo(toShardId);
             generic_argument_util::setMajorityWriteConcern(shardsvrRequest,
                                                            &opCtx->getWriteConcern());
 
-            const auto commandResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-                opCtx,
-                DatabaseName::kAdmin,
-                dbInfo,
-                shardsvrRequest.toBSON(),
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                Shard::RetryPolicy::kIdempotent);
+            sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), dbNss.dbName());
+            router.route(opCtx,
+                         Request::kCommandParameterFieldName,
+                         [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+                             const auto commandResponse =
+                                 executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                                     opCtx,
+                                     DatabaseName::kAdmin,
+                                     dbInfo,
+                                     shardsvrRequest.toBSON(),
+                                     ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                     Shard::RetryPolicy::kIdempotent);
 
-            const auto remoteResponse = uassertStatusOK(commandResponse.swResponse);
-            uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+                             const auto remoteResponse =
+                                 uassertStatusOK(commandResponse.swResponse);
+                             uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+                         });
         }
 
     private:

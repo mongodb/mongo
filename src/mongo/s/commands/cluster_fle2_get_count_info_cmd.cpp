@@ -132,8 +132,10 @@ ClusterGetQueryableEncryptionCountInfoCmd::Invocation::typedRun(OperationContext
     }
 
     auto nss = request().getNamespace();
-    auto response = routing_context_utils::withValidatedRoutingContext(
-        opCtx, {nss}, [&](RoutingContext& routingCtx) {
+
+    sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+    return router.routeWithRoutingContext(
+        opCtx, Request::kCommandName, [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             tassert(7924701,
                     "ESC collection cannot be sharded",
                     !routingCtx.getCollectionRoutingInfo(nss).isSharded());
@@ -141,7 +143,7 @@ ClusterGetQueryableEncryptionCountInfoCmd::Invocation::typedRun(OperationContext
             auto& cmd = request();
             setReadWriteConcern(opCtx, cmd, this);
 
-            return uassertStatusOK(
+            auto response = uassertStatusOK(
                 executeCommandAgainstShardWithMinKeyChunk(
                     opCtx,
                     routingCtx,
@@ -150,14 +152,12 @@ ClusterGetQueryableEncryptionCountInfoCmd::Invocation::typedRun(OperationContext
                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                     Shard::RetryPolicy::kIdempotent)
                     .swResponse);
+
+            auto reply = CommandHelpers::filterCommandReplyForPassthrough(response.data);
+            uassertStatusOK(getStatusFromCommandResult(reply));
+            return Reply::parse(IDLParserContext{Request::kCommandName},
+                                reply.removeField("ok"_sd));
         });
-
-    BSONObjBuilder result;
-    CommandHelpers::filterCommandReplyForPassthrough(response.data, &result);
-
-    auto reply = result.obj();
-    uassertStatusOK(getStatusFromCommandResult(reply));
-    return Reply::parse(IDLParserContext{Request::kCommandName}, reply.removeField("ok"_sd));
 }
 
 }  // namespace

@@ -69,19 +69,22 @@ public:
                   "dbName"_attr = request().getDbName(),
                   "toShard"_attr = request().getToShard());
 
-            auto catalogCache = Grid::get(opCtx)->catalogCache();
-            const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.dbName()));
+            sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+            router.route(opCtx,
+                         Request::kCommandParameterFieldName,
+                         [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+                             auto cmdResponse =
+                                 executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                                     opCtx,
+                                     DatabaseName::kAdmin,
+                                     dbInfo,
+                                     moveCollectionRequest.toBSON(),
+                                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                     Shard::RetryPolicy::kIdempotent);
 
-            auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-                opCtx,
-                DatabaseName::kAdmin,
-                dbInfo,
-                moveCollectionRequest.toBSON(),
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kIdempotent);
-
-            const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-            uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+                             const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+                             uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+                         });
         }
 
     private:

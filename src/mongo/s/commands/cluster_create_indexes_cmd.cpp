@@ -130,60 +130,113 @@ public:
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         LOGV2_DEBUG(22750, 1, "CMD: createIndexes", logAttrs(nss), "command"_attr = redact(cmdObj));
 
-        auto targeter = CollectionRoutingInfoTargeter(opCtx, nss);
-        auto routingInfo = targeter.getRoutingInfo();
-        auto cmdToBeSent = cmdObj;
-        if (targeter.timeseriesNamespaceNeedsRewrite(nss)) {
-            const auto& request = requestParser.request();
-            if (auto uuid = request.getCollectionUUID()) {
-                auto status = Status(CollectionUUIDMismatchInfo(
-                                         nss.dbName(), *uuid, std::string{nss.coll()}, boost::none),
-                                     "'collectionUUID' is specified for a time-series view "
-                                     "namespace; views do not have UUIDs");
-                uassertStatusOK(populateCollectionUUIDMismatch(opCtx, status));
-                MONGO_UNREACHABLE_TASSERT(8549600);
-            }
+        const size_t kMaxDatabaseCreationAttempts = 3;
+        size_t attempts = 1;
 
-            cmdToBeSent = timeseries::makeTimeseriesCommand(
-                cmdToBeSent, nss, getName(), CreateIndexesCommand::kIsTimeseriesNamespaceFieldName);
-        }
+        while (true) {
+            try {
+                // Implicitly create the db if it doesn't exist
+                cluster::createDatabase(opCtx, nss.dbName());
 
-        return routing_context_utils::runAndValidate(
-            targeter.getRoutingCtx(), [&](RoutingContext& routingCtx) {
-                auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
+                sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+                return router.routeWithRoutingContext(
                     opCtx,
-                    routingCtx,
-                    targeter.getNS(),
-                    CommandHelpers::filterCommandRequestForPassthrough(
-                        applyReadWriteConcern(opCtx, this, cmdToBeSent)),
-                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                    Shard::RetryPolicy::kIdempotent,
-                    BSONObj() /*query*/,
-                    BSONObj() /*collation*/,
-                    boost::none /*letParameters*/,
-                    boost::none /*runtimeConstants*/);
+                    Request::kCommandName,
+                    [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
+                        // The CollectionRouter is not capable of implicitly translate the namespace
+                        // to a timeseries buckets collection, which is required in this command.
+                        // Hence, we'll use the CollectionRouter to handle StaleConfig errors but
+                        // will ignore its RoutingContext. Instead, we'll use a
+                        // CollectionRoutingInfoTargeter object to properly get the RoutingContext
+                        // when the collection is timeseries.
+                        // TODO (SPM-3830) Use the RoutingContext provided by the CollectionRouter
+                        // once all timeseries collections become viewless.
+                        unusedRoutingCtx.skipValidation();
 
-                std::string errmsg;
-                bool allShardsSucceeded =
-                    appendRawResponses(
-                        opCtx, &errmsg, &output, shardResponses, shardResponses.size() > 1)
-                        .responseOK;
+                        // Clear the `result` BSON builder since this lambda function may be retried
+                        // if the router cache is stale.
+                        output.resetToEmpty();
 
-                // Append the single shard command result to the top-level output to ensure parity
-                // between replica-set and a single sharded cluster.
-                if (shardResponses.size() == 1 && allShardsSucceeded) {
-                    CommandHelpers::filterCommandReplyForPassthrough(
-                        shardResponses[0].swResponse.getValue().data, &output);
+                        auto targeter = CollectionRoutingInfoTargeter(opCtx, nss);
+                        auto routingInfo = targeter.getRoutingInfo();
+                        auto cmdToBeSent = cmdObj;
+
+                        if (targeter.timeseriesNamespaceNeedsRewrite(nss)) {
+                            const auto& request = requestParser.request();
+                            if (auto uuid = request.getCollectionUUID()) {
+                                auto status = Status(
+                                    CollectionUUIDMismatchInfo(
+                                        nss.dbName(), *uuid, std::string{nss.coll()}, boost::none),
+                                    "'collectionUUID' is specified for a time-series view "
+                                    "namespace; views do not have UUIDs");
+                                uassertStatusOK(populateCollectionUUIDMismatch(opCtx, status));
+                                MONGO_UNREACHABLE_TASSERT(8549600);
+                            }
+
+                            cmdToBeSent = timeseries::makeTimeseriesCommand(
+                                cmdToBeSent,
+                                nss,
+                                getName(),
+                                CreateIndexesCommand::kIsTimeseriesNamespaceFieldName);
+                        }
+
+                        return routing_context_utils::runAndValidate(
+                            targeter.getRoutingCtx(), [&](RoutingContext& routingCtx) {
+                                auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
+                                    opCtx,
+                                    routingCtx,
+                                    targeter.getNS(),
+                                    CommandHelpers::filterCommandRequestForPassthrough(
+                                        applyReadWriteConcern(opCtx, this, cmdToBeSent)),
+                                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                    Shard::RetryPolicy::kIdempotent,
+                                    BSONObj() /*query*/,
+                                    BSONObj() /*collation*/,
+                                    boost::none /*letParameters*/,
+                                    boost::none /*runtimeConstants*/);
+
+                                std::string errmsg;
+                                bool allShardsSucceeded =
+                                    appendRawResponses(opCtx,
+                                                       &errmsg,
+                                                       &output,
+                                                       shardResponses,
+                                                       shardResponses.size() > 1)
+                                        .responseOK;
+
+                                // Append the single shard command result to the top-level output to
+                                // ensure parity between replica-set and a single sharded cluster.
+                                if (shardResponses.size() == 1 && allShardsSucceeded) {
+                                    CommandHelpers::filterCommandReplyForPassthrough(
+                                        shardResponses[0].swResponse.getValue().data, &output);
+                                }
+
+                                CommandHelpers::appendSimpleCommandStatus(
+                                    output, allShardsSucceeded, errmsg);
+
+                                if (allShardsSucceeded) {
+                                    LOGV2(5706400, "Indexes created", logAttrs(nss));
+                                }
+
+                                return allShardsSucceeded;
+                            });
+                    });
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                LOGV2_INFO(10370501,
+                           "Failed initialization of routing info because the database has been "
+                           "concurrently dropped",
+                           logAttrs(nss.dbName()),
+                           "attemptNumber"_attr = attempts,
+                           "maxAttempts"_attr = kMaxDatabaseCreationAttempts);
+
+                if (attempts++ >= kMaxDatabaseCreationAttempts) {
+                    // The maximum number of attempts has been reached, so the procedure fails as it
+                    // could be a logical error. At this point, it is unlikely that the error is
+                    // caused by concurrent drop database operations.
+                    throw;
                 }
-
-                CommandHelpers::appendSimpleCommandStatus(output, allShardsSucceeded, errmsg);
-
-                if (allShardsSucceeded) {
-                    LOGV2(5706400, "Indexes created", logAttrs(nss));
-                }
-
-                return allShardsSucceeded;
-            });
+            }
+        }
     }
 
     /**

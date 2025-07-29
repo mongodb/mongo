@@ -285,19 +285,23 @@ void ReshardingCoordinatorCleaner::_dropTemporaryReshardingCollection(
     generic_argument_util::setMajorityWriteConcern(dropCollectionCommand,
                                                    &opCtx->getWriteConcern());
 
-    const auto dbInfo = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, tempReshardingNss.dbName()));
+    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(),
+                                             tempReshardingNss.dbName());
+    router.route(opCtx,
+                 "dropTemporaryReshardingCollection"_sd,
+                 [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+                     auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                         opCtx,
+                         tempReshardingNss.dbName(),
+                         dbInfo,
+                         dropCollectionCommand.toBSON(),
+                         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                         Shard::RetryPolicy::kIdempotent);
 
-    auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-        opCtx,
-        tempReshardingNss.dbName(),
-        dbInfo,
-        dropCollectionCommand.toBSON(),
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        Shard::RetryPolicy::kIdempotent);
-
-    assertResponseOK(
-        _originalCollectionNss, std::move(cmdResponse.swResponse), std::move(cmdResponse.shardId));
+                     assertResponseOK(_originalCollectionNss,
+                                      std::move(cmdResponse.swResponse),
+                                      std::move(cmdResponse.shardId));
+                 });
 }
 
 ReshardingDonorCleaner::ReshardingDonorCleaner(NamespaceString nss, UUID reshardingUUID)

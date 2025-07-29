@@ -248,201 +248,221 @@ public:
 
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
-        const auto targeter = CollectionRoutingInfoTargeter(opCtx, nss);
-        const auto cri = targeter.getRoutingInfo();
-        const auto& cm = cri.getChunkManager();
-        if (cm.isSharded()) {
-            result.appendBool("sharded", true);
-        } else {
-            result.appendBool("sharded", false);
-            result.append("primary", cri.getDbPrimaryShardId().toString());
-        }
+        sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+        return router.routeWithRoutingContext(
+            opCtx, getName(), [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
+                // The CollectionRouter is not capable of implicitly translate the namespace to a
+                // timeseries buckets collection, which is required in this command. Hence, we'll
+                // use the CollectionRouter to handle StaleConfig errors but will ignore its
+                // RoutingContext. Instead, we'll use a CollectionRoutingInfoTargeter object to
+                // properly get the RoutingContext when the collection is timeseries.
+                // TODO (SPM-3830) Use the RoutingContext provided by the CollectionRouter once
+                // all timeseries collections become viewless.
+                unusedRoutingCtx.skipValidation();
 
-        int scale = 1;
-        if (cmdObj["scale"].isNumber()) {
-            scale = cmdObj["scale"].safeNumberInt();
-            uassert(4390200, "scale has to be >= 1", scale >= 1);
-        } else if (cmdObj["scale"].trueValue()) {
-            uasserted(4390201, "scale has to be a number >= 1");
-        }
+                // If the operation is retried due to a stale router, the `result` may contain
+                // outdated or partial data. We need to reset it before proceeding.
+                result.resetToEmpty();
 
-        // Re-construct the command's BSONObj without any scaling to be applied.
-        BSONObj cmdObjToSend = cmdObj.removeField("scale");
+                const auto targeter = CollectionRoutingInfoTargeter(opCtx, nss);
+                const auto cri = targeter.getRoutingInfo();
+                const auto& cm = cri.getChunkManager();
+                if (cm.isSharded()) {
+                    result.appendBool("sharded", true);
+                } else {
+                    result.appendBool("sharded", false);
+                    result.append("primary", cri.getDbPrimaryShardId().toString());
+                }
 
-        // Translate command collection namespace for time-series collection.
-        if (targeter.timeseriesNamespaceNeedsRewrite(nss)) {
-            cmdObjToSend =
-                timeseries::makeTimeseriesCommand(cmdObjToSend, nss, getName(), boost::none);
-        }
+                int scale = 1;
+                if (cmdObj["scale"].isNumber()) {
+                    scale = cmdObj["scale"].safeNumberInt();
+                    uassert(4390200, "scale has to be >= 1", scale >= 1);
+                } else if (cmdObj["scale"].trueValue()) {
+                    uasserted(4390201, "scale has to be a number >= 1");
+                }
 
-        return routing_context_utils::runAndValidate(
-            targeter.getRoutingCtx(), [&](RoutingContext& routingCtx) {
-                // Unscaled individual shard results. This is required to apply scaling after
-                // summing the statistics from individual shards as opposed to adding the summation
-                // of the scaled statistics.
-                auto unscaledShardResults = scatterGatherVersionedTargetByRoutingTable(
-                    opCtx,
-                    routingCtx,
-                    targeter.getNS(),
-                    applyReadWriteConcern(
-                        opCtx,
-                        this,
-                        CommandHelpers::filterCommandRequestForPassthrough(cmdObjToSend)),
-                    ReadPreferenceSetting::get(opCtx),
-                    Shard::RetryPolicy::kIdempotent,
-                    {} /*query*/,
-                    {} /*collation*/,
-                    boost::none /*letParameters*/,
-                    boost::none /*runtimeConstants*/);
+                // Re-construct the command's BSONObj without any scaling to be applied.
+                BSONObj cmdObjToSend = cmdObj.removeField("scale");
 
-                BSONObjBuilder shardStats;
-                std::map<std::string, long long> counts;
-                std::map<std::string, long long> indexSizes;
-                std::map<std::string, long long> clusterTimeseriesStats;
+                // Translate command collection namespace for time-series collection.
+                if (targeter.timeseriesNamespaceNeedsRewrite(nss)) {
+                    cmdObjToSend = timeseries::makeTimeseriesCommand(
+                        cmdObjToSend, nss, getName(), boost::none);
+                }
 
-                long long maxSize = 0;
-                long long unscaledCollSize = 0;
+                return routing_context_utils::runAndValidate(
+                    targeter.getRoutingCtx(), [&](RoutingContext& routingCtx) {
+                        // Unscaled individual shard results. This is required to apply scaling
+                        // after summing the statistics from individual shards as opposed to adding
+                        // the summation of the scaled statistics.
+                        auto unscaledShardResults = scatterGatherVersionedTargetByRoutingTable(
+                            opCtx,
+                            routingCtx,
+                            targeter.getNS(),
+                            applyReadWriteConcern(
+                                opCtx,
+                                this,
+                                CommandHelpers::filterCommandRequestForPassthrough(cmdObjToSend)),
+                            ReadPreferenceSetting::get(opCtx),
+                            Shard::RetryPolicy::kIdempotent,
+                            {} /*query*/,
+                            {} /*collation*/,
+                            boost::none /*letParameters*/,
+                            boost::none /*runtimeConstants*/);
 
-                int nindexes = 0;
-                bool warnedAboutIndexes = false;
-                std::string timeseriesBucketsNs;
-                long long timeseriesTotalBucketSize = 0;
+                        BSONObjBuilder shardStats;
+                        std::map<std::string, long long> counts;
+                        std::map<std::string, long long> indexSizes;
+                        std::map<std::string, long long> clusterTimeseriesStats;
 
-                for (const auto& shardResult : unscaledShardResults) {
-                    const auto& shardId = shardResult.shardId;
-                    const auto shardResponse = uassertStatusOK(std::move(shardResult.swResponse));
-                    uassertStatusOK(shardResponse.status);
+                        long long maxSize = 0;
+                        long long unscaledCollSize = 0;
 
-                    const auto& res = shardResponse.data;
-                    uassertStatusOK(getStatusFromCommandResult(res));
+                        int nindexes = 0;
+                        bool warnedAboutIndexes = false;
+                        std::string timeseriesBucketsNs;
+                        long long timeseriesTotalBucketSize = 0;
 
-                    // We don't know the order that we will encounter the count and size, so we save
-                    // them until we've iterated through all the fields before updating
-                    // unscaledCollSize Timeseries bucket collection does not provide 'count' or
-                    // 'avgObjSize'.
-                    BSONElement countField = res.getField("count");
-                    const auto shardObjCount =
-                        static_cast<long long>(!countField.eoo() ? countField.Number() : 0);
+                        for (const auto& shardResult : unscaledShardResults) {
+                            const auto& shardId = shardResult.shardId;
+                            const auto shardResponse =
+                                uassertStatusOK(std::move(shardResult.swResponse));
+                            uassertStatusOK(shardResponse.status);
 
-                    for (const auto& e : res) {
-                        StringData fieldName = e.fieldNameStringData();
-                        if (fieldIsAnyOf(fieldName,
-                                         {"ns", "ok", "lastExtentSize", "paddingFactor"})) {
-                            continue;
-                        }
-                        if (fieldIsAnyOf(fieldName,
-                                         {"userFlags",
-                                          "capped",
-                                          "max",
-                                          "paddingFactorNote",
-                                          "indexDetails",
-                                          "wiredTiger"})) {
-                            // Fields that are copied from the first shard only, because they need
-                            // to match across shards
-                            if (!result.hasField(e.fieldName()))
-                                result.append(e);
-                        } else if (fieldName == "timeseries") {
-                            aggregateTimeseriesStats(e.Obj(),
-                                                     &clusterTimeseriesStats,
-                                                     &timeseriesBucketsNs,
-                                                     &timeseriesTotalBucketSize);
-                        } else if (fieldIsAnyOf(fieldName,
-                                                {"count",
-                                                 "size",
-                                                 "storageSize",
-                                                 "totalIndexSize",
-                                                 "totalSize"})) {
-                            counts[e.fieldName()] += e.numberLong();
-                        } else if (fieldName == "avgObjSize") {
-                            const auto shardAvgObjSize = e.numberLong();
-                            uassert(5688300,
-                                    "'avgObjSize' provided but not 'count'",
-                                    !countField.eoo());
-                            unscaledCollSize += shardAvgObjSize * shardObjCount;
-                        } else if (fieldName == "maxSize") {
-                            const auto shardMaxSize = e.numberLong();
-                            maxSize = std::max(maxSize, shardMaxSize);
-                        } else if (fieldName == "indexSizes") {
-                            BSONObjIterator k(e.Obj());
-                            while (k.more()) {
-                                BSONElement temp = k.next();
-                                indexSizes[temp.fieldName()] += temp.numberLong();
-                            }
-                        } else if (fieldName == "nindexes") {
-                            int myIndexes = e.numberInt();
+                            const auto& res = shardResponse.data;
+                            uassertStatusOK(getStatusFromCommandResult(res));
 
-                            if (nindexes == 0) {
-                                nindexes = myIndexes;
-                            } else if (nindexes == myIndexes) {
-                                // no-op
-                            } else {
-                                // hopefully this means we're building an index
+                            // We don't know the order that we will encounter the count and size, so
+                            // we save them until we've iterated through all the fields before
+                            // updating unscaledCollSize Timeseries bucket collection does not
+                            // provide 'count' or 'avgObjSize'.
+                            BSONElement countField = res.getField("count");
+                            const auto shardObjCount =
+                                static_cast<long long>(!countField.eoo() ? countField.Number() : 0);
 
-                                if (myIndexes > nindexes)
-                                    nindexes = myIndexes;
+                            for (const auto& e : res) {
+                                StringData fieldName = e.fieldNameStringData();
+                                if (fieldIsAnyOf(fieldName,
+                                                 {"ns", "ok", "lastExtentSize", "paddingFactor"})) {
+                                    continue;
+                                }
+                                if (fieldIsAnyOf(fieldName,
+                                                 {"userFlags",
+                                                  "capped",
+                                                  "max",
+                                                  "paddingFactorNote",
+                                                  "indexDetails",
+                                                  "wiredTiger"})) {
+                                    // Fields that are copied from the first shard only, because
+                                    // they need to match across shards
+                                    if (!result.hasField(e.fieldName()))
+                                        result.append(e);
+                                } else if (fieldName == "timeseries") {
+                                    aggregateTimeseriesStats(e.Obj(),
+                                                             &clusterTimeseriesStats,
+                                                             &timeseriesBucketsNs,
+                                                             &timeseriesTotalBucketSize);
+                                } else if (fieldIsAnyOf(fieldName,
+                                                        {"count",
+                                                         "size",
+                                                         "storageSize",
+                                                         "totalIndexSize",
+                                                         "totalSize"})) {
+                                    counts[e.fieldName()] += e.numberLong();
+                                } else if (fieldName == "avgObjSize") {
+                                    const auto shardAvgObjSize = e.numberLong();
+                                    uassert(5688300,
+                                            "'avgObjSize' provided but not 'count'",
+                                            !countField.eoo());
+                                    unscaledCollSize += shardAvgObjSize * shardObjCount;
+                                } else if (fieldName == "maxSize") {
+                                    const auto shardMaxSize = e.numberLong();
+                                    maxSize = std::max(maxSize, shardMaxSize);
+                                } else if (fieldName == "indexSizes") {
+                                    BSONObjIterator k(e.Obj());
+                                    while (k.more()) {
+                                        BSONElement temp = k.next();
+                                        indexSizes[temp.fieldName()] += temp.numberLong();
+                                    }
+                                } else if (fieldName == "nindexes") {
+                                    int myIndexes = e.numberInt();
 
-                                if (!warnedAboutIndexes) {
-                                    result.append(
-                                        "warning",
-                                        "indexes don't all match - ok if ensureIndex is running");
-                                    warnedAboutIndexes = true;
+                                    if (nindexes == 0) {
+                                        nindexes = myIndexes;
+                                    } else if (nindexes == myIndexes) {
+                                        // no-op
+                                    } else {
+                                        // hopefully this means we're building an index
+
+                                        if (myIndexes > nindexes)
+                                            nindexes = myIndexes;
+
+                                        if (!warnedAboutIndexes) {
+                                            result.append("warning",
+                                                          "indexes don't all match - ok if "
+                                                          "ensureIndex is running");
+                                            warnedAboutIndexes = true;
+                                        }
+                                    }
+                                } else {
+                                    LOGV2(22749,
+                                          "Unexpected field for mongos collStats",
+                                          "fieldName"_attr = e.fieldName());
                                 }
                             }
-                        } else {
-                            LOGV2(22749,
-                                  "Unexpected field for mongos collStats",
-                                  "fieldName"_attr = e.fieldName());
+
+                            shardStats.append(shardId.toString(),
+                                              scaleIndividualShardStatistics(res, scale));
                         }
-                    }
 
-                    shardStats.append(shardId.toString(),
-                                      scaleIndividualShardStatistics(res, scale));
-                }
+                        result.append("ns",
+                                      NamespaceStringUtil::serialize(
+                                          nss, SerializationContext::stateDefault()));
 
-                result.append(
-                    "ns",
-                    NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
+                        for (const auto& countEntry : counts) {
+                            if (fieldIsAnyOf(
+                                    countEntry.first,
+                                    {"size", "storageSize", "totalIndexSize", "totalSize"})) {
+                                result.appendNumber(countEntry.first, countEntry.second / scale);
+                            } else {
+                                result.appendNumber(countEntry.first, countEntry.second);
+                            }
+                        }
 
-                for (const auto& countEntry : counts) {
-                    if (fieldIsAnyOf(countEntry.first,
-                                     {"size", "storageSize", "totalIndexSize", "totalSize"})) {
-                        result.appendNumber(countEntry.first, countEntry.second / scale);
-                    } else {
-                        result.appendNumber(countEntry.first, countEntry.second);
-                    }
-                }
+                        if (!clusterTimeseriesStats.empty() || !timeseriesBucketsNs.empty()) {
+                            // 'clusterTimeseriesStats' and 'timeseriesBucketsNs' should both be
+                            // set. If only one is ever set, the error will be caught in
+                            // appendTimeseriesInfoToResult().
+                            appendTimeseriesInfoToResult(
+                                clusterTimeseriesStats, timeseriesBucketsNs, &result);
+                        }
 
-                if (!clusterTimeseriesStats.empty() || !timeseriesBucketsNs.empty()) {
-                    // 'clusterTimeseriesStats' and 'timeseriesBucketsNs' should both be set. If
-                    // only one is ever set, the error will be caught in
-                    // appendTimeseriesInfoToResult().
-                    appendTimeseriesInfoToResult(
-                        clusterTimeseriesStats, timeseriesBucketsNs, &result);
-                }
+                        {
+                            BSONObjBuilder ib(result.subobjStart("indexSizes"));
+                            for (const auto& entry : indexSizes) {
+                                ib.appendNumber(entry.first, entry.second / scale);
+                            }
+                            ib.done();
+                        }
 
-                {
-                    BSONObjBuilder ib(result.subobjStart("indexSizes"));
-                    for (const auto& entry : indexSizes) {
-                        ib.appendNumber(entry.first, entry.second / scale);
-                    }
-                    ib.done();
-                }
+                        // The unscaled avgObjSize for each shard is used to get the
+                        // unscaledCollSize because the raw size returned by the shard is affected
+                        // by the command's scale parameter
+                        if (counts["count"] > 0)
+                            result.append("avgObjSize",
+                                          (double)unscaledCollSize / (double)counts["count"]);
+                        else
+                            result.append("avgObjSize", 0.0);
 
-                // The unscaled avgObjSize for each shard is used to get the unscaledCollSize
-                // because the raw size returned by the shard is affected by the command's scale
-                // parameter
-                if (counts["count"] > 0)
-                    result.append("avgObjSize", (double)unscaledCollSize / (double)counts["count"]);
-                else
-                    result.append("avgObjSize", 0.0);
+                        result.append("maxSize", maxSize / scale);
+                        result.append("nindexes", nindexes);
+                        result.append("scaleFactor", scale);
+                        result.append("nchunks", cm.numChunks());
+                        result.append("shards", shardStats.obj());
 
-                result.append("maxSize", maxSize / scale);
-                result.append("nindexes", nindexes);
-                result.append("scaleFactor", scale);
-                result.append("nchunks", cm.numChunks());
-                result.append("shards", shardStats.obj());
-
-                return true;
+                        return true;
+                    });
             });
     }
 };

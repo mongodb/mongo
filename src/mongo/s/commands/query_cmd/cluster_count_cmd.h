@@ -170,196 +170,233 @@ public:
         Impl::checkCanRunHere(opCtx);
 
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-        NamespaceString nss(parseNs(dbName, originalCmdObj));
+        const NamespaceString originalNss(parseNs(dbName, originalCmdObj));
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg()
-                              << "'",
-                nss.isValid());
+                str::stream() << "Invalid namespace specified '"
+                              << originalNss.toStringForErrorMsg() << "'",
+                originalNss.isValid());
 
-        // Specifies whether or not we ultimately request query stats from each shard.
-        bool requestQueryStats = false;
-
-        std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
-            auto cmdObj = translateCmdObjForRawData(opCtx, originalCmdObj, nss);
-            auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
+            sharding::router::CollectionRouter router{opCtx->getServiceContext(), originalNss};
+            return router.routeWithRoutingContext(
+                opCtx, getName(), [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
+                    // Clear the bodyBuilder since this lambda function may be retried if the router
+                    // cache is stale.
+                    result.resetToEmpty();
 
-            RoutingContext routingCtx(opCtx, {nss});
-            const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
+                    // Transform the nss, routingCtx and cmdObj if the 'rawData' field is enabled
+                    // and the collection is timeseries.
+                    BSONObj cmdObj = originalCmdObj;
+                    auto nss = originalNss;
+                    const auto targeter = CollectionRoutingInfoTargeter(opCtx, nss);
+                    auto& routingCtx = translateNssForRawDataAccordingToRoutingInfo(
+                        opCtx,
+                        originalNss,
+                        targeter,
+                        originalRoutingCtx,
+                        [&](const NamespaceString& translatedNss) {
+                            cmdObj = rewriteCommandForRawDataOperation<CountCommandRequest>(
+                                cmdObj, translatedNss.coll());
+                            nss = translatedNss;
+                        });
 
-            {
-                // This scope is used to end the use of the builder whether or not we convert to a
-                // view-less timeseries aggregate request.
-                auto aggResult = BSONObjBuilder{};
+                    auto countRequest =
+                        CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
 
-                if (convertAndRunAggregateIfViewlessTimeseries(
-                        opCtx, routingCtx, aggResult, countRequest, nss)) {
-                    ViewResponseFormatter{aggResult.obj()}.appendAsCountResponse(
-                        &result, boost::none /*tenantId*/);
-                    // We've delegated execution to agg.
-                    routingCtx.validateOnContextEnd();
+                    {
+                        // This scope is used to end the use of the builder whether or not we
+                        // convert to a view-less timeseries aggregate request.
+                        auto aggResult = BSONObjBuilder{};
+
+                        if (convertAndRunAggregateIfViewlessTimeseries(
+                                opCtx, routingCtx, aggResult, countRequest, nss)) {
+                            ViewResponseFormatter{aggResult.obj()}.appendAsCountResponse(
+                                &result, boost::none /*tenantId*/);
+                            return true;
+                        }
+                    }
+
+                    // Create an RAII object that prints the collection's shard key in the case of a
+                    // tassert or crash.
+                    const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
+                    ScopedDebugInfo shardKeyDiagnostics(
+                        "ShardKeyDiagnostics",
+                        diagnostic_printers::ShardKeyDiagnosticPrinter{
+                            cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON()
+                                            : BSONObj()});
+
+                    const auto collation = countRequest.getCollation().get_value_or(BSONObj());
+
+                    if (prepareForFLERewrite(opCtx, countRequest.getEncryptionInformation())) {
+                        processFLECountS(opCtx, nss, countRequest);
+                    }
+
+                    const auto expCtx = makeExpressionContextWithDefaultsForTargeter(
+                        opCtx,
+                        nss,
+                        cri,
+                        collation,
+                        boost::none /*explainVerbosity*/,
+                        boost::none /*letParameters*/,
+                        boost::none /*runtimeConstants*/);
+
+                    // Create an RAII object that prints useful information about the
+                    // ExpressionContext in the case of a tassert or crash.
+                    ScopedDebugInfo expCtxDiagnostics(
+                        "ExpCtxDiagnostics", diagnostic_printers::ExpressionContextPrinter{expCtx});
+
+                    const auto parsedFind = uassertStatusOK(parsed_find_command::parseFromCount(
+                        expCtx, countRequest, ExtensionsCallbackNoop(), nss));
+
+                    if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabled(
+                            VersionContext::getDecoration(opCtx),
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                        query_stats::registerRequest(opCtx, nss, [&]() {
+                            return std::make_unique<query_stats::CountKey>(
+                                expCtx,
+                                *parsedFind,
+                                countRequest.getLimit().has_value(),
+                                countRequest.getSkip().has_value(),
+                                countRequest.getReadConcern(),
+                                countRequest.getMaxTimeMS().has_value());
+                        });
+                    }
+
+                    // We only need to factor in the skip value when sending to the shards if we
+                    // have a value for limit, otherwise, we apply it only once we have collected
+                    // all counts.
+                    if (countRequest.getLimit() && countRequest.getSkip()) {
+                        const auto limit = countRequest.getLimit().value();
+                        const auto skip = countRequest.getSkip().value();
+                        if (limit != 0) {
+                            std::int64_t sum = 0;
+                            uassert(ErrorCodes::Overflow,
+                                    str::stream() << "Overflow on the count command: The sum of "
+                                                     "the limit and skip "
+                                                     "fields must fit into a long integer. Limit: "
+                                                  << limit << "   Skip: " << skip,
+                                    !overflow::add(limit, skip, &sum));
+                            countRequest.setLimit(sum);
+                        }
+                    }
+                    countRequest.setSkip(boost::none);
+
+                    // The includeQueryStatsMetrics field is not supported on mongos for the count
+                    // command, so we do not need to check the value on the original request when
+                    // updating requestQueryStats here.
+                    bool requestQueryStats =
+                        query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug());
+
+                    std::vector<AsyncRequestsSender::Response> shardResponses;
+                    try {
+                        shardResponses = scatterGatherVersionedTargetByRoutingTable(
+                            expCtx,
+                            routingCtx,
+                            nss,
+                            applyReadWriteConcern(opCtx,
+                                                  this,
+                                                  prepareCountForPassthrough(countRequest.toBSON(),
+                                                                             requestQueryStats)),
+                            ReadPreferenceSetting::get(opCtx),
+                            Shard::RetryPolicy::kIdempotent,
+                            countRequest.getQuery(),
+                            collation,
+                            true /*eligibleForSampling*/);
+
+                    } catch (
+                        const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>&
+                            ex) {
+                        // Rewrite the count command as an aggregation.
+                        auto countRequest =
+                            CountCommandRequest::parse(IDLParserContext("count"), originalCmdObj);
+                        auto aggRequestOnView =
+                            query_request_conversion::asAggregateCommandRequest(countRequest);
+                        auto resolvedAggRequest = ex->asExpandedViewAggregation(
+                            VersionContext::getDecoration(opCtx), aggRequestOnView);
+
+                        BSONObj aggResult = CommandHelpers::runCommandDirectly(
+                            opCtx,
+                            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx),
+                                                        dbName,
+                                                        resolvedAggRequest.toBSON()));
+
+                        result.resetToEmpty();
+                        ViewResponseFormatter{aggResult}.appendAsCountResponse(
+                            &result, boost::none /*tenantId*/);
+                        return true;
+                    }
+
+                    long long total = 0;
+                    bool allShardMetricsReturned = true;
+                    BSONObjBuilder shardSubTotal(result.subobjStart("shards"));
+
+                    for (const auto& response : shardResponses) {
+                        auto status = response.swResponse.getStatus();
+                        if (status.isOK()) {
+                            status =
+                                getStatusFromCommandResult(response.swResponse.getValue().data);
+                            if (status.isOK()) {
+                                const BSONObj& data = response.swResponse.getValue().data;
+                                const long long shardCount = data["n"].numberLong();
+                                shardSubTotal.appendNumber(response.shardId.toString(), shardCount);
+                                total += shardCount;
+
+                                // We aggregate the metrics from all the shards. If any shard does
+                                // not include metrics, we avoid collecting the remote metrics for
+                                // the entire query and do not write an entry to the query stats
+                                // store. Note that we do not expect shards to fail to collect
+                                // metrics for the count command; this is just thorough error
+                                // handling.
+                                BSONElement shardMetrics = data["metrics"];
+                                if (allShardMetricsReturned &= shardMetrics.isABSONObj()) {
+                                    const auto metrics = CursorMetrics::parse(
+                                        IDLParserContext("CursorMetrics"), shardMetrics.Obj());
+                                    CurOp::get(opCtx)
+                                        ->debug()
+                                        .additiveMetrics.aggregateCursorMetrics(metrics);
+                                }
+                                continue;
+                            }
+                        }
+
+                        shardSubTotal.doneFast();
+                        // Add error context so that you can see on which shard failed as well as
+                        // details about that error.
+                        uassertStatusOK(
+                            status.withContext(str::stream() << "failed on: " << response.shardId));
+                    }
+
+                    shardSubTotal.doneFast();
+                    total = applySkipLimit(total, originalCmdObj);
+                    result.appendNumber("n", total);
+
+                    // The # of documents returned is always 1 for the count command.
+                    static constexpr long long kNReturned = 1;
+
+                    auto* curOp = CurOp::get(opCtx);
+                    curOp->setEndOfOpMetrics(kNReturned);
+
+                    if (allShardMetricsReturned) {
+                        collectQueryStatsMongos(opCtx,
+                                                std::move(curOp->debug().queryStatsInfo.key));
+                    }
+
                     return true;
-                }
-            }
-
-            // Create an RAII object that prints the collection's shard key in the case of a
-            // tassert or crash.
-            ScopedDebugInfo shardKeyDiagnostics(
-                "ShardKeyDiagnostics",
-                diagnostic_printers::ShardKeyDiagnosticPrinter{
-                    cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON()
-                                    : BSONObj()});
-
-            const auto collation = countRequest.getCollation().get_value_or(BSONObj());
-
-            if (prepareForFLERewrite(opCtx, countRequest.getEncryptionInformation())) {
-                processFLECountS(opCtx, nss, countRequest);
-            }
-
-            const auto expCtx =
-                makeExpressionContextWithDefaultsForTargeter(opCtx,
-                                                             nss,
-                                                             cri,
-                                                             collation,
-                                                             boost::none /*explainVerbosity*/,
-                                                             boost::none /*letParameters*/,
-                                                             boost::none /*runtimeConstants*/);
-
-            // Create an RAII object that prints useful information about the
-            // ExpressionContext in the case of a tassert or crash.
-            ScopedDebugInfo expCtxDiagnostics(
-                "ExpCtxDiagnostics", diagnostic_printers::ExpressionContextPrinter{expCtx});
-
-            const auto parsedFind = uassertStatusOK(parsed_find_command::parseFromCount(
-                expCtx, countRequest, ExtensionsCallbackNoop(), nss));
-
-            if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabled(
-                    VersionContext::getDecoration(opCtx),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                query_stats::registerRequest(opCtx, nss, [&]() {
-                    return std::make_unique<query_stats::CountKey>(
-                        expCtx,
-                        *parsedFind,
-                        countRequest.getLimit().has_value(),
-                        countRequest.getSkip().has_value(),
-                        countRequest.getReadConcern(),
-                        countRequest.getMaxTimeMS().has_value());
                 });
-            }
-
-            // We only need to factor in the skip value when sending to the shards if we
-            // have a value for limit, otherwise, we apply it only once we have collected
-            // all counts.
-            if (countRequest.getLimit() && countRequest.getSkip()) {
-                const auto limit = countRequest.getLimit().value();
-                const auto skip = countRequest.getSkip().value();
-                if (limit != 0) {
-                    std::int64_t sum = 0;
-                    uassert(ErrorCodes::Overflow,
-                            str::stream() << "Overflow on the count command: The sum of "
-                                             "the limit and skip "
-                                             "fields must fit into a long integer. Limit: "
-                                          << limit << "   Skip: " << skip,
-                            !overflow::add(limit, skip, &sum));
-                    countRequest.setLimit(sum);
-                }
-            }
-            countRequest.setSkip(boost::none);
-
-            // The includeQueryStatsMetrics field is not supported on mongos for the count
-            // command, so we do not need to check the value on the original request when
-            // updating requestQueryStats here.
-            requestQueryStats = query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug());
-
-            shardResponses = scatterGatherVersionedTargetByRoutingTable(
-                expCtx,
-                routingCtx,
-                nss,
-                applyReadWriteConcern(
-                    opCtx,
-                    this,
-                    prepareCountForPassthrough(countRequest.toBSON(), requestQueryStats)),
-                ReadPreferenceSetting::get(opCtx),
-                Shard::RetryPolicy::kIdempotent,
-                countRequest.getQuery(),
-                collation,
-                true /*eligibleForSampling*/);
-
-            routingCtx.validateOnContextEnd();
-        } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
-            // Rewrite the count command as an aggregation.
-            auto countRequest =
-                CountCommandRequest::parse(IDLParserContext("count"), originalCmdObj);
-            auto aggRequestOnView =
-                query_request_conversion::asAggregateCommandRequest(countRequest);
-            auto resolvedAggRequest = ex->asExpandedViewAggregation(
-                VersionContext::getDecoration(opCtx), aggRequestOnView);
-
-            BSONObj aggResult = CommandHelpers::runCommandDirectly(
-                opCtx,
-                OpMsgRequestBuilder::create(
-                    auth::ValidatedTenancyScope::get(opCtx), dbName, resolvedAggRequest.toBSON()));
-
-            result.resetToEmpty();
-            ViewResponseFormatter{aggResult}.appendAsCountResponse(&result,
-                                                                   boost::none /*tenantId*/);
-            return true;
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            result.resetToEmpty();
+
             // If there's no collection with this name, the count aggregation behavior below
             // will produce a total count of 0.
-            shardResponses = {};
-        }
+            result.appendNumber("n", 0);
 
-        long long total = 0;
-        bool allShardMetricsReturned = true;
-        BSONObjBuilder shardSubTotal(result.subobjStart("shards"));
+            // The # of documents returned is always 1 for the count command.
+            auto* curOp = CurOp::get(opCtx);
+            curOp->setEndOfOpMetrics(1);
 
-        for (const auto& response : shardResponses) {
-            auto status = response.swResponse.getStatus();
-            if (status.isOK()) {
-                status = getStatusFromCommandResult(response.swResponse.getValue().data);
-                if (status.isOK()) {
-                    const BSONObj& data = response.swResponse.getValue().data;
-                    const long long shardCount = data["n"].numberLong();
-                    shardSubTotal.appendNumber(response.shardId.toString(), shardCount);
-                    total += shardCount;
-
-                    // We aggregate the metrics from all the shards. If any shard does not include
-                    // metrics, we avoid collecting the remote metrics for the entire query and do
-                    // not write an entry to the query stats store. Note that we do not expect
-                    // shards to fail to collect metrics for the count command; this is just
-                    // thorough error handling.
-                    BSONElement shardMetrics = data["metrics"];
-                    if (allShardMetricsReturned &= shardMetrics.isABSONObj()) {
-                        const auto metrics = CursorMetrics::parse(IDLParserContext("CursorMetrics"),
-                                                                  shardMetrics.Obj());
-                        CurOp::get(opCtx)->debug().additiveMetrics.aggregateCursorMetrics(metrics);
-                    }
-                    continue;
-                }
-            }
-
-            shardSubTotal.doneFast();
-            // Add error context so that you can see on which shard failed as well as details
-            // about that error.
-            uassertStatusOK(status.withContext(str::stream() << "failed on: " << response.shardId));
-        }
-
-        shardSubTotal.doneFast();
-        total = applySkipLimit(total, originalCmdObj);
-        result.appendNumber("n", total);
-
-        // The # of documents returned is always 1 for the count command.
-        static constexpr long long kNReturned = 1;
-
-        auto* curOp = CurOp::get(opCtx);
-        curOp->setEndOfOpMetrics(kNReturned);
-
-        if (allShardMetricsReturned) {
             collectQueryStatsMongos(opCtx, std::move(curOp->debug().queryStatsInfo.key));
+            return true;
         }
-
-        return true;
     }
 
     Status explain(OperationContext* opCtx,
@@ -373,26 +410,48 @@ public:
         auto curOp = CurOp::get(opCtx);
         curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
 
-        auto nss = parseNs(request.parseDbName(), originalCmdObj);
+        const auto originalNss = parseNs(request.parseDbName(), originalCmdObj);
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg()
-                              << "'",
-                nss.isValid());
+                str::stream() << "Invalid namespace specified '"
+                              << originalNss.toStringForErrorMsg() << "'",
+                originalNss.isValid());
 
-        auto cmdObj = translateCmdObjForRawData(opCtx, originalCmdObj, nss);
-        CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString{}));
-        try {
-            countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
-        } catch (...) {
-            return exceptionToStatus();
-        }
+        sharding::router::CollectionRouter router{opCtx->getServiceContext(), originalNss};
+        return router.routeWithRoutingContext(
+            opCtx,
+            "explain count"_sd,
+            [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
+                // Clear the bodyBuilder since this lambda function may be retried if the router
+                // cache is stale.
+                result->getBodyBuilder().resetToEmpty();
 
-        return routing_context_utils::withValidatedRoutingContext(
-            opCtx, {nss}, [&](RoutingContext& routingCtx) {
-                const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
+                // Transform the nss, routingCtx and cmdObj if the 'rawData' field is enabled and
+                // the collection is timeseries.
+                BSONObj cmdObj = originalCmdObj;
+                auto nss = originalNss;
+                const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
+                auto& routingCtx = translateNssForRawDataAccordingToRoutingInfo(
+                    opCtx,
+                    originalNss,
+                    targeter,
+                    originalRoutingCtx,
+                    [&](const NamespaceString& translatedNss) {
+                        cmdObj = rewriteCommandForRawDataOperation<CountCommandRequest>(
+                            cmdObj, translatedNss.coll());
+                        nss = translatedNss;
+                    });
+
+                CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString{}));
+                try {
+                    countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
+                } catch (...) {
+                    routingCtx.skipValidation();
+                    return exceptionToStatus();
+                }
 
                 // Create an RAII object that prints the collection's shard key in the case of a
                 // tassert or crash.
+                const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
                 ScopedDebugInfo shardKeyDiagnostics(
                     "ShardKeyDiagnostics",
                     diagnostic_printers::ShardKeyDiagnosticPrinter{
@@ -519,18 +578,6 @@ private:
         }
 
         return num;
-    }
-
-    static BSONObj translateCmdObjForRawData(OperationContext* opCtx,
-                                             const BSONObj& cmdObj,
-                                             NamespaceString& ns) {
-        if (!OptionalBool::parseFromBSON(cmdObj[CountCommandRequest::kRawDataFieldName]) ||
-            !CollectionRoutingInfoTargeter{opCtx, ns}.timeseriesNamespaceNeedsRewrite(ns)) {
-            return cmdObj;
-        }
-
-        ns = ns.makeTimeseriesBucketsNamespace();
-        return rewriteCommandForRawDataOperation<CountCommandRequest>(cmdObj, ns.coll());
     }
 };
 

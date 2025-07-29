@@ -148,29 +148,44 @@ public:
         ListIndexesReply typedRun(OperationContext* opCtx) final {
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
-            // The command's IDL definition permits namespace or UUID, but mongos requires a
-            // namespace.
-            auto targeter = CollectionRoutingInfoTargeter(opCtx, ns());
-            return routing_context_utils::runAndValidate(
-                targeter.getRoutingCtx(), [&](RoutingContext& routingCtx) {
-                    auto& cmd = request();
-                    setReadWriteConcern(opCtx, cmd, this);
-                    auto cmdToBeSent = cmd.toBSON();
-                    if (targeter.timeseriesNamespaceNeedsRewrite(ns())) {
-                        cmdToBeSent = timeseries::makeTimeseriesCommand(
-                            cmdToBeSent,
-                            ns(),
-                            ListIndexes::kCommandName,
-                            ListIndexes::kIsTimeseriesNamespaceFieldName);
-                    }
+            sharding::router::CollectionRouter router{opCtx->getServiceContext(), ns()};
+            return router.routeWithRoutingContext(
+                opCtx,
+                Request::kCommandName,
+                [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
+                    // The CollectionRouter is not capable of implicitly translate the namespace to
+                    // a timeseries buckets collection, which is required in this command. Hence,
+                    // we'll use the CollectionRouter to handle StaleConfig errors but will ignore
+                    // its RoutingContext. Instead, we'll use a CollectionRoutingInfoTargeter object
+                    // to properly get the RoutingContext when the collection is timeseries.
+                    // TODO (SPM-3830) Use the RoutingContext provided by the CollectionRouter once
+                    // all timeseries collections become viewless.
+                    unusedRoutingCtx.skipValidation();
 
-                    return cursorCommandPassthroughShardWithMinKeyChunk(
-                        opCtx,
-                        routingCtx,
-                        targeter.getNS(),
-                        cmdToBeSent,
-                        {Privilege(ResourcePattern::forExactNamespace(ns()),
-                                   ActionType::listIndexes)});
+                    // The command's IDL definition permits namespace or UUID, but mongos requires a
+                    // namespace.
+                    auto targeter = CollectionRoutingInfoTargeter(opCtx, ns());
+                    return routing_context_utils::runAndValidate(
+                        targeter.getRoutingCtx(), [&](RoutingContext& routingCtx) {
+                            auto& cmd = request();
+                            setReadWriteConcern(opCtx, cmd, this);
+                            auto cmdToBeSent = cmd.toBSON();
+                            if (targeter.timeseriesNamespaceNeedsRewrite(ns())) {
+                                cmdToBeSent = timeseries::makeTimeseriesCommand(
+                                    cmdToBeSent,
+                                    ns(),
+                                    ListIndexes::kCommandName,
+                                    ListIndexes::kIsTimeseriesNamespaceFieldName);
+                            }
+
+                            return cursorCommandPassthroughShardWithMinKeyChunk(
+                                opCtx,
+                                routingCtx,
+                                targeter.getNS(),
+                                cmdToBeSent,
+                                {Privilege(ResourcePattern::forExactNamespace(ns()),
+                                           ActionType::listIndexes)});
+                        });
                 });
         }
     };

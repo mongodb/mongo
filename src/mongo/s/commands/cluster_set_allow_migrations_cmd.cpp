@@ -84,18 +84,22 @@ public:
             shardsvrRequest.setSetAllowMigrationsRequest(allowMigrationsRequest);
             generic_argument_util::setMajorityWriteConcern(shardsvrRequest);
 
-            auto catalogCache = Grid::get(opCtx)->catalogCache();
-            const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.dbName()));
-            auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-                opCtx,
-                nss.dbName(),
-                dbInfo,
-                shardsvrRequest.toBSON(),
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kIdempotent);
+            sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+            router.route(opCtx,
+                         Request::kCommandParameterFieldName,
+                         [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+                             auto cmdResponse =
+                                 executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                                     opCtx,
+                                     nss.dbName(),
+                                     dbInfo,
+                                     shardsvrRequest.toBSON(),
+                                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                     Shard::RetryPolicy::kIdempotent);
 
-            const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-            uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+                             const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+                             uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+                         });
         }
 
         NamespaceString ns() const override {

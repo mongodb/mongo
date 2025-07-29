@@ -67,21 +67,25 @@ public:
                   "toShard"_attr = request().getToShard().has_value() ? request().getToShard().get()
                                                                       : ShardId());
 
-            const auto dbInfo =
-                uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
-
             generic_argument_util::setMajorityWriteConcern(unshardCollectionRequest,
                                                            &opCtx->getWriteConcern());
-            auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-                opCtx,
-                DatabaseName::kAdmin,
-                dbInfo,
-                unshardCollectionRequest.toBSON(),
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kIdempotent);
 
-            const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-            uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+            sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+            router.route(opCtx,
+                         Request::kCommandParameterFieldName,
+                         [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+                             auto cmdResponse =
+                                 executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                                     opCtx,
+                                     DatabaseName::kAdmin,
+                                     dbInfo,
+                                     unshardCollectionRequest.toBSON(),
+                                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                     Shard::RetryPolicy::kIdempotent);
+
+                             const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+                             uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+                         });
         }
 
     private:

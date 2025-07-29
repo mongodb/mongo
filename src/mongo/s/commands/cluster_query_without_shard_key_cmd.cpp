@@ -422,8 +422,11 @@ public:
             // Get all shard ids for shards that have chunks in the desired namespace.
             hangBeforeMetadataRefreshClusterQuery.pauseWhileSet(opCtx);
 
-            return routing_context_utils::withValidatedRoutingContextForTxnCmd(
-                opCtx, {nss}, [&](RoutingContext& routingCtx) {
+            sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+            return router.routeWithRoutingContext(
+                opCtx,
+                Request::kCommandName,
+                [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                     const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
                     auto allShardsContainingChunksForNs =
@@ -590,8 +593,11 @@ public:
 
             // Get all shard ids for shards that have chunks in the desired namespace.
             const auto& nss = parsedInfoFromRequest.nss;
-            return routing_context_utils::withValidatedRoutingContextForTxnCmd(
-                opCtx, {nss}, [&](RoutingContext& routingCtx) {
+            sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+            return router.routeWithRoutingContext(
+                opCtx,
+                "explain queryWithoutShardKey"_sd,
+                [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                     const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
                     auto allShardsContainingChunksForNs =

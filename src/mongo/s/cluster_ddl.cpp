@@ -263,34 +263,44 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
         }
         return request.toBSON();
     }();
-    auto cmdResponse = [&]() {
-        // TODO (SERVER-100309): remove againstFirstShard option once 9.0 becomes last LTS.
-        if (againstFirstShard)
-            return executeCommandAgainstFirstShard(
-                opCtx,
-                nss.dbName(),
-                nss,
-                dbInfo,
-                cmdObjWithWc,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kIdempotent);
-        else {
-            return executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-                opCtx,
-                nss.dbName(),
-                dbInfo,
-                cmdObjWithWc,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kIdempotent);
-        }
-    }();
 
-    const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-    uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
-    uassertStatusOK(getWriteConcernStatusFromCommandResult(remoteResponse.data));
+    boost::optional<executor::RemoteCommandResponse> remoteResponse;
 
+    // TODO (SERVER-100309): remove againstFirstShard option once 9.0 becomes last LTS.
+    if (againstFirstShard) {
+        const auto cmdResponse =
+            executeCommandAgainstFirstShard(opCtx,
+                                            nss.dbName(),
+                                            nss,
+                                            dbInfo,
+                                            cmdObjWithWc,
+                                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                            Shard::RetryPolicy::kIdempotent);
+        remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+        uassertStatusOK(getStatusFromCommandResult(remoteResponse->data));
+        uassertStatusOK(getWriteConcernStatusFromCommandResult(remoteResponse->data));
+
+    } else {
+        sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+        router.route(
+            opCtx,
+            "createCollection"_sd,
+            [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+                const auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                    opCtx,
+                    nss.dbName(),
+                    dbInfo,
+                    cmdObjWithWc,
+                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                    Shard::RetryPolicy::kIdempotent);
+
+                remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+                uassertStatusOK(getStatusFromCommandResult(remoteResponse->data));
+                uassertStatusOK(getWriteConcernStatusFromCommandResult(remoteResponse->data));
+            });
+    }
     auto createCollResp =
-        CreateCollectionResponse::parse(IDLParserContext("createCollection"), remoteResponse.data);
+        CreateCollectionResponse::parse(IDLParserContext("createCollection"), remoteResponse->data);
 
     auto catalogCache = Grid::get(opCtx)->catalogCache();
     catalogCache->onStaleCollectionVersion(nss, createCollResp.getCollectionVersion());

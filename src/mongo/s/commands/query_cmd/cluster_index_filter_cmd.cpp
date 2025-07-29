@@ -119,8 +119,13 @@ public:
         const NamespaceString nss(parseNs(dbName, cmdObj));
         const BSONObj query;
 
-        return routing_context_utils::withValidatedRoutingContext(
-            opCtx, {nss}, [&](RoutingContext& routingCtx) {
+        sharding::router::CollectionRouter router{opCtx->getServiceContext(), nss};
+        return router.routeWithRoutingContext(
+            opCtx, getName(), [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+                // Clear the result builder since this lambda function may be retried if the router
+                // cache is stale.
+                result.resetToEmpty();
+
                 auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
                     routingCtx,

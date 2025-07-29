@@ -141,50 +141,61 @@ public:
                     ->isAuthorizedForActionsOnResource(
                         ResourcePattern::forClusterResource(fromNss.tenantId()),
                         ActionType::setUserWriteBlockMode));
+            generic_argument_util::setMajorityWriteConcern(renameCollRequest);
 
-            auto catalogCache = Grid::get(opCtx)->catalogCache();
-            auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, fromNss.dbName());
-            if (swDbInfo == ErrorCodes::NamespaceNotFound) {
+            sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), fromNss.dbName());
+
+            try {
+                router.route(
+                    opCtx,
+                    Request::kCommandName,
+                    [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+                        // Creates the destination database if it doesn't exist already.
+                        cluster::createDatabase(opCtx, toNss.dbName(), dbInfo->getPrimary());
+
+                        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                            &renameWaitAfterDatabaseCreation,
+                            opCtx,
+                            "renameWaitAfterDatabaseCreation",
+                            []() {
+                                LOGV2(8433001,
+                                      "Hanging rename due to 'renameWaitAfterDatabaseCreation' "
+                                      "failpoint");
+                            });
+
+                        auto cmdResponse =
+                            executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                                opCtx,
+                                fromNss.dbName(),
+                                dbInfo,
+                                renameCollRequest.toBSON(),
+                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                Shard::RetryPolicy::kNoRetry);
+
+                        const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+                        const auto resultObj =
+                            CommandHelpers::filterCommandReplyForPassthrough(remoteResponse.data);
+                        uassertStatusOK(getStatusFromWriteCommandReply(resultObj));
+
+                        auto renameCollResp = RenameCollectionResponse::parse(
+                            IDLParserContext("renameCollection"), resultObj);
+
+                        auto catalogCache = Grid::get(opCtx)->catalogCache();
+                        catalogCache->onStaleCollectionVersion(
+                            toNss, renameCollResp.getCollectionVersion());
+                        catalogCache->invalidateCollectionEntry_LINEARIZABLE(fromNss);
+                    });
+            } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                // Throw a CollectionUUIDMismatchInfo instead of a NamespaceNotFound error if the
+                // collectionUUID was provided.
                 uassert(CollectionUUIDMismatchInfo(fromNss.dbName(),
                                                    *request().getCollectionUUID(),
                                                    std::string{fromNss.coll()},
                                                    boost::none),
                         "Database does not exist",
                         !request().getCollectionUUID());
+                throw;
             }
-            const auto dbInfo = uassertStatusOK(swDbInfo);
-
-            auto shard = uassertStatusOK(
-                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbInfo->getPrimary()));
-
-            // Creates the destination database if it doesn't exist already.
-            cluster::createDatabase(opCtx, toNss.dbName(), shard->getId());
-
-            CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                &renameWaitAfterDatabaseCreation, opCtx, "renameWaitAfterDatabaseCreation", []() {
-                    LOGV2(8433001,
-                          "Hanging rename due to 'renameWaitAfterDatabaseCreation' "
-                          "failpoint");
-                });
-
-            generic_argument_util::setMajorityWriteConcern(renameCollRequest);
-            generic_argument_util::setDbVersionIfPresent(renameCollRequest, dbInfo->getVersion());
-
-            auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                fromNss.dbName(),
-                renameCollRequest.toBSON(),
-                Shard::RetryPolicy::kNoRetry));
-
-            uassertStatusOK(cmdResponse.commandStatus);
-
-            auto renameCollResp = RenameCollectionResponse::parse(
-                IDLParserContext("renameCollection"), cmdResponse.response);
-
-            catalogCache->onStaleCollectionVersion(toNss, renameCollResp.getCollectionVersion());
-
-            catalogCache->invalidateCollectionEntry_LINEARIZABLE(fromNss);
         }
 
         NamespaceString ns() const override {

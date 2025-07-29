@@ -79,8 +79,6 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             const NamespaceString& nss = ns();
-            const CachedDatabaseInfo dbInfo =
-                uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
 
             if (MONGO_unlikely(hangRefineCollectionShardKeyAfterRefresh.shouldFail())) {
                 LOGV2(22756, "Hit hangRefineCollectionShardKeyAfterRefresh failpoint");
@@ -97,16 +95,22 @@ public:
             generic_argument_util::setMajorityWriteConcern(refineCollectionShardKeyCommand,
                                                            &opCtx->getWriteConcern());
 
-            auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
-                opCtx,
-                nss.dbName(),
-                dbInfo,
-                refineCollectionShardKeyCommand.toBSON(),
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kIdempotent);
+            sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
+            router.route(opCtx,
+                         Request::kCommandParameterFieldName,
+                         [&](OperationContext* opCtx, const CachedDatabaseInfo& dbInfo) {
+                             auto cmdResponse =
+                                 executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                                     opCtx,
+                                     nss.dbName(),
+                                     dbInfo,
+                                     refineCollectionShardKeyCommand.toBSON(),
+                                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                     Shard::RetryPolicy::kIdempotent);
 
-            const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-            uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+                             const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+                             uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+                         });
         }
 
     private:
